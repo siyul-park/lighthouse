@@ -20,17 +20,6 @@ type uses struct {
 	list    []usage
 }
 
-func collectUses(u *unit, d *ast.FuncDecl) []usage {
-	w := &uses{
-		res:     u.res,
-		info:    u.info(),
-		handled: map[ast.Node]bool{},
-		seen:    map[usage]bool{},
-	}
-	ast.Walk(w, d.Body)
-	return w.list
-}
-
 func (w *uses) Visit(n ast.Node) ast.Visitor {
 	switch n := n.(type) {
 	case *ast.CallExpr:
@@ -152,6 +141,17 @@ func (w *uses) add(kind, to string) {
 		w.seen[u] = true
 		w.list = append(w.list, u)
 	}
+}
+
+func collectUses(u *unit, d *ast.FuncDecl) []usage {
+	w := &uses{
+		res:     u.res,
+		info:    u.info(),
+		handled: map[ast.Node]bool{},
+		seen:    map[usage]bool{},
+	}
+	ast.Walk(w, d.Body)
+	return w.list
 }
 
 // callee strips parentheses and explicit type arguments from a call's function.

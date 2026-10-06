@@ -15,6 +15,21 @@ type subtests struct {
 	deepest int
 }
 
+func (s *subtests) Visit(n ast.Node) ast.Visitor {
+	call, ok := n.(*ast.CallExpr)
+	if !ok || !isSubtest(call, s.info) {
+		return s
+	}
+	s.depth++
+	s.deepest = max(s.deepest, s.depth)
+	ast.Walk(s, call.Fun)
+	for _, arg := range call.Args {
+		ast.Walk(s, arg)
+	}
+	s.depth--
+	return nil
+}
+
 // testCaseOf describes the test entry point d, whose body references usages.
 func testCaseOf(d *ast.FuncDecl, id string, usages []usage, info *types.Info) sdk.TestCase {
 	style := styleScenario
@@ -32,21 +47,6 @@ func testCaseOf(d *ast.FuncDecl, id string, usages []usage, info *types.Info) sd
 	walker := &subtests{info: info}
 	ast.Walk(walker, d.Body)
 	return sdk.TestCase{Symbol: id, Nesting: walker.deepest, Style: style, Targets: targets}
-}
-
-func (s *subtests) Visit(n ast.Node) ast.Visitor {
-	call, ok := n.(*ast.CallExpr)
-	if !ok || !isSubtest(call, s.info) {
-		return s
-	}
-	s.depth++
-	s.deepest = max(s.deepest, s.depth)
-	ast.Walk(s, call.Fun)
-	for _, arg := range call.Args {
-		ast.Walk(s, arg)
-	}
-	s.depth--
-	return nil
 }
 
 // isSubtest reports a call of testing's Run with a function literal last.

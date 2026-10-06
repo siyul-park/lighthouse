@@ -29,14 +29,6 @@ const (
 	flowRecursion = "recursion"
 )
 
-func newFlow(d *ast.FuncDecl, info *types.Info) *flow {
-	f := &flow{info: info, events: []sdk.Flow{}}
-	if fn, ok := info.Defs[d.Name].(*types.Func); ok {
-		f.self = fn.Origin()
-	}
-	return f
-}
-
 func (f *flow) Visit(n ast.Node) ast.Visitor {
 	switch n := n.(type) {
 	case *ast.BlockStmt:
@@ -188,6 +180,14 @@ func (f *flow) walk(nodes ...ast.Node) {
 
 func (f *flow) event(kind string) {
 	f.events = append(f.events, sdk.Flow{Kind: kind, Nesting: f.nesting})
+}
+
+func newFlow(d *ast.FuncDecl, info *types.Info) *flow {
+	f := &flow{info: info, events: []sdk.Flow{}}
+	if fn, ok := info.Defs[d.Name].(*types.Func); ok {
+		f.self = fn.Origin()
+	}
+	return f
 }
 
 // switchArms counts the non-default arms of a switch or select; a switch
