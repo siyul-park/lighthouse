@@ -11,8 +11,8 @@ use rusqlite::{Connection, OptionalExtension, Row, Transaction, params, types::T
 use serde_json::{Value, json};
 
 use crate::{
-    Error, Filter, FindingRecord, NewReview, Observed, ReviewEvent, Run, RunSummary, StatusFilter,
-    migrations,
+    Error, Filter, FindingRecord, LatestReview, NewReview, Observed, ReviewEvent, Run, RunSummary,
+    StatusFilter, migrations,
 };
 
 /// File name of the database inside the store directory.
@@ -294,7 +294,10 @@ fn finding_record(row: &Row) -> rusqlite::Result<FindingRecord> {
     let verdict: Option<String> = row.get(13)?;
     let reason: Option<String> = row.get(14)?;
     let review = match (verdict, reason) {
-        (Some(verdict), Some(reason)) => Some((parse(13, &verdict)?, parse(14, &reason)?)),
+        (Some(verdict), Some(reason)) => Some(LatestReview {
+            verdict: parse(13, &verdict)?,
+            reason: parse(14, &reason)?,
+        }),
         _ => None,
     };
     Ok(FindingRecord {

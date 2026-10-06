@@ -9,15 +9,23 @@ use std::{
 use clap::{Parser, Subcommand};
 use lighthouse_config::FILE_NAME;
 use lighthouse_engine::Engine;
-use lighthouse_report::{Format, render};
+use lighthouse_report::{Briefing, Format, render_with};
+use review::ReviewCommand;
 use session::Session;
 
 mod docs;
+mod findings;
+mod git;
+mod review;
 mod rules;
 mod scope;
 mod session;
 
 const DEFAULT_CONFIG: &str = "plugins = [\"core\"]\nextends = [\"core/recommended\"]\n";
+
+/// What `init` keeps out of version control: the store is a local cache of
+/// one machine's checks and reviews.
+const STORE_IGNORE: &str = ".lighthouse/*.db*";
 
 #[derive(Parser)]
 #[command(name = "lighthouse", version, about = "Design-quality linter")]
@@ -57,8 +65,17 @@ enum Command {
         /// including the working tree and untracked files. A report filter.
         #[arg(long, value_name = "BASE")]
         diff: Option<String>,
+        /// text, json, sarif, agent (self-contained blocks for a coding agent)
+        /// or agent-json (the same records as JSON lines).
         #[arg(long, default_value = "text")]
         format: Format,
+        /// Do not record this run in `.lighthouse/lighthouse.db` and do not
+        /// apply review verdicts. By default a run is recorded: findings it
+        /// no longer reports in the reported scope are marked resolved (never
+        /// when the analysis was incomplete), and findings whose latest
+        /// verdict is a rejection stay out of the report.
+        #[arg(long)]
+        no_store: bool,
         /// Fail on warnings too.
         #[arg(long)]
         strict: bool,
@@ -72,6 +89,11 @@ enum Command {
         /// Use this config file; the project root is then the current directory.
         #[arg(long)]
         config: Option<PathBuf>,
+    },
+    /// Review the findings `check` remembers and record verdicts on them.
+    Review {
+        #[command(subcommand)]
+        command: ReviewCommand,
     },
     /// Inspect bundled rules.
     Rule {
@@ -131,6 +153,7 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 struct Options {
     format: Format,
+    store: bool,
     strict: bool,
     allow_incomplete: bool,
 }
@@ -158,6 +181,7 @@ fn run(cli: Cli) -> Result<u8> {
             changed,
             diff,
             format,
+            no_store,
             strict,
             allow_incomplete,
             rules,
@@ -170,12 +194,14 @@ fn run(cli: Cli) -> Result<u8> {
             },
             Options {
                 format,
+                store: !no_store,
                 strict,
                 allow_incomplete,
             },
             &rules,
             config.as_deref(),
         ),
+        Command::Review { command } => review::run(command),
         Command::Rule {
             command: RuleCommand::List { all },
         } => rules::list(all),
@@ -206,13 +232,16 @@ fn check(
     let session = Session::load(config)?;
     let (registry, plugins) = session.registry()?;
     let root = session.root.clone();
+    let catalog = briefed(options.format)
+        .then(|| session.catalog())
+        .transpose()?;
     let engine = Engine::new(registry, session.config, &root)?.with_incomplete(plugins.incomplete);
     let files = match (reported.changed, reported.diff) {
         (true, _) => Some(scope::changed(&root)?),
         (_, Some(base)) => Some(scope::since(&root, base)?),
         _ => None,
     };
-    let outcome = match files {
+    let mut outcome = match files {
         Some(files) => {
             let files = within(&root, paths, files)?;
             eprintln!(
@@ -237,11 +266,36 @@ fn check(
     for notice in &outcome.notices {
         eprintln!("lighthouse: {notice}");
     }
+    let suppressed = if options.store {
+        findings::remember(&root, &mut outcome)
+    } else {
+        0
+    };
+    if suppressed > 0 {
+        eprintln!(
+            "lighthouse: {suppressed} finding(s) suppressed by review verdicts (`lighthouse review list --status suppressed`)"
+        );
+    }
+    let briefing = Briefing {
+        catalog: catalog.as_ref(),
+        facts: Some(&outcome.facts),
+        suppressed,
+    };
     print!(
         "{}",
-        render(options.format, &outcome.diagnostics, &outcome.incomplete)
+        render_with(
+            options.format,
+            &outcome.diagnostics,
+            &outcome.incomplete,
+            &briefing
+        )
     );
     Ok(outcome.exit_code(options.strict, options.allow_incomplete))
+}
+
+/// Whether the format draws on the catalog.
+fn briefed(format: Format) -> bool {
+    matches!(format, Format::Agent | Format::AgentJson)
 }
 
 /// The changed files that also lie under the given paths, when there are any.
@@ -279,5 +333,24 @@ fn init() -> Result<u8> {
     }
     fs::write(&path, DEFAULT_CONFIG)?;
     println!("wrote {}", path.display());
+    if ignore_store(&path.with_file_name(".gitignore"))? {
+        println!("added {STORE_IGNORE} to .gitignore");
+    }
     Ok(0)
+}
+
+/// Adds the store to the ignore file, creating it if needed; false when the
+/// file already ignores it.
+fn ignore_store(path: &Path) -> Result<bool> {
+    let mut text = fs::read_to_string(path).unwrap_or_default();
+    if text.lines().any(|line| line.trim() == STORE_IGNORE) {
+        return Ok(false);
+    }
+    if !text.is_empty() && !text.ends_with('\n') {
+        text.push('\n');
+    }
+    text.push_str(STORE_IGNORE);
+    text.push('\n');
+    fs::write(path, text)?;
+    Ok(true)
 }

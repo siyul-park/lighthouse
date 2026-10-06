@@ -128,6 +128,24 @@ fn init_writes_config_that_checks_clean_and_refuses_overwrite() {
 }
 
 #[test]
+fn init_keeps_the_store_out_of_version_control() {
+    let fresh = tempfile::tempdir().unwrap();
+    lighthouse(fresh.path()).arg("init").assert().success();
+    let ignore = |dir: &TempDir| fs::read_to_string(dir.path().join(".gitignore")).unwrap();
+    assert_eq!(ignore(&fresh), ".lighthouse/*.db*\n");
+
+    let existing = tempfile::tempdir().unwrap();
+    fs::write(existing.path().join(".gitignore"), "target").unwrap();
+    lighthouse(existing.path()).arg("init").assert().success();
+    assert_eq!(ignore(&existing), "target\n.lighthouse/*.db*\n");
+
+    let ignoring = tempfile::tempdir().unwrap();
+    fs::write(ignoring.path().join(".gitignore"), ".lighthouse/*.db*\n").unwrap();
+    lighthouse(ignoring.path()).arg("init").assert().success();
+    assert_eq!(ignore(&ignoring), ".lighthouse/*.db*\n");
+}
+
+#[test]
 fn rule_list_and_explain() {
     let dir = tempfile::tempdir().unwrap();
     let list = lighthouse(dir.path())

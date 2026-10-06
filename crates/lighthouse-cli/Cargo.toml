@@ -9,18 +9,20 @@ clap.workspace = true
 lighthouse-config.workspace = true
 lighthouse-declarative.workspace = true
 lighthouse-engine.workspace = true
+lighthouse-model.workspace = true
 lighthouse-builtin.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-report.workspace = true
 lighthouse-rpc.workspace = true
 lighthouse-spec.workspace = true
+lighthouse-store.workspace = true
+serde_json.workspace = true
 
 [[bin]]
 name = "lighthouse"
 path = "src/main.rs"
 
 [dev-dependencies]
-serde_json.workspace = true
 assert_cmd.workspace = true
 predicates = "3"
 tempfile.workspace = true

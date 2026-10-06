@@ -1,12 +1,9 @@
 //! Report scope from git: which files a run reports on. Analysis scope never
 //! changes; these only narrow the report.
 
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::path::{Path, PathBuf};
 
-use crate::Result;
+use crate::{Result, git::git};
 
 /// Files changed in the working tree against HEAD: modified, added, renamed
 /// (to their new name) and untracked. Project-relative, sorted.
@@ -72,18 +69,4 @@ fn finish(root: &Path, files: Vec<String>) -> Result<Vec<PathBuf>> {
     out.sort();
     out.dedup();
     Ok(out)
-}
-
-fn git(root: &Path, args: &[&str]) -> Result<String> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(args)
-        .output()
-        .map_err(|e| format!("cannot run git: {e}"))?;
-    if !output.status.success() {
-        let why = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("git {} failed: {}", args.join(" "), why.trim()).into());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }

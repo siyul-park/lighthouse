@@ -346,10 +346,9 @@ fn list_filters_by_rule_and_status() {
     };
     assert_eq!(fingerprints(&rule), ["b1"]);
     let listed = store.list(&suppressed).unwrap();
-    assert_eq!(
-        listed[0].review,
-        Some((Verdict::Rejected, Reason::NotWorthFixing))
-    );
+    let latest = listed[0].review.unwrap();
+    assert_eq!(latest.verdict, Verdict::Rejected);
+    assert_eq!(latest.reason, Reason::NotWorthFixing);
     assert!(listed[0].suppressed);
 }
 

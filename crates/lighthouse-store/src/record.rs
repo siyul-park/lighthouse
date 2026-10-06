@@ -1,4 +1,5 @@
 use lighthouse_model::{Diagnostic, Label, Reason, ReviewerKind, Severity, Verdict};
+use serde::Serialize;
 use serde_json::{Value, json};
 
 /// One finding as a run saw it. The locator and evidence are JSON so that
@@ -79,8 +80,15 @@ pub struct Filter {
     pub status: StatusFilter,
 }
 
+/// The most recent verdict on a finding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct LatestReview {
+    pub verdict: Verdict,
+    pub reason: Reason,
+}
+
 /// A finding as stored: its latest sighting, its history and its standing.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct FindingRecord {
     pub fingerprint: String,
     pub rule_id: String,
@@ -97,8 +105,8 @@ pub struct FindingRecord {
     pub message: String,
     pub evidence: Value,
     pub facts: Value,
-    /// The latest verdict and its reason, if the finding was reviewed.
-    pub review: Option<(Verdict, Reason)>,
+    /// The latest verdict, if the finding was reviewed.
+    pub review: Option<LatestReview>,
     /// The latest verdict is a rejection.
     pub suppressed: bool,
 }
@@ -124,7 +132,7 @@ pub struct NewReview {
 }
 
 /// One row of the append-only review log.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReviewEvent {
     pub id: i64,
     pub fingerprint: String,

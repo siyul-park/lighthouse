@@ -13,6 +13,7 @@ mod store;
 
 pub use error::Error;
 pub use record::{
-    Filter, FindingRecord, NewReview, Observed, ReviewEvent, Run, RunSummary, StatusFilter,
+    Filter, FindingRecord, LatestReview, NewReview, Observed, ReviewEvent, Run, RunSummary,
+    StatusFilter,
 };
 pub use store::Store;
