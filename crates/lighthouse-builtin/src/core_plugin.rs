@@ -1,4 +1,7 @@
-use lighthouse_model::{Capability, Diagnostic, Fingerprint, Fragment, Position, Span};
+use lighthouse_model::{
+    Capability, Diagnostic, Fingerprint, Fragment, Position, Span,
+    annotation::{ANNOTATION_REASON, UNUSED_ALLOW},
+};
 use lighthouse_plugin::{
     Analyzer, Conventions, Ctx, Error, Indexed, LanguageProvider, Manifest, Plugin, Preset, Rule,
     RuleMeta, Scope, Source, Workspace,
@@ -29,7 +32,11 @@ impl Plugin for Core {
     }
 
     fn rules(&self) -> Vec<Box<dyn Rule>> {
-        vec![max_file_lines()]
+        vec![
+            max_file_lines(),
+            annotation_rule(ANNOTATION_REASON),
+            annotation_rule(UNUSED_ALLOW),
+        ]
     }
 
     fn presets(&self) -> Vec<Preset> {
@@ -113,6 +120,21 @@ impl Analyzer for LineCount {
 #[derive(Deserialize)]
 struct Limit {
     max: usize,
+}
+
+#[derive(Deserialize)]
+struct Unconfigured {}
+
+/// A rule about allow annotations. The engine reads the annotations of the
+/// whole project and reports these findings itself, because whether an
+/// annotation is used depends on every other rule's findings; the rule exists
+/// so that configuration, presets and the catalog treat it like any other.
+fn annotation_rule(id: &'static str) -> Box<dyn Rule> {
+    Box::new(PatternRule::new(
+        id,
+        &[],
+        |_: &RuleMeta, _: &Ctx, _: Unconfigured| Ok(Vec::new()),
+    ))
 }
 
 fn max_file_lines() -> Box<dyn Rule> {

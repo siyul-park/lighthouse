@@ -85,6 +85,16 @@ impl Fingerprint {
         Self(hex(&hash.finalize()))
     }
 
+    /// Tells apart findings that share a fingerprint by something stable about
+    /// where they are, such as the symbol that encloses them.
+    pub fn discriminate(&self, discriminator: &str) -> Self {
+        let mut hash = Sha256::new();
+        hash.update(&self.0);
+        hash.update([0xff]);
+        hash.update(discriminator);
+        Self(hex(&hash.finalize()))
+    }
+
     /// The opaque hex string; equal fingerprints identify the same finding.
     pub fn as_str(&self) -> &str {
         &self.0

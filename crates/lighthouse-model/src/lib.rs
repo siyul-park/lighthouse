@@ -1,3 +1,4 @@
+pub mod annotation;
 mod diagnostic;
 mod review;
 mod ucm;

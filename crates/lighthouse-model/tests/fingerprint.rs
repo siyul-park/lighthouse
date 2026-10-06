@@ -65,3 +65,13 @@ fn occurrence_distinguishes_repeats_and_keeps_the_first() {
     assert_ne!(fp.occurrence(1), fp);
     assert_ne!(fp.occurrence(1), fp.occurrence(2));
 }
+
+#[test]
+fn discriminate_separates_findings_by_a_stable_marker() {
+    let base = Fingerprint::of("a", "b", "c");
+    let one = base.discriminate("m::f#function");
+    assert_ne!(one, base);
+    assert_eq!(one, base.discriminate("m::f#function"));
+    assert_ne!(one, base.discriminate("m::g#function"));
+    assert_ne!(one.occurrence(1), one);
+}

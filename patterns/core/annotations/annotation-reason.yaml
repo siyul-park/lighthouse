@@ -1,0 +1,52 @@
+id: core/annotation-reason
+title: An allow annotation states its reason
+intent: An exception without a reason cannot be reviewed or revisited.
+scope: file
+requirement: An allow annotation MUST give a reason after `--`; an annotation without one is ignored and reported.
+enforcement: mechanical
+evidence: [rules, reason]
+implementation:
+  builtin: core/annotation-reason
+examples:
+  - name: go-missing-reason
+    language: go
+    kind: invalid
+    files:
+      - path: example.go
+        body: |-
+          package sample
+
+          // lighthouse:allow design/exported-doc
+          func Open() {}
+    expect:
+      - line: 3
+  - name: go-with-reason
+    language: go
+    kind: valid
+    canonical: true
+    files:
+      - path: example.go
+        body: |-
+          package sample
+
+          // lighthouse:allow design/exported-doc -- generated shim
+          func Open() {}
+  - name: rust-missing-reason
+    language: rust
+    kind: invalid
+    files:
+      - path: src/lib.rs
+        body: |-
+          // lighthouse:allow design/exported-doc
+          pub fn open() {}
+    expect:
+      - line: 1
+  - name: rust-with-reason
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+      - path: src/lib.rs
+        body: |-
+          // lighthouse:allow design/exported-doc -- re-exported shim
+          pub fn open() {}

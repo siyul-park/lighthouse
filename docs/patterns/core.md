@@ -56,3 +56,123 @@ Splitting by size alone creates arbitrary boundaries.
 **Requirement**
 
 A file MUST be split along cohesion boundaries, not by size alone.
+
+## Source annotations
+
+A finding that is right to leave in place can be allowed where it happens, in a comment that a reviewer sees in the diff.
+
+### Allow a finding in source
+
+`core/allow-annotation` · scope `symbol` · enforcement `doc` · severity `none`
+
+**Intent**
+
+A decision to accept a finding belongs next to the code it is about, where a reviewer sees it change.
+
+**Requirement**
+
+A finding that is right to leave in place MAY be allowed by a comment on the symbol, the line before it or the same line, written `lighthouse:allow <rule>[, <rule>] -- <reason>`. The comment suppresses the named rules there, whatever their severity, and the reason is required. Allowed findings are counted in the report.
+
+**Valid example: go-allow (go)**
+
+```go
+package sample
+
+// lighthouse:allow design/exported-doc -- generated shim, documented in the generator
+func Open() {}
+```
+
+**Valid example: rust-allow (rust)**
+
+```rust
+// lighthouse:allow design/exported-doc -- re-exported and documented at its origin
+pub fn open() {}
+```
+
+### An allow annotation states its reason
+
+`core/annotation-reason` · scope `file` · enforcement `mechanical` · severity `error`
+
+**Intent**
+
+An exception without a reason cannot be reviewed or revisited.
+
+**Requirement**
+
+An allow annotation MUST give a reason after `--`; an annotation without one is ignored and reported.
+
+**Invalid example: go-missing-reason (go)**
+
+```go
+package sample
+
+// lighthouse:allow design/exported-doc
+func Open() {}
+```
+
+**Valid example: go-with-reason (go)**
+
+```go
+package sample
+
+// lighthouse:allow design/exported-doc -- generated shim
+func Open() {}
+```
+
+**Invalid example: rust-missing-reason (rust)**
+
+```rust
+// lighthouse:allow design/exported-doc
+pub fn open() {}
+```
+
+**Valid example: rust-with-reason (rust)**
+
+```rust
+// lighthouse:allow design/exported-doc -- re-exported shim
+pub fn open() {}
+```
+
+### Allow annotations suppress something
+
+`core/unused-allow` · scope `file` · enforcement `heuristic` · severity `warn`
+
+**Intent**
+
+An exception that no longer applies is noise that hides the next real one.
+
+**Requirement**
+
+An allow annotation SHOULD suppress a finding; one whose rule no longer fires there, or is not enabled, SHOULD be removed.
+
+**Invalid example: go-stale-allow (go)**
+
+```go
+package sample
+
+// lighthouse:allow design/exported-doc -- stale
+func open() {}
+```
+
+**Valid example: go-plain-comment (go)**
+
+```go
+package sample
+
+// open is not exported.
+func open() {}
+```
+
+**Invalid example: rust-stale-allow (rust)**
+
+```rust
+// lighthouse:allow design/exported-doc -- stale
+fn open() {}
+```
+
+**Valid example: rust-plain-comment (rust)**
+
+```rust
+// open is not exported.
+fn open() {}
+```

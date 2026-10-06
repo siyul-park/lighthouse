@@ -6,13 +6,19 @@ use std::{
 
 use ignore::WalkBuilder;
 use lighthouse_config::{Config, GlobSet, Rules, glob_set};
-use lighthouse_model::{Diagnostic, File, Fingerprint, Fragment, Incomplete, Project, Severity};
+use lighthouse_model::{
+    Diagnostic, File, Fingerprint, Fragment, Incomplete, Options, Project, Severity,
+};
 use lighthouse_plugin::{Ctx, Facts, LanguageProvider, Registry, Rule, Scope, Source, Workspace};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::subject::Subjects;
+use crate::{
+    annotations::{self, Allowed},
+    identity,
+    subject::Subjects,
+};
 
 /// Name of the file, in `.gitignore` syntax, that keeps files out of the
 /// analysis altogether, such as fixtures that are broken on purpose.
@@ -68,6 +74,15 @@ pub struct Outcome {
     /// What the analysis knew about each finding's subject (language, symbol
     /// shape, function summary, measures), by fingerprint.
     pub facts: BTreeMap<Fingerprint, Value>,
+    /// The options the configuration set for each finding's rule, by
+    /// fingerprint; options left to the pattern's defaults are absent.
+    pub options: BTreeMap<Fingerprint, Options>,
+    /// Every rule the configuration enables for some file, whether or not it
+    /// ran: a remembered finding of any other rule is no longer configured.
+    pub configured: Vec<String>,
+    /// Findings that source annotations allow, within the report scope. They
+    /// are not in `diagnostics` and never fail the run.
+    pub allowed: Vec<Allowed>,
 }
 
 impl Outcome {
@@ -95,9 +110,9 @@ struct Language {
     tests: GlobSet,
 }
 
-struct Input {
-    file: File,
-    text: String,
+pub(crate) struct Input {
+    pub(crate) file: File,
+    pub(crate) text: String,
     language: usize,
 }
 
@@ -183,32 +198,88 @@ impl Engine {
         let inputs = self.read(&mut outcome.notices, &mut incomplete);
         let (inputs, project) = self.build_project(inputs, &mut outcome.notices, &mut incomplete);
         let facts = self.analyze(&selected, &inputs, &project)?;
-        let mut found = self.apply(&selected, &inputs, &project, &facts, &mut outcome.notices)?;
+        let found = self.apply(&selected, &inputs, &project, &facts, &mut outcome.notices)?;
 
+        let ran: BTreeSet<String> = selected.iter().map(|r| r.meta().id.clone()).collect();
+        let level = |rule: &str, file: &Path, lang: &str| self.level_at(rule, file, lang);
+        let gate = annotations::Gate {
+            level: &level,
+            active: &self.active,
+            selected: &ran,
+        };
+        let (mut found, allowed) = annotations::apply(found, &project, &gate);
         found.retain(|d| scopes.iter().any(|s| d.file.starts_with(s)));
+        outcome.allowed = allowed
+            .into_iter()
+            .filter(|a| scopes.iter().any(|s| a.diagnostic.file.starts_with(s)))
+            .collect();
         found.sort_by(|a, b| {
             (&a.file, a.span.start, &a.rule_id).cmp(&(&b.file, b.span.start, &b.rule_id))
         });
-        let mut seen: BTreeMap<_, usize> = BTreeMap::new();
-        for d in &mut found {
-            let n = seen
-                .entry((d.rule_id.clone(), d.file.clone(), d.fingerprint.clone()))
-                .or_default();
-            d.fingerprint = d.fingerprint.occurrence(*n);
-            *n += 1;
-        }
-        let subjects = Subjects::new(&project, &facts);
+        let ordinal = identity::assign(&mut found, &project);
+        let subjects = Subjects::new(&project, &facts, &inputs);
         outcome.facts = found
             .iter()
-            .map(|d| (d.fingerprint.clone(), subjects.of(d)))
+            .map(|d| {
+                let mut subject = subjects.of(d);
+                if ordinal.contains(&d.fingerprint) {
+                    subject["ordinal"] = Value::Bool(true);
+                }
+                (d.fingerprint.clone(), subject)
+            })
             .collect();
+        outcome.options = self.options_of(&found, &project)?;
         outcome.diagnostics = found;
         outcome.reported = scopes;
-        outcome.rules = selected.iter().map(|r| r.meta().id.clone()).collect();
+        outcome.rules = ran.into_iter().collect();
+        outcome.configured = self.active.iter().cloned().collect();
         incomplete.sort();
         incomplete.dedup();
         outcome.incomplete = incomplete;
         Ok(outcome)
+    }
+
+    /// The level the configuration gives a rule at a file; `None` when off.
+    fn level_at(&self, rule: &str, file: &Path, lang: &str) -> Option<Severity> {
+        let rules = self
+            .config
+            .resolve(file, lang, &|id| self.preset_rules(id))
+            .ok()?;
+        rules.get(rule)?.level
+    }
+
+    /// The options the configuration resolves for each finding's rule at its
+    /// file (project-scope rules at the project).
+    fn options_of(
+        &self,
+        found: &[Diagnostic],
+        project: &Project,
+    ) -> Result<BTreeMap<Fingerprint, Options>, Error> {
+        let mut resolved: BTreeMap<(PathBuf, String), Rules> = BTreeMap::new();
+        let mut options = BTreeMap::new();
+        for d in found {
+            let project_scope = self
+                .registry
+                .rule(&d.rule_id)
+                .is_some_and(|r| r.meta().scope == Scope::Project);
+            let (path, lang) = match project.file(&d.file) {
+                Some(file) if !project_scope => (file.path.clone(), file.lang.clone()),
+                _ => (PathBuf::new(), String::new()),
+            };
+            let rules = match resolved.entry((path, lang)) {
+                std::collections::btree_map::Entry::Occupied(e) => e.into_mut(),
+                std::collections::btree_map::Entry::Vacant(e) => {
+                    let (path, lang) = e.key().clone();
+                    let rules = self
+                        .config
+                        .resolve(&path, &lang, &|id| self.preset_rules(id))?;
+                    e.insert(rules)
+                }
+            };
+            let found = rules.get(&d.rule_id).map(|c| c.options.clone());
+            options.insert(d.fingerprint.clone(), found.unwrap_or_default());
+        }
+        Ok(options)
     }
 
     fn active_rules(&self) -> Result<BTreeSet<String>, Error> {
