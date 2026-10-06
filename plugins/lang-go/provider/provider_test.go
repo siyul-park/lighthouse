@@ -12,6 +12,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/siyul-park/lighthouse/plugins/lang-go/provider"
 	"github.com/siyul-park/lighthouse/plugins/lang-go/sdk"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -25,9 +26,7 @@ func TestProviderInitialize(t *testing.T) {
 
 		result, err := g.Initialize(sdk.InitializeParams{Root: "/", ProtocolVersion: sdk.ProtocolVersion})
 
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		assertValid(t, validator(t, "InitializeResult"), result, "initialize result")
 	})
 
@@ -36,9 +35,7 @@ func TestProviderInitialize(t *testing.T) {
 
 		_, err := g.Initialize(sdk.InitializeParams{ProtocolVersion: "9.9"})
 
-		if err == nil {
-			t.Error("another protocol version must be refused")
-		}
+		require.Error(t, err, "another protocol version must be refused")
 	})
 }
 
@@ -46,14 +43,11 @@ func TestProviderIndex(t *testing.T) {
 	t.Run("matches the protocol schema for every conformance case", func(t *testing.T) {
 		schema := validator(t, "IndexResult")
 		cases, err := filepath.Glob(casesGlob)
-		if err != nil || len(cases) < 12 {
-			t.Fatalf("conformance cases went missing: %v (%d found)", err, len(cases))
-		}
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, len(cases), 12, "conformance cases went missing")
 		for _, dir := range cases {
 			root, err := filepath.Abs(filepath.Join(dir, "project"))
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			files := goFiles(t, root)
 			for variant, options := range variants(t, dir) {
 				result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
@@ -62,9 +56,7 @@ func TestProviderIndex(t *testing.T) {
 					Files:    files,
 					Context:  sdk.Context{Options: options},
 				})
-				if err != nil {
-					t.Fatalf("%s/%s: %v", filepath.Base(dir), variant, err)
-				}
+				require.NoError(t, err, "%s/%s", filepath.Base(dir), variant)
 				assertValid(t, schema, result, filepath.Base(dir)+"/"+variant+" index result")
 			}
 		}
@@ -73,9 +65,7 @@ func TestProviderIndex(t *testing.T) {
 	t.Run("classifies entry points the way go test does", func(t *testing.T) {
 		root := t.TempDir()
 		write := func(name, body string) {
-			if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o644); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(filepath.Join(root, name), []byte(body), 0o644))
 		}
 		write("go.mod", "module example.com/p\n\ngo 1.22\n")
 		write("p.go", "package p\n")
@@ -102,9 +92,7 @@ func helper(t *testing.T)             {}
 			Files:    []sdk.FileRef{{Path: "p_test.go"}, {Path: "p.go"}},
 		})
 
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		kinds := map[string]string{}
 		cases := []string{}
 		for _, f := range result.Fragments {
@@ -121,13 +109,9 @@ func helper(t *testing.T)             {}
 			"BenchmarkX": "test", "Benchmarking": "function", "helper": "function",
 		}
 		for name, kind := range want {
-			if kinds[name] != kind {
-				t.Errorf("%s is a %q, want %q", name, kinds[name], kind)
-			}
+			require.Equal(t, kind, kinds[name], name)
 		}
-		if len(cases) != 3 {
-			t.Errorf("test cases = %v, want only Test, TestAdd and Test_add", cases)
-		}
+		require.Len(t, cases, 3, "only Test, TestAdd and Test_add are test cases")
 	})
 
 	t.Run("reports an unknown option key as incomplete", func(t *testing.T) {
@@ -136,12 +120,9 @@ func helper(t *testing.T)             {}
 
 		result, err := g.Index(sdk.IndexParams{Project: sdk.ProjectRef{Root: t.TempDir()}, Context: sdk.Context{Options: options}})
 
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(result.Incomplete) != 1 || !strings.Contains(result.Incomplete[0].Reason, "tagz") {
-			t.Errorf("incomplete = %+v, want one naming the unknown key", result.Incomplete)
-		}
+		require.NoError(t, err)
+		require.Len(t, result.Incomplete, 1)
+		require.Contains(t, result.Incomplete[0].Reason, "tagz")
 	})
 
 	t.Run("ignores the options of another language", func(t *testing.T) {
@@ -150,12 +131,8 @@ func helper(t *testing.T)             {}
 
 		result, err := g.Index(sdk.IndexParams{Project: sdk.ProjectRef{Root: t.TempDir()}, Context: sdk.Context{Options: options}})
 
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(result.Incomplete) != 0 {
-			t.Errorf("incomplete = %+v, want none", result.Incomplete)
-		}
+		require.NoError(t, err)
+		require.Empty(t, result.Incomplete)
 	})
 
 	t.Run("reports a missing go command as incomplete", func(t *testing.T) {
@@ -164,12 +141,9 @@ func helper(t *testing.T)             {}
 
 		result, err := g.Index(sdk.IndexParams{Project: sdk.ProjectRef{Root: t.TempDir()}, Context: sdk.Context{Options: options}})
 
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(result.Incomplete) != 1 || !strings.Contains(result.Incomplete[0].Reason, "go command not found") {
-			t.Errorf("incomplete = %+v, want one naming the missing command", result.Incomplete)
-		}
+		require.NoError(t, err)
+		require.Len(t, result.Incomplete, 1)
+		require.Contains(t, result.Incomplete[0].Reason, "go command not found")
 	})
 }
 
@@ -186,13 +160,12 @@ func TestSchemaRejectsWhatTheWireForbids(t *testing.T) {
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			raw, _ := json.Marshal(tc.result)
+			raw, err := json.Marshal(tc.result)
+			require.NoError(t, err)
 			var instance any
-			_ = json.Unmarshal(raw, &instance)
+			require.NoError(t, json.Unmarshal(raw, &instance))
 
-			if schema.Validate(instance) == nil {
-				t.Error("the schema accepted an invalid result")
-			}
+			require.Error(t, schema.Validate(instance), "the schema accepted an invalid result")
 		})
 	}
 }
@@ -202,42 +175,28 @@ func TestSchemaRejectsWhatTheWireForbids(t *testing.T) {
 func validator(t *testing.T, definition string) *jsonschema.Schema {
 	t.Helper()
 	raw, err := os.ReadFile(schemaPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	var schema map[string]any
-	if err := json.Unmarshal(raw, &schema); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, json.Unmarshal(raw, &schema))
 	doc := map[string]any{
 		"$schema": schema["$schema"],
 		"$ref":    "#/$defs/" + definition,
 		"$defs":   schema["$defs"],
 	}
 	c := jsonschema.NewCompiler()
-	if err := c.AddResource("schema.json", doc); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, c.AddResource("schema.json", doc))
 	compiled, err := c.Compile("schema.json")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return compiled
 }
 
 func assertValid(t *testing.T, s *jsonschema.Schema, value any, what string) {
 	t.Helper()
 	raw, err := json.Marshal(value)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	var instance any
-	if err := json.Unmarshal(raw, &instance); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Validate(instance); err != nil {
-		t.Errorf("%s violates the schema: %v", what, err)
-	}
+	require.NoError(t, json.Unmarshal(raw, &instance))
+	require.NoError(t, s.Validate(instance), "%s violates the schema", what)
 }
 
 func goFiles(t *testing.T, root string) []sdk.FileRef {
@@ -250,9 +209,7 @@ func goFiles(t *testing.T, root string) []sdk.FileRef {
 		}
 		return err
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
 	return files
 }
@@ -266,13 +223,9 @@ func variants(t *testing.T, dir string) map[string]map[string]json.RawMessage {
 	for _, path := range paths {
 		name := strings.TrimSuffix(strings.TrimPrefix(filepath.Base(path), "options"), ".json")
 		raw, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		var options map[string]json.RawMessage
-		if err := json.Unmarshal(raw, &options); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, json.Unmarshal(raw, &options))
 		found[strings.TrimPrefix(name, ".")] = options
 	}
 	if _, ok := found[""]; !ok {

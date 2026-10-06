@@ -143,7 +143,7 @@ func (w *uses) add(kind, to string) {
 	}
 }
 
-func collectUses(u *unit, d *ast.FuncDecl) []usage {
+func (u *unit) usages(d *ast.FuncDecl) []usage {
 	w := &uses{
 		res:     u.res,
 		info:    u.info(),

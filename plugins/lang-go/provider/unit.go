@@ -126,7 +126,7 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 	if d.Body == nil {
 		return
 	}
-	usages := collectUses(u, d)
+	usages := u.usages(d)
 	for _, use := range usages {
 		u.edge(use.kind, sdk.Node{Symbol: id}, use.to)
 	}
@@ -274,19 +274,6 @@ func (u *unit) functionRole(d *ast.FuncDecl) string {
 	return roleFixture
 }
 
-// declarationRole is the role of a type, constant or variable of a test
-// file, which is always a fixture.
-func (u *unit) declarationRole(kind, owner string) string {
-	switch {
-	case !u.test || owner != "":
-		return ""
-	case kind == kindType || kind == kindInterface || kind == kindConst || kind == kindVar:
-		return roleFixture
-	default:
-		return ""
-	}
-}
-
 func (u *unit) symbol(kind, name, owner, id string, from, to token.Pos, doc string) {
 	u.frag.Symbols = append(u.frag.Symbols, sdk.Symbol{
 		ID:         id,
@@ -304,6 +291,19 @@ func (u *unit) symbol(kind, name, owner, id string, from, to token.Pos, doc stri
 		container = sdk.Node{Symbol: owner}
 	}
 	u.edge(edgeContains, container, id)
+}
+
+// declarationRole is the role of a type, constant or variable of a test
+// file, which is always a fixture.
+func (u *unit) declarationRole(kind, owner string) string {
+	switch {
+	case !u.test || owner != "":
+		return ""
+	case kind == kindType || kind == kindInterface || kind == kindConst || kind == kindVar:
+		return roleFixture
+	default:
+		return ""
+	}
 }
 
 func (u *unit) edge(kind string, from sdk.Node, to string) {
