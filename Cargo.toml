@@ -18,6 +18,7 @@ include_dir = "0.7"
 insta = "1"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"
+rusqlite = { version = "0.40", features = ["bundled"] }
 schemars = { version = "1", default-features = false, features = ["derive", "std"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -40,4 +41,5 @@ lighthouse-protocol = { path = "crates/lighthouse-protocol" }
 lighthouse-report = { path = "crates/lighthouse-report" }
 lighthouse-rpc = { path = "crates/lighthouse-rpc" }
 lighthouse-spec = { path = "crates/lighthouse-spec" }
+lighthouse-store = { path = "crates/lighthouse-store" }
 lighthouse-testing = { path = "crates/lighthouse-testing" }
