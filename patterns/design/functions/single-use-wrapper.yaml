@@ -8,22 +8,103 @@ requirement: >-
   than mechanical removal.
 enforcement: heuristic
 evidence: [callee, callers]
+implementation:
+  builtin: design/single-use-wrapper
 examples:
   - name: invalid
     language: go
     kind: invalid
     files:
       - path: example.go
-        body: "func (s *Store) load(k string) ([]byte, error) { return s.read(k) }"
+        body: |-
+          package sample
+
+          type Store struct{ data map[string][]byte }
+
+          func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
+
+          func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+          func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+    expect:
+      - line: 5
   - name: valid
     language: go
     kind: valid
     files:
       - path: example.go
         body: |-
+          package sample
+
+          type Store struct {
+          	closed bool
+          	data   map[string][]byte
+          }
+
           func (s *Store) load(k string) ([]byte, error) {
           	if s.closed {
           		return nil, ErrClosed
           	}
           	return s.read(k)
+          }
+
+          func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+          func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+  - name: used-as-value
+    language: go
+    kind: valid
+    files:
+      - path: example.go
+        body: |-
+          package sample
+
+          type Store struct{ data map[string][]byte }
+
+          func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
+
+          func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+          func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+
+          func (s *Store) Loader() func(string) ([]byte, error) { return s.load }
+  - name: adds-an-argument
+    language: go
+    kind: valid
+    files:
+      - path: example.go
+        body: |-
+          package sample
+
+          type Store struct{ data map[string][]byte }
+
+          func (s *Store) load(k string) ([]byte, error) { return s.read(k, true) }
+
+          func (s *Store) read(k string, fresh bool) ([]byte, error) { return s.data[k], nil }
+
+          func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+  - name: called-from-a-test
+    language: go
+    kind: valid
+    files:
+      - path: example.go
+        body: |-
+          package sample
+
+          type Store struct{ data map[string][]byte }
+
+          func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
+
+          func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+          func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+      - path: example_test.go
+        body: |-
+          package sample
+
+          import "testing"
+
+          func TestLoad(t *testing.T) {
+          	s := &Store{}
+          	s.load("k")
           }

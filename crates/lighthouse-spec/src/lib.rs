@@ -14,3 +14,4 @@ pub use model::{
     OptionType, Pack, Pattern, Scope, Section,
 };
 pub use render::{docs, pattern_markdown};
+pub use rule::PatternRule;

@@ -18,13 +18,11 @@ use crate::{
 const PACK_FILE: &str = "pack.yaml";
 const SECTION_FILE: &str = "section.yaml";
 const SOURCES_FILE: &str = "sources.yaml";
-const LEGACY_FILE: &str = "legacy.yaml";
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Catalog {
     pub packs: Vec<Pack>,
     pub(crate) sources: Vec<Source>,
-    pub(crate) legacy: BTreeMap<String, Vec<String>>,
     overrides: Vec<Override>,
 }
 
@@ -87,8 +85,7 @@ impl Catalog {
     }
 
     /// Builds a validated layer from files keyed by `/`-separated paths
-    /// relative to the catalog root. `sources.yaml` and `legacy.yaml` are
-    /// optional. Pattern files holding `extends` become overrides, applied by
+    /// relative to the catalog root. `sources.yaml` is optional. Pattern files holding `extends` become overrides, applied by
     /// `overlay`.
     pub fn from_files(files: Files) -> Result<Self, Error> {
         let mut catalog = Self::default();
@@ -101,9 +98,6 @@ impl Catalog {
         }
         if let Some(text) = files.get(SOURCES_FILE) {
             catalog.sources = parse(SOURCES_FILE, text)?;
-        }
-        if let Some(text) = files.get(LEGACY_FILE) {
-            catalog.legacy = parse(LEGACY_FILE, text)?;
         }
         validate::layer(&catalog)?;
         Ok(catalog)
@@ -124,11 +118,6 @@ impl Catalog {
             }
         }
         merged.sources.extend(local.sources.iter().cloned());
-        for (old, targets) in &local.legacy {
-            if merged.legacy.insert(old.clone(), targets.clone()).is_some() {
-                return Err(Error::invalid(old, "legacy id mapped in two layers"));
-            }
-        }
         for o in &local.overrides {
             let pattern = merged
                 .packs
@@ -137,7 +126,7 @@ impl Catalog {
                 .flat_map(|s| &mut s.patterns)
                 .find(|p| p.id == o.extends)
                 .ok_or_else(|| Error::invalid(&o.extends, "extends an unknown pattern"))?;
-            apply(pattern, o);
+            apply(pattern, o)?;
         }
         validate::patterns(&merged)?;
         Ok(merged)
@@ -229,11 +218,6 @@ impl Catalog {
     pub fn pattern(&self, id: &str) -> Option<&Pattern> {
         self.patterns().find(|p| p.id == id)
     }
-
-    /// Prototype rule id to the patterns that replace it.
-    pub fn legacy(&self) -> &BTreeMap<String, Vec<String>> {
-        &self.legacy
-    }
 }
 
 fn merge_sections(into: &mut Pack, from: &Pack) {
@@ -245,7 +229,7 @@ fn merge_sections(into: &mut Pack, from: &Pack) {
     }
 }
 
-fn apply(pattern: &mut Pattern, o: &Override) {
+fn apply(pattern: &mut Pattern, o: &Override) -> Result<(), Error> {
     if o.severity.is_some() {
         pattern.severity_override = o.severity;
     }
@@ -257,7 +241,10 @@ fn apply(pattern: &mut Pattern, o: &Override) {
     }
     for (name, change) in &o.options {
         let Some(spec) = pattern.options.get_mut(name) else {
-            continue;
+            return Err(Error::invalid(
+                &o.extends,
+                format!("extends an unknown option `{name}`"),
+            ));
         };
         if let Some(default) = &change.default {
             spec.default = default.clone();
@@ -267,6 +254,7 @@ fn apply(pattern: &mut Pattern, o: &Override) {
         }
     }
     pattern.examples.extend(o.examples.iter().cloned());
+    Ok(())
 }
 
 fn read(path: &Path) -> Result<String, Error> {

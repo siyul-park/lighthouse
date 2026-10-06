@@ -1,4 +1,10 @@
-use std::{collections::BTreeSet, fmt, ops::Deref, path::PathBuf};
+use std::{
+    cell::Cell,
+    collections::{BTreeMap, BTreeSet, HashSet},
+    fmt,
+    ops::Deref,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -45,6 +51,12 @@ pub struct File {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Module {
     pub path: String,
+    /// Name the language gives the module, such as a Go package name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// The module whose public surface this one tests from outside.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub test_of: Option<String>,
 }
 
 /// Project-stable identity: `module::owner::name#kind`.
@@ -66,6 +78,13 @@ impl SymbolId {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Path of the module that declares the symbol.
+    pub fn module(&self) -> &str {
+        self.0
+            .split_once("::")
+            .map_or(&self.0, |(module, _)| module)
     }
 }
 
@@ -111,27 +130,30 @@ pub struct Symbol {
     pub kind: SymbolKind,
     pub visibility: Visibility,
     pub owner: Option<SymbolId>,
+    pub file: PathBuf,
     pub span: Span,
     pub doc: Option<String>,
     pub name: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Node {
     Module(String),
     Symbol(SymbolId),
 }
 
-/// Edge target; `Path` is a qualified id or module path resolved by [`Project::merge`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Edge target. `Path` is resolved by [`Project::merge`]: a module path, a full
+/// symbol id (`module::owner::name#kind`), or a kind-less id
+/// (`module::owner::name`) that names exactly one symbol.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Target {
     Resolved(Node),
     Path(String),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum EdgeKind {
     Calls,
@@ -142,14 +164,14 @@ pub enum EdgeKind {
     AccessesPrivate,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Resolution {
     Semantic,
     Syntactic,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Edge {
     pub kind: EdgeKind,
     pub from: Node,
@@ -157,17 +179,89 @@ pub struct Edge {
     pub resolution: Resolution,
 }
 
+/// Normalized control-flow construct, shared by every language. Providers map
+/// their syntax onto these kinds; analyzers never see language syntax.
+///
+/// Mapping guidance for providers:
+/// - conditional expression (`?:`, `x if c else y`): `If`; `elif`/`else if`:
+///   `ElseIf`; `else`, also `for ... else` and `while ... else`: `Else`.
+/// - `switch`, `match`, `select`: one `Switch` whose `arms` counts the arms
+///   that are not the default or wildcard arm.
+/// - every loop form, comprehension generators included: `Loop`; a
+///   comprehension filter `if`: `If`.
+/// - `catch`/`except`/`rescue` handler: one `Catch` each; `try` and `finally`
+///   emit nothing.
+/// - `goto` and labeled `break`/`continue`: `Jump`.
+/// - a run of like `&&`/`||`/`and`/`or` operators: one `Logic` whose
+///   `operators` counts the operators in the run; `??` and `?.` emit nothing.
+/// - a direct call to the enclosing function: `Recursion`.
+/// - nested functions, lambdas and closures emit nothing but raise the
+///   nesting of what they contain.
+///
+/// Cyclomatic complexity is `1 + ifs + else-ifs + loops + catches + switch
+/// arms + logic operators`; cognitive complexity follows Campbell 2018.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum FlowKind {
+    If,
+    ElseIf,
+    Else,
+    Switch,
+    Loop,
+    Catch,
+    Jump,
+    Logic,
+    Recursion,
+}
+
+/// A construct and the number of enclosing nesting constructs (including
+/// nested functions) around it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Flow {
+    pub kind: FlowKind,
+    pub nesting: u32,
+    /// `Switch`: arms other than the default arm.
+    #[serde(default)]
+    pub arms: u32,
+    /// `Logic`: operators in the run.
+    #[serde(default)]
+    pub operators: u32,
+    /// `Switch`: every arm, default included, is a single return.
+    #[serde(default)]
+    pub returning: bool,
+}
+
+impl Flow {
+    pub fn new(kind: FlowKind, nesting: u32) -> Self {
+        Self {
+            kind,
+            nesting,
+            arms: 0,
+            operators: 0,
+            returning: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FunctionSummary {
     pub symbol: SymbolId,
-    pub decisions: u32,
+    /// Deepest level of nested constructs; a flat body is 0.
     pub max_nesting: u32,
     pub statements: u32,
+    /// Statements directly in the body, not in nested blocks.
+    pub top_level: u32,
     pub params: u32,
     pub returns: u32,
+    /// Leaf tokens of the body.
+    pub tokens: u32,
+    /// Control-flow constructs in source order.
+    pub flow: Vec<Flow>,
     /// Normalized AST/token fingerprint for clone detection.
     pub clone_fingerprint: Option<Fingerprint>,
-    pub single_forward_call: bool,
+    /// The body is a single call that passes the receiver and every parameter
+    /// on, in order.
+    pub forwards_to: Option<Target>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -197,14 +291,32 @@ pub struct Fragment {
 }
 
 /// All fragments merged: sorted, deduplicated, edge targets resolved.
+///
+/// A symbol id declared in several files (build variants, for instance) keeps
+/// the first declaration in file order; the rest are dropped and reported by
+/// [`Project::notices`], as are targets that stayed ambiguous.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Project(Fragment);
+pub struct Project {
+    all: Fragment,
+    index: Index,
+    notices: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct Index {
+    symbols: BTreeMap<SymbolId, usize>,
+    in_file: BTreeMap<PathBuf, Vec<usize>>,
+    functions: BTreeMap<SymbolId, usize>,
+    callers: BTreeMap<SymbolId, Vec<SymbolId>>,
+    callees: BTreeMap<SymbolId, Vec<SymbolId>>,
+    references: BTreeMap<SymbolId, Vec<SymbolId>>,
+}
 
 impl Deref for Project {
     type Target = Fragment;
 
     fn deref(&self) -> &Fragment {
-        &self.0
+        &self.all
     }
 }
 
@@ -224,26 +336,245 @@ impl Project {
         all.modules.sort_by(|a, b| a.path.cmp(&b.path));
         all.modules.dedup_by(|a, b| a.path == b.path);
         all.symbols.sort_by(|a, b| a.id.cmp(&b.id));
+        let mut notices = Vec::new();
+        notices.extend(duplicate_notice(&all.symbols));
         all.symbols.dedup_by(|a, b| a.id == b.id);
+        all.functions.sort_by(|a, b| a.symbol.cmp(&b.symbol));
+        all.functions.dedup_by(|a, b| a.symbol == b.symbol);
+        all.tests.sort_by(|a, b| a.symbol.cmp(&b.symbol));
+        all.tests.dedup_by(|a, b| a.symbol == b.symbol);
 
-        let symbols: BTreeSet<&str> = all.symbols.iter().map(|s| s.id.as_str()).collect();
-        let modules: BTreeSet<&str> = all.modules.iter().map(|m| m.path.as_str()).collect();
+        let resolver = Resolver::new(&all);
         let resolved: Vec<Target> = all
             .edges
             .iter()
-            .map(|edge| match &edge.to {
-                Target::Path(p) if symbols.contains(p.as_str()) => {
-                    Target::Resolved(Node::Symbol(SymbolId(p.clone())))
-                }
-                Target::Path(p) if modules.contains(p.as_str()) => {
-                    Target::Resolved(Node::Module(p.clone()))
-                }
-                other => other.clone(),
+            .map(|e| resolver.resolve(&e.to, e.kind == EdgeKind::Calls))
+            .collect();
+        let targets: Vec<Vec<Target>> = all
+            .tests
+            .iter()
+            .map(|t| {
+                t.targets
+                    .iter()
+                    .map(|x| resolver.resolve(x, false))
+                    .collect()
             })
             .collect();
+        let forwards: Vec<Option<Target>> = all
+            .functions
+            .iter()
+            .map(|f| f.forwards_to.as_ref().map(|t| resolver.resolve(t, true)))
+            .collect();
+        let ambiguous = resolver.ambiguous.get();
         for (edge, to) in all.edges.iter_mut().zip(resolved) {
             edge.to = to;
         }
-        Self(all)
+        let mut seen = HashSet::new();
+        all.edges.retain(|e| seen.insert(e.clone()));
+        for (test, targets) in all.tests.iter_mut().zip(targets) {
+            test.targets = targets;
+        }
+        for (function, to) in all.functions.iter_mut().zip(forwards) {
+            function.forwards_to = to;
+        }
+        if ambiguous > 0 {
+            notices.push(format!(
+                "{ambiguous} edge target(s) matched several symbols and stayed unresolved"
+            ));
+        }
+        let index = Index::new(&all);
+        Self {
+            all,
+            index,
+            notices,
+        }
     }
+
+    /// Things merging dropped or could not decide, for the user to see.
+    pub fn notices(&self) -> &[String] {
+        &self.notices
+    }
+
+    pub fn file(&self, path: &Path) -> Option<&File> {
+        let at = self
+            .all
+            .files
+            .binary_search_by(|f| f.path.as_path().cmp(path))
+            .ok()?;
+        self.all.files.get(at)
+    }
+
+    pub fn symbol(&self, id: &SymbolId) -> Option<&Symbol> {
+        self.all.symbols.get(*self.index.symbols.get(id)?)
+    }
+
+    /// Symbols declared in `path`, sorted by id.
+    pub fn symbols_in<'a>(&'a self, path: &Path) -> impl Iterator<Item = &'a Symbol> + use<'a> {
+        let at = self.index.in_file.get(path).map_or(&[][..], Vec::as_slice);
+        at.iter().map(|&i| &self.all.symbols[i])
+    }
+
+    /// Whether the symbol is declared in a test file.
+    pub fn in_test(&self, id: &SymbolId) -> bool {
+        self.symbol(id)
+            .and_then(|s| self.file(&s.file))
+            .is_some_and(|f| f.test)
+    }
+
+    pub fn function(&self, id: &SymbolId) -> Option<&FunctionSummary> {
+        self.all.functions.get(*self.index.functions.get(id)?)
+    }
+
+    /// Distinct symbols with a resolved `calls` edge to `id`, excluding itself.
+    pub fn callers(&self, id: &SymbolId) -> &[SymbolId] {
+        self.index.callers.get(id).map_or(&[], Vec::as_slice)
+    }
+
+    /// Distinct symbols with a resolved `references` edge to `id`, excluding
+    /// itself: every use of `id` as a value rather than a call.
+    pub fn references(&self, id: &SymbolId) -> &[SymbolId] {
+        self.index.references.get(id).map_or(&[], Vec::as_slice)
+    }
+
+    /// Distinct symbols `id` has a resolved `calls` edge to, excluding itself.
+    pub fn callees(&self, id: &SymbolId) -> &[SymbolId] {
+        self.index.callees.get(id).map_or(&[], Vec::as_slice)
+    }
+}
+
+impl Index {
+    fn new(all: &Fragment) -> Self {
+        let mut index = Self::default();
+        for (at, symbol) in all.symbols.iter().enumerate() {
+            index.symbols.insert(symbol.id.clone(), at);
+            index
+                .in_file
+                .entry(symbol.file.clone())
+                .or_default()
+                .push(at);
+        }
+        for (at, function) in all.functions.iter().enumerate() {
+            index.functions.insert(function.symbol.clone(), at);
+        }
+        let mut calls = BTreeSet::new();
+        let mut references = BTreeSet::new();
+        for edge in &all.edges {
+            let (Node::Symbol(from), Target::Resolved(Node::Symbol(to))) = (&edge.from, &edge.to)
+            else {
+                continue;
+            };
+            match edge.kind {
+                EdgeKind::Calls if from != to => calls.insert((from, to)),
+                EdgeKind::References if from != to => references.insert((from, to)),
+                _ => false,
+            };
+        }
+        for (from, to) in calls {
+            index
+                .callees
+                .entry(from.clone())
+                .or_default()
+                .push(to.clone());
+            index
+                .callers
+                .entry(to.clone())
+                .or_default()
+                .push(from.clone());
+        }
+        for (from, to) in references {
+            index
+                .references
+                .entry(to.clone())
+                .or_default()
+                .push(from.clone());
+        }
+        index
+    }
+}
+
+struct Resolver<'a> {
+    symbols: BTreeSet<&'a str>,
+    bare: BTreeMap<&'a str, Vec<(&'a SymbolId, SymbolKind)>>,
+    modules: BTreeSet<&'a str>,
+    ambiguous: Cell<usize>,
+}
+
+impl<'a> Resolver<'a> {
+    fn new(all: &'a Fragment) -> Self {
+        let mut bare: BTreeMap<&str, Vec<(&SymbolId, SymbolKind)>> = BTreeMap::new();
+        for symbol in &all.symbols {
+            let id = symbol.id.as_str();
+            bare.entry(id.split_once('#').map_or(id, |(head, _)| head))
+                .or_default()
+                .push((&symbol.id, symbol.kind));
+        }
+        Self {
+            symbols: all.symbols.iter().map(|s| s.id.as_str()).collect(),
+            bare,
+            modules: all.modules.iter().map(|m| m.path.as_str()).collect(),
+            ambiguous: Cell::new(0),
+        }
+    }
+
+    /// A kind-less path naming several symbols resolves only for a call that
+    /// matches exactly one function or method; otherwise it stays a path.
+    fn resolve(&self, target: &Target, call: bool) -> Target {
+        let Target::Path(path) = target else {
+            return target.clone();
+        };
+        let symbol = |id: &str| Target::Resolved(Node::Symbol(SymbolId(id.to_owned())));
+        if self.symbols.contains(path.as_str()) {
+            return symbol(path);
+        }
+        if self.modules.contains(path.as_str()) {
+            return Target::Resolved(Node::Module(path.clone()));
+        }
+        let Some(found) = self.bare.get(path.as_str()) else {
+            return target.clone();
+        };
+        if let [(only, _)] = found.as_slice() {
+            return symbol(only.as_str());
+        }
+        if call {
+            let callable: Vec<_> = found
+                .iter()
+                .filter(|(_, kind)| matches!(kind, SymbolKind::Function | SymbolKind::Method))
+                .collect();
+            if let [(only, _)] = callable.as_slice() {
+                return symbol(only.as_str());
+            }
+        }
+        self.ambiguous.set(self.ambiguous.get() + 1);
+        target.clone()
+    }
+}
+
+fn duplicate_notice(sorted: &[Symbol]) -> Option<String> {
+    let mut groups: Vec<(&SymbolId, Vec<String>)> = Vec::new();
+    for pair in sorted.windows(2) {
+        if pair[0].id != pair[1].id || pair[0].file == pair[1].file {
+            continue;
+        }
+        let (a, b) = (
+            pair[0].file.display().to_string(),
+            pair[1].file.display().to_string(),
+        );
+        match groups.last_mut() {
+            Some((id, files)) if **id == pair[0].id => files.push(b),
+            _ => groups.push((&pair[0].id, vec![a, b])),
+        }
+    }
+    if groups.is_empty() {
+        return None;
+    }
+    let examples: Vec<String> = groups
+        .iter()
+        .take(3)
+        .map(|(id, files)| format!("{} ({})", id.as_str(), files.join(", ")))
+        .collect();
+    Some(format!(
+        "{} symbol id(s) are declared in several files and only the first is analyzed: {}",
+        groups.len(),
+        examples.join("; ")
+    ))
 }

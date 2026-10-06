@@ -305,7 +305,9 @@ impl Engine {
                 }
             }
         }
-        (kept, Project::merge(parts))
+        let project = Project::merge(parts);
+        notices.extend(project.notices().iter().cloned());
+        (kept, project)
     }
 
     fn analyze(

@@ -5,6 +5,132 @@ scope: symbol
 requirement: >-
   Complexity SHOULD be judged from cyclomatic complexity together with
   statement count and nesting depth, against deliberately high thresholds.
+  Cyclomatic complexity is one path plus each `if`, `else if`, loop, error
+  handler clause, non-default switch arm and boolean operator (`&&`, `||`);
+  nesting counts the deepest level of nested constructs, a flat body being 0,
+  and nested functions count as a level.
 enforcement: heuristic
+exceptions: >-
+  A body that is one switch whose every arm is a single return is a table in
+  code form and is not reported.
 evidence: [cyclomatic, cognitive, statements, nesting]
+options:
+  cyclomatic:
+    type: int
+    default: 15
+    description: Cyclomatic complexity that, with `statements`, marks high complexity.
+  statements:
+    type: int
+    default: 30
+    description: Statement count that, with `cyclomatic`, marks high complexity.
+  structural_cyclomatic:
+    type: int
+    default: 10
+    description: Cyclomatic complexity of the structural signal.
+  structural_statements:
+    type: int
+    default: 25
+    description: Statement count of the structural signal.
+  structural_nesting:
+    type: int
+    default: 5
+    description: Nesting depth of the structural signal; a flat body is 0.
+  cognitive:
+    type: int
+    default: 30
+    description: Cognitive complexity that, with `cognitive_statements`, marks a hard-to-follow body.
+  cognitive_statements:
+    type: int
+    default: 30
+    description: Statement count of the cognitive signal.
 citation: "McCabe 1976; Campbell, Cognitive Complexity (SonarSource 2018)"
+implementation:
+  builtin: design/complexity-signal
+examples:
+  - name: many-branches
+    language: go
+    kind: invalid
+    options:
+      cyclomatic: 4
+      statements: 7
+    files:
+      - path: sample.go
+        body: |-
+          package sample
+
+          func classify(n int) string {
+          	if n < 0 {
+          		return "negative"
+          	}
+          	if n == 0 {
+          		return "zero"
+          	}
+          	if n < 10 {
+          		return "small"
+          	}
+          	return "large"
+          }
+    expect:
+      - line: 3
+  - name: deep-loops
+    language: go
+    kind: invalid
+    options:
+      cognitive: 6
+      cognitive_statements: 6
+    files:
+      - path: sample.go
+        body: |-
+          package sample
+
+          func scan(rows [][]int) int {
+          	total := 0
+          	for _, row := range rows {
+          		for _, v := range row {
+          			if v > 0 {
+          				total += v
+          			}
+          		}
+          	}
+          	return total
+          }
+    expect:
+      - line: 3
+  - name: below-thresholds
+    language: go
+    kind: valid
+    files:
+      - path: sample.go
+        body: |-
+          package sample
+
+          func classify(n int) string {
+          	if n < 0 {
+          		return "negative"
+          	}
+          	if n == 0 {
+          		return "zero"
+          	}
+          	return "positive"
+          }
+  - name: dispatcher
+    language: go
+    kind: valid
+    options:
+      cyclomatic: 1
+      statements: 1
+    files:
+      - path: sample.go
+        body: |-
+          package sample
+
+          func name(k int) string {
+          	switch k {
+          	case 0:
+          		return "zero"
+          	case 1:
+          		return "one"
+          	default:
+          		return "many"
+          	}
+          }

@@ -6,7 +6,8 @@ use lighthouse_plugin::{
     Analyzer, Conventions, Ctx, Error, LanguageProvider, Manifest, Plugin, Preset, Rule, RuleMeta,
     Scope, Workspace,
 };
-use lighthouse_spec::{Catalog, Pattern};
+use lighthouse_spec::PatternRule;
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 const LINE_COUNT: &str = "core/line-count";
@@ -31,7 +32,7 @@ impl Plugin for Core {
     }
 
     fn rules(&self) -> Vec<Box<dyn Rule>> {
-        vec![Box::new(MaxFileLines::new())]
+        vec![max_file_lines()]
     }
 
     fn presets(&self) -> Vec<Preset> {
@@ -80,6 +81,10 @@ impl LanguageProvider for Text {
         &[]
     }
 
+    fn fallback(&self) -> bool {
+        true
+    }
+
     fn index(&self, _: &Workspace, file: &File, _: &str) -> Result<Fragment, Error> {
         Ok(Fragment {
             files: vec![file.clone()],
@@ -111,73 +116,40 @@ impl Analyzer for LineCount {
     }
 }
 
-struct MaxFileLines {
-    meta: RuleMeta,
-    pattern: &'static Pattern,
+#[derive(Deserialize)]
+struct Limit {
+    max: usize,
 }
 
-impl MaxFileLines {
-    fn new() -> Self {
-        let pattern = Catalog::bundled()
-            .pattern(MAX_FILE_LINES)
-            .expect("bundled catalog defines core/max-file-lines");
-        let mut meta = pattern
-            .rule_meta()
-            .expect("core/max-file-lines is implemented");
-        meta.analyzers = vec![LINE_COUNT.to_owned()];
-        Self { meta, pattern }
-    }
-
-    fn max(&self, file: Option<&File>, options: &Options) -> Result<usize, Error> {
-        let language = file.map(|f| f.lang.as_str());
-        let resolved = self
-            .pattern
-            .resolve_options(options, language)
-            .map_err(|e| Error::Options {
-                rule: MAX_FILE_LINES.to_owned(),
-                message: e.to_string(),
-            })?;
-        resolved["max"]
-            .as_u64()
-            .and_then(|max| usize::try_from(max).ok())
-            .ok_or_else(|| Error::Failed("option `max` is not a size".to_owned()))
-    }
-}
-
-impl Rule for MaxFileLines {
-    fn meta(&self) -> &RuleMeta {
-        &self.meta
-    }
-
-    fn validate(&self, options: &Options) -> Result<(), Error> {
-        self.max(None, options).map(drop)
-    }
-
-    fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, Error> {
-        let (file, _) = ctx
-            .file
-            .ok_or_else(|| Error::Failed("no file".to_owned()))?;
-        let max = self.max(Some(file), options)?;
-        let lines: usize = ctx.fact(LINE_COUNT)?;
-        if lines <= max {
-            return Ok(Vec::new());
-        }
-        let at = |line: usize| Position {
-            line: u32::try_from(line).unwrap_or(u32::MAX),
-            col: 1,
-        };
-        let mut diagnostic = Diagnostic::new(
-            MAX_FILE_LINES,
-            self.meta.severity,
-            format!("file has {lines} lines, limit is {max}"),
-            &file.path,
-            Span {
-                start: at(max + 1),
-                end: at(lines),
-            },
-            Fingerprint::of(MAX_FILE_LINES, &file.path.to_string_lossy(), ""),
-        );
-        diagnostic.evidence = json!({ "lines": lines, "max": max });
-        Ok(vec![diagnostic])
-    }
+fn max_file_lines() -> Box<dyn Rule> {
+    Box::new(PatternRule::new(
+        MAX_FILE_LINES,
+        &[LINE_COUNT],
+        |meta: &RuleMeta, ctx: &Ctx, Limit { max }| {
+            let (file, _) = ctx
+                .file
+                .ok_or_else(|| Error::Failed("no file".to_owned()))?;
+            let lines: usize = ctx.fact(LINE_COUNT)?;
+            if lines <= max {
+                return Ok(Vec::new());
+            }
+            let at = |line: usize| Position {
+                line: u32::try_from(line).unwrap_or(u32::MAX),
+                col: 1,
+            };
+            let mut diagnostic = Diagnostic::new(
+                MAX_FILE_LINES,
+                meta.severity,
+                format!("file has {lines} lines, limit is {max}"),
+                &file.path,
+                Span {
+                    start: at(max + 1),
+                    end: at(lines),
+                },
+                Fingerprint::of(MAX_FILE_LINES, &file.path.to_string_lossy(), ""),
+            );
+            diagnostic.evidence = json!({ "lines": lines, "max": max });
+            Ok(vec![diagnostic])
+        },
+    ))
 }

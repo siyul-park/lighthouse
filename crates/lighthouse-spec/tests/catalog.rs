@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use lighthouse_model::Severity;
 use lighthouse_plugin::Scope as RunScope;
 use lighthouse_spec::{Catalog, Content, Enforcement, Error, Pattern, Scope};
@@ -15,20 +13,6 @@ fn bundled(id: &str) -> &'static Pattern {
 fn bundled_catalog_has_core_design_and_testing_packs() {
     let ids: Vec<_> = Catalog::bundled().packs.iter().map(|p| &*p.id).collect();
     assert_eq!(ids, ["core", "design", "testing"]);
-}
-
-#[test]
-fn legacy_map_covers_every_prototype_rule() {
-    let covered: BTreeSet<_> = Catalog::bundled()
-        .legacy()
-        .keys()
-        .map(String::as_str)
-        .collect();
-    let prototype = [
-        "CP001", "CP002", "CP004", "CP005", "CP006", "CP007", "CP008", "CP009", "CP010", "CP011",
-        "CP012", "CP013", "TP001", "TP002", "TP003", "TP004", "TP005", "TP007",
-    ];
-    assert_eq!(covered, BTreeSet::from(prototype));
 }
 
 #[test]
@@ -399,13 +383,6 @@ mod validation {
             assert_eq!(Catalog::from_files(files).is_ok(), ok, "{sources}");
         }
     }
-
-    #[test]
-    fn legacy_ids_map_to_existing_patterns() {
-        Catalog::from_files(with("legacy.yaml", "CP1: [p/a]\n")).unwrap();
-        rejected(with("legacy.yaml", "CP1: [p/zzz]\n"), "unknown pattern");
-        rejected(with("legacy.yaml", "CP1: []\n"), "at least one");
-    }
 }
 
 mod overlay {
@@ -532,6 +509,13 @@ examples:
         );
         let wrong_type = tweak("extends: p/a\noptions:\n  max:\n    default: text\n");
         assert!(Catalog::overlay(&base_catalog(), &wrong_type).is_err());
+    }
+
+    #[test]
+    fn extends_rejects_unknown_option_names() {
+        let typo = tweak("extends: p/a\noptions:\n  mx:\n    default: 9\n");
+        let err = Catalog::overlay(&base_catalog(), &typo).unwrap_err();
+        assert!(err.to_string().contains("unknown option `mx`"), "{err}");
     }
 
     #[test]

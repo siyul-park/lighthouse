@@ -56,7 +56,6 @@ requirement: Beta SHOULD be considered.
 enforcement: doc
 ",
         ),
-        ("legacy.yaml", "CP999: [demo/alpha]\n"),
     ];
     Catalog::from_files(
         files

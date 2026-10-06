@@ -250,7 +250,99 @@ High complexity often marks a symbol doing too much.
 
 **Requirement**
 
-Complexity SHOULD be judged from cyclomatic complexity together with statement count and nesting depth, against deliberately high thresholds.
+Complexity SHOULD be judged from cyclomatic complexity together with statement count and nesting depth, against deliberately high thresholds. Cyclomatic complexity is one path plus each `if`, `else if`, loop, error handler clause, non-default switch arm and boolean operator (`&&`, `||`); nesting counts the deepest level of nested constructs, a flat body being 0, and nested functions count as a level.
+
+**Exceptions**
+
+A body that is one switch whose every arm is a single return is a table in code form and is not reported.
+
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `cognitive` | int | `30` | Cognitive complexity that, with `cognitive_statements`, marks a hard-to-follow body. |
+| `cognitive_statements` | int | `30` | Statement count of the cognitive signal. |
+| `cyclomatic` | int | `15` | Cyclomatic complexity that, with `statements`, marks high complexity. |
+| `statements` | int | `30` | Statement count that, with `cyclomatic`, marks high complexity. |
+| `structural_cyclomatic` | int | `10` | Cyclomatic complexity of the structural signal. |
+| `structural_nesting` | int | `5` | Nesting depth of the structural signal; a flat body is 0. |
+| `structural_statements` | int | `25` | Statement count of the structural signal. |
+
+**Invalid example: many-branches (go)**
+
+Options: `cyclomatic` = `4`, `statements` = `7`
+
+```go
+package sample
+
+func classify(n int) string {
+	if n < 0 {
+		return "negative"
+	}
+	if n == 0 {
+		return "zero"
+	}
+	if n < 10 {
+		return "small"
+	}
+	return "large"
+}
+```
+
+**Invalid example: deep-loops (go)**
+
+Options: `cognitive` = `6`, `cognitive_statements` = `6`
+
+```go
+package sample
+
+func scan(rows [][]int) int {
+	total := 0
+	for _, row := range rows {
+		for _, v := range row {
+			if v > 0 {
+				total += v
+			}
+		}
+	}
+	return total
+}
+```
+
+**Valid example: below-thresholds (go)**
+
+```go
+package sample
+
+func classify(n int) string {
+	if n < 0 {
+		return "negative"
+	}
+	if n == 0 {
+		return "zero"
+	}
+	return "positive"
+}
+```
+
+**Valid example: dispatcher (go)**
+
+Options: `cyclomatic` = `1`, `statements` = `1`
+
+```go
+package sample
+
+func name(k int) string {
+	switch k {
+	case 0:
+		return "zero"
+	case 1:
+		return "one"
+	default:
+		return "many"
+	}
+}
+```
 
 **Method**
 
@@ -266,7 +358,72 @@ A dependency hub changes for many reasons.
 
 **Requirement**
 
-Coupling SHOULD be judged from direct fan-in, fan-out, and dependency depth, against deliberately high thresholds.
+Coupling SHOULD be judged from direct intra-package fan-in and fan-out, that is the functions and methods of the same package that call a symbol or are called by it, against deliberately high thresholds. Calls from other packages and from tests do not count: a widely used public function is a service, not a hub.
+
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `coordinator_fan_out` | int | `12` | Callees that, with the other `coordinator_*` options, mark a coordinator. |
+| `coordinator_max_fan_in` | int | `1` | Most callers a coordinator may have. |
+| `coordinator_statements` | int | `15` | Statement count of a coordinator. |
+| `hub_fan_in` | int | `8` | Callers that, with `hub_fan_out` and `hub_statements`, mark a dependency hub. |
+| `hub_fan_out` | int | `6` | Callees of a dependency hub. |
+| `hub_statements` | int | `20` | Statement count of a dependency hub. |
+
+**Invalid example: hub (go)**
+
+Options: `hub_fan_in` = `2`, `hub_fan_out` = `2`, `hub_statements` = `1`
+
+```go
+package sample
+
+func hub() {
+	left()
+	right()
+}
+
+func left()  {}
+func right() {}
+
+func a() { hub() }
+func b() { hub() }
+```
+
+**Invalid example: coordinator (go)**
+
+Options: `coordinator_fan_out` = `3`, `coordinator_max_fan_in` = `0`, `coordinator_statements` = `3`, `hub_fan_in` = `100`
+
+```go
+package sample
+
+func run() {
+	one()
+	two()
+	three()
+}
+
+func one()   {}
+func two()   {}
+func three() {}
+```
+
+**Valid example: ordinary-fan (go)**
+
+```go
+package sample
+
+func hub() {
+	left()
+	right()
+}
+
+func left()  {}
+func right() {}
+
+func a() { hub() }
+func b() { hub() }
+```
 
 **Method**
 
@@ -355,17 +512,95 @@ A simple single-use wrapper SHOULD be inlined unless its name expresses a real p
 **Invalid example: invalid (go)**
 
 ```go
+package sample
+
+type Store struct{ data map[string][]byte }
+
 func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
+
+func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
 ```
 
 **Valid example: valid (go)**
 
 ```go
+package sample
+
+type Store struct {
+	closed bool
+	data   map[string][]byte
+}
+
 func (s *Store) load(k string) ([]byte, error) {
 	if s.closed {
 		return nil, ErrClosed
 	}
 	return s.read(k)
+}
+
+func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+```
+
+**Valid example: used-as-value (go)**
+
+```go
+package sample
+
+type Store struct{ data map[string][]byte }
+
+func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
+
+func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+
+func (s *Store) Loader() func(string) ([]byte, error) { return s.load }
+```
+
+**Valid example: adds-an-argument (go)**
+
+```go
+package sample
+
+type Store struct{ data map[string][]byte }
+
+func (s *Store) load(k string) ([]byte, error) { return s.read(k, true) }
+
+func (s *Store) read(k string, fresh bool) ([]byte, error) { return s.data[k], nil }
+
+func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+```
+
+**Valid example: called-from-a-test (go)**
+
+`example.go`
+
+```go
+package sample
+
+type Store struct{ data map[string][]byte }
+
+func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
+
+func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+```
+
+`example_test.go`
+
+```go
+package sample
+
+import "testing"
+
+func TestLoad(t *testing.T) {
+	s := &Store{}
+	s.load("k")
 }
 ```
 
@@ -970,6 +1205,85 @@ Public API changes need facts callers cannot read from the code.
 **Requirement**
 
 Exported symbols SHOULD have doc comments in the language's standard form. Public API changes SHOULD document user-visible behavior, constraints, ownership, or other facts the code cannot express.
+
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `exempt_methods` | list | `["String","Error","Unwrap"]` | Method names that implement well-known interfaces and need no doc comment of their own. |
+| `include_internal` | bool | `false` | Also require docs for symbols exported only inside the project, such as under an internal path. |
+| `kinds` | list | `["function","method","type","interface","const","var"]` | Symbol kinds that must be documented when exported. |
+
+**Invalid example: undocumented (go)**
+
+```go
+package sample
+
+type Store struct{}
+
+func (s *Store) Get() int { return 0 }
+
+func New() *Store { return &Store{} }
+
+const Limit = 3
+
+var Default = New()
+```
+
+**Valid example: well-known-methods (go)**
+
+```go
+package sample
+
+// Code is a failure code.
+type Code int
+
+func (c Code) String() string { return "code" }
+
+func (c Code) Error() string { return "code" }
+```
+
+**Valid example: generated-file (go)**
+
+```go
+// Code generated by tool. DO NOT EDIT.
+
+package sample
+
+func Generated() {}
+```
+
+**Valid example: test-file (go)**
+
+```go
+package sample
+
+func Helper() {}
+```
+
+**Valid example: documented (go)**
+
+```go
+package sample
+
+// Store keeps values.
+type Store struct{}
+
+// Get returns the stored value.
+func (s *Store) Get() int { return 0 }
+
+type hidden struct{}
+
+func (h hidden) Run() {}
+
+// Limits bound the store.
+const (
+	Min = 1
+	Max = 3
+)
+
+func helper() {}
+```
 
 **Tuning: go**
 

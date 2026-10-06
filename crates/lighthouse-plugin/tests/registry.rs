@@ -1,4 +1,8 @@
-use lighthouse_plugin::{Analyzer, Ctx, Error, Manifest, Plugin, Registry, Scope};
+use lighthouse_model::{Capability, File, Fragment};
+use lighthouse_plugin::{
+    Analyzer, Conventions, Ctx, Error, LanguageProvider, Manifest, Plugin, Registry, Scope,
+    Workspace,
+};
 use serde_json::Value;
 
 struct Node {
@@ -118,4 +122,79 @@ fn register_rejects_bad_plugins_without_side_effects() {
         registry.register(&graph(&[("t/b", &[])])),
         Err(Error::Duplicate(_))
     ));
+}
+
+#[test]
+fn plugins_are_listed_in_registration_order() {
+    let mut registry = Registry::default();
+    registry
+        .register(&Graph {
+            plugin: "b",
+            nodes: &[],
+        })
+        .unwrap();
+    registry
+        .register(&Graph {
+            plugin: "a",
+            nodes: &[],
+        })
+        .unwrap();
+    assert_eq!(registry.plugins().collect::<Vec<_>>(), ["b", "a"]);
+}
+
+struct Lang {
+    id: &'static str,
+    fallback: bool,
+}
+
+impl LanguageProvider for Lang {
+    fn id(&self) -> &str {
+        self.id
+    }
+    fn globs(&self) -> &[String] {
+        &[]
+    }
+    fn conventions(&self) -> Conventions {
+        Conventions::default()
+    }
+    fn capabilities(&self) -> &[Capability] {
+        &[]
+    }
+    fn fallback(&self) -> bool {
+        self.fallback
+    }
+    fn index(&self, _: &Workspace, _: &File, _: &str) -> Result<Fragment, Error> {
+        Ok(Fragment::default())
+    }
+}
+
+struct Langs(&'static str, &'static [(&'static str, bool)]);
+
+impl Plugin for Langs {
+    fn manifest(&self) -> Manifest {
+        Manifest {
+            id: self.0.to_owned(),
+            version: "0".to_owned(),
+        }
+    }
+    fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
+        self.1
+            .iter()
+            .map(|&(id, fallback)| Box::new(Lang { id, fallback }) as Box<dyn LanguageProvider>)
+            .collect()
+    }
+}
+
+#[test]
+fn fallback_providers_come_after_regular_ones_whatever_the_registration_order() {
+    let mut registry = Registry::default();
+    registry.register(&Langs("a", &[("text", true)])).unwrap();
+    registry
+        .register(&Langs("b", &[("go", false), ("py", false)]))
+        .unwrap();
+    let ids: Vec<_> = registry
+        .languages()
+        .map(|(_, l)| l.id().to_owned())
+        .collect();
+    assert_eq!(ids, ["go", "py", "text"]);
 }

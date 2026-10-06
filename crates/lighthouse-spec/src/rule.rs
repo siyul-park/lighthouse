@@ -1,6 +1,11 @@
-use lighthouse_plugin::{RuleMeta, Scope as RunScope};
+use std::marker::PhantomData;
 
-use crate::{Pattern, Scope};
+use lighthouse_model::{Diagnostic, Options};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta, Scope as RunScope};
+use serde::de::DeserializeOwned;
+use serde_json::Value;
+
+use crate::{Catalog, Pattern, Scope};
 
 impl Scope {
     /// Symbol, file and test patterns are checked once per file; module and
@@ -28,5 +33,68 @@ impl Pattern {
             capabilities: Vec::new(),
             citation: self.citation.clone(),
         })
+    }
+}
+
+/// A rule whose metadata and option defaults come from its catalog pattern.
+/// `check` receives the options resolved for the focused file's language.
+pub struct PatternRule<O, F> {
+    meta: RuleMeta,
+    pattern: &'static Pattern,
+    check: F,
+    options: PhantomData<fn() -> O>,
+}
+
+impl<O, F> PatternRule<O, F>
+where
+    O: DeserializeOwned,
+    F: Fn(&RuleMeta, &Ctx, O) -> Result<Vec<Diagnostic>, Error> + Send + Sync,
+{
+    /// Panics when the bundled catalog has no implemented pattern `id`.
+    pub fn new(id: &str, analyzers: &[&str], check: F) -> Self {
+        let pattern = Catalog::bundled()
+            .pattern(id)
+            .unwrap_or_else(|| panic!("bundled catalog defines {id}"));
+        let mut meta = pattern
+            .rule_meta()
+            .unwrap_or_else(|| panic!("{id} is implemented"));
+        meta.analyzers = analyzers.iter().map(|a| (*a).to_owned()).collect();
+        Self {
+            meta,
+            pattern,
+            check,
+            options: PhantomData,
+        }
+    }
+
+    fn resolve(&self, configured: &Options, language: Option<&str>) -> Result<O, Error> {
+        let fail = |message: String| Error::Options {
+            rule: self.meta.id.clone(),
+            message,
+        };
+        let resolved = self
+            .pattern
+            .resolve_options(configured, language)
+            .map_err(|e| fail(e.to_string()))?;
+        serde_json::from_value(Value::Object(resolved)).map_err(|e| fail(e.to_string()))
+    }
+}
+
+impl<O, F> Rule for PatternRule<O, F>
+where
+    O: DeserializeOwned + Send + Sync,
+    F: Fn(&RuleMeta, &Ctx, O) -> Result<Vec<Diagnostic>, Error> + Send + Sync,
+{
+    fn meta(&self) -> &RuleMeta {
+        &self.meta
+    }
+
+    fn validate(&self, options: &Options) -> Result<(), Error> {
+        self.resolve(options, None).map(drop)
+    }
+
+    fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, Error> {
+        let language = ctx.file.map(|(file, _)| file.lang.as_str());
+        (self.check)(&self.meta, ctx, self.resolve(options, language)?)
     }
 }

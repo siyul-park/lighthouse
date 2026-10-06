@@ -1,4 +1,10 @@
-use std::{env, error::Error, fs, path::PathBuf, process::ExitCode};
+use std::{
+    env,
+    error::Error,
+    fs,
+    path::{Path, PathBuf},
+    process::ExitCode,
+};
 
 use clap::{Parser, Subcommand};
 use lighthouse_config::{Config, FILE_NAME};
@@ -31,6 +37,9 @@ enum Command {
         /// Run only these fully qualified rule ids.
         #[arg(long, value_delimiter = ',')]
         rules: Vec<String>,
+        /// Use this config file; the project root is then the current directory.
+        #[arg(long)]
+        config: Option<PathBuf>,
     },
     /// Inspect bundled rules.
     Rule {
@@ -91,7 +100,8 @@ fn run(cli: Cli) -> Result<u8> {
             format,
             strict,
             rules,
-        } => check(&paths, format, strict, &rules),
+            config,
+        } => check(&paths, format, strict, &rules, config.as_deref()),
         Command::Rule {
             command: RuleCommand::List { all },
         } => rules::list(all),
@@ -104,11 +114,23 @@ fn run(cli: Cli) -> Result<u8> {
     }
 }
 
-fn check(paths: &[PathBuf], format: Format, strict: bool, only: &[String]) -> Result<u8> {
-    let (path, config) = Config::discover(&env::current_dir()?)?
-        .ok_or_else(|| format!("no {FILE_NAME} found (run `lighthouse init`)"))?;
-    let root = path.parent().ok_or("config path has no parent")?;
-    let outcome = Engine::new(lighthouse_builtin::registry(), config, root)?.check(paths, only)?;
+fn check(
+    paths: &[PathBuf],
+    format: Format,
+    strict: bool,
+    only: &[String],
+    config: Option<&Path>,
+) -> Result<u8> {
+    let (config, root) = match config {
+        Some(path) => (Config::load(path)?, env::current_dir()?),
+        None => {
+            let (path, config) = Config::discover(&env::current_dir()?)?
+                .ok_or_else(|| format!("no {FILE_NAME} found (run `lighthouse init`)"))?;
+            let root = path.parent().ok_or("config path has no parent")?.to_owned();
+            (config, root)
+        }
+    };
+    let outcome = Engine::new(lighthouse_builtin::registry(), config, &root)?.check(paths, only)?;
     for notice in &outcome.notices {
         eprintln!("lighthouse: {notice}");
     }

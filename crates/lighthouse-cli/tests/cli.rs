@@ -133,7 +133,14 @@ fn rule_list_and_explain() {
         .args(["rule", "list"])
         .assert()
         .success()
-        .stdout("core/max-file-lines\twarn\tFiles stay below a line limit\n");
+        .stdout(
+            "core/max-file-lines\twarn\tFiles stay below a line limit
+design/complexity-signal\twarn\tComplexity is a review signal
+design/coupling-signal\twarn\tCoupling is a review signal
+design/exported-doc\twarn\tExported symbols are documented
+design/single-use-wrapper\twarn\tInline single-use wrappers
+",
+        );
     let out = lighthouse(dir.path())
         .args(["explain", "core/max-file-lines"])
         .output()
@@ -244,6 +251,34 @@ fn docs_check_reports_unreadable_output_as_an_error() {
     fs::create_dir_all(dir.path().join("docs/patterns/design.md")).unwrap();
     lighthouse(dir.path())
         .args(["docs", "check"])
+        .assert()
+        .code(2);
+}
+
+#[test]
+fn config_flag_checks_the_current_directory_with_another_config_file() {
+    let project = tempfile::tempdir().unwrap();
+    fs::write(project.path().join("go.mod"), "module example.com/app\n").unwrap();
+    fs::write(
+        project.path().join("api.go"),
+        "package app\n\nfunc Open() {}\n",
+    )
+    .unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    let config = elsewhere.path().join("lh.toml");
+    fs::write(
+        &config,
+        "plugins = [\"lang-go\", \"design\"]\nextends = [\"design/recommended\"]\n",
+    )
+    .unwrap();
+    lighthouse(project.path())
+        .args(["check", "--config"])
+        .arg(&config)
+        .assert()
+        .success()
+        .stdout("api.go:3:1: warn design/exported-doc: exported function Open must have a doc comment\n");
+    lighthouse(project.path())
+        .args(["check", "--config", "missing.toml"])
         .assert()
         .code(2);
 }

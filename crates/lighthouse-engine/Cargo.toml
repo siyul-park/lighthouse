@@ -8,11 +8,12 @@ publish.workspace = true
 thiserror.workspace = true
 globset.workspace = true
 ignore.workspace = true
+serde_json.workspace = true
 sha2.workspace = true
+tempfile.workspace = true
+toml.workspace = true
 lighthouse-model.workspace = true
 lighthouse-config.workspace = true
 lighthouse-plugin.workspace = true
+lighthouse-spec.workspace = true
 
-[dev-dependencies]
-serde_json.workspace = true
-tempfile.workspace = true

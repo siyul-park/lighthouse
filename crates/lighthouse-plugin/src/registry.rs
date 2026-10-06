@@ -84,14 +84,24 @@ impl Registry {
         Ok(())
     }
 
+    /// Ids of registered plugins, in registration order.
+    pub fn plugins(&self) -> impl Iterator<Item = &str> {
+        self.plugins.iter().map(|m| m.id.as_str())
+    }
+
     pub fn has_plugin(&self, id: &str) -> bool {
         self.plugins.iter().any(|m| m.id == id)
     }
 
-    /// With the owning plugin id, in registration order; the first provider
-    /// matching a file wins.
+    /// With the owning plugin id: regular providers in registration order,
+    /// then fallback providers; the first provider matching a file wins.
     pub fn languages(&self) -> impl Iterator<Item = (&str, &dyn LanguageProvider)> {
-        self.languages.iter().map(|(p, l)| (p.as_str(), l.as_ref()))
+        let (regular, fallback): (Vec<_>, Vec<_>) = self
+            .languages
+            .iter()
+            .map(|(p, l)| (p.as_str(), l.as_ref()))
+            .partition(|(_, l)| !l.fallback());
+        regular.into_iter().chain(fallback)
     }
 
     pub fn rule(&self, id: &str) -> Option<&dyn Rule> {

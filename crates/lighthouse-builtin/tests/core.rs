@@ -65,6 +65,7 @@ fn recommended_preset_derives_levels_from_rule_meta() {
     let preset = registry.preset("core/recommended").unwrap();
     let want: BTreeMap<_, _> = registry
         .rules()
+        .filter(|r| lighthouse_plugin::plugin_of(&r.meta().id) == "core")
         .map(|r| (r.meta().id.clone(), Some(r.meta().severity)))
         .collect();
     let got: BTreeMap<_, _> = preset
@@ -150,25 +151,6 @@ fn registered_rules_are_exactly_the_catalog_patterns_implemented_by_builtin() {
 }
 
 #[test]
-fn catalog_examples_drive_the_rule() {
-    let catalog = lighthouse_spec::Catalog::bundled();
-    let pattern = catalog.pattern("core/max-file-lines").unwrap();
-    for example in &pattern.examples {
-        let options: Options = example.options.clone();
-        let text = example.files[0].text();
-        let found = run_rule(text, &options).unwrap();
-        match example.kind {
-            lighthouse_spec::Kind::Valid => assert!(found.is_empty(), "{}", example.name),
-            lighthouse_spec::Kind::Invalid => {
-                let lines: Vec<_> = found.iter().map(|d| d.span.start.line).collect();
-                let want: Vec<_> = example.expect.iter().map(|e| e.line).collect();
-                assert_eq!(lines, want, "{}", example.name);
-            }
-        }
-    }
-}
-
-#[test]
 fn default_limit_comes_from_the_catalog() {
     let text = "x\n".repeat(1001);
     assert_eq!(run_rule(&text, &Options::new()).unwrap().len(), 1);
@@ -177,4 +159,32 @@ fn default_limit_comes_from_the_catalog() {
             .unwrap()
             .is_empty()
     );
+}
+
+#[test]
+fn fallback_text_provider_is_tried_after_language_providers() {
+    let registry = lighthouse_builtin::registry();
+    let plugins: Vec<_> = registry.plugins().collect();
+    assert_eq!(plugins, ["core", "lang-go", "metrics", "design"]);
+    let languages: Vec<_> = registry
+        .languages()
+        .map(|(_, l)| l.id().to_owned())
+        .collect();
+    assert_eq!(languages, ["go", "text"]);
+    let design: Vec<_> = registry
+        .rules()
+        .filter(|r| lighthouse_plugin::plugin_of(&r.meta().id) == "design")
+        .map(|r| r.meta().id.clone())
+        .collect();
+    assert_eq!(
+        design,
+        [
+            "design/complexity-signal",
+            "design/coupling-signal",
+            "design/exported-doc",
+            "design/single-use-wrapper"
+        ]
+    );
+    let preset = registry.preset("design/recommended").unwrap();
+    assert_eq!(preset.rules.len(), design.len());
 }

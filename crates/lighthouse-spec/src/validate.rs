@@ -8,8 +8,7 @@ use crate::{
 /// Everything a single layer must satisfy on its own.
 pub(crate) fn layer(catalog: &Catalog) -> Result<(), Error> {
     patterns(catalog)?;
-    sources(catalog)?;
-    legacy(catalog)
+    sources(catalog)
 }
 
 /// Pattern-level rules; also run on a merged overlay.
@@ -188,24 +187,6 @@ fn sources(catalog: &Catalog) -> Result<(), Error> {
         {
             return Err(Error::invalid(
                 &source.reference,
-                format!("maps to unknown pattern `{id}`"),
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn legacy(catalog: &Catalog) -> Result<(), Error> {
-    for (old, targets) in &catalog.legacy {
-        if targets.is_empty() {
-            return Err(Error::invalid(
-                old,
-                "a legacy id maps to at least one pattern",
-            ));
-        }
-        if let Some(id) = targets.iter().find(|id| catalog.pattern(id).is_none()) {
-            return Err(Error::invalid(
-                old,
                 format!("maps to unknown pattern `{id}`"),
             ));
         }

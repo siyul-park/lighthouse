@@ -100,6 +100,10 @@ pub trait LanguageProvider: Send + Sync {
     fn globs(&self) -> &[String];
     fn conventions(&self) -> Conventions;
     fn capabilities(&self) -> &[Capability];
+    /// A fallback provider claims a file only when no other provider does.
+    fn fallback(&self) -> bool {
+        false
+    }
     fn index(&self, ws: &Workspace, file: &File, text: &str) -> Result<Fragment, Error>;
 }
 
