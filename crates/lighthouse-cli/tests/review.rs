@@ -356,7 +356,7 @@ fn agent_format_briefs_the_agent_and_agent_json_carries_the_same_records() {
     assert_eq!(findings.len(), 2);
     let review = findings.iter().find(|f| f["severity"] == "review").unwrap();
     let command = review["resolve"]["command"].as_str().unwrap();
-    assert!(command.contains(review["fingerprint"].as_str().unwrap()));
+    assert!(command.contains(&review["fingerprint"].as_str().unwrap()[..12]));
     assert_eq!(json.last().unwrap()["type"], "summary");
 }
 
@@ -461,4 +461,18 @@ fn go_findings_are_remembered_and_resolved_like_any_other() {
             "review", "list", "--status", "all", "--format", "json",
         ])));
     assert!(all[0]["resolved_at"].is_string());
+}
+
+#[test]
+fn limit_trims_agent_output_and_is_refused_for_other_formats() {
+    let dir = rust_project(&[("src/lib.rs", HELPER)]);
+    let text = stdout(lighthouse(dir.path()).args(["check", "--format", "agent", "--limit", "1"]));
+    assert!(text.contains("design/exported-doc  warn"), "{text}");
+    assert!(!text.contains("private-helper-callers  review"), "{text}");
+    assert!(text.contains("... 1 more finding(s) not shown"), "{text}");
+    lighthouse(dir.path())
+        .args(["check", "--limit", "1"])
+        .assert()
+        .code(2)
+        .stderr("lighthouse: --limit applies to the agent formats only\n");
 }

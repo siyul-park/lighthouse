@@ -77,6 +77,8 @@ fn agent_text_gives_each_finding_everything_needed_to_act() {
         catalog: Some(Catalog::bundled()),
         facts: Some(&facts),
         suppressed: 2,
+        allowed: 1,
+        ..Briefing::default()
     };
     insta::assert_snapshot!(render_with(Format::Agent, &findings, &gap(), &briefing));
 }
@@ -89,6 +91,8 @@ fn agent_json_is_one_tagged_record_per_line() {
         catalog: Some(Catalog::bundled()),
         facts: Some(&facts),
         suppressed: 2,
+        allowed: 1,
+        ..Briefing::default()
     };
     let out = render_with(Format::AgentJson, &findings, &gap(), &briefing);
     let records: Vec<Value> = out
@@ -122,8 +126,8 @@ fn agent_json_is_one_tagged_record_per_line() {
         command.starts_with("lighthouse review resolve "),
         "{command}"
     );
-    assert!(command.contains(review["fingerprint"].as_str().unwrap()));
-    assert_eq!(review["resolve"]["verdicts"]["deferred"], json!(["none"]));
+    assert!(command.contains(&review["fingerprint"].as_str().unwrap()[..12]));
+    assert!(review["resolve"].get("verdicts").is_none());
 
     let custom = &records[2];
     assert_eq!(custom["tier"], "mechanical");
@@ -134,6 +138,9 @@ fn agent_json_is_one_tagged_record_per_line() {
     assert_eq!(summary["errors"], 1);
     assert_eq!(summary["reviews"], 1);
     assert_eq!(summary["suppressed"], 2);
+    assert_eq!(summary["allowed"], 1);
+    assert_eq!(summary["reasons"]["deferred"], json!(["none"]));
+    assert_eq!(summary["reasons"]["rejected"][0], "false-positive");
 }
 
 #[test]
@@ -141,7 +148,7 @@ fn agent_formats_state_a_clean_run() {
     let text = render(Format::Agent, &[], &[]);
     assert_eq!(
         text,
-        "summary: 0 error, 0 warn, 0 review, 0 incomplete, 0 suppressed\n"
+        "summary: 0 error, 0 warn, 0 review, 0 incomplete, 0 suppressed, 0 allowed\n"
     );
     let json = render(Format::AgentJson, &[], &[]);
     let summary: Value = serde_json::from_str(json.trim()).unwrap();
@@ -155,7 +162,7 @@ fn agent_excerpts_stay_bounded() {
     let briefing = Briefing {
         catalog: Some(Catalog::bundled()),
         facts: Some(&facts),
-        suppressed: 0,
+        ..Briefing::default()
     };
     let out = render_with(Format::AgentJson, &findings, &[], &briefing);
     let record: Value = serde_json::from_str(out.lines().next().unwrap()).unwrap();
@@ -168,4 +175,217 @@ fn agent_excerpts_stay_bounded() {
 fn format_parses_agent_names() {
     assert_eq!("agent".parse::<Format>().unwrap(), Format::Agent);
     assert_eq!("agent-json".parse::<Format>().unwrap(), Format::AgentJson);
+}
+
+fn briefed<'a>(
+    facts: &'a BTreeMap<Fingerprint, Value>,
+    extra: impl FnOnce(Briefing<'a>) -> Briefing<'a>,
+) -> Briefing<'a> {
+    extra(Briefing {
+        catalog: Some(Catalog::bundled()),
+        facts: Some(facts),
+        ..Briefing::default()
+    })
+}
+
+fn records_of(out: &str) -> Vec<Value> {
+    out.lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect()
+}
+
+#[test]
+fn limit_keeps_the_most_severe_findings_and_counts_the_rest() {
+    let findings = [helper(), coupling(), unknown_rule()];
+    let facts = facts(&findings);
+    let briefing = briefed(&facts, |b| Briefing {
+        limit: Some(2),
+        ..b
+    });
+    let text = render_with(Format::Agent, &findings, &[], &briefing);
+    assert!(text.contains("acme/custom  error"), "{text}");
+    assert!(text.contains("design/coupling-signal  warn"), "{text}");
+    assert!(!text.contains("private-helper-callers  review"), "{text}");
+    assert!(
+        text.contains("... 1 more finding(s) not shown (raise --limit)"),
+        "{text}"
+    );
+    assert!(
+        text.contains("summary: 1 error, 1 warn, 1 review"),
+        "{text}"
+    );
+    assert!(!text.contains("reasons:"), "{text}");
+
+    let json = records_of(&render_with(Format::AgentJson, &findings, &[], &briefing));
+    let kinds: Vec<_> = json.iter().map(|r| r["type"].as_str().unwrap()).collect();
+    assert_eq!(kinds, ["finding", "finding", "truncated", "summary"]);
+    assert_eq!(json[2]["omitted"], 1);
+    assert_eq!(
+        json[0]["rule"], "design/coupling-signal",
+        "original order is kept"
+    );
+    assert!(json[3].get("reasons").is_none());
+}
+
+#[test]
+fn notes_say_why_a_finding_is_reported() {
+    let findings = [unknown_rule()];
+    let facts = facts(&findings);
+    let notes = BTreeMap::from([(
+        findings[0].fingerprint.clone(),
+        "verdict expired: rule changed".to_owned(),
+    )]);
+    let briefing = briefed(&facts, |b| Briefing {
+        notes: Some(&notes),
+        ..b
+    });
+    let text = render_with(Format::Agent, &findings, &[], &briefing);
+    assert!(
+        text.contains("  note:        verdict expired: rule changed"),
+        "{text}"
+    );
+    let json = records_of(&render_with(Format::AgentJson, &findings, &[], &briefing));
+    assert_eq!(json[0]["note"], "verdict expired: rule changed");
+}
+
+#[test]
+fn evidence_leaves_out_the_owner_symbol_and_cuts_long_values() {
+    let mut d = coupling();
+    d.evidence = json!({
+        "symbol": "jit::compile#function",
+        "callees": "x".repeat(400),
+        "fan_in": 2,
+    });
+    let findings = [d];
+    let facts = facts(&findings);
+    let briefing = briefed(&facts, |b| b);
+    let json = records_of(&render_with(Format::AgentJson, &findings, &[], &briefing));
+    let evidence = &json[0]["evidence"];
+    assert!(evidence.get("symbol").is_none());
+    assert_eq!(evidence["fan_in"], 2);
+    assert!(evidence["callees"].as_str().unwrap().len() < 140);
+    let text = render_with(Format::Agent, &findings, &[], &briefing);
+    assert!(!text.contains("symbol=jit"), "{text}");
+}
+
+#[test]
+fn fingerprint_prefixes_grow_until_the_shown_findings_are_distinct() {
+    let make = |raw: &str| {
+        let mut d = unknown_rule();
+        d.fingerprint = Fingerprint::from_raw(raw);
+        d
+    };
+    let a = format!("{}1{}", "a".repeat(12), "0".repeat(51));
+    let b = format!("{}2{}", "a".repeat(12), "0".repeat(51));
+    let findings = [make(&a), make(&b)];
+    let text = render(Format::Agent, &findings, &[]);
+    assert!(
+        text.contains(&format!("fingerprint: {}", &a[..13])),
+        "{text}"
+    );
+    assert!(
+        text.contains(&format!("fingerprint: {}", &b[..13])),
+        "{text}"
+    );
+}
+
+fn pattern_with(examples: &str, tuning: &str) -> Catalog {
+    let pattern = format!(
+        "id: p/a\ntitle: A\nintent: i\nscope: symbol\nrequirement: A MUST b.\nenforcement: judgment\n{tuning}examples:\n{examples}"
+    );
+    let files = std::collections::BTreeMap::from([
+        (
+            "p/pack.yaml".to_owned(),
+            "id: p\ntitle: P\nintro: x\nsections: [s]\n".to_owned(),
+        ),
+        (
+            "p/s/section.yaml".to_owned(),
+            "id: s\ntitle: S\nintro: x\npatterns: [a]\n".to_owned(),
+        ),
+        ("p/s/a.yaml".to_owned(), pattern),
+    ]);
+    Catalog::from_files(files).unwrap()
+}
+
+fn example(name: &str, kind: &str, canonical: bool, body: &str) -> String {
+    format!(
+        "  - name: {name}\n    language: go\n    kind: {kind}\n    canonical: {canonical}\n    files:\n      - path: a.go\n        body: |-\n          {body}\n"
+    )
+}
+
+fn expected_basis(catalog: &Catalog, kind: &str) -> Option<(String, String)> {
+    let mut d = unknown_rule();
+    d.rule_id = "p/a".to_owned();
+    d.file = "x.go".into();
+    let findings = [d];
+    let facts = BTreeMap::from([(
+        findings[0].fingerprint.clone(),
+        json!({ "language": "go", "kind": kind, "visibility": "private" }),
+    )]);
+    let briefing = Briefing {
+        catalog: Some(catalog),
+        facts: Some(&facts),
+        ..Briefing::default()
+    };
+    let out = render_with(Format::AgentJson, &findings, &[], &briefing);
+    let record = &records_of(&out)[0];
+    let expected = record.get("expected")?;
+    Some((
+        expected["basis"].as_str()?.to_owned(),
+        expected["name"]
+            .as_str()
+            .or(expected["source"].as_str())?
+            .to_owned(),
+    ))
+}
+
+#[test]
+fn expected_structure_prefers_canonical_then_a_match_then_the_shortest_then_tuning() {
+    let canonical = pattern_with(
+        &format!(
+            "{}{}",
+            example("short-valid", "valid", false, "x"),
+            example("long-valid", "valid", true, "x\n          y\n          z")
+        ),
+        "",
+    );
+    assert_eq!(
+        expected_basis(&canonical, "function"),
+        Some(("canonical".to_owned(), "long-valid".to_owned()))
+    );
+
+    let matched = pattern_with(
+        &format!(
+            "{}{}{}{}",
+            example("plain-valid", "valid", false, "x"),
+            example("method-valid", "valid", false, "x\n          y"),
+            example("plain-invalid", "invalid", false, "x").replace(
+                "canonical: false",
+                "canonical: false\n    expect: [{ line: 1 }]"
+            ),
+            example("method-invalid", "invalid", false, "x").replace(
+                "canonical: false",
+                "canonical: false\n    expect: [{ line: 1 }]"
+            ),
+        ),
+        "",
+    );
+    assert_eq!(
+        expected_basis(&matched, "method"),
+        Some(("matches kind=method".to_owned(), "method-valid".to_owned()))
+    );
+    assert_eq!(
+        expected_basis(&matched, "function"),
+        Some((
+            "shortest valid example".to_owned(),
+            "plain-valid".to_owned()
+        ))
+    );
+
+    let tuned = pattern_with("", "tuning:\n  go: Write it the Go way.\n");
+    assert_eq!(
+        expected_basis(&tuned, "function"),
+        Some(("tuning".to_owned(), "tuning".to_owned()))
+    );
+    assert_eq!(expected_basis(&pattern_with("", ""), "function"), None);
 }

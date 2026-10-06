@@ -1,9 +1,9 @@
 use std::{collections::BTreeMap, fmt::Write, path::Path};
 
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Severity, Verdict};
-use lighthouse_spec::{Catalog, Enforcement, Example, Kind, Pattern};
+use lighthouse_spec::{Catalog, Example, Kind, Pattern, tier};
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
 /// Longest excerpt of an example, in lines and in characters.
 const EXCERPT_LINES: usize = 12;
@@ -11,17 +11,28 @@ const EXCERPT_CHARS: usize = 600;
 /// Longest tuning text and longest single evidence value, in characters.
 const TUNING_CHARS: usize = 300;
 const VALUE_CHARS: usize = 120;
+/// Shortest fingerprint prefix shown; longer when needed to stay unambiguous.
+const PREFIX_MIN: usize = 12;
 
 /// What the agent formats add to a bare diagnostic: the catalog the rules
-/// come from, what the analysis knew about each finding, and how many
-/// findings review verdicts kept out of the report.
+/// come from, what the analysis knew about each finding, how many findings
+/// verdicts and source annotations kept out of the report, and how many to
+/// print.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Briefing<'a> {
     pub catalog: Option<&'a Catalog>,
-    /// Subject facts by fingerprint; the `language` entry picks the
-    /// language-specific expected structure.
+    /// Subject facts by fingerprint; the `language`, `kind` and `visibility`
+    /// entries pick the expected structure.
     pub facts: Option<&'a BTreeMap<Fingerprint, Value>>,
+    /// Why a finding is reported although a verdict was recorded on it, by
+    /// fingerprint.
+    pub notes: Option<&'a BTreeMap<Fingerprint, String>>,
     pub suppressed: usize,
+    /// Findings allowed by source annotations.
+    pub allowed: usize,
+    /// Print at most this many findings, errors first, and say how many were
+    /// left out.
+    pub limit: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -39,6 +50,9 @@ struct Expected {
     /// the language).
     source: &'static str,
     language: String,
+    /// Why this one: `canonical`, `matches kind=function`, `shortest valid
+    /// example` or `tuning`.
+    basis: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -62,12 +76,33 @@ struct Finding<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     intent: Option<String>,
     #[serde(skip_serializing_if = "Value::is_null")]
-    evidence: &'a Value,
+    evidence: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     expected: Option<Expected>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    note: Option<String>,
     fingerprint: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     resolve: Option<Value>,
+}
+
+/// What the expected structure is chosen by: the file's language and the kind
+/// and visibility of the finding's symbol.
+struct Subject<'a> {
+    language: Option<&'a str>,
+    kind: Option<&'a str>,
+    visibility: Option<&'a str>,
+}
+
+impl<'a> Subject<'a> {
+    fn of(facts: Option<&'a Value>) -> Self {
+        let text = |key: &str| facts.and_then(|f| f.get(key)).and_then(Value::as_str);
+        Self {
+            language: text("language"),
+            kind: text("kind"),
+            visibility: text("visibility"),
+        }
+    }
 }
 
 /// One block per finding, then the gaps, a footer naming the reasons review
@@ -77,59 +112,104 @@ pub(crate) fn text(
     incomplete: &[Incomplete],
     briefing: &Briefing,
 ) -> String {
+    let (shown, omitted) = select(diagnostics, briefing.limit);
+    let width = prefix_len(&shown);
     let mut out = String::new();
-    for diagnostic in diagnostics {
-        out.push_str(&block(&finding(diagnostic, briefing)));
+    for diagnostic in &shown {
+        out.push_str(&block(&finding(diagnostic, briefing, width), width));
         out.push('\n');
+    }
+    if omitted > 0 {
+        let _ = writeln!(
+            out,
+            "... {omitted} more finding(s) not shown (raise --limit)"
+        );
     }
     for item in incomplete {
         let _ = writeln!(out, "{}", incomplete_line(item));
     }
-    if diagnostics.iter().any(|d| d.severity == Severity::Review) {
+    if shown.iter().any(|d| d.severity == Severity::Review) {
         let _ = writeln!(out, "reasons: {}", reasons_line());
     }
     let _ = writeln!(out, "{}", summary_line(diagnostics, incomplete, briefing));
     out
 }
 
-/// One JSON object per line: findings, incomplete entries, then the summary,
-/// each tagged with `type`.
+/// One JSON object per line: findings, incomplete entries, a `truncated`
+/// record when `limit` left findings out, then the summary, each tagged with
+/// `type`. The summary carries the reasons table once, when a shown finding
+/// asks for review.
 pub(crate) fn json_lines(
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
     briefing: &Briefing,
 ) -> String {
-    let mut lines: Vec<String> = diagnostics
+    let (shown, omitted) = select(diagnostics, briefing.limit);
+    let width = prefix_len(&shown);
+    let mut lines: Vec<String> = shown
         .iter()
-        .map(|d| serde_json::to_string(&finding(d, briefing)).expect("finding serializes"))
+        .map(|d| serde_json::to_string(&finding(d, briefing, width)).expect("finding serializes"))
         .collect();
     lines.extend(incomplete.iter().map(|item| {
         json!({ "type": "incomplete", "path": item.path, "reason": item.reason }).to_string()
     }));
+    if omitted > 0 {
+        lines.push(json!({ "type": "truncated", "omitted": omitted }).to_string());
+    }
     let count = |s: Severity| diagnostics.iter().filter(|d| d.severity == s).count();
-    lines.push(
-        json!({
-            "type": "summary",
-            "errors": count(Severity::Error),
-            "warnings": count(Severity::Warn),
-            "reviews": count(Severity::Review),
-            "incomplete": incomplete.len(),
-            "suppressed": briefing.suppressed,
-        })
-        .to_string(),
-    );
+    let mut summary = json!({
+        "type": "summary",
+        "errors": count(Severity::Error),
+        "warnings": count(Severity::Warn),
+        "reviews": count(Severity::Review),
+        "incomplete": incomplete.len(),
+        "suppressed": briefing.suppressed,
+        "allowed": briefing.allowed,
+    });
+    if shown.iter().any(|d| d.severity == Severity::Review) {
+        summary["reasons"] = reasons();
+    }
+    lines.push(summary.to_string());
     lines.iter().map(|line| format!("{line}\n")).collect()
 }
 
-fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing) -> Finding<'a> {
+/// The findings to print: all of them, or the first `limit` by severity
+/// (errors first) in their original order, and how many were left out.
+fn select(diagnostics: &[Diagnostic], limit: Option<usize>) -> (Vec<&Diagnostic>, usize) {
+    let Some(limit) = limit.filter(|&l| l < diagnostics.len()) else {
+        return (diagnostics.iter().collect(), 0);
+    };
+    let mut order: Vec<usize> = (0..diagnostics.len()).collect();
+    order.sort_by_key(|&i| diagnostics[i].severity);
+    order.truncate(limit);
+    order.sort_unstable();
+    let shown = order.into_iter().map(|i| &diagnostics[i]).collect();
+    (shown, diagnostics.len() - limit)
+}
+
+/// How many characters of a fingerprint tell the shown findings apart.
+fn prefix_len(shown: &[&Diagnostic]) -> usize {
+    let distinct = |len: usize| {
+        let mut seen = std::collections::BTreeSet::new();
+        shown
+            .iter()
+            .all(|d| seen.insert(prefix(d.fingerprint.as_str(), len)))
+    };
+    (PREFIX_MIN..=64).find(|&len| distinct(len)).unwrap_or(64)
+}
+
+fn prefix(fingerprint: &str, len: usize) -> &str {
+    fingerprint.get(..len).unwrap_or(fingerprint)
+}
+
+fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) -> Finding<'a> {
     let pattern = briefing
         .catalog
         .and_then(|catalog| catalog.pattern(&diagnostic.rule_id));
-    let language = briefing
+    let facts = briefing
         .facts
-        .and_then(|facts| facts.get(&diagnostic.fingerprint))
-        .and_then(|facts| facts.get("language"))
-        .and_then(Value::as_str);
+        .and_then(|facts| facts.get(&diagnostic.fingerprint));
+    let subject = Subject::of(facts);
     Finding {
         kind: "finding",
         rule: &diagnostic.rule_id,
@@ -145,53 +225,95 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing) -> Finding<'a> {
         message: &diagnostic.message,
         requirement: pattern.map(|p| one_line(&p.requirement)),
         intent: pattern.map(|p| one_line(&p.intent)),
-        evidence: &diagnostic.evidence,
-        expected: pattern.and_then(|p| expected(p, language, &diagnostic.file)),
+        evidence: evidence(&diagnostic.evidence, diagnostic.symbol.as_deref()),
+        expected: pattern.and_then(|p| expected(p, &subject, &diagnostic.file)),
+        note: briefing
+            .notes
+            .and_then(|notes| notes.get(&diagnostic.fingerprint))
+            .cloned(),
         fingerprint: diagnostic.fingerprint.as_str(),
-        resolve: (diagnostic.severity == Severity::Review).then(|| resolve(diagnostic)),
+        resolve: (diagnostic.severity == Severity::Review).then(|| resolve(diagnostic, width)),
     }
 }
 
-/// How the finding is decided: the pattern's enforcement, or, for a rule
-/// without a pattern, what its severity implies.
-fn tier(severity: Severity, pattern: Option<&Pattern>) -> &'static str {
-    match pattern.map(|p| p.enforcement) {
-        Some(Enforcement::Mechanical) => "mechanical",
-        Some(Enforcement::Heuristic) => "heuristic",
-        Some(Enforcement::Judgment) => "judgment",
-        Some(Enforcement::Doc) | None => match severity {
-            Severity::Error => "mechanical",
-            Severity::Warn => "heuristic",
-            Severity::Review => "judgment",
-            Severity::Info => "evidence",
-        },
+/// The canonical valid example for the file's language; else the valid
+/// example whose name (or whose invalid counterpart's) mentions the kind or
+/// visibility of the finding's symbol; else the shortest valid example; else
+/// the pattern's tuning note for the language. Each kept short.
+fn expected(pattern: &Pattern, subject: &Subject, file: &Path) -> Option<Expected> {
+    let valid: Vec<&Example> = pattern
+        .examples
+        .iter()
+        .filter(|e| e.kind == Kind::Valid)
+        .filter(|e| subject.language.is_none_or(|l| e.language == l))
+        .collect();
+    let chosen = valid
+        .iter()
+        .find(|e| e.canonical)
+        .map(|e| (*e, "canonical".to_owned()))
+        .or_else(|| matching(pattern, &valid, subject))
+        .or_else(|| {
+            let shortest = valid.iter().min_by_key(|e| size(e))?;
+            Some((*shortest, "shortest valid example".to_owned()))
+        });
+    if let Some((example, basis)) = chosen {
+        return Some(from_example(example, basis, file));
     }
+    let language = subject.language?;
+    let text = pattern.tuning.get(language)?;
+    Some(Expected {
+        source: "tuning",
+        language: language.to_owned(),
+        basis: "tuning".to_owned(),
+        name: None,
+        path: None,
+        excerpt: truncate(&one_line(text), TUNING_CHARS),
+    })
 }
 
-/// A valid example for the file's language, else the pattern's tuning for it,
-/// else a valid example of any language, each kept short.
-fn expected(pattern: &Pattern, language: Option<&str>, file: &Path) -> Option<Expected> {
-    let valid = |wanted: Option<&str>| {
-        pattern
+/// The valid example that mentions the most of the subject's kind and
+/// visibility, in its own name or in its invalid counterpart's; none when no
+/// example mentions either.
+fn matching<'a>(
+    pattern: &'a Pattern,
+    valid: &[&'a Example],
+    subject: &Subject,
+) -> Option<(&'a Example, String)> {
+    let score = |example: &Example| {
+        let counterpart = pattern
             .examples
             .iter()
-            .find(|e| e.kind == Kind::Valid && wanted.is_none_or(|l| e.language == l))
+            .filter(|e| e.kind == Kind::Invalid && e.language == example.language)
+            .find(|e| pair_key(&e.name) == pair_key(&example.name))
+            .map_or("", |e| e.name.as_str());
+        let names = format!("{} {counterpart}", example.name).to_lowercase();
+        [subject.kind, subject.visibility]
+            .into_iter()
+            .flatten()
+            .filter(|word| names.contains(*word))
+            .count()
     };
-    let tuning = language.and_then(|l| pattern.tuning.get(l).map(|text| (l, text)));
-    match (language.and_then(|l| valid(Some(l))), tuning, valid(None)) {
-        (Some(example), _, _) | (None, None, Some(example)) => Some(from_example(example, file)),
-        (None, Some((language, text)), _) => Some(Expected {
-            source: "tuning",
-            language: language.to_owned(),
-            name: None,
-            path: None,
-            excerpt: truncate(&one_line(text), TUNING_CHARS),
-        }),
-        (None, None, None) => None,
-    }
+    let best = valid
+        .iter()
+        .map(|e| (score(e), *e))
+        .filter(|(score, _)| *score > 0)
+        .max_by_key(|(score, _)| *score)?
+        .1;
+    let kind = subject.kind.unwrap_or("symbol");
+    Some((best, format!("matches kind={kind}")))
 }
 
-fn from_example(example: &Example, file: &Path) -> Expected {
+/// A name without the words that mark an example valid or invalid, so
+/// `rust-valid` and `rust-invalid` pair up.
+fn pair_key(name: &str) -> String {
+    name.replace("invalid", "").replace("valid", "")
+}
+
+fn size(example: &Example) -> usize {
+    example.files.iter().map(|f| f.text().len()).sum()
+}
+
+fn from_example(example: &Example, basis: String, file: &Path) -> Expected {
     let extension = file.extension();
     let chosen = example
         .files
@@ -201,6 +323,7 @@ fn from_example(example: &Example, file: &Path) -> Expected {
     Expected {
         source: "example",
         language: example.language.clone(),
+        basis,
         name: Some(example.name.clone()),
         path: chosen.map(|f| f.path.clone()),
         excerpt: chosen.map(|f| excerpt(f.text())).unwrap_or_default(),
@@ -229,19 +352,49 @@ fn one_line(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn resolve(diagnostic: &Diagnostic) -> Value {
+/// The evidence without values that repeat the owner symbol, each value cut
+/// to a bounded length.
+fn evidence(evidence: &Value, symbol: Option<&str>) -> Value {
+    let Some(map) = evidence.as_object() else {
+        return evidence.clone();
+    };
+    let kept: Map<String, Value> = map
+        .iter()
+        .filter(|(_, value)| value.as_str().is_none_or(|s| Some(s) != symbol))
+        .map(|(key, value)| (key.clone(), bounded(value)))
+        .collect();
+    if kept.is_empty() {
+        Value::Null
+    } else {
+        Value::Object(kept)
+    }
+}
+
+fn bounded(value: &Value) -> Value {
+    let text = value.to_string();
+    if text.chars().count() > VALUE_CHARS {
+        Value::String(truncate(&text, VALUE_CHARS))
+    } else {
+        value.clone()
+    }
+}
+
+fn resolve(diagnostic: &Diagnostic, width: usize) -> Value {
+    json!({
+        "command": format!(
+            "lighthouse review resolve {} --verdict <verdict> --reason <reason> --reviewer-kind agent",
+            prefix(diagnostic.fingerprint.as_str(), width)
+        ),
+    })
+}
+
+fn reasons() -> Value {
     let verdicts: BTreeMap<&str, Vec<&str>> =
         [Verdict::Confirmed, Verdict::Rejected, Verdict::Deferred]
             .into_iter()
             .map(|v| (v.as_str(), v.reasons().iter().map(|r| r.as_str()).collect()))
             .collect();
-    json!({
-        "command": format!(
-            "lighthouse review resolve {} --verdict <verdict> --reason <reason> --reviewer-kind agent",
-            diagnostic.fingerprint.as_str()
-        ),
-        "verdicts": verdicts,
-    })
+    json!(verdicts)
 }
 
 fn reasons_line() -> String {
@@ -255,13 +408,13 @@ fn reasons_line() -> String {
         .join("; ")
 }
 
-fn block(finding: &Finding) -> String {
+fn block(finding: &Finding, width: usize) -> String {
     let location = &finding.location;
     let mut out = format!(
         "{}  {} ({})  {}:{}:{}\n",
         finding.rule, finding.severity, finding.tier, location.path, location.line, location.column
     );
-    for (label, value) in fields(finding) {
+    for (label, value) in fields(finding, width) {
         let mut lines = value.lines();
         let first = format!("  {label:<13}{}", lines.next().unwrap_or_default());
         let _ = writeln!(out, "{}", first.trim_end());
@@ -274,7 +427,7 @@ fn block(finding: &Finding) -> String {
 
 /// The labeled lines of a finding's block, in reading order; a value may span
 /// several lines.
-fn fields(finding: &Finding) -> Vec<(&'static str, String)> {
+fn fields(finding: &Finding, width: usize) -> Vec<(&'static str, String)> {
     let mut fields = Vec::new();
     if let Some(symbol) = finding.symbol {
         fields.push(("owner:", symbol.to_owned()));
@@ -287,14 +440,19 @@ fn fields(finding: &Finding) -> Vec<(&'static str, String)> {
             .map(|text| ("requirement:", text)),
     );
     fields.extend(finding.intent.clone().map(|text| ("intent:", text)));
-    fields.extend(evidence_line(finding.evidence).map(|text| ("evidence:", text)));
+    fields.extend(evidence_line(&finding.evidence).map(|text| ("evidence:", text)));
     if let Some(expected) = &finding.expected {
-        let heading = expected_heading(expected);
         let picture = expected.excerpt.lines().map(|l| format!("  {l}"));
-        let lines: Vec<String> = std::iter::once(heading).chain(picture).collect();
+        let lines: Vec<String> = std::iter::once(expected_heading(expected))
+            .chain(picture)
+            .collect();
         fields.push(("expected:", lines.join("\n")));
     }
-    fields.push(("fingerprint:", finding.fingerprint.to_owned()));
+    fields.extend(finding.note.clone().map(|text| ("note:", text)));
+    fields.push((
+        "fingerprint:",
+        prefix(finding.fingerprint, width).to_owned(),
+    ));
     if let Some(resolve) = &finding.resolve {
         let command = resolve["command"].as_str().unwrap_or_default();
         fields.push(("resolve:", command.to_owned()));
@@ -304,15 +462,19 @@ fn fields(finding: &Finding) -> Vec<(&'static str, String)> {
 
 fn expected_heading(expected: &Expected) -> String {
     match (&expected.name, &expected.path) {
-        (Some(name), Some(path)) => {
-            format!("valid {} example `{name}` ({path})", expected.language)
-        }
-        (Some(name), None) => format!("valid {} example `{name}`", expected.language),
+        (Some(name), Some(path)) => format!(
+            "valid {} example `{name}` ({path}), {}",
+            expected.language, expected.basis
+        ),
+        (Some(name), None) => format!(
+            "valid {} example `{name}`, {}",
+            expected.language, expected.basis
+        ),
         _ => format!("{} tuning", expected.language),
     }
 }
 
-/// `key=value` pairs of an evidence object; long values are cut.
+/// `key=value` pairs of an evidence object.
 fn evidence_line(evidence: &Value) -> Option<String> {
     let pairs: Vec<String> = evidence
         .as_object()?
@@ -323,11 +485,10 @@ fn evidence_line(evidence: &Value) -> Option<String> {
 }
 
 fn evidence_value(value: &Value) -> String {
-    let text = match value {
+    match value {
         Value::String(s) if !s.contains(char::is_whitespace) && !s.is_empty() => s.clone(),
         other => other.to_string(),
-    };
-    truncate(&text, VALUE_CHARS)
+    }
 }
 
 fn incomplete_line(item: &Incomplete) -> String {
@@ -344,11 +505,12 @@ fn summary_line(
 ) -> String {
     let count = |s: Severity| diagnostics.iter().filter(|d| d.severity == s).count();
     format!(
-        "summary: {} error, {} warn, {} review, {} incomplete, {} suppressed",
+        "summary: {} error, {} warn, {} review, {} incomplete, {} suppressed, {} allowed",
         count(Severity::Error),
         count(Severity::Warn),
         count(Severity::Review),
         incomplete.len(),
-        briefing.suppressed
+        briefing.suppressed,
+        briefing.allowed
     )
 }

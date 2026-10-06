@@ -69,6 +69,10 @@ enum Command {
         /// or agent-json (the same records as JSON lines).
         #[arg(long, default_value = "text")]
         format: Format,
+        /// Print at most this many findings, errors first, and say how many
+        /// were left out. Agent formats only.
+        #[arg(long)]
+        limit: Option<usize>,
         /// Do not record this run in `.lighthouse/lighthouse.db` and do not
         /// apply review verdicts. By default a run is recorded: findings it
         /// no longer reports in the reported scope are marked resolved (never
@@ -153,6 +157,7 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 struct Options {
     format: Format,
+    limit: Option<usize>,
     store: bool,
     strict: bool,
     allow_incomplete: bool,
@@ -181,6 +186,7 @@ fn run(cli: Cli) -> Result<u8> {
             changed,
             diff,
             format,
+            limit,
             no_store,
             strict,
             allow_incomplete,
@@ -194,6 +200,7 @@ fn run(cli: Cli) -> Result<u8> {
             },
             Options {
                 format,
+                limit,
                 store: !no_store,
                 strict,
                 allow_incomplete,
@@ -229,6 +236,9 @@ fn check(
     only: &[String],
     config: Option<&Path>,
 ) -> Result<u8> {
+    if options.limit.is_some() && !briefed(options.format) {
+        return Err("--limit applies to the agent formats only".into());
+    }
     let session = Session::load(config)?;
     let (registry, plugins) = session.registry()?;
     let root = session.root.clone();
@@ -280,6 +290,8 @@ fn check(
         catalog: catalog.as_ref(),
         facts: Some(&outcome.facts),
         suppressed,
+        limit: options.limit,
+        ..Briefing::default()
     };
     print!(
         "{}",
