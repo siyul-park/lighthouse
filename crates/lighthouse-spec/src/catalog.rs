@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
 use crate::{
-    Content, Error, Example, Pack, Pattern, Section,
+    Content, Error, Example, Implementation, Pack, Pattern, Section,
     load::{self, Files},
     sources::{Source, extract},
     validate,
@@ -24,6 +24,9 @@ pub struct Catalog {
     pub packs: Vec<Pack>,
     pub(crate) sources: Vec<Source>,
     overrides: Vec<Override>,
+    /// Text of the declarative rule files that patterns name, by their path
+    /// in the catalog layer.
+    rules: BTreeMap<String, String>,
 }
 
 /// A local pattern file with `extends`: adjusts a pattern of a lower layer.
@@ -100,7 +103,84 @@ impl Catalog {
             catalog.sources = parse(SOURCES_FILE, text)?;
         }
         validate::layer(&catalog)?;
+        catalog.attach_rules(&files)?;
         Ok(catalog)
+    }
+
+    /// Builds the project-local layer from the files of `.lighthouse/rules`,
+    /// keyed by file name. A file is a pattern (id `local/<name>`, the fields
+    /// of any pattern but `implementation`) with its declarative rule under
+    /// `rule:`; the pattern is added to the `local` pack. A file with
+    /// `extends` adjusts a pattern of a lower layer as `overlay` describes.
+    /// Examples must be inline.
+    pub fn from_local(files: Files) -> Result<Self, Error> {
+        let mut catalog = Self::default();
+        let mut patterns = Vec::new();
+        for (name, text) in &files {
+            let mut doc: serde_norway::Mapping = parse(name, text)?;
+            if doc.contains_key("extends") {
+                let mut o: Override = parse(name, text)?;
+                o.examples = resolve_all(&files, "", &o.extends, o.examples)?;
+                catalog.overrides.push(o);
+                continue;
+            }
+            let rule = doc
+                .remove("rule")
+                .ok_or_else(|| Error::layout(name, "a local rule file needs a `rule:` section"))?;
+            doc.insert(
+                "implementation".into(),
+                serde_norway::from_str(&format!("declarative: {name:?}"))
+                    .map_err(|e| Error::layout(name, e.to_string()))?,
+            );
+            let pattern: Pattern = serde_norway::from_value(doc.into())
+                .map_err(|e| Error::layout(name, e.to_string()))?;
+            if !pattern.id.starts_with("local/") {
+                return Err(Error::layout(
+                    name,
+                    format!("id is `{}`, a local rule is `local/<name>`", pattern.id),
+                ));
+            }
+            catalog.rules.insert(name.clone(), dump(&rule)?);
+            patterns.push(pattern);
+        }
+        if !patterns.is_empty() {
+            catalog.packs.push(Pack {
+                id: "local".to_owned(),
+                title: "Local rules".to_owned(),
+                intro: "Rules of this project, from `.lighthouse/rules`.".to_owned(),
+                sections: vec![Section {
+                    id: "rules".to_owned(),
+                    title: "Rules".to_owned(),
+                    intro: "Project-local declarative rules.".to_owned(),
+                    patterns,
+                }],
+            });
+        }
+        validate::layer(&catalog)?;
+        Ok(catalog)
+    }
+
+    /// The declarative rule file `path`, as written in the layer that defines
+    /// the pattern naming it.
+    pub fn declarative(&self, path: &str) -> Option<&str> {
+        self.rules.get(path).map(String::as_str)
+    }
+
+    fn attach_rules(&mut self, files: &Files) -> Result<(), Error> {
+        let wanted: Vec<(String, String)> = self
+            .patterns()
+            .filter_map(|p| match &p.implementation {
+                Some(Implementation::Declarative(path)) => Some((p.id.clone(), path.clone())),
+                _ => None,
+            })
+            .collect();
+        for (id, path) in wanted {
+            let text = files.get(&path).ok_or_else(|| {
+                Error::invalid(&id, format!("declarative rule `{path}` does not exist"))
+            })?;
+            self.rules.insert(path, text.clone());
+        }
+        Ok(())
     }
 
     /// `base` with `local` on top. Local packs, sections and patterns are
@@ -118,6 +198,7 @@ impl Catalog {
             }
         }
         merged.sources.extend(local.sources.iter().cloned());
+        merged.rules.extend(local.rules.clone());
         for o in &local.overrides {
             let pattern = merged
                 .packs
@@ -405,7 +486,7 @@ fn sections_in<'a>(files: &'a Files, pack: &str) -> Vec<&'a str> {
 }
 
 /// Direct `.yaml` children of the section directory; subdirectories such as
-/// `examples/` are never patterns.
+/// `testdata/` are never patterns.
 fn patterns_in<'a>(files: &'a Files, pack: &str, section: &str) -> Vec<&'a str> {
     let prefix = format!("{pack}/{section}/");
     files

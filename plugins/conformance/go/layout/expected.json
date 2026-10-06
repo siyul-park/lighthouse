@@ -1,6 +1,36 @@
 {
   "fragments": [
     {
+      "comments": [
+        {
+          "attached_to": "cmd/app::Version#var",
+          "span": {
+            "end": {
+              "col": 62,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "text": "// Version is exported but nothing can import a main package."
+        },
+        {
+          "attached_to": "cmd/app::Greeting#function",
+          "span": {
+            "end": {
+              "col": 31,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "text": "// Greeting is built at start."
+        }
+      ],
       "edges": [
         {
           "from": {
@@ -148,6 +178,35 @@
       "tests": []
     },
     {
+      "comments": [
+        {
+          "span": {
+            "end": {
+              "col": 59,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "// Package helpers lives in a directory with another name."
+        },
+        {
+          "attached_to": "internal/text::Count#function",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "text": "// Count counts words."
+        }
+      ],
       "edges": [
         {
           "from": {

@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use lighthouse_model::{
-    Edge, EdgeKind, File, Fragment, FunctionSummary, Module, Node, Position, Project, Resolution,
-    Span, Symbol, SymbolId, SymbolKind, Target, Visibility,
+    Comment, Edge, EdgeKind, File, Fragment, FunctionSummary, Module, Node, Position, Project,
+    Resolution, Span, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle, Visibility,
 };
 
 fn at() -> Span {
@@ -305,4 +305,89 @@ fn heuristic_edges_are_possible_uses_not_calls() {
     assert!(project.callers(&b.id).is_empty());
     assert!(project.callees(&a.id).is_empty());
     assert_eq!(project.references(&b.id), [a.id]);
+}
+
+fn comment(file: &str, line: u32, text: &str) -> Comment {
+    let p = Position { line, col: 1 };
+    Comment {
+        file: file.into(),
+        span: Span { start: p, end: p },
+        text: text.to_owned(),
+        attached_to: None,
+    }
+}
+
+#[test]
+fn comments_are_sorted_and_found_by_file() {
+    let project = Project::merge([
+        Fragment {
+            comments: vec![
+                comment("b.go", 3, "// late"),
+                comment("b.go", 1, "// early"),
+            ],
+            ..Fragment::default()
+        },
+        Fragment {
+            comments: vec![comment("a.go", 2, "// other")],
+            ..Fragment::default()
+        },
+    ]);
+    let texts = |path: &str| -> Vec<&str> {
+        project
+            .comments_in(Path::new(path))
+            .iter()
+            .map(|c| c.text.as_str())
+            .collect()
+    };
+    assert_eq!(texts("b.go"), ["// early", "// late"]);
+    assert_eq!(texts("a.go"), ["// other"]);
+    assert!(texts("c.go").is_empty());
+}
+
+#[test]
+fn indexes_answer_uses_members_and_tests_by_module() {
+    let ty = Symbol {
+        kind: SymbolKind::Type,
+        id: SymbolId::new("m", &[], "T", SymbolKind::Type),
+        name: "T".to_owned(),
+        ..symbol("m", "T")
+    };
+    let method = Symbol {
+        kind: SymbolKind::Method,
+        id: SymbolId::new("m", &["T"], "run", SymbolKind::Method),
+        owner: Some(ty.id.clone()),
+        name: "run".to_owned(),
+        ..symbol("m", "run")
+    };
+    let user = symbol("m", "user");
+    let test = Symbol {
+        kind: SymbolKind::Test,
+        id: SymbolId::new("m[test]", &[], "TestT", SymbolKind::Test),
+        name: "TestT".to_owned(),
+        ..symbol("m", "TestT")
+    };
+    let case = TestCase {
+        symbol: test.id.clone(),
+        nesting: 0,
+        style: TestStyle::Scenario,
+        targets: vec![Target::Path(ty.id.as_str().to_owned())],
+    };
+    let project = Project::merge([Fragment {
+        symbols: vec![ty.clone(), method.clone(), user.clone(), test.clone()],
+        edges: vec![
+            call(&user, method.id.as_str()),
+            call(&user, user.id.as_str()),
+        ],
+        tests: vec![case.clone()],
+        ..Fragment::default()
+    }]);
+    assert_eq!(project.members(&ty.id), std::slice::from_ref(&method.id));
+    assert_eq!(
+        project.uses(&user.id),
+        std::slice::from_ref(&method.id),
+        "no self use"
+    );
+    assert_eq!(project.test(&test.id).map(|t| t.nesting), Some(0));
+    assert_eq!(project.tests_in("m[test]").len(), 1);
+    assert!(project.tests_in("m").is_empty(), "a prefix is not a module");
 }

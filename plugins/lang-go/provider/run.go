@@ -90,6 +90,7 @@ func (r *run) fileOnly(rel string) {
 		Edges:     []sdk.Edge{},
 		Functions: []sdk.FunctionSummary{},
 		Tests:     []sdk.TestCase{},
+		Comments:  []sdk.Comment{},
 	}
 }
 

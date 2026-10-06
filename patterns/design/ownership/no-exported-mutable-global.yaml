@@ -1,0 +1,56 @@
+id: design/no-exported-mutable-global
+title: No exported mutable global
+intent: State that any importer can assign has no owner and no invariant.
+scope: symbol
+requirement: >-
+  An exported package-level variable MUST NOT hold mutable state: state
+  belongs to an owner that guards it, and a global that never changes SHOULD
+  be a constant or a function.
+enforcement: heuristic
+evidence: [symbol, module]
+exceptions: >-
+  Sentinel errors, by the `Err` name prefix, are exported variables by
+  convention and are not reported.
+tuning:
+  go: >-
+    A package-level `var` whose name is exported (and not an `Err...` sentinel)
+    outside test and generated files.
+  rust: >-
+    Not checked: an immutable `pub static` is not mutable state and the
+    provider does not report whether a static is `mut`.
+implementation:
+  declarative: design/ownership/rules/no-exported-mutable-global.yaml
+examples:
+  - name: invalid
+    language: go
+    kind: invalid
+    files:
+      - path: example.go
+        body: |-
+          package config
+
+          var Defaults = map[string]string{}
+    expect:
+      - line: 3
+  - name: valid
+    language: go
+    kind: valid
+    files:
+      - path: example.go
+        body: |-
+          package config
+
+          import "errors"
+
+          var ErrMissing = errors.New("missing")
+
+          var defaults = map[string]string{}
+
+          const Limit = 3
+  - name: rust-valid
+    language: rust
+    kind: valid
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub static LIMIT: u8 = 3;

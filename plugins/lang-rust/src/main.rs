@@ -4,6 +4,7 @@
 
 mod body;
 mod cargo;
+mod comments;
 mod extract;
 mod macros;
 mod names;

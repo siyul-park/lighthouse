@@ -1,6 +1,106 @@
 {
   "fragments": [
     {
+      "comments": [
+        {
+          "attached_to": ".::Logger#interface",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "text": "// Logger writes lines."
+        },
+        {
+          "attached_to": ".::Closer#interface",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "text": "// Closer releases resources."
+        },
+        {
+          "attached_to": ".::LogCloser#interface",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "text": "// LogCloser does both."
+        },
+        {
+          "attached_to": ".::Base#type",
+          "span": {
+            "end": {
+              "col": 38,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 21
+            }
+          },
+          "text": "// Base provides the shared behavior."
+        },
+        {
+          "attached_to": ".::Base::Log#method",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 24
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "text": "// Log writes a line."
+        },
+        {
+          "attached_to": ".::Base::Close#method",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 27
+            },
+            "start": {
+              "col": 1,
+              "line": 27
+            }
+          },
+          "text": "// Close does nothing."
+        },
+        {
+          "attached_to": ".::Service#type",
+          "span": {
+            "end": {
+              "col": 73,
+              "line": 30
+            },
+            "start": {
+              "col": 1,
+              "line": 30
+            }
+          },
+          "text": "// Service embeds its base by pointer and a reader from another package."
+        }
+      ],
       "edges": [
         {
           "from": {

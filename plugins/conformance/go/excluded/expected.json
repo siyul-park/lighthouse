@@ -1,6 +1,7 @@
 {
   "fragments": [
     {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -54,6 +55,7 @@
       "tests": []
     },
     {
+      "comments": [],
       "edges": [],
       "file": {
         "path": "os_windows.go"
@@ -64,6 +66,7 @@
       "tests": []
     },
     {
+      "comments": [],
       "edges": [],
       "file": {
         "path": "testdata/sample.go"
@@ -74,6 +77,7 @@
       "tests": []
     },
     {
+      "comments": [],
       "edges": [],
       "file": {
         "path": "vendor/dep/dep.go"

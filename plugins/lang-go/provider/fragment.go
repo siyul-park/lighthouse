@@ -31,6 +31,7 @@ func buildFragment(u *unit) sdk.Fragment {
 			Edges:     []sdk.Edge{},
 			Functions: []sdk.FunctionSummary{},
 			Tests:     []sdk.TestCase{},
+			Comments:  []sdk.Comment{},
 		},
 		edges: map[sdk.Edge]bool{},
 	}
@@ -43,6 +44,7 @@ func buildFragment(u *unit) sdk.Fragment {
 			b.general(d)
 		}
 	}
+	b.comments()
 	return b.frag
 }
 

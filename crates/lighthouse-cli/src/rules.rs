@@ -1,7 +1,85 @@
+use std::{collections::BTreeSet, path::Path};
+
+use lighthouse_engine::RuleTester;
 use lighthouse_plugin::Registry;
 use lighthouse_spec::{Catalog, Enforcement, Pattern};
 
-use crate::Result;
+use crate::{Result, session::Session};
+
+/// The language examples without a provider run in.
+const NEUTRAL: &str = "text";
+
+/// Runs the examples of the implemented patterns named by `ids` (all when
+/// empty) in every language the project's plugins provide, or in `language`.
+/// Returns 1 when an example fails.
+pub fn test(ids: &[String], language: Option<&str>, config: Option<&Path>) -> Result<u8> {
+    let session = Session::load_or_default(config)?;
+    let catalog = session.catalog()?;
+    let patterns = selected(&catalog, ids)?;
+    let (probe, registered) = session.registry()?;
+    if let Some(gap) = registered.incomplete.first() {
+        return Err(format!("a language plugin did not start: {}", gap.reason).into());
+    }
+    let languages: BTreeSet<String> = match language {
+        Some(language) => BTreeSet::from([language.to_owned()]),
+        None => probe
+            .languages()
+            .map(|(_, l)| l.id().to_owned())
+            .filter(|l| l != NEUTRAL)
+            .collect(),
+    };
+    drop(probe);
+    let languages = if languages.is_empty() {
+        BTreeSet::from([NEUTRAL.to_owned()])
+    } else {
+        languages
+    };
+    let mut failures = Vec::new();
+    let mut runs = 0;
+    for language in &languages {
+        let fresh = || session.registry().expect("plugins started once already").0;
+        let tester = RuleTester::new(fresh, &catalog).language(language);
+        for pattern in &patterns {
+            runs += 1;
+            failures.extend(
+                tester
+                    .check(pattern)
+                    .into_iter()
+                    .map(|f| format!("[{language}] {f}")),
+            );
+        }
+    }
+    for failure in &failures {
+        println!("FAIL {failure}");
+    }
+    println!(
+        "rule test: {} pattern(s) in {} language(s), {runs} run(s), {} failure(s)",
+        patterns.len(),
+        languages.len(),
+        failures.len()
+    );
+    Ok(u8::from(!failures.is_empty()))
+}
+
+fn selected<'c>(catalog: &'c Catalog, ids: &[String]) -> Result<Vec<&'c Pattern>> {
+    if ids.is_empty() {
+        return Ok(catalog
+            .patterns()
+            .filter(|p| p.implementation.is_some())
+            .collect());
+    }
+    ids.iter()
+        .map(|id| {
+            let pattern = catalog
+                .pattern(id)
+                .ok_or_else(|| format!("unknown pattern `{id}`"))?;
+            if pattern.implementation.is_none() {
+                return Err(format!("`{id}` has no implementation to test").into());
+            }
+            Ok(pattern)
+        })
+        .collect()
+}
 
 pub fn list(all: bool) -> Result<u8> {
     let registry = lighthouse_builtin::registry();

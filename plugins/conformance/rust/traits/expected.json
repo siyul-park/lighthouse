@@ -1,6 +1,36 @@
 {
   "fragments": [
     {
+      "comments": [
+        {
+          "attached_to": "traits::Shape#interface",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "/// A shape."
+        },
+        {
+          "attached_to": "traits::Shape::area#method",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 3
+            },
+            "start": {
+              "col": 5,
+              "line": 3
+            }
+          },
+          "text": "/// Surface of the shape."
+        }
+      ],
       "edges": [
         {
           "from": {

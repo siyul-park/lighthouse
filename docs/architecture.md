@@ -3,7 +3,8 @@
 ```
  CLI ─ engine ─ config ─ reporters
           │
-   plugin registry ── in-process plugins: core, metrics, design
+   plugin registry ── in-process plugins: core, metrics, design, testing,
+          │            and `local` (declarative rules of the project)
           │
    RPC host (lighthouse-rpc) ── language plugins as processes
           │                      plugins/lang-go (go/packages + go/types)
@@ -25,12 +26,50 @@ core model: renaming a core field is not a protocol change.
 
 ## Analysis scope and report scope
 
-They differ on purpose. `check [paths]`, and later `--changed` and `--diff`, and
-hook file scopes only filter which diagnostics are reported. Analysis always
+They differ on purpose. `check [paths]`, `--changed` (working tree against HEAD,
+untracked files included) and `--diff <base>` (since the merge base with `<base>`),
+and later hook file scopes, only filter which diagnostics are reported. Analysis always
 covers the whole project, because a rule about a function needs its callers, a
 provider needs the whole package and build context, and a finding in one file may
 depend on another. A gap anywhere in the analysis is reported whatever paths were
 requested.
+
+A file-level filter is all there is for now: a finding in a changed file is
+reported even on a line the change did not touch. Files the project never wants
+analyzed (fixtures that are broken on purpose) are listed in `.lighthouseignore`,
+in `.gitignore` syntax; unlike a report filter, that removes them from analysis.
+
+## Rules
+
+Every implemented rule belongs to a catalog pattern whose `implementation` is
+either `builtin` (a Rust rule of a bundled plugin: `design`, `testing`, `core`) or
+`declarative`: a YAML file with a CEL expression over the code model.
+
+```yaml
+select: symbol            # symbol | function | edge | module | file | test
+where: 'symbol.kind == "var" && symbol.visibility != "private"'
+message: 'exported variable {{ symbol.name }} is mutable package state'
+evidence: { symbol: symbol.id }
+```
+
+`select` binds one variable of the same name (`func` for `function`, which CEL
+reserves) with the fields of that kind: symbols have `id name kind visibility
+owner owner_kind file line module lang documented test generated callers callees
+references members`; functions add `statements top_level params returns
+max_nesting tokens branches`; edges have `kind resolution from to` (each end with
+`kind id module name`); modules `path name test_of files symbols`; files `path
+lang test generated lines symbols functions`; tests add `nesting style targets
+target_count`. Absent values are empty strings, never null. `edge` and `module`
+rules run once over the project, the others once per file. Projects add their
+own rules as `.lighthouse/rules/*.yaml` (a pattern with id `local/<name>` and
+the rule file under `rule:`), enabled through the `local` plugin of
+`lighthouse.toml`. `lighthouse rule test [ids]` runs every example of the
+bundled and local patterns through the whole engine, in each language whose
+plugin the configuration lists.
+
+Language specifics stay out of the rules: provider facts (symbols, owners,
+visibility, spans, comments) are the same everywhere, and per-language option
+defaults and tuning prose in the pattern realize a rule per language.
 
 ## Incomplete analysis
 
@@ -66,9 +105,9 @@ that cannot start is one), 3 incomplete.
 ## Dogfooding
 
 Lighthouse checks its own sources. The repository's `lighthouse.toml` enables the
-bundled `core` and `design` plugins with their recommended presets and the Rust
-plugin built by `make plugins`, and `make test` ends with `lighthouse check .`,
-which must exit 0: a finding is either fixed in the code, or it exposes a rule or
+bundled `core`, `design` and `testing` plugins with their recommended presets and
+the Go and Rust plugins built by `make plugins`, and `make lint` (part of `make ci`)
+ends with `lighthouse check .`, which must exit 0: a finding is either fixed in the code, or it exposes a rule or
 provider that is imprecise, and that is fixed instead of silenced. The only
 overrides are for `plugins/conformance/**`, whose fixtures describe code on
 purpose.

@@ -1,6 +1,6 @@
 PLUGINS := target/plugins
 
-.PHONY: plugins test
+.PHONY: plugins test lint ci
 
 # Builds the bundled out-of-process plugins; each directory holds the binary
 # and its lighthouse-plugin.toml, the layout plugin discovery expects.
@@ -13,8 +13,17 @@ plugins:
 	cp target/release/lang-rust $(PLUGINS)/lang-rust/
 	cp plugins/lang-rust/lighthouse-plugin.toml $(PLUGINS)/lang-rust/
 
-# The last step is the dogfood gate: Lighthouse checks its own sources with
-# the rules this repository enforces (lighthouse.toml) and must find nothing.
 test: plugins
 	cargo test --workspace
+	cd plugins/lang-go && go test ./...
+
+# Formatters, compilers' linters, then the dogfood gate: Lighthouse checks its
+# own sources with the rules this repository enforces (lighthouse.toml).
+lint: plugins
+	cargo fmt --all --check
+	cargo clippy --workspace --all-targets -- -D warnings
+	cd plugins/lang-go && test -z "$$(gofmt -l .)" && go vet ./...
 	cargo run -q -p lighthouse-cli -- check .
+
+# What CI runs.
+ci: test lint

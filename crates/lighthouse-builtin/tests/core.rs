@@ -117,7 +117,7 @@ fn missing_fact_is_a_distinct_error() {
 }
 
 #[test]
-fn registered_rules_are_exactly_the_catalog_patterns_implemented_by_builtin() {
+fn registered_rules_are_exactly_the_implemented_catalog_patterns() {
     let registry = lighthouse_builtin::registry();
     let catalog = lighthouse_spec::Catalog::bundled();
     let registered: std::collections::BTreeSet<_> =
@@ -131,18 +131,21 @@ fn registered_rules_are_exactly_the_catalog_patterns_implemented_by_builtin() {
             lighthouse_spec::Enforcement::Doc,
             "{id}"
         );
-        assert_eq!(
-            pattern.implementation,
-            Some(lighthouse_spec::Implementation::Builtin(id.clone())),
-            "{id}"
-        );
+        match &pattern.implementation {
+            Some(lighthouse_spec::Implementation::Builtin(rule)) => assert_eq!(rule, id),
+            Some(lighthouse_spec::Implementation::Declarative(_)) => {}
+            None => panic!("{id} is registered but its pattern has no implementation"),
+        }
     }
     let implemented: std::collections::BTreeSet<_> = catalog
         .patterns()
         .filter(|p| {
             matches!(
                 p.implementation,
-                Some(lighthouse_spec::Implementation::Builtin(_))
+                Some(
+                    lighthouse_spec::Implementation::Builtin(_)
+                        | lighthouse_spec::Implementation::Declarative(_)
+                )
             )
         })
         .map(|p| p.id.clone())
@@ -165,7 +168,7 @@ fn default_limit_comes_from_the_catalog() {
 fn bundled_plugins_provide_only_the_fallback_text_language() {
     let registry = lighthouse_builtin::registry();
     let plugins: Vec<_> = registry.plugins().collect();
-    assert_eq!(plugins, ["core", "metrics", "design"]);
+    assert_eq!(plugins, ["core", "metrics", "design", "testing"]);
     let languages: Vec<_> = registry
         .languages()
         .map(|(_, l)| l.id().to_owned())
@@ -179,12 +182,21 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
     assert_eq!(
         design,
         [
+            "design/callers-before-callees",
             "design/complexity-signal",
             "design/coupling-signal",
+            "design/declaration-groups",
             "design/exported-doc",
+            "design/no-exported-mutable-global",
+            "design/no-redundant-qualifiers",
+            "design/private-helper-callers",
+            "design/related-symbols-close",
+            "design/section-banners",
             "design/single-use-wrapper"
         ]
     );
     let preset = registry.preset("design/recommended").unwrap();
     assert_eq!(preset.rules.len(), design.len());
+    let testing = registry.preset("testing/recommended").unwrap();
+    assert_eq!(testing.rules.len(), 3);
 }

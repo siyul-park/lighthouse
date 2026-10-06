@@ -36,6 +36,10 @@ fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error {
     }
 }
 
+/// Name of the file, in `.gitignore` syntax, that keeps files out of the
+/// analysis altogether, such as fixtures that are broken on purpose.
+pub const IGNORE_FILE: &str = ".lighthouseignore";
+
 /// Process exit code of a run whose analysis was incomplete.
 pub const EXIT_INCOMPLETE: u8 = 3;
 
@@ -68,6 +72,12 @@ impl Outcome {
         let fails = |s: Severity| s == Severity::Error || (strict && s == Severity::Warn);
         u8::from(self.diagnostics.iter().any(|d| fails(d.severity)))
     }
+}
+
+/// What a run reports: everything under some paths, or exactly some files.
+enum Reported<'a> {
+    Paths(&'a [PathBuf]),
+    Files(&'a [PathBuf]),
 }
 
 struct Language {
@@ -169,6 +179,18 @@ impl Engine {
     /// Checks the whole project, then reports diagnostics under `paths`.
     /// `only` restricts which rules run; empty means all enabled rules.
     pub fn check(&self, paths: &[PathBuf], only: &[String]) -> Result<Outcome, Error> {
+        self.run(Reported::Paths(paths), only)
+    }
+
+    /// Checks the whole project, then reports only the diagnostics in `files`,
+    /// project-relative paths of changed files. Unlike `check`, no files means
+    /// nothing is reported, not everything: analysis scope is unchanged, only
+    /// the report is narrowed.
+    pub fn check_files(&self, files: &[PathBuf], only: &[String]) -> Result<Outcome, Error> {
+        self.run(Reported::Files(files), only)
+    }
+
+    fn run(&self, reported: Reported, only: &[String]) -> Result<Outcome, Error> {
         for id in only {
             if self.registry.rule(id).is_none() {
                 return Err(Error::UnknownRule(id.clone()));
@@ -186,7 +208,10 @@ impl Engine {
 
         let mut outcome = Outcome::default();
         let mut incomplete = self.startup.clone();
-        let scopes = self.scopes(paths, &mut incomplete)?;
+        let scopes = match reported {
+            Reported::Paths(paths) => self.scopes(paths, &mut incomplete)?,
+            Reported::Files(files) => files.to_vec(),
+        };
         let inputs = self.read(&mut outcome.notices, &mut incomplete);
         let (inputs, project) = self.index(inputs, &mut outcome.notices, &mut incomplete);
         let facts = self.analyze(&selected, &inputs, &project)?;
@@ -250,7 +275,11 @@ impl Engine {
     /// Reads every file under the root that a listed language claims.
     fn read(&self, notices: &mut BTreeSet<String>, incomplete: &mut Vec<Incomplete>) -> Vec<Input> {
         let mut inputs = Vec::new();
-        for entry in WalkBuilder::new(&self.ws.root).require_git(false).build() {
+        let walk = WalkBuilder::new(&self.ws.root)
+            .require_git(false)
+            .add_custom_ignore_filename(IGNORE_FILE)
+            .build();
+        for entry in walk {
             let entry = match entry {
                 Ok(entry) => entry,
                 Err(e) => {

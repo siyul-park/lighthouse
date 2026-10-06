@@ -7,3 +7,155 @@ scope: test
 requirement: A public symbol MUST NOT have multiple semantic owner test functions.
 enforcement: mechanical
 evidence: [symbol, owner_tests]
+options:
+  test_prefix:
+    type: string
+    default: Test
+    description: Prefix of the name of an owner test; a test without it is not one.
+    per_language:
+      rust: ""
+  snake_case:
+    type: bool
+    default: false
+    description: Compare names in snake case, as Rust tests are written.
+    per_language:
+      rust: true
+  variant_tests:
+    type: bool
+    default: true
+    description: >-
+      Count `TestGet_Missing` as a second owner of `Get`; a name that adds a
+      suffix to the symbol's own name restates the same contract.
+    per_language:
+      rust: false
+tuning:
+  go: >-
+    `TestGet` and `TestGet_Missing` both own `Get`: the second is a case of the
+    first, written with `t.Run`. A name matches the longest symbol it starts
+    with, so `TestStore_Get_Missing` belongs to the method `Get`, not to the
+    type `Store`.
+  rust: >-
+    A test is an owner of the item it is named after in snake case. Rust tests
+    are many small functions, so names that merely extend a symbol's name are
+    not owners; two tests with exactly the name of one item (in different
+    test crates, or inline and in `tests/`) are.
+implementation:
+  builtin: testing/single-owner-test
+examples:
+  - name: invalid
+    language: go
+    kind: invalid
+    files:
+      - path: go.mod
+        body: |-
+          module example.com/store
+
+          go 1.26
+      - path: store.go
+        body: |-
+          package store
+
+          func Get() int { return 1 }
+      - path: store_test.go
+        body: |-
+          package store_test
+
+          import (
+          	"testing"
+
+          	"example.com/store"
+          )
+
+          func TestGet(t *testing.T) {
+          	if store.Get() != 1 {
+          		t.Fatal("get")
+          	}
+          }
+
+          func TestGet_Missing(t *testing.T) {
+          	if store.Get() != 1 {
+          		t.Fatal("missing")
+          	}
+          }
+    expect:
+      - line: 3
+  - name: valid
+    language: go
+    kind: valid
+    files:
+      - path: go.mod
+        body: |-
+          module example.com/store
+
+          go 1.26
+      - path: store.go
+        body: |-
+          package store
+
+          type Store struct{}
+
+          func (s *Store) Get() int { return 1 }
+      - path: store_test.go
+        body: |-
+          package store_test
+
+          import (
+          	"testing"
+
+          	"example.com/store"
+          )
+
+          func TestStore(t *testing.T) {
+          	s := &store.Store{}
+          	_ = s
+          }
+
+          func TestStore_Get(t *testing.T) {
+          	s := &store.Store{}
+          	if s.Get() != 1 {
+          		t.Fatal("get")
+          	}
+          }
+  - name: rust-invalid
+    language: rust
+    kind: invalid
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub fn get() -> u8 {
+              1
+          }
+      - path: tests/first.rs
+        body: |-
+          #[test]
+          fn get() {
+              assert_eq!(workspace::get(), 1);
+          }
+      - path: tests/second.rs
+        body: |-
+          #[test]
+          fn get() {
+              assert_eq!(workspace::get(), 1);
+          }
+    expect:
+      - line: 1
+  - name: rust-valid
+    language: rust
+    kind: valid
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub fn get() -> u8 {
+              1
+          }
+      - path: tests/store.rs
+        body: |-
+          #[test]
+          fn get() {
+              assert_eq!(workspace::get(), 1);
+          }
+
+          #[test]
+          fn get_is_stable() {
+              assert_eq!(workspace::get(), workspace::get());
+          }

@@ -160,6 +160,120 @@ Distance between collaborators hides their relationship.
 
 Strongly related symbols MUST be physically close; direct collaborators SHOULD be adjacent.
 
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `visibility_groups` | bool | `true`; rust: `false` | The layout groups methods by visibility (public methods of all types, then private ones), so a method of another owner in the other visibility group does not separate an owner's methods. Set to false when a file puts every owner's methods together, as impl blocks do. |
+
+**Invalid example: invalid (go)**
+
+```go
+package sample
+
+type A struct{}
+
+type B struct{}
+
+func (a A) One() int { return 1 }
+
+func (b B) One() int { return 1 }
+
+func (a A) Two() int { return 2 }
+```
+
+**Invalid example: free-function-between (go)**
+
+```go
+package sample
+
+type A struct{}
+
+func (a A) One() int { return 1 }
+
+func Other() int { return 0 }
+
+func (a A) Two() int { return 2 }
+```
+
+**Valid example: valid (go)**
+
+```go
+package sample
+
+type A struct{}
+
+type B struct{}
+
+func (a A) One() int { return 1 }
+
+func (a A) Two() int { return 2 }
+
+func (b B) One() int { return 1 }
+
+func (a A) hidden() int { return 3 }
+```
+
+**Invalid example: rust-invalid (rust)**
+
+```rust
+pub struct A;
+
+pub struct B;
+
+impl A {
+    pub fn one(&self) -> u8 {
+        1
+    }
+}
+
+impl B {
+    pub fn one(&self) -> u8 {
+        1
+    }
+}
+
+impl A {
+    pub fn two(&self) -> u8 {
+        2
+    }
+}
+```
+
+**Valid example: rust-valid (rust)**
+
+```rust
+pub struct A;
+
+pub struct B;
+
+impl A {
+    pub fn one(&self) -> u8 {
+        1
+    }
+}
+
+impl A {
+    pub fn two(&self) -> u8 {
+        2
+    }
+}
+
+impl B {
+    pub fn one(&self) -> u8 {
+        1
+    }
+}
+```
+
+**Tuning: go**
+
+The methods of one receiver type are contiguous within their declaration group: no free function, type, constant or variable, and no method of another type of the same visibility, between two of them.
+
+**Tuning: rust**
+
+The members of one type (its impl blocks, inherent and trait impls) are adjacent in a file: another type, a free function or an item of another owner between two impl blocks of a type is a finding; two impl blocks side by side are fine.
+
 ### Layout shows ownership
 
 `design/readable-layout` · scope `file` · enforcement `judgment` · severity `review`
@@ -676,7 +790,7 @@ A helper MUST be extracted only to remove semantic duplication, name reusable be
 
 ### Private helpers have two callers
 
-`design/private-helper-callers` · scope `symbol` · enforcement `heuristic` · severity `warn`
+`design/private-helper-callers` · scope `symbol` · enforcement `heuristic` · severity `review`
 
 **Intent**
 
@@ -685,6 +799,74 @@ A private helper with one caller is usually part of that caller.
 **Requirement**
 
 A private helper SHOULD have at least two callers.
+
+**Invalid example: invalid (go)**
+
+```go
+package sample
+
+func Run(x int) int { return clamp(x) + 1 }
+
+func clamp(x int) int {
+	if x > 10 {
+		return 10
+	}
+	return x
+}
+```
+
+**Valid example: valid (go)**
+
+```go
+package sample
+
+func Run(x int) int { return clamp(x) + 1 }
+
+func Other(x int) int { return clamp(x) + 2 }
+
+func clamp(x int) int {
+	if x > 10 {
+		return 10
+	}
+	return x
+}
+```
+
+**Invalid example: rust-invalid (rust)**
+
+```rust
+pub fn run(x: u8) -> u8 {
+    clamp(x) + 1
+}
+
+fn clamp(x: u8) -> u8 {
+    if x > 10 { 10 } else { x }
+}
+```
+
+**Valid example: rust-valid (rust)**
+
+```rust
+pub fn run(x: u8) -> u8 {
+    clamp(x) + 1
+}
+
+pub fn other(x: u8) -> u8 {
+    clamp(x) + 2
+}
+
+fn clamp(x: u8) -> u8 {
+    if x > 10 { 10 } else { x }
+}
+```
+
+**Tuning: go**
+
+A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count. Forwarding wrappers are reported by `design/single-use-wrapper`, and a function used as a value is not judged.
+
+**Tuning: rust**
+
+Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.
 
 ### Inline single-use wrappers
 
@@ -1010,7 +1192,7 @@ One function MUST stay at one abstraction level.
 
 ### Callers before callees
 
-`design/callers-before-callees` · scope `file` · enforcement `mechanical` · severity `error`
+`design/callers-before-callees` · scope `file` · enforcement `heuristic` · severity `warn`
 
 **Intent**
 
@@ -1020,9 +1202,17 @@ Readers follow behavior from intent to mechanics.
 
 Declarations MUST be ordered for reading: callers before callees, related symbols adjacent, and cohesive implementations together. Callers MUST precede their exclusive helpers, and shared leaves MUST follow the code that uses them.
 
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `shared_after_last_caller` | bool | `false` | Require a helper used by several functions of its file to follow all of them, not only the first. |
+
 **Invalid example: invalid (go)**
 
 ```go
+package sample
+
 func helper() int { return 1 }
 
 func Run() int { return helper() }
@@ -1031,10 +1221,96 @@ func Run() int { return helper() }
 **Valid example: valid (go)**
 
 ```go
+package sample
+
 func Run() int { return helper() }
 
 func helper() int { return 1 }
 ```
+
+**Invalid example: shared-leaf-between-callers (go)**
+
+Options: `shared_after_last_caller` = `true`
+
+```go
+package sample
+
+func First() int { return leaf() }
+
+func leaf() int { return 1 }
+
+func Second() int { return leaf() + 1 }
+```
+
+**Valid example: used-elsewhere (go)**
+
+`a.go`
+
+```go
+package sample
+
+func helper() int { return 1 }
+
+func Run() int { return helper() }
+```
+
+`b.go`
+
+```go
+package sample
+
+func Other() int { return helper() }
+```
+
+**Valid example: mutual-recursion (go)**
+
+```go
+package sample
+
+func even(n int) bool {
+	if n == 0 {
+		return true
+	}
+	return odd(n - 1)
+}
+
+func odd(n int) bool {
+	if n == 0 {
+		return false
+	}
+	return even(n - 1)
+}
+
+func Run(n int) bool { return even(n) }
+```
+
+**Invalid example: rust-invalid (rust)**
+
+```rust
+fn helper() -> u8 {
+    1
+}
+
+pub fn run() -> u8 {
+    helper()
+}
+```
+
+**Valid example: rust-valid (rust)**
+
+```rust
+pub fn run() -> u8 {
+    helper()
+}
+
+fn helper() -> u8 {
+    1
+}
+```
+
+**Tuning: rust**
+
+Applies to private free functions and private methods. A function that some call may reach through a receiver of unknown type is not judged.
 
 ## Naming
 
@@ -1075,6 +1351,123 @@ Context already names the package, receiver, phase, or representation.
 **Requirement**
 
 Package, receiver, phase, or representation MUST NOT be repeated in a name without meaning.
+
+**Exceptions**
+
+A name equal to its package or module name (`provider.Provider`, `list.List`, `time.Time`) is the package's primary concept; repeating it has meaning and is never reported.
+
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `kinds` | list | `["function","type","interface","const","var"]`; rust: `[]` | Kinds of exported top-level symbols whose names are checked. Empty for Rust: see its tuning. |
+
+**Invalid example: invalid (go)**
+
+```go
+package provider
+
+type ProviderOptions struct{}
+```
+
+**Invalid example: suffix (go)**
+
+```go
+package provider
+
+type OptionsProvider struct{}
+```
+
+**Valid example: valid (go)**
+
+```go
+package provider
+
+type Config struct{}
+
+type Providence struct{}
+
+type providerState struct{}
+```
+
+**Valid example: primary-concept (go)**
+
+```go
+package provider
+
+type Provider struct{}
+```
+
+**Invalid example: rust-invalid (rust)**
+
+Options: `kinds` = `["type"]`
+
+`src/lib.rs`
+
+```rust
+pub mod store;
+```
+
+`src/store.rs`
+
+```rust
+pub struct StoreHandle;
+```
+
+**Valid example: rust-valid (rust)**
+
+Options: `kinds` = `["type"]`
+
+`src/lib.rs`
+
+```rust
+pub mod store;
+```
+
+`src/store.rs`
+
+```rust
+pub struct Handle;
+```
+
+**Valid example: rust-primary-concept (rust)**
+
+Options: `kinds` = `["type"]`
+
+`src/lib.rs`
+
+```rust
+pub mod store;
+```
+
+`src/store.rs`
+
+```rust
+pub struct Store;
+```
+
+**Valid example: rust-off-by-default (rust)**
+
+`src/lib.rs`
+
+```rust
+mod store;
+pub use store::StoreHandle;
+```
+
+`src/store.rs`
+
+```rust
+pub struct StoreHandle;
+```
+
+**Tuning: go**
+
+The package name, as the importing code writes it, repeated at the start of a longer exported name: `provider.ProviderOptions`, `sdk.SDKFrame`. Whole words only (`provider.Providence` is fine).
+
+**Tuning: rust**
+
+Off by default (`kinds` is empty): the path callers write is the crate's public path, and the provider cannot say whether a public item is reached through its module (`store::StoreHandle`) or re-exported from the crate root (`crate::StoreHandle`), where the module name is not repeated. Set `kinds` to check the name of the module, the last component of its path, as a prefix or suffix of a longer public item name; the root module of a crate is matched by the crate name as a whole.
 
 ### Keep standard abbreviations
 
@@ -1324,6 +1717,58 @@ Pure layout can be shared without sharing ownership.
 
 Layout-only declarations MAY name private members but MUST NOT access runtime state.
 
+### No exported mutable global
+
+`design/no-exported-mutable-global` · scope `symbol` · enforcement `heuristic` · severity `warn`
+
+**Intent**
+
+State that any importer can assign has no owner and no invariant.
+
+**Requirement**
+
+An exported package-level variable MUST NOT hold mutable state: state belongs to an owner that guards it, and a global that never changes SHOULD be a constant or a function.
+
+**Exceptions**
+
+Sentinel errors, by the `Err` name prefix, are exported variables by convention and are not reported.
+
+**Invalid example: invalid (go)**
+
+```go
+package config
+
+var Defaults = map[string]string{}
+```
+
+**Valid example: valid (go)**
+
+```go
+package config
+
+import "errors"
+
+var ErrMissing = errors.New("missing")
+
+var defaults = map[string]string{}
+
+const Limit = 3
+```
+
+**Valid example: rust-valid (rust)**
+
+```rust
+pub static LIMIT: u8 = 3;
+```
+
+**Tuning: go**
+
+A package-level `var` whose name is exported (and not an `Err...` sentinel) outside test and generated files.
+
+**Tuning: rust**
+
+Not checked: an immutable `pub static` is not mutable state and the provider does not report whether a static is `mut`.
+
 ## Concurrency
 
 Concurrency rules prevent races and leaks by making shared state and shutdown ownership explicit.
@@ -1484,25 +1929,150 @@ A fixed group order makes every file predictable.
 
 Top-level declarations in a file MUST follow the language's ownership-group order, from public contract to private mechanics. Initializers MUST stay together and MUST precede non-initializer functions and methods. Within one type, constructors MUST precede other behavior.
 
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `constructor_prefixes` | list | `["New"]`; rust: `["new"]` | A public function whose name is one of these, or one of these followed by a word (`New`, `NewStore`; not `Newton`), is a constructor. |
+| `constructors_first` | bool | `false`; rust: `true` | A constructor method (a public method named like a constructor) must precede the other methods of its type in the file. Go constructors are functions, ordered by the `constructor` group instead. |
+| `groups` | list | `["public-type","private-type","public-const","private-const","var","init","public-function","constructor","public-method","hook","private-function"]`; rust: `["const","var","type","public-function","private-function"]` | The group order of a file, first to last. A declaration belongs to the first of its candidate groups that this list names; one the list does not name is not ordered. Groups: `public-type`, `private-type`, `type` (types and the members of a type together), `public-const`, `private-const`, `const`, `var`, `init`, `public-function`, `constructor`, `public-method`, `hook`, `private-function` (private functions and, where `type` is not listed, private methods). |
+| `hook_names` | list | `["Clone","String","GoString","Error","Unwrap","MarshalJSON","UnmarshalJSON","MarshalText","UnmarshalText","MarshalBinary","UnmarshalBinary"]`; rust: `[]` | Public methods that implement clone, conversion or interface hooks; they follow the other public methods. Names are kept to ones that are never ordinary behavior. |
+
 **Invalid example: invalid (go)**
 
 ```go
-func helper() {}
+package sample
+
+func helper() int { return 1 }
 
 type Service struct{}
+
+func (s *Service) Run() int { return helper() }
 ```
 
 **Valid example: valid (go)**
 
 ```go
+package sample
+
 type Service struct{}
 
-func helper() {}
+func (s *Service) Run() int { return helper() }
+
+func helper() int { return 1 }
+```
+
+**Invalid example: private-method-before-public (go)**
+
+```go
+package sample
+
+type Service struct{}
+
+func (s *Service) run() int { return 1 }
+
+func (s *Service) Run() int { return s.run() }
+```
+
+**Invalid example: init-after-functions (go)**
+
+```go
+package sample
+
+var ready bool
+
+func Run() bool { return ready }
+
+func init() { ready = true }
+```
+
+**Valid example: groups-in-order (go)**
+
+```go
+package sample
+
+type Service struct{ ok bool }
+
+type state int
+
+const Limit = 3
+
+const floor = 1
+
+var ready bool
+
+func init() { ready = true }
+
+func Open() *Service { return NewService() }
+
+func NewService() *Service { return &Service{ok: true} }
+
+func (s *Service) Run() int { return floor + int(state(Limit)) }
+
+func (s *Service) String() string { return "service" }
+
+func (s *Service) check() bool { return s.ok }
+```
+
+**Invalid example: rust-invalid (rust)**
+
+```rust
+pub fn run() -> u8 {
+    1
+}
+
+pub struct Store;
+```
+
+**Valid example: rust-valid (rust)**
+
+```rust
+const LIMIT: u8 = 3;
+
+pub struct Store;
+
+impl Store {
+    pub fn new() -> Self {
+        Store
+    }
+
+    pub fn get(&self) -> u8 {
+        LIMIT
+    }
+}
+
+pub fn run() -> u8 {
+    helper()
+}
+
+fn helper() -> u8 {
+    1
+}
+```
+
+**Invalid example: rust-constructor-after-behavior (rust)**
+
+```rust
+pub struct Store;
+
+impl Store {
+    pub fn get(&self) -> u8 {
+        1
+    }
+
+    pub fn new() -> Self {
+        Store
+    }
+}
 ```
 
 **Tuning: go**
 
 Order: public types; private types; public constants; private constants; variables; all `init` functions; public options and functions; public constructors; public methods; clone, conversion and interface hooks; private functions and methods.
+
+**Tuning: rust**
+
+The same principle, from the concepts to the machinery, with a type kept next to its impl blocks because that is how Rust code reads. Order: constants; statics; types, traits and their impl blocks (types and impls are one group, `owner-contiguity` keeps an owner's impls together); public free functions; private free functions. Associated functions named `new` come before the other methods of their type. Items of `#[cfg(test)]` modules are not ordered. Visibility counts as public when it is `pub` or `pub(crate)`.
 
 ### Read from behavior to machinery
 
@@ -1569,6 +2139,88 @@ count++
 // The wire format counts from zero; callers expect one-based totals.
 count++
 ```
+
+### Comments do not label sections
+
+`design/section-banners` · scope `file` · enforcement `heuristic` · severity `warn`
+
+**Intent**
+
+A banner restates structure that names and file layout already carry.
+
+**Requirement**
+
+A comment MUST NOT only label a section of code: banner lines such as `// ---- Helpers ----`, `// ====` rules and `// MARK:` markers are a substitute for splitting, naming or ordering, and SHOULD be replaced by one of them.
+
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `labels` | list | `["MARK:","#region","#endregion"]` | Line prefixes that label a section on their own. |
+| `min_run` | int | `3` | Rule characters in a row that make a banner line. |
+| `rule_chars` | string | `"-=*~_+"` | Characters a banner rule is drawn with. |
+
+**Invalid example: invalid (go)**
+
+```go
+package sample
+
+// ---- Helpers ----
+
+func helper() int { return 1 }
+```
+
+**Invalid example: marker (go)**
+
+```go
+package sample
+
+// MARK: - Helpers
+
+func helper() int { return 1 }
+```
+
+**Valid example: valid (go)**
+
+```go
+package sample
+
+// Parse reads the header.
+//
+// The layout is
+//
+//	---
+//	name: value
+//	---
+func Parse() int { return 1 }
+
+var x = 1 // --- not a banner: it trails code
+```
+
+**Invalid example: rust-invalid (rust)**
+
+```rust
+// ===== Types =====
+
+pub struct Store;
+```
+
+**Valid example: rust-valid (rust)**
+
+```rust
+/// Store of values.
+///
+/// ---
+pub struct Store;
+```
+
+**Tuning: go**
+
+Reported when every non-blank line of a comment group is a banner line. A group that mixes banner lines with prose (a table, a diagram) is documentation and passes.
+
+**Tuning: rust**
+
+Doc comments (`///`, `//!`) are Markdown and never banners; a plain `//` or block comment made only of banner lines is reported.
 
 ### Exported symbols are documented
 

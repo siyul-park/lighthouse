@@ -7,3 +7,138 @@ requirement: >-
   SHOULD be adjacent.
 enforcement: heuristic
 evidence: [symbols, distance]
+options:
+  visibility_groups:
+    type: bool
+    default: true
+    description: >-
+      The layout groups methods by visibility (public methods of all types,
+      then private ones), so a method of another owner in the other visibility
+      group does not separate an owner's methods. Set to false when a file puts
+      every owner's methods together, as impl blocks do.
+    per_language:
+      rust: false
+tuning:
+  go: >-
+    The methods of one receiver type are contiguous within their declaration
+    group: no free function, type, constant or variable, and no method of
+    another type of the same visibility, between two of them.
+  rust: >-
+    The members of one type (its impl blocks, inherent and trait impls) are
+    adjacent in a file: another type, a free function or an item of another
+    owner between two impl blocks of a type is a finding; two impl blocks side
+    by side are fine.
+implementation:
+  builtin: design/related-symbols-close
+examples:
+  - name: invalid
+    language: go
+    kind: invalid
+    files:
+      - path: example.go
+        body: |-
+          package sample
+
+          type A struct{}
+
+          type B struct{}
+
+          func (a A) One() int { return 1 }
+
+          func (b B) One() int { return 1 }
+
+          func (a A) Two() int { return 2 }
+    expect:
+      - line: 11
+  - name: free-function-between
+    language: go
+    kind: invalid
+    files:
+      - path: example.go
+        body: |-
+          package sample
+
+          type A struct{}
+
+          func (a A) One() int { return 1 }
+
+          func Other() int { return 0 }
+
+          func (a A) Two() int { return 2 }
+    expect:
+      - line: 9
+  - name: valid
+    language: go
+    kind: valid
+    files:
+      - path: example.go
+        body: |-
+          package sample
+
+          type A struct{}
+
+          type B struct{}
+
+          func (a A) One() int { return 1 }
+
+          func (a A) Two() int { return 2 }
+
+          func (b B) One() int { return 1 }
+
+          func (a A) hidden() int { return 3 }
+  - name: rust-invalid
+    language: rust
+    kind: invalid
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub struct A;
+
+          pub struct B;
+
+          impl A {
+              pub fn one(&self) -> u8 {
+                  1
+              }
+          }
+
+          impl B {
+              pub fn one(&self) -> u8 {
+                  1
+              }
+          }
+
+          impl A {
+              pub fn two(&self) -> u8 {
+                  2
+              }
+          }
+    expect:
+      - line: 18
+  - name: rust-valid
+    language: rust
+    kind: valid
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub struct A;
+
+          pub struct B;
+
+          impl A {
+              pub fn one(&self) -> u8 {
+                  1
+              }
+          }
+
+          impl A {
+              pub fn two(&self) -> u8 {
+                  2
+              }
+          }
+
+          impl B {
+              pub fn one(&self) -> u8 {
+                  1
+              }
+          }

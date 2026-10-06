@@ -1,0 +1,3 @@
+# Fixture projects of the plugin conformance suite: broken or incomplete on
+# purpose, and checked against their goldens instead of by lint.
+plugins/conformance/*/*/project/

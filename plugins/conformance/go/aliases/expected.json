@@ -1,6 +1,78 @@
 {
   "fragments": [
     {
+      "comments": [
+        {
+          "attached_to": ".::Store#type",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Store keeps values."
+        },
+        {
+          "attached_to": ".::Repo#type",
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "text": "// Repo is another name for Store."
+        },
+        {
+          "attached_to": ".::Handler#type",
+          "span": {
+            "end": {
+              "col": 32,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "text": "// Handler is a callback shape."
+        },
+        {
+          "attached_to": ".::Reader#interface",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "text": "// Reader reads values."
+        },
+        {
+          "attached_to": ".::Store::Read#method",
+          "span": {
+            "end": {
+              "col": 76,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "text": "// Read returns the value count; its receiver is spelled through the alias."
+        }
+      ],
       "edges": [
         {
           "from": {

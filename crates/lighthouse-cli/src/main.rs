@@ -7,12 +7,15 @@ use std::{
 };
 
 use clap::{Parser, Subcommand};
-use lighthouse_config::{Config, FILE_NAME};
+use lighthouse_config::FILE_NAME;
 use lighthouse_engine::Engine;
 use lighthouse_report::{Format, render};
+use session::Session;
 
 mod docs;
 mod rules;
+mod scope;
+mod session;
 
 const DEFAULT_CONFIG: &str = "plugins = [\"core\"]\nextends = [\"core/recommended\"]\n";
 
@@ -43,8 +46,17 @@ enum Command {
     /// or answers badly is reported as incomplete (exit 3).
     Check {
         /// Where to report diagnostics; the whole project is analyzed anyway.
-        #[arg(default_value = ".")]
+        /// Default: the whole project.
         paths: Vec<PathBuf>,
+        /// Report only files changed in the working tree against HEAD
+        /// (modified, added, renamed, untracked). A report filter like PATHS:
+        /// the whole project is still analyzed.
+        #[arg(long, conflicts_with = "diff")]
+        changed: bool,
+        /// Report only files changed since the merge base of BASE and HEAD,
+        /// including the working tree and untracked files. A report filter.
+        #[arg(long, value_name = "BASE")]
+        diff: Option<String>,
         #[arg(long, default_value = "text")]
         format: Format,
         /// Fail on warnings too.
@@ -85,6 +97,20 @@ enum RuleCommand {
         #[arg(long)]
         all: bool,
     },
+    /// Run the examples of implemented patterns: the bundled catalog and the
+    /// project's `.lighthouse/rules`. Exits 1 when any example fails.
+    ///
+    /// Examples run in each language whose plugin the config lists (or only
+    /// in --language); a pattern needs an example for every language run.
+    Test {
+        /// Pattern ids; default: every implemented pattern.
+        ids: Vec<String>,
+        #[arg(long)]
+        language: Option<String>,
+        /// Use this config file; the project root is then the current directory.
+        #[arg(long)]
+        config: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -117,6 +143,8 @@ fn run(cli: Cli) -> Result<u8> {
     match cli.command {
         Command::Check {
             paths,
+            changed,
+            diff,
             format,
             strict,
             allow_incomplete,
@@ -124,6 +152,10 @@ fn run(cli: Cli) -> Result<u8> {
             config,
         } => check(
             &paths,
+            Reported {
+                changed,
+                diff: diff.as_deref(),
+            },
             Options {
                 format,
                 strict,
@@ -135,6 +167,14 @@ fn run(cli: Cli) -> Result<u8> {
         Command::Rule {
             command: RuleCommand::List { all },
         } => rules::list(all),
+        Command::Rule {
+            command:
+                RuleCommand::Test {
+                    ids,
+                    language,
+                    config,
+                },
+        } => rules::test(&ids, language.as_deref(), config.as_deref()),
         Command::Explain { id } => rules::explain(&id),
         Command::Docs { command } => match command {
             DocsCommand::Generate { out } => docs::generate(&out),
@@ -150,31 +190,47 @@ struct Options {
     allow_incomplete: bool,
 }
 
+/// A report filter taken from git instead of paths.
+struct Reported<'a> {
+    changed: bool,
+    diff: Option<&'a str>,
+}
+
 fn check(
     paths: &[PathBuf],
+    reported: Reported,
     options: Options,
     only: &[String],
     config: Option<&Path>,
 ) -> Result<u8> {
-    let (config, root) = match config {
-        Some(path) => (Config::load(path)?, env::current_dir()?),
+    let session = Session::load(config)?;
+    let (registry, plugins) = session.registry()?;
+    let root = session.root.clone();
+    let engine = Engine::new(registry, session.config, &root)?.with_incomplete(plugins.incomplete);
+    let files = match (reported.changed, reported.diff) {
+        (true, _) => Some(scope::changed(&root)?),
+        (_, Some(base)) => Some(scope::since(&root, base)?),
+        _ => None,
+    };
+    let outcome = match files {
+        Some(files) => {
+            let files = within(&root, paths, files)?;
+            eprintln!(
+                "lighthouse: reporting {} changed file(s); the whole project is analyzed",
+                files.len()
+            );
+            engine.check_files(&files, only)?
+        }
         None => {
-            let (path, config) = Config::discover(&env::current_dir()?)?
-                .ok_or_else(|| format!("no {FILE_NAME} found (run `lighthouse init`)"))?;
-            let root = path.parent().ok_or("config path has no parent")?.to_owned();
-            (config, root)
+            let default = [PathBuf::from(".")];
+            let paths = if paths.is_empty() {
+                &default[..]
+            } else {
+                paths
+            };
+            engine.check(paths, only)?
         }
     };
-    let mut registry = lighthouse_builtin::registry();
-    let plugins = lighthouse_rpc::register(
-        &mut registry,
-        &config,
-        &root,
-        &lighthouse_rpc::search_dirs(&root),
-    )?;
-    let outcome = Engine::new(registry, config, &root)?
-        .with_incomplete(plugins.incomplete)
-        .check(paths, only)?;
     for notice in &plugins.notices {
         eprintln!("lighthouse: {notice}");
     }
@@ -186,6 +242,34 @@ fn check(
         render(options.format, &outcome.diagnostics, &outcome.incomplete)
     );
     Ok(outcome.exit_code(options.strict, options.allow_incomplete))
+}
+
+/// The changed files that also lie under the given paths, when there are any.
+fn within(root: &Path, paths: &[PathBuf], files: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
+    if paths.is_empty() {
+        return Ok(files);
+    }
+    let root = root.canonicalize()?;
+    let mut scopes = Vec::new();
+    for path in paths {
+        let absolute = path.canonicalize()?;
+        scopes.push(
+            absolute
+                .strip_prefix(&root)
+                .map(Path::to_owned)
+                .map_err(|_| {
+                    format!(
+                        "{} is outside the project root {}",
+                        path.display(),
+                        root.display()
+                    )
+                })?,
+        );
+    }
+    Ok(files
+        .into_iter()
+        .filter(|f| scopes.iter().any(|s| f.starts_with(s)))
+        .collect())
 }
 
 fn init() -> Result<u8> {

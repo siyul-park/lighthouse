@@ -90,7 +90,7 @@ unknown keys in it (as an `incomplete` entry, see below).
 Result `{ fragments, notices, incomplete }`:
 
 - `fragments`: one per analyzed file, sorted by path, each
-  `{ file: { path, generated? }, modules, symbols, edges, functions, tests }`.
+  `{ file: { path, generated? }, modules, symbols, edges, functions, tests, comments }`.
   A requested file with no fragment is incomplete. Files the provider
   deliberately skips (excluded by the build context, `testdata`) get an empty
   fragment.
@@ -203,6 +203,18 @@ map syntax onto these kinds:
 Nested functions and closures emit nothing but raise the nesting of what they
 contain. Cyclomatic complexity is `1 + if + else-if + loop + catch + switch
 arms + logic operators`; cognitive complexity follows Campbell, SonarSource 2018.
+
+### Comments
+
+`comments` holds the comments of the file in source order, which lets rules judge
+text no symbol carries (section banners, commented-out code). Adjacent line
+comments with nothing else between them form one comment. Each entry is `{ span,
+text, attached_to? }`: `text` is the source text with its comment markers, the
+lines of one comment joined by `\n`; `attached_to` is the id of the symbol the
+comment documents, set when the comment stands alone on the lines directly above
+that symbol's declaration (attributes may sit between). Doc comments appear here
+too, as written. The field was added to 0.1 before 1.0 and may be omitted by a
+plugin that does not report comments; hosts then see none.
 
 ### Tests
 

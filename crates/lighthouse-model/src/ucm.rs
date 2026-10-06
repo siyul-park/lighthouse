@@ -309,6 +309,22 @@ pub struct TestCase {
     pub targets: Vec<Target>,
 }
 
+/// A comment of a file. Comments are facts about a file's text, so the
+/// locator is the `span` and nothing here is specific to code: any provider
+/// of a text artifact can state them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Comment {
+    pub file: PathBuf,
+    pub span: Span,
+    /// Source text with the comment markers; adjacent line comments form one
+    /// comment, their lines joined by `\n`.
+    pub text: String,
+    /// The symbol this comment is the documentation of, when the provider
+    /// knows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attached_to: Option<SymbolId>,
+}
+
 /// UCM contribution of one indexed file; ids are project-stable.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fragment {
@@ -318,6 +334,8 @@ pub struct Fragment {
     pub edges: Vec<Edge>,
     pub functions: Vec<FunctionSummary>,
     pub tests: Vec<TestCase>,
+    #[serde(default)]
+    pub comments: Vec<Comment>,
 }
 
 /// All fragments merged: sorted, deduplicated, edge targets resolved.
@@ -340,6 +358,8 @@ struct Index {
     callers: BTreeMap<SymbolId, Vec<SymbolId>>,
     callees: BTreeMap<SymbolId, Vec<SymbolId>>,
     references: BTreeMap<SymbolId, Vec<SymbolId>>,
+    uses: BTreeMap<SymbolId, Vec<SymbolId>>,
+    members: BTreeMap<SymbolId, Vec<SymbolId>>,
 }
 
 impl Deref for Project {
@@ -360,6 +380,7 @@ impl Project {
             all.edges.extend(part.edges);
             all.functions.extend(part.functions);
             all.tests.extend(part.tests);
+            all.comments.extend(part.comments);
         }
         all.files.sort_by(|a, b| a.path.cmp(&b.path));
         all.files.dedup_by(|a, b| a.path == b.path);
@@ -373,6 +394,9 @@ impl Project {
         all.functions.dedup_by(|a, b| a.symbol == b.symbol);
         all.tests.sort_by(|a, b| a.symbol.cmp(&b.symbol));
         all.tests.dedup_by(|a, b| a.symbol == b.symbol);
+        all.comments
+            .sort_by(|a, b| (&a.file, a.span.start).cmp(&(&b.file, b.span.start)));
+        all.comments.dedup();
 
         let resolver = Resolver::new(&all);
         let resolved: Vec<Target> = all
@@ -485,6 +509,41 @@ impl Project {
         self.index.references.get(id).map_or(&[], Vec::as_slice)
     }
 
+    /// Distinct symbols `id` calls or references through a resolved,
+    /// non-heuristic edge, excluding itself: every use `id` makes of another
+    /// symbol, whether as a call or as a value.
+    pub fn uses(&self, id: &SymbolId) -> &[SymbolId] {
+        self.index.uses.get(id).map_or(&[], Vec::as_slice)
+    }
+
+    /// Symbols whose `owner` is `id`: fields, methods, associated items.
+    pub fn members(&self, id: &SymbolId) -> &[SymbolId] {
+        self.index.members.get(id).map_or(&[], Vec::as_slice)
+    }
+
+    /// The test case of a test symbol.
+    pub fn test(&self, id: &SymbolId) -> Option<&TestCase> {
+        let at = self.all.tests.binary_search_by(|t| t.symbol.cmp(id)).ok()?;
+        self.all.tests.get(at)
+    }
+
+    /// Test cases declared in `module`, ordered by id.
+    pub fn tests_in(&self, module: &str) -> &[TestCase] {
+        let prefix = format!("{module}::");
+        let tests = &self.all.tests;
+        let start = tests.partition_point(|t| t.symbol.as_str() < prefix.as_str());
+        let len = tests[start..].partition_point(|t| t.symbol.as_str().starts_with(&prefix));
+        &tests[start..start + len]
+    }
+
+    /// Comments of `path`, in source order.
+    pub fn comments_in(&self, path: &Path) -> &[Comment] {
+        let comments = &self.all.comments;
+        let start = comments.partition_point(|c| c.file.as_path() < path);
+        let end = comments.partition_point(|c| c.file.as_path() <= path);
+        &comments[start..end]
+    }
+
     /// Distinct symbols `id` has a resolved, non-heuristic `calls` edge to,
     /// excluding itself.
     pub fn callees(&self, id: &SymbolId) -> &[SymbolId] {
@@ -497,6 +556,13 @@ impl Index {
         let mut index = Self::default();
         for (at, symbol) in all.symbols.iter().enumerate() {
             index.symbols.insert(symbol.id.clone(), at);
+            if let Some(owner) = &symbol.owner {
+                index
+                    .members
+                    .entry(owner.clone())
+                    .or_default()
+                    .push(symbol.id.clone());
+            }
             index
                 .in_file
                 .entry(symbol.file.clone())
@@ -508,15 +574,19 @@ impl Index {
         }
         let mut calls = BTreeSet::new();
         let mut references = BTreeSet::new();
+        let mut uses = BTreeSet::new();
         for edge in &all.edges {
             let (Node::Symbol(from), Target::Resolved(Node::Symbol(to))) = (&edge.from, &edge.to)
             else {
                 continue;
             };
+            let precise = edge.resolution != Resolution::Heuristic;
+            if from != to && precise && matches!(edge.kind, EdgeKind::Calls | EdgeKind::References)
+            {
+                uses.insert((from, to));
+            }
             match edge.kind {
-                EdgeKind::Calls if from != to && edge.resolution != Resolution::Heuristic => {
-                    calls.insert((from, to))
-                }
+                EdgeKind::Calls if from != to && precise => calls.insert((from, to)),
                 EdgeKind::References if from != to => references.insert((from, to)),
                 _ => false,
             };
@@ -532,6 +602,9 @@ impl Index {
                 .entry(to.clone())
                 .or_default()
                 .push(from.clone());
+        }
+        for (from, to) in uses {
+            index.uses.entry(from.clone()).or_default().push(to.clone());
         }
         for (from, to) in references {
             index

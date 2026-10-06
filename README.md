@@ -116,6 +116,8 @@ lighthouse init                               # writes lighthouse.toml
 lighthouse check                              # analyze the project
 lighthouse explain design/single-use-wrapper  # intent, requirement, examples
 lighthouse rule list --all                    # every pattern and its status
+lighthouse rule test                          # run the examples of every implemented pattern
+lighthouse check --changed                    # report only what the working tree changed
 ```
 
 A minimal `lighthouse.toml` for a Go project:
@@ -158,8 +160,8 @@ incomplete. "Not checked" never counts as "passed".
 | Pattern catalog | `design` and `testing` packs from a real style guide, generated docs, overlays | more executable examples |
 | Languages | Go (semantic), Rust (syntactic), both over RPC | TypeScript, Python |
 | Analysis | size, cyclomatic, cognitive (SonarSource), nesting, fan-in/out | dependency direction, cycles, clones, cohesion |
-| Rules | complexity, coupling, exported docs, single-use wrappers | declarative CEL rules, test-contract rules |
-| Agent loop | CLI with text, JSON and SARIF output | agent output format, MCP server, Skill, hooks |
+| Rules | complexity, coupling, docs, wrappers, declaration order and ownership layout, naming, banners, test contracts, declarative CEL rules (`.lighthouse/rules`) | dependency direction, cohesion, clones |
+| Agent loop | CLI with text, JSON and SARIF output, `--changed` / `--diff` report scopes, `rule test` | agent output format, MCP server, Skill, hooks |
 | Memory | | verdict store, pattern index, similarity search |
 | Evolution | | coverage analysis, rule proposals, judged and learned rule forms |
 | Editors | | LSP server |
@@ -170,5 +172,6 @@ incomplete. "Not checked" never counts as "passed".
 - [Architecture](docs/architecture.md): core model, scopes and incomplete analysis
 - [Plugin protocol](docs/plugin-protocol.md): writing a language plugin in any language
 
-Development: `make test` builds the plugins and runs the test suite. The Go plugin
-pins its toolchain in `plugins/lang-go/.go-version`.
+Development: `make test` builds the plugins and runs the test suites, `make lint` runs
+formatters, clippy, `go vet` and Lighthouse on its own sources, and `make ci` runs both.
+The Go plugin pins its toolchain in `plugins/lang-go/.go-version`.

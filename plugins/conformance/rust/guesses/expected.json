@@ -1,6 +1,64 @@
 {
   "fragments": [
     {
+      "comments": [
+        {
+          "attached_to": "guesses::common#function",
+          "span": {
+            "end": {
+              "col": 53,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 26
+            }
+          },
+          "text": "/// Five private `run` methods: too common to guess."
+        },
+        {
+          "attached_to": "guesses::few#function",
+          "span": {
+            "end": {
+              "col": 59,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 31
+            }
+          },
+          "text": "/// Two private `tick` methods: both are possible targets."
+        },
+        {
+          "attached_to": "guesses::single#function",
+          "span": {
+            "end": {
+              "col": 31,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 36
+            }
+          },
+          "text": "/// One private `once` method."
+        },
+        {
+          "attached_to": "guesses::exact#function",
+          "span": {
+            "end": {
+              "col": 72,
+              "line": 41
+            },
+            "start": {
+              "col": 1,
+              "line": 41
+            }
+          },
+          "text": "/// The receiver is known, so the call is exact and nothing is guessed."
+        }
+      ],
       "edges": [
         {
           "from": {

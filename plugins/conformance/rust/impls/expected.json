@@ -1,6 +1,64 @@
 {
   "fragments": [
     {
+      "comments": [
+        {
+          "attached_to": "impls::Stack#type",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "/// A bounded stack."
+        },
+        {
+          "attached_to": "impls::Stack::new#method",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 12
+            },
+            "start": {
+              "col": 5,
+              "line": 12
+            }
+          },
+          "text": "/// An empty stack."
+        },
+        {
+          "attached_to": "impls::Named#interface",
+          "span": {
+            "end": {
+              "col": 24,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 36
+            }
+          },
+          "text": "/// Things with a name."
+        },
+        {
+          "attached_to": "impls::Named::name#method",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 38
+            },
+            "start": {
+              "col": 5,
+              "line": 38
+            }
+          },
+          "text": "/// The name."
+        }
+      ],
       "edges": [
         {
           "from": {

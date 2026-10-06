@@ -1,6 +1,7 @@
 {
   "fragments": [
     {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -71,6 +72,7 @@
       "tests": []
     },
     {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -132,6 +134,22 @@
       "tests": []
     },
     {
+      "comments": [
+        {
+          "attached_to": "bins::api#function",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "/// The library surface."
+        }
+      ],
       "edges": [
         {
           "from": {
@@ -186,6 +204,7 @@
       "tests": []
     },
     {
+      "comments": [],
       "edges": [
         {
           "from": {

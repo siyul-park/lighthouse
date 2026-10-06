@@ -1,6 +1,7 @@
 use std::{fs, path::Path};
 
 use assert_cmd::Command;
+use predicates::prelude::*;
 use tempfile::TempDir;
 
 fn lighthouse(dir: &Path) -> Command {
@@ -129,18 +130,25 @@ fn init_writes_config_that_checks_clean_and_refuses_overwrite() {
 #[test]
 fn rule_list_and_explain() {
     let dir = tempfile::tempdir().unwrap();
-    lighthouse(dir.path())
+    let list = lighthouse(dir.path())
         .args(["rule", "list"])
-        .assert()
-        .success()
-        .stdout(
-            "core/max-file-lines\twarn\tFiles stay below a line limit
-design/complexity-signal\twarn\tComplexity is a review signal
-design/coupling-signal\twarn\tCoupling is a review signal
-design/exported-doc\twarn\tExported symbols are documented
-design/single-use-wrapper\twarn\tInline single-use wrappers
-",
+        .output()
+        .unwrap();
+    let list = String::from_utf8(list.stdout).unwrap();
+    for line in [
+        "core/max-file-lines\twarn\tFiles stay below a line limit",
+        "design/complexity-signal\twarn\tComplexity is a review signal",
+        "design/declaration-groups\terror\t",
+        "design/no-exported-mutable-global\twarn\t",
+        "design/private-helper-callers\treview\t",
+        "testing/owner-test\twarn\t",
+        "testing/single-owner-test\terror\t",
+    ] {
+        assert!(
+            list.lines().any(|l| l.starts_with(line)),
+            "{line} not in {list}"
         );
+    }
     let out = lighthouse(dir.path())
         .args(["explain", "core/max-file-lines"])
         .output()
@@ -368,6 +376,173 @@ fn config_flag_checks_the_current_directory_with_another_config_file() {
         .stdout("api.go:3:1: warn design/exported-doc: exported function Open must have a doc comment\nsummary: 0 error, 1 warn, 0 review, 0 incomplete\n");
     lighthouse(project.path())
         .args(["check", "--config", "missing.toml"])
+        .assert()
+        .code(2);
+}
+
+fn git(dir: &Path, args: &[&str]) {
+    let status = std::process::Command::new("git")
+        .args([
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "-c",
+            "commit.gpgsign=false",
+        ])
+        .args(args)
+        .current_dir(dir)
+        .status()
+        .unwrap();
+    assert!(status.success(), "git {args:?}");
+}
+
+fn repository() -> TempDir {
+    let dir = project(6);
+    fs::write(dir.path().join(".gitignore"), "target\n").unwrap();
+    git(dir.path(), &["init", "-q", "-b", "main"]);
+    git(dir.path(), &["add", "."]);
+    git(dir.path(), &["commit", "-q", "-m", "base"]);
+    dir
+}
+
+#[test]
+fn changed_reports_only_modified_and_untracked_files_but_analyzes_everything() {
+    let dir = repository();
+    lighthouse(dir.path())
+        .args(["check", "--changed"])
+        .assert()
+        .success()
+        .stdout("");
+    fs::write(dir.path().join("new.txt"), "a\nb\nc\nd\ne\nf\ng\nh\n").unwrap();
+    lighthouse(dir.path())
+        .args(["check", "--changed"])
+        .assert()
+        .success()
+        .stdout(predicates_contains("new.txt:7:1: warn core/max-file-lines"))
+        .stdout(predicates_lacks("big.txt"));
+    fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\ne\nf\ng\nh\ni\n").unwrap();
+    let out = lighthouse(dir.path())
+        .args(["check", "--changed"])
+        .output()
+        .unwrap();
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("big.txt:7:1") && text.contains("new.txt:7:1"),
+        "{text}"
+    );
+}
+
+#[test]
+fn diff_reports_files_changed_since_the_merge_base() {
+    let dir = repository();
+    git(dir.path(), &["checkout", "-q", "-b", "work"]);
+    fs::write(dir.path().join("small.txt"), "a\nb\nc\nd\ne\nf\ng\nh\n").unwrap();
+    git(dir.path(), &["commit", "-q", "-am", "grow"]);
+    let out = lighthouse(dir.path())
+        .args(["check", "--diff", "main"])
+        .output()
+        .unwrap();
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("small.txt:7:1") && !text.contains("big.txt"),
+        "{text}"
+    );
+    lighthouse(dir.path())
+        .args(["check", "--diff", "no-such-branch"])
+        .assert()
+        .code(2);
+}
+
+#[test]
+fn changed_and_diff_exclude_each_other() {
+    let dir = repository();
+    lighthouse(dir.path())
+        .args(["check", "--changed", "--diff", "main"])
+        .assert()
+        .code(2);
+}
+
+fn predicates_contains(text: &'static str) -> impl predicates::Predicate<[u8]> {
+    predicates::str::contains(text).from_utf8()
+}
+
+fn predicates_lacks(text: &'static str) -> impl predicates::Predicate<[u8]> {
+    predicates::str::contains(text).not().from_utf8()
+}
+
+const LOCAL_RULE: &str = "id: local/long-file
+title: Files stay short
+intent: Long files are hard to read.
+scope: file
+requirement: A file MUST have at most three lines.
+enforcement: mechanical
+evidence: [path]
+examples:
+  - name: long
+    language: text
+    kind: invalid
+    files: [{ path: a.txt, body: \"1\\n2\\n3\\n4\" }]
+    expect: [{ line: 1 }]
+  - name: short
+    language: text
+    kind: valid
+    files: [{ path: a.txt, body: \"1\\n2\" }]
+rule:
+  select: file
+  where: 'file.lines > 3 && !file.generated'
+  message: 'file {{ file.path }} has {{ file.lines }} lines'
+  evidence:
+    path: file.path
+";
+
+fn local_project(rule: &str) -> TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join("lighthouse.toml"),
+        "plugins = [\"core\", \"local\"]\n[rules]\n\"local/long-file\" = \"error\"\n",
+    )
+    .unwrap();
+    fs::create_dir_all(dir.path().join(".lighthouse/rules")).unwrap();
+    fs::write(dir.path().join(".lighthouse/rules/long-file.yaml"), rule).unwrap();
+    fs::write(dir.path().join("big.txt"), "1\n2\n3\n4\n5\n").unwrap();
+    fs::write(dir.path().join("small.txt"), "1\n").unwrap();
+    dir
+}
+
+#[test]
+fn local_declarative_rules_run_in_check_and_are_tested_by_rule_test() {
+    let dir = local_project(LOCAL_RULE);
+    lighthouse(dir.path())
+        .arg("check")
+        .assert()
+        .code(1)
+        .stdout(predicates_contains(
+            "big.txt:1:1: error local/long-file: file big.txt has 5 lines",
+        ));
+    lighthouse(dir.path())
+        .args(["rule", "test", "local/long-file"])
+        .assert()
+        .success()
+        .stdout(predicates_contains("0 failure(s)"));
+}
+
+#[test]
+fn rule_test_fails_when_an_example_does_not_hold() {
+    let broken = LOCAL_RULE.replace("where: 'file.lines > 3", "where: 'file.lines > 30");
+    let dir = local_project(&broken);
+    lighthouse(dir.path())
+        .args(["rule", "test", "local/long-file"])
+        .assert()
+        .code(1)
+        .stdout(predicates_contains("FAIL [text] local/long-file long"));
+}
+
+#[test]
+fn rule_test_rejects_unknown_ids() {
+    let dir = local_project(LOCAL_RULE);
+    lighthouse(dir.path())
+        .args(["rule", "test", "local/nope"])
         .assert()
         .code(2);
 }

@@ -9,3 +9,4 @@ patterns:
   - borrow-within-boundary
   - single-resource-owner
   - layout-declarations-hold-no-state
+  - no-exported-mutable-global

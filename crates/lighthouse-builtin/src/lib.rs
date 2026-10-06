@@ -4,10 +4,11 @@ use lighthouse_plugin::{Plugin, Registry};
 
 /// Registry holding every bundled plugin.
 pub fn registry() -> Registry {
-    let bundled: [&dyn Plugin; 3] = [
+    let bundled: [&dyn Plugin; 4] = [
         &core_plugin::Core,
         &lighthouse_metrics::Metrics,
         &lighthouse_design::Design,
+        &lighthouse_testing::Testing,
     ];
     let mut registry = Registry::default();
     for plugin in bundled {

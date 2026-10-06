@@ -45,6 +45,30 @@
       ],
       "type": "object"
     },
+    "Comment": {
+      "description": "A comment of the file. Adjacent line comments are one comment.",
+      "properties": {
+        "attached_to": {
+          "description": "Id of the symbol the comment is the documentation of, when known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "text": {
+          "description": "Source text including the comment markers (`//`, `/* */`, `#`); the\nlines of one comment are joined by `\\n`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "span",
+        "text"
+      ],
+      "type": "object"
+    },
     "Context": {
       "properties": {
         "options": {
@@ -197,6 +221,14 @@
     "Fragment": {
       "description": "Code-model contribution of one file.",
       "properties": {
+        "comments": {
+          "default": [],
+          "description": "Comments of the file in source order. Added in 0.1 before 1.0; a\nplugin that does not know comments omits the field.",
+          "items": {
+            "$ref": "#/$defs/Comment"
+          },
+          "type": "array"
+        },
         "edges": {
           "default": [],
           "items": {

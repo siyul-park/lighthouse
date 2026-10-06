@@ -13,6 +13,7 @@ lighthouse-plugin.workspace = true
 lighthouse-spec.workspace = true
 lighthouse-design.workspace = true
 lighthouse-metrics.workspace = true
+lighthouse-testing.workspace = true
 
 [dev-dependencies]
 lighthouse-engine.workspace = true

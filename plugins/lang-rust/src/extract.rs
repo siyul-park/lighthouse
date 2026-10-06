@@ -12,6 +12,7 @@ use syn::{Attribute, Block, Item};
 
 use crate::{
     body::{self, Home},
+    comments,
     names::{
         Generics, Index, ModId, Ns, Res, Sym, TyCx, ViaTrait, generics_of, is_test_fn, symbol_id,
     },
@@ -51,6 +52,7 @@ pub fn fragment(idx: &Index, file: usize) -> (Fragment, MacroStats) {
             out.module(m);
         }
     }
+    out.frag.comments = comments::scan(&src.text, &out.frag.symbols);
     (out.frag, out.stats)
 }
 

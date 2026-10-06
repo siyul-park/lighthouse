@@ -1,6 +1,92 @@
 {
   "fragments": [
     {
+      "comments": [
+        {
+          "attached_to": ".::Number#interface",
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Number is a numeric constraint."
+        },
+        {
+          "attached_to": ".::Stack#type",
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "text": "// Stack holds values of one type."
+        },
+        {
+          "attached_to": ".::Stack::Push#method",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "text": "// Push adds an item."
+        },
+        {
+          "attached_to": ".::Stack::Len#method",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "text": "// Len counts the items."
+        },
+        {
+          "attached_to": ".::Map#function",
+          "span": {
+            "end": {
+              "col": 32,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "text": "// Map applies f to every item."
+        },
+        {
+          "attached_to": ".::Sum#function",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 28
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "text": "// Sum adds numbers."
+        }
+      ],
       "edges": [
         {
           "from": {

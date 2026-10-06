@@ -89,6 +89,7 @@ type Fragment struct {
 	Edges     []Edge            `json:"edges"`
 	Functions []FunctionSummary `json:"functions"`
 	Tests     []TestCase        `json:"tests"`
+	Comments  []Comment         `json:"comments"`
 }
 
 type FileInfo struct {
@@ -162,4 +163,12 @@ type TestCase struct {
 	Nesting int      `json:"nesting"`
 	Style   string   `json:"style"`
 	Targets []string `json:"targets"`
+}
+
+// Comment is a comment group of a file: adjacent comments with no blank line
+// between them, as the source reads, markers included.
+type Comment struct {
+	Span       Span   `json:"span"`
+	Text       string `json:"text"`
+	AttachedTo string `json:"attached_to,omitempty"`
 }

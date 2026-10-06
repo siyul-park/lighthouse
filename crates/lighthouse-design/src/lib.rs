@@ -1,6 +1,13 @@
+mod banner;
+mod callers;
 mod complexity;
 mod coupling;
 mod doc;
+mod helpers;
+mod layout;
+mod order;
+mod qualifier;
+mod related;
 mod wrapper;
 
 use std::path::Path;
@@ -23,12 +30,20 @@ impl Plugin for Design {
     }
 
     fn rules(&self) -> Vec<Box<dyn Rule>> {
-        vec![
+        let mut rules = vec![
+            banner::rule(),
+            callers::rule(),
             complexity::rule(),
             coupling::rule(),
             doc::rule(),
+            helpers::rule(),
+            order::rule(),
+            qualifier::rule(),
+            related::rule(),
             wrapper::rule(),
-        ]
+        ];
+        rules.extend(lighthouse_declarative::Declarative::bundled_rules(ID));
+        rules
     }
 
     fn presets(&self) -> Vec<Preset> {

@@ -1,0 +1,142 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// ---- Helpers ----"
+        },
+        {
+          "attached_to": ".::Run#function",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "text": "// Run runs the thing.\n// It returns one."
+        },
+        {
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 8
+            },
+            "start": {
+              "col": 9,
+              "line": 8
+            }
+          },
+          "text": "// trailing"
+        },
+        {
+          "attached_to": ".::Block#var",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "text": "/* block comment */"
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Run#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Block#var"
+        }
+      ],
+      "file": {
+        "path": "c.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 2,
+          "symbol": ".::Run#function",
+          "tokens": 7,
+          "top_level": 2
+        }
+      ],
+      "modules": [
+        {
+          "name": "comments",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Run runs the thing.\nIt returns one.",
+          "file": "c.go",
+          "id": ".::Run#function",
+          "kind": "function",
+          "name": "Run",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "block comment",
+          "file": "c.go",
+          "id": ".::Block#var",
+          "kind": "var",
+          "name": "Block",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 13
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

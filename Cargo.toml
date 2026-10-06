@@ -9,6 +9,7 @@ publish = false
 
 [workspace.dependencies]
 assert_cmd = "2"
+cel = "0.14"
 clap = { version = "4", features = ["derive"] }
 globset = "0.4"
 libc = "0.2"
@@ -29,6 +30,7 @@ toml = "0.9"
 
 lighthouse-builtin = { path = "crates/lighthouse-builtin" }
 lighthouse-config = { path = "crates/lighthouse-config" }
+lighthouse-declarative = { path = "crates/lighthouse-declarative" }
 lighthouse-design = { path = "crates/lighthouse-design" }
 lighthouse-engine = { path = "crates/lighthouse-engine" }
 lighthouse-metrics = { path = "crates/lighthouse-metrics" }
@@ -38,3 +40,4 @@ lighthouse-protocol = { path = "crates/lighthouse-protocol" }
 lighthouse-report = { path = "crates/lighthouse-report" }
 lighthouse-rpc = { path = "crates/lighthouse-rpc" }
 lighthouse-spec = { path = "crates/lighthouse-spec" }
+lighthouse-testing = { path = "crates/lighthouse-testing" }

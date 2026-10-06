@@ -8,28 +8,135 @@ requirement: >-
   Feature contract tests MUST use only the target's public symbols and MUST
   live outside the target's private scope.
 enforcement: mechanical
-evidence: [test_file, package]
+evidence: [test_file, package, private_symbols]
+tuning:
+  go: >-
+    Tests live in `package <target>_test`. A test file inside the target
+    package is reported when it uses an unexported symbol of that package; one
+    that only uses exported symbols is left alone.
+  rust: >-
+    Contract tests are integration tests under `tests/`. Inline `#[cfg(test)]`
+    unit tests are never reported: the provider cannot tell a `pub(crate)` item
+    from a `pub` one of an unpublished crate, so it cannot say that such a test
+    could have lived in `tests/`.
+  typescript: "Contract tests import only the package's public exports."
+  python: "Contract tests import only the package's public API."
+implementation:
+  builtin: testing/external-test-package
 examples:
   - name: invalid
     language: go
     kind: invalid
     files:
-      - path: example.go
+      - path: go.mod
+        body: |-
+          module example.com/store
+
+          go 1.26
+      - path: store.go
         body: |-
           package store
 
-          func TestGet(t *testing.T) { _ = New() }
+          func get() int { return 1 }
+
+          func Get() int { return get() }
+      - path: store_test.go
+        body: |-
+          package store
+
+          import "testing"
+
+          func TestGet(t *testing.T) {
+          	if get() != 1 {
+          		t.Fatal("get")
+          	}
+          }
+    expect:
+      - line: 5
   - name: valid
     language: go
     kind: valid
     files:
-      - path: example.go
+      - path: go.mod
+        body: |-
+          module example.com/store
+
+          go 1.26
+      - path: store.go
+        body: |-
+          package store
+
+          func get() int { return 1 }
+
+          func Get() int { return get() }
+      - path: store_test.go
         body: |-
           package store_test
 
-          func TestGet(t *testing.T) { _ = store.New() }
-tuning:
-  go: "Tests live in `package <target>_test`."
-  rust: "Contract tests are integration tests under `tests/`."
-  typescript: "Contract tests import only the package's public exports."
-  python: "Contract tests import only the package's public API."
+          import (
+          	"testing"
+
+          	"example.com/store"
+          )
+
+          func TestGet(t *testing.T) {
+          	if store.Get() != 1 {
+          		t.Fatal("get")
+          	}
+          }
+  - name: internal-test-of-the-public-api
+    language: go
+    kind: valid
+    files:
+      - path: go.mod
+        body: |-
+          module example.com/store
+
+          go 1.26
+      - path: store.go
+        body: |-
+          package store
+
+          func get() int { return 1 }
+
+          func Get() int { return get() }
+      - path: store_test.go
+        body: |-
+          package store
+
+          import "testing"
+
+          func TestGet(t *testing.T) {
+          	if Get() != 1 {
+          		t.Fatal("get")
+          	}
+          }
+  - name: rust-valid
+    language: rust
+    kind: valid
+    files:
+      - path: src/lib.rs
+        body: |-
+          fn hidden() -> u8 {
+              1
+          }
+
+          pub fn get() -> u8 {
+              hidden()
+          }
+
+          #[cfg(test)]
+          mod tests {
+              use super::*;
+
+              #[test]
+              fn hidden_is_one() {
+                  assert_eq!(hidden(), 1);
+              }
+          }
+      - path: tests/store.rs
+        body: |-
+          #[test]
+          fn get_is_one() {
+              assert_eq!(workspace::get(), 1);
+          }

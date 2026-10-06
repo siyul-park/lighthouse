@@ -1,6 +1,21 @@
 {
   "fragments": [
     {
+      "comments": [
+        {
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "//go:build fast"
+        }
+      ],
       "edges": [
         {
           "from": {
@@ -43,6 +58,22 @@
       "tests": []
     },
     {
+      "comments": [
+        {
+          "attached_to": ".::Mode#function",
+          "span": {
+            "end": {
+              "col": 32,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Mode names the build flavor."
+        }
+      ],
       "edges": [
         {
           "from": {
@@ -105,6 +136,7 @@
       "tests": []
     },
     {
+      "comments": [],
       "edges": [],
       "file": {
         "path": "slow.go"

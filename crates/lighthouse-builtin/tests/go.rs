@@ -295,7 +295,16 @@ fn engine_checks_a_multi_file_go_package() {
     write(root, "store/load.go", LOAD);
     write(root, "store/store_test.go", STORE_TEST);
     write(root, "cmd/main.go", MAIN);
-    let outcome = engine(&plugin, root, "").check(&[], &[]).unwrap();
+    // The original four rules; the ordering and naming rules have their own
+    // examples and would also speak about this deliberately small package.
+    let only = [
+        "design/complexity-signal",
+        "design/coupling-signal",
+        "design/exported-doc",
+        "design/single-use-wrapper",
+    ]
+    .map(str::to_owned);
+    let outcome = engine(&plugin, root, "").check(&[], &only).unwrap();
 
     let found: Vec<(String, u32, String)> = outcome
         .diagnostics

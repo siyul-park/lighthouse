@@ -1,6 +1,7 @@
 {
   "fragments": [
     {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -114,6 +115,7 @@
       "tests": []
     },
     {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -183,6 +185,7 @@
       "tests": []
     },
     {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -296,6 +299,7 @@
       "tests": []
     },
     {
+      "comments": [],
       "edges": [
         {
           "from": {

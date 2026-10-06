@@ -159,6 +159,10 @@ pub struct Fragment {
     pub functions: Vec<FunctionSummary>,
     #[serde(default)]
     pub tests: Vec<TestCase>,
+    /// Comments of the file in source order. Added in 0.1 before 1.0; a
+    /// plugin that does not know comments omits the field.
+    #[serde(default)]
+    pub comments: Vec<Comment>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -343,4 +347,16 @@ pub struct TestCase {
     pub style: TestStyle,
     /// Symbols the test calls or references, as edge targets.
     pub targets: Vec<String>,
+}
+
+/// A comment of the file. Adjacent line comments are one comment.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Comment {
+    pub span: Span,
+    /// Source text including the comment markers (`//`, `/* */`, `#`); the
+    /// lines of one comment are joined by `\n`.
+    pub text: String,
+    /// Id of the symbol the comment is the documentation of, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attached_to: Option<String>,
 }

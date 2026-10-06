@@ -5,8 +5,8 @@ mod wire;
 pub use frame::{ErrorObject, FrameError, Id, Message, read_message, write_message};
 pub use serve::{Handler, ServeError, serve};
 pub use wire::{
-    Call, ClientInfo, Context, Conventions, Edge, EdgeKind, FileInfo, FileRef, Flow, FlowKind,
-    Fragment, FunctionSummary, Incomplete, IndexParams, IndexResult, InitializeParams,
+    Call, ClientInfo, Comment, Context, Conventions, Edge, EdgeKind, FileInfo, FileRef, Flow,
+    FlowKind, Fragment, FunctionSummary, Incomplete, IndexParams, IndexResult, InitializeParams,
     InitializeResult, Language, Methods, Module, Node, Overlay, Position, ProjectRef, Resolution,
     Span, Symbol, SymbolKind, TestCase, TestStyle, Visibility,
 };

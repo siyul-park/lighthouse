@@ -1,6 +1,22 @@
 {
   "fragments": [
     {
+      "comments": [
+        {
+          "attached_to": "layout::add#function",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "/// Adds two numbers."
+        }
+      ],
       "edges": [
         {
           "from": {
@@ -262,6 +278,7 @@
       ]
     },
     {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -341,6 +358,7 @@
       ]
     },
     {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -395,6 +413,7 @@
       "tests": []
     },
     {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -891,6 +910,7 @@
       ]
     },
     {
+      "comments": [],
       "edges": [
         {
           "from": {

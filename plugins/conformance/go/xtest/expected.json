@@ -1,6 +1,7 @@
 {
   "fragments": [
     {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -84,6 +85,22 @@
       ]
     },
     {
+      "comments": [
+        {
+          "attached_to": "pkg::Run#function",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Run does the work."
+        }
+      ],
       "edges": [
         {
           "from": {
@@ -182,6 +199,7 @@
       "tests": []
     },
     {
+      "comments": [],
       "edges": [
         {
           "from": {

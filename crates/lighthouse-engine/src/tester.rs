@@ -14,15 +14,15 @@ const NEUTRAL: &str = "text";
 /// `lighthouse check` would see them. The registry is built per example
 /// because an engine owns its registry.
 pub struct RuleTester<'a> {
-    registry: fn() -> Registry,
+    registry: Box<dyn Fn() -> Registry + 'a>,
     catalog: &'a Catalog,
     language: Option<String>,
 }
 
 impl<'a> RuleTester<'a> {
-    pub fn new(registry: fn() -> Registry, catalog: &'a Catalog) -> Self {
+    pub fn new(registry: impl Fn() -> Registry + 'a, catalog: &'a Catalog) -> Self {
         Self {
-            registry,
+            registry: Box::new(registry),
             catalog,
             language: None,
         }

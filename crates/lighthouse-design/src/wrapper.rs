@@ -46,7 +46,7 @@ fn check(meta: &RuleMeta, ctx: &Ctx, _: NoOptions) -> Result<Vec<Diagnostic>, Er
 /// wrapper must have exactly one caller, test callers included, and no use as
 /// a value; a method named like an interface method may be reached through
 /// that interface, so it is left alone.
-fn forwarded<'p>(project: &'p Project, wrapper: &Symbol) -> Option<&'p SymbolId> {
+pub(crate) fn forwarded<'p>(project: &'p Project, wrapper: &Symbol) -> Option<&'p SymbolId> {
     if wrapper.visibility != Visibility::Private
         || wrapper.doc.is_some()
         || project.callers(&wrapper.id).len() != 1
@@ -68,7 +68,7 @@ fn forwarded<'p>(project: &'p Project, wrapper: &Symbol) -> Option<&'p SymbolId>
     eligible.then_some(target)
 }
 
-fn satisfies_interface(project: &Project, wrapper: &Symbol) -> bool {
+pub(crate) fn satisfies_interface(project: &Project, wrapper: &Symbol) -> bool {
     wrapper.kind == SymbolKind::Method
         && project.symbols.iter().any(|s| {
             s.kind == SymbolKind::Method

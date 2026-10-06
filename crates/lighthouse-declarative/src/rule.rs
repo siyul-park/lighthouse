@@ -1,0 +1,260 @@
+use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
+
+use cel::{Context, Program};
+use lighthouse_model::{Diagnostic, Fingerprint, Options, Span, Symbol};
+use lighthouse_plugin::{Ctx, Error as PluginError, Rule, RuleMeta, Scope};
+use lighthouse_spec::Pattern;
+use serde_json::{Map, Value};
+
+use crate::{
+    Error,
+    definition::{Compiled, Definition, Piece, Select},
+    facts,
+};
+
+/// A rule built from a pattern and its rule file.
+#[derive(Clone)]
+pub struct DeclarativeRule {
+    meta: RuleMeta,
+    compiled: Arc<Compiled>,
+}
+
+impl DeclarativeRule {
+    /// Compiles the rule file `text` for `pattern`. The pattern's scope must
+    /// agree with what the rule selects, and it declares no options: a
+    /// declarative rule is tuned by editing its expression.
+    pub fn new(pattern: &Pattern, text: &str) -> Result<Self, Error> {
+        let definition: Definition =
+            serde_norway::from_str(text).map_err(|e| Error::invalid(&pattern.id, e.to_string()))?;
+        let mut meta = pattern.rule_meta().ok_or_else(|| {
+            Error::invalid(&pattern.id, "the pattern has no severity or implementation")
+        })?;
+        if meta.scope != definition.select.scope() {
+            return Err(Error::invalid(
+                &pattern.id,
+                format!(
+                    "selects `{}`, which a `{}` pattern cannot run over",
+                    definition.select.name(),
+                    pattern.scope
+                ),
+            ));
+        }
+        meta.docs.clone_from(&pattern.requirement);
+        Ok(Self {
+            compiled: Arc::new(definition.compile(&pattern.id)?),
+            meta,
+        })
+    }
+
+    fn fail(&self, message: impl std::fmt::Display) -> PluginError {
+        PluginError::Failed(format!("{}: {message}", self.meta.id))
+    }
+
+    /// Evaluates the rule for one selected value; `at` is where a finding goes.
+    fn judge(
+        &self,
+        value: &Value,
+        file: PathBuf,
+        span: Span,
+        key: &str,
+    ) -> Result<Option<Diagnostic>, PluginError> {
+        let mut context = Context::default();
+        context
+            .add_variable(self.compiled.select.variable(), value)
+            .map_err(|e| self.fail(e))?;
+        let verdict = self.run(&self.compiled.condition, &context)?;
+        if verdict != cel::Value::Bool(true) {
+            return Ok(None);
+        }
+        let mut message = String::new();
+        for piece in &self.compiled.message {
+            match piece {
+                Piece::Text(text) => message.push_str(text),
+                Piece::Hole(program) => message.push_str(&render(&self.run(program, &context)?)),
+            }
+        }
+        let mut evidence = Map::new();
+        for (name, program) in &self.compiled.evidence {
+            evidence.insert(name.clone(), to_json(&self.run(program, &context)?));
+        }
+        let fingerprint = Fingerprint::of(&self.meta.id, &file.to_string_lossy(), key);
+        let mut diagnostic = Diagnostic::new(
+            &self.meta.id,
+            self.meta.severity,
+            message,
+            file,
+            span,
+            fingerprint,
+        );
+        diagnostic.evidence = Value::Object(evidence);
+        Ok(Some(diagnostic))
+    }
+
+    fn run(&self, program: &Program, context: &Context) -> Result<cel::Value, PluginError> {
+        program.execute(context).map_err(|e| self.fail(e))
+    }
+
+    fn symbol_found(
+        &self,
+        symbol: &Symbol,
+        value: &Value,
+    ) -> Result<Option<Diagnostic>, PluginError> {
+        self.judge(value, symbol.file.clone(), symbol.span, symbol.id.as_str())
+    }
+
+    fn check_file(&self, ctx: &Ctx) -> Result<Vec<Diagnostic>, PluginError> {
+        let Some((file, text)) = ctx.file else {
+            return Ok(Vec::new());
+        };
+        let project = ctx.project;
+        let mut found = Vec::new();
+        match self.compiled.select {
+            Select::File => {
+                let at = top_of_file();
+                let value = facts::file(project, file, text);
+                found.extend(self.judge(
+                    &value,
+                    file.path.clone(),
+                    at,
+                    &file.path.to_string_lossy(),
+                )?);
+            }
+            Select::Symbol => {
+                for symbol in project.symbols_in(&file.path) {
+                    let value = facts::symbol(project, symbol);
+                    found.extend(self.symbol_found(symbol, &value)?);
+                }
+            }
+            Select::Function => {
+                for symbol in project.symbols_in(&file.path) {
+                    if let Some(value) = facts::function(project, symbol) {
+                        found.extend(self.symbol_found(symbol, &value)?);
+                    }
+                }
+            }
+            Select::Test => {
+                for symbol in project.symbols_in(&file.path) {
+                    if let Some(case) = project.test(&symbol.id) {
+                        let value = facts::test(project, symbol, case);
+                        found.extend(self.symbol_found(symbol, &value)?);
+                    }
+                }
+            }
+            Select::Edge | Select::Module => {}
+        }
+        Ok(found)
+    }
+
+    fn check_project(&self, ctx: &Ctx) -> Result<Vec<Diagnostic>, PluginError> {
+        let project = ctx.project;
+        let mut first_file: BTreeMap<&str, (&Symbol, usize)> = BTreeMap::new();
+        for symbol in &project.symbols {
+            let entry = first_file.entry(symbol.id.module()).or_insert((symbol, 0));
+            entry.1 += 1;
+            if (&symbol.file, symbol.span.start) < (&entry.0.file, entry.0.span.start) {
+                entry.0 = symbol;
+            }
+        }
+        let mut found = Vec::new();
+        match self.compiled.select {
+            Select::Module => {
+                for module in &project.modules {
+                    let Some((anchor, count)) = first_file.get(module.path.as_str()) else {
+                        continue;
+                    };
+                    let files = project
+                        .files
+                        .iter()
+                        .filter(|f| {
+                            project
+                                .symbols_in(&f.path)
+                                .any(|s| s.id.module() == module.path)
+                        })
+                        .count();
+                    let value = facts::module(project, module, files, *count);
+                    found.extend(self.judge(
+                        &value,
+                        anchor.file.clone(),
+                        top_of_file(),
+                        &module.path,
+                    )?);
+                }
+            }
+            Select::Edge => {
+                for edge in &project.edges {
+                    let anchor = match &edge.from {
+                        lighthouse_model::Node::Symbol(id) => project.symbol(id),
+                        lighthouse_model::Node::Module(m) => {
+                            first_file.get(m.as_str()).map(|(s, _)| *s)
+                        }
+                    };
+                    let Some(anchor) = anchor else { continue };
+                    let value = facts::edge(project, edge);
+                    let key = format!("{:?}->{:?}", edge.from, edge.to);
+                    found.extend(self.judge(&value, anchor.file.clone(), anchor.span, &key)?);
+                }
+            }
+            _ => {}
+        }
+        Ok(found)
+    }
+}
+
+/// The start of a file, where findings that belong to a whole file go.
+fn top_of_file() -> Span {
+    let p = lighthouse_model::Position { line: 1, col: 1 };
+    Span { start: p, end: p }
+}
+
+impl Rule for DeclarativeRule {
+    fn meta(&self) -> &RuleMeta {
+        &self.meta
+    }
+
+    fn validate(&self, options: &Options) -> Result<(), PluginError> {
+        match options.keys().next() {
+            None => Ok(()),
+            Some(key) => Err(PluginError::Options {
+                rule: self.meta.id.clone(),
+                message: format!("unknown option `{key}`: a declarative rule has none"),
+            }),
+        }
+    }
+
+    fn check(&self, ctx: &Ctx, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
+        match self.meta.scope {
+            Scope::File => self.check_file(ctx),
+            Scope::Project => self.check_project(ctx),
+        }
+    }
+}
+
+fn render(value: &cel::Value) -> String {
+    match value {
+        cel::Value::String(s) => s.to_string(),
+        cel::Value::Int(i) => i.to_string(),
+        cel::Value::UInt(u) => u.to_string(),
+        cel::Value::Float(f) => f.to_string(),
+        cel::Value::Bool(b) => b.to_string(),
+        cel::Value::Null => "null".to_owned(),
+        other => to_json(other).to_string(),
+    }
+}
+
+fn to_json(value: &cel::Value) -> Value {
+    match value {
+        cel::Value::String(s) => Value::String(s.to_string()),
+        cel::Value::Int(i) => Value::from(*i),
+        cel::Value::UInt(u) => Value::from(*u),
+        cel::Value::Float(f) => Value::from(*f),
+        cel::Value::Bool(b) => Value::Bool(*b),
+        cel::Value::List(items) => Value::Array(items.iter().map(to_json).collect()),
+        cel::Value::Map(map) => Value::Object(
+            map.map
+                .iter()
+                .map(|(k, v)| (k.to_string(), to_json(v)))
+                .collect(),
+        ),
+        _ => Value::Null,
+    }
+}

@@ -7,8 +7,21 @@ requirement: >-
   symbols adjacent, and cohesive implementations together. Callers MUST
   precede their exclusive helpers, and shared leaves MUST follow the code that
   uses them.
-enforcement: mechanical
+enforcement: heuristic
 evidence: [caller, callee]
+options:
+  shared_after_last_caller:
+    type: bool
+    default: false
+    description: >-
+      Require a helper used by several functions of its file to follow all of
+      them, not only the first.
+tuning:
+  rust: >-
+    Applies to private free functions and private methods. A function that
+    some call may reach through a receiver of unknown type is not judged.
+implementation:
+  builtin: design/callers-before-callees
 examples:
   - name: invalid
     language: go
@@ -16,15 +29,105 @@ examples:
     files:
       - path: example.go
         body: |-
+          package sample
+
           func helper() int { return 1 }
 
           func Run() int { return helper() }
+    expect:
+      - line: 3
   - name: valid
     language: go
     kind: valid
     files:
       - path: example.go
         body: |-
+          package sample
+
           func Run() int { return helper() }
 
           func helper() int { return 1 }
+  - name: shared-leaf-between-callers
+    language: go
+    kind: invalid
+    options:
+      shared_after_last_caller: true
+    files:
+      - path: example.go
+        body: |-
+          package sample
+
+          func First() int { return leaf() }
+
+          func leaf() int { return 1 }
+
+          func Second() int { return leaf() + 1 }
+    expect:
+      - line: 5
+  - name: used-elsewhere
+    language: go
+    kind: valid
+    files:
+      - path: a.go
+        body: |-
+          package sample
+
+          func helper() int { return 1 }
+
+          func Run() int { return helper() }
+      - path: b.go
+        body: |-
+          package sample
+
+          func Other() int { return helper() }
+  - name: mutual-recursion
+    language: go
+    kind: valid
+    files:
+      - path: example.go
+        body: |-
+          package sample
+
+          func even(n int) bool {
+          	if n == 0 {
+          		return true
+          	}
+          	return odd(n - 1)
+          }
+
+          func odd(n int) bool {
+          	if n == 0 {
+          		return false
+          	}
+          	return even(n - 1)
+          }
+
+          func Run(n int) bool { return even(n) }
+  - name: rust-invalid
+    language: rust
+    kind: invalid
+    files:
+      - path: src/lib.rs
+        body: |-
+          fn helper() -> u8 {
+              1
+          }
+
+          pub fn run() -> u8 {
+              helper()
+          }
+    expect:
+      - line: 1
+  - name: rust-valid
+    language: rust
+    kind: valid
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub fn run() -> u8 {
+              helper()
+          }
+
+          fn helper() -> u8 {
+              1
+          }

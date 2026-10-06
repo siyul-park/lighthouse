@@ -1,6 +1,7 @@
 {
   "fragments": [
     {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -54,6 +55,22 @@
       "tests": []
     },
     {
+      "comments": [
+        {
+          "attached_to": "pkg::A#function",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// A is exported."
+        }
+      ],
       "edges": [
         {
           "from": {

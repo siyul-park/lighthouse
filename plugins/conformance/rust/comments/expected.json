@@ -1,0 +1,141 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "// ---- Helpers ----"
+        },
+        {
+          "attached_to": "comments::run#function",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "/// Runs the thing."
+        },
+        {
+          "span": {
+            "end": {
+              "col": 44,
+              "line": 6
+            },
+            "start": {
+              "col": 33,
+              "line": 6
+            }
+          },
+          "text": "// trailing"
+        },
+        {
+          "attached_to": "comments::BLOCK#const",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "text": "/* block /* nested */ comment */"
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "comments"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "comments::run#function"
+        },
+        {
+          "from": {
+            "module": "comments"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "comments::BLOCK#const"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 2,
+          "symbol": "comments::run#function",
+          "tokens": 8,
+          "top_level": 2
+        }
+      ],
+      "modules": [
+        {
+          "name": "comments",
+          "path": "comments"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Runs the thing.",
+          "file": "src/lib.rs",
+          "id": "comments::run#function",
+          "kind": "function",
+          "name": "run",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "comments::BLOCK#const",
+          "kind": "const",
+          "name": "BLOCK",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

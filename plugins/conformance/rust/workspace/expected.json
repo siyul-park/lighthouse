@@ -1,6 +1,7 @@
 {
   "fragments": [
     {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -86,6 +87,36 @@
       "tests": []
     },
     {
+      "comments": [
+        {
+          "attached_to": "core_lib::Thing#type",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "/// A thing."
+        },
+        {
+          "attached_to": "core_lib::make#function",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "text": "/// Makes a thing."
+        }
+      ],
       "edges": [
         {
           "from": {

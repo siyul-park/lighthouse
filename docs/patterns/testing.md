@@ -74,23 +74,146 @@ Feature contract tests MUST use only the target's public symbols and MUST live o
 
 **Invalid example: invalid (go)**
 
+`go.mod`
+
+```go
+module example.com/store
+
+go 1.26
+```
+
+`store.go`
+
 ```go
 package store
 
-func TestGet(t *testing.T) { _ = New() }
+func get() int { return 1 }
+
+func Get() int { return get() }
+```
+
+`store_test.go`
+
+```go
+package store
+
+import "testing"
+
+func TestGet(t *testing.T) {
+	if get() != 1 {
+		t.Fatal("get")
+	}
+}
 ```
 
 **Valid example: valid (go)**
 
+`go.mod`
+
+```go
+module example.com/store
+
+go 1.26
+```
+
+`store.go`
+
+```go
+package store
+
+func get() int { return 1 }
+
+func Get() int { return get() }
+```
+
+`store_test.go`
+
 ```go
 package store_test
 
-func TestGet(t *testing.T) { _ = store.New() }
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+func TestGet(t *testing.T) {
+	if store.Get() != 1 {
+		t.Fatal("get")
+	}
+}
+```
+
+**Valid example: internal-test-of-the-public-api (go)**
+
+`go.mod`
+
+```go
+module example.com/store
+
+go 1.26
+```
+
+`store.go`
+
+```go
+package store
+
+func get() int { return 1 }
+
+func Get() int { return get() }
+```
+
+`store_test.go`
+
+```go
+package store
+
+import "testing"
+
+func TestGet(t *testing.T) {
+	if Get() != 1 {
+		t.Fatal("get")
+	}
+}
+```
+
+**Valid example: rust-valid (rust)**
+
+`src/lib.rs`
+
+```rust
+fn hidden() -> u8 {
+    1
+}
+
+pub fn get() -> u8 {
+    hidden()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hidden_is_one() {
+        assert_eq!(hidden(), 1);
+    }
+}
+```
+
+`tests/store.rs`
+
+```rust
+#[test]
+fn get_is_one() {
+    assert_eq!(workspace::get(), 1);
+}
 ```
 
 **Tuning: go**
 
-Tests live in `package <target>_test`.
+Tests live in `package <target>_test`. A test file inside the target package is reported when it uses an unexported symbol of that package; one that only uses exported symbols is left alone.
 
 **Tuning: python**
 
@@ -98,7 +221,7 @@ Contract tests import only the package's public API.
 
 **Tuning: rust**
 
-Contract tests are integration tests under `tests/`.
+Contract tests are integration tests under `tests/`. Inline `#[cfg(test)]` unit tests are never reported: the provider cannot tell a `pub(crate)` item from a `pub` one of an unpublished crate, so it cannot say that such a test could have lived in `tests/`.
 
 **Tuning: typescript**
 
@@ -160,6 +283,158 @@ A contract without an owner test has no place to read or extend its specificatio
 
 Each public symbol SHOULD have one top-level test function, and exported contracts MUST have an owning test.
 
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `exempt_methods` | list | `["String","Error","Unwrap","GoString"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]` | Method names that implement well-known interfaces. |
+| `include_data_types` | bool | `false` | Also require owner tests for types that declare no method; such a type is specified by the functions that build and read it. |
+| `include_internal` | bool | `false` | Also require owner tests for symbols public only inside the project. |
+| `kinds` | list | `["function","method","type"]` | Kinds of public symbols that need an owner test. Interfaces are tested through their implementations and are left out by default. |
+| `snake_case` | bool | `false`; rust: `true` | Compare names in snake case, as Rust tests are written. |
+| `test_prefix` | string | `"Test"`; rust: `""` | Prefix of the name of an owner test; a test without it is not one. |
+| `variant_tests` | bool | `true`; rust: `false` | Count `TestGet_Missing` as a second owner of `Get`; a name that adds a suffix to the symbol's own name restates the same contract. |
+
+**Invalid example: invalid (go)**
+
+`go.mod`
+
+```go
+module example.com/store
+
+go 1.26
+```
+
+`store.go`
+
+```go
+package store
+
+func Get() int { return 1 }
+
+func Put() int { return 2 }
+```
+
+`store_test.go`
+
+```go
+package store_test
+
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+func TestGet(t *testing.T) {
+	if store.Get() != 1 {
+		t.Fatal("get")
+	}
+}
+```
+
+**Valid example: valid (go)**
+
+`go.mod`
+
+```go
+module example.com/store
+
+go 1.26
+```
+
+`store.go`
+
+```go
+package store
+
+func Get() int { return 1 }
+
+func Put() int { return 2 }
+```
+
+`store_test.go`
+
+```go
+package store_test
+
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+func TestGet(t *testing.T) {
+	if store.Get() != 1 {
+		t.Fatal("get")
+	}
+}
+
+func TestPutFlow(t *testing.T) {
+	if store.Put() != 2 {
+		t.Fatal("put")
+	}
+}
+```
+
+**Valid example: no-tests-at-all (go)**
+
+```go
+package store
+
+func Get() int { return 1 }
+```
+
+**Invalid example: rust-invalid (rust)**
+
+`src/lib.rs`
+
+```rust
+pub fn get() -> u8 {
+    1
+}
+
+pub fn put() -> u8 {
+    2
+}
+```
+
+`tests/store.rs`
+
+```rust
+#[test]
+fn get() {
+    assert_eq!(workspace::get(), 1);
+}
+```
+
+**Valid example: rust-valid (rust)**
+
+`src/lib.rs`
+
+```rust
+pub fn get() -> u8 {
+    1
+}
+```
+
+`tests/store.rs`
+
+```rust
+#[test]
+fn get() {
+    assert_eq!(workspace::get(), 1);
+}
+```
+
+**Tuning: go**
+
+The owner of a function or type is `TestName`, of a method `TestType_Method`. A symbol that no test names and no test code calls or references is reported; a type counts as tested when one of its members is. Only modules that have tests are judged. Types without methods and interfaces are not required to have one.
+
+**Tuning: rust**
+
+The owner of a function or type is the test named after it in snake case (`get`, `store`), of a method `type_method`. A public item that no test code, in `tests/` or inline, calls or references is reported, in crates that have tests. Methods of trait impls and types without methods are not required to have one.
+
 ### One owner test per public symbol
 
 `testing/single-owner-test` · scope `test` · enforcement `mechanical` · severity `error`
@@ -171,6 +446,160 @@ Several semantic owners split one contract across places and let them contradict
 **Requirement**
 
 A public symbol MUST NOT have multiple semantic owner test functions.
+
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `snake_case` | bool | `false`; rust: `true` | Compare names in snake case, as Rust tests are written. |
+| `test_prefix` | string | `"Test"`; rust: `""` | Prefix of the name of an owner test; a test without it is not one. |
+| `variant_tests` | bool | `true`; rust: `false` | Count `TestGet_Missing` as a second owner of `Get`; a name that adds a suffix to the symbol's own name restates the same contract. |
+
+**Invalid example: invalid (go)**
+
+`go.mod`
+
+```go
+module example.com/store
+
+go 1.26
+```
+
+`store.go`
+
+```go
+package store
+
+func Get() int { return 1 }
+```
+
+`store_test.go`
+
+```go
+package store_test
+
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+func TestGet(t *testing.T) {
+	if store.Get() != 1 {
+		t.Fatal("get")
+	}
+}
+
+func TestGet_Missing(t *testing.T) {
+	if store.Get() != 1 {
+		t.Fatal("missing")
+	}
+}
+```
+
+**Valid example: valid (go)**
+
+`go.mod`
+
+```go
+module example.com/store
+
+go 1.26
+```
+
+`store.go`
+
+```go
+package store
+
+type Store struct{}
+
+func (s *Store) Get() int { return 1 }
+```
+
+`store_test.go`
+
+```go
+package store_test
+
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+func TestStore(t *testing.T) {
+	s := &store.Store{}
+	_ = s
+}
+
+func TestStore_Get(t *testing.T) {
+	s := &store.Store{}
+	if s.Get() != 1 {
+		t.Fatal("get")
+	}
+}
+```
+
+**Invalid example: rust-invalid (rust)**
+
+`src/lib.rs`
+
+```rust
+pub fn get() -> u8 {
+    1
+}
+```
+
+`tests/first.rs`
+
+```rust
+#[test]
+fn get() {
+    assert_eq!(workspace::get(), 1);
+}
+```
+
+`tests/second.rs`
+
+```rust
+#[test]
+fn get() {
+    assert_eq!(workspace::get(), 1);
+}
+```
+
+**Valid example: rust-valid (rust)**
+
+`src/lib.rs`
+
+```rust
+pub fn get() -> u8 {
+    1
+}
+```
+
+`tests/store.rs`
+
+```rust
+#[test]
+fn get() {
+    assert_eq!(workspace::get(), 1);
+}
+
+#[test]
+fn get_is_stable() {
+    assert_eq!(workspace::get(), workspace::get());
+}
+```
+
+**Tuning: go**
+
+`TestGet` and `TestGet_Missing` both own `Get`: the second is a case of the first, written with `t.Run`. A name matches the longest symbol it starts with, so `TestStore_Get_Missing` belongs to the method `Get`, not to the type `Store`.
+
+**Tuning: rust**
+
+A test is an owner of the item it is named after in snake case. Rust tests are many small functions, so names that merely extend a symbol's name are not owners; two tests with exactly the name of one item (in different test crates, or inline and in `tests/`) are.
 
 ### Cases are at most two levels deep
 

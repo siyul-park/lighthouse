@@ -1,6 +1,22 @@
 {
   "fragments": [
     {
+      "comments": [
+        {
+          "attached_to": ".::Fine#function",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Fine compiles."
+        }
+      ],
       "edges": [
         {
           "from": {
@@ -55,6 +71,7 @@
       "tests": []
     },
     {
+      "comments": [],
       "edges": [
         {
           "from": {
@@ -97,6 +114,7 @@
       "tests": []
     },
     {
+      "comments": [],
       "edges": [
         {
           "from": {

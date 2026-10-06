@@ -366,7 +366,7 @@
   text: >-
     Comments MUST NOT narrate code, restate names, label control-flow phases, or
     explain obvious behavior. Prefer a better name, type, or structure.
-  patterns: [design/no-narration]
+  patterns: [design/no-narration, design/section-banners]
 - ref: "coding-patterns#comments-f522539c"
   text: >-
     Exported symbols SHOULD have normal Go doc comments. Public API changes

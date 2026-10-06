@@ -109,6 +109,7 @@ fn incomplete(item: wire::Incomplete) -> core::Incomplete {
 }
 
 fn fragment(f: wire::Fragment) -> Result<core::Fragment, String> {
+    let path = PathBuf::from(&f.file.path);
     Ok(core::Fragment {
         files: Vec::new(),
         modules: f.modules.into_iter().map(module).collect(),
@@ -124,6 +125,11 @@ fn fragment(f: wire::Fragment) -> Result<core::Fragment, String> {
             .map(function)
             .collect::<Result<_, _>>()?,
         tests: f.tests.into_iter().map(test).collect::<Result<_, _>>()?,
+        comments: f
+            .comments
+            .into_iter()
+            .map(|c| comment(&path, c))
+            .collect::<Result<_, _>>()?,
     })
 }
 
@@ -247,5 +253,14 @@ fn test(t: wire::TestCase) -> Result<core::TestCase, String> {
             wire::TestStyle::Scenario => core::TestStyle::Scenario,
         },
         targets: t.targets.into_iter().map(core::Target::Path).collect(),
+    })
+}
+
+fn comment(file: &std::path::Path, c: wire::Comment) -> Result<core::Comment, String> {
+    Ok(core::Comment {
+        file: file.to_owned(),
+        span: span(c.span),
+        text: c.text,
+        attached_to: c.attached_to.map(id).transpose()?,
     })
 }

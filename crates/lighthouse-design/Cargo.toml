@@ -8,6 +8,7 @@ publish.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 lighthouse-config.workspace = true
+lighthouse-declarative.workspace = true
 lighthouse-metrics.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
