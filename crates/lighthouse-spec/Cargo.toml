@@ -1,0 +1,19 @@
+[package]
+name = "lighthouse-spec"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+include_dir.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_norway.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+lighthouse-model.workspace = true
+lighthouse-plugin.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+tempfile.workspace = true

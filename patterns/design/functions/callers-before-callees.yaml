@@ -1,0 +1,30 @@
+id: design/callers-before-callees
+title: Callers before callees
+intent: Readers follow behavior from intent to mechanics.
+scope: file
+requirement: >-
+  Declarations MUST be ordered for reading: callers before callees, related
+  symbols adjacent, and cohesive implementations together. Callers MUST
+  precede their exclusive helpers, and shared leaves MUST follow the code that
+  uses them.
+enforcement: mechanical
+evidence: [caller, callee]
+examples:
+  - name: invalid
+    language: go
+    kind: invalid
+    files:
+      - path: example.go
+        body: |-
+          func helper() int { return 1 }
+
+          func Run() int { return helper() }
+  - name: valid
+    language: go
+    kind: valid
+    files:
+      - path: example.go
+        body: |-
+          func Run() int { return helper() }
+
+          func helper() int { return 1 }

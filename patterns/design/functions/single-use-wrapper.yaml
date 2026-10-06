@@ -1,0 +1,29 @@
+id: design/single-use-wrapper
+title: Inline single-use wrappers
+intent: A forwarding wrapper adds a name without adding meaning.
+scope: symbol
+requirement: >-
+  A simple single-use wrapper SHOULD be inlined unless its name expresses a
+  real policy or mechanic; complex one-use mechanics require review rather
+  than mechanical removal.
+enforcement: heuristic
+evidence: [callee, callers]
+examples:
+  - name: invalid
+    language: go
+    kind: invalid
+    files:
+      - path: example.go
+        body: "func (s *Store) load(k string) ([]byte, error) { return s.read(k) }"
+  - name: valid
+    language: go
+    kind: valid
+    files:
+      - path: example.go
+        body: |-
+          func (s *Store) load(k string) ([]byte, error) {
+          	if s.closed {
+          		return nil, ErrClosed
+          	}
+          	return s.read(k)
+          }

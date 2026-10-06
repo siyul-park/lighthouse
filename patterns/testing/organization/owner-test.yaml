@@ -1,0 +1,11 @@
+id: testing/owner-test
+title: Every public symbol has an owner test
+intent: >-
+  A contract without an owner test has no place to read or extend its
+  specification.
+scope: test
+requirement: >-
+  Each public symbol SHOULD have one top-level test function, and exported
+  contracts MUST have an owning test.
+enforcement: heuristic
+evidence: [symbol]

@@ -10,3 +10,4 @@ serde_json.workspace = true
 lighthouse-model.workspace = true
 lighthouse-config.workspace = true
 lighthouse-plugin.workspace = true
+lighthouse-spec.workspace = true

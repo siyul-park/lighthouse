@@ -1,0 +1,9 @@
+id: design/merge-overlapping-symbols
+title: Merge overlapping symbols
+intent: Parallel variants multiply what readers must learn.
+scope: symbol
+requirement: >-
+  Symbols with substantially the same responsibility at the same abstraction
+  level MUST be consolidated; one general symbol SHOULD be preferred over
+  parallel variants, wrappers, aliases, or coordinators.
+enforcement: judgment

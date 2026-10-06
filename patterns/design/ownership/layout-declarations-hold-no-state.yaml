@@ -1,0 +1,8 @@
+id: design/layout-declarations-hold-no-state
+title: Layout declarations hold no runtime state
+intent: Pure layout can be shared without sharing ownership.
+scope: symbol
+requirement: >-
+  Layout-only declarations MAY name private members but MUST NOT access
+  runtime state.
+enforcement: judgment

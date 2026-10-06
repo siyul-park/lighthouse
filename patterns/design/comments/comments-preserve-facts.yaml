@@ -1,0 +1,11 @@
+id: design/comments-preserve-facts
+title: Comments preserve facts
+intent: A comment is justified only by a fact the code cannot say.
+scope: symbol
+requirement: >-
+  Comments MAY be added only when clearly necessary to preserve invariants and
+  consequences, external or cross-package constraints, rejected alternatives
+  with evidence, or external contracts or specifications. A necessary comment
+  MUST state the smallest sufficient fact, constraint, invariant, or
+  consequence.
+enforcement: judgment

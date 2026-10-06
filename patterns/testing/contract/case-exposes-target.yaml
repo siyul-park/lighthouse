@@ -1,0 +1,8 @@
+id: testing/case-exposes-target
+title: A case exposes its target
+intent: A reader should see what is called, with what, and what is expected.
+scope: test
+requirement: >-
+  A test MUST expose the target, input, operation, and expected result in the
+  case; the target and its behavior MUST remain visible.
+enforcement: judgment

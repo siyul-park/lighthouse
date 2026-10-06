@@ -1,0 +1,36 @@
+id: design/declaration-groups
+title: Declarations follow ownership groups
+intent: A fixed group order makes every file predictable.
+scope: file
+requirement: >-
+  Top-level declarations in a file MUST follow the language's ownership-group
+  order, from public contract to private mechanics. Initializers MUST stay
+  together and MUST precede non-initializer functions and methods. Within one
+  type, constructors MUST precede other behavior.
+enforcement: mechanical
+evidence: [declaration, group, expected_after]
+examples:
+  - name: invalid
+    language: go
+    kind: invalid
+    files:
+      - path: example.go
+        body: |-
+          func helper() {}
+
+          type Service struct{}
+  - name: valid
+    language: go
+    kind: valid
+    files:
+      - path: example.go
+        body: |-
+          type Service struct{}
+
+          func helper() {}
+tuning:
+  go: >-
+    Order: public types; private types; public constants; private constants;
+    variables; all `init` functions; public options and functions; public
+    constructors; public methods; clone, conversion and interface hooks; private
+    functions and methods.

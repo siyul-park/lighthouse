@@ -114,3 +114,67 @@ fn missing_fact_is_a_distinct_error() {
         .check(&ctx, &Options::new());
     assert!(matches!(err, Err(Error::MissingFact(_))));
 }
+
+#[test]
+fn registered_rules_are_exactly_the_catalog_patterns_implemented_by_builtin() {
+    let registry = lighthouse_builtin::registry();
+    let catalog = lighthouse_spec::Catalog::bundled();
+    let registered: std::collections::BTreeSet<_> =
+        registry.rules().map(|r| r.meta().id.clone()).collect();
+    for id in &registered {
+        let pattern = catalog
+            .pattern(id)
+            .unwrap_or_else(|| panic!("{id} has no pattern"));
+        assert_ne!(
+            pattern.enforcement,
+            lighthouse_spec::Enforcement::Doc,
+            "{id}"
+        );
+        assert_eq!(
+            pattern.implementation,
+            Some(lighthouse_spec::Implementation::Builtin(id.clone())),
+            "{id}"
+        );
+    }
+    let implemented: std::collections::BTreeSet<_> = catalog
+        .patterns()
+        .filter(|p| {
+            matches!(
+                p.implementation,
+                Some(lighthouse_spec::Implementation::Builtin(_))
+            )
+        })
+        .map(|p| p.id.clone())
+        .collect();
+    assert_eq!(registered, implemented);
+}
+
+#[test]
+fn catalog_examples_drive_the_rule() {
+    let catalog = lighthouse_spec::Catalog::bundled();
+    let pattern = catalog.pattern("core/max-file-lines").unwrap();
+    for example in &pattern.examples {
+        let options: Options = example.options.clone();
+        let text = example.files[0].text();
+        let found = run_rule(text, &options).unwrap();
+        match example.kind {
+            lighthouse_spec::Kind::Valid => assert!(found.is_empty(), "{}", example.name),
+            lighthouse_spec::Kind::Invalid => {
+                let lines: Vec<_> = found.iter().map(|d| d.span.start.line).collect();
+                let want: Vec<_> = example.expect.iter().map(|e| e.line).collect();
+                assert_eq!(lines, want, "{}", example.name);
+            }
+        }
+    }
+}
+
+#[test]
+fn default_limit_comes_from_the_catalog() {
+    let text = "x\n".repeat(1001);
+    assert_eq!(run_rule(&text, &Options::new()).unwrap().len(), 1);
+    assert!(
+        run_rule(&"x\n".repeat(1000), &Options::new())
+            .unwrap()
+            .is_empty()
+    );
+}

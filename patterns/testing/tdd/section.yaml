@@ -1,0 +1,10 @@
+id: tdd
+title: TDD
+intro: >-
+  TDD separates the required behavior from its implementation by making the
+  smallest missing contract fail before the implementation is generalized.
+patterns:
+  - red-green-cycle
+  - cover-contract-dimensions
+  - lowest-proving-layer
+  - no-structure-only-tests

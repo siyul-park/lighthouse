@@ -1,0 +1,9 @@
+id: design/adjacent-siblings
+title: Similar siblings are adjacent
+intent: Symmetric siblings read best side by side.
+scope: symbol
+requirement: >-
+  Similar or symmetric siblings SHOULD be adjacent when they share an owner
+  and implementation shape.
+enforcement: heuristic
+evidence: [peer, distance]

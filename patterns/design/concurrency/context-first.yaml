@@ -1,0 +1,24 @@
+id: design/context-first
+title: Cancellation context comes first
+intent: A uniform position makes cancellation visible and checkable.
+scope: symbol
+requirement: >-
+  Blocking, I/O, and process-boundary operations MUST take the cancellation
+  context as their first parameter.
+enforcement: heuristic
+evidence: [function, parameter_index]
+examples:
+  - name: invalid
+    language: go
+    kind: invalid
+    files:
+      - path: example.go
+        body: "func Fetch(url string, ctx context.Context) ([]byte, error)"
+  - name: valid
+    language: go
+    kind: valid
+    files:
+      - path: example.go
+        body: "func Fetch(ctx context.Context, url string) ([]byte, error)"
+tuning:
+  go: "`ctx context.Context` is the first parameter."

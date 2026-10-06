@@ -1,0 +1,9 @@
+id: design/narrow-inputs-concrete-outputs
+title: Narrow inputs, concrete outputs
+intent: Callers get flexibility on the way in and precision on the way out.
+scope: symbol
+requirement: >-
+  Public inputs SHOULD use the narrowest reusable abstraction that fully
+  expresses the contract; public outputs SHOULD use the most concrete public
+  type unless polymorphism is itself the contract.
+enforcement: judgment

@@ -1,0 +1,8 @@
+id: design/validated-constructors
+title: Constructors validate
+intent: A constructed value should be valid or not exist.
+scope: symbol
+requirement: >-
+  Constructors MUST require inputs with no safe default and MUST validate
+  required dependencies and shape; `Build` MUST validate a complete builder.
+enforcement: judgment

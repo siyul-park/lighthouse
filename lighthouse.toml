@@ -3,3 +3,7 @@ extends = ["core/recommended"]
 
 [rules]
 "core/max-file-lines" = { level = "warn", max = 1000 }
+
+[[overrides]]
+files = ["docs/patterns/**"]
+rules = { "core/max-file-lines" = "off" }

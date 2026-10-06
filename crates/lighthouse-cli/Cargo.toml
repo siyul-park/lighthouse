@@ -9,7 +9,9 @@ clap.workspace = true
 lighthouse-config.workspace = true
 lighthouse-engine.workspace = true
 lighthouse-builtin.workspace = true
+lighthouse-plugin.workspace = true
 lighthouse-report.workspace = true
+lighthouse-spec.workspace = true
 
 [[bin]]
 name = "lighthouse"

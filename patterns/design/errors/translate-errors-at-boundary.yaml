@@ -1,0 +1,6 @@
+id: design/translate-errors-at-boundary
+title: Translate errors at their boundary
+intent: "Early translation loses information; late translation leaks layers."
+scope: symbol
+requirement: Error categories MUST be translated only at their owning boundary.
+enforcement: judgment

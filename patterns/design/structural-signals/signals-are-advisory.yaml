@@ -1,0 +1,12 @@
+id: design/signals-are-advisory
+title: Signals stay advisory
+intent: >-
+  Metrics approximate design quality; treating them as proof produces harmful
+  churn.
+scope: project
+requirement: >-
+  Metrics MUST NOT define universal declaration order, justify automatic
+  reordering, or prove single responsibility. Mechanical checks SHOULD be
+  preferred for directly expressible rules; heuristic signals SHOULD remain
+  advisory and use deliberately high thresholds.
+enforcement: doc

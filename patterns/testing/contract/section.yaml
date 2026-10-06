@@ -1,0 +1,10 @@
+id: contract
+title: Contract
+intro: >-
+  Tests are the executable specification of a feature: they should show what
+  the public contract promises, not how the implementation happens to work.
+patterns:
+  - shows-public-contract
+  - structure-serves-contract
+  - case-exposes-target
+  - case-is-behavior

@@ -1,0 +1,17 @@
+id: testing
+title: Testing Patterns
+intro: >-
+  Tests are the executable specification of a feature. They define the
+  contracts, structure, evidence, and validation required to establish correct
+  behavior.
+sections:
+  - contract
+  - public-boundary
+  - readability
+  - organization
+  - first
+  - tdd
+  - evidence
+  - validation
+  - completeness
+  - ownership

@@ -1,0 +1,8 @@
+id: design/symbol-earns-existence
+title: Every symbol earns its existence
+intent: "Each symbol pays for itself; otherwise it is noise."
+scope: symbol
+requirement: >-
+  Every symbol MUST earn its existence through a distinct responsibility,
+  invariant, ownership boundary, or reusable abstraction.
+enforcement: judgment

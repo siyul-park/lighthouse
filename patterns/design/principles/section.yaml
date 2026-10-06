@@ -1,0 +1,11 @@
+id: principles
+title: Principles
+intro: >-
+  Design minimizes conceptual surface while keeping responsibility and
+  ownership boundaries explicit.
+patterns:
+  - minimal-symbols
+  - symbol-earns-existence
+  - single-owner
+  - coherent-responsibility
+  - no-forced-reuse

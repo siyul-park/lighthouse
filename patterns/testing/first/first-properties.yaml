@@ -1,0 +1,7 @@
+id: testing/first-properties
+title: Fast, independent, repeatable, self-validating, timely
+intent: Unreliable tests train people to ignore failures.
+scope: test
+requirement: Tests MUST be Fast, Independent, Repeatable, Self-validating, and Timely.
+enforcement: judgment
+citation: Martin, Clean Code, chapter 9

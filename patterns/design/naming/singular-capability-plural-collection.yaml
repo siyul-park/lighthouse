@@ -1,0 +1,6 @@
+id: design/singular-capability-plural-collection
+title: Singular capabilities, plural collections
+intent: Number in a name tells what the value is.
+scope: symbol
+requirement: "Capability names MUST be singular; collections and stores MUST be plural."
+enforcement: judgment

@@ -1,0 +1,13 @@
+id: design/stable-error-categories
+title: Stable error categories
+intent: Callers classify failures by identity, not by message text.
+scope: symbol
+requirement: >-
+  Semantic errors MUST use stable, named error values or types, and semantic
+  categories MUST NOT be created from ad hoc formatted messages alone.
+enforcement: heuristic
+evidence: [error, site]
+tuning:
+  go: >-
+    Semantic errors are `ErrXxx` sentinels; `fmt.Errorf` alone does not create a
+    category.

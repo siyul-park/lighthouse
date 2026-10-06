@@ -1,0 +1,35 @@
+id: testing/external-test-package
+title: Contract tests live outside the target
+intent: >-
+  Living outside the target makes private access impossible rather than
+  discouraged.
+scope: test
+requirement: >-
+  Feature contract tests MUST use only the target's public symbols and MUST
+  live outside the target's private scope.
+enforcement: mechanical
+evidence: [test_file, package]
+examples:
+  - name: invalid
+    language: go
+    kind: invalid
+    files:
+      - path: example.go
+        body: |-
+          package store
+
+          func TestGet(t *testing.T) { _ = New() }
+  - name: valid
+    language: go
+    kind: valid
+    files:
+      - path: example.go
+        body: |-
+          package store_test
+
+          func TestGet(t *testing.T) { _ = store.New() }
+tuning:
+  go: "Tests live in `package <target>_test`."
+  rust: "Contract tests are integration tests under `tests/`."
+  typescript: "Contract tests import only the package's public exports."
+  python: "Contract tests import only the package's public API."

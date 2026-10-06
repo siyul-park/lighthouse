@@ -1,0 +1,10 @@
+id: design/complexity-signal
+title: Complexity is a review signal
+intent: High complexity often marks a symbol doing too much.
+scope: symbol
+requirement: >-
+  Complexity SHOULD be judged from cyclomatic complexity together with
+  statement count and nesting depth, against deliberately high thresholds.
+enforcement: heuristic
+evidence: [cyclomatic, cognitive, statements, nesting]
+citation: "McCabe 1976; Campbell, Cognitive Complexity (SonarSource 2018)"

@@ -1,0 +1,8 @@
+id: testing/case-is-behavior
+title: A case is a behavior
+intent: Cases named after branches test the implementation, not the promise.
+scope: test
+requirement: >-
+  A case MUST represent behavior, not a branch or implementation path, and
+  MUST contain the behavior it claims to specify.
+enforcement: judgment

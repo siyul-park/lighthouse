@@ -1,0 +1,8 @@
+id: design/minimal-names
+title: Minimal names
+intent: Longer names add words, not meaning.
+scope: symbol
+requirement: >-
+  One word SHOULD be the default; a multi-word name MUST add only the minimum
+  qualifier needed to express a distinction.
+enforcement: judgment

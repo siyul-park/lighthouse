@@ -1,0 +1,8 @@
+id: testing/structure-serves-contract
+title: Structure serves the contract
+intent: Test structure shaped by coverage or implementation hides the specification.
+scope: test
+requirement: >-
+  Test structure MUST serve the contract rather than implementation shape or
+  coverage.
+enforcement: judgment

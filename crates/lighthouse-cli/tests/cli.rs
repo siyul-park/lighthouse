@@ -133,7 +133,7 @@ fn rule_list_and_explain() {
         .args(["rule", "list"])
         .assert()
         .success()
-        .stdout("core/max-file-lines\twarn\tfile exceeds the maximum number of lines\n");
+        .stdout("core/max-file-lines\twarn\tFiles stay below a line limit\n");
     let out = lighthouse(dir.path())
         .args(["explain", "core/max-file-lines"])
         .output()
@@ -145,6 +145,105 @@ fn rule_list_and_explain() {
     );
     lighthouse(dir.path())
         .args(["explain", "core/nope"])
+        .assert()
+        .code(2);
+}
+
+#[test]
+fn rule_list_all_shows_status_of_every_pattern() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = lighthouse(dir.path())
+        .args(["rule", "list", "--all"])
+        .output()
+        .unwrap();
+    let text = String::from_utf8(out.stdout).unwrap();
+    for line in [
+        "core/max-file-lines\timplemented\twarn\tFiles stay below a line limit",
+        "design/error-identity\tunimplemented\twarn\tPreserve error identity",
+        "design/signals-are-advisory\tdoc\t-\tSignals stay advisory",
+    ] {
+        assert!(text.lines().any(|l| l == line), "{line}");
+    }
+}
+
+#[test]
+fn explain_describes_unimplemented_patterns() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = lighthouse(dir.path())
+        .args(["explain", "design/error-identity"])
+        .output()
+        .unwrap();
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("**Requirement**\n\nDependency identity MUST be preserved"));
+    assert!(text.contains("%w"));
+    assert!(text.contains("Status: unimplemented"));
+}
+
+#[test]
+fn docs_check_fails_until_generated_and_after_edits() {
+    let dir = tempfile::tempdir().unwrap();
+    lighthouse(dir.path())
+        .args(["docs", "check"])
+        .assert()
+        .code(1);
+    lighthouse(dir.path())
+        .args(["docs", "generate"])
+        .assert()
+        .success();
+    lighthouse(dir.path())
+        .args(["docs", "check"])
+        .assert()
+        .success();
+
+    let page = dir.path().join("docs/patterns/design.md");
+    fs::write(&page, "edited\n").unwrap();
+    lighthouse(dir.path())
+        .args(["docs", "check"])
+        .assert()
+        .code(1);
+    lighthouse(dir.path())
+        .args(["docs", "generate", "--out", "other"])
+        .assert()
+        .success();
+    assert!(dir.path().join("other/patterns/testing.md").exists());
+}
+
+#[test]
+fn docs_generate_removes_orphans_and_check_flags_them() {
+    let dir = tempfile::tempdir().unwrap();
+    lighthouse(dir.path())
+        .args(["docs", "generate"])
+        .assert()
+        .success();
+    let orphan = dir.path().join("docs/patterns/old.md");
+    fs::write(&orphan, "x").unwrap();
+    let out = lighthouse(dir.path())
+        .args(["docs", "check"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("old.md is not generated")
+    );
+    lighthouse(dir.path())
+        .args(["docs", "generate"])
+        .assert()
+        .success();
+    assert!(!orphan.exists());
+    lighthouse(dir.path())
+        .args(["docs", "check"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn docs_check_reports_unreadable_output_as_an_error() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("docs/patterns/design.md")).unwrap();
+    lighthouse(dir.path())
+        .args(["docs", "check"])
         .assert()
         .code(2);
 }

@@ -1,0 +1,7 @@
+id: design/no-stored-request-context
+title: Request contexts are not stored
+intent: A request context outliving its request carries stale cancellation.
+scope: symbol
+requirement: Request contexts MUST NOT be stored in long-lived objects.
+enforcement: heuristic
+evidence: [type, field]

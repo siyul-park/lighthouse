@@ -5,6 +5,9 @@ use lighthouse_config::{Config, FILE_NAME};
 use lighthouse_engine::Engine;
 use lighthouse_report::{Format, render};
 
+mod docs;
+mod rules;
+
 const DEFAULT_CONFIG: &str = "plugins = [\"core\"]\nextends = [\"core/recommended\"]\n";
 
 #[derive(Parser)]
@@ -34,8 +37,13 @@ enum Command {
         #[command(subcommand)]
         command: RuleCommand,
     },
-    /// Show a rule's description, requirements and docs.
-    Explain { rule_id: String },
+    /// Show a pattern or rule: intent, requirement, examples and status.
+    Explain { id: String },
+    /// Generate or verify the Markdown docs derived from the pattern catalog.
+    Docs {
+        #[command(subcommand)]
+        command: DocsCommand,
+    },
     /// Write a default lighthouse.toml in the current directory.
     Init,
 }
@@ -43,7 +51,25 @@ enum Command {
 #[derive(Subcommand)]
 enum RuleCommand {
     /// List bundled rules.
-    List,
+    List {
+        /// Include every catalog pattern with its implementation status.
+        #[arg(long)]
+        all: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum DocsCommand {
+    /// Write the pattern docs.
+    Generate {
+        #[arg(long, default_value = "docs")]
+        out: PathBuf,
+    },
+    /// Exit 1 when the pattern docs are stale.
+    Check {
+        #[arg(long, default_value = "docs")]
+        out: PathBuf,
+    },
 }
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
@@ -67,15 +93,13 @@ fn run(cli: Cli) -> Result<u8> {
             rules,
         } => check(&paths, format, strict, &rules),
         Command::Rule {
-            command: RuleCommand::List,
-        } => {
-            for rule in lighthouse_builtin::registry().rules() {
-                let meta = rule.meta();
-                println!("{}\t{}\t{}", meta.id, meta.severity, meta.description);
-            }
-            Ok(0)
-        }
-        Command::Explain { rule_id } => explain(&rule_id),
+            command: RuleCommand::List { all },
+        } => rules::list(all),
+        Command::Explain { id } => rules::explain(&id),
+        Command::Docs { command } => match command {
+            DocsCommand::Generate { out } => docs::generate(&out),
+            DocsCommand::Check { out } => docs::check(&out),
+        },
         Command::Init => init(),
     }
 }
@@ -90,30 +114,6 @@ fn check(paths: &[PathBuf], format: Format, strict: bool, only: &[String]) -> Re
     }
     print!("{}", render(format, &outcome.diagnostics));
     Ok(outcome.exit_code(strict))
-}
-
-fn explain(rule_id: &str) -> Result<u8> {
-    let registry = lighthouse_builtin::registry();
-    let rule = registry
-        .rule(rule_id)
-        .ok_or_else(|| format!("unknown rule `{rule_id}`"))?;
-    let meta = rule.meta();
-    println!(
-        "{}  (default: {})\n\n{}\n\n{}",
-        meta.id, meta.severity, meta.description, meta.docs
-    );
-    if !meta.analyzers.is_empty() {
-        println!("\nAnalyzers: {}", meta.analyzers.join(", "));
-    }
-    println!("Scope: {:?}", meta.scope);
-    if !meta.capabilities.is_empty() {
-        let caps: Vec<_> = meta.capabilities.iter().map(ToString::to_string).collect();
-        println!("Capabilities: {}", caps.join(", "));
-    }
-    if let Some(citation) = &meta.citation {
-        println!("Method: {citation}");
-    }
-    Ok(0)
 }
 
 fn init() -> Result<u8> {

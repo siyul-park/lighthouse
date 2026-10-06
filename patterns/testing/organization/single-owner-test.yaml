@@ -1,0 +1,9 @@
+id: testing/single-owner-test
+title: One owner test per public symbol
+intent: >-
+  Several semantic owners split one contract across places and let them
+  contradict.
+scope: test
+requirement: A public symbol MUST NOT have multiple semantic owner test functions.
+enforcement: mechanical
+evidence: [symbol, owner_tests]

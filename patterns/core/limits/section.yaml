@@ -1,0 +1,4 @@
+id: limits
+title: Limits
+intro: Size limits that keep files reviewable.
+patterns: [max-file-lines, split-by-cohesion]

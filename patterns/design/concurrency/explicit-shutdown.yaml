@@ -1,0 +1,9 @@
+id: design/explicit-shutdown
+title: Long-lived tasks can be stopped
+intent: A task nobody can stop leaks and blocks shutdown.
+scope: symbol
+requirement: Long-lived concurrent tasks MUST have an explicit shutdown path.
+enforcement: heuristic
+evidence: [task, spawned_at]
+tuning:
+  go: Applies to goroutines.

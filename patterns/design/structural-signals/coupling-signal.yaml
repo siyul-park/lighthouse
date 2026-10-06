@@ -1,0 +1,10 @@
+id: design/coupling-signal
+title: Coupling is a review signal
+intent: A dependency hub changes for many reasons.
+scope: symbol
+requirement: >-
+  Coupling SHOULD be judged from direct fan-in, fan-out, and dependency depth,
+  against deliberately high thresholds.
+enforcement: heuristic
+evidence: [fan_in, fan_out, depth]
+citation: Henry and Kafura 1981, information flow

@@ -1,0 +1,6 @@
+id: generated-and-platform
+title: Generated and Platform Code
+intro: >-
+  Generated and platform-specific code should remain behind the mechanism and
+  boundary that own it.
+patterns: [generated-via-generator, platform-behind-owner]

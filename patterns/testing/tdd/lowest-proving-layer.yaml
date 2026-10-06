@@ -1,0 +1,6 @@
+id: testing/lowest-proving-layer
+title: Use the lowest layer that proves it
+intent: Higher layers are slower and fail for more reasons.
+scope: test
+requirement: The lowest test layer that proves the contract MUST be used.
+enforcement: judgment

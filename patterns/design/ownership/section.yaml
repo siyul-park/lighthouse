@@ -1,0 +1,11 @@
+id: ownership
+title: Ownership
+intro: >-
+  Ownership makes it explicit who creates, changes, and ends mutable state or
+  resources.
+patterns:
+  - single-state-owner
+  - private-state-behind-owner
+  - borrow-within-boundary
+  - single-resource-owner
+  - layout-declarations-hold-no-state

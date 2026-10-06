@@ -1,0 +1,15 @@
+id: organization
+title: Organization
+intro: >-
+  Test structure should provide one obvious owner for each public contract and
+  keep case structure shallow.
+patterns:
+  - owner-test
+  - single-owner-test
+  - case-depth
+  - table-for-same-behavior
+  - scenario-per-behavior
+  - single-case-style
+  - assertions-in-cases
+  - polling-outlives-teardown
+  - polling-conditions-are-pure

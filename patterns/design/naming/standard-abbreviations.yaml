@@ -1,0 +1,9 @@
+id: design/standard-abbreviations
+title: Keep standard abbreviations
+intent: Conventional abbreviations are recognized faster than their expansions.
+scope: symbol
+requirement: Standard abbreviations MUST be kept in their conventional form.
+enforcement: heuristic
+evidence: [name, abbreviation]
+tuning:
+  go: "Initialisms keep a uniform case, for example `ID` and `IP`."

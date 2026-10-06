@@ -1,0 +1,6 @@
+id: core/split-by-cohesion
+title: Split files by cohesion
+intent: Splitting by size alone creates arbitrary boundaries.
+scope: file
+requirement: A file MUST be split along cohesion boundaries, not by size alone.
+enforcement: doc

@@ -1,0 +1,8 @@
+id: design/single-state-owner
+title: One owner per mutable state
+intent: Two writers without a protocol means races and broken invariants.
+scope: symbol
+requirement: >-
+  One symbol MUST own each mutable state and its transitions; shared mutable
+  state MUST have one owner and one synchronization strategy.
+enforcement: judgment

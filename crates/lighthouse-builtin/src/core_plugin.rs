@@ -1,17 +1,16 @@
 use lighthouse_config::{RuleConfig, Rules};
 use lighthouse_model::{
-    Capability, Diagnostic, File, Fingerprint, Fragment, Options, Position, Severity, Span,
+    Capability, Diagnostic, File, Fingerprint, Fragment, Options, Position, Span,
 };
 use lighthouse_plugin::{
     Analyzer, Conventions, Ctx, Error, LanguageProvider, Manifest, Plugin, Preset, Rule, RuleMeta,
     Scope, Workspace,
 };
-use serde::Deserialize;
+use lighthouse_spec::{Catalog, Pattern};
 use serde_json::{Value, json};
 
 const LINE_COUNT: &str = "core/line-count";
 const MAX_FILE_LINES: &str = "core/max-file-lines";
-const DEFAULT_MAX: usize = 1000;
 
 pub struct Core;
 
@@ -112,38 +111,36 @@ impl Analyzer for LineCount {
     }
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields, default)]
-struct MaxOptions {
-    max: usize,
-}
-
-impl Default for MaxOptions {
-    fn default() -> Self {
-        Self { max: DEFAULT_MAX }
-    }
-}
-
 struct MaxFileLines {
     meta: RuleMeta,
+    pattern: &'static Pattern,
 }
 
 impl MaxFileLines {
     fn new() -> Self {
-        Self {
-            meta: RuleMeta {
-                id: MAX_FILE_LINES.to_owned(),
-                severity: Severity::Warn,
-                scope: Scope::File,
-                description: "file exceeds the maximum number of lines".to_owned(),
-                docs: "Large files tend to mix responsibilities. Split by cohesion, not by size alone.\n\
-                       Option `max` (default 1000) sets the line limit."
-                    .to_owned(),
-                analyzers: vec![LINE_COUNT.to_owned()],
-                capabilities: Vec::new(),
-                citation: None,
-            },
-        }
+        let pattern = Catalog::bundled()
+            .pattern(MAX_FILE_LINES)
+            .expect("bundled catalog defines core/max-file-lines");
+        let mut meta = pattern
+            .rule_meta()
+            .expect("core/max-file-lines is implemented");
+        meta.analyzers = vec![LINE_COUNT.to_owned()];
+        Self { meta, pattern }
+    }
+
+    fn max(&self, file: Option<&File>, options: &Options) -> Result<usize, Error> {
+        let language = file.map(|f| f.lang.as_str());
+        let resolved = self
+            .pattern
+            .resolve_options(options, language)
+            .map_err(|e| Error::Options {
+                rule: MAX_FILE_LINES.to_owned(),
+                message: e.to_string(),
+            })?;
+        resolved["max"]
+            .as_u64()
+            .and_then(|max| usize::try_from(max).ok())
+            .ok_or_else(|| Error::Failed("option `max` is not a size".to_owned()))
     }
 }
 
@@ -153,14 +150,14 @@ impl Rule for MaxFileLines {
     }
 
     fn validate(&self, options: &Options) -> Result<(), Error> {
-        lighthouse_plugin::options::<MaxOptions>(MAX_FILE_LINES, options).map(drop)
+        self.max(None, options).map(drop)
     }
 
     fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, Error> {
-        let MaxOptions { max } = lighthouse_plugin::options(MAX_FILE_LINES, options)?;
         let (file, _) = ctx
             .file
             .ok_or_else(|| Error::Failed("no file".to_owned()))?;
+        let max = self.max(Some(file), options)?;
         let lines: usize = ctx.fact(LINE_COUNT)?;
         if lines <= max {
             return Ok(Vec::new());
@@ -171,7 +168,7 @@ impl Rule for MaxFileLines {
         };
         let mut diagnostic = Diagnostic::new(
             MAX_FILE_LINES,
-            Severity::Warn,
+            self.meta.severity,
             format!("file has {lines} lines, limit is {max}"),
             &file.path,
             Span {

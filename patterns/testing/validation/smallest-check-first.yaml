@@ -1,0 +1,6 @@
+id: testing/smallest-check-first
+title: Run the smallest falsifying check first
+intent: Fast feedback finds most problems.
+scope: project
+requirement: The smallest falsifying check MUST be run first.
+enforcement: doc

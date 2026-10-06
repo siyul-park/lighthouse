@@ -1,0 +1,10 @@
+id: dependency-direction
+title: Dependency Direction
+intro: >-
+  Dependency direction keeps stable, general code independent from specific
+  policy and context.
+patterns:
+  - no-upward-dependency
+  - general-lower-level
+  - no-dependency-on-callers
+  - generalize-when-extracting

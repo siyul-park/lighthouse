@@ -1,0 +1,12 @@
+id: design/exported-doc
+title: Exported symbols are documented
+intent: Public API changes need facts callers cannot read from the code.
+scope: symbol
+requirement: >-
+  Exported symbols SHOULD have doc comments in the language's standard form.
+  Public API changes SHOULD document user-visible behavior, constraints,
+  ownership, or other facts the code cannot express.
+enforcement: heuristic
+evidence: [symbol]
+tuning:
+  go: Normal Go doc comments beginning with the symbol name.

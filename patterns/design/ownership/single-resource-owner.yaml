@@ -1,0 +1,8 @@
+id: design/single-resource-owner
+title: One owner per resource transition
+intent: Resources leak when nobody, or two parties, ends them.
+scope: symbol
+requirement: >-
+  Retain/release and resource transitions MUST have one owner, and each
+  resource MUST be released exactly once.
+enforcement: judgment

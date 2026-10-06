@@ -1,0 +1,6 @@
+id: testing/shows-public-contract
+title: Tests show the public contract
+intent: A test that documents internals breaks when internals change.
+scope: test
+requirement: A test MUST show public usage and promised behavior.
+enforcement: judgment

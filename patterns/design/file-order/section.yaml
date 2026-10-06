@@ -1,0 +1,6 @@
+id: file-order
+title: File Order
+intro: >-
+  Declaration order should let a reader follow ownership and behavior from
+  public concepts to implementation mechanics.
+patterns: [declaration-groups, top-down-reading, order-is-not-a-reason-to-split]

@@ -1,0 +1,24 @@
+id: design/error-identity
+title: Preserve error identity
+intent: Adding context must not hide the cause callers depend on.
+scope: symbol
+requirement: >-
+  Dependency identity MUST be preserved when callers depend on it; context
+  added to an error MUST keep the cause reachable.
+enforcement: heuristic
+evidence: [call, verb]
+examples:
+  - name: invalid
+    language: go
+    kind: invalid
+    files:
+      - path: error-identity-invalid.go
+        source: examples/error-identity-invalid.go
+  - name: valid
+    language: go
+    kind: valid
+    files:
+      - path: error-identity-valid.go
+        source: examples/error-identity-valid.go
+tuning:
+  go: "Wrap with `%w` when adding context."

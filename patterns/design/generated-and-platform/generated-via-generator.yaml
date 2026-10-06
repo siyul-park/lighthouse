@@ -1,0 +1,7 @@
+id: design/generated-via-generator
+title: Generated files change only through their generator
+intent: Hand edits to generated files are lost on the next run.
+scope: file
+requirement: Generated files MUST change only through their generator.
+enforcement: heuristic
+evidence: [file, generator]

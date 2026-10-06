@@ -1,0 +1,11 @@
+id: errors
+title: Errors
+intro: >-
+  Errors are contracts: callers should be able to classify failures, preserve
+  causes, and avoid leaking implementation state.
+patterns:
+  - stable-error-categories
+  - error-identity
+  - translate-errors-at-boundary
+  - errors-hide-private-state
+  - errors-not-panics

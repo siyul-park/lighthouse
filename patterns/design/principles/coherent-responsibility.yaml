@@ -1,0 +1,10 @@
+id: design/coherent-responsibility
+title: Coherent symbol responsibility
+intent: >-
+  A symbol with one responsibility and a narrow contract is easy to name, test
+  and reuse.
+scope: symbol
+requirement: >-
+  Each symbol MUST have one coherent responsibility, a narrow contract, and
+  sufficient scope for every legitimate caller.
+enforcement: judgment

@@ -1,0 +1,9 @@
+id: design/no-redundant-qualifiers
+title: No redundant qualifiers
+intent: Context already names the package, receiver, phase, or representation.
+scope: symbol
+requirement: >-
+  Package, receiver, phase, or representation MUST NOT be repeated in a name
+  without meaning.
+enforcement: heuristic
+evidence: [name, repeated]

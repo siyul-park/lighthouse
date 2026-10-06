@@ -1,0 +1,6 @@
+id: comments
+title: Comments
+intro: >-
+  Comments preserve facts that code cannot express; they should not narrate
+  code that is already visible.
+patterns: [comments-preserve-facts, no-narration, exported-doc]

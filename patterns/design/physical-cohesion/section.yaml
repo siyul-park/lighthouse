@@ -1,0 +1,10 @@
+id: physical-cohesion
+title: Physical Cohesion
+intro: >-
+  Physical layout should make ownership and collaboration visible while
+  preserving real structural boundaries.
+patterns:
+  - single-file-per-owner
+  - related-symbols-close
+  - readable-layout
+  - separation-is-a-boundary

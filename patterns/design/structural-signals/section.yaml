@@ -1,0 +1,9 @@
+id: structural-signals
+title: Structural Signals
+intro: Structural metrics are review signals, not proof of a design violation.
+patterns:
+  - complexity-signal
+  - coupling-signal
+  - near-clone-signal
+  - adjacent-siblings
+  - signals-are-advisory

@@ -1,0 +1,10 @@
+id: testing/independent-tests
+title: Tests do not depend on hidden state
+intent: Order-dependent or manual tests fail intermittently.
+scope: test
+requirement: >-
+  Tests MUST NOT depend on other tests, uncontrolled mutable state, manual
+  inspection, or unnecessary setup.
+enforcement: heuristic
+evidence: [test, smell]
+citation: "van Deursen et al. 2001; Peruma et al., tsDetect 2020"

@@ -1,0 +1,6 @@
+id: validation
+title: Validation
+intro: >-
+  Validation should start with the smallest useful falsification and expand
+  only as far as the affected contract requires.
+patterns: [smallest-check-first, expand-validation-to-contract]

@@ -1,0 +1,4 @@
+id: core
+title: Core Patterns
+intro: Language-independent checks that need nothing beyond file contents.
+sections: [limits]

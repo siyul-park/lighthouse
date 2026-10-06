@@ -1,0 +1,10 @@
+id: structural-rules
+title: Structural Rules
+intro: >-
+  These rules reduce accidental duplication and unnecessary boundaries without
+  hiding genuine differences.
+patterns:
+  - abstract-semantic-duplication
+  - merge-overlapping-symbols
+  - split-real-boundaries
+  - reuse-before-extension

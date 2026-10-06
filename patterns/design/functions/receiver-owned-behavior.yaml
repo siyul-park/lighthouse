@@ -1,0 +1,10 @@
+id: design/receiver-owned-behavior
+title: Behavior lives with its owner
+intent: Where a function lives tells readers who owns the behavior.
+scope: symbol
+requirement: >-
+  Methods SHOULD express receiver-owned behavior; free functions SHOULD
+  express construction or behavior with no natural receiver.
+enforcement: judgment
+tuning:
+  go: Free functions are package functions.

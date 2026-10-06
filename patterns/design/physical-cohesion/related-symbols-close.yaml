@@ -1,0 +1,9 @@
+id: design/related-symbols-close
+title: Collaborators stay close
+intent: Distance between collaborators hides their relationship.
+scope: file
+requirement: >-
+  Strongly related symbols MUST be physically close; direct collaborators
+  SHOULD be adjacent.
+enforcement: heuristic
+evidence: [symbols, distance]

@@ -1,0 +1,13 @@
+id: design/interface-at-consumer
+title: Interfaces live at the consumer
+intent: An interface describes what a caller needs, so it belongs to the caller.
+scope: symbol
+requirement: >-
+  Interfaces MUST be used only when callers supply behavior and MUST be
+  defined where that behavior is consumed.
+enforcement: heuristic
+evidence: [interface, consumers]
+tuning:
+  go: >-
+    Declare the interface in the consuming package, not beside its only
+    implementation.

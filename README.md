@@ -26,6 +26,12 @@ in-process registry (analyzer DAG), `lighthouse.toml` config with presets and
 overrides, engine, text/json/SARIF reporters, CLI (`check`, `rule list`,
 `explain`, `init`) and the bundled `core` plugin (`core/max-file-lines`).
 
+Pattern catalog (`patterns/`, crate `lighthouse-spec`) is the single source of
+truth for rule metadata and `docs/patterns/*.md`; `lighthouse docs generate`
+rewrites the docs and `lighthouse docs check` fails when they are stale.
+`lighthouse rule list --all` shows every pattern as implemented, unimplemented
+or doc; `lighthouse explain <pattern-id>` prints intent, requirement and examples.
+
 Not yet: tree-sitter, language servers, SQLite index, MCP/LSP frontends.
 
 ## Usage
@@ -33,7 +39,9 @@ Not yet: tree-sitter, language servers, SQLite index, MCP/LSP frontends.
 ```
 lighthouse init
 lighthouse check [paths] [--format text|json|sarif] [--strict] [--rules a,b]
-lighthouse rule list
+lighthouse rule list [--all]
+lighthouse docs generate [--out docs]
+lighthouse docs check
 lighthouse explain core/max-file-lines
 ```
 

@@ -1,0 +1,7 @@
+id: design/private-helper-callers
+title: Private helpers have two callers
+intent: A private helper with one caller is usually part of that caller.
+scope: symbol
+requirement: A private helper SHOULD have at least two callers.
+enforcement: heuristic
+evidence: [callers]

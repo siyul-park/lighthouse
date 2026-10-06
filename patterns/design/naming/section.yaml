@@ -1,0 +1,14 @@
+id: naming
+title: Naming
+intro: >-
+  Names should expose role, contract, or ownership with the smallest
+  vocabulary that preserves the required distinction.
+patterns:
+  - single-term-per-concept
+  - minimal-names
+  - no-redundant-qualifiers
+  - standard-abbreviations
+  - short-names-limited
+  - predicate-names
+  - reserved-action-verbs
+  - singular-capability-plural-collection

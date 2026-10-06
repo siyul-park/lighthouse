@@ -1,0 +1,8 @@
+id: testing/parity-across-paths
+title: Test parity across execution paths
+intent: Two paths for one contract can silently diverge.
+scope: project
+requirement: >-
+  Parity MUST be tested wherever multiple execution paths are required to
+  implement the same public contract.
+enforcement: judgment
