@@ -73,7 +73,9 @@ options:
       rust: true
 tuning:
   go: >-
-    Order: public types; private types; public constants; private constants;
+    Fixtures of a test file (its types, constants, variables and functions
+    that take no testing handle) follow the same order; tests and test
+    helpers are placed by `testing/test-file-layout`. Order: public types; private types; public constants; private constants;
     variables; all `init` functions; public options and functions; public
     constructors; public methods; clone, conversion and interface hooks; private
     functions and methods.
@@ -235,3 +237,25 @@ examples:
           }
     expect:
       - line: 8
+  - name: test-fixtures-out-of-order
+    language: go
+    kind: invalid
+    files:
+      - path: go.mod
+        body: |-
+          module example.com/store
+
+          go 1.26
+      - path: store_test.go
+        body: |-
+          package store
+
+          import "testing"
+
+          var limit = 3
+
+          type sample struct{}
+
+          func TestSample(t *testing.T) { _ = sample{} }
+    expect:
+      - line: 7

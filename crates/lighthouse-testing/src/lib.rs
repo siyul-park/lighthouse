@@ -1,4 +1,6 @@
+mod assertions;
 mod external;
+mod layout;
 mod naming;
 mod owner;
 mod single_owner;
@@ -21,7 +23,13 @@ impl Plugin for Testing {
     }
 
     fn rules(&self) -> Vec<Box<dyn Rule>> {
-        vec![external::rule(), owner::rule(), single_owner::rule()]
+        vec![
+            assertions::rule(),
+            external::rule(),
+            layout::rule(),
+            owner::rule(),
+            single_owner::rule(),
+        ]
     }
 
     fn presets(&self) -> Vec<Preset> {

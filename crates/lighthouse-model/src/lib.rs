@@ -4,8 +4,8 @@ mod ucm;
 pub use diagnostic::{Diagnostic, Fingerprint, Incomplete, Severity, UnknownSeverity};
 pub use ucm::{
     Capability, Comment, Edge, EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Module,
-    Node, Position, Project, Resolution, Span, Symbol, SymbolId, SymbolKind, Target, TestCase,
-    TestStyle, Visibility,
+    Node, Position, Project, Resolution, Span, Symbol, SymbolId, SymbolKind, SymbolRole, Target,
+    TestCase, TestStyle, Visibility,
 };
 
 /// Rule options as configured in `lighthouse.toml`.

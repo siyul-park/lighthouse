@@ -6,6 +6,7 @@ intro: >-
 patterns:
   - owner-test
   - single-owner-test
+  - test-file-layout
   - case-depth
   - table-for-same-behavior
   - scenario-per-behavior

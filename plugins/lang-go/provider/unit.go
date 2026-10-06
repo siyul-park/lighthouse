@@ -105,6 +105,9 @@ func (u *unit) function(d *ast.FuncDecl) {
 		}
 		id := symbolID(kind, u.module, idName)
 		u.symbol(kind, name, "", id, d.Pos(), d.End(), doc)
+		if u.test && kind == kindFunction {
+			u.frag.Symbols[len(u.frag.Symbols)-1].Role = u.functionRole(d)
+		}
 		u.summarize(d, id, kind == kindTest && isTestEntry(name, "Test"))
 		return
 	}
@@ -130,16 +133,21 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 	f := newFlow(d, u.info())
 	ast.Walk(f, d.Body)
 	params, returns := signature(d.Type)
+	manual := 0
+	if u.test {
+		manual = manualAssertions(d.Body, u.info())
+	}
 	u.frag.Functions = append(u.frag.Functions, sdk.FunctionSummary{
-		Symbol:     id,
-		MaxNesting: f.deepest,
-		Statements: f.count,
-		TopLevel:   statementCount(d.Body.List),
-		Params:     params,
-		Returns:    returns,
-		Tokens:     u.tokens(d.Body),
-		Flow:       f.events,
-		ForwardsTo: forwardTarget(d, u.info(), u.res),
+		Symbol:           id,
+		MaxNesting:       f.deepest,
+		Statements:       f.count,
+		TopLevel:         statementCount(d.Body.List),
+		Params:           params,
+		Returns:          returns,
+		Tokens:           u.tokens(d.Body),
+		Flow:             f.events,
+		ForwardsTo:       forwardTarget(d, u.info(), u.res),
+		ManualAssertions: manual,
 	})
 	if isTestCase {
 		u.frag.Tests = append(u.frag.Tests, testCaseOf(d, id, usages, u.info()))
@@ -254,6 +262,30 @@ func (u *unit) interfaceMethods(t *ast.InterfaceType, owner, ownerID string) {
 	}
 }
 
+// functionRole is the role of a function of a test file: a helper when it
+// takes the testing handle, a fixture otherwise.
+func (u *unit) functionRole(d *ast.FuncDecl) string {
+	if fn, ok := u.info().Defs[d.Name].(*types.Func); ok {
+		if sig, ok := fn.Type().(*types.Signature); ok && takesTestingHandle(sig) {
+			return roleTestHelper
+		}
+	}
+	return roleFixture
+}
+
+// declarationRole is the role of a type, constant or variable of a test
+// file, which is always a fixture.
+func (u *unit) declarationRole(kind, owner string) string {
+	switch {
+	case !u.test || owner != "":
+		return ""
+	case kind == kindType || kind == kindInterface || kind == kindConst || kind == kindVar:
+		return roleFixture
+	default:
+		return ""
+	}
+}
+
 func (u *unit) symbol(kind, name, owner, id string, from, to token.Pos, doc string) {
 	u.frag.Symbols = append(u.frag.Symbols, sdk.Symbol{
 		ID:         id,
@@ -264,6 +296,7 @@ func (u *unit) symbol(kind, name, owner, id string, from, to token.Pos, doc stri
 		Span:       span(u.fset, from, to),
 		Doc:        doc,
 		Name:       name,
+		Role:       u.declarationRole(kind, owner),
 	})
 	container := sdk.Node{Module: u.module}
 	if owner != "" {

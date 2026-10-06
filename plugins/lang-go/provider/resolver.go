@@ -3,6 +3,7 @@ package provider
 import (
 	"go/types"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
@@ -166,9 +167,17 @@ func moduleOf(root string, p *packages.Package) (module string, inside bool) {
 	return rel, true
 }
 
-// isExternalTest reports the package of `package x_test` files.
+// isExternalTest reports the package of `package x_test` files: a package
+// named like its import path with a `_test` suffix whose files are all test
+// files. The go command sets ForTest only when the directory also has
+// in-package tests.
 func isExternalTest(p *packages.Package) bool {
-	return p.ForTest != "" && strings.HasSuffix(p.PkgPath, "_test") && strings.HasSuffix(p.Name, "_test")
+	if !strings.HasSuffix(p.PkgPath, "_test") || !strings.HasSuffix(p.Name, "_test") {
+		return false
+	}
+	return len(p.GoFiles) > 0 && !slices.ContainsFunc(p.GoFiles, func(f string) bool {
+		return !strings.HasSuffix(f, "_test.go")
+	})
 }
 
 // holder is the named type that declares the field a selection ends in,

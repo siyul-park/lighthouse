@@ -133,6 +133,7 @@ type Symbol struct {
 	Span       Span   `json:"span"`
 	Doc        string `json:"doc,omitempty"`
 	Name       string `json:"name"`
+	Role       string `json:"role,omitempty"`
 }
 
 // Node is a module or a symbol: exactly one field is set.
@@ -170,6 +171,7 @@ type FunctionSummary struct {
 	Flow             []Flow `json:"flow"`
 	CloneFingerprint string `json:"clone_fingerprint,omitempty"`
 	ForwardsTo       string `json:"forwards_to,omitempty"`
+	ManualAssertions int    `json:"manual_assertions,omitempty"`
 }
 
 // TestCase describes how a test entry point is written and what it targets.

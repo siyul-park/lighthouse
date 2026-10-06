@@ -32,6 +32,9 @@ const (
 	visibilityPrivate  = "private"
 	visibilityInternal = "internal"
 
+	roleTestHelper = "test-helper"
+	roleFixture    = "fixture"
+
 	styleTable    = "table"
 	styleScenario = "scenario"
 )

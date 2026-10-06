@@ -251,6 +251,7 @@
               "nesting": 2
             }
           ],
+          "manual_assertions": 1,
           "max_nesting": 3,
           "params": 1,
           "returns": 0,
@@ -389,6 +390,7 @@
           "id": ".::Testing#function",
           "kind": "function",
           "name": "Testing",
+          "role": "fixture",
           "span": {
             "end": {
               "col": 18,
@@ -406,6 +408,7 @@
           "id": ".::helper#function",
           "kind": "function",
           "name": "helper",
+          "role": "test-helper",
           "span": {
             "end": {
               "col": 44,

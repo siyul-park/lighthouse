@@ -20,6 +20,7 @@ fn symbol(module: &str, name: &str) -> Symbol {
         span: at(),
         doc: None,
         name: name.to_owned(),
+        role: None,
     }
 }
 
@@ -80,6 +81,7 @@ fn summary(symbol: &Symbol, forwards_to: Option<Target>) -> FunctionSummary {
         flow: Vec::new(),
         clone_fingerprint: None,
         forwards_to,
+        manual_assertions: 0,
     }
 }
 

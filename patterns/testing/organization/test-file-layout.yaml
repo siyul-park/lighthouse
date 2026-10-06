@@ -1,0 +1,153 @@
+id: testing/test-file-layout
+title: A test file reads fixtures, tests, helpers
+intent: >-
+  A test file reads top-down: what the tests use, then the specification, then
+  how it checks.
+scope: test
+requirement: >-
+  A test file MUST declare its fixtures (test types, constants, variables and
+  the functions that build them without the test framework's handle) above its
+  tests, and its test helpers (functions that take the test framework's handle
+  and are called from tests) below the tests that use them. Fixtures keep the
+  declaration-group order among themselves and sit next to the fixtures they
+  compose.
+enforcement: mechanical
+evidence: [symbol, role, before, after]
+tuning:
+  go: >-
+    A fixture is a type, constant, variable or function without a `*testing.T`,
+    `*testing.B`, `*testing.F` or `testing.TB` parameter; a helper is a function
+    with one. Fixtures follow `design/declaration-groups`. Methods are judged
+    with their type. Test entry points are `Test`, `Benchmark`, `Fuzz` and
+    `Example` functions; a helper that no test or helper of the same file uses
+    may sit anywhere below the fixtures.
+  rust: >-
+    The same reading order applies to a `#[cfg(test)]` module and to files of
+    `tests/`: fixtures and builders first, then the `#[test]` functions, then
+    the helpers that check. It is not enforced for Rust, whose provider does
+    not tell fixtures from helpers.
+implementation:
+  builtin: testing/test-file-layout
+examples:
+  - name: fixture-after-test
+    language: go
+    kind: invalid
+    files:
+      - path: go.mod
+        body: |-
+          module example.com/store
+
+          go 1.26
+      - path: store.go
+        body: |-
+          package store
+
+          func Get() int { return 1 }
+      - path: store_test.go
+        body: |-
+          package store_test
+
+          import (
+          	"testing"
+
+          	"example.com/store"
+          )
+
+          func TestGet(t *testing.T) {
+          	if store.Get() != want {
+          		t.Fatal("get")
+          	}
+          }
+
+          const want = 1
+    expect:
+      - line: 15
+  - name: helper-above-its-test
+    language: go
+    kind: invalid
+    files:
+      - path: go.mod
+        body: |-
+          module example.com/store
+
+          go 1.26
+      - path: store.go
+        body: |-
+          package store
+
+          func Get() int { return 1 }
+      - path: store_test.go
+        body: |-
+          package store_test
+
+          import (
+          	"testing"
+
+          	"example.com/store"
+          )
+
+          func checkGet(t *testing.T) {
+          	t.Helper()
+          	_ = store.Get()
+          }
+
+          func TestGet(t *testing.T) { checkGet(t) }
+    expect:
+      - line: 9
+  - name: fixtures-tests-helpers
+    language: go
+    kind: valid
+    files:
+      - path: go.mod
+        body: |-
+          module example.com/store
+
+          go 1.26
+      - path: store.go
+        body: |-
+          package store
+
+          func Get() int { return 1 }
+      - path: store_test.go
+        body: |-
+          package store_test
+
+          import (
+          	"testing"
+
+          	"example.com/store"
+          )
+
+          const want = 1
+
+          func TestGet(t *testing.T) { checkGet(t, want) }
+
+          func checkGet(t *testing.T, want int) {
+          	t.Helper()
+          	_ = store.Get() + want
+          }
+  - name: rust-fixtures-tests-helpers
+    language: rust
+    kind: valid
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub fn get() -> i32 {
+              1
+          }
+
+          #[cfg(test)]
+          mod tests {
+              use super::*;
+
+              const WANT: i32 = 1;
+
+              #[test]
+              fn get_returns_one() {
+                  check(get());
+              }
+
+              fn check(got: i32) {
+                  assert_eq!(got, WANT);
+              }
+          }

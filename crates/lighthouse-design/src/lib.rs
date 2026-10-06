@@ -53,9 +53,13 @@ impl Plugin for Design {
 
 /// Whether the focused file is a test or generated and rules skip it.
 fn skipped(ctx: &Ctx) -> bool {
-    ctx.file.is_none_or(|(file, _)| {
-        file.test || ctx.project.file(&file.path).is_none_or(|f| f.generated)
-    })
+    ctx.file.is_none_or(|(file, _)| file.test) || generated(ctx)
+}
+
+/// Whether the focused file is generated and rules skip it.
+fn generated(ctx: &Ctx) -> bool {
+    ctx.file
+        .is_none_or(|(file, _)| ctx.project.file(&file.path).is_none_or(|f| f.generated))
 }
 
 /// Functions and methods with a body declared in the focused file, outside

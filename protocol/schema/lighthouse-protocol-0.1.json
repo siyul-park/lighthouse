@@ -296,6 +296,12 @@
             "null"
           ]
         },
+        "manual_assertions": {
+          "description": "Checks of a test file's function written out by hand: an `if` that\ncompares and whose only effect is to fail the test. Added in 0.1\nbefore 1.0; zero when the plugin does not count them.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
         "max_nesting": {
           "description": "Deepest level of nested constructs; a flat body is 0.",
           "format": "uint32",
@@ -682,6 +688,17 @@
             "null"
           ]
         },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SymbolRole"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set on the declarations of test files whose purpose the language can\ntell; test entry points are `test` symbols and carry none."
+        },
         "span": {
           "$ref": "#/$defs/Span"
         },
@@ -711,6 +728,21 @@
         "test"
       ],
       "type": "string"
+    },
+    "SymbolRole": {
+      "description": "What a declaration of a test file is for. Added in 0.1 before 1.0; a\nplugin that cannot tell omits it.",
+      "oneOf": [
+        {
+          "const": "test-helper",
+          "description": "Test code that checks on behalf of tests, such as a function that takes\nthe test framework's handle.",
+          "type": "string"
+        },
+        {
+          "const": "fixture",
+          "description": "Test data and code that builds it: types, constants, variables and\nfunctions that need no handle.",
+          "type": "string"
+        }
+      ]
     },
     "TestCase": {
       "properties": {

@@ -40,7 +40,7 @@ struct Lang {
 const GO: Lang = Lang {
     id: "go",
     ext: ".go",
-    min_cases: 12,
+    min_cases: 15,
     plugin: lighthouse_testkit::lang_go,
     probe: ("plain.go", || json!({ "go": { "tagz": [] } })),
     manifest_id: "lang-go",

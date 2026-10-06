@@ -5,9 +5,8 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
-    finding,
+    finding, generated,
     layout::{declarations, exposed, has_word_prefix, owner_key},
-    skipped,
 };
 
 const ID: &str = "design/declaration-groups";
@@ -25,7 +24,7 @@ pub(crate) fn rule() -> Box<dyn Rule> {
 }
 
 fn check(meta: &RuleMeta, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
-    if skipped(ctx) {
+    if generated(ctx) {
         return Ok(Vec::new());
     }
     let mut found = Vec::new();

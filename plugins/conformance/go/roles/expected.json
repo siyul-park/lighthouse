@@ -1,0 +1,571 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": ".::Greet#function",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Greet greets."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Greet#function"
+        }
+      ],
+      "file": {
+        "path": "roles.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::Greet#function",
+          "tokens": 6,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "roles",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Greet greets.",
+          "file": "roles.go",
+          "id": ".::Greet#function",
+          "kind": "function",
+          "name": "Greet",
+          "span": {
+            "end": {
+              "col": 55,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "testing"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::fixture#type"
+        },
+        {
+          "from": {
+            "symbol": ".::fixture#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::fixture::name#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::want#const"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::names#var"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::newFixture#function"
+        },
+        {
+          "from": {
+            "symbol": ".::newFixture#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::fixture::name"
+        },
+        {
+          "from": {
+            "symbol": ".::newFixture#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::fixture"
+        },
+        {
+          "from": {
+            "symbol": ".::fixture#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::fixture::label#method"
+        },
+        {
+          "from": {
+            "symbol": ".::fixture::label#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::fixture::name"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::TestGreet#test"
+        },
+        {
+          "from": {
+            "symbol": ".::TestGreet#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::check"
+        },
+        {
+          "from": {
+            "symbol": ".::TestGreet#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::fixture::label"
+        },
+        {
+          "from": {
+            "symbol": ".::TestGreet#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::newFixture"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::BenchmarkGreet#test"
+        },
+        {
+          "from": {
+            "symbol": ".::BenchmarkGreet#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::measure"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::check#function"
+        },
+        {
+          "from": {
+            "symbol": ".::check#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::assertGreeting"
+        },
+        {
+          "from": {
+            "symbol": ".::check#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Greet"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::assertGreeting#function"
+        },
+        {
+          "from": {
+            "symbol": ".::assertGreeting#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::want"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::measure#function"
+        },
+        {
+          "from": {
+            "symbol": ".::measure#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Greet"
+        },
+        {
+          "from": {
+            "symbol": ".::measure#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::names"
+        }
+      ],
+      "file": {
+        "path": "roles_test.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::newFixture#function",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::fixture::label#method",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": ".::TestGreet#test",
+          "tokens": 14,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": ".::measure",
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": ".::BenchmarkGreet#test",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 0,
+          "statements": 1,
+          "symbol": ".::check#function",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "manual_assertions": 1,
+          "max_nesting": 1,
+          "params": 2,
+          "returns": 0,
+          "statements": 3,
+          "symbol": ".::assertGreeting#function",
+          "tokens": 19,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": ".::measure#function",
+          "tokens": 11,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "roles",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "file": "roles_test.go",
+          "id": ".::fixture#type",
+          "kind": "type",
+          "name": "fixture",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 5
+            },
+            "start": {
+              "col": 6,
+              "line": 5
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "roles_test.go",
+          "id": ".::fixture::name#field",
+          "kind": "field",
+          "name": "name",
+          "owner": ".::fixture#type",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 5
+            },
+            "start": {
+              "col": 22,
+              "line": 5
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "roles_test.go",
+          "id": ".::want#const",
+          "kind": "const",
+          "name": "want",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 7
+            },
+            "start": {
+              "col": 7,
+              "line": 7
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "roles_test.go",
+          "id": ".::names#var",
+          "kind": "var",
+          "name": "names",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 28,
+              "line": 9
+            },
+            "start": {
+              "col": 5,
+              "line": 9
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "roles_test.go",
+          "id": ".::newFixture#function",
+          "kind": "function",
+          "name": "newFixture",
+          "role": "fixture",
+          "span": {
+            "end": {
+              "col": 58,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "roles_test.go",
+          "id": ".::fixture::label#method",
+          "kind": "method",
+          "name": "label",
+          "owner": ".::fixture#type",
+          "span": {
+            "end": {
+              "col": 50,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "roles_test.go",
+          "id": ".::TestGreet#test",
+          "kind": "test",
+          "name": "TestGreet",
+          "span": {
+            "end": {
+              "col": 64,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "roles_test.go",
+          "id": ".::BenchmarkGreet#test",
+          "kind": "test",
+          "name": "BenchmarkGreet",
+          "span": {
+            "end": {
+              "col": 49,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "roles_test.go",
+          "id": ".::check#function",
+          "kind": "function",
+          "name": "check",
+          "role": "test-helper",
+          "span": {
+            "end": {
+              "col": 73,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "roles_test.go",
+          "id": ".::assertGreeting#function",
+          "kind": "function",
+          "name": "assertGreeting",
+          "role": "test-helper",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 21
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "roles_test.go",
+          "id": ".::measure#function",
+          "kind": "function",
+          "name": "measure",
+          "role": "test-helper",
+          "span": {
+            "end": {
+              "col": 51,
+              "line": 28
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": ".::TestGreet#test",
+          "targets": [
+            ".::check",
+            ".::fixture::label",
+            ".::newFixture"
+          ]
+        }
+      ]
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

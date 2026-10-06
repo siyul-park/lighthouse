@@ -220,6 +220,19 @@ pub struct Span {
     pub end: Position,
 }
 
+/// What a declaration of a test file is for. Added in 0.1 before 1.0; a
+/// plugin that cannot tell omits it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum SymbolRole {
+    /// Test code that checks on behalf of tests, such as a function that takes
+    /// the test framework's handle.
+    TestHelper,
+    /// Test data and code that builds it: types, constants, variables and
+    /// functions that need no handle.
+    Fixture,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Symbol {
     /// `module::owner::name#kind`, see docs/plugin-protocol.md.
@@ -235,6 +248,10 @@ pub struct Symbol {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc: Option<String>,
     pub name: String,
+    /// Set on the declarations of test files whose purpose the language can
+    /// tell; test entry points are `test` symbols and carry none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<SymbolRole>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -326,6 +343,11 @@ pub struct FunctionSummary {
     /// Reserved: normalized fingerprint for clone detection.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clone_fingerprint: Option<String>,
+    /// Checks of a test file's function written out by hand: an `if` that
+    /// compares and whose only effect is to fail the test. Added in 0.1
+    /// before 1.0; zero when the plugin does not count them.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub manual_assertions: u32,
     /// Target of the call the body consists of when it passes the receiver and
     /// every parameter on, in order.
     #[serde(default, skip_serializing_if = "Option::is_none")]

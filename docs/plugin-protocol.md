@@ -149,6 +149,12 @@ internal error. The host treats failures as follows, always turning them into
   symbol is the id of its direct container.
 - `visibility`: `public` (importable by anyone), `internal` (importable only
   inside the project), `private`.
+- `role` (optional): on the declarations of a test file whose purpose the
+  language can tell, `test-helper` (test code that checks on behalf of tests;
+  in Go a function that takes `*testing.T`, `*testing.B`, `*testing.F` or
+  `testing.TB`) or `fixture` (test data and the code that builds it: types,
+  constants, variables and functions that need no handle). Test entry points
+  are `test` symbols and carry no role; methods and fields carry none either.
 - `span`: 1-based `line`, 1-based `col` counted in bytes, `end` exclusive.
 
 ### Edges
@@ -185,6 +191,11 @@ statements in the body, case clauses counting as statements), `top_level`
 (statements directly in the body), `params`, `returns`, `tokens` (leaf tokens of
 the body) and `forwards_to` (set when the body is one call that passes the
 receiver and every parameter on, in order, naming the callee).
+
+`manual_assertions` (optional, test files only) counts the checks a function
+writes out by hand: an `if` with no `else` whose condition compares or negates
+and whose only effect is to fail the test (in Go, through the `testing`
+handle). It lets rules ask whether tests use the project's assertion library.
 
 `flow` lists control-flow constructs in source order, each with the number of
 enclosing nesting constructs (nested functions included) around it. Providers

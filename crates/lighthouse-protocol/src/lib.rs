@@ -8,7 +8,7 @@ pub use wire::{
     Call, ClientInfo, Comment, Context, Conventions, Edge, EdgeKind, FileInfo, FileRef, Flow,
     FlowKind, Fragment, FunctionSummary, Incomplete, IndexParams, IndexResult, InitializeParams,
     InitializeResult, Language, Methods, Module, Node, Overlay, Position, ProjectRef, Resolution,
-    Span, Symbol, SymbolKind, TestCase, TestStyle, Visibility,
+    Span, Symbol, SymbolKind, SymbolRole, TestCase, TestStyle, Visibility,
 };
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.

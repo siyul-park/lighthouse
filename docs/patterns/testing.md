@@ -267,6 +267,118 @@ A table that needs its own logic is no longer a specification.
 
 Table data and generation code MUST remain simple enough to read as specification.
 
+### Assertions use the standard library
+
+`testing/standard-assertions` · scope `test` · enforcement `heuristic` · severity `warn`
+
+**Intent**
+
+A hand-written compare-and-fail repeats what the project's assertion library already states, with worse failure output.
+
+**Requirement**
+
+Tests SHOULD assert through the project's standard assertion library, and a test helper SHOULD NOT reimplement a comparison and failure that the library already provides.
+
+**Invalid example: hand-written-comparison (go)**
+
+`go.mod`
+
+```go
+module example.com/store
+
+go 1.26
+```
+
+`store.go`
+
+```go
+package store
+
+func Get() int { return 1 }
+```
+
+`store_test.go`
+
+```go
+package store_test
+
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+func TestGet(t *testing.T) {
+	if got := store.Get(); got != 1 {
+		t.Fatalf("got %d", got)
+	}
+}
+```
+
+**Valid example: check-that-does-more (go)**
+
+`go.mod`
+
+```go
+module example.com/store
+
+go 1.26
+```
+
+`store.go`
+
+```go
+package store
+
+func Get() int { return 1 }
+```
+
+`store_test.go`
+
+```go
+package store_test
+
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+func TestGet(t *testing.T) {
+	got := store.Get()
+	if got != 1 {
+		t.Errorf("got %d", got)
+		return
+	}
+}
+```
+
+**Valid example: rust-assert-macros (rust)**
+
+```rust
+pub fn get() -> i32 {
+    1
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_returns_one() {
+        assert_eq!(get(), 1);
+    }
+}
+```
+
+**Tuning: go**
+
+The library is `github.com/stretchr/testify/require`. A function of a test file that has an `if` with no `else` whose condition compares or negates and whose only effect is `t.Fatal`, `t.Fatalf`, `t.Error`, `t.Errorf`, `t.Fail` or `t.FailNow` is reported with the number of such checks. A check that does more than fail, such as one that also returns, is not a plain assertion.
+
+**Tuning: rust**
+
+Use `assert_eq!`, `assert_ne!` and `assert!` with a message instead of helpers that compare and `panic!`. Not enforced for Rust, whose provider does not count hand-written checks.
+
 ## Organization
 
 Test structure should provide one obvious owner for each public contract and keep case structure shallow.
@@ -600,6 +712,164 @@ fn get_is_stable() {
 **Tuning: rust**
 
 A test is an owner of the item it is named after in snake case. Rust tests are many small functions, so names that merely extend a symbol's name are not owners; two tests with exactly the name of one item (in different test crates, or inline and in `tests/`) are.
+
+### A test file reads fixtures, tests, helpers
+
+`testing/test-file-layout` · scope `test` · enforcement `mechanical` · severity `error`
+
+**Intent**
+
+A test file reads top-down: what the tests use, then the specification, then how it checks.
+
+**Requirement**
+
+A test file MUST declare its fixtures (test types, constants, variables and the functions that build them without the test framework's handle) above its tests, and its test helpers (functions that take the test framework's handle and are called from tests) below the tests that use them. Fixtures keep the declaration-group order among themselves and sit next to the fixtures they compose.
+
+**Invalid example: fixture-after-test (go)**
+
+`go.mod`
+
+```go
+module example.com/store
+
+go 1.26
+```
+
+`store.go`
+
+```go
+package store
+
+func Get() int { return 1 }
+```
+
+`store_test.go`
+
+```go
+package store_test
+
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+func TestGet(t *testing.T) {
+	if store.Get() != want {
+		t.Fatal("get")
+	}
+}
+
+const want = 1
+```
+
+**Invalid example: helper-above-its-test (go)**
+
+`go.mod`
+
+```go
+module example.com/store
+
+go 1.26
+```
+
+`store.go`
+
+```go
+package store
+
+func Get() int { return 1 }
+```
+
+`store_test.go`
+
+```go
+package store_test
+
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+func checkGet(t *testing.T) {
+	t.Helper()
+	_ = store.Get()
+}
+
+func TestGet(t *testing.T) { checkGet(t) }
+```
+
+**Valid example: fixtures-tests-helpers (go)**
+
+`go.mod`
+
+```go
+module example.com/store
+
+go 1.26
+```
+
+`store.go`
+
+```go
+package store
+
+func Get() int { return 1 }
+```
+
+`store_test.go`
+
+```go
+package store_test
+
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+const want = 1
+
+func TestGet(t *testing.T) { checkGet(t, want) }
+
+func checkGet(t *testing.T, want int) {
+	t.Helper()
+	_ = store.Get() + want
+}
+```
+
+**Valid example: rust-fixtures-tests-helpers (rust)**
+
+```rust
+pub fn get() -> i32 {
+    1
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const WANT: i32 = 1;
+
+    #[test]
+    fn get_returns_one() {
+        check(get());
+    }
+
+    fn check(got: i32) {
+        assert_eq!(got, WANT);
+    }
+}
+```
+
+**Tuning: go**
+
+A fixture is a type, constant, variable or function without a `*testing.T`, `*testing.B`, `*testing.F` or `testing.TB` parameter; a helper is a function with one. Fixtures follow `design/declaration-groups`. Methods are judged with their type. Test entry points are `Test`, `Benchmark`, `Fuzz` and `Example` functions; a helper that no test or helper of the same file uses may sit anywhere below the fixtures.
+
+**Tuning: rust**
+
+The same reading order applies to a `#[cfg(test)]` module and to files of `tests/`: fixtures and builders first, then the `#[test]` functions, then the helpers that check. It is not enforced for Rust, whose provider does not tell fixtures from helpers.
 
 ### Cases are at most two levels deep
 

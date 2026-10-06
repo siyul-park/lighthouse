@@ -102,6 +102,7 @@ impl World {
             span: at(line),
             doc: None,
             name: name.to_owned(),
+            role: None,
         };
         self.symbols.push(symbol.clone());
         symbol
@@ -146,6 +147,7 @@ impl World {
             flow: flow.to_vec(),
             clone_fingerprint: None,
             forwards_to: None,
+            manual_assertions: 0,
         });
     }
 

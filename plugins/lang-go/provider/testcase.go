@@ -132,3 +132,29 @@ func structCollection(t types.Type) bool {
 	_, isStruct := element.Underlying().(*types.Struct)
 	return isStruct
 }
+
+// takesTestingHandle reports a parameter that is a testing handle.
+func takesTestingHandle(sig *types.Signature) bool {
+	for i := range sig.Params().Len() {
+		if testingHandle(sig.Params().At(i).Type()) {
+			return true
+		}
+	}
+	return false
+}
+
+// testingHandle reports testing's T, B, F or TB, by value or by pointer.
+func testingHandle(t types.Type) bool {
+	if p, ok := t.(*types.Pointer); ok {
+		t = p.Elem()
+	}
+	named, ok := t.(*types.Named)
+	if !ok || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != "testing" {
+		return false
+	}
+	switch named.Obj().Name() {
+	case "T", "B", "F", "TB":
+		return true
+	}
+	return false
+}

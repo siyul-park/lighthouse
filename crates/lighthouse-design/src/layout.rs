@@ -1,13 +1,15 @@
 //! What the ordering rules share: the declarations of a file in source order
 //! and the vocabulary that tells a declaration's owner and visibility.
 
-use lighthouse_model::{Project, Symbol, SymbolKind, Visibility};
+use lighthouse_model::{Project, Symbol, SymbolKind, SymbolRole, Visibility};
 use lighthouse_plugin::Ctx;
 
 /// Declarations of the focused file in source order, one list per module the
 /// file declares (an inline module is a module of its own). A declaration is a
 /// type, interface, constant, variable, function or method that is not a member
-/// of an interface and not nested in a function body. Test code is left out.
+/// of an interface and not nested in a function body. Test code is left out,
+/// except the fixtures of a test file, which are ordered like any other
+/// declarations.
 pub(crate) fn declarations<'a>(ctx: &Ctx<'a>) -> Vec<Vec<&'a Symbol>> {
     let Some((file, _)) = ctx.file else {
         return Vec::new();
@@ -16,7 +18,13 @@ pub(crate) fn declarations<'a>(ctx: &Ctx<'a>) -> Vec<Vec<&'a Symbol>> {
         .project
         .symbols_in(&file.path)
         .filter(|s| is_declaration(ctx.project, s))
-        .filter(|s| !ctx.project.in_test(&s.id))
+        .filter(|s| {
+            if file.test {
+                s.role == Some(SymbolRole::Fixture)
+            } else {
+                !ctx.project.in_test(&s.id)
+            }
+        })
         .collect();
     all.sort_by(|a, b| (a.span.start, &a.id).cmp(&(b.span.start, &b.id)));
     let mut modules: Vec<(&str, Vec<&Symbol>)> = Vec::new();

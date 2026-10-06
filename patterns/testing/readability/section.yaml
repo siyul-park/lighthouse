@@ -3,4 +3,4 @@ title: Readability
 intro: >-
   A readable test is a small, direct specification whose behavior can be
   understood without following test infrastructure.
-patterns: [simple-table-data]
+patterns: [simple-table-data, standard-assertions]

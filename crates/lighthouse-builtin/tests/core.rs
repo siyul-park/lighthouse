@@ -201,5 +201,5 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
     let strict = registry.preset("design/strict").unwrap();
     assert_eq!(strict.rules.len(), design.len());
     let testing = registry.preset("testing/recommended").unwrap();
-    assert_eq!(testing.rules.len(), 3);
+    assert_eq!(testing.rules.len(), 5);
 }

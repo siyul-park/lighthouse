@@ -134,6 +134,7 @@ impl Extractor<'_> {
             span: d.span,
             doc: d.doc,
             name: d.name,
+            role: None,
         });
     }
 
@@ -608,6 +609,7 @@ impl Extractor<'_> {
             flow: facts.flow,
             clone_fingerprint: None,
             forwards_to: facts.forwards_to,
+            manual_assertions: 0,
         });
         if let Some(attrs) = test {
             self.frag.tests.push(TestCase {

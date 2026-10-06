@@ -143,6 +143,18 @@ pub enum Visibility {
     Internal,
 }
 
+/// What a declaration of a test file is for, when its language can tell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SymbolRole {
+    /// Test code that checks on behalf of tests, such as a function that takes
+    /// the test framework's handle.
+    TestHelper,
+    /// Test data and code that builds it: types, constants, variables and
+    /// functions that need no handle.
+    Fixture,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Symbol {
     pub id: SymbolId,
@@ -153,6 +165,7 @@ pub struct Symbol {
     pub span: Span,
     pub doc: Option<String>,
     pub name: String,
+    pub role: Option<SymbolRole>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -292,6 +305,10 @@ pub struct FunctionSummary {
     /// The body is a single call that passes the receiver and every parameter
     /// on, in order.
     pub forwards_to: Option<Target>,
+    /// Checks written out by hand in a test file's function: an `if` that
+    /// compares and whose only effect is to fail the test.
+    #[serde(default)]
+    pub manual_assertions: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

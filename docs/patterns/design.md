@@ -2163,9 +2163,33 @@ impl Store {
 }
 ```
 
+**Invalid example: test-fixtures-out-of-order (go)**
+
+`go.mod`
+
+```go
+module example.com/store
+
+go 1.26
+```
+
+`store_test.go`
+
+```go
+package store
+
+import "testing"
+
+var limit = 3
+
+type sample struct{}
+
+func TestSample(t *testing.T) { _ = sample{} }
+```
+
 **Tuning: go**
 
-Order: public types; private types; public constants; private constants; variables; all `init` functions; public options and functions; public constructors; public methods; clone, conversion and interface hooks; private functions and methods.
+Fixtures of a test file (its types, constants, variables and functions that take no testing handle) follow the same order; tests and test helpers are placed by `testing/test-file-layout`. Order: public types; private types; public constants; private constants; variables; all `init` functions; public options and functions; public constructors; public methods; clone, conversion and interface hooks; private functions and methods.
 
 **Tuning: rust**
 

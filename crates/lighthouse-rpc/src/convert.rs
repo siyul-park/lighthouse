@@ -159,7 +159,15 @@ fn symbol(s: wire::Symbol) -> Result<core::Symbol, String> {
         span: span(s.span),
         doc: s.doc,
         name: s.name,
+        role: s.role.map(role),
     })
+}
+
+fn role(role: wire::SymbolRole) -> core::SymbolRole {
+    match role {
+        wire::SymbolRole::TestHelper => core::SymbolRole::TestHelper,
+        wire::SymbolRole::Fixture => core::SymbolRole::Fixture,
+    }
 }
 
 fn symbol_kind(kind: wire::SymbolKind) -> core::SymbolKind {
@@ -241,6 +249,7 @@ fn function(f: wire::FunctionSummary) -> Result<core::FunctionSummary, String> {
         flow: f.flow.into_iter().map(flow).collect(),
         clone_fingerprint: f.clone_fingerprint.map(core::Fingerprint::from_raw),
         forwards_to: f.forwards_to.map(core::Target::Path),
+        manual_assertions: f.manual_assertions,
     })
 }
 

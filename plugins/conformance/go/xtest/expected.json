@@ -39,6 +39,7 @@
               "nesting": 0
             }
           ],
+          "manual_assertions": 1,
           "max_nesting": 1,
           "params": 1,
           "returns": 0,
@@ -245,6 +246,7 @@
               "nesting": 0
             }
           ],
+          "manual_assertions": 1,
           "max_nesting": 1,
           "params": 1,
           "returns": 0,
