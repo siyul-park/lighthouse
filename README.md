@@ -53,8 +53,11 @@ design/private-helper-callers  review (heuristic)  src/lib.rs:5:1
 ```
 
 The agent fixes it, or it records a verdict: `rejected: intentional-exception` with a
-reason. That verdict is kept in a local store with a snapshot of the evidence, and the
-finding stays out of later reports, so the same structure is never asked about twice.
+reason. That verdict is appended to a log that is committed with the code, with a snapshot
+of the evidence, so the finding stays out of later reports for everyone who has the log,
+CI included, until the rule or the evidence changes. A decision that belongs to one place
+can instead be written where it happens, `lighthouse:allow <rule> -- <reason>` in a
+comment, and shows up in the diff. The same structure is never asked about twice.
 When structurally similar code keeps getting the same verdict and no rule covers it,
 Lighthouse proposes one. The proposal carries the occurrences, the verdicts and
 valid/invalid examples. It must pass the existing rule fixtures before anyone approves
@@ -131,10 +134,11 @@ lighthouse review list                        # findings the store remembers
 lighthouse review resolve <fingerprint> --verdict rejected --reason intentional-exception
 ```
 
-`check` records each run in `.lighthouse/lighthouse.db` (`init` ignores it in git;
-`--no-store` skips it): fixed findings are marked resolved, and findings whose latest
-verdict is a rejection stay out of the report. `review show` and `review history` give
-the evidence and every verdict of one finding.
+`check` records each run in `.lighthouse/lighthouse.db`, a local cache (`init` ignores it
+in git; `--no-store` skips it): fixed findings are marked resolved. Verdicts go to
+`.lighthouse/decisions.jsonl`, which you commit: findings whose latest valid verdict is a
+rejection stay out of the report on every machine. `review show` and `review history`
+give the evidence and every verdict of one finding.
 
 A minimal `lighthouse.toml` for a Go project:
 
@@ -178,7 +182,7 @@ incomplete. "Not checked" never counts as "passed".
 | Analysis | size, cyclomatic, cognitive (SonarSource), nesting, fan-in/out | dependency direction, cycles, clones, cohesion |
 | Rules | complexity, coupling, docs, wrappers, declaration order and ownership layout, naming, banners, test contracts, declarative CEL rules (`.lighthouse/rules`) | dependency direction, cohesion, clones |
 | Agent loop | CLI with text, JSON, SARIF and agent output, `--changed` / `--diff` report scopes, `rule test`, `review` | MCP server, Skill, hooks |
-| Memory | finding history, append-only verdict log with evidence snapshots, verdict-based suppression | pattern index, similarity search |
+| Memory | finding history, a committed append-only decision log with evidence snapshots, verdict suppression that expires with the rule or evidence, source annotations | pattern index, similarity search |
 | Evolution | | coverage analysis, rule proposals, judged and learned rule forms |
 | Editors | | LSP server |
 

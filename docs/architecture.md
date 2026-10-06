@@ -106,76 +106,162 @@ that cannot start is one), 3 incomplete.
 
 ## Memory: findings, verdicts and the feedback loop
 
-`lighthouse check` remembers what it saw, in `.lighthouse/lighthouse.db` at the
-project root (SQLite, the `lighthouse-store` crate). The file is a local cache of one
-machine's checks and reviews, so `lighthouse init` adds `.lighthouse/*.db*` to
-`.gitignore`. A run is recorded by default whenever the project has a
-`lighthouse.toml`; `--no-store` runs without reading or writing the store. A store that
-cannot be opened never fails a check: the run goes on without memory and says so on
-stderr. The schema is versioned with `PRAGMA user_version` and migrated on open; a
-database written by a newer build is refused.
+Memory has two parts with different owners. **Sightings** (what `check` saw, when, with
+which facts) stay on one machine, in `.lighthouse/lighthouse.db` (SQLite, the
+`lighthouse-store` crate). **Decisions** (verdicts on findings) are shared through a
+committed file, `.lighthouse/decisions.jsonl`, and the database holds a copy of them
+that it rebuilds from the file. See [Shared decisions](#shared-decisions).
+
+`lighthouse init` ignores `.lighthouse/*.db*` and marks the decision log `merge=union`
+in `.gitattributes`. A run is recorded by default whenever the project has a
+`lighthouse.toml`; `--no-store` runs without reading or writing the store and applies no
+verdicts. A store that cannot be used never fails a check: the run goes on, says so on
+stderr, and still applies the verdicts it can read. The database uses WAL with
+`synchronous=NORMAL`, writers take the write lock up front (`BEGIN IMMEDIATE`) and wait
+for each other, and opening and migrating are serialized the same way, so a hook, a
+stop script and a human can run at once. The schema is versioned with
+`PRAGMA user_version`; a database written by a newer build is refused, and a file that
+is not a database is named in the error and left where it is (move it aside; it is
+rebuilt from the log, and only the history of sightings is lost).
 
 The store is artifact-neutral: a finding's artifact is a path string and its locator is
 JSON (`{"span": {...}}` for text, a JSON pointer or region id for other artifacts), and
-evidence and facts are JSON, so nothing in it is specific to code.
+evidence, facts and options are JSON, so nothing in it is specific to code.
 
-**`findings`** has one row per fingerprint: rule, severity, path, locator, owner
-symbol, `first_seen`, `last_seen`, `resolved_at`, how often it came back
-(`reopened`), and the last message, evidence and facts. The facts are what the
-analysis knew about the finding's subject in its last run: language, symbol kind,
-visibility, callers and callees, the function summary, and the measures analyzers took
-(cognitive, cyclomatic, fan-in and fan-out, size). They are kept per open finding so a
-review can snapshot them without re-analyzing.
+### Findings
+
+`findings` has one row per fingerprint: rule, last severity and tier, path, locator,
+owner symbol, `first_seen`, `last_seen`, `resolved_at`, `inactive_at`, how often it came
+back (`reopened`), and the last sighting: message, evidence, facts, the options the rule
+ran with, the commit and whether the tracked files were dirty, the Lighthouse and
+catalog versions, the semantic version of the rule and a digest of the evidence. The
+facts are what the analysis knew about the subject: language; for a symbol its kind,
+visibility, owner, callers (split into same-module and other-module), callees, function
+summary and the measures analyzers took (cognitive, cyclomatic, fan-in and fan-out,
+size); for any other finding the file's size and the measures taken of the file. They are
+kept per finding so a review can snapshot them without re-analyzing.
 
 A run updates `findings` like this:
 
 - every reported finding is inserted or refreshed, a resolved one is reopened;
-- a finding that was open inside the run's *report scope* and rules and is absent now
-  is marked resolved;
+- a finding that was open inside the run's *report scope* and rules and is absent now is
+  marked resolved. `--changed` and `--diff` include deleted files in the scope, so what a
+  deleted file had is resolved;
 - nothing is resolved outside the report scope (`check src/a.rs`, `--changed`, `--diff`
-  narrow it), for rules that did not run (`--rules`), or when the analysis was
-  incomplete. "Not checked" never means "fixed".
+  narrow it), for rules that did not run (`--rules`), or under a directory that holds a
+  file the run could not analyze. A gap that cannot be placed (a language provider that
+  failed) stops all resolving. "Not checked" never means "fixed";
+- an open finding of a rule the configuration no longer enables becomes `inactive`: it
+  is not open, not resolved, and listed with `review list --status inactive`. It is
+  reactivated if the rule is enabled again.
+
+`review prune [--older-than DAYS]` deletes resolved and inactive findings that nobody
+reviewed; findings with verdicts stay, because the verdicts are labels.
+
+### Fingerprints
 
 A fingerprint is the rule, the owner symbol's path (`module::owner::name#kind`) or the
 file for file-level rules, and a whitespace-normalized snippet where the finding has
 one. Line numbers are not part of it, so edits above a finding do not change its
-identity. Findings that repeat within a file get an occurrence index, so removing the
-first of several identical findings renames the others.
+identity. When findings of one rule in one file still share a fingerprint, the engine
+tells them apart by the finding's symbol, or the symbol that encloses or precedes it,
+and only the ones that still collide get an ordinal. Identities that rest on an ordinal
+are marked in the facts (`ordinal`), and `review resolve` warns about them: the ordinal
+moves when an identical finding appears before it. A finding that stops colliding goes
+back to its undistinguished fingerprint.
 
-**`review_events`** is the append-only log of verdicts (triggers reject `UPDATE` and
-`DELETE`). Each row carries the finding's fingerprint, rule id, `rule_version` (a hash of
-the pattern definition), `catalog_version` (a hash of all patterns), a nullable
+### Verdicts
+
+A verdict is a review event: the finding's fingerprint, rule id, `rule_version` (the
+*semantic* version of the pattern: a hash of its requirement, enforcement, options and
+implementation, not of prose, examples or tuning notes), `pattern_hash` (the whole
+pattern definition), `catalog_version`, the Lighthouse version, a nullable
 `pattern_fingerprint` (code-pattern identity, filled by the similarity index), the
-verdict `confirmed | rejected | deferred`, the reason code, free text, the reviewer
-(`agent | human` and id), language, scope, evidence, a `feature_snapshot` frozen at review
-time (the finding with its evidence and facts), the git commit and a timestamp.
+verdict, the reason, free text, the reviewer (`agent | human` and id), language, scope,
+a digest of the evidence, a **snapshot** frozen at review time, the commit and a
+timestamp. The snapshot is one JSON object, versioned (`"v": 1`): message, path,
+locator, symbol, evidence, facts, options, severity, tier, when the finding was seen
+(`seen_at`), the commit and dirtiness at that sighting, the Lighthouse version and
+`pattern_fingerprint: null`. The snapshot is the single owner of the frozen evidence.
 
 | Verdict | Reasons | Effect |
 | --- | --- | --- |
 | `confirmed` | `fixed`, `accepted-debt`, or none | the finding is right; stays visible |
-| `rejected` | `false-positive`, `intentional-exception`, `scope-too-broad`, `project-allowed`, `not-worth-fixing` (required) | suppressed |
+| `rejected` | `false-positive`, `intentional-exception`, `scope-too-broad`, `project-allowed`, `not-worth-fixing` (required) | suppressed while valid |
 | `deferred` | none | stays visible, marked deferred in `review list` |
 
-**Suppression** is derived, not stored: the latest verdict per fingerprint is the finding's
-standing (views `latest_verdicts` and `suppressions`). A fingerprint whose latest verdict is
-`rejected` is left out of reports and out of the exit code, and `check` prints
-`N finding(s) suppressed by review verdicts`; `review list --status suppressed`
-lists them. `scope-too-broad` also suppresses and is flagged (`narrowing`) as a hint
-to narrow the rule. A later `confirmed` or `deferred` verdict lifts the suppression.
-Suppression is by fingerprint, so it follows the symbol across edits and ends when the
-symbol is renamed or moved.
+The reviewer is `--reviewer-kind` / `--reviewer-id`, else `LIGHTHOUSE_REVIEWER_KIND` /
+`LIGHTHOUSE_REVIEWER`, else `human` and `$USER`. Tools that run reviews for an agent
+(hooks, an MCP server) set both variables, so `agent` is recorded without the agent
+having to remember it. `review resolve --seen <last seen>` refuses the verdict when the
+finding has been seen again since the reviewer read it, and the finding is read in the
+same transaction that records the verdict. `review resolve` works without a readable
+catalog: it warns, and the versions are left out.
+
+**Suppression is derived**, never stored, from the latest verdict per finding (ordered by
+time, then event id). A rejected verdict suppresses only while it is valid:
+
+- the finding is not mechanical: findings of severity `error` are decided by the rule, so a
+  verdict on one is recorded but never suppresses it, and `check` says so (`rejected as
+  <reason> - mechanical findings are not suppressible; fix the rule`);
+- the semantic version of the rule is the one the verdict judged (otherwise `verdict
+  expired: rule changed`);
+- the digest of the finding's normalized evidence is the one the verdict judged (otherwise
+  `verdict expired: evidence changed`).
+
+An expired verdict leaves the finding in the report with a note, so it is asked again. A
+verdict from before a version or digest was recorded matches anything. `scope-too-broad`
+also suppresses and is flagged as a hint to narrow the rule: `review list --status
+narrowing` lists those. `check` prints how many findings verdicts suppressed.
 
 **Labels** are what a verdict teaches later models about its rule: `confirmed` is
 positive; `rejected` as `false-positive` or `scope-too-broad` is negative; the other
-rejections (`intentional-exception`, `project-allowed`, `not-worth-fixing`) are
-separate targets that say nothing about precision; `deferred` is unlabeled. A finding
-nobody reviewed has no label and is never a negative.
+rejections (`intentional-exception`, `project-allowed`, `not-worth-fixing`) are separate
+targets that say nothing about precision; `deferred` is unlabeled. A finding nobody
+reviewed has no label and is never a negative.
+
+## Shared decisions
+
+Three things decide that a finding is not reported, with different lifetimes:
+
+| | Lives in | Shared by | Holds while |
+| --- | --- | --- | --- |
+| Verdict | `.lighthouse/decisions.jsonl` (committed) | git | the rule's semantic version and the finding's evidence are unchanged; never for mechanical findings |
+| Source annotation | a comment in the code | git, in the diff | the comment is there; reported when it suppresses nothing |
+| Sighting history | `.lighthouse/lighthouse.db` (ignored) | nobody | it is a local cache |
+
+**The decision log** is the source of truth for verdicts. `review resolve` appends one
+JSON object per verdict (canonical, compact, keys sorted, so diffs are one line) with a
+single write and `fsync`, then updates the cache. Every entry's `id` is a hash of the
+entry without it. Opening the store imports the entries the cache does not have and
+ignores the ones it has, so the cache can always be deleted and rebuilt, a teammate's
+verdicts apply as soon as the log is pulled, and CI suppresses what developers
+suppressed. Two branches that both appended merge by keeping both lines
+(`.gitattributes`: `merge=union`); the same entry twice is one entry; ordering uses the
+entries' timestamps. A line that is not an entry, whose id does not match its content, or
+whose verdict and reason do not belong together stops the store with the line number, so a
+decision is never skipped silently. A verdict recorded in a cache from before the log
+existed is exported to the log once. Verdicts are never edited or deleted; a later
+verdict replaces the standing of the finding.
+
+**Source annotations** put the decision next to the code it is about, where a reviewer
+sees it change. A comment line that starts with `lighthouse:allow <rule>[, <rule>] --
+<reason>` allows the named rules on the symbol it documents, on the line after it and on
+its own line. It applies at every severity, mechanical errors included, because it is
+reviewed in the diff, and the report counts what was allowed (`N allowed`). The reason is
+required: an annotation without one is ignored and reported by the mechanical rule
+`core/annotation-reason`. An annotation whose rule no longer fires there, or is not
+enabled, is reported by `core/unused-allow` so annotations do not rot (when
+`--rules` leaves the annotated rule out of the run, nothing is said). Both rules belong to
+the `core` pack, so `core/recommended` enables them; the engine evaluates them because
+whether an annotation is used depends on every other rule's findings. Prose that merely
+mentions the marker mid-line is not an annotation.
 
 ### Agent output
 
 `check --format agent` prints one block per finding that an agent can act on without
 another lookup, `--format agent-json` the same records as JSON lines (`finding`,
-`incomplete` and `summary` records tagged by `type`):
+`incomplete`, `truncated` and `summary` records tagged by `type`):
 
 ```text
 design/private-helper-callers  review (heuristic)  src/lib.rs:5:1
@@ -184,20 +270,27 @@ design/private-helper-callers  review (heuristic)  src/lib.rs:5:1
   requirement: A private helper SHOULD have at least two callers.
   intent:      A private helper with one caller is usually part of that caller.
   evidence:    caller=demo::run#function callers=1 statements=3
-  expected:    valid rust example `rust-valid` (src/lib.rs)
+  expected:    valid rust example `rust-valid` (src/lib.rs), canonical
                  pub fn run(x: u8) -> u8 { ... }
-  fingerprint: 395d1985...
-  resolve:     lighthouse review resolve 395d1985... --verdict <verdict> --reason <reason> --reviewer-kind agent
+  fingerprint: 395d1985afe8
+  resolve:     lighthouse review resolve 395d1985afe8 --verdict <verdict> --reason <reason> --reviewer-kind agent
 ```
 
-The requirement and intent come from the catalog; the expected structure is the first
-valid example of the pattern for the file's language (at most 12 lines and 600
-characters), or the pattern's tuning note for that language, or a valid example of any
-language, in that order. Only findings at the `review` severity carry a resolve
-command; the choices to make are the verdict and the reason, listed once after the
-blocks (`reasons:`) and as a table in the JSON record. Both formats end with a
-summary that is printed for clean runs too, with the incomplete and suppressed
-counts, so silence is never read as success.
+The requirement and intent come from the catalog. The expected structure is a valid
+example of the pattern for the file's language, at most 12 lines and 600 characters,
+chosen in this order, and the block says why: the example marked `canonical` (at most
+one per language and kind, enforced by the catalog validation); a valid example whose name
+or whose invalid counterpart's name mentions the kind or visibility of the finding's
+symbol; the shortest valid example; the pattern's tuning note for the language. Evidence
+that repeats the owner symbol is left out and long values are cut. Fingerprints are
+shown as 12-character prefixes, longer when two shown findings would collide, and the
+store accepts any unambiguous prefix. Only findings at the `review` severity carry a
+resolve command; the choices to make are the verdict and the reason, listed once after the
+blocks (`reasons:`) and in the summary record of the JSON. A finding reported although a
+verdict exists says why in a `note`. `--limit N` prints the N most severe findings (errors
+first, original order kept) and a `... N more` tail or a `truncated` record; the summary
+always counts everything. Both formats end with a summary, printed for clean runs too,
+with the incomplete, suppressed and allowed counts, so silence is never read as success.
 
 ## Dogfooding
 
