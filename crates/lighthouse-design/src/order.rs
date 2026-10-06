@@ -1,8 +1,8 @@
 use lighthouse_model::{Diagnostic, Symbol, SymbolKind};
 use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
-use lighthouse_spec::PatternRule;
+use lighthouse_spec::{Catalog, PatternRule};
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{Map, Value, json};
 
 use crate::{
     finding, generated,
@@ -21,6 +21,26 @@ struct Options {
 
 pub(crate) fn rule() -> Box<dyn Rule> {
     Box::new(PatternRule::new(ID, &[], check))
+}
+
+/// The group index of a symbol under the default order of `language`, for the
+/// rules whose verdict depends on where the order places a declaration.
+pub(crate) fn group_index(
+    language: Option<&str>,
+) -> Result<impl Fn(&Symbol) -> Option<usize>, Error> {
+    let fail = |message: String| Error::Options {
+        rule: ID.to_owned(),
+        message,
+    };
+    let pattern = Catalog::bundled()
+        .pattern(ID)
+        .ok_or_else(|| fail("pattern missing from the bundled catalog".to_owned()))?;
+    let resolved = pattern
+        .resolve_options(&Map::new(), language)
+        .map_err(|e| fail(e.to_string()))?;
+    let options: Options =
+        serde_json::from_value(Value::Object(resolved)).map_err(|e| fail(e.to_string()))?;
+    Ok(move |symbol: &Symbol| group_of(symbol, &options))
 }
 
 fn check(meta: &RuleMeta, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {

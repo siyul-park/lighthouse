@@ -1538,9 +1538,81 @@ fn helper() -> u8 {
 }
 ```
 
+**Valid example: go-method-group-fixes-the-order (go)**
+
+```go
+package sample
+
+type Store struct{ n int }
+
+func Use(s *Store) int { return s.step() }
+
+func (s *Store) step() int { return s.n }
+```
+
+**Valid example: rust-impl-precedes-free-function (rust)**
+
+```rust
+pub struct Store {
+    n: u8,
+}
+
+impl Store {
+    fn step(&self) -> u8 {
+        self.n
+    }
+}
+
+pub fn run(store: &Store) -> u8 {
+    store.step()
+}
+```
+
+**Valid example: rust-crate-function-after-private-methods (rust)**
+
+```rust
+pub struct Store {
+    n: u8,
+}
+
+impl Store {
+    fn second(&self) -> u8 {
+        self.first() + 1
+    }
+
+    fn first(&self) -> u8 {
+        self.n
+    }
+}
+
+pub(crate) fn run(store: &Store) -> u8 {
+    store.second()
+}
+```
+
+**Valid example: rust-inherent-impl-precedes-trait-impl (rust)**
+
+```rust
+pub struct Store {
+    n: u8,
+}
+
+impl Store {
+    fn step(&self) -> u8 {
+        self.n
+    }
+}
+
+impl Drop for Store {
+    fn drop(&mut self) {
+        self.step();
+    }
+}
+```
+
 **Tuning: rust**
 
-Applies to private free functions and private methods. A function that some call may reach through a receiver of unknown type is not judged.
+Applies to private free functions and private methods. A function that some call may reach through a receiver of unknown type is not judged. A declaration-group order that places the callee before its caller (a type's methods precede the free functions of a Rust file) fixes the callee's position, so such a pair is not judged. Neither is a private method of an inherent impl called by a method of a trait impl: inherent impls come first.
 
 ## Naming
 

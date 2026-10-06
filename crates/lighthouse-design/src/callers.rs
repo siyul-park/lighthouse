@@ -6,7 +6,7 @@ use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::{finding, functions, skipped};
+use crate::{finding, functions, order::group_index, skipped};
 
 const ID: &str = "design/callers-before-callees";
 
@@ -20,12 +20,17 @@ pub(crate) fn rule() -> Box<dyn Rule> {
 }
 
 /// A private function that only code of its own file uses is declared after
-/// its first caller (after its last one with `shared_after_last_caller`).
+/// its first caller (after its last one with `shared_after_last_caller`). A
+/// callee whose declaration group the file order places before its caller's is
+/// not judged: that order, not the reading order, fixes its position. Neither
+/// is a method of an inherent impl called from a trait impl, which follows it.
 fn check(meta: &RuleMeta, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
     if skipped(ctx) {
         return Ok(Vec::new());
     }
     let project = ctx.project;
+    let language = ctx.file.map(|(file, _)| file.lang.as_str());
+    let group = group_index(language)?;
     let mut found = Vec::new();
     for callee in functions(ctx) {
         let Some(callers) = file_local_callers(project, callee) else {
@@ -42,6 +47,11 @@ fn check(meta: &RuleMeta, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>
         if callee.span.start > anchor.span.start {
             continue;
         }
+        if group(callee).zip(group(anchor)).is_some_and(|(c, a)| c < a)
+            || (inherent(callee) && via_trait(anchor))
+        {
+            continue;
+        }
         found.push(finding(
             meta,
             callee,
@@ -55,6 +65,17 @@ fn check(meta: &RuleMeta, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>
         ));
     }
     Ok(found)
+}
+
+/// A method declared by an impl of a trait: its id carries the trait next to
+/// the type (`m::Type::Trait::method`).
+fn via_trait(symbol: &Symbol) -> bool {
+    symbol.kind == SymbolKind::Method && symbol.id.as_str().matches("::").count() > 2
+}
+
+/// A method declared by an inherent impl of its type.
+fn inherent(symbol: &Symbol) -> bool {
+    symbol.kind == SymbolKind::Method && !via_trait(symbol)
 }
 
 /// The production callers of a private function in source order, when every

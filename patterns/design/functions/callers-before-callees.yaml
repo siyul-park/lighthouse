@@ -20,6 +20,11 @@ tuning:
   rust: >-
     Applies to private free functions and private methods. A function that
     some call may reach through a receiver of unknown type is not judged.
+    A declaration-group order that places the callee before its caller (a
+    type's methods precede the free functions of a Rust file) fixes the
+    callee's position, so such a pair is not judged. Neither is a private
+    method of an inherent impl called by a method of a trait impl: inherent
+    impls come first.
 implementation:
   builtin: design/callers-before-callees
 examples:
@@ -130,4 +135,80 @@ examples:
 
           fn helper() -> u8 {
               1
+          }
+  - name: go-method-group-fixes-the-order
+    language: go
+    kind: valid
+    files:
+      - path: example.go
+        body: |-
+          package sample
+
+          type Store struct{ n int }
+
+          func Use(s *Store) int { return s.step() }
+
+          func (s *Store) step() int { return s.n }
+  - name: rust-impl-precedes-free-function
+    language: rust
+    kind: valid
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub struct Store {
+              n: u8,
+          }
+
+          impl Store {
+              fn step(&self) -> u8 {
+                  self.n
+              }
+          }
+
+          pub fn run(store: &Store) -> u8 {
+              store.step()
+          }
+  - name: rust-crate-function-after-private-methods
+    language: rust
+    kind: valid
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub struct Store {
+              n: u8,
+          }
+
+          impl Store {
+              fn second(&self) -> u8 {
+                  self.first() + 1
+              }
+
+              fn first(&self) -> u8 {
+                  self.n
+              }
+          }
+
+          pub(crate) fn run(store: &Store) -> u8 {
+              store.second()
+          }
+  - name: rust-inherent-impl-precedes-trait-impl
+    language: rust
+    kind: valid
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub struct Store {
+              n: u8,
+          }
+
+          impl Store {
+              fn step(&self) -> u8 {
+                  self.n
+              }
+          }
+
+          impl Drop for Store {
+              fn drop(&mut self) {
+                  self.step();
+              }
           }
