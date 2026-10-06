@@ -26,11 +26,13 @@ type options struct {
 	// single method, which nearly every type satisfies by accident.
 	SmallInterfaces bool `json:"small_interfaces"`
 
-	// bin is the resolved go binary; see resolve.
+	// bin is the absolute path of the go binary.
 	bin string
 }
 
-func parseOptions(raw map[string]json.RawMessage, language string) (options, error) {
+// newOptions decodes the options of the Go language, rejecting unknown keys,
+// and resolves the go binary.
+func newOptions(raw map[string]json.RawMessage) (options, error) {
 	var o options
 	if data, ok := raw[language]; ok {
 		dec := json.NewDecoder(bytes.NewReader(data))
@@ -39,30 +41,18 @@ func parseOptions(raw map[string]json.RawMessage, language string) (options, err
 			return options{}, fmt.Errorf("invalid [languages.%s] options: %w", language, err)
 		}
 	}
-	return o, nil
-}
-
-// resolve finds the go binary as an absolute path.
-func (o options) resolve() (options, error) {
 	name := o.Go
 	if name == "" {
 		name = "go"
 	}
 	bin, err := exec.LookPath(name)
 	if err != nil {
-		return o, fmt.Errorf("go command not found: %w", err)
+		return options{}, fmt.Errorf("go command not found: %w", err)
 	}
 	if o.bin, err = filepath.Abs(bin); err != nil {
-		return o, err
+		return options{}, err
 	}
 	return o, nil
-}
-
-func (o options) buildFlags() []string {
-	if len(o.Tags) == 0 {
-		return nil
-	}
-	return []string{"-tags=" + strings.Join(o.Tags, ",")}
 }
 
 // environ is the environment of the go command: this process's with the
@@ -82,10 +72,15 @@ func (o options) environ() []string {
 	return env
 }
 
-// load runs fn with the chosen go binary reachable the way go/packages finds
-// it. go/packages resolves `go` on this process's PATH and offers no way to
-// name a binary, so an explicit `go` option puts its directory first for the
-// duration of fn; the default needs no change.
+func (o options) buildFlags() []string {
+	if len(o.Tags) == 0 {
+		return nil
+	}
+	return []string{"-tags=" + strings.Join(o.Tags, ",")}
+}
+
+// load runs fn with the chosen go binary first on this process's PATH:
+// go/packages resolves `go` there and cannot be told a binary.
 func (o options) load(fn func()) {
 	if o.Go == "" {
 		fn()

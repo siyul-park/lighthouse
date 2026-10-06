@@ -5,36 +5,30 @@ import (
 	"go/types"
 )
 
-// forwards names the call a function body consists of when that call passes
-// the receiver and every parameter on, in order: `return s.read(k)` in
+// forwardTarget names the call a function body consists of when that call
+// passes the receiver and every parameter on, in order: `return s.read(k)` in
 // `func (s *S) load(k string)`, or `inner(a, rest...)`.
-func (b *builder) forwards(d *ast.FuncDecl) string {
+func forwardTarget(d *ast.FuncDecl, info *types.Info, res *resolver) string {
 	call := soleCall(d.Body)
-	if call == nil {
+	if call == nil || !passesOn(d.Type, call.Args) {
 		return ""
 	}
-	params, ok := parameterNames(d.Type)
-	if !ok || !sameNames(params, call.Args) {
-		return ""
-	}
-	info := b.u.info()
 	switch fun := call.Fun.(type) {
 	case *ast.Ident:
 		if d.Recv != nil {
 			return ""
 		}
-		if obj, ok := info.Uses[fun].(*types.Func); ok {
-			to, _ := b.u.res.function(obj)
+		if fn, ok := info.Uses[fun].(*types.Func); ok {
+			to, _ := res.function(fn)
 			return to
 		}
 	case *ast.SelectorExpr:
-		return b.forwardSelector(d, fun)
+		return forwardSelector(d, fun, info, res)
 	}
 	return ""
 }
 
-func (b *builder) forwardSelector(d *ast.FuncDecl, fun *ast.SelectorExpr) string {
-	info := b.u.info()
+func forwardSelector(d *ast.FuncDecl, fun *ast.SelectorExpr, info *types.Info, res *resolver) string {
 	operand, ok := fun.X.(*ast.Ident)
 	if !ok {
 		return ""
@@ -43,8 +37,8 @@ func (b *builder) forwardSelector(d *ast.FuncDecl, fun *ast.SelectorExpr) string
 		if _, pkg := info.Uses[operand].(*types.PkgName); !pkg {
 			return ""
 		}
-		if obj, ok := info.Uses[fun.Sel].(*types.Func); ok {
-			to, _ := b.u.res.function(obj)
+		if fn, ok := info.Uses[fun.Sel].(*types.Func); ok {
+			to, _ := res.function(fn)
 			return to
 		}
 		return ""
@@ -55,7 +49,7 @@ func (b *builder) forwardSelector(d *ast.FuncDecl, fun *ast.SelectorExpr) string
 	}
 	if s := info.Selections[fun]; s != nil && s.Kind() == types.MethodVal {
 		if fn, ok := s.Obj().(*types.Func); ok {
-			to, _ := b.u.res.function(fn)
+			to, _ := res.function(fn)
 			return to
 		}
 	}
@@ -89,34 +83,29 @@ func soleCall(body *ast.BlockStmt) *ast.CallExpr {
 	return call
 }
 
-// parameterNames lists parameter names in order; false when one is unnamed
-// or blank.
-func parameterNames(t *ast.FuncType) ([]string, bool) {
+// passesOn reports whether args are exactly the parameters of t, named and
+// not blank, in order.
+func passesOn(t *ast.FuncType, args []ast.Expr) bool {
 	var names []string
-	if t.Params == nil {
-		return names, true
-	}
-	for _, f := range t.Params.List {
-		if len(f.Names) == 0 {
-			return nil, false
-		}
-		for _, n := range f.Names {
-			if n.Name == "_" {
-				return nil, false
+	if t.Params != nil {
+		for _, f := range t.Params.List {
+			if len(f.Names) == 0 {
+				return false
 			}
-			names = append(names, n.Name)
+			for _, n := range f.Names {
+				if n.Name == "_" {
+					return false
+				}
+				names = append(names, n.Name)
+			}
 		}
 	}
-	return names, true
-}
-
-func sameNames(params []string, args []ast.Expr) bool {
-	if len(params) != len(args) {
+	if len(names) != len(args) {
 		return false
 	}
 	for i, arg := range args {
 		id, ok := arg.(*ast.Ident)
-		if !ok || id.Name != params[i] {
+		if !ok || id.Name != names[i] {
 			return false
 		}
 	}

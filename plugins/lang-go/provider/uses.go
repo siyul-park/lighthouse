@@ -31,14 +31,6 @@ func collectUses(u *unit, d *ast.FuncDecl) []usage {
 	return w.list
 }
 
-func (w *uses) add(kind, to string) {
-	u := usage{kind, to}
-	if !w.seen[u] {
-		w.seen[u] = true
-		w.list = append(w.list, u)
-	}
-}
-
 func (w *uses) Visit(n ast.Node) ast.Visitor {
 	switch n := n.(type) {
 	case *ast.CallExpr:
@@ -77,39 +69,10 @@ func (w *uses) call(n *ast.CallExpr) {
 	}
 }
 
-// callee strips parentheses and explicit type arguments from a call's function.
-func callee(e ast.Expr) ast.Expr {
-	for {
-		switch t := e.(type) {
-		case *ast.ParenExpr:
-			e = t.X
-		case *ast.IndexExpr:
-			e = t.X
-		case *ast.IndexListExpr:
-			e = t.X
-		default:
-			return e
-		}
-	}
-}
-
 func (w *uses) ident(id *ast.Ident, kind string) {
 	if obj := w.info.Uses[id]; obj != nil {
 		w.object(obj, kind)
 	}
-}
-
-// object records a use of a package-level object or method: a call stays a
-// call only for functions and methods.
-func (w *uses) object(obj types.Object, kind string) {
-	to, ok := w.res.object(obj)
-	if !ok {
-		return
-	}
-	if _, fn := obj.(*types.Func); !fn {
-		kind = edgeReferences
-	}
-	w.add(kind, to)
 }
 
 func (w *uses) selector(n *ast.SelectorExpr, kind string) {
@@ -138,13 +101,6 @@ func (w *uses) selector(n *ast.SelectorExpr, kind string) {
 	}
 }
 
-// field records a use of a field of a named type.
-func (w *uses) field(owner *types.TypeName, field types.Object) {
-	if to, ok := w.res.field(owner, field); ok {
-		w.add(edgeReferences, to)
-	}
-}
-
 // literal records the fields a keyed struct literal sets.
 func (w *uses) literal(n *ast.CompositeLit) {
 	tv, ok := w.info.Types[n]
@@ -167,6 +123,49 @@ func (w *uses) literal(n *ast.CompositeLit) {
 		if field, ok := w.info.Uses[key].(*types.Var); ok && field.IsField() {
 			w.handled[key] = true
 			w.field(owner, field)
+		}
+	}
+}
+
+// object records a use of a package-level object or method: a call stays a
+// call only for functions and methods.
+func (w *uses) object(obj types.Object, kind string) {
+	to, ok := w.res.object(obj)
+	if !ok {
+		return
+	}
+	if _, fn := obj.(*types.Func); !fn {
+		kind = edgeReferences
+	}
+	w.add(kind, to)
+}
+
+func (w *uses) field(owner *types.TypeName, field types.Object) {
+	if to, ok := w.res.field(owner, field); ok {
+		w.add(edgeReferences, to)
+	}
+}
+
+func (w *uses) add(kind, to string) {
+	u := usage{kind, to}
+	if !w.seen[u] {
+		w.seen[u] = true
+		w.list = append(w.list, u)
+	}
+}
+
+// callee strips parentheses and explicit type arguments from a call's function.
+func callee(e ast.Expr) ast.Expr {
+	for {
+		switch t := e.(type) {
+		case *ast.ParenExpr:
+			e = t.X
+		case *ast.IndexExpr:
+			e = t.X
+		case *ast.IndexListExpr:
+			e = t.X
+		default:
+			return e
 		}
 	}
 }
