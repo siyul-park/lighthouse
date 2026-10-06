@@ -16,16 +16,16 @@ use crate::{
     names::{Index, Ns, Res, Sym, TyCx, UseEntry, flatten, symbol_id},
 };
 
+/// A method name shared by more private methods than this is too common for a
+/// guess about an unknown receiver to mean anything.
+const MAX_GUESSED_CANDIDATES: usize = 3;
+
 /// A call or reference found in a body.
 pub struct Use {
     pub kind: EdgeKind,
     pub to: String,
     pub resolution: Resolution,
 }
-
-/// A method name shared by more private methods than this is too common for a
-/// guess about an unknown receiver to mean anything.
-const MAX_GUESSED_CANDIDATES: usize = 3;
 
 /// What the walk of one body found.
 pub struct Facts {
@@ -41,6 +41,26 @@ pub struct Facts {
     pub forwards_to: Option<String>,
 }
 
+impl Facts {
+    /// Walks `block` and summarizes the calls, flow and counts of the body.
+    pub fn of(idx: &Index, home: &Home, sig: &syn::Signature, block: &Block) -> Self {
+        let mut walker = Walker::new(idx, home, sig);
+        walker.mark_tail(block);
+        walker.bind_params(sig);
+        walker.visit_block(block);
+        let forwards_to = walker.forwards(sig, block);
+        Facts {
+            uses: walker.uses,
+            unread_macros: walker.unread_macros,
+            flow: walker.flow,
+            max_nesting: walker.deepest,
+            statements: walker.count,
+            nested: walker.nested,
+            forwards_to,
+        }
+    }
+}
+
 /// Where a function lives: the module of its id, its owner path parts and the
 /// type context its signature is read in.
 pub struct Home {
@@ -48,23 +68,6 @@ pub struct Home {
     pub module_path: String,
     pub parts: Vec<String>,
     pub cx: TyCx,
-}
-
-pub fn analyze(idx: &Index, home: &Home, sig: &syn::Signature, block: &Block) -> Facts {
-    let mut walker = Walker::new(idx, home, sig);
-    walker.mark_tail(block);
-    walker.bind_params(sig);
-    walker.visit_block(block);
-    let forwards_to = walker.forwards(sig, block);
-    Facts {
-        uses: walker.uses,
-        unread_macros: walker.unread_macros,
-        flow: walker.flow,
-        max_nesting: walker.deepest,
-        statements: walker.count,
-        nested: walker.nested,
-        forwards_to,
-    }
 }
 
 enum Hit {
@@ -101,30 +104,93 @@ struct Walker<'i> {
     tails: HashSet<*const ExprMatch>,
 }
 
-impl<'i> Walker<'i> {
-    fn new(idx: &'i Index<'i>, home: &Home, sig: &syn::Signature) -> Self {
-        let parts: Vec<&str> = home.parts.iter().map(String::as_str).collect();
-        Self {
-            idx,
-            cx: home.cx.clone(),
-            id: symbol_id(&home.module_path, &parts, home.kind),
-            module_path: home.module_path.clone(),
-            parts: home.parts.clone(),
-            returns_value: !matches!(sig.output, syn::ReturnType::Default),
-            scopes: vec![Scope::default()],
-            extra: Vec::new(),
-            nesting: 0,
-            deepest: 0,
-            count: 0,
-            flow: Vec::new(),
-            uses: Vec::new(),
-            unread_macros: 0,
-            seen: HashSet::new(),
-            nested: Vec::new(),
-            tails: HashSet::new(),
+impl<'ast> Visit<'ast> for Walker<'_> {
+    fn visit_block(&mut self, block: &'ast Block) {
+        self.scopes.push(Scope::default());
+        self.register_items(block);
+        let statements = block
+            .stmts
+            .iter()
+            .filter(|s| !matches!(s, Stmt::Item(_)))
+            .count();
+        self.count += u32::try_from(statements).unwrap_or(u32::MAX);
+        for stmt in &block.stmts {
+            self.visit_stmt(stmt);
+        }
+        self.scopes.pop();
+    }
+
+    fn visit_stmt(&mut self, stmt: &'ast Stmt) {
+        match stmt {
+            Stmt::Local(local) => self.local_stmt(local),
+            Stmt::Item(_) => {}
+            other => visit::visit_stmt(self, other),
         }
     }
 
+    fn visit_expr(&mut self, e: &'ast Expr) {
+        match e {
+            Expr::If(i) => self.if_expr(i, false),
+            Expr::Match(m) => self.match_expr(m),
+            Expr::ForLoop(f) => self.for_loop(f),
+            Expr::While(l) => self.while_loop(l),
+            Expr::Loop(l) => self.plain_loop(l),
+            Expr::Closure(c) => self.closure(c),
+            Expr::Async(a) => self.nested_in(|w| w.visit_block(&a.block)),
+            Expr::Binary(b) if is_logic(&b.op) => self.logic(e),
+            Expr::Call(c) => self.call(c),
+            Expr::MethodCall(m) => self.method_call(m),
+            Expr::Path(p) => self.path_value(p),
+            Expr::Struct(s) => self.struct_literal(s),
+            Expr::Field(f) => self.field_access(f),
+            Expr::Break(b) => self.jump(b.label.is_some(), |w| visit::visit_expr_break(w, b)),
+            Expr::Continue(c) => self.jump(c.label.is_some(), |_| {}),
+            Expr::Return(r) => self.return_expr(r),
+            Expr::Let(l) => self.let_expr(l),
+            other => visit::visit_expr(self, other),
+        }
+    }
+
+    fn visit_type_path(&mut self, tp: &'ast syn::TypePath) {
+        if tp.qself.is_none()
+            && !tp.path.is_ident("Self")
+            && let Hit::Item(sym) = self.hit(&tp.path, Ns::Type)
+            && matches!(sym.kind, SymbolKind::Type | SymbolKind::Interface)
+        {
+            self.add(EdgeKind::References, sym.id.clone());
+        }
+        visit::visit_type_path(self, tp);
+    }
+
+    fn visit_pat_struct(&mut self, p: &'ast syn::PatStruct) {
+        self.pattern_path(&p.path, Ns::Type);
+        visit::visit_pat_struct(self, p);
+    }
+
+    fn visit_pat_tuple_struct(&mut self, p: &'ast syn::PatTupleStruct) {
+        self.pattern_path(&p.path, Ns::Value);
+        visit::visit_pat_tuple_struct(self, p);
+    }
+
+    /// Reached only through a path pattern: expression paths are taken by
+    /// `path_value` before the walk gets here.
+    fn visit_expr_path(&mut self, p: &'ast ExprPath) {
+        self.pattern_path(&p.path, Ns::Value);
+        visit::visit_expr_path(self, p);
+    }
+
+    fn visit_macro(&mut self, m: &'ast syn::Macro) {
+        let Some(arguments) = macros::arguments(m) else {
+            self.unread_macros += 1;
+            return;
+        };
+        for argument in &arguments {
+            self.visit_expr(argument);
+        }
+    }
+}
+
+impl<'i> Walker<'i> {
     fn mark_tail(&mut self, block: &Block) {
         if !self.returns_value {
             return;
@@ -150,232 +216,6 @@ impl<'i> Walker<'i> {
             }
         }
     }
-
-    fn event(&mut self, kind: FlowKind) {
-        self.flow.push(Flow {
-            kind,
-            nesting: self.nesting,
-            arms: 0,
-            operators: 0,
-            returning: false,
-        });
-    }
-
-    fn nested_in(&mut self, body: impl FnOnce(&mut Self)) {
-        self.nesting += 1;
-        self.deepest = self.deepest.max(self.nesting);
-        body(self);
-        self.nesting -= 1;
-    }
-
-    fn add(&mut self, kind: EdgeKind, to: String) {
-        self.record(kind, to, Resolution::Syntactic);
-    }
-
-    fn record(&mut self, kind: EdgeKind, to: String, resolution: Resolution) {
-        let guess = resolution == Resolution::Heuristic;
-        if self.seen.insert((kind, to.clone(), guess)) {
-            self.uses.push(Use {
-                kind,
-                to,
-                resolution,
-            });
-        }
-    }
-
-    fn scoped(&mut self, body: impl FnOnce(&mut Self)) {
-        self.scopes.push(Scope::default());
-        body(self);
-        self.scopes.pop();
-    }
-
-    // ---- names -----------------------------------------------------------
-
-    fn local(&self, name: &str) -> Option<&Option<Sym>> {
-        self.scopes.iter().rev().find_map(|s| s.locals.get(name))
-    }
-
-    fn nested_item(&self, name: &str) -> Option<String> {
-        self.scopes
-            .iter()
-            .rev()
-            .find_map(|s| s.items.get(name).cloned())
-    }
-
-    fn hit(&self, path: &syn::Path, ns: Ns) -> Hit {
-        let segs: Vec<String> = path
-            .segments
-            .iter()
-            .map(|s| s.ident.to_string().trim_start_matches("r#").to_owned())
-            .collect();
-        let Some(first) = segs.first() else {
-            return Hit::Unknown;
-        };
-        if segs.len() == 1 {
-            if self.local(first).is_some() {
-                return Hit::Local;
-            }
-            if let Some(id) = self.nested_item(first) {
-                return Hit::Nested(id);
-            }
-        }
-        if first == "Self" {
-            return self.self_hit(&segs);
-        }
-        if let Some(bound) = self.cx.generics.get(first) {
-            return match (segs.len(), bound) {
-                (2, Some(_)) => self.bound_hit(first, &segs[1]),
-                _ => Hit::Unknown,
-            };
-        }
-        match self
-            .idx
-            .resolve_path(self.cx.module, &segs, ns, &self.extra)
-        {
-            Some(Res::Item(sym)) => Hit::Item(sym),
-            Some(Res::Assoc(sym, name)) => Hit::Assoc(sym, name),
-            _ => Hit::Unknown,
-        }
-    }
-
-    fn self_hit(&self, segs: &[String]) -> Hit {
-        let Some(owner) = self.cx.self_ty.clone() else {
-            return Hit::Unknown;
-        };
-        match segs {
-            [_] => Hit::Item(owner),
-            [_, member] => match self.idx.member(owner, member) {
-                Res::Item(sym) => Hit::Item(sym),
-                Res::Assoc(sym, name) => Hit::Assoc(sym, name),
-                _ => Hit::Unknown,
-            },
-            _ => Hit::Unknown,
-        }
-    }
-
-    /// `T::name` where `T` is a generic parameter bounded by a project trait.
-    fn bound_hit(&self, param: &str, name: &str) -> Hit {
-        let ty = syn::parse_str::<syn::Type>(param).ok();
-        match ty.and_then(|t| self.idx.type_sym(&t, &self.cx)) {
-            Some(sym) => Hit::Assoc(sym, name.to_owned()),
-            None => Hit::Unknown,
-        }
-    }
-
-    fn call_target(&self, hit: &Hit) -> Option<(EdgeKind, String)> {
-        match hit {
-            Hit::Item(sym) => match sym.kind {
-                SymbolKind::Function => Some((EdgeKind::Calls, sym.id.clone())),
-                SymbolKind::Type | SymbolKind::Field | SymbolKind::Const | SymbolKind::Var => {
-                    Some((EdgeKind::References, sym.id.clone()))
-                }
-                _ => None,
-            },
-            Hit::Assoc(sym, name) => self.assoc_target(sym, name, EdgeKind::Calls),
-            Hit::Nested(id) => Some((EdgeKind::Calls, id.clone())),
-            Hit::Local | Hit::Unknown => None,
-        }
-    }
-
-    fn value_target(&self, hit: &Hit) -> Option<(EdgeKind, String)> {
-        match hit {
-            Hit::Item(sym) if sym.kind != SymbolKind::Test => {
-                Some((EdgeKind::References, sym.id.clone()))
-            }
-            Hit::Assoc(sym, name) => self.assoc_target(sym, name, EdgeKind::References),
-            Hit::Nested(id) => Some((EdgeKind::References, id.clone())),
-            _ => None,
-        }
-    }
-
-    fn assoc_target(
-        &self,
-        sym: &Sym,
-        name: &str,
-        method_kind: EdgeKind,
-    ) -> Option<(EdgeKind, String)> {
-        if let Some(id) = self.idx.method(sym, name) {
-            return Some((method_kind, id));
-        }
-        let id = self.idx.assoc_const(sym, name)?;
-        Some((EdgeKind::References, id))
-    }
-
-    // ---- receiver types --------------------------------------------------
-
-    fn expr_hint(&self, e: &Expr) -> Option<Sym> {
-        match e {
-            Expr::Path(p) if p.qself.is_none() => {
-                let ident = p.path.get_ident()?;
-                self.local(&ident.to_string()).cloned().flatten()
-            }
-            Expr::Reference(r) => self.expr_hint(&r.expr),
-            Expr::Paren(p) => self.expr_hint(&p.expr),
-            Expr::Group(g) => self.expr_hint(&g.expr),
-            Expr::Unary(u) if matches!(u.op, UnOp::Deref(_)) => self.expr_hint(&u.expr),
-            Expr::Cast(c) => self.idx.type_sym(&c.ty, &self.cx),
-            Expr::Field(f) => {
-                let owner = self.expr_hint(&f.base)?;
-                let Member::Named(name) = &f.member else {
-                    return None;
-                };
-                let field = self.idx.field(&owner, &name.to_string())?;
-                self.idx.type_sym(&field.ty, &field.cx)
-            }
-            Expr::MethodCall(m) => self.method_hint(m, false),
-            Expr::Call(c) => self.call_hint(c, false),
-            Expr::Struct(s) => self.struct_hint(s),
-            Expr::Try(t) => self.try_hint(&t.expr),
-            Expr::Await(a) => self.expr_hint(&a.base),
-            _ => None,
-        }
-    }
-
-    fn try_hint(&self, inner: &Expr) -> Option<Sym> {
-        match inner {
-            Expr::Await(a) => self.try_hint(&a.base),
-            Expr::Call(c) => self.call_hint(c, true),
-            Expr::MethodCall(m) => self.method_hint(m, true),
-            _ => None,
-        }
-    }
-
-    fn method_hint(&self, m: &ExprMethodCall, unwrap: bool) -> Option<Sym> {
-        let recv = self.expr_hint(&m.receiver)?;
-        let id = self.idx.method(&recv, &m.method.to_string())?;
-        self.idx.return_sym(&id, unwrap)
-    }
-
-    fn call_hint(&self, c: &ExprCall, unwrap: bool) -> Option<Sym> {
-        let Expr::Path(p) = &*c.func else {
-            return None;
-        };
-        match self.hit(&p.path, Ns::Value) {
-            Hit::Item(sym) => match sym.kind {
-                SymbolKind::Function => self.idx.return_sym(&sym.id, unwrap),
-                SymbolKind::Type if !unwrap => Some(sym),
-                SymbolKind::Field if !unwrap => self.idx.variant_owner.get(&sym.id).cloned(),
-                _ => None,
-            },
-            Hit::Assoc(sym, name) => {
-                let id = self.idx.method(&sym, &name)?;
-                self.idx.return_sym(&id, unwrap)
-            }
-            _ => None,
-        }
-    }
-
-    fn struct_hint(&self, s: &ExprStruct) -> Option<Sym> {
-        match self.hit(&s.path, Ns::Type) {
-            Hit::Item(sym) if sym.kind == SymbolKind::Type => Some(sym),
-            Hit::Item(sym) if sym.kind == SymbolKind::Field => {
-                self.idx.variant_owner.get(&sym.id).cloned()
-            }
-            _ => None,
-        }
-    }
-
-    // ---- patterns --------------------------------------------------------
 
     fn bind(&mut self, pat: &Pat, hint: Option<Sym>) {
         match pat {
@@ -422,7 +262,91 @@ impl<'i> Walker<'i> {
         }
     }
 
-    // ---- statements ------------------------------------------------------
+    fn hit(&self, path: &syn::Path, ns: Ns) -> Hit {
+        let segs: Vec<String> = path
+            .segments
+            .iter()
+            .map(|s| s.ident.to_string().trim_start_matches("r#").to_owned())
+            .collect();
+        let Some(first) = segs.first() else {
+            return Hit::Unknown;
+        };
+        if segs.len() == 1 {
+            if self.local(first).is_some() {
+                return Hit::Local;
+            }
+            if let Some(id) = self.nested_item(first) {
+                return Hit::Nested(id);
+            }
+        }
+        if first == "Self" {
+            return self.self_hit(&segs);
+        }
+        if let Some(bound) = self.cx.generics.get(first) {
+            return match (segs.len(), bound) {
+                (2, Some(_)) => self.bound_hit(first, &segs[1]),
+                _ => Hit::Unknown,
+            };
+        }
+        match self
+            .idx
+            .resolve_path(self.cx.module, &segs, ns, &self.extra)
+        {
+            Some(Res::Item(sym)) => Hit::Item(sym),
+            Some(Res::Assoc(sym, name)) => Hit::Assoc(sym, name),
+            _ => Hit::Unknown,
+        }
+    }
+
+    fn local(&self, name: &str) -> Option<&Option<Sym>> {
+        self.scopes.iter().rev().find_map(|s| s.locals.get(name))
+    }
+
+    fn nested_item(&self, name: &str) -> Option<String> {
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|s| s.items.get(name).cloned())
+    }
+
+    fn self_hit(&self, segs: &[String]) -> Hit {
+        let Some(owner) = self.cx.self_ty.clone() else {
+            return Hit::Unknown;
+        };
+        match segs {
+            [_] => Hit::Item(owner),
+            [_, member] => match self.idx.member(owner, member) {
+                Res::Item(sym) => Hit::Item(sym),
+                Res::Assoc(sym, name) => Hit::Assoc(sym, name),
+                _ => Hit::Unknown,
+            },
+            _ => Hit::Unknown,
+        }
+    }
+
+    /// `T::name` where `T` is a generic parameter bounded by a project trait.
+    fn bound_hit(&self, param: &str, name: &str) -> Hit {
+        let ty = syn::parse_str::<syn::Type>(param).ok();
+        match ty.and_then(|t| self.idx.type_sym(&t, &self.cx)) {
+            Some(sym) => Hit::Assoc(sym, name.to_owned()),
+            None => Hit::Unknown,
+        }
+    }
+
+    fn add(&mut self, kind: EdgeKind, to: String) {
+        self.record(kind, to, Resolution::Syntactic);
+    }
+
+    fn record(&mut self, kind: EdgeKind, to: String, resolution: Resolution) {
+        let guess = resolution == Resolution::Heuristic;
+        if self.seen.insert((kind, to.clone(), guess)) {
+            self.uses.push(Use {
+                kind,
+                to,
+                resolution,
+            });
+        }
+    }
 
     fn local_stmt(&mut self, local: &Local) {
         let mut hint = None;
@@ -436,6 +360,95 @@ impl<'i> Walker<'i> {
         }
         self.visit_pat(&local.pat);
         self.bind(&local.pat, hint);
+    }
+
+    fn expr_hint(&self, e: &Expr) -> Option<Sym> {
+        match e {
+            Expr::Path(p) if p.qself.is_none() => {
+                let ident = p.path.get_ident()?;
+                self.local(&ident.to_string()).cloned().flatten()
+            }
+            Expr::Reference(r) => self.expr_hint(&r.expr),
+            Expr::Paren(p) => self.expr_hint(&p.expr),
+            Expr::Group(g) => self.expr_hint(&g.expr),
+            Expr::Unary(u) if matches!(u.op, UnOp::Deref(_)) => self.expr_hint(&u.expr),
+            Expr::Cast(c) => self.idx.type_sym(&c.ty, &self.cx),
+            Expr::Field(f) => {
+                let owner = self.expr_hint(&f.base)?;
+                let Member::Named(name) = &f.member else {
+                    return None;
+                };
+                let field = self.idx.field(&owner, &name.to_string())?;
+                self.idx.type_sym(&field.ty, &field.cx)
+            }
+            Expr::MethodCall(m) => self.method_hint(m, false),
+            Expr::Call(c) => self.call_hint(c, false),
+            Expr::Struct(s) => self.struct_hint(s),
+            Expr::Try(t) => self.try_hint(&t.expr),
+            Expr::Await(a) => self.expr_hint(&a.base),
+            _ => None,
+        }
+    }
+
+    fn method_hint(&self, m: &ExprMethodCall, unwrap: bool) -> Option<Sym> {
+        let recv = self.expr_hint(&m.receiver)?;
+        let id = self.idx.method(&recv, &m.method.to_string())?;
+        self.idx.return_sym(&id, unwrap)
+    }
+
+    fn call_hint(&self, c: &ExprCall, unwrap: bool) -> Option<Sym> {
+        let Expr::Path(p) = &*c.func else {
+            return None;
+        };
+        match self.hit(&p.path, Ns::Value) {
+            Hit::Item(sym) => match sym.kind {
+                SymbolKind::Function => self.idx.return_sym(&sym.id, unwrap),
+                SymbolKind::Type if !unwrap => Some(sym),
+                SymbolKind::Field if !unwrap => self.idx.variant_owner.get(&sym.id).cloned(),
+                _ => None,
+            },
+            Hit::Assoc(sym, name) => {
+                let id = self.idx.method(&sym, &name)?;
+                self.idx.return_sym(&id, unwrap)
+            }
+            _ => None,
+        }
+    }
+
+    fn struct_hint(&self, s: &ExprStruct) -> Option<Sym> {
+        match self.hit(&s.path, Ns::Type) {
+            Hit::Item(sym) if sym.kind == SymbolKind::Type => Some(sym),
+            Hit::Item(sym) if sym.kind == SymbolKind::Field => {
+                self.idx.variant_owner.get(&sym.id).cloned()
+            }
+            _ => None,
+        }
+    }
+
+    fn try_hint(&self, inner: &Expr) -> Option<Sym> {
+        match inner {
+            Expr::Await(a) => self.try_hint(&a.base),
+            Expr::Call(c) => self.call_hint(c, true),
+            Expr::MethodCall(m) => self.method_hint(m, true),
+            _ => None,
+        }
+    }
+
+    fn event(&mut self, kind: FlowKind) {
+        self.flow.push(Flow {
+            kind,
+            nesting: self.nesting,
+            arms: 0,
+            operators: 0,
+            returning: false,
+        });
+    }
+
+    fn nested_in(&mut self, body: impl FnOnce(&mut Self)) {
+        self.nesting += 1;
+        self.deepest = self.deepest.max(self.nesting);
+        body(self);
+        self.nesting -= 1;
     }
 
     fn register_items(&mut self, block: &Block) {
@@ -471,7 +484,28 @@ impl<'i> Walker<'i> {
         }
     }
 
-    // ---- control flow ----------------------------------------------------
+    fn new(idx: &'i Index<'i>, home: &Home, sig: &syn::Signature) -> Self {
+        let parts: Vec<&str> = home.parts.iter().map(String::as_str).collect();
+        Self {
+            idx,
+            cx: home.cx.clone(),
+            id: symbol_id(&home.module_path, &parts, home.kind),
+            module_path: home.module_path.clone(),
+            parts: home.parts.clone(),
+            returns_value: !matches!(sig.output, syn::ReturnType::Default),
+            scopes: vec![Scope::default()],
+            extra: Vec::new(),
+            nesting: 0,
+            deepest: 0,
+            count: 0,
+            flow: Vec::new(),
+            uses: Vec::new(),
+            unread_macros: 0,
+            seen: HashSet::new(),
+            nested: Vec::new(),
+            tails: HashSet::new(),
+        }
+    }
 
     fn if_expr(&mut self, i: &ExprIf, chained: bool) {
         self.event(if chained {
@@ -492,6 +526,12 @@ impl<'i> Walker<'i> {
             Some(other) => self.visit_expr(other),
             None => {}
         }
+    }
+
+    fn scoped(&mut self, body: impl FnOnce(&mut Self)) {
+        self.scopes.push(Scope::default());
+        body(self);
+        self.scopes.pop();
     }
 
     fn match_expr(&mut self, m: &ExprMatch) {
@@ -612,8 +652,6 @@ impl<'i> Walker<'i> {
         self.bind(&l.pat, hint);
     }
 
-    // ---- calls and references -------------------------------------------
-
     fn call(&mut self, c: &ExprCall) {
         if let Expr::Path(p) = &*c.func {
             let hit = self.hit(&p.path, Ns::Value);
@@ -631,6 +669,34 @@ impl<'i> Walker<'i> {
         for arg in &c.args {
             self.visit_expr(arg);
         }
+    }
+
+    fn call_target(&self, hit: &Hit) -> Option<(EdgeKind, String)> {
+        match hit {
+            Hit::Item(sym) => match sym.kind {
+                SymbolKind::Function => Some((EdgeKind::Calls, sym.id.clone())),
+                SymbolKind::Type | SymbolKind::Field | SymbolKind::Const | SymbolKind::Var => {
+                    Some((EdgeKind::References, sym.id.clone()))
+                }
+                _ => None,
+            },
+            Hit::Assoc(sym, name) => self.assoc_target(sym, name, EdgeKind::Calls),
+            Hit::Nested(id) => Some((EdgeKind::Calls, id.clone())),
+            Hit::Local | Hit::Unknown => None,
+        }
+    }
+
+    fn assoc_target(
+        &self,
+        sym: &Sym,
+        name: &str,
+        method_kind: EdgeKind,
+    ) -> Option<(EdgeKind, String)> {
+        if let Some(id) = self.idx.method(sym, name) {
+            return Some((method_kind, id));
+        }
+        let id = self.idx.assoc_const(sym, name)?;
+        Some((EdgeKind::References, id))
     }
 
     fn method_call(&mut self, m: &ExprMethodCall) {
@@ -689,6 +755,17 @@ impl<'i> Walker<'i> {
         visit::visit_expr_path(self, p);
     }
 
+    fn value_target(&self, hit: &Hit) -> Option<(EdgeKind, String)> {
+        match hit {
+            Hit::Item(sym) if sym.kind != SymbolKind::Test => {
+                Some((EdgeKind::References, sym.id.clone()))
+            }
+            Hit::Assoc(sym, name) => self.assoc_target(sym, name, EdgeKind::References),
+            Hit::Nested(id) => Some((EdgeKind::References, id.clone())),
+            _ => None,
+        }
+    }
+
     fn struct_literal(&mut self, s: &ExprStruct) {
         match self.hit(&s.path, Ns::Type) {
             Hit::Item(sym) if sym.kind == SymbolKind::Type => {
@@ -720,8 +797,6 @@ impl<'i> Walker<'i> {
         }
         visit::visit_expr_field(self, f);
     }
-
-    // ---- forwarding ------------------------------------------------------
 
     /// The callee when the body is one call that passes the receiver and every
     /// parameter on, in order.
@@ -761,92 +836,6 @@ impl<'i> Walker<'i> {
                 }
             }
             _ => None,
-        }
-    }
-}
-
-impl<'ast> Visit<'ast> for Walker<'_> {
-    fn visit_block(&mut self, block: &'ast Block) {
-        self.scopes.push(Scope::default());
-        self.register_items(block);
-        let statements = block
-            .stmts
-            .iter()
-            .filter(|s| !matches!(s, Stmt::Item(_)))
-            .count();
-        self.count += u32::try_from(statements).unwrap_or(u32::MAX);
-        for stmt in &block.stmts {
-            self.visit_stmt(stmt);
-        }
-        self.scopes.pop();
-    }
-
-    fn visit_stmt(&mut self, stmt: &'ast Stmt) {
-        match stmt {
-            Stmt::Local(local) => self.local_stmt(local),
-            Stmt::Item(_) => {}
-            other => visit::visit_stmt(self, other),
-        }
-    }
-
-    fn visit_expr(&mut self, e: &'ast Expr) {
-        match e {
-            Expr::If(i) => self.if_expr(i, false),
-            Expr::Match(m) => self.match_expr(m),
-            Expr::ForLoop(f) => self.for_loop(f),
-            Expr::While(l) => self.while_loop(l),
-            Expr::Loop(l) => self.plain_loop(l),
-            Expr::Closure(c) => self.closure(c),
-            Expr::Async(a) => self.nested_in(|w| w.visit_block(&a.block)),
-            Expr::Binary(b) if is_logic(&b.op) => self.logic(e),
-            Expr::Call(c) => self.call(c),
-            Expr::MethodCall(m) => self.method_call(m),
-            Expr::Path(p) => self.path_value(p),
-            Expr::Struct(s) => self.struct_literal(s),
-            Expr::Field(f) => self.field_access(f),
-            Expr::Break(b) => self.jump(b.label.is_some(), |w| visit::visit_expr_break(w, b)),
-            Expr::Continue(c) => self.jump(c.label.is_some(), |_| {}),
-            Expr::Return(r) => self.return_expr(r),
-            Expr::Let(l) => self.let_expr(l),
-            other => visit::visit_expr(self, other),
-        }
-    }
-
-    fn visit_type_path(&mut self, tp: &'ast syn::TypePath) {
-        if tp.qself.is_none()
-            && !tp.path.is_ident("Self")
-            && let Hit::Item(sym) = self.hit(&tp.path, Ns::Type)
-            && matches!(sym.kind, SymbolKind::Type | SymbolKind::Interface)
-        {
-            self.add(EdgeKind::References, sym.id.clone());
-        }
-        visit::visit_type_path(self, tp);
-    }
-
-    fn visit_pat_struct(&mut self, p: &'ast syn::PatStruct) {
-        self.pattern_path(&p.path, Ns::Type);
-        visit::visit_pat_struct(self, p);
-    }
-
-    fn visit_pat_tuple_struct(&mut self, p: &'ast syn::PatTupleStruct) {
-        self.pattern_path(&p.path, Ns::Value);
-        visit::visit_pat_tuple_struct(self, p);
-    }
-
-    fn visit_pat(&mut self, p: &'ast Pat) {
-        if let Pat::Path(path) = p {
-            self.pattern_path(&path.path, Ns::Value);
-        }
-        visit::visit_pat(self, p);
-    }
-
-    fn visit_macro(&mut self, m: &'ast syn::Macro) {
-        let Some(arguments) = macros::arguments(m) else {
-            self.unread_macros += 1;
-            return;
-        };
-        for argument in &arguments {
-            self.visit_expr(argument);
         }
     }
 }
@@ -893,8 +882,15 @@ fn single_value(body: &Expr) -> bool {
     }
 }
 
-fn is_logic(op: &BinOp) -> bool {
-    matches!(op, BinOp::And(_) | BinOp::Or(_))
+fn flatten_logic<'e>(e: &'e Expr, ops: &mut Vec<BinOp>, leaves: &mut Vec<&'e Expr>) {
+    match peel(e) {
+        Expr::Binary(b) if is_logic(&b.op) => {
+            flatten_logic(&b.left, ops, leaves);
+            ops.push(b.op);
+            flatten_logic(&b.right, ops, leaves);
+        }
+        leaf => leaves.push(leaf),
+    }
 }
 
 fn peel(mut e: &Expr) -> &Expr {
@@ -907,15 +903,8 @@ fn peel(mut e: &Expr) -> &Expr {
     }
 }
 
-fn flatten_logic<'e>(e: &'e Expr, ops: &mut Vec<BinOp>, leaves: &mut Vec<&'e Expr>) {
-    match peel(e) {
-        Expr::Binary(b) if is_logic(&b.op) => {
-            flatten_logic(&b.left, ops, leaves);
-            ops.push(b.op);
-            flatten_logic(&b.right, ops, leaves);
-        }
-        leaf => leaves.push(leaf),
-    }
+fn is_logic(op: &BinOp) -> bool {
+    matches!(op, BinOp::And(_) | BinOp::Or(_))
 }
 
 fn is_self(e: &Expr) -> bool {

@@ -11,7 +11,7 @@ use quote::ToTokens;
 use syn::{Attribute, Block, Item};
 
 use crate::{
-    body::{self, Home},
+    body::{Facts, Home},
     comments,
     names::{
         Generics, Index, ModId, Ns, Res, Sym, TyCx, ViaTrait, generics_of, is_test_fn, symbol_id,
@@ -31,29 +31,41 @@ pub struct MacroStats {
     pub unread: u32,
 }
 
-pub fn fragment(idx: &Index, file: usize) -> (Fragment, MacroStats) {
-    let src = &idx.tree.files[file];
-    let mut out = Extractor {
-        idx,
-        file,
-        src,
-        frag: Fragment {
-            file: FileInfo {
-                path: src.rel.clone(),
-                generated: src.generated,
+/// The fragment of one file with what its macros kept from the analysis.
+pub struct Extracted {
+    pub fragment: Fragment,
+    pub stats: MacroStats,
+}
+
+impl Extracted {
+    /// Reads every module that lives in `file` of the project.
+    pub fn of(idx: &Index, file: usize) -> Self {
+        let src = &idx.tree.files[file];
+        let mut out = Extractor {
+            idx,
+            file,
+            src,
+            frag: Fragment {
+                file: FileInfo {
+                    path: src.rel.clone(),
+                    generated: src.generated,
+                },
+                ..Fragment::default()
             },
-            ..Fragment::default()
-        },
-        seen: HashSet::new(),
-        stats: MacroStats::default(),
-    };
-    for m in 0..idx.tree.mods.len() {
-        if idx.tree.mods[m].file == file {
-            out.module(m);
+            seen: HashSet::new(),
+            stats: MacroStats::default(),
+        };
+        for m in 0..idx.tree.mods.len() {
+            if idx.tree.mods[m].file == file {
+                out.module(m);
+            }
+        }
+        out.frag.comments = comments::scan(&src.text, &out.frag.symbols);
+        Self {
+            fragment: out.frag,
+            stats: out.stats,
         }
     }
-    out.frag.comments = comments::scan(&src.text, &out.frag.symbols);
-    (out.frag, out.stats)
 }
 
 struct Extractor<'a> {
@@ -65,79 +77,7 @@ struct Extractor<'a> {
     stats: MacroStats,
 }
 
-/// A symbol to report.
-struct Decl {
-    id: String,
-    kind: SymbolKind,
-    visibility: Visibility,
-    owner: Option<String>,
-    span: Span,
-    doc: Option<String>,
-    name: String,
-}
-
-fn rank(v: Visibility) -> u8 {
-    match v {
-        Visibility::Public => 0,
-        Visibility::Internal => 1,
-        Visibility::Private => 2,
-    }
-}
-
-/// The more restricted of two visibilities.
-fn cap(a: Visibility, b: Visibility) -> Visibility {
-    if rank(a) >= rank(b) { a } else { b }
-}
-
-fn declared(v: Vis) -> Visibility {
-    match v {
-        Vis::Pub => Visibility::Public,
-        Vis::Crate => Visibility::Internal,
-        Vis::Private => Visibility::Private,
-    }
-}
-
-fn node_key(node: &Node) -> String {
-    match node {
-        Node::Module(path) => format!("module:{path}"),
-        Node::Symbol(id) => format!("symbol:{id}"),
-    }
-}
-
 impl Extractor<'_> {
-    fn edge(&mut self, kind: EdgeKind, from: Node, to: String) {
-        self.edge_as(kind, from, to, Resolution::Syntactic);
-    }
-
-    fn edge_as(&mut self, kind: EdgeKind, from: Node, to: String, resolution: Resolution) {
-        if self
-            .seen
-            .insert((kind, node_key(&from), to.clone(), resolution))
-        {
-            self.frag.edges.push(Edge {
-                kind,
-                from,
-                to,
-                resolution,
-            });
-        }
-    }
-
-    fn declare(&mut self, d: Decl, container: Node) {
-        self.edge(EdgeKind::Contains, container, d.id.clone());
-        self.frag.symbols.push(Symbol {
-            id: d.id,
-            kind: d.kind,
-            visibility: d.visibility,
-            owner: d.owner,
-            file: self.src.rel.clone(),
-            span: d.span,
-            doc: d.doc,
-            name: d.name,
-            role: None,
-        });
-    }
-
     fn module(&mut self, m: ModId) {
         let idx = self.idx;
         let module = &idx.tree.mods[m];
@@ -189,6 +129,24 @@ impl Extractor<'_> {
         }
     }
 
+    fn edge(&mut self, kind: EdgeKind, from: Node, to: String) {
+        self.edge_as(kind, from, to, Resolution::Syntactic);
+    }
+
+    fn edge_as(&mut self, kind: EdgeKind, from: Node, to: String, resolution: Resolution) {
+        if self
+            .seen
+            .insert((kind, node_key(&from), to.clone(), resolution))
+        {
+            self.frag.edges.push(Edge {
+                kind,
+                from,
+                to,
+                resolution,
+            });
+        }
+    }
+
     fn item(&mut self, m: ModId, item: &Item) {
         match item {
             Item::Fn(f) => self.free_fn(m, f),
@@ -207,14 +165,6 @@ impl Extractor<'_> {
             Item::Impl(i) => self.impl_item(m, i),
             Item::Macro(mac) => self.item_macro(mac),
             _ => {}
-        }
-    }
-
-    fn item_macro(&mut self, mac: &syn::ItemMacro) {
-        if mac.mac.path.is_ident("macro_rules") {
-            self.stats.defines = true;
-        } else if !mac.mac.path.is_ident("include") {
-            self.stats.unread += 1;
         }
     }
 
@@ -261,31 +211,108 @@ impl Extractor<'_> {
         );
     }
 
-    fn value_item(
+    fn declare(&mut self, d: Decl, container: Node) {
+        self.edge(EdgeKind::Contains, container, d.id.clone());
+        self.frag.symbols.push(Symbol {
+            id: d.id,
+            kind: d.kind,
+            visibility: d.visibility,
+            owner: d.owner,
+            file: self.src.rel.clone(),
+            span: d.span,
+            doc: d.doc,
+            name: d.name,
+            role: None,
+        });
+    }
+
+    /// Records the summary, the edges and, for tests, the test case of one
+    /// function; functions declared in its body follow as symbols of their own.
+    fn summarize(
         &mut self,
-        m: ModId,
-        ident: &syn::Ident,
-        v: &syn::Visibility,
-        attrs: &[Attribute],
-        item: &impl ToTokens,
-        kind: SymbolKind,
+        id: &str,
+        home: &Home,
+        sig: &syn::Signature,
+        block: &Block,
+        test: Option<&[Attribute]>,
     ) {
-        let name = ident.to_string();
-        let module = self.idx.module_path(m).to_owned();
-        let id = symbol_id(&module, &[&name], kind);
-        let visibility = self.idx.visibility(vis(v), m, &id);
+        let facts = Facts::of(self.idx, home, sig, block);
+        self.stats.unread += facts.unread_macros;
+        for u in &facts.uses {
+            self.edge_as(
+                u.kind,
+                Node::Symbol(id.to_owned()),
+                u.to.clone(),
+                u.resolution,
+            );
+        }
+        let top_level = block
+            .stmts
+            .iter()
+            .filter(|s| !matches!(s, syn::Stmt::Item(_)))
+            .count();
+        let (params, returns) = signature_counts(sig);
+        self.frag.functions.push(FunctionSummary {
+            symbol: id.to_owned(),
+            max_nesting: facts.max_nesting,
+            statements: facts.statements,
+            top_level: u32::try_from(top_level).unwrap_or(u32::MAX),
+            params,
+            returns,
+            tokens: count_tokens(block.to_token_stream()),
+            flow: facts.flow,
+            clone_fingerprint: None,
+            forwards_to: facts.forwards_to,
+            param_types: Vec::new(),
+            manual_assertions: 0,
+        });
+        if let Some(attrs) = test {
+            self.frag.tests.push(TestCase {
+                symbol: id.to_owned(),
+                nesting: 0,
+                style: testcase::style(attrs, block),
+                targets: facts
+                    .uses
+                    .iter()
+                    .filter(|u| u.resolution != Resolution::Heuristic)
+                    .map(|u| u.to.clone())
+                    .collect(),
+            });
+        }
+        for nested in &facts.nested {
+            self.nested_fn(id, home, nested);
+        }
+    }
+
+    fn nested_fn(&mut self, outer: &str, home: &Home, f: &syn::ItemFn) {
+        let name = f.sig.ident.to_string();
+        let mut parts = home.parts.clone();
+        parts.push(name.clone());
+        let ids: Vec<&str> = parts.iter().map(String::as_str).collect();
+        let id = symbol_id(&home.module_path, &ids, SymbolKind::Function);
         self.declare(
             Decl {
-                id,
-                kind,
-                visibility,
-                owner: None,
-                span: span_of(self.src, item),
-                doc: doc_of(attrs),
+                id: id.clone(),
+                kind: SymbolKind::Function,
+                visibility: Visibility::Private,
+                owner: Some(outer.to_owned()),
+                span: span_of(self.src, f),
+                doc: doc_of(&f.attrs),
                 name,
             },
-            Node::Module(module),
+            Node::Symbol(outer.to_owned()),
         );
+        let inner = Home {
+            kind: SymbolKind::Function,
+            module_path: home.module_path.clone(),
+            parts,
+            cx: TyCx {
+                module: home.cx.module,
+                self_ty: None,
+                generics: generics_of(&f.sig.generics, None),
+            },
+        };
+        self.summarize(&id, &inner, &f.sig, &f.block, None);
     }
 
     fn type_item(
@@ -369,6 +396,33 @@ impl Extractor<'_> {
                 Node::Symbol(owner.id.clone()),
             );
         }
+    }
+
+    fn value_item(
+        &mut self,
+        m: ModId,
+        ident: &syn::Ident,
+        v: &syn::Visibility,
+        attrs: &[Attribute],
+        item: &impl ToTokens,
+        kind: SymbolKind,
+    ) {
+        let name = ident.to_string();
+        let module = self.idx.module_path(m).to_owned();
+        let id = symbol_id(&module, &[&name], kind);
+        let visibility = self.idx.visibility(vis(v), m, &id);
+        self.declare(
+            Decl {
+                id,
+                kind,
+                visibility,
+                owner: None,
+                span: span_of(self.src, item),
+                doc: doc_of(attrs),
+                name,
+            },
+            Node::Module(module),
+        );
     }
 
     fn trait_item(&mut self, m: ModId, t: &syn::ItemTrait) {
@@ -515,20 +569,6 @@ impl Extractor<'_> {
         }
     }
 
-    /// Trait impl members are as visible as the trait and the type allow;
-    /// inherent members as visible as written, capped by the type.
-    fn member_visibility(&self, ctx: &ImplCtx, written: Vis) -> Visibility {
-        if !self.idx.is_library(ctx.m) {
-            return Visibility::Private;
-        }
-        let base = match &ctx.via {
-            Some(ViaTrait::Project(t)) => self.idx.visibility(t.vis, t.module, &t.id),
-            Some(ViaTrait::Foreign) => Visibility::Public,
-            None => declared(written),
-        };
-        ctx.owner_vis.map_or(base, |o| cap(base, o))
-    }
-
     fn impl_fn(&mut self, ctx: &ImplCtx, f: &syn::ImplItemFn) {
         let name = f.sig.ident.to_string();
         let mut parts = ctx.parts.clone();
@@ -572,94 +612,38 @@ impl Extractor<'_> {
         self.idx.trait_docs.get(&method.id).cloned()
     }
 
-    /// Records the summary, the edges and, for tests, the test case of one
-    /// function; functions declared in its body follow as symbols of their own.
-    fn summarize(
-        &mut self,
-        id: &str,
-        home: &Home,
-        sig: &syn::Signature,
-        block: &Block,
-        test: Option<&[Attribute]>,
-    ) {
-        let facts = body::analyze(self.idx, home, sig, block);
-        self.stats.unread += facts.unread_macros;
-        for u in &facts.uses {
-            self.edge_as(
-                u.kind,
-                Node::Symbol(id.to_owned()),
-                u.to.clone(),
-                u.resolution,
-            );
+    /// Trait impl members are as visible as the trait and the type allow;
+    /// inherent members as visible as written, capped by the type.
+    fn member_visibility(&self, ctx: &ImplCtx, written: Vis) -> Visibility {
+        if !self.idx.is_library(ctx.m) {
+            return Visibility::Private;
         }
-        let top_level = block
-            .stmts
-            .iter()
-            .filter(|s| !matches!(s, syn::Stmt::Item(_)))
-            .count();
-        let (params, returns) = signature_counts(sig);
-        self.frag.functions.push(FunctionSummary {
-            symbol: id.to_owned(),
-            max_nesting: facts.max_nesting,
-            statements: facts.statements,
-            top_level: u32::try_from(top_level).unwrap_or(u32::MAX),
-            params,
-            returns,
-            tokens: count_tokens(block.to_token_stream()),
-            flow: facts.flow,
-            clone_fingerprint: None,
-            forwards_to: facts.forwards_to,
-            param_types: Vec::new(),
-            manual_assertions: 0,
-        });
-        if let Some(attrs) = test {
-            self.frag.tests.push(TestCase {
-                symbol: id.to_owned(),
-                nesting: 0,
-                style: testcase::style(attrs, block),
-                targets: facts
-                    .uses
-                    .iter()
-                    .filter(|u| u.resolution != Resolution::Heuristic)
-                    .map(|u| u.to.clone())
-                    .collect(),
-            });
-        }
-        for nested in &facts.nested {
-            self.nested_fn(id, home, nested);
-        }
+        let base = match &ctx.via {
+            Some(ViaTrait::Project(t)) => self.idx.visibility(t.vis, t.module, &t.id),
+            Some(ViaTrait::Foreign) => Visibility::Public,
+            None => declared(written),
+        };
+        ctx.owner_vis.map_or(base, |o| cap(base, o))
     }
 
-    fn nested_fn(&mut self, outer: &str, home: &Home, f: &syn::ItemFn) {
-        let name = f.sig.ident.to_string();
-        let mut parts = home.parts.clone();
-        parts.push(name.clone());
-        let ids: Vec<&str> = parts.iter().map(String::as_str).collect();
-        let id = symbol_id(&home.module_path, &ids, SymbolKind::Function);
-        self.declare(
-            Decl {
-                id: id.clone(),
-                kind: SymbolKind::Function,
-                visibility: Visibility::Private,
-                owner: Some(outer.to_owned()),
-                span: span_of(self.src, f),
-                doc: doc_of(&f.attrs),
-                name,
-            },
-            Node::Symbol(outer.to_owned()),
-        );
-        let inner = Home {
-            kind: SymbolKind::Function,
-            module_path: home.module_path.clone(),
-            parts,
-            cx: TyCx {
-                module: home.cx.module,
-                self_ty: None,
-                generics: generics_of(&f.sig.generics, None),
-            },
-        };
-        self.summarize(&id, &inner, &f.sig, &f.block, None);
+    fn item_macro(&mut self, mac: &syn::ItemMacro) {
+        if mac.mac.path.is_ident("macro_rules") {
+            self.stats.defines = true;
+        } else if !mac.mac.path.is_ident("include") {
+            self.stats.unread += 1;
+        }
     }
+}
+
+/// A symbol to report.
+struct Decl {
+    id: String,
+    kind: SymbolKind,
+    visibility: Visibility,
+    owner: Option<String>,
+    span: Span,
+    doc: Option<String>,
+    name: String,
 }
 
 enum Shape<'a> {
@@ -684,4 +668,32 @@ struct ImplCtx {
     generics: Generics,
     container: Node,
     owner_vis: Option<Visibility>,
+}
+
+/// The more restricted of two visibilities.
+fn cap(a: Visibility, b: Visibility) -> Visibility {
+    if rank(a) >= rank(b) { a } else { b }
+}
+
+fn rank(v: Visibility) -> u8 {
+    match v {
+        Visibility::Public => 0,
+        Visibility::Internal => 1,
+        Visibility::Private => 2,
+    }
+}
+
+fn declared(v: Vis) -> Visibility {
+    match v {
+        Vis::Pub => Visibility::Public,
+        Vis::Crate => Visibility::Internal,
+        Vis::Private => Visibility::Private,
+    }
+}
+
+fn node_key(node: &Node) -> String {
+    match node {
+        Node::Module(path) => format!("module:{path}"),
+        Node::Symbol(id) => format!("symbol:{id}"),
+    }
 }

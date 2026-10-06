@@ -25,15 +25,6 @@ pub enum Vis {
     Private,
 }
 
-pub fn vis(v: &Visibility) -> Vis {
-    match v {
-        Visibility::Public(_) => Vis::Pub,
-        Visibility::Restricted(r) if r.path.is_ident("self") => Vis::Private,
-        Visibility::Restricted(_) => Vis::Crate,
-        Visibility::Inherited => Vis::Private,
-    }
-}
-
 pub struct SourceFile {
     pub rel: String,
     pub text: String,
@@ -102,30 +93,6 @@ pub struct Tree {
     pub aliases: HashMap<(usize, String), usize>,
     by_abs: HashMap<PathBuf, usize>,
     root: PathBuf,
-}
-
-/// What a crate target is made of, before its modules are read.
-pub struct Root {
-    pub label: String,
-    pub package: usize,
-    pub kind: TargetKind,
-    pub file: PathBuf,
-    pub exported: bool,
-    pub test_of: Option<String>,
-}
-
-enum Load {
-    New(usize),
-    Claimed,
-    Unreadable,
-}
-
-struct Child {
-    name: String,
-    vis: Vis,
-    cfg_test: bool,
-    path: Option<String>,
-    inline: Option<usize>,
 }
 
 impl Tree {
@@ -369,6 +336,47 @@ impl Tree {
     }
 }
 
+/// What a crate target is made of, before its modules are read.
+pub struct Root {
+    pub label: String,
+    pub package: usize,
+    pub kind: TargetKind,
+    pub file: PathBuf,
+    pub exported: bool,
+    pub test_of: Option<String>,
+}
+
+enum Load {
+    New(usize),
+    Claimed,
+    Unreadable,
+}
+
+struct Child {
+    name: String,
+    vis: Vis,
+    cfg_test: bool,
+    path: Option<String>,
+    inline: Option<usize>,
+}
+
+pub fn vis(v: &Visibility) -> Vis {
+    match v {
+        Visibility::Public(_) => Vis::Pub,
+        Visibility::Restricted(r) if r.path.is_ident("self") => Vis::Private,
+        Visibility::Restricted(_) => Vis::Crate,
+        Visibility::Inherited => Vis::Private,
+    }
+}
+
+/// Whether an attribute list gates the item on `cfg(test)`.
+pub fn attrs_cfg_test(attrs: &[Attribute]) -> bool {
+    attrs.iter().any(|a| {
+        a.path().is_ident("cfg")
+            && matches!(&a.meta, Meta::List(list) if mentions_test(list.tokens.clone()))
+    })
+}
+
 fn describe(candidates: &[(PathBuf, bool)], root: &Path) -> String {
     let names: Vec<String> = candidates
         .iter()
@@ -444,14 +452,6 @@ fn path_value(nv: &syn::MetaNameValue) -> Option<String> {
 
 fn file_cfg_test(file: &syn::File) -> bool {
     attrs_cfg_test(&file.attrs)
-}
-
-/// Whether an attribute list gates the item on `cfg(test)`.
-pub fn attrs_cfg_test(attrs: &[Attribute]) -> bool {
-    attrs.iter().any(|a| {
-        a.path().is_ident("cfg")
-            && matches!(&a.meta, Meta::List(list) if mentions_test(list.tokens.clone()))
-    })
 }
 
 fn mentions_test(tokens: TokenStream) -> bool {

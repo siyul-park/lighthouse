@@ -11,6 +11,32 @@ use syn::{
 
 use crate::macros;
 
+#[derive(Default)]
+struct Finder {
+    tables: HashSet<String>,
+    found: bool,
+}
+
+impl<'ast> Visit<'ast> for Finder {
+    fn visit_stmt(&mut self, stmt: &'ast Stmt) {
+        if let Stmt::Local(local) = stmt
+            && let (Pat::Ident(name), Some(init)) = (&local.pat, &local.init)
+            && is_table(&init.expr)
+        {
+            self.tables.insert(name.ident.to_string());
+        }
+        visit::visit_stmt(self, stmt);
+    }
+
+    fn visit_expr_for_loop(&mut self, f: &'ast syn::ExprForLoop) {
+        let base = iterated(&f.expr);
+        let named = matches!(base, Expr::Path(p) if p.path.get_ident()
+            .is_some_and(|i| self.tables.contains(&i.to_string())));
+        self.found |= named || is_table(base);
+        visit::visit_expr_for_loop(self, f);
+    }
+}
+
 /// `table` when the test loops over cases written in the test (a literal
 /// array or `vec!` of tuples or structs, directly or through a `let`), or when
 /// an `rstest`/`test_case` function carries several cases; else `scenario`.
@@ -37,32 +63,6 @@ fn declared_cases(attrs: &[Attribute]) -> usize {
         0
     };
     rstest_cases + count(&["test_case", "test_case::test_case"])
-}
-
-#[derive(Default)]
-struct Finder {
-    tables: HashSet<String>,
-    found: bool,
-}
-
-impl<'ast> Visit<'ast> for Finder {
-    fn visit_stmt(&mut self, stmt: &'ast Stmt) {
-        if let Stmt::Local(local) = stmt
-            && let (Pat::Ident(name), Some(init)) = (&local.pat, &local.init)
-            && is_table(&init.expr)
-        {
-            self.tables.insert(name.ident.to_string());
-        }
-        visit::visit_stmt(self, stmt);
-    }
-
-    fn visit_expr_for_loop(&mut self, f: &'ast syn::ExprForLoop) {
-        let base = iterated(&f.expr);
-        let named = matches!(base, Expr::Path(p) if p.path.get_ident()
-            .is_some_and(|i| self.tables.contains(&i.to_string())));
-        self.found |= named || is_table(base);
-        visit::visit_expr_for_loop(self, f);
-    }
 }
 
 /// The collection a loop walks, behind references and iterator adapters.

@@ -10,6 +10,8 @@ use std::{
 
 use toml::{Table, Value};
 
+const DEP_SECTIONS: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TargetKind {
     Lib,
@@ -97,12 +99,9 @@ pub fn synthetic(dir: &Path) -> Package {
     }
 }
 
-fn publish_flag(value: &Value) -> bool {
-    match value {
-        Value::Boolean(flag) => *flag,
-        Value::Array(registries) => !registries.is_empty(),
-        _ => true,
-    }
+/// How code spells a crate: hyphens become underscores.
+pub fn crate_name(name: &str) -> String {
+    name.replace('-', "_")
 }
 
 /// `publish = false`, `publish = []`, or `publish.workspace = true` with the
@@ -126,12 +125,13 @@ fn workspace_publish(dir: &Path) -> Option<bool> {
     Some(package.get("publish").is_none_or(publish_flag))
 }
 
-/// How code spells a crate: hyphens become underscores.
-pub fn crate_name(name: &str) -> String {
-    name.replace('-', "_")
+fn publish_flag(value: &Value) -> bool {
+    match value {
+        Value::Boolean(flag) => *flag,
+        Value::Array(registries) => !registries.is_empty(),
+        _ => true,
+    }
 }
-
-const DEP_SECTIONS: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
 fn dependencies(manifest: &Table) -> BTreeMap<String, String> {
     let mut tables: Vec<&Table> = Vec::new();
@@ -195,17 +195,6 @@ fn lib_target(dir: &Path, package: &str, manifest: &Table, found: &mut Vec<Targe
     }
 }
 
-fn build_target(dir: &Path, section: &Table, found: &mut Vec<Target>) {
-    let path = match section.get("build") {
-        Some(Value::Boolean(false)) => return,
-        Some(Value::String(p)) => dir.join(p),
-        _ => dir.join("build.rs"),
-    };
-    if path.is_file() {
-        push(found, TargetKind::Build, "build-script", path);
-    }
-}
-
 fn push(found: &mut Vec<Target>, kind: TargetKind, name: &str, root: PathBuf) {
     if !found.iter().any(|t| t.root == root) {
         found.push(Target {
@@ -260,5 +249,16 @@ fn discover(dir: &Path, folder: &str, kind: TargetKind, found: &mut Vec<Target>)
                 path.join("main.rs"),
             );
         }
+    }
+}
+
+fn build_target(dir: &Path, section: &Table, found: &mut Vec<Target>) {
+    let path = match section.get("build") {
+        Some(Value::Boolean(false)) => return,
+        Some(Value::String(p)) => dir.join(p),
+        _ => dir.join("build.rs"),
+    };
+    if path.is_file() {
+        push(found, TargetKind::Build, "build-script", path);
     }
 }

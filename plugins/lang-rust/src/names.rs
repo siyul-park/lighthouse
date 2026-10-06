@@ -16,6 +16,23 @@ use crate::{
     util::doc_of,
 };
 
+/// Attributes that make a function a test, matched on the whole path:
+/// `test`, `tokio::test`, `rstest`, `test_case::test_case`, ...
+pub const TEST_ATTRIBUTES: [&str; 12] = [
+    "test",
+    "tokio::test",
+    "async_std::test",
+    "actix_rt::test",
+    "actix_web::test",
+    "sqlx::test",
+    "wasm_bindgen_test::wasm_bindgen_test",
+    "wasm_bindgen_test",
+    "rstest",
+    "rstest::rstest",
+    "test_case",
+    "test_case::test_case",
+];
+
 pub type ModId = usize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -123,89 +140,6 @@ pub struct Index<'t> {
     children: HashMap<(ModId, String), ModId>,
 }
 
-pub fn symbol_id(module: &str, parts: &[&str], kind: SymbolKind) -> String {
-    let mut id = module.to_owned();
-    for part in parts {
-        id.push_str("::");
-        id.push_str(part);
-    }
-    id.push('#');
-    id.push_str(kind_name(kind));
-    id
-}
-
-pub fn kind_name(kind: SymbolKind) -> &'static str {
-    match kind {
-        SymbolKind::Function => "function",
-        SymbolKind::Method => "method",
-        SymbolKind::Type => "type",
-        SymbolKind::Field => "field",
-        SymbolKind::Const => "const",
-        SymbolKind::Var => "var",
-        SymbolKind::Interface => "interface",
-        SymbolKind::Test => "test",
-    }
-}
-
-/// Attributes that make a function a test, matched on the whole path:
-/// `test`, `tokio::test`, `rstest`, `test_case::test_case`, ...
-pub const TEST_ATTRIBUTES: [&str; 12] = [
-    "test",
-    "tokio::test",
-    "async_std::test",
-    "actix_rt::test",
-    "actix_web::test",
-    "sqlx::test",
-    "wasm_bindgen_test::wasm_bindgen_test",
-    "wasm_bindgen_test",
-    "rstest",
-    "rstest::rstest",
-    "test_case",
-    "test_case::test_case",
-];
-
-pub fn is_test_fn(attrs: &[syn::Attribute]) -> bool {
-    attrs
-        .iter()
-        .any(|a| TEST_ATTRIBUTES.contains(&crate::util::attr_path(a).as_str()))
-}
-
-pub fn generics_of(generics: &syn::Generics, outer: Option<&Generics>) -> Generics {
-    let mut found: BTreeMap<String, Option<syn::Path>> =
-        outer.map(|o| (**o).clone()).unwrap_or_default();
-    for param in &generics.params {
-        if let syn::GenericParam::Type(t) = param {
-            found.insert(t.ident.to_string(), first_trait(t.bounds.iter()));
-        }
-    }
-    if let Some(clause) = &generics.where_clause {
-        for predicate in &clause.predicates {
-            let syn::WherePredicate::Type(p) = predicate else {
-                continue;
-            };
-            let syn::Type::Path(path) = &p.bounded_ty else {
-                continue;
-            };
-            let Some(ident) = path.path.get_ident() else {
-                continue;
-            };
-            if let Some(bound) = first_trait(p.bounds.iter()) {
-                found.insert(ident.to_string(), Some(bound));
-            }
-        }
-    }
-    Rc::new(found)
-}
-
-pub fn first_trait<'a>(
-    mut bounds: impl Iterator<Item = &'a syn::TypeParamBound>,
-) -> Option<syn::Path> {
-    bounds.find_map(|b| match b {
-        syn::TypeParamBound::Trait(t) => Some(t.path.clone()),
-        _ => None,
-    })
-}
-
 impl<'t> Index<'t> {
     /// Declares every module's items, then its impl blocks, then settles
     /// which items are exported.
@@ -242,33 +176,6 @@ impl<'t> Index<'t> {
         }
         index.settle_exports();
         index
-    }
-
-    pub fn module_path(&self, m: ModId) -> &str {
-        &self.tree.mods[m].path
-    }
-
-    pub fn crate_root(&self, m: ModId) -> ModId {
-        self.tree.crates[self.tree.mods[m].krate].root
-    }
-
-    fn sym(&self, m: ModId, parts: &[&str], kind: SymbolKind, v: Vis) -> Sym {
-        let name = parts.last().copied().unwrap_or("").to_owned();
-        Sym {
-            id: symbol_id(self.module_path(m), parts, kind),
-            name,
-            kind,
-            module: m,
-            vis: v,
-        }
-    }
-
-    fn cx(&self, m: ModId, self_ty: Option<Sym>, generics: Generics) -> TyCx {
-        TyCx {
-            module: m,
-            self_ty,
-            generics,
-        }
     }
 
     fn declare(&mut self, m: ModId) {
@@ -334,6 +241,29 @@ impl<'t> Index<'t> {
         self.names[m].values.entry(name).or_insert(Def::Sym(sym));
     }
 
+    fn sym(&self, m: ModId, parts: &[&str], kind: SymbolKind, v: Vis) -> Sym {
+        let name = parts.last().copied().unwrap_or("").to_owned();
+        Sym {
+            id: symbol_id(self.module_path(m), parts, kind),
+            name,
+            kind,
+            module: m,
+            vis: v,
+        }
+    }
+
+    pub fn module_path(&self, m: ModId) -> &str {
+        &self.tree.mods[m].path
+    }
+
+    fn cx(&self, m: ModId, self_ty: Option<Sym>, generics: Generics) -> TyCx {
+        TyCx {
+            module: m,
+            self_ty,
+            generics,
+        }
+    }
+
     fn declare_struct(&mut self, m: ModId, s: &syn::ItemStruct) {
         let name = s.ident.to_string();
         let sym = self.sym(m, &[&name], SymbolKind::Type, vis(&s.vis));
@@ -345,14 +275,6 @@ impl<'t> Index<'t> {
                 .entry(name.clone())
                 .or_insert(Def::Sym(sym.clone()));
         }
-        self.names[m].types.entry(name).or_insert(Def::Sym(sym));
-    }
-
-    fn declare_union(&mut self, m: ModId, u: &syn::ItemUnion) {
-        let name = u.ident.to_string();
-        let sym = self.sym(m, &[&name], SymbolKind::Type, vis(&u.vis));
-        let cx = self.cx(m, None, generics_of(&u.generics, None));
-        self.declare_fields(&sym, &syn::Fields::Named(u.fields.clone()), &cx);
         self.names[m].types.entry(name).or_insert(Def::Sym(sym));
     }
 
@@ -395,6 +317,14 @@ impl<'t> Index<'t> {
             self.variant_owner.insert(item.id.clone(), sym.clone());
             table.entry(v).or_insert(item);
         }
+        self.names[m].types.entry(name).or_insert(Def::Sym(sym));
+    }
+
+    fn declare_union(&mut self, m: ModId, u: &syn::ItemUnion) {
+        let name = u.ident.to_string();
+        let sym = self.sym(m, &[&name], SymbolKind::Type, vis(&u.vis));
+        let cx = self.cx(m, None, generics_of(&u.generics, None));
+        self.declare_fields(&sym, &syn::Fields::Named(u.fields.clone()), &cx);
         self.names[m].types.entry(name).or_insert(Def::Sym(sym));
     }
 
@@ -522,97 +452,87 @@ impl<'t> Index<'t> {
         self.type_sym(ty, cx)
     }
 
-    /// Owner path parts of an impl's items: the type, then for a trait impl
-    /// the trait with its arguments, so two impls never share an id.
-    pub fn impl_parts(&self, i: &syn::ItemImpl, owner: Option<&Sym>) -> Vec<String> {
-        let mut parts = vec![owner.map_or_else(|| type_text(&i.self_ty), |o| o.name.clone())];
-        if let Some((_, path, _)) = &i.trait_ {
-            parts.push(path_text(path));
-        }
-        parts
-    }
-
-    /// Marks everything `pub use` makes reachable from outside a library.
-    fn settle_exports(&mut self) {
-        loop {
-            let before = (self.exported.len(), self.exported_mods.len());
-            for m in 0..self.tree.mods.len() {
-                if self.is_library(m) && self.module_reachable(m) {
-                    self.export_uses(m);
-                }
-            }
-            if before == (self.exported.len(), self.exported_mods.len()) {
-                break;
-            }
+    /// The project type or trait a written type denotes, behind references,
+    /// `Box`/`Arc`/`Rc`, `dyn Trait`, `impl Trait` and generic parameters.
+    pub fn type_sym(&self, ty: &syn::Type, cx: &TyCx) -> Option<Sym> {
+        match ty {
+            syn::Type::Reference(r) => self.type_sym(&r.elem, cx),
+            syn::Type::Paren(p) => self.type_sym(&p.elem, cx),
+            syn::Type::Group(g) => self.type_sym(&g.elem, cx),
+            syn::Type::TraitObject(t) => self.bound_sym(first_trait(t.bounds.iter())?, cx),
+            syn::Type::ImplTrait(t) => self.bound_sym(first_trait(t.bounds.iter())?, cx),
+            syn::Type::Path(p) if p.qself.is_none() => self.path_type_sym(&p.path, cx),
+            _ => None,
         }
     }
 
-    fn export_uses(&mut self, m: ModId) {
-        let entries: Vec<UseEntry> = self.names[m]
-            .uses
-            .iter()
-            .filter(|u| u.vis == Vis::Pub)
-            .cloned()
-            .collect();
-        for entry in entries {
-            if entry.name == "*" {
-                if let Some(Res::Module(target)) = self.resolve_path(m, &entry.path, Ns::Type, &[])
-                {
-                    self.export_declared(target);
-                }
-                continue;
-            }
-            for ns in [Ns::Type, Ns::Value] {
-                match self.resolve_path(m, &entry.path, ns, &[]) {
-                    Some(Res::Item(sym)) => {
-                        self.exported.insert(sym.id);
-                    }
-                    Some(Res::Module(target)) => {
-                        self.exported_mods.insert(target);
-                    }
-                    _ => {}
-                }
-            }
+    fn bound_sym(&self, path: syn::Path, cx: &TyCx) -> Option<Sym> {
+        let segments: Vec<String> = path.segments.iter().map(|s| s.ident.to_string()).collect();
+        match self.resolve_path(cx.module, &segments, Ns::Type, &[])? {
+            Res::Item(sym) if sym.kind == SymbolKind::Interface => Some(sym),
+            _ => None,
         }
     }
 
-    fn export_declared(&mut self, target: ModId) {
-        let mut found: Vec<String> = Vec::new();
-        let mut modules = Vec::new();
-        let names = &self.names[target];
-        for def in names.types.values().chain(names.values.values()) {
-            match def {
-                Def::Sym(s) if s.vis == Vis::Pub => found.push(s.id.clone()),
-                Def::Module(child, Vis::Pub) => modules.push(*child),
-                _ => {}
-            }
-        }
-        self.exported.extend(found);
-        self.exported_mods.extend(modules);
+    pub fn resolve_path(
+        &self,
+        m: ModId,
+        segs: &[String],
+        ns: Ns,
+        extra: &[UseEntry],
+    ) -> Option<Res> {
+        self.resolve_with(m, segs, ns, extra, &mut Vec::new())
     }
 
-    pub fn is_library(&self, m: ModId) -> bool {
-        self.tree.crates[self.tree.mods[m].krate].kind == crate::cargo::TargetKind::Lib
+    fn resolve_with(
+        &self,
+        m: ModId,
+        segs: &[String],
+        ns: Ns,
+        extra: &[UseEntry],
+        seen: &mut Vec<(ModId, String, Ns)>,
+    ) -> Option<Res> {
+        let (first, rest) = segs.split_first()?;
+        let lead_ns = if rest.is_empty() { ns } else { Ns::Type };
+        let mut current = match first.as_str() {
+            "crate" => Res::Module(self.crate_root(m)),
+            "self" => Res::Module(m),
+            "super" => Res::Module(self.tree.mods[m].parent?),
+            "Self" => return None,
+            name => self.first(m, name, lead_ns, extra, seen)?,
+        };
+        for (at, seg) in rest.iter().enumerate() {
+            let step_ns = if at + 1 == rest.len() { ns } else { Ns::Type };
+            current = self.step(current, seg, step_ns, seen)?;
+        }
+        Some(current)
     }
 
-    /// Every module from the crate root down to `m` is `pub` or re-exported.
-    pub fn module_reachable(&self, m: ModId) -> bool {
-        let mut at = m;
-        loop {
-            let module = &self.tree.mods[at];
-            let Some(parent) = module.parent else {
-                return true;
-            };
-            // A re-exported module is reachable by its new name, whatever
-            // the modules around its declaration are.
-            if self.exported_mods.contains(&at) {
-                return true;
+    pub fn crate_root(&self, m: ModId) -> ModId {
+        self.tree.crates[self.tree.mods[m].krate].root
+    }
+
+    fn first(
+        &self,
+        m: ModId,
+        name: &str,
+        ns: Ns,
+        extra: &[UseEntry],
+        seen: &mut Vec<(ModId, String, Ns)>,
+    ) -> Option<Res> {
+        for entry in extra.iter().filter(|u| u.name == name) {
+            if let Some(found) = self.resolve_with(entry.module, &entry.path, ns, &[], seen) {
+                return Some(found);
             }
-            if module.vis != Vis::Pub {
-                return false;
-            }
-            at = parent;
         }
+        if let Some(found) = self.lookup_in_module(m, name, ns, seen) {
+            return Some(found);
+        }
+        let krate = self.tree.mods[m].krate;
+        if let Some(&root) = self.externs[krate].get(name) {
+            return Some(Res::Module(root));
+        }
+        matches!(name, "std" | "core" | "alloc").then_some(Res::External)
     }
 
     pub fn lookup_in_module(
@@ -661,63 +581,6 @@ impl<'t> Index<'t> {
         None
     }
 
-    pub fn resolve_path(
-        &self,
-        m: ModId,
-        segs: &[String],
-        ns: Ns,
-        extra: &[UseEntry],
-    ) -> Option<Res> {
-        self.resolve_with(m, segs, ns, extra, &mut Vec::new())
-    }
-
-    fn resolve_with(
-        &self,
-        m: ModId,
-        segs: &[String],
-        ns: Ns,
-        extra: &[UseEntry],
-        seen: &mut Vec<(ModId, String, Ns)>,
-    ) -> Option<Res> {
-        let (first, rest) = segs.split_first()?;
-        let lead_ns = if rest.is_empty() { ns } else { Ns::Type };
-        let mut current = match first.as_str() {
-            "crate" => Res::Module(self.crate_root(m)),
-            "self" => Res::Module(m),
-            "super" => Res::Module(self.tree.mods[m].parent?),
-            "Self" => return None,
-            name => self.first(m, name, lead_ns, extra, seen)?,
-        };
-        for (at, seg) in rest.iter().enumerate() {
-            let step_ns = if at + 1 == rest.len() { ns } else { Ns::Type };
-            current = self.step(current, seg, step_ns, seen)?;
-        }
-        Some(current)
-    }
-
-    fn first(
-        &self,
-        m: ModId,
-        name: &str,
-        ns: Ns,
-        extra: &[UseEntry],
-        seen: &mut Vec<(ModId, String, Ns)>,
-    ) -> Option<Res> {
-        for entry in extra.iter().filter(|u| u.name == name) {
-            if let Some(found) = self.resolve_with(entry.module, &entry.path, ns, &[], seen) {
-                return Some(found);
-            }
-        }
-        if let Some(found) = self.lookup_in_module(m, name, ns, seen) {
-            return Some(found);
-        }
-        let krate = self.tree.mods[m].krate;
-        if let Some(&root) = self.externs[krate].get(name) {
-            return Some(Res::Module(root));
-        }
-        matches!(name, "std" | "core" | "alloc").then_some(Res::External)
-    }
-
     fn step(
         &self,
         current: Res,
@@ -745,26 +608,6 @@ impl<'t> Index<'t> {
         }
     }
 
-    /// Effective visibility of a module-level item: what its declaration says,
-    /// capped by whether anything outside the crate (or the project) can reach
-    /// it. Binary, test and example crates export nothing; the public items of
-    /// a library that cannot be published are importable only inside the
-    /// project, like Go's `internal` packages.
-    pub fn visibility(&self, declared: Vis, m: ModId, id: &str) -> Visibility {
-        if !self.is_library(m) {
-            return Visibility::Private;
-        }
-        match declared {
-            Vis::Private => Visibility::Private,
-            Vis::Crate => Visibility::Internal,
-            Vis::Pub if !self.tree.crates[self.tree.mods[m].krate].exported => Visibility::Internal,
-            Vis::Pub if self.exported.contains(id) || self.module_reachable(m) => {
-                Visibility::Public
-            }
-            Vis::Pub => Visibility::Internal,
-        }
-    }
-
     /// Follows type aliases to the type they name.
     pub fn canonical(&self, sym: Sym) -> Sym {
         let mut sym = sym;
@@ -778,28 +621,6 @@ impl<'t> Index<'t> {
             }
         }
         sym
-    }
-
-    /// The project type or trait a written type denotes, behind references,
-    /// `Box`/`Arc`/`Rc`, `dyn Trait`, `impl Trait` and generic parameters.
-    pub fn type_sym(&self, ty: &syn::Type, cx: &TyCx) -> Option<Sym> {
-        match ty {
-            syn::Type::Reference(r) => self.type_sym(&r.elem, cx),
-            syn::Type::Paren(p) => self.type_sym(&p.elem, cx),
-            syn::Type::Group(g) => self.type_sym(&g.elem, cx),
-            syn::Type::TraitObject(t) => self.bound_sym(first_trait(t.bounds.iter())?, cx),
-            syn::Type::ImplTrait(t) => self.bound_sym(first_trait(t.bounds.iter())?, cx),
-            syn::Type::Path(p) if p.qself.is_none() => self.path_type_sym(&p.path, cx),
-            _ => None,
-        }
-    }
-
-    fn bound_sym(&self, path: syn::Path, cx: &TyCx) -> Option<Sym> {
-        let segments: Vec<String> = path.segments.iter().map(|s| s.ident.to_string()).collect();
-        match self.resolve_path(cx.module, &segments, Ns::Type, &[])? {
-            Res::Item(sym) if sym.kind == SymbolKind::Interface => Some(sym),
-            _ => None,
-        }
     }
 
     fn path_type_sym(&self, path: &syn::Path, cx: &TyCx) -> Option<Sym> {
@@ -823,6 +644,119 @@ impl<'t> Index<'t> {
                 Some(self.canonical(sym))
             }
             _ => None,
+        }
+    }
+
+    /// Owner path parts of an impl's items: the type, then for a trait impl
+    /// the trait with its arguments, so two impls never share an id.
+    pub fn impl_parts(&self, i: &syn::ItemImpl, owner: Option<&Sym>) -> Vec<String> {
+        let mut parts = vec![owner.map_or_else(|| type_text(&i.self_ty), |o| o.name.clone())];
+        if let Some((_, path, _)) = &i.trait_ {
+            parts.push(path_text(path));
+        }
+        parts
+    }
+
+    /// Marks everything `pub use` makes reachable from outside a library.
+    fn settle_exports(&mut self) {
+        loop {
+            let before = (self.exported.len(), self.exported_mods.len());
+            for m in 0..self.tree.mods.len() {
+                if self.is_library(m) && self.module_reachable(m) {
+                    self.export_uses(m);
+                }
+            }
+            if before == (self.exported.len(), self.exported_mods.len()) {
+                break;
+            }
+        }
+    }
+
+    pub fn is_library(&self, m: ModId) -> bool {
+        self.tree.crates[self.tree.mods[m].krate].kind == crate::cargo::TargetKind::Lib
+    }
+
+    /// Every module from the crate root down to `m` is `pub` or re-exported.
+    pub fn module_reachable(&self, m: ModId) -> bool {
+        let mut at = m;
+        loop {
+            let module = &self.tree.mods[at];
+            let Some(parent) = module.parent else {
+                return true;
+            };
+            // A re-exported module is reachable by its new name, whatever
+            // the modules around its declaration are.
+            if self.exported_mods.contains(&at) {
+                return true;
+            }
+            if module.vis != Vis::Pub {
+                return false;
+            }
+            at = parent;
+        }
+    }
+
+    fn export_uses(&mut self, m: ModId) {
+        let entries: Vec<UseEntry> = self.names[m]
+            .uses
+            .iter()
+            .filter(|u| u.vis == Vis::Pub)
+            .cloned()
+            .collect();
+        for entry in entries {
+            if entry.name == "*" {
+                if let Some(Res::Module(target)) = self.resolve_path(m, &entry.path, Ns::Type, &[])
+                {
+                    self.export_declared(target);
+                }
+                continue;
+            }
+            for ns in [Ns::Type, Ns::Value] {
+                match self.resolve_path(m, &entry.path, ns, &[]) {
+                    Some(Res::Item(sym)) => {
+                        self.exported.insert(sym.id);
+                    }
+                    Some(Res::Module(target)) => {
+                        self.exported_mods.insert(target);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    fn export_declared(&mut self, target: ModId) {
+        let mut found: Vec<String> = Vec::new();
+        let mut modules = Vec::new();
+        let names = &self.names[target];
+        for def in names.types.values().chain(names.values.values()) {
+            match def {
+                Def::Sym(s) if s.vis == Vis::Pub => found.push(s.id.clone()),
+                Def::Module(child, Vis::Pub) => modules.push(*child),
+                _ => {}
+            }
+        }
+        self.exported.extend(found);
+        self.exported_mods.extend(modules);
+    }
+
+    /// Effective visibility of a module-level item: what its declaration says,
+    /// capped by whether anything outside the crate (or the project) can reach
+    /// it. Binary, test and example crates export nothing; the public items of
+    /// a library that cannot be published are importable only inside the
+    /// project, like Go's `internal` packages.
+    pub fn visibility(&self, declared: Vis, m: ModId, id: &str) -> Visibility {
+        if !self.is_library(m) {
+            return Visibility::Private;
+        }
+        match declared {
+            Vis::Private => Visibility::Private,
+            Vis::Crate => Visibility::Internal,
+            Vis::Pub if !self.tree.crates[self.tree.mods[m].krate].exported => Visibility::Internal,
+            Vis::Pub if self.exported.contains(id) || self.module_reachable(m) => {
+                Visibility::Public
+            }
+            Vis::Pub => Visibility::Internal,
         }
     }
 
@@ -892,6 +826,108 @@ impl<'t> Index<'t> {
     }
 }
 
+pub fn symbol_id(module: &str, parts: &[&str], kind: SymbolKind) -> String {
+    let mut id = module.to_owned();
+    for part in parts {
+        id.push_str("::");
+        id.push_str(part);
+    }
+    id.push('#');
+    id.push_str(kind_name(kind));
+    id
+}
+
+pub fn kind_name(kind: SymbolKind) -> &'static str {
+    match kind {
+        SymbolKind::Function => "function",
+        SymbolKind::Method => "method",
+        SymbolKind::Type => "type",
+        SymbolKind::Field => "field",
+        SymbolKind::Const => "const",
+        SymbolKind::Var => "var",
+        SymbolKind::Interface => "interface",
+        SymbolKind::Test => "test",
+    }
+}
+
+pub fn is_test_fn(attrs: &[syn::Attribute]) -> bool {
+    attrs
+        .iter()
+        .any(|a| TEST_ATTRIBUTES.contains(&crate::util::attr_path(a).as_str()))
+}
+
+pub fn generics_of(generics: &syn::Generics, outer: Option<&Generics>) -> Generics {
+    let mut found: BTreeMap<String, Option<syn::Path>> =
+        outer.map(|o| (**o).clone()).unwrap_or_default();
+    for param in &generics.params {
+        if let syn::GenericParam::Type(t) = param {
+            found.insert(t.ident.to_string(), first_trait(t.bounds.iter()));
+        }
+    }
+    if let Some(clause) = &generics.where_clause {
+        for predicate in &clause.predicates {
+            let syn::WherePredicate::Type(p) = predicate else {
+                continue;
+            };
+            let syn::Type::Path(path) = &p.bounded_ty else {
+                continue;
+            };
+            let Some(ident) = path.path.get_ident() else {
+                continue;
+            };
+            if let Some(bound) = first_trait(p.bounds.iter()) {
+                found.insert(ident.to_string(), Some(bound));
+            }
+        }
+    }
+    Rc::new(found)
+}
+
+pub fn first_trait<'a>(
+    mut bounds: impl Iterator<Item = &'a syn::TypeParamBound>,
+) -> Option<syn::Path> {
+    bounds.find_map(|b| match b {
+        syn::TypeParamBound::Trait(t) => Some(t.path.clone()),
+        _ => None,
+    })
+}
+
+/// `use` trees as `(path, bound name)` pairs.
+pub fn flatten(tree: &UseTree, prefix: &mut Vec<String>, out: &mut Vec<(Vec<String>, String)>) {
+    match tree {
+        UseTree::Path(p) => {
+            prefix.push(p.ident.to_string());
+            flatten(&p.tree, prefix, out);
+            prefix.pop();
+        }
+        UseTree::Name(n) => leaf(&n.ident.to_string(), None, prefix, out),
+        UseTree::Rename(r) => leaf(
+            &r.ident.to_string(),
+            Some(r.rename.to_string()),
+            prefix,
+            out,
+        ),
+        UseTree::Glob(_) => out.push((prefix.clone(), "*".to_owned())),
+        UseTree::Group(g) => {
+            for item in &g.items {
+                flatten(item, prefix, out);
+            }
+        }
+    }
+}
+
+/// A type as source text without whitespace, for ids.
+pub fn type_text(ty: &syn::Type) -> String {
+    squash(&ty.to_token_stream().to_string())
+}
+
+/// The last segment of a path with its generic arguments, without whitespace.
+pub fn path_text(path: &syn::Path) -> String {
+    path.segments
+        .last()
+        .map_or_else(String::new, |s| squash(&s.to_token_stream().to_string()))
+}
+
 fn first_type_argument(segment: &syn::PathSegment) -> Option<&syn::Type> {
     let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {
         return None;
@@ -937,30 +973,6 @@ fn externs(tree: &Tree, packages: &[crate::cargo::Package]) -> Vec<BTreeMap<Stri
         .collect()
 }
 
-/// `use` trees as `(path, bound name)` pairs.
-pub fn flatten(tree: &UseTree, prefix: &mut Vec<String>, out: &mut Vec<(Vec<String>, String)>) {
-    match tree {
-        UseTree::Path(p) => {
-            prefix.push(p.ident.to_string());
-            flatten(&p.tree, prefix, out);
-            prefix.pop();
-        }
-        UseTree::Name(n) => leaf(&n.ident.to_string(), None, prefix, out),
-        UseTree::Rename(r) => leaf(
-            &r.ident.to_string(),
-            Some(r.rename.to_string()),
-            prefix,
-            out,
-        ),
-        UseTree::Glob(_) => out.push((prefix.clone(), "*".to_owned())),
-        UseTree::Group(g) => {
-            for item in &g.items {
-                flatten(item, prefix, out);
-            }
-        }
-    }
-}
-
 fn leaf(
     ident: &str,
     rename: Option<String>,
@@ -975,18 +987,6 @@ fn leaf(
     if let Some(name) = name {
         out.push((path, name));
     }
-}
-
-/// A type as source text without whitespace, for ids.
-pub fn type_text(ty: &syn::Type) -> String {
-    squash(&ty.to_token_stream().to_string())
-}
-
-/// The last segment of a path with its generic arguments, without whitespace.
-pub fn path_text(path: &syn::Path) -> String {
-    path.segments
-        .last()
-        .map_or_else(String::new, |s| squash(&s.to_token_stream().to_string()))
 }
 
 fn squash(text: &str) -> String {
