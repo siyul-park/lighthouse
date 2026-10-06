@@ -6,10 +6,13 @@ use std::{
 
 use ignore::WalkBuilder;
 use lighthouse_config::{Config, GlobSet, Rules, glob_set};
-use lighthouse_model::{Diagnostic, File, Fragment, Incomplete, Project, Severity};
+use lighthouse_model::{Diagnostic, File, Fingerprint, Fragment, Incomplete, Project, Severity};
 use lighthouse_plugin::{Ctx, Facts, LanguageProvider, Registry, Rule, Scope, Source, Workspace};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
+
+use crate::subject::Subjects;
 
 /// Name of the file, in `.gitignore` syntax, that keeps files out of the
 /// analysis altogether, such as fixtures that are broken on purpose.
@@ -55,6 +58,16 @@ pub struct Outcome {
     /// requested paths outside the root are incomplete. A non-UTF-8 file
     /// claimed only by a fallback provider (binary data) is a notice.
     pub incomplete: Vec<Incomplete>,
+    /// The report scope: project-relative paths (a file, or a directory
+    /// prefix) whose findings `diagnostics` holds. The empty path is the
+    /// whole project; no entries means nothing was in scope.
+    pub reported: Vec<PathBuf>,
+    /// The rules that ran; a finding of any other rule says nothing about
+    /// the code in this run.
+    pub rules: Vec<String>,
+    /// What the analysis knew about each finding's subject (language, symbol
+    /// shape, function summary, measures), by fingerprint.
+    pub facts: BTreeMap<Fingerprint, Value>,
 }
 
 impl Outcome {
@@ -184,7 +197,14 @@ impl Engine {
             d.fingerprint = d.fingerprint.occurrence(*n);
             *n += 1;
         }
+        let subjects = Subjects::new(&project, &facts);
+        outcome.facts = found
+            .iter()
+            .map(|d| (d.fingerprint.clone(), subjects.of(d)))
+            .collect();
         outcome.diagnostics = found;
+        outcome.reported = scopes;
+        outcome.rules = selected.iter().map(|r| r.meta().id.clone()).collect();
         incomplete.sort();
         incomplete.dedup();
         outcome.incomplete = incomplete;

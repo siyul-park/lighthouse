@@ -347,6 +347,37 @@ fn engine_checks_a_multi_file_go_package() {
     assert_eq!(outcome.exit_code(false, false), 0);
 }
 
+/// The findings of a one-file Go package as (symbol, fingerprint).
+fn exported_doc_findings(plugin: &Path, source: &str) -> Vec<(String, String)> {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "go.mod", "module example.com/app\n");
+    write(dir.path(), "api.go", source);
+    let only = ["design/exported-doc".to_owned()];
+    let outcome = engine(plugin, dir.path(), "").check(&[], &only).unwrap();
+    outcome
+        .diagnostics
+        .into_iter()
+        .map(|d| (d.symbol.unwrap(), d.fingerprint.as_str().to_owned()))
+        .collect()
+}
+
+#[test]
+fn fingerprints_survive_edits_above_a_go_finding() {
+    let Some(plugin) = go_plugin() else { return };
+    let before = exported_doc_findings(
+        &plugin,
+        "package app\n\nfunc Open() {}\n\nfunc Close() {}\n",
+    );
+    let after = exported_doc_findings(
+        &plugin,
+        "package app\n\nimport \"fmt\"\n\n// Added is documented.\nfunc Added() { fmt.Println() }\n\n\nfunc Open() {}\n\nfunc Close() {}\n",
+    );
+    assert_eq!(before.len(), 2, "{before:?}");
+    for finding in &before {
+        assert!(after.contains(finding), "{finding:?} not in {after:?}");
+    }
+}
+
 #[test]
 fn engine_reports_files_with_syntax_errors_as_incomplete() {
     let Some(plugin) = go_plugin() else { return };

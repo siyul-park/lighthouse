@@ -140,7 +140,11 @@ impl DeclarativeRule {
         symbol: &Symbol,
         value: &Value,
     ) -> Result<Option<Diagnostic>, PluginError> {
-        self.judge(value, symbol.file.clone(), symbol.span, symbol.id.as_str())
+        let found = self.judge(value, symbol.file.clone(), symbol.span, symbol.id.as_str())?;
+        Ok(found.map(|d| Diagnostic {
+            symbol: Some(symbol.id.as_str().to_owned()),
+            ..d
+        }))
     }
 
     /// Evaluates the rule for one selected value; a finding is reported at `span` of `file`.

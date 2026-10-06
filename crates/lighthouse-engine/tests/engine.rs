@@ -580,3 +580,26 @@ fn engine_with_incomplete() {
         assert_eq!(out.incomplete, std::slice::from_ref(&gap));
     }
 }
+
+#[test]
+fn outcome_states_report_scope_rules_that_ran_and_subject_facts() {
+    let dir = project(&[("a/x.txt", b"1"), ("b/y.txt", b"2")]);
+    let engine = engine(&dir, ALL).unwrap();
+
+    let by_path = engine
+        .check(&[dir.path().join("b")], &["fake/each".to_owned()])
+        .unwrap();
+    assert_eq!(by_path.reported, [PathBuf::from("b")]);
+    assert_eq!(by_path.rules, ["fake/each"]);
+    let facts = &by_path.facts[&by_path.diagnostics[0].fingerprint];
+    assert_eq!(facts["language"], "any");
+
+    let whole = engine.check(&[], &[]).unwrap();
+    assert_eq!(whole.reported, [PathBuf::new()]);
+    assert_eq!(whole.rules, ["fake/all", "fake/each", "fake/semantic"]);
+
+    let none = engine.check_files(&[], &[]).unwrap();
+    assert!(none.reported.is_empty());
+    let files = engine.check_files(&["a/x.txt".into()], &[]).unwrap();
+    assert_eq!(files.reported, [PathBuf::from("a/x.txt")]);
+}

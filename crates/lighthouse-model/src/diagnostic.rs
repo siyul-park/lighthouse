@@ -101,6 +101,9 @@ pub struct Diagnostic {
     pub file: PathBuf,
     pub span: Span,
     pub fingerprint: Fingerprint,
+    /// Id of the symbol the finding is about, when it is about one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<String>,
     #[serde(default, skip_serializing_if = "Value::is_null")]
     pub evidence: Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -108,7 +111,7 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    /// A finding without evidence or fix; set those fields directly.
+    /// A finding without symbol, evidence or fix; set those fields directly.
     pub fn new(
         rule_id: impl Into<String>,
         severity: Severity,
@@ -124,6 +127,7 @@ impl Diagnostic {
             file: file.into(),
             span,
             fingerprint,
+            symbol: None,
             evidence: Value::Null,
             fix: None,
         }

@@ -94,6 +94,7 @@ fn finding(meta: &RuleMeta, symbol: &Symbol, message: String, evidence: Value) -
         symbol.span,
         fingerprint,
     );
+    diagnostic.symbol = Some(symbol.id.as_str().to_owned());
     diagnostic.evidence = evidence;
     diagnostic
 }
