@@ -7,6 +7,7 @@ use serde::Deserialize;
 
 use crate::Error;
 
+/// File name of a plugin manifest inside its directory.
 pub const FILE_NAME: &str = "lighthouse-plugin.toml";
 
 /// `lighthouse-plugin.toml`: how to start a plugin process.
@@ -40,6 +41,17 @@ pub struct Found {
     pub dir: PathBuf,
 }
 
+/// What a search found: usable manifests, and manifests that did not parse.
+/// A broken manifest only matters to a plugin that is listed, so discovery
+/// does not fail on it.
+#[derive(Debug, Default)]
+pub struct Discovered {
+    pub found: Vec<Found>,
+    pub broken: Vec<Error>,
+}
+
+/// Reads `<dir>/lighthouse-plugin.toml`; fails with `Io` when unreadable and
+/// `Manifest` when it does not parse or has unknown keys.
 pub fn load(dir: &Path) -> Result<Found, Error> {
     let path = dir.join(FILE_NAME);
     let text = fs::read_to_string(&path).map_err(|source| Error::Io {
@@ -51,15 +63,6 @@ pub fn load(dir: &Path) -> Result<Found, Error> {
         manifest,
         dir: dir.to_owned(),
     })
-}
-
-/// What a search found: usable manifests, and manifests that did not parse.
-/// A broken manifest only matters to a plugin that is listed, so discovery
-/// does not fail on it.
-#[derive(Debug, Default)]
-pub struct Discovered {
-    pub found: Vec<Found>,
-    pub broken: Vec<Error>,
 }
 
 /// Manifests in `<search>/*/lighthouse-plugin.toml` for every existing search

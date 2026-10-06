@@ -4,14 +4,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-fn is_zero(n: &u32) -> bool {
-    *n == 0
-}
-
-fn is_false(b: &bool) -> bool {
-    !*b
-}
-
 /// Every method with its params and result. Exists to anchor the schema.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Methods {
@@ -19,12 +11,14 @@ pub struct Methods {
     pub index: Call<IndexParams, IndexResult>,
 }
 
+/// Params and result types of one method.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Call<P, R> {
     pub params: P,
     pub result: R,
 }
 
+/// Name and version of the host, for the plugin's diagnostics only.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ClientInfo {
     pub name: String,
@@ -42,6 +36,8 @@ pub struct InitializeParams {
     pub client_info: ClientInfo,
 }
 
+/// A plugin's answer to `initialize`: who it is, which protocol it speaks, and
+/// the languages it indexes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InitializeResult {
@@ -53,6 +49,7 @@ pub struct InitializeResult {
     pub languages: Vec<Language>,
 }
 
+/// A language a plugin indexes and how the host routes files to it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Language {
     pub id: String,
@@ -72,6 +69,7 @@ pub struct Language {
     pub capabilities: Vec<String>,
 }
 
+/// Layout conventions of a language that the host cannot infer from its files.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Conventions {
     /// Globs of test files.
@@ -79,12 +77,14 @@ pub struct Conventions {
     pub test_globs: Vec<String>,
 }
 
+/// The project an index request belongs to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ProjectRef {
     /// Absolute path of the project root.
     pub root: String,
 }
 
+/// A file to index; the plugin reads its content from disk.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct FileRef {
     /// Project-relative, `/`-separated.
@@ -101,6 +101,7 @@ pub struct Overlay {
     pub text: String,
 }
 
+/// Host-side settings that accompany an index request.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Context {
     /// Per-language options from `[languages.<id>]`, keyed by language id.
@@ -124,6 +125,8 @@ pub struct IndexParams {
     pub context: Context,
 }
 
+/// A plugin's answer to `index`: one fragment per analyzed file plus what could
+/// not be analyzed. A file is never silently dropped.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct IndexResult {
     /// One fragment per analyzed file, ordered by path.
@@ -137,6 +140,7 @@ pub struct IndexResult {
     pub incomplete: Vec<Incomplete>,
 }
 
+/// Part of the request that was not analyzed; "not checked" is not "passed".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Incomplete {
     /// Project-relative path; absent when the gap is not tied to one file.
@@ -165,6 +169,7 @@ pub struct Fragment {
     pub comments: Vec<Comment>,
 }
 
+/// Identity and classification of an indexed file.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct FileInfo {
     pub path: String,
@@ -185,6 +190,7 @@ pub struct Module {
     pub test_of: Option<String>,
 }
 
+/// What a symbol declares; the kebab-case name is the `#kind` suffix of its id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum SymbolKind {
@@ -198,6 +204,8 @@ pub enum SymbolKind {
     Test,
 }
 
+/// Who may use a symbol, as its language defines it; `internal` means visible
+/// within a bounded unit such as a crate, not outside it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Visibility {
@@ -233,6 +241,7 @@ pub enum SymbolRole {
     Fixture,
 }
 
+/// A named declaration; `id` is unique across the project.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Symbol {
     /// `module::owner::name#kind`, see docs/plugin-protocol.md.
@@ -254,6 +263,7 @@ pub struct Symbol {
     pub role: Option<SymbolRole>,
 }
 
+/// An edge endpoint: a whole module or one symbol.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Node {
@@ -261,6 +271,7 @@ pub enum Node {
     Symbol(String),
 }
 
+/// The relation an edge states between its endpoints.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum EdgeKind {
@@ -272,6 +283,7 @@ pub enum EdgeKind {
     AccessesPrivate,
 }
 
+/// How reliable an edge's target is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Resolution {
@@ -285,6 +297,7 @@ pub enum Resolution {
     Heuristic,
 }
 
+/// A directed relation between two code-model nodes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Edge {
     pub kind: EdgeKind,
@@ -295,6 +308,7 @@ pub struct Edge {
     pub resolution: Resolution,
 }
 
+/// Normalized control-flow construct, the same for every language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum FlowKind {
@@ -326,6 +340,7 @@ pub struct Flow {
     pub returning: bool,
 }
 
+/// Size and shape measures of one function or method, keyed by its symbol id.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct FunctionSummary {
     pub symbol: String,
@@ -359,6 +374,7 @@ pub struct FunctionSummary {
     pub forwards_to: Option<String>,
 }
 
+/// How a test enumerates its cases: one body over a data table, or separate scenarios.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum TestStyle {
@@ -366,6 +382,7 @@ pub enum TestStyle {
     Scenario,
 }
 
+/// A test symbol and the symbols it exercises.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct TestCase {
     pub symbol: String,
@@ -386,4 +403,12 @@ pub struct Comment {
     /// Id of the symbol the comment is the documentation of, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attached_to: Option<String>,
+}
+
+fn is_zero(n: &u32) -> bool {
+    *n == 0
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
 }

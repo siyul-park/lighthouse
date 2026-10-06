@@ -286,3 +286,30 @@ fn fan_counts_same_module_functions_and_ignores_tests_types_and_self() {
         }
     );
 }
+
+#[test]
+fn read_maps_the_metric_fact_by_function_and_fails_when_it_is_missing() {
+    let f = symbol("m", "f", SymbolKind::Function, FILE, (1, 1));
+    let project = one(&[]);
+    let ws = Workspace::new(".");
+    let mut facts = Facts::new();
+    facts.insert(
+        (CYCLOMATIC.to_owned(), String::new()),
+        serde_json::to_value([Measured {
+            symbol: f.id.clone(),
+            value: 3u32,
+        }])
+        .unwrap(),
+    );
+    let ctx = Ctx {
+        ws: &ws,
+        project: &project,
+        file: None,
+        facts: &facts,
+    };
+
+    let by_function = lighthouse_metrics::read::<u32>(&ctx, CYCLOMATIC).unwrap();
+
+    assert_eq!(by_function[&f.id], 3);
+    assert!(lighthouse_metrics::read::<u32>(&ctx, COGNITIVE).is_err());
+}

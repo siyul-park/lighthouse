@@ -10,10 +10,6 @@ use std::{
 static LANG_GO: OnceLock<Option<PathBuf>> = OnceLock::new();
 static LANG_RUST: OnceLock<PathBuf> = OnceLock::new();
 
-fn workspace() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
-}
-
 /// Directory of the `lang-go` plugin (manifest and binary, the layout
 /// `make plugins` produces), built once per process. `None` after printing a
 /// skip message when no Go toolchain runs in `plugins/lang-go`, unless `CI` or
@@ -21,6 +17,12 @@ fn workspace() -> PathBuf {
 /// build panics.
 pub fn lang_go() -> Option<PathBuf> {
     LANG_GO.get_or_init(build_lang_go).clone()
+}
+
+/// Directory of the `lang-rust` plugin (manifest and binary), built once per
+/// process with the cargo that runs the tests; a failing build panics.
+pub fn lang_rust() -> PathBuf {
+    LANG_RUST.get_or_init(build_lang_rust).clone()
 }
 
 fn build_lang_go() -> Option<PathBuf> {
@@ -93,12 +95,6 @@ fn install_manifest(source: &Path, out: &Path, goroot: &str) {
     fs::rename(&tmp, out.join("lighthouse-plugin.toml")).expect("install plugin manifest");
 }
 
-/// Directory of the `lang-rust` plugin (manifest and binary), built once per
-/// process with the cargo that runs the tests; a failing build panics.
-pub fn lang_rust() -> PathBuf {
-    LANG_RUST.get_or_init(build_lang_rust).clone()
-}
-
 fn build_lang_rust() -> PathBuf {
     let cargo = env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
     let status = Command::new(&cargo)
@@ -126,4 +122,8 @@ fn build_lang_rust() -> PathBuf {
     .expect("copy plugin manifest");
     fs::rename(&manifest, out.join("lighthouse-plugin.toml")).expect("install plugin manifest");
     out
+}
+
+fn workspace() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }

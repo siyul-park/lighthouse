@@ -7,6 +7,8 @@ use thiserror::Error;
 const JSONRPC: &str = "2.0";
 const MAX_BODY: usize = 256 * 1024 * 1024;
 
+/// Why a message could not be read or written; the stream is unusable after
+/// any variant but a clean end of input.
 #[derive(Debug, Error)]
 pub enum FrameError {
     #[error(transparent)]
@@ -19,6 +21,7 @@ pub enum FrameError {
     Json(#[from] serde_json::Error),
 }
 
+/// Request id chosen by the sender and echoed in the response.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Id {
@@ -26,6 +29,7 @@ pub enum Id {
     Text(String),
 }
 
+/// JSON-RPC error carried by a failed response.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ErrorObject {
     pub code: i64,
@@ -52,17 +56,7 @@ pub struct Message {
 }
 
 impl Message {
-    fn empty() -> Self {
-        Self {
-            jsonrpc: JSONRPC.to_owned(),
-            id: None,
-            method: None,
-            params: None,
-            result: None,
-            error: None,
-        }
-    }
-
+    /// A request with `params` serialized; fails only if they do not serialize.
     pub fn request(
         id: i64,
         method: &str,
@@ -76,6 +70,7 @@ impl Message {
         })
     }
 
+    /// A request without id: the peer must not answer it.
     pub fn notification(method: &str) -> Self {
         Self {
             method: Some(method.to_owned()),
@@ -83,6 +78,7 @@ impl Message {
         }
     }
 
+    /// A successful response with `result` serialized; fails only if it does not serialize.
     pub fn response(id: Id, result: impl Serialize) -> Result<Self, serde_json::Error> {
         Ok(Self {
             id: Some(id),
@@ -91,6 +87,7 @@ impl Message {
         })
     }
 
+    /// An error response; `id` is `None` when the request could not be read.
     pub fn failure(id: Option<Id>, code: i64, message: impl Into<String>) -> Self {
         Self {
             id,
@@ -114,8 +111,20 @@ impl Message {
         serde_json::from_value(self.result.unwrap_or(Value::Null)).map(Ok)
     }
 
+    /// Deserializes `params`; absent params read as JSON `null`.
     pub fn into_params<T: DeserializeOwned>(self) -> Result<T, serde_json::Error> {
         serde_json::from_value(self.params.unwrap_or(Value::Null))
+    }
+
+    fn empty() -> Self {
+        Self {
+            jsonrpc: JSONRPC.to_owned(),
+            id: None,
+            method: None,
+            params: None,
+            result: None,
+            error: None,
+        }
     }
 }
 
@@ -158,6 +167,7 @@ pub fn read_message(reader: &mut impl BufRead) -> Result<Option<Message>, FrameE
     Ok(Some(serde_json::from_slice(&body)?))
 }
 
+/// Writes one `Content-Length` framed message and flushes, so the peer can read it at once.
 pub fn write_message(writer: &mut impl Write, message: &Message) -> Result<(), FrameError> {
     let body = serde_json::to_vec(message)?;
     write!(writer, "Content-Length: {}\r\n\r\n", body.len())?;

@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 use lighthouse_model::{Diagnostic, Incomplete, Severity};
 use serde::Serialize;
@@ -117,47 +120,9 @@ struct Region {
     end_column: u32,
 }
 
-fn notification(item: &Incomplete) -> Notification<'_> {
-    Notification {
-        level: "error",
-        message: Message { text: &item.reason },
-        locations: item
-            .path
-            .iter()
-            .map(|path| NotificationLocation {
-                physical_location: ArtifactOnly {
-                    artifact_location: Artifact {
-                        uri: encode(&path.to_string_lossy().replace('\\', "/")),
-                        uri_base_id: SRCROOT,
-                    },
-                },
-            })
-            .collect(),
-    }
-}
-
-fn level(severity: Severity) -> &'static str {
-    match severity {
-        Severity::Error => "error",
-        Severity::Warn => "warning",
-        Severity::Review | Severity::Info => "note",
-    }
-}
-
-/// Percent-encodes everything but unreserved characters and `/`.
-fn encode(path: &str) -> String {
-    let mut out = String::new();
-    for b in path.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' => {
-                out.push(char::from(b));
-            }
-            _ => out.push_str(&format!("%{b:02X}")),
-        }
-    }
-    out
-}
-
+/// Renders a SARIF 2.1.0 log with one result per diagnostic and a tool
+/// notification per incomplete entry; an incomplete analysis marks the
+/// invocation unsuccessful.
 pub fn render(diagnostics: &[Diagnostic], incomplete: &[Incomplete]) -> String {
     let rules: BTreeSet<&str> = diagnostics.iter().map(|d| d.rule_id.as_str()).collect();
     let log = Log {
@@ -183,35 +148,75 @@ pub fn render(diagnostics: &[Diagnostic], incomplete: &[Incomplete]) -> String {
                     rules: rules.into_iter().map(|id| RuleRef { id }).collect(),
                 },
             },
-            results: diagnostics
-                .iter()
-                .map(|d| SarifResult {
-                    rule_id: &d.rule_id,
-                    level: level(d.severity),
-                    message: Message { text: &d.message },
-                    locations: [Location {
-                        physical_location: Physical {
-                            artifact_location: Artifact {
-                                uri: encode(&d.file.to_string_lossy().replace('\\', "/")),
-                                uri_base_id: SRCROOT,
-                            },
-                            region: Region {
-                                start_line: d.span.start.line,
-                                start_column: d.span.start.col,
-                                end_line: d.span.end.line,
-                                end_column: d.span.end.col,
-                            },
-                        },
-                    }],
-                    partial_fingerprints: BTreeMap::from([(
-                        FINGERPRINT_KEY,
-                        d.fingerprint.as_str(),
-                    )]),
-                })
-                .collect(),
+            results: diagnostics.iter().map(result).collect(),
         }],
     };
     let mut out = serde_json::to_string_pretty(&log).expect("sarif serializes");
     out.push('\n');
+    out
+}
+
+fn notification(item: &Incomplete) -> Notification<'_> {
+    Notification {
+        level: "error",
+        message: Message { text: &item.reason },
+        locations: item
+            .path
+            .iter()
+            .map(|path| NotificationLocation {
+                physical_location: ArtifactOnly {
+                    artifact_location: artifact(path),
+                },
+            })
+            .collect(),
+    }
+}
+
+fn result(d: &Diagnostic) -> SarifResult<'_> {
+    SarifResult {
+        rule_id: &d.rule_id,
+        level: level(d.severity),
+        message: Message { text: &d.message },
+        locations: [Location {
+            physical_location: Physical {
+                artifact_location: artifact(&d.file),
+                region: Region {
+                    start_line: d.span.start.line,
+                    start_column: d.span.start.col,
+                    end_line: d.span.end.line,
+                    end_column: d.span.end.col,
+                },
+            },
+        }],
+        partial_fingerprints: BTreeMap::from([(FINGERPRINT_KEY, d.fingerprint.as_str())]),
+    }
+}
+
+fn artifact(path: &Path) -> Artifact {
+    Artifact {
+        uri: encode(&path.to_string_lossy().replace('\\', "/")),
+        uri_base_id: SRCROOT,
+    }
+}
+
+fn level(severity: Severity) -> &'static str {
+    match severity {
+        Severity::Error => "error",
+        Severity::Warn => "warning",
+        Severity::Review | Severity::Info => "note",
+    }
+}
+
+/// Percent-encodes everything but unreserved characters and `/`.
+fn encode(path: &str) -> String {
+    let mut out = String::new();
+    for b in path.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' => {
+                out.push(char::from(b));
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
     out
 }

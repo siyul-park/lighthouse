@@ -66,10 +66,12 @@ impl RpcPlugin {
 }
 
 impl Plugin for RpcPlugin {
+    /// The identity the process reported during the handshake.
     fn manifest(&self) -> Manifest {
         self.manifest.clone()
     }
 
+    /// One provider per language the process declared, all sharing its connection.
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
         self.languages
             .iter()
@@ -94,32 +96,6 @@ struct Provider {
     language: wire::Language,
     capabilities: Vec<Capability>,
     client: Arc<Client>,
-}
-
-impl Provider {
-    fn request(&self, ws: &Workspace, files: &[Source]) -> wire::IndexParams {
-        wire::IndexParams {
-            project: wire::ProjectRef {
-                root: ws.root.to_string_lossy().into_owned(),
-            },
-            language: self.language.id.clone(),
-            files: files
-                .iter()
-                .map(|s| wire::FileRef {
-                    path: s.file.path.to_string_lossy().replace('\\', "/"),
-                    hash: s.file.hash.clone(),
-                })
-                .collect(),
-            context: wire::Context {
-                options: ws
-                    .languages
-                    .iter()
-                    .map(|(id, options)| (id.clone(), Value::Object(options.clone())))
-                    .collect(),
-                overlays: None,
-            },
-        }
-    }
 }
 
 impl LanguageProvider for Provider {
@@ -168,5 +144,31 @@ impl LanguageProvider for Provider {
         });
         indexed.notices.extend(self.client.drain_stderr());
         Ok(indexed)
+    }
+}
+
+impl Provider {
+    fn request(&self, ws: &Workspace, files: &[Source]) -> wire::IndexParams {
+        wire::IndexParams {
+            project: wire::ProjectRef {
+                root: ws.root.to_string_lossy().into_owned(),
+            },
+            language: self.language.id.clone(),
+            files: files
+                .iter()
+                .map(|s| wire::FileRef {
+                    path: s.file.path.to_string_lossy().replace('\\', "/"),
+                    hash: s.file.hash.clone(),
+                })
+                .collect(),
+            context: wire::Context {
+                options: ws
+                    .languages
+                    .iter()
+                    .map(|(id, options)| (id.clone(), Value::Object(options.clone())))
+                    .collect(),
+                overlays: None,
+            },
+        }
     }
 }

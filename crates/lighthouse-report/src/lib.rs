@@ -5,6 +5,7 @@ use std::{fmt::Write, str::FromStr};
 use lighthouse_model::{Diagnostic, Incomplete, Severity};
 use thiserror::Error;
 
+/// Output format of [`render`]; parsed from `text`, `json` or `sarif`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
     Text,
@@ -12,6 +13,7 @@ pub enum Format {
     Sarif,
 }
 
+/// The text given to [`Format::from_str`] names no format.
 #[derive(Debug, Error)]
 #[error("unknown format `{0}` (expected text, json or sarif)")]
 pub struct UnknownFormat(String);
@@ -31,10 +33,10 @@ impl FromStr for Format {
 
 /// Renders diagnostics in the given order, then what the analysis could not
 /// cover; the output ends with a newline unless it is empty. Text output ends
-/// with a `summary:` line of counts whenever there is anything to report. An incomplete
-/// analysis is stated in every format: text prints `incomplete` lines, JSON
-/// prints `{"incomplete": {...}}` lines and SARIF marks its invocation as
-/// unsuccessful with a tool notification per entry.
+/// with a `summary:` line of counts whenever there is anything to report. An
+/// incomplete analysis is stated in every format: text prints `incomplete`
+/// lines, JSON prints `{"incomplete": {...}}` lines and SARIF marks its
+/// invocation as unsuccessful with a tool notification per entry.
 pub fn render(format: Format, diagnostics: &[Diagnostic], incomplete: &[Incomplete]) -> String {
     match format {
         Format::Text => text(diagnostics, incomplete),

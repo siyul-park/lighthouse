@@ -26,6 +26,7 @@ fn fingerprint_is_hex_sha256() {
     let fp = Fingerprint::of("a", "b", "c");
     assert_eq!(fp.as_str().len(), 64);
     assert!(fp.as_str().bytes().all(|b| b.is_ascii_hexdigit()));
+    assert_eq!(Fingerprint::from_raw(fp.as_str()), fp);
 }
 
 #[test]

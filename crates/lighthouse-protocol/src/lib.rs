@@ -14,9 +14,13 @@ pub use wire::{
 /// Protocol version spoken by this crate. Peers must agree on it exactly.
 pub const VERSION: &str = "0.1";
 
+/// Request: handshake; the first message of a session.
 pub const INITIALIZE: &str = "initialize";
+/// Request: index the files of one language.
 pub const INDEX: &str = "index";
+/// Request: stop accepting work; answered, then followed by [`EXIT`].
 pub const SHUTDOWN: &str = "shutdown";
+/// Notification: end the process; valid only after [`SHUTDOWN`] was answered.
 pub const EXIT: &str = "exit";
 
 /// The only capability defined by version 0.1.

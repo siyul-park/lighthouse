@@ -48,6 +48,21 @@ fn symbol_ids_are_qualified_and_stable() {
 }
 
 #[test]
+fn symbol_kind_as_str() {
+    for kind in [
+        SymbolKind::Function,
+        SymbolKind::Test,
+        SymbolKind::Interface,
+    ] {
+        let id = SymbolId::new("m", &[], "x", kind);
+        assert!(
+            id.as_str()
+                .ends_with(&format!("#{}", SymbolKind::as_str(kind)))
+        );
+    }
+}
+
+#[test]
 fn merge_resolves_cross_fragment_targets_and_keeps_unknown_paths() {
     let a = symbol("a", "f");
     let b = symbol("b", "g");
@@ -151,6 +166,11 @@ fn project_indexes_answer_by_file_symbol_and_call_graph() {
     };
     let fragment = Fragment {
         files: vec![test_file],
+        modules: vec![Module {
+            path: "m".to_owned(),
+            name: None,
+            test_of: None,
+        }],
         symbols: vec![a.clone(), b.clone(), c.clone()],
         edges: vec![
             call(&a, b.id.as_str()),
@@ -175,6 +195,8 @@ fn project_indexes_answer_by_file_symbol_and_call_graph() {
         Some(Target::Resolved(Node::Symbol(b.id.clone())))
     );
     assert_eq!(b.id.module(), "m");
+    assert!(project.module("m").is_some());
+    assert!(project.module("n").is_none());
 }
 
 fn kinded(module: &str, owner: &str, name: &str, kind: SymbolKind, file: &str) -> Symbol {

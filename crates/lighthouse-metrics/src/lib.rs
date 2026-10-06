@@ -10,12 +10,21 @@ use serde_json::Value;
 
 pub use fan::Fan;
 
-pub const ID: &str = "metrics";
+/// Plugin id.
+const ID: &str = "metrics";
+/// Analyzer id of the per-function [`Size`] fact.
 pub const SIZE: &str = "metrics/size";
+/// Analyzer id of the per-function cyclomatic complexity fact (`u32`).
 pub const CYCLOMATIC: &str = "metrics/cyclomatic";
+/// Analyzer id of the per-function cognitive complexity fact (`u32`).
 pub const COGNITIVE: &str = "metrics/cognitive";
+/// Analyzer id of the per-function deepest-nesting fact (`u32`).
 pub const NESTING: &str = "metrics/nesting";
+/// Analyzer id of the per-function [`Fan`] fact.
 pub const FAN: &str = "metrics/fan";
+
+/// Deepest nesting of a flat dispatch's arms.
+const FLAT_DISPATCH_NESTING: u32 = 2;
 
 /// A function's value of one metric; every metric fact is a list of these.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -24,24 +33,18 @@ pub struct Measured<T> {
     pub value: T,
 }
 
+/// Statement and line count of a function; `lines` is inclusive of both ends.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Size {
     pub statements: u32,
     pub lines: u32,
 }
 
-/// Reads the metric fact of `analyzer` for the focused file, by function.
-pub fn read<T: DeserializeOwned>(
-    ctx: &Ctx,
-    analyzer: &str,
-) -> Result<BTreeMap<SymbolId, T>, Error> {
-    let all: Vec<Measured<T>> = ctx.fact(analyzer)?;
-    Ok(all.into_iter().map(|m| (m.symbol, m.value)).collect())
-}
-
+/// The plugin providing the `metrics/*` analyzers; stateless.
 pub struct Metrics;
 
 impl Plugin for Metrics {
+    /// Identifies the plugin as `metrics` at this crate's version.
     fn manifest(&self) -> Manifest {
         Manifest {
             id: ID.to_owned(),
@@ -49,6 +52,7 @@ impl Plugin for Metrics {
         }
     }
 
+    /// One per-function analyzer per metric constant, each file-scoped.
     fn analyzers(&self) -> Vec<Box<dyn Analyzer>> {
         vec![
             Box::new(PerFunction::new(SIZE, size)),
@@ -108,6 +112,46 @@ impl<T: Serialize + Send + Sync> Analyzer for PerFunction<T> {
     }
 }
 
+/// Reads the metric fact of `analyzer` for the focused file, by function.
+pub fn read<T: DeserializeOwned>(
+    ctx: &Ctx,
+    analyzer: &str,
+) -> Result<BTreeMap<SymbolId, T>, Error> {
+    let all: Vec<Measured<T>> = ctx.fact(analyzer)?;
+    Ok(all.into_iter().map(|m| (m.symbol, m.value)).collect())
+}
+
+/// A body that is one multi-way branch with a single return per arm: a table
+/// in code form, long but not complex.
+pub fn is_dispatcher(summary: &FunctionSummary) -> bool {
+    summary.top_level == 1
+        && summary
+            .flow
+            .first()
+            .is_some_and(|f| f.kind == FlowKind::Switch && f.nesting == 0 && f.returning)
+}
+
+/// A body whose only top-level branching is one multi-way branch, whatever
+/// its arms do, nested at most two levels: many paths, one shape. Its
+/// cyclomatic complexity overstates how hard it is to follow; only cognitive
+/// complexity can still mark it.
+pub fn is_flat_dispatch(summary: &FunctionSummary) -> bool {
+    let mut top_level = summary.flow.iter().filter(|f| {
+        f.nesting == 0
+            && matches!(
+                f.kind,
+                FlowKind::If
+                    | FlowKind::ElseIf
+                    | FlowKind::Loop
+                    | FlowKind::Catch
+                    | FlowKind::Switch
+            )
+    });
+    summary.max_nesting <= FLAT_DISPATCH_NESTING
+        && top_level.next().is_some_and(|f| f.kind == FlowKind::Switch)
+        && top_level.next().is_none()
+}
+
 fn size(_: &Project, symbol: &Symbol, summary: &FunctionSummary) -> Size {
     Size {
         statements: summary.statements,
@@ -129,40 +173,6 @@ fn cyclomatic(_: &Project, _: &Symbol, summary: &FunctionSummary) -> u32 {
             FlowKind::Else | FlowKind::Jump | FlowKind::Recursion => 0,
         })
         .sum::<u32>()
-}
-
-/// A body that is one multi-way branch with a single return per arm: a table
-/// in code form, long but not complex.
-pub fn is_dispatcher(summary: &FunctionSummary) -> bool {
-    summary.top_level == 1
-        && summary
-            .flow
-            .first()
-            .is_some_and(|f| f.kind == FlowKind::Switch && f.nesting == 0 && f.returning)
-}
-
-/// Deepest nesting of a flat dispatch's arms.
-const FLAT_DISPATCH_NESTING: u32 = 2;
-
-/// A body whose only top-level branching is one multi-way branch, whatever
-/// its arms do, nested at most two levels: many paths, one shape. Its
-/// cyclomatic complexity overstates how hard it is to follow; only cognitive
-/// complexity can still mark it.
-pub fn is_flat_dispatch(summary: &FunctionSummary) -> bool {
-    let mut top_level = summary.flow.iter().filter(|f| {
-        f.nesting == 0
-            && matches!(
-                f.kind,
-                FlowKind::If
-                    | FlowKind::ElseIf
-                    | FlowKind::Loop
-                    | FlowKind::Catch
-                    | FlowKind::Switch
-            )
-    });
-    summary.max_nesting <= FLAT_DISPATCH_NESTING
-        && top_level.next().is_some_and(|f| f.kind == FlowKind::Switch)
-        && top_level.next().is_none()
 }
 
 fn nesting(_: &Project, _: &Symbol, summary: &FunctionSummary) -> u32 {

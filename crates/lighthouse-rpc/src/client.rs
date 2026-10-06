@@ -81,39 +81,12 @@ impl Client {
         let mut child = process
             .spawn()
             .map_err(|e| format!("cannot start `{}`: {e}", command.display()))?;
-        let mut stdin = child.stdin.take().ok_or("no stdin")?;
+        let stdin = child.stdin.take().ok_or("no stdin")?;
         let stdout = child.stdout.take().ok_or("no stdout")?;
         let stderr_pipe = child.stderr.take().ok_or("no stderr")?;
 
-        let (writer, frames) = mpsc::channel::<Vec<u8>>();
-        thread::spawn(move || {
-            for frame in frames {
-                if stdin
-                    .write_all(&frame)
-                    .and_then(|()| stdin.flush())
-                    .is_err()
-                {
-                    break;
-                }
-            }
-        });
-
-        let (tx, events) = mpsc::sync_channel(EVENT_QUEUE);
-        thread::spawn(move || {
-            let mut reader = BufReader::new(stdout);
-            loop {
-                let event = match read_message(&mut reader) {
-                    Ok(Some(m)) if m.method.is_none() && m.id.is_some() => Event::Response(m),
-                    Ok(Some(_)) => continue,
-                    Ok(None) => Event::Closed("closed its output".to_owned()),
-                    Err(e) => Event::Closed(e.to_string()),
-                };
-                let last = matches!(event, Event::Closed(_));
-                if tx.send(event).is_err() || last {
-                    break;
-                }
-            }
-        });
+        let writer = spawn_writer(stdin);
+        let events = spawn_reader(stdout);
 
         let stderr = Arc::new(Mutex::new(Stderr::default()));
         let sink = Arc::clone(&stderr);
@@ -251,6 +224,68 @@ impl Client {
     }
 }
 
+impl Drop for Client {
+    fn drop(&mut self) {
+        let Ok(Ok(session)) = self.session.get_mut() else {
+            return;
+        };
+        let shutdown = Message::request(session.next_id, lighthouse_protocol::SHUTDOWN, ());
+        for message in shutdown
+            .into_iter()
+            .chain([Message::notification(lighthouse_protocol::EXIT)])
+        {
+            let mut frame = Vec::new();
+            if write_message(&mut frame, &message).is_ok() {
+                let _ = session.writer.send(frame);
+            }
+        }
+        let deadline = Instant::now() + EXIT_GRACE;
+        while matches!(session.child.try_wait(), Ok(None)) && Instant::now() < deadline {
+            thread::sleep(POLL);
+        }
+        reap(&mut session.child);
+    }
+}
+
+/// Writes frames to the plugin on its own thread, so a plugin that stops
+/// reading cannot block the caller past its deadline.
+fn spawn_writer(mut stdin: impl Write + Send + 'static) -> Sender<Vec<u8>> {
+    let (writer, frames) = mpsc::channel::<Vec<u8>>();
+    thread::spawn(move || {
+        for frame in frames {
+            if stdin
+                .write_all(&frame)
+                .and_then(|()| stdin.flush())
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
+    writer
+}
+
+/// Forwards the plugin's responses; the last event is `Closed` once its output ends or breaks.
+fn spawn_reader(stdout: impl Read + Send + 'static) -> Receiver<Event> {
+    let (tx, events) = mpsc::sync_channel(EVENT_QUEUE);
+    thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        loop {
+            let event = match read_message(&mut reader) {
+                Ok(Some(m)) if m.method.is_none() && m.id.is_some() => Event::Response(m),
+                Ok(Some(_)) => continue,
+                Ok(None) => Event::Closed("closed its output".to_owned()),
+                Err(e) => Event::Closed(e.to_string()),
+            };
+            let last = matches!(event, Event::Closed(_));
+            if tx.send(event).is_err() || last {
+                break;
+            }
+        }
+    });
+    events
+}
+
 /// Keeps the last lines, each cut to a byte limit; reads never buffer more
 /// than one limited line.
 fn collect_stderr(mut reader: impl BufRead, sink: &Mutex<Stderr>) {
@@ -288,29 +323,6 @@ fn discard_line(reader: &mut impl BufRead) {
             Ok(n) if n > 0 && !scrap.ends_with(b"\n") => {}
             _ => return,
         }
-    }
-}
-
-impl Drop for Client {
-    fn drop(&mut self) {
-        let Ok(Ok(session)) = self.session.get_mut() else {
-            return;
-        };
-        let shutdown = Message::request(session.next_id, lighthouse_protocol::SHUTDOWN, ());
-        for message in shutdown
-            .into_iter()
-            .chain([Message::notification(lighthouse_protocol::EXIT)])
-        {
-            let mut frame = Vec::new();
-            if write_message(&mut frame, &message).is_ok() {
-                let _ = session.writer.send(frame);
-            }
-        }
-        let deadline = Instant::now() + EXIT_GRACE;
-        while matches!(session.child.try_wait(), Ok(None)) && Instant::now() < deadline {
-            thread::sleep(POLL);
-        }
-        reap(&mut session.child);
     }
 }
 

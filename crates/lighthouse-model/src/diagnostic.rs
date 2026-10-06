@@ -7,6 +7,7 @@ use thiserror::Error;
 
 use crate::Span;
 
+/// How a finding is acted on; serialized and parsed as the lowercase variant name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
@@ -19,6 +20,7 @@ pub enum Severity {
     Info,
 }
 
+/// The text given to [`Severity::from_str`] names no severity.
 #[derive(Debug, Error)]
 #[error("unknown severity `{0}` (expected error, warn, review or info)")]
 pub struct UnknownSeverity(pub String);
@@ -83,15 +85,14 @@ impl Fingerprint {
         Self(hex(&hash.finalize()))
     }
 
+    /// The opaque hex string; equal fingerprints identify the same finding.
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
 
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
-}
-
+/// One finding: where a rule found a violation and how to tell it apart from
+/// the same finding in another run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Diagnostic {
     pub rule_id: String,
@@ -107,6 +108,7 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
+    /// A finding without evidence or fix; set those fields directly.
     pub fn new(
         rule_id: impl Into<String>,
         severity: Severity,
@@ -136,4 +138,8 @@ pub struct Incomplete {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<PathBuf>,
     pub reason: String,
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }

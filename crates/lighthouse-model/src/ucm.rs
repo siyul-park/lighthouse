@@ -17,6 +17,7 @@ pub struct Position {
     pub col: u32,
 }
 
+/// Source range within one file; `start` is never after `end`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Span {
     pub start: Position,
@@ -38,6 +39,8 @@ impl fmt::Display for Capability {
     }
 }
 
+/// A project file; `path` is its project-relative identity and `hash` its content hash.
+/// `generated` and `test` are the provider's classification, never inferred here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct File {
     pub path: PathBuf,
@@ -65,6 +68,7 @@ pub struct Module {
 pub struct SymbolId(String);
 
 impl SymbolId {
+    /// Builds `module::owner::...::name#kind`; the result always satisfies [`SymbolId::parse`].
     pub fn new(module: &str, owners: &[&str], name: &str, kind: SymbolKind) -> Self {
         let mut id = module.to_owned();
         for part in owners.iter().chain([&name]) {
@@ -76,6 +80,7 @@ impl SymbolId {
         Self(id)
     }
 
+    /// The id text, `module::owner::name#kind`.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -96,6 +101,7 @@ impl SymbolId {
     }
 }
 
+/// What a symbol declares; the lowercase name is the `#kind` suffix of its id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SymbolKind {
@@ -121,6 +127,7 @@ impl SymbolKind {
         Self::Test,
     ];
 
+    /// The kind's id suffix, such as `function`; inverse of the ids built by [`SymbolId::new`].
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Function => "function",
@@ -135,6 +142,8 @@ impl SymbolKind {
     }
 }
 
+/// Who may use a symbol, as the language defines it; `Internal` is
+/// visible within a bounded unit such as a crate, but not outside it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Visibility {
@@ -155,6 +164,8 @@ pub enum SymbolRole {
     Fixture,
 }
 
+/// A named declaration. `id` is project-unique; `owner` is the declaring type
+/// or interface of a member, `None` at module level.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Symbol {
     pub id: SymbolId,
@@ -168,6 +179,7 @@ pub struct Symbol {
     pub role: Option<SymbolRole>,
 }
 
+/// A vertex of the dependency graph: a whole module or one symbol.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Node {
@@ -185,6 +197,7 @@ pub enum Target {
     Path(String),
 }
 
+/// The relation an [`Edge`] states between its endpoints.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum EdgeKind {
@@ -201,6 +214,7 @@ pub enum EdgeKind {
     AccessesPrivate,
 }
 
+/// How reliable an [`Edge`]'s target is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Resolution {
@@ -214,6 +228,8 @@ pub enum Resolution {
     Heuristic,
 }
 
+/// A directed relation from `from` to `to`; unresolved targets stay
+/// [`Target::Path`] after [`Project::merge`] when they are unknown or ambiguous.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Edge {
     pub kind: EdgeKind,
@@ -275,6 +291,7 @@ pub struct Flow {
 }
 
 impl Flow {
+    /// A construct with no arms, operators or returning arms; set those directly.
     pub fn new(kind: FlowKind, nesting: u32) -> Self {
         Self {
             kind,
@@ -286,6 +303,8 @@ impl Flow {
     }
 }
 
+/// Size and shape measures of one function or method, keyed by its symbol.
+/// Counts are the provider's; nothing here is recomputed from source.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FunctionSummary {
     pub symbol: SymbolId,
@@ -315,6 +334,7 @@ pub struct FunctionSummary {
     pub manual_assertions: u32,
 }
 
+/// How a test enumerates its cases: one body over a data table, or separate scenarios.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum TestStyle {
@@ -322,6 +342,8 @@ pub enum TestStyle {
     Scenario,
 }
 
+/// A test symbol and the symbols it exercises (`targets`); `nesting` is its
+/// deepest subtest level, 0 for a flat test.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TestCase {
     pub symbol: SymbolId,
@@ -392,66 +414,11 @@ impl Deref for Project {
 }
 
 impl Project {
+    /// Sorts, deduplicates and indexes `parts`, then resolves edge targets;
+    /// never fails: what it drops or leaves ambiguous is reported by [`Project::notices`].
     pub fn merge(parts: impl IntoIterator<Item = Fragment>) -> Self {
-        let mut all = Fragment::default();
-        for part in parts {
-            all.files.extend(part.files);
-            all.modules.extend(part.modules);
-            all.symbols.extend(part.symbols);
-            all.edges.extend(part.edges);
-            all.functions.extend(part.functions);
-            all.tests.extend(part.tests);
-            all.comments.extend(part.comments);
-        }
-        all.files.sort_by(|a, b| a.path.cmp(&b.path));
-        all.files.dedup_by(|a, b| a.path == b.path);
-        all.modules.sort_by(|a, b| a.path.cmp(&b.path));
-        all.modules.dedup_by(|a, b| a.path == b.path);
-        all.symbols.sort_by(|a, b| a.id.cmp(&b.id));
-        let mut notices = Vec::new();
-        notices.extend(duplicate_notice(&all.symbols));
-        all.symbols.dedup_by(|a, b| a.id == b.id);
-        all.functions.sort_by(|a, b| a.symbol.cmp(&b.symbol));
-        all.functions.dedup_by(|a, b| a.symbol == b.symbol);
-        all.tests.sort_by(|a, b| a.symbol.cmp(&b.symbol));
-        all.tests.dedup_by(|a, b| a.symbol == b.symbol);
-        all.comments
-            .sort_by(|a, b| (&a.file, a.span.start).cmp(&(&b.file, b.span.start)));
-        all.comments.dedup();
-
-        let resolver = Resolver::new(&all);
-        let resolved: Vec<Target> = all
-            .edges
-            .iter()
-            .map(|e| resolver.resolve(&e.to, e.kind == EdgeKind::Calls))
-            .collect();
-        let targets: Vec<Vec<Target>> = all
-            .tests
-            .iter()
-            .map(|t| {
-                t.targets
-                    .iter()
-                    .map(|x| resolver.resolve(x, false))
-                    .collect()
-            })
-            .collect();
-        let forwards: Vec<Option<Target>> = all
-            .functions
-            .iter()
-            .map(|f| f.forwards_to.as_ref().map(|t| resolver.resolve(t, true)))
-            .collect();
-        let ambiguous = resolver.ambiguous.get();
-        for (edge, to) in all.edges.iter_mut().zip(resolved) {
-            edge.to = to;
-        }
-        let mut seen = HashSet::new();
-        all.edges.retain(|e| seen.insert(e.clone()));
-        for (test, targets) in all.tests.iter_mut().zip(targets) {
-            test.targets = targets;
-        }
-        for (function, to) in all.functions.iter_mut().zip(forwards) {
-            function.forwards_to = to;
-        }
+        let (mut all, mut notices) = sorted_union(parts);
+        let ambiguous = Resolver::resolve_all(&mut all);
         if ambiguous > 0 {
             notices.push(format!(
                 "{ambiguous} edge target(s) matched several symbols and stayed unresolved"
@@ -470,6 +437,7 @@ impl Project {
         &self.notices
     }
 
+    /// The file at this exact project-relative path.
     pub fn file(&self, path: &Path) -> Option<&File> {
         let at = self
             .all
@@ -479,6 +447,7 @@ impl Project {
         self.all.files.get(at)
     }
 
+    /// The symbol with this id, if declared.
     pub fn symbol(&self, id: &SymbolId) -> Option<&Symbol> {
         self.all.symbols.get(*self.index.symbols.get(id)?)
     }
@@ -513,6 +482,7 @@ impl Project {
         self.all.modules.get(at)
     }
 
+    /// The summary of a function or method symbol; `None` for other kinds.
     pub fn function(&self, id: &SymbolId) -> Option<&FunctionSummary> {
         self.all.functions.get(*self.index.functions.get(id)?)
     }
@@ -645,6 +615,47 @@ struct Resolver<'a> {
     ambiguous: Cell<usize>,
 }
 
+impl Resolver<'_> {
+    /// Resolves edge, test and forwarding targets in place, drops duplicate edges,
+    /// and returns how many targets stayed ambiguous.
+    fn resolve_all(all: &mut Fragment) -> usize {
+        let resolver = Resolver::new(all);
+        let resolved: Vec<Target> = all
+            .edges
+            .iter()
+            .map(|e| resolver.resolve(&e.to, e.kind == EdgeKind::Calls))
+            .collect();
+        let targets: Vec<Vec<Target>> = all
+            .tests
+            .iter()
+            .map(|t| {
+                t.targets
+                    .iter()
+                    .map(|x| resolver.resolve(x, false))
+                    .collect()
+            })
+            .collect();
+        let forwards: Vec<Option<Target>> = all
+            .functions
+            .iter()
+            .map(|f| f.forwards_to.as_ref().map(|t| resolver.resolve(t, true)))
+            .collect();
+        let ambiguous = resolver.ambiguous.get();
+        for (edge, to) in all.edges.iter_mut().zip(resolved) {
+            edge.to = to;
+        }
+        let mut seen = HashSet::new();
+        all.edges.retain(|e| seen.insert(e.clone()));
+        for (test, targets) in all.tests.iter_mut().zip(targets) {
+            test.targets = targets;
+        }
+        for (function, to) in all.functions.iter_mut().zip(forwards) {
+            function.forwards_to = to;
+        }
+        ambiguous
+    }
+}
+
 impl<'a> Resolver<'a> {
     fn new(all: &'a Fragment) -> Self {
         let mut bare: BTreeMap<&str, Vec<(&SymbolId, SymbolKind)>> = BTreeMap::new();
@@ -693,6 +704,36 @@ impl<'a> Resolver<'a> {
         self.ambiguous.set(self.ambiguous.get() + 1);
         target.clone()
     }
+}
+
+/// The fragments concatenated, sorted and deduplicated by identity, with a
+/// notice when a symbol id is declared in several files.
+fn sorted_union(parts: impl IntoIterator<Item = Fragment>) -> (Fragment, Vec<String>) {
+    let mut all = Fragment::default();
+    for part in parts {
+        all.files.extend(part.files);
+        all.modules.extend(part.modules);
+        all.symbols.extend(part.symbols);
+        all.edges.extend(part.edges);
+        all.functions.extend(part.functions);
+        all.tests.extend(part.tests);
+        all.comments.extend(part.comments);
+    }
+    all.files.sort_by(|a, b| a.path.cmp(&b.path));
+    all.files.dedup_by(|a, b| a.path == b.path);
+    all.modules.sort_by(|a, b| a.path.cmp(&b.path));
+    all.modules.dedup_by(|a, b| a.path == b.path);
+    all.symbols.sort_by(|a, b| a.id.cmp(&b.id));
+    let notices = duplicate_notice(&all.symbols).into_iter().collect();
+    all.symbols.dedup_by(|a, b| a.id == b.id);
+    all.functions.sort_by(|a, b| a.symbol.cmp(&b.symbol));
+    all.functions.dedup_by(|a, b| a.symbol == b.symbol);
+    all.tests.sort_by(|a, b| a.symbol.cmp(&b.symbol));
+    all.tests.dedup_by(|a, b| a.symbol == b.symbol);
+    all.comments
+        .sort_by(|a, b| (&a.file, a.span.start).cmp(&(&b.file, b.span.start)));
+    all.comments.dedup();
+    (all, notices)
 }
 
 fn duplicate_notice(sorted: &[Symbol]) -> Option<String> {

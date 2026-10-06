@@ -1,6 +1,7 @@
 {
   "$defs": {
     "Call": {
+      "description": "Params and result types of one method.",
       "properties": {
         "params": {
           "$ref": "#/$defs/InitializeParams"
@@ -16,6 +17,7 @@
       "type": "object"
     },
     "Call2": {
+      "description": "Params and result types of one method.",
       "properties": {
         "params": {
           "$ref": "#/$defs/IndexParams"
@@ -31,6 +33,7 @@
       "type": "object"
     },
     "ClientInfo": {
+      "description": "Name and version of the host, for the plugin's diagnostics only.",
       "properties": {
         "name": {
           "type": "string"
@@ -70,6 +73,7 @@
       "type": "object"
     },
     "Context": {
+      "description": "Host-side settings that accompany an index request.",
       "properties": {
         "options": {
           "additionalProperties": true,
@@ -91,6 +95,7 @@
       "type": "object"
     },
     "Conventions": {
+      "description": "Layout conventions of a language that the host cannot infer from its files.",
       "properties": {
         "test_globs": {
           "default": [],
@@ -104,6 +109,7 @@
       "type": "object"
     },
     "Edge": {
+      "description": "A directed relation between two code-model nodes.",
       "properties": {
         "from": {
           "$ref": "#/$defs/Node"
@@ -128,6 +134,7 @@
       "type": "object"
     },
     "EdgeKind": {
+      "description": "The relation an edge states between its endpoints.",
       "enum": [
         "calls",
         "references",
@@ -139,6 +146,7 @@
       "type": "string"
     },
     "FileInfo": {
+      "description": "Identity and classification of an indexed file.",
       "properties": {
         "generated": {
           "description": "The file is machine-generated.",
@@ -154,6 +162,7 @@
       "type": "object"
     },
     "FileRef": {
+      "description": "A file to index; the plugin reads its content from disk.",
       "properties": {
         "hash": {
           "description": "SHA-256 of the file content, lowercase hex.",
@@ -205,6 +214,7 @@
       "type": "object"
     },
     "FlowKind": {
+      "description": "Normalized control-flow construct, the same for every language.",
       "enum": [
         "if",
         "else-if",
@@ -274,6 +284,7 @@
       "type": "object"
     },
     "FunctionSummary": {
+      "description": "Size and shape measures of one function or method, keyed by its symbol id.",
       "properties": {
         "clone_fingerprint": {
           "description": "Reserved: normalized fingerprint for clone detection.",
@@ -359,6 +370,7 @@
       "type": "object"
     },
     "Incomplete": {
+      "description": "Part of the request that was not analyzed; \"not checked\" is not \"passed\".",
       "properties": {
         "path": {
           "description": "Project-relative path; absent when the gap is not tied to one file.",
@@ -407,6 +419,7 @@
       "type": "object"
     },
     "IndexResult": {
+      "description": "A plugin's answer to `index`: one fragment per analyzed file plus what could\nnot be analyzed. A file is never silently dropped.",
       "properties": {
         "fragments": {
           "description": "One fragment per analyzed file, ordered by path.",
@@ -459,6 +472,7 @@
       "type": "object"
     },
     "InitializeResult": {
+      "description": "A plugin's answer to `initialize`: who it is, which protocol it speaks, and\nthe languages it indexes.",
       "properties": {
         "id": {
           "description": "Plugin id; must equal the `id` of its `lighthouse-plugin.toml`.",
@@ -487,6 +501,7 @@
       "type": "object"
     },
     "Language": {
+      "description": "A language a plugin indexes and how the host routes files to it.",
       "properties": {
         "capabilities": {
           "default": [],
@@ -556,6 +571,7 @@
       "type": "object"
     },
     "Node": {
+      "description": "An edge endpoint: a whole module or one symbol.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -620,6 +636,7 @@
       "type": "object"
     },
     "ProjectRef": {
+      "description": "The project an index request belongs to.",
       "properties": {
         "root": {
           "description": "Absolute path of the project root.",
@@ -632,6 +649,7 @@
       "type": "object"
     },
     "Resolution": {
+      "description": "How reliable an edge's target is.",
       "oneOf": [
         {
           "const": "semantic",
@@ -667,6 +685,7 @@
       "type": "object"
     },
     "Symbol": {
+      "description": "A named declaration; `id` is unique across the project.",
       "properties": {
         "doc": {
           "type": [
@@ -724,6 +743,7 @@
       "type": "object"
     },
     "SymbolKind": {
+      "description": "What a symbol declares; the kebab-case name is the `#kind` suffix of its id.",
       "enum": [
         "function",
         "method",
@@ -752,6 +772,7 @@
       ]
     },
     "TestCase": {
+      "description": "A test symbol and the symbols it exercises.",
       "properties": {
         "nesting": {
           "description": "Depth of nested sub-tests.",
@@ -782,6 +803,7 @@
       "type": "object"
     },
     "TestStyle": {
+      "description": "How a test enumerates its cases: one body over a data table, or separate scenarios.",
       "enum": [
         "table",
         "scenario"
@@ -789,6 +811,7 @@
       "type": "string"
     },
     "Visibility": {
+      "description": "Who may use a symbol, as its language defines it; `internal` means visible\nwithin a bounded unit such as a crate, not outside it.",
       "enum": [
         "public",
         "private",

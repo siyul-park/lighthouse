@@ -678,3 +678,42 @@ fn search_directories_cover_the_project_home_and_the_executable() {
     );
     assert!(dirs.last().unwrap().ends_with("plugins"));
 }
+
+#[test]
+fn plugin_manifest_reads_command_and_defaults_args_and_rejects_unknown_keys() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join(lighthouse_rpc::FILE_NAME),
+        "id = \"x\"\nversion = \"1\"\ncommand = \"./run\"\nargs = [\"-v\"]\n",
+    )
+    .unwrap();
+    let found = lighthouse_rpc::load(dir.path()).unwrap();
+    let manifest: &lighthouse_rpc::PluginManifest = &found.manifest;
+    assert_eq!(
+        (manifest.id.as_str(), manifest.command.as_str()),
+        ("x", "./run")
+    );
+    assert_eq!(manifest.args, ["-v"]);
+
+    fs::write(
+        dir.path().join(lighthouse_rpc::FILE_NAME),
+        "id = \"x\"\nversion = \"1\"\ncommand = \"c\"\n",
+    )
+    .unwrap();
+    assert!(
+        lighthouse_rpc::load(dir.path())
+            .unwrap()
+            .manifest
+            .args
+            .is_empty()
+    );
+    fs::write(
+        dir.path().join(lighthouse_rpc::FILE_NAME),
+        "id = \"x\"\nversion = \"1\"\ncommand = \"c\"\nextra = 1\n",
+    )
+    .unwrap();
+    assert!(matches!(
+        lighthouse_rpc::load(dir.path()),
+        Err(Error::Manifest { .. })
+    ));
+}

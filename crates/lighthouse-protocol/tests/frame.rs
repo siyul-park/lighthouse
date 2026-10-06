@@ -85,3 +85,14 @@ fn error_responses_come_back_on_the_err_side() {
         .unwrap();
     assert_eq!(result.unwrap_err().code, -32601);
 }
+
+#[test]
+fn message_into_params_reads_absent_params_as_null() {
+    let request = Message::request(1, "m", json!({ "n": 2 })).unwrap();
+    let params: serde_json::Value = request.into_params().unwrap();
+    assert_eq!(params, json!({ "n": 2 }));
+
+    let absent: Option<u8> = Message::notification("exit").into_params().unwrap();
+    assert_eq!(absent, None);
+    assert!(Message::notification("exit").into_params::<u8>().is_err());
+}

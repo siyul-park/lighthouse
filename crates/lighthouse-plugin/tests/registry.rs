@@ -1,7 +1,7 @@
-use lighthouse_model::Capability;
+use lighthouse_model::{Capability, Severity};
 use lighthouse_plugin::{
-    Analyzer, Conventions, Ctx, Error, Indexed, LanguageProvider, Manifest, Plugin, Registry,
-    Scope, Source, Workspace,
+    Analyzer, Conventions, Ctx, Error, Indexed, LanguageProvider, Manifest, Plugin, Preset,
+    Registry, RuleMeta, Scope, Source, Workspace, options,
 };
 use serde_json::Value;
 
@@ -103,7 +103,7 @@ fn missing_requirement_is_reported() {
 }
 
 #[test]
-fn register_rejects_bad_plugins_without_side_effects() {
+fn registry_register() {
     let mut registry = Registry::default();
     let wrong_prefix = graph(&[("other/a", &[])]);
     assert!(matches!(
@@ -117,7 +117,7 @@ fn register_rejects_bad_plugins_without_side_effects() {
     ));
     assert!(!registry.has_plugin("t"));
 
-    registry.register(&graph(&[("t/a", &[])])).unwrap();
+    Registry::register(&mut registry, &graph(&[("t/a", &[])])).unwrap();
     assert!(matches!(
         registry.register(&graph(&[("t/b", &[])])),
         Err(Error::Duplicate(_))
@@ -225,4 +225,49 @@ fn higher_priority_providers_come_first_and_ties_keep_registration_order() {
         .map(|(_, l)| l.id().to_owned())
         .collect();
     assert_eq!(ids, ["high", "tie", "tie2", "low"]);
+}
+
+fn meta(id: &str, severity: Severity, strict: bool) -> RuleMeta {
+    RuleMeta {
+        id: id.to_owned(),
+        severity,
+        scope: Scope::File,
+        description: String::new(),
+        docs: String::new(),
+        analyzers: Vec::new(),
+        capabilities: Vec::new(),
+        citation: None,
+        strict,
+    }
+}
+
+#[test]
+fn preset_standard_puts_strict_rules_only_in_the_strict_preset() {
+    let metas = [
+        meta("p/a", Severity::Warn, false),
+        meta("p/b", Severity::Error, true),
+    ];
+
+    let presets = Preset::standard("p", &metas);
+
+    let ids: Vec<&str> = presets.iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(ids, ["p/recommended", "p/strict"]);
+    assert_eq!(presets[0].rules.len(), 1);
+    assert_eq!(presets[0].rules["p/a"].level, Some(Severity::Warn));
+    assert_eq!(presets[1].rules.len(), 2);
+    assert_eq!(Preset::standard("p", &metas[..1]).len(), 1);
+}
+
+#[test]
+fn options_deserializes_rule_options_and_names_the_rule_on_failure() {
+    #[derive(serde::Deserialize, Debug)]
+    #[serde(deny_unknown_fields)]
+    struct Max {
+        max: u64,
+    }
+    let ok: Max = options("p/a", &serde_json::from_str(r#"{"max": 3}"#).unwrap()).unwrap();
+    assert_eq!(ok.max, 3);
+
+    let err = options::<Max>("p/a", &serde_json::from_str(r#"{"nope": 1}"#).unwrap()).unwrap_err();
+    assert!(matches!(&err, Error::Options { rule, .. } if rule == "p/a"));
 }

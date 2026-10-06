@@ -39,6 +39,10 @@ pub enum ServeError {
     Frame(#[from] FrameError),
 }
 
+type Reply = Box<dyn FnOnce(crate::Id) -> Message>;
+
+type Outcome = Result<Result<serde_json::Value, String>, (i64, String)>;
+
 /// Answers requests from `reader` on `writer` until the host sends `exit`.
 /// Returns `Ok` after a `shutdown` followed by `exit`, or by the input closing
 /// once `shutdown` was answered (a host that went away after asking the plugin
@@ -80,8 +84,6 @@ pub fn serve(
     }
 }
 
-type Reply = Box<dyn FnOnce(crate::Id) -> Message>;
-
 fn dispatch(
     handler: &mut impl Handler,
     method: &str,
@@ -111,8 +113,6 @@ fn dispatch(
         Err((code, text)) => Message::failure(Some(id), code, text),
     })
 }
-
-type Outcome = Result<Result<serde_json::Value, String>, (i64, String)>;
 
 fn call<P, R: Serialize>(message: Message, run: impl FnOnce(P) -> Result<R, String>) -> Outcome
 where

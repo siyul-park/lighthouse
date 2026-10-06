@@ -129,6 +129,18 @@ enum DocsCommand {
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
+struct Options {
+    format: Format,
+    strict: bool,
+    allow_incomplete: bool,
+}
+
+/// A report filter taken from git instead of paths.
+struct Reported<'a> {
+    changed: bool,
+    diff: Option<&'a str>,
+}
+
 fn main() -> ExitCode {
     match run(Cli::parse()) {
         Ok(code) => ExitCode::from(code),
@@ -182,18 +194,6 @@ fn run(cli: Cli) -> Result<u8> {
         },
         Command::Init => init(),
     }
-}
-
-struct Options {
-    format: Format,
-    strict: bool,
-    allow_incomplete: bool,
-}
-
-/// A report filter taken from git instead of paths.
-struct Reported<'a> {
-    changed: bool,
-    diff: Option<&'a str>,
 }
 
 fn check(

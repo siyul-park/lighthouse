@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_config::Config;
+use lighthouse_config::{Config, PluginRef};
 use lighthouse_model::Incomplete;
 use lighthouse_plugin::{Plugin, Registry};
 use thiserror::Error;
@@ -21,6 +21,8 @@ pub use plugin::RpcPlugin;
 /// a first index may build a cold cache.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(600);
 
+/// Why discovering, starting or registering an external plugin failed. Every
+/// variant but `Unavailable` is a configuration error that aborts the run.
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("{}: {source}", path.display())]
@@ -53,23 +55,6 @@ pub enum Error {
     },
 }
 
-/// Where plugin manifests are searched: `<root>/.lighthouse/plugins`,
-/// `~/.lighthouse/plugins` and `plugins` next to the executable. A
-/// development checkout is reached only through an explicit `path`.
-pub fn search_dirs(root: &Path) -> Vec<PathBuf> {
-    let mut dirs = vec![root.join(".lighthouse/plugins")];
-    if let Some(home) = env::var_os("HOME") {
-        dirs.push(PathBuf::from(home).join(".lighthouse/plugins"));
-    }
-    if let Some(dir) = env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(|p| p.join("plugins")))
-    {
-        dirs.push(dir);
-    }
-    dirs
-}
-
 /// What registering external plugins left for the run to report.
 #[derive(Debug, Default)]
 pub struct Registered {
@@ -90,6 +75,23 @@ impl Plugin for Unavailable {
     }
 }
 
+/// Where plugin manifests are searched: `<root>/.lighthouse/plugins`,
+/// `~/.lighthouse/plugins` and `plugins` next to the executable. A
+/// development checkout is reached only through an explicit `path`.
+pub fn search_dirs(root: &Path) -> Vec<PathBuf> {
+    let mut dirs = vec![root.join(".lighthouse/plugins")];
+    if let Some(home) = env::var_os("HOME") {
+        dirs.push(PathBuf::from(home).join(".lighthouse/plugins"));
+    }
+    if let Some(dir) = env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|p| p.join("plugins")))
+    {
+        dirs.push(dir);
+    }
+    dirs
+}
+
 /// Starts every plugin listed in `config` that is not already registered and
 /// registers it. An entry with `path` uses that directory (relative to
 /// `root`); other ids are looked up in `search`. An id provided by more than
@@ -107,55 +109,10 @@ pub fn register(
 ) -> Result<Registered, Error> {
     let discovered = discover(search)?;
     let mut registered = Registered::default();
-    for broken in discovered.broken {
-        let listed = match &broken {
-            Error::Manifest { path, .. } => path
-                .parent()
-                .and_then(Path::file_name)
-                .is_some_and(|name| config.lists(&name.to_string_lossy())),
-            _ => false,
-        };
-        if listed {
-            return Err(broken);
-        }
-        registered
-            .notices
-            .push(format!("ignored plugin manifest: {broken}"));
-    }
+    note_broken(discovered.broken, config, &mut registered)?;
     for listed in config.plugins() {
         let id = listed.id.as_str();
-        let builtin = registry.has_plugin(id);
-        let chosen = match &listed.path {
-            Some(path) => {
-                let dir = root.join(path);
-                let one = load(&dir)?;
-                if one.manifest.id != id {
-                    return Err(Error::IdMismatch {
-                        id: id.to_owned(),
-                        found: one.manifest.id,
-                        dir,
-                    });
-                }
-                vec![one]
-            }
-            None => discovered
-                .found
-                .iter()
-                .filter(|f| f.manifest.id == id)
-                .cloned()
-                .collect(),
-        };
-        if chosen.len() + usize::from(builtin) > 1 {
-            let mut places: Vec<String> =
-                chosen.iter().map(|f| f.dir.display().to_string()).collect();
-            if builtin {
-                places.insert(0, "built in".to_owned());
-            }
-            return Err(Error::Conflict {
-                id: id.to_owned(),
-                places,
-            });
-        }
+        let chosen = choose(listed, registry.has_plugin(id), &discovered.found, root)?;
         let Some(one) = chosen.first() else { continue };
         let timeout = listed.timeout().unwrap_or(DEFAULT_TIMEOUT);
         let registration = match RpcPlugin::connect(one, root, timeout) {
@@ -185,4 +142,69 @@ pub fn register(
         })?;
     }
     Ok(registered)
+}
+
+/// A broken manifest of a listed plugin is an error; any other is a notice.
+fn note_broken(
+    broken: Vec<Error>,
+    config: &Config,
+    registered: &mut Registered,
+) -> Result<(), Error> {
+    for broken in broken {
+        let listed = match &broken {
+            Error::Manifest { path, .. } => path
+                .parent()
+                .and_then(Path::file_name)
+                .is_some_and(|name| config.lists(&name.to_string_lossy())),
+            _ => false,
+        };
+        if listed {
+            return Err(broken);
+        }
+        registered
+            .notices
+            .push(format!("ignored plugin manifest: {broken}"));
+    }
+    Ok(())
+}
+
+/// The manifests that provide the listed plugin: its `path` entry, else every
+/// discovered match. More than one place, built in included, is a conflict.
+fn choose(
+    listed: &PluginRef,
+    builtin: bool,
+    found: &[Found],
+    root: &Path,
+) -> Result<Vec<Found>, Error> {
+    let id = listed.id.as_str();
+    let chosen = match &listed.path {
+        Some(path) => {
+            let dir = root.join(path);
+            let one = load(&dir)?;
+            if one.manifest.id != id {
+                return Err(Error::IdMismatch {
+                    id: id.to_owned(),
+                    found: one.manifest.id,
+                    dir,
+                });
+            }
+            vec![one]
+        }
+        None => found
+            .iter()
+            .filter(|f| f.manifest.id == id)
+            .cloned()
+            .collect(),
+    };
+    if chosen.len() + usize::from(builtin) > 1 {
+        let mut places: Vec<String> = chosen.iter().map(|f| f.dir.display().to_string()).collect();
+        if builtin {
+            places.insert(0, "built in".to_owned());
+        }
+        return Err(Error::Conflict {
+            id: id.to_owned(),
+            places,
+        });
+    }
+    Ok(chosen)
 }

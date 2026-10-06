@@ -2,6 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{Analyzer, Error, LanguageProvider, Manifest, Plugin, Preset, Rule};
 
+/// The registered plugins and everything they contribute. `register` is atomic,
+/// so a registry never holds a half-registered plugin.
 #[derive(Default)]
 pub struct Registry {
     plugins: Vec<Manifest>,
@@ -15,34 +17,6 @@ pub struct Registry {
 enum Mark {
     Visiting,
     Done,
-}
-
-/// Plugin id of a qualified `plugin/name` id.
-pub fn plugin_of(id: &str) -> &str {
-    id.split_once('/').map_or(id, |(plugin, _)| plugin)
-}
-
-/// Every id a plugin contributes must be qualified with the plugin's own id.
-fn check_prefixes(
-    plugin: &str,
-    analyzers: &[Box<dyn Analyzer>],
-    rules: &[Box<dyn Rule>],
-    presets: &[Preset],
-) -> Result<(), Error> {
-    let ids = analyzers
-        .iter()
-        .map(|a| a.id())
-        .chain(rules.iter().map(|r| r.meta().id.as_str()))
-        .chain(presets.iter().map(|p| p.id.as_str()));
-    for item in ids {
-        if plugin_of(item) != plugin || !item.contains('/') {
-            return Err(Error::Prefix {
-                plugin: plugin.to_owned(),
-                id: item.to_owned(),
-            });
-        }
-    }
-    Ok(())
 }
 
 impl Registry {
@@ -114,6 +88,7 @@ impl Registry {
         self.plugins.iter().map(|m| m.id.as_str())
     }
 
+    /// Whether a plugin with this id is registered.
     pub fn has_plugin(&self, id: &str) -> bool {
         self.plugins.iter().any(|m| m.id == id)
     }
@@ -131,6 +106,7 @@ impl Registry {
         regular.into_iter().chain(fallback)
     }
 
+    /// The rule with this qualified id.
     pub fn rule(&self, id: &str) -> Option<&dyn Rule> {
         self.rules.get(id).map(Box::as_ref)
     }
@@ -140,6 +116,7 @@ impl Registry {
         self.rules.values().map(Box::as_ref)
     }
 
+    /// The preset with this qualified id.
     pub fn preset(&self, id: &str) -> Option<&Preset> {
         self.presets.get(id)
     }
@@ -199,4 +176,32 @@ impl Registry {
         out.push(analyzer.as_ref());
         Ok(())
     }
+}
+
+/// Plugin id of a qualified `plugin/name` id.
+pub fn plugin_of(id: &str) -> &str {
+    id.split_once('/').map_or(id, |(plugin, _)| plugin)
+}
+
+/// Every id a plugin contributes must be qualified with the plugin's own id.
+fn check_prefixes(
+    plugin: &str,
+    analyzers: &[Box<dyn Analyzer>],
+    rules: &[Box<dyn Rule>],
+    presets: &[Preset],
+) -> Result<(), Error> {
+    let ids = analyzers
+        .iter()
+        .map(|a| a.id())
+        .chain(rules.iter().map(|r| r.meta().id.as_str()))
+        .chain(presets.iter().map(|p| p.id.as_str()));
+    for item in ids {
+        if plugin_of(item) != plugin || !item.contains('/') {
+            return Err(Error::Prefix {
+                plugin: plugin.to_owned(),
+                id: item.to_owned(),
+            });
+        }
+    }
+    Ok(())
 }

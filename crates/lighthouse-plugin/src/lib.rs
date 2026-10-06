@@ -12,6 +12,8 @@ use thiserror::Error;
 
 pub use registry::{Registry, plugin_of};
 
+/// Why registering a plugin, resolving analyzers, reading facts or running a
+/// rule failed. Messages name the offending id and are fit to show the user.
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("`{0}` is registered twice")]
@@ -41,6 +43,7 @@ pub enum Scope {
     Project,
 }
 
+/// Identity of a plugin: `id` prefixes every analyzer, rule and preset it contributes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Manifest {
     pub id: String,
@@ -56,6 +59,7 @@ pub struct Workspace {
 }
 
 impl Workspace {
+    /// A workspace at `root` with no language options.
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
             root: root.into(),
@@ -77,11 +81,6 @@ pub struct Ctx<'a> {
 }
 
 impl Ctx<'_> {
-    fn key(&self) -> String {
-        self.file
-            .map_or_else(String::new, |(f, _)| f.path.to_string_lossy().into_owned())
-    }
-
     /// The analyzer's fact for the focused file, else its project fact.
     pub fn fact<T: DeserializeOwned>(&self, analyzer: &str) -> Result<T, Error> {
         let at = |key| self.facts.get(&(analyzer.to_owned(), key));
@@ -93,16 +92,14 @@ impl Ctx<'_> {
             message: e.to_string(),
         })
     }
+
+    fn key(&self) -> String {
+        self.file
+            .map_or_else(String::new, |(f, _)| f.path.to_string_lossy().into_owned())
+    }
 }
 
-/// Deserializes rule options; unknown keys are rejected when `T` denies them.
-pub fn options<T: DeserializeOwned>(rule: &str, options: &Options) -> Result<T, Error> {
-    serde_json::from_value(Value::Object(options.clone())).map_err(|e| Error::Options {
-        rule: rule.to_owned(),
-        message: e.to_string(),
-    })
-}
-
+/// Layout conventions a language declares; the engine applies them to every file of that language.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Conventions {
     pub test_globs: Vec<String>,
@@ -125,6 +122,8 @@ pub struct Indexed {
     pub incomplete: Vec<Incomplete>,
 }
 
+/// Turns the files of one language into UCM fragments. Implementations must
+/// be thread-safe, and `index` must not read outside `files` and `ws`.
 pub trait LanguageProvider: Send + Sync {
     fn id(&self) -> &str;
     fn globs(&self) -> &[String];
@@ -143,6 +142,8 @@ pub trait LanguageProvider: Send + Sync {
     fn index(&self, ws: &Workspace, files: &[Source]) -> Result<Indexed, Error>;
 }
 
+/// Computes one fact, declared by `id`, from the project and the facts of its `requires`.
+/// `run` must be deterministic for equal inputs; the engine runs it once per `scope`.
 pub trait Analyzer: Send + Sync {
     /// Fully qualified `plugin/name`.
     fn id(&self) -> &str;
@@ -151,6 +152,8 @@ pub trait Analyzer: Send + Sync {
     fn run(&self, ctx: &Ctx) -> Result<Value, Error>;
 }
 
+/// Static description of a rule: its identity, default severity, scope and
+/// the analyzers and provider capabilities it depends on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuleMeta {
     /// Fully qualified `plugin/name`.
@@ -166,6 +169,8 @@ pub struct RuleMeta {
     pub strict: bool,
 }
 
+/// A check that turns facts into diagnostics. `validate` rejects bad options
+/// before any run; `check` must report only for the scope in `meta()`.
 pub trait Rule: Send + Sync {
     fn meta(&self) -> &RuleMeta;
     fn validate(&self, options: &Options) -> Result<(), Error>;
@@ -208,6 +213,8 @@ impl Preset {
     }
 }
 
+/// A bundle of language providers, analyzers, rules and presets, all of whose
+/// ids are qualified with `manifest().id`. Everything defaults to empty.
 pub trait Plugin {
     fn manifest(&self) -> Manifest;
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
@@ -222,4 +229,12 @@ pub trait Plugin {
     fn presets(&self) -> Vec<Preset> {
         Vec::new()
     }
+}
+
+/// Deserializes rule options; unknown keys are rejected when `T` denies them.
+pub fn options<T: DeserializeOwned>(rule: &str, options: &Options) -> Result<T, Error> {
+    serde_json::from_value(Value::Object(options.clone())).map_err(|e| Error::Options {
+        rule: rule.to_owned(),
+        message: e.to_string(),
+    })
 }
