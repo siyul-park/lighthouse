@@ -141,6 +141,30 @@ pub fn is_dispatcher(summary: &FunctionSummary) -> bool {
             .is_some_and(|f| f.kind == FlowKind::Switch && f.nesting == 0 && f.returning)
 }
 
+/// Deepest nesting of a flat dispatch's arms.
+const FLAT_DISPATCH_NESTING: u32 = 2;
+
+/// A body whose only top-level branching is one multi-way branch, whatever
+/// its arms do, nested at most two levels: many paths, one shape. Its
+/// cyclomatic complexity overstates how hard it is to follow; only cognitive
+/// complexity can still mark it.
+pub fn is_flat_dispatch(summary: &FunctionSummary) -> bool {
+    let mut top_level = summary.flow.iter().filter(|f| {
+        f.nesting == 0
+            && matches!(
+                f.kind,
+                FlowKind::If
+                    | FlowKind::ElseIf
+                    | FlowKind::Loop
+                    | FlowKind::Catch
+                    | FlowKind::Switch
+            )
+    });
+    summary.max_nesting <= FLAT_DISPATCH_NESTING
+        && top_level.next().is_some_and(|f| f.kind == FlowKind::Switch)
+        && top_level.next().is_none()
+}
+
 fn nesting(_: &Project, _: &Symbol, summary: &FunctionSummary) -> u32 {
     summary.max_nesting
 }

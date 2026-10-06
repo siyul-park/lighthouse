@@ -368,7 +368,7 @@ Complexity SHOULD be judged from cyclomatic complexity together with statement c
 
 **Exceptions**
 
-A body that is one switch whose every arm is a single return is a table in code form and is not reported.
+A body that is one switch whose every arm is a single return is a table in code form and is not reported. A body whose only top-level branching is one switch of any arms, nested at most two levels, is a flat dispatch: its many paths do not make it hard to follow, so only cognitive complexity can report it.
 
 **Options**
 
@@ -556,6 +556,103 @@ mod tests {
             return -n;
         }
         0
+    }
+}
+```
+
+**Valid example: flat-dispatch (go)**
+
+Options: `cyclomatic` = `4`, `statements` = `1`
+
+```go
+package sample
+
+type visitor struct{ ifs, elses, loops, calls int }
+
+func (v *visitor) visit(n any) *visitor {
+	switch n := n.(type) {
+	case *ifStmt:
+		v.ifs++
+		if n.hasElse {
+			v.elses++
+		}
+	case *forStmt:
+		v.loops++
+	case *callExpr:
+		v.calls++
+	}
+	return v
+}
+
+type ifStmt struct{ hasElse bool }
+type forStmt struct{}
+type callExpr struct{}
+```
+
+**Invalid example: dispatch-among-other-statements (go)**
+
+Options: `cyclomatic` = `4`, `statements` = `1`
+
+```go
+package sample
+
+type visitor struct{ ifs, elses, loops, calls, seen int }
+
+func (v *visitor) visit(n any) {
+	if n == nil {
+		return
+	}
+	switch n := n.(type) {
+	case *ifStmt:
+		v.ifs++
+		if n.hasElse {
+			v.elses++
+		}
+	case *forStmt:
+		v.loops++
+	case *callExpr:
+		v.calls++
+	}
+}
+
+type ifStmt struct{ hasElse bool }
+type forStmt struct{}
+type callExpr struct{}
+```
+
+**Valid example: rust-flat-dispatch (rust)**
+
+Options: `cyclomatic` = `4`, `statements` = `1`
+
+```rust
+pub enum Node {
+    If { has_else: bool },
+    For,
+    Call,
+    Other,
+}
+
+#[derive(Default)]
+pub struct Counts {
+    ifs: u32,
+    elses: u32,
+    loops: u32,
+    calls: u32,
+}
+
+impl Counts {
+    pub fn visit(&mut self, node: &Node) {
+        match node {
+            Node::If { has_else } => {
+                self.ifs += 1;
+                if *has_else {
+                    self.elses += 1;
+                }
+            }
+            Node::For => self.loops += 1,
+            Node::Call => self.calls += 1,
+            Node::Other => {}
+        }
     }
 }
 ```

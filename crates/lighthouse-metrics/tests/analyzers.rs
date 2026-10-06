@@ -159,6 +159,27 @@ fn dispatchers_are_single_switches_whose_arms_only_return() {
 }
 
 #[test]
+fn flat_dispatch_is_one_top_level_switch_nested_at_most_two_levels() {
+    use FlowKind::*;
+    let flat = |nesting: u32, flow: &[Flow]| {
+        let s = summary(
+            &symbol("m", "f", SymbolKind::Function, FILE, (1, 1)),
+            nesting,
+            1,
+            flow,
+        );
+        lighthouse_metrics::is_flat_dispatch(&s)
+    };
+    let arms = [Flow::new(Switch, 0), at(If, 1), at(Logic, 1), at(Loop, 2)];
+    assert!(flat(2, &arms));
+    assert!(!flat(3, &arms));
+    assert!(!flat(0, &[at(If, 0), at(Switch, 0)]));
+    assert!(!flat(0, &[at(Switch, 0), at(Loop, 0)]));
+    assert!(!flat(0, &[at(Switch, 0), at(Switch, 0)]));
+    assert!(!flat(0, &[at(If, 1)]));
+}
+
+#[test]
 fn cognitive_matches_the_sonarsource_specification_examples() {
     use FlowKind::*;
     let sum_of_primes = [at(Loop, 0), at(Loop, 1), at(If, 2), at(Jump, 3)];

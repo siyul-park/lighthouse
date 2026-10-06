@@ -1,4 +1,7 @@
-use lighthouse_metrics::{COGNITIVE, CYCLOMATIC, NESTING, SIZE, Size, is_dispatcher, read};
+use lighthouse_metrics::{
+    COGNITIVE, CYCLOMATIC, NESTING, SIZE, Size, is_dispatcher, is_flat_dispatch, read,
+};
+use lighthouse_model::FunctionSummary;
 use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
@@ -42,9 +45,9 @@ fn check(
     let mut found = Vec::new();
     for symbol in functions(ctx) {
         let summary = ctx.project.function(&symbol.id);
-        if summary.is_none_or(is_dispatcher) {
+        let Some(summary) = summary.filter(|s| !is_dispatcher(s)) else {
             continue;
-        }
+        };
         let (Some(size), Some(&cc), Some(&cog), Some(&depth)) = (
             sizes.get(&symbol.id),
             cyclomatic.get(&symbol.id),
@@ -54,16 +57,7 @@ fn check(
             continue;
         };
         let statements = size.statements;
-        let verdict = if cc >= t.cyclomatic && statements >= t.statements {
-            "high complexity"
-        } else if cc >= t.structural_cyclomatic
-            && statements >= t.structural_statements
-            && depth >= t.structural_nesting
-        {
-            "high structural complexity"
-        } else if cog >= t.cognitive && statements >= t.cognitive_statements {
-            "high cognitive complexity"
-        } else {
+        let Some(verdict) = verdict(&t, summary, [cc, cog, statements, depth]) else {
             continue;
         };
         found.push(finding(
@@ -82,4 +76,30 @@ fn check(
         ));
     }
     Ok(found)
+}
+
+/// Which signal, if any, marks a function with the given metrics
+/// `[cyclomatic, cognitive, statements, nesting]`. A flat dispatch is judged
+/// by cognitive complexity alone.
+fn verdict(
+    t: &Thresholds,
+    summary: &FunctionSummary,
+    [cc, cog, statements, depth]: [u32; 4],
+) -> Option<&'static str> {
+    let cognitive = cog >= t.cognitive && statements >= t.cognitive_statements;
+    if is_flat_dispatch(summary) {
+        return cognitive.then_some("high cognitive complexity");
+    }
+    if cc >= t.cyclomatic && statements >= t.statements {
+        Some("high complexity")
+    } else if cc >= t.structural_cyclomatic
+        && statements >= t.structural_statements
+        && depth >= t.structural_nesting
+    {
+        Some("high structural complexity")
+    } else if cognitive {
+        Some("high cognitive complexity")
+    } else {
+        None
+    }
 }
