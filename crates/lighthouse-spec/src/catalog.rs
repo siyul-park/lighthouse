@@ -11,6 +11,7 @@ use serde_json::Value;
 use crate::{
     Content, Error, Example, Implementation, Pack, Pattern, Section,
     load::{self, Files},
+    model::short_hash,
     sources::{Source, extract},
     validate,
 };
@@ -288,6 +289,16 @@ impl Catalog {
     /// The pattern with this `<pack>/<name>` id.
     pub fn pattern(&self, id: &str) -> Option<&Pattern> {
         self.patterns().find(|p| p.id == id)
+    }
+
+    /// Identifies this set of patterns: the hash of every pattern's id and
+    /// version, in catalog order.
+    pub fn version(&self) -> String {
+        let listing: String = self
+            .patterns()
+            .map(|p| format!("{}:{}\n", p.id, p.version()))
+            .collect();
+        short_hash(&listing)
     }
 
     fn load_pack(&mut self, files: &Files, id: &str) -> Result<(), Error> {

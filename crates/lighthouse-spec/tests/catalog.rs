@@ -658,3 +658,20 @@ mod write {
         assert_eq!(Catalog::load(dir.path()).unwrap().patterns().count(), 1);
     }
 }
+
+#[test]
+fn pattern_version_changes_with_its_definition() {
+    let pattern = bundled("core/max-file-lines");
+    assert_eq!(pattern.version().len(), 16);
+    assert_eq!(pattern.version(), pattern.clone().version());
+    let mut edited = pattern.clone();
+    edited.requirement.push('!');
+    assert_ne!(edited.version(), pattern.version());
+}
+
+#[test]
+fn catalog_version_changes_with_any_pattern() {
+    let catalog = Catalog::bundled();
+    assert_eq!(catalog.version(), Catalog::bundled().version());
+    assert_ne!(catalog.version(), Catalog::default().version());
+}

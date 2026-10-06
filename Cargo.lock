@@ -785,6 +785,7 @@ version = "0.1.0"
 dependencies = [
  "insta",
  "lighthouse-model",
+ "lighthouse-spec",
  "serde",
  "serde_json",
  "thiserror",

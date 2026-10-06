@@ -1,0 +1,52 @@
+---
+source: crates/lighthouse-report/tests/agent.rs
+expression: "render_with(Format::Agent, &findings, &gap(), &briefing)"
+---
+design/coupling-signal  warn (heuristic)  internal/jit/compile.go:350:1
+  owner:       jit::compile#function
+  message:     function coordinates 14 collaborators in its package
+  requirement: Coupling SHOULD be judged from direct intra-package fan-in and fan-out, that is the functions and methods of the same package that call a symbol or are called by it, against deliberately high thresholds. Calls from other packages and from tests do not count: a widely used public function is a service, not a hub.
+  intent:      A dependency hub changes for many reasons.
+  evidence:    callees=["a","b c"] fan_in=2 fan_out=14
+  expected:    valid go example `ordinary-fan` (sample.go)
+                 package sample
+
+                 func hub() {
+                 	left()
+                 	right()
+                 }
+
+                 func left()  {}
+                 func right() {}
+
+                 func a() { hub() }
+                 func b() { hub() }
+  fingerprint: f5ed6fd96750ace1775528b31f2cdc85a58b8b9bb1222cd4e3d4bd9d6d9f8bfd
+
+design/private-helper-callers  review (heuristic)  src/lib.rs:7:1
+  owner:       m::helper#function
+  message:     private helper has one caller
+  requirement: A private helper SHOULD have at least two callers.
+  intent:      A private helper with one caller is usually part of that caller.
+  expected:    valid rust example `rust-valid` (src/lib.rs)
+                 pub fn run(x: u8) -> u8 {
+                     clamp(x) + 1
+                 }
+
+                 pub fn other(x: u8) -> u8 {
+                     clamp(x) + 2
+                 }
+
+                 fn clamp(x: u8) -> u8 {
+                     if x > 10 { 10 } else { x }
+                 }
+  fingerprint: d3d6fba8ce7cade7821d061a1658cf3e2954b152b97bb59df4d4868d563a3237
+  resolve:     lighthouse review resolve d3d6fba8ce7cade7821d061a1658cf3e2954b152b97bb59df4d4868d563a3237 --verdict <verdict> --reason <reason> --reviewer-kind agent
+
+acme/custom  error (mechanical)  a.txt:1:1
+  message:     custom finding
+  fingerprint: c8dfae349df15f6bf48d04c90320dd0ee8a7052ab896f3440b2e6562db7ab21f
+
+broken.go: incomplete: type error
+reasons: confirmed=fixed|accepted-debt|none; rejected=false-positive|intentional-exception|scope-too-broad|project-allowed|not-worth-fixing; deferred=none
+summary: 1 error, 1 warn, 1 review, 1 incomplete, 2 suppressed

@@ -1,3 +1,4 @@
+mod agent;
 mod sarif;
 
 use std::{fmt::Write, str::FromStr};
@@ -5,17 +6,24 @@ use std::{fmt::Write, str::FromStr};
 use lighthouse_model::{Diagnostic, Incomplete, Severity};
 use thiserror::Error;
 
-/// Output format of [`render`]; parsed from `text`, `json` or `sarif`.
+pub use agent::Briefing;
+
+/// Output format of [`render`]; parsed from `text`, `json`, `sarif`, `agent`
+/// or `agent-json`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
     Text,
     Json,
     Sarif,
+    /// Self-contained blocks an agent can act on without another lookup.
+    Agent,
+    /// The agent records as JSON lines.
+    AgentJson,
 }
 
 /// The text given to [`Format::from_str`] names no format.
 #[derive(Debug, Error)]
-#[error("unknown format `{0}` (expected text, json or sarif)")]
+#[error("unknown format `{0}` (expected text, json, sarif, agent or agent-json)")]
 pub struct UnknownFormat(String);
 
 impl FromStr for Format {
@@ -26,6 +34,8 @@ impl FromStr for Format {
             "text" => Ok(Self::Text),
             "json" => Ok(Self::Json),
             "sarif" => Ok(Self::Sarif),
+            "agent" => Ok(Self::Agent),
+            "agent-json" => Ok(Self::AgentJson),
             _ => Err(UnknownFormat(s.to_owned())),
         }
     }
@@ -38,10 +48,25 @@ impl FromStr for Format {
 /// lines, JSON prints `{"incomplete": {...}}` lines and SARIF marks its
 /// invocation as unsuccessful with a tool notification per entry.
 pub fn render(format: Format, diagnostics: &[Diagnostic], incomplete: &[Incomplete]) -> String {
+    render_with(format, diagnostics, incomplete, &Briefing::default())
+}
+
+/// Like [`render`], with the catalog, subject facts and suppressed count the
+/// agent formats draw on. The agent formats always end with a summary, a
+/// clean run included, so that silence cannot be mistaken for success; the
+/// other formats ignore the briefing.
+pub fn render_with(
+    format: Format,
+    diagnostics: &[Diagnostic],
+    incomplete: &[Incomplete],
+    briefing: &Briefing,
+) -> String {
     match format {
         Format::Text => text(diagnostics, incomplete),
         Format::Json => json_lines(diagnostics, incomplete),
         Format::Sarif => sarif::render(diagnostics, incomplete),
+        Format::Agent => agent::text(diagnostics, incomplete, briefing),
+        Format::AgentJson => agent::json_lines(diagnostics, incomplete, briefing),
     }
 }
 

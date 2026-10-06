@@ -9,6 +9,7 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 lighthouse-model.workspace = true
+lighthouse-spec.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

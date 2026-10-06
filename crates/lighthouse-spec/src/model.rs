@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, fmt};
 use lighthouse_model::Severity;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 
 use crate::Error;
 
@@ -282,6 +283,12 @@ impl Pattern {
             .or_else(|| self.enforcement.default_severity())
     }
 
+    /// Identifies this wording of the pattern: the hash of its definition, so
+    /// a verdict can say which version of the rule it judged.
+    pub fn version(&self) -> String {
+        short_hash(&serde_json::to_string(self).expect("a pattern serializes"))
+    }
+
     /// Defaults filled in and configured keys checked against the declared
     /// options; `language` selects per-language defaults.
     pub fn resolve_options(
@@ -341,6 +348,12 @@ pub struct Pack {
     pub title: String,
     pub intro: String,
     pub sections: Vec<Section>,
+}
+
+/// The first eight bytes of the SHA-256 of `text`, in hex.
+pub(crate) fn short_hash(text: &str) -> String {
+    let digest = Sha256::digest(text.as_bytes());
+    digest[..8].iter().map(|b| format!("{b:02x}")).collect()
 }
 
 macro_rules! display {
