@@ -420,7 +420,10 @@ mod process {
     #[test]
     fn a_timeout_kills_the_whole_process_group() {
         let fake = Fake::new("grandchild");
-        let provider = fake.provider(Duration::from_secs(2));
+        // The fake answers initialize at once and stalls only on index, but the
+        // one timeout covers both: keep it far above a loaded machine's
+        // process start-up so that only the stalled index can exceed it.
+        let provider = fake.provider(Duration::from_secs(6));
         let indexed = index(provider.as_ref(), &ws(&fake), &["a.fake"]);
         assert!(only_gap(&indexed).reason.contains("timed out"));
         let pid = fs::read_to_string(fake.path().join("log.pid")).unwrap();
@@ -432,7 +435,7 @@ mod process {
                 .unwrap()
                 .success()
         };
-        let deadline = Instant::now() + Duration::from_secs(5);
+        let deadline = Instant::now() + Duration::from_secs(15);
         while alive() && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(50));
         }
