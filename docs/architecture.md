@@ -1,7 +1,7 @@
 # Architecture
 
 ```
- CLI ─ engine ─ config ─ reporters
+ CLI ─ engine ─ config ─ reporters ─ store (.lighthouse/lighthouse.db)
           │
    plugin registry ── in-process plugins: core, metrics, design, testing,
           │            and `local` (declarative rules of the project)
@@ -22,7 +22,9 @@ provider once with all of its files.
 Dependency direction runs from the general to the specific:
 `model` ← `plugin` (contracts) ← `protocol` (wire types) ← `rpc` (host and the only
 wire-to-model conversion) ← `engine` ← `cli`. The wire model is separate from the
-core model: renaming a core field is not a protocol change.
+core model: renaming a core field is not a protocol change. `store` knows only
+`model` (artifact-neutral records), and `report` knows `model` and the pattern
+catalog in `spec`.
 
 ## Analysis scope and report scope
 
@@ -101,6 +103,101 @@ config names, like build scripts (see the trust model in
 
 Exit codes: 0 clean, 1 findings, 2 usage or runtime error (a configured plugin
 that cannot start is one), 3 incomplete.
+
+## Memory: findings, verdicts and the feedback loop
+
+`lighthouse check` remembers what it saw, in `.lighthouse/lighthouse.db` at the
+project root (SQLite, the `lighthouse-store` crate). The file is a local cache of one
+machine's checks and reviews, so `lighthouse init` adds `.lighthouse/*.db*` to
+`.gitignore`. A run is recorded by default whenever the project has a
+`lighthouse.toml`; `--no-store` runs without reading or writing the store. A store that
+cannot be opened never fails a check: the run goes on without memory and says so on
+stderr. The schema is versioned with `PRAGMA user_version` and migrated on open; a
+database written by a newer build is refused.
+
+The store is artifact-neutral: a finding's artifact is a path string and its locator is
+JSON (`{"span": {...}}` for text, a JSON pointer or region id for other artifacts), and
+evidence and facts are JSON, so nothing in it is specific to code.
+
+**`findings`** has one row per fingerprint: rule, severity, path, locator, owner
+symbol, `first_seen`, `last_seen`, `resolved_at`, how often it came back
+(`reopened`), and the last message, evidence and facts. The facts are what the
+analysis knew about the finding's subject in its last run: language, symbol kind,
+visibility, callers and callees, the function summary, and the measures analyzers took
+(cognitive, cyclomatic, fan-in and fan-out, size). They are kept per open finding so a
+review can snapshot them without re-analyzing.
+
+A run updates `findings` like this:
+
+- every reported finding is inserted or refreshed, a resolved one is reopened;
+- a finding that was open inside the run's *report scope* and rules and is absent now
+  is marked resolved;
+- nothing is resolved outside the report scope (`check src/a.rs`, `--changed`, `--diff`
+  narrow it), for rules that did not run (`--rules`), or when the analysis was
+  incomplete. "Not checked" never means "fixed".
+
+A fingerprint is the rule, the owner symbol's path (`module::owner::name#kind`) or the
+file for file-level rules, and a whitespace-normalized snippet where the finding has
+one. Line numbers are not part of it, so edits above a finding do not change its
+identity. Findings that repeat within a file get an occurrence index, so removing the
+first of several identical findings renames the others.
+
+**`review_events`** is the append-only log of verdicts (triggers reject `UPDATE` and
+`DELETE`). Each row carries the finding's fingerprint, rule id, `rule_version` (a hash of
+the pattern definition), `catalog_version` (a hash of all patterns), a nullable
+`pattern_fingerprint` (code-pattern identity, filled by the similarity index), the
+verdict `confirmed | rejected | deferred`, the reason code, free text, the reviewer
+(`agent | human` and id), language, scope, evidence, a `feature_snapshot` frozen at review
+time (the finding with its evidence and facts), the git commit and a timestamp.
+
+| Verdict | Reasons | Effect |
+| --- | --- | --- |
+| `confirmed` | `fixed`, `accepted-debt`, or none | the finding is right; stays visible |
+| `rejected` | `false-positive`, `intentional-exception`, `scope-too-broad`, `project-allowed`, `not-worth-fixing` (required) | suppressed |
+| `deferred` | none | stays visible, marked deferred in `review list` |
+
+**Suppression** is derived, not stored: the latest verdict per fingerprint is the finding's
+standing (views `latest_verdicts` and `suppressions`). A fingerprint whose latest verdict is
+`rejected` is left out of reports and out of the exit code, and `check` prints
+`N finding(s) suppressed by review verdicts`; `review list --status suppressed`
+lists them. `scope-too-broad` also suppresses and is flagged (`narrowing`) as a hint
+to narrow the rule. A later `confirmed` or `deferred` verdict lifts the suppression.
+Suppression is by fingerprint, so it follows the symbol across edits and ends when the
+symbol is renamed or moved.
+
+**Labels** are what a verdict teaches later models about its rule: `confirmed` is
+positive; `rejected` as `false-positive` or `scope-too-broad` is negative; the other
+rejections (`intentional-exception`, `project-allowed`, `not-worth-fixing`) are
+separate targets that say nothing about precision; `deferred` is unlabeled. A finding
+nobody reviewed has no label and is never a negative.
+
+### Agent output
+
+`check --format agent` prints one block per finding that an agent can act on without
+another lookup, `--format agent-json` the same records as JSON lines (`finding`,
+`incomplete` and `summary` records tagged by `type`):
+
+```text
+design/private-helper-callers  review (heuristic)  src/lib.rs:5:1
+  owner:       demo::clamp#function
+  message:     private function clamp has one caller (run); review whether ...
+  requirement: A private helper SHOULD have at least two callers.
+  intent:      A private helper with one caller is usually part of that caller.
+  evidence:    caller=demo::run#function callers=1 statements=3
+  expected:    valid rust example `rust-valid` (src/lib.rs)
+                 pub fn run(x: u8) -> u8 { ... }
+  fingerprint: 395d1985...
+  resolve:     lighthouse review resolve 395d1985... --verdict <verdict> --reason <reason> --reviewer-kind agent
+```
+
+The requirement and intent come from the catalog; the expected structure is the first
+valid example of the pattern for the file's language (at most 12 lines and 600
+characters), or the pattern's tuning note for that language, or a valid example of any
+language, in that order. Only findings at the `review` severity carry a resolve
+command; the choices to make are the verdict and the reason, listed once after the
+blocks (`reasons:`) and as a table in the JSON record. Both formats end with a
+summary that is printed for clean runs too, with the incomplete and suppressed
+counts, so silence is never read as success.
 
 ## Dogfooding
 

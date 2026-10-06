@@ -35,22 +35,30 @@ promoted into System 1.
 
 ## What the loop looks like
 
-An agent edits a file. A hook runs `lighthouse check` on what changed and hands back
-structured feedback rather than a bare lint line (agent output format, arriving with the MCP and hook integration):
+An agent edits a file. A hook runs `lighthouse check` on what changed with
+`--format agent` and hands back structured feedback rather than a bare lint line:
 
 ```text
-internal/jit/compile/compile.go:350:1: warn design/coupling-signal:
-  function coordinates 14 collaborators in its package
-  evidence: fan_in=2 fan_out=14 statements=61
-  requirement: coupling is judged from fan-in and fan-out within a package (review signal)
+design/private-helper-callers  review (heuristic)  src/lib.rs:5:1
+  owner:       demo::clamp#function
+  message:     private function clamp has one caller (run); review whether it is part of that caller or names a real policy
+  requirement: A private helper SHOULD have at least two callers.
+  intent:      A private helper with one caller is usually part of that caller.
+  evidence:    caller=demo::run#function callers=1 statements=3
+  expected:    valid rust example `rust-valid` (src/lib.rs)
+                 pub fn run(x: u8) -> u8 { clamp(x) + 1 }
+                 ...
+  fingerprint: 395d1985afe8...
+  resolve:     lighthouse review resolve 395d1985afe8... --verdict <verdict> --reason <reason> --reviewer-kind agent
 ```
 
 The agent fixes it, or it records a verdict: `rejected: intentional-exception` with a
-reason. That verdict is kept with a snapshot of the evidence, so the same structure is
-never asked about twice. When structurally similar code keeps getting the same
-verdict and no rule covers it, Lighthouse proposes one. The proposal carries the
-occurrences, the verdicts and valid/invalid examples. It must pass the existing rule
-fixtures before anyone approves it.
+reason. That verdict is kept in a local store with a snapshot of the evidence, and the
+finding stays out of later reports, so the same structure is never asked about twice.
+When structurally similar code keeps getting the same verdict and no rule covers it,
+Lighthouse proposes one. The proposal carries the occurrences, the verdicts and
+valid/invalid examples. It must pass the existing rule fixtures before anyone approves
+it.
 
 Rules come from a **pattern catalog**: one canonical specification per decision, from
 which the checks, the human-readable docs ([docs/patterns](docs/patterns)) and the
@@ -118,7 +126,15 @@ lighthouse explain design/single-use-wrapper  # intent, requirement, examples
 lighthouse rule list --all                    # every pattern and its status
 lighthouse rule test                          # run the examples of every implemented pattern
 lighthouse check --changed                    # report only what the working tree changed
+lighthouse check --format agent               # self-contained blocks for a coding agent
+lighthouse review list                        # findings the store remembers
+lighthouse review resolve <fingerprint> --verdict rejected --reason intentional-exception
 ```
+
+`check` records each run in `.lighthouse/lighthouse.db` (`init` ignores it in git;
+`--no-store` skips it): fixed findings are marked resolved, and findings whose latest
+verdict is a rejection stay out of the report. `review show` and `review history` give
+the evidence and every verdict of one finding.
 
 A minimal `lighthouse.toml` for a Go project:
 
@@ -161,15 +177,15 @@ incomplete. "Not checked" never counts as "passed".
 | Languages | Go (semantic), Rust (syntactic), both over RPC | TypeScript, Python |
 | Analysis | size, cyclomatic, cognitive (SonarSource), nesting, fan-in/out | dependency direction, cycles, clones, cohesion |
 | Rules | complexity, coupling, docs, wrappers, declaration order and ownership layout, naming, banners, test contracts, declarative CEL rules (`.lighthouse/rules`) | dependency direction, cohesion, clones |
-| Agent loop | CLI with text, JSON and SARIF output, `--changed` / `--diff` report scopes, `rule test` | agent output format, MCP server, Skill, hooks |
-| Memory | | verdict store, pattern index, similarity search |
+| Agent loop | CLI with text, JSON, SARIF and agent output, `--changed` / `--diff` report scopes, `rule test`, `review` | MCP server, Skill, hooks |
+| Memory | finding history, append-only verdict log with evidence snapshots, verdict-based suppression | pattern index, similarity search |
 | Evolution | | coverage analysis, rule proposals, judged and learned rule forms |
 | Editors | | LSP server |
 
 ## Documentation
 
 - [Pattern catalog, rendered](docs/patterns): every decision Lighthouse knows
-- [Architecture](docs/architecture.md): core model, scopes and incomplete analysis
+- [Architecture](docs/architecture.md): core model, scopes, incomplete analysis, the store and the review loop
 - [Plugin protocol](docs/plugin-protocol.md): writing a language plugin in any language
 
 Development: `make test` builds the plugins and runs the test suites, `make lint` runs
