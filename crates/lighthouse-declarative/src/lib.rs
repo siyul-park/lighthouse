@@ -95,17 +95,6 @@ impl Plugin for Declarative {
     }
 
     fn presets(&self) -> Vec<lighthouse_plugin::Preset> {
-        let rules = self.definitions.iter().map(|r| {
-            let meta = r.meta();
-            let config = lighthouse_config::RuleConfig {
-                level: Some(meta.severity),
-                options: lighthouse_model::Options::new(),
-            };
-            (meta.id.clone(), config)
-        });
-        vec![lighthouse_plugin::Preset {
-            id: format!("{}/recommended", self.id),
-            rules: lighthouse_config::Rules::from_iter(rules),
-        }]
+        lighthouse_plugin::Preset::standard(&self.id, self.definitions.iter().map(|r| r.meta()))
     }
 }

@@ -32,6 +32,7 @@ impl Pattern {
             analyzers: Vec::new(),
             capabilities: Vec::new(),
             citation: self.citation.clone(),
+            strict: self.strict,
         })
     }
 }

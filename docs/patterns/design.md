@@ -790,7 +790,7 @@ A helper MUST be extracted only to remove semantic duplication, name reusable be
 
 ### Private helpers have two callers
 
-`design/private-helper-callers` · scope `symbol` · enforcement `heuristic` · severity `review`
+`design/private-helper-callers` · scope `symbol` · enforcement `heuristic` · severity `review` · preset `strict`
 
 **Intent**
 

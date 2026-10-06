@@ -260,6 +260,14 @@ pub struct Pattern {
     pub implementation: Option<Implementation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub citation: Option<String>,
+    /// Review-level advice that is too noisy for the `recommended` preset;
+    /// the `strict` preset enables it.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub strict: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 impl Pattern {

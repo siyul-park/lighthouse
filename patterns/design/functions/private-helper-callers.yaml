@@ -5,6 +5,7 @@ scope: symbol
 requirement: A private helper SHOULD have at least two callers.
 enforcement: heuristic
 severity: review
+strict: true
 evidence: [caller, callers, statements]
 tuning:
   go: >-

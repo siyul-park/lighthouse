@@ -196,7 +196,10 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
         ]
     );
     let preset = registry.preset("design/recommended").unwrap();
-    assert_eq!(preset.rules.len(), design.len());
+    assert_eq!(preset.rules.len(), design.len() - 1);
+    assert!(!preset.rules.contains_key("design/private-helper-callers"));
+    let strict = registry.preset("design/strict").unwrap();
+    assert_eq!(strict.rules.len(), design.len());
     let testing = registry.preset("testing/recommended").unwrap();
     assert_eq!(testing.rules.len(), 3);
 }

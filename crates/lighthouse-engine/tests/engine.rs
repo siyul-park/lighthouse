@@ -99,6 +99,7 @@ fn meta(id: &str, scope: Scope, analyzers: &[&str], capabilities: &[Capability])
         analyzers: analyzers.iter().map(|a| (*a).to_owned()).collect(),
         capabilities: capabilities.to_vec(),
         citation: None,
+        strict: false,
     }
 }
 

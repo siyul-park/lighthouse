@@ -7,7 +7,6 @@ publish.workspace = true
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
-lighthouse-config.workspace = true
 lighthouse-declarative.workspace = true
 lighthouse-metrics.workspace = true
 lighthouse-model.workspace = true
@@ -15,6 +14,7 @@ lighthouse-plugin.workspace = true
 lighthouse-spec.workspace = true
 
 [dev-dependencies]
+lighthouse-config.workspace = true
 lighthouse-engine.workspace = true
 tempfile.workspace = true
 toml.workspace = true

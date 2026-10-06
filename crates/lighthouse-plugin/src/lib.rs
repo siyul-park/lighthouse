@@ -2,7 +2,7 @@ mod registry;
 
 use std::{collections::BTreeMap, path::PathBuf};
 
-use lighthouse_config::Rules;
+use lighthouse_config::{RuleConfig, Rules};
 use lighthouse_model::{
     Capability, Diagnostic, File, Fragment, Incomplete, Options, Project, Severity,
 };
@@ -162,6 +162,8 @@ pub struct RuleMeta {
     pub analyzers: Vec<String>,
     pub capabilities: Vec<Capability>,
     pub citation: Option<String>,
+    /// Left out of the plugin's `recommended` preset; only `strict` enables it.
+    pub strict: bool,
 }
 
 pub trait Rule: Send + Sync {
@@ -176,6 +178,34 @@ pub struct Preset {
     /// Fully qualified `plugin/name`.
     pub id: String,
     pub rules: Rules,
+}
+
+impl Preset {
+    /// The presets of a plugin's rules: `<plugin>/recommended` holds every
+    /// rule that is not `strict` at its default severity, and
+    /// `<plugin>/strict` adds the rest, present only when some rule is strict.
+    pub fn standard<'a>(plugin: &str, metas: impl IntoIterator<Item = &'a RuleMeta>) -> Vec<Self> {
+        let metas: Vec<&RuleMeta> = metas.into_iter().collect();
+        let preset = |name: &str, include: fn(&RuleMeta) -> bool| Self {
+            id: format!("{plugin}/{name}"),
+            rules: metas
+                .iter()
+                .filter(|meta| include(meta))
+                .map(|meta| {
+                    let config = RuleConfig {
+                        level: Some(meta.severity),
+                        options: Options::new(),
+                    };
+                    (meta.id.clone(), config)
+                })
+                .collect(),
+        };
+        let mut presets = vec![preset("recommended", |meta| !meta.strict)];
+        if metas.iter().any(|meta| meta.strict) {
+            presets.push(preset("strict", |_| true));
+        }
+        presets
+    }
 }
 
 pub trait Plugin {

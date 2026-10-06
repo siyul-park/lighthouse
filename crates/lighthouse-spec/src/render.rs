@@ -22,9 +22,14 @@ pub fn pattern_markdown(pattern: &Pattern, level: usize) -> String {
     let severity = pattern
         .severity()
         .map_or_else(|| "none".to_owned(), |s| s.to_string());
+    let preset = if pattern.strict {
+        " · preset `strict`"
+    } else {
+        ""
+    };
     let _ = writeln!(
         out,
-        "`{}` · scope `{}` · enforcement `{}` · severity `{severity}`\n",
+        "`{}` · scope `{}` · enforcement `{}` · severity `{severity}`{preset}\n",
         pattern.id, pattern.scope, pattern.enforcement
     );
     block(&mut out, "Intent", &pattern.intent);

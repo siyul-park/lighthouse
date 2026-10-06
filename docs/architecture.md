@@ -105,7 +105,8 @@ that cannot start is one), 3 incomplete.
 ## Dogfooding
 
 Lighthouse checks its own sources. The repository's `lighthouse.toml` enables the
-bundled `core`, `design` and `testing` plugins with their recommended presets and
+bundled `core`, `design` and `testing` plugins with their recommended presets (`<plugin>/strict` adds the review-level
+advice that is too noisy to recommend, such as `design/private-helper-callers`) and
 the Go and Rust plugins built by `make plugins`, and `make lint` (part of `make ci`)
 ends with `lighthouse check .`, which must exit 0: a finding is either fixed in the code, or it exposes a rule or
 provider that is imprecise, and that is fixed instead of silenced. The only

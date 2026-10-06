@@ -1,5 +1,4 @@
-use lighthouse_config::{RuleConfig, Rules};
-use lighthouse_model::{Capability, Diagnostic, Fingerprint, Fragment, Options, Position, Span};
+use lighthouse_model::{Capability, Diagnostic, Fingerprint, Fragment, Position, Span};
 use lighthouse_plugin::{
     Analyzer, Conventions, Ctx, Error, Indexed, LanguageProvider, Manifest, Plugin, Preset, Rule,
     RuleMeta, Scope, Source, Workspace,
@@ -35,17 +34,7 @@ impl Plugin for Core {
 
     fn presets(&self) -> Vec<Preset> {
         let rules = self.rules();
-        let rules = rules.iter().map(|r| r.meta()).map(|meta| {
-            let config = RuleConfig {
-                level: Some(meta.severity),
-                options: Options::new(),
-            };
-            (meta.id.clone(), config)
-        });
-        vec![Preset {
-            id: "core/recommended".to_owned(),
-            rules: Rules::from_iter(rules),
-        }]
+        Preset::standard("core", rules.iter().map(|rule| rule.meta()))
     }
 }
 

@@ -8,7 +8,6 @@ publish.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 lighthouse-model.workspace = true
-lighthouse-config.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-spec.workspace = true
 lighthouse-design.workspace = true
@@ -16,6 +15,7 @@ lighthouse-metrics.workspace = true
 lighthouse-testing.workspace = true
 
 [dev-dependencies]
+lighthouse-config.workspace = true
 lighthouse-engine.workspace = true
 tempfile.workspace = true
 lighthouse-rpc.workspace = true

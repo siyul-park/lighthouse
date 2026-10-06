@@ -114,6 +114,7 @@ impl Plugin for Fake {
                 analyzers: Vec::new(),
                 capabilities: Vec::new(),
                 citation: None,
+                strict: false,
             },
         })]
     }

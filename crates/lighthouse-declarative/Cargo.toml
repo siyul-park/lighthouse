@@ -13,9 +13,9 @@ thiserror.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-spec.workspace = true
-lighthouse-config.workspace = true
 
 [dev-dependencies]
+lighthouse-config.workspace = true
 lighthouse-design.workspace = true
 lighthouse-engine.workspace = true
 lighthouse-metrics.workspace = true

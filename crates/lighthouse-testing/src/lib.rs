@@ -3,8 +3,7 @@ mod naming;
 mod owner;
 mod single_owner;
 
-use lighthouse_config::{RuleConfig, Rules};
-use lighthouse_model::{Diagnostic, Fingerprint, Options, Symbol};
+use lighthouse_model::{Diagnostic, Fingerprint, Symbol};
 use lighthouse_plugin::{Ctx, Manifest, Plugin, Preset, Rule, RuleMeta};
 use serde_json::Value;
 
@@ -26,21 +25,8 @@ impl Plugin for Testing {
     }
 
     fn presets(&self) -> Vec<Preset> {
-        let rules = self
-            .rules()
-            .into_iter()
-            .map(|r| r.meta().clone())
-            .map(|meta| {
-                let config = RuleConfig {
-                    level: Some(meta.severity),
-                    options: Options::new(),
-                };
-                (meta.id, config)
-            });
-        vec![Preset {
-            id: "testing/recommended".to_owned(),
-            rules: Rules::from_iter(rules),
-        }]
+        let rules = self.rules();
+        Preset::standard("testing", rules.iter().map(|rule| rule.meta()))
     }
 }
 

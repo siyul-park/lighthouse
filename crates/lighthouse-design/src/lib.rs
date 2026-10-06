@@ -12,8 +12,7 @@ mod wrapper;
 
 use std::path::Path;
 
-use lighthouse_config::{RuleConfig, Rules};
-use lighthouse_model::{Diagnostic, Fingerprint, Options, Symbol, SymbolKind};
+use lighthouse_model::{Diagnostic, Fingerprint, Symbol, SymbolKind};
 use lighthouse_plugin::{Ctx, Manifest, Plugin, Preset, Rule, RuleMeta};
 use serde_json::Value;
 
@@ -47,21 +46,8 @@ impl Plugin for Design {
     }
 
     fn presets(&self) -> Vec<Preset> {
-        let rules = self
-            .rules()
-            .into_iter()
-            .map(|r| r.meta().clone())
-            .map(|meta| {
-                let config = RuleConfig {
-                    level: Some(meta.severity),
-                    options: Options::new(),
-                };
-                (meta.id, config)
-            });
-        vec![Preset {
-            id: "design/recommended".to_owned(),
-            rules: Rules::from_iter(rules),
-        }]
+        let rules = self.rules();
+        Preset::standard(ID, rules.iter().map(|rule| rule.meta()))
     }
 }
 
