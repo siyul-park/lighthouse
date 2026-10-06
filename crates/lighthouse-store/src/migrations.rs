@@ -1,11 +1,17 @@
-use rusqlite::Connection;
+use rusqlite::{Connection, TransactionBehavior};
 
 use crate::Error;
 
 /// Schema migrations, oldest first; `PRAGMA user_version` holds how many have
 /// been applied. A migration never changes once released: a change is a new
 /// entry.
-const MIGRATIONS: &[&str] = &[V1];
+///
+/// `review_events` is append-only, enforced by triggers, so a migration that
+/// changes its shape rewrites it: in the one transaction every migration runs
+/// in, it drops the triggers and the views over the table, creates the new
+/// table, copies every row across, drops the old table, renames the new one,
+/// and recreates indexes, triggers and views. `V2` does exactly that.
+const MIGRATIONS: &[&str] = &[V1, V2];
 
 /// Findings and the append-only review log. Locators, evidence and facts are
 /// JSON text, so nothing here assumes the artifact is code.
@@ -78,15 +84,121 @@ FROM findings f
 LEFT JOIN latest_verdicts l ON l.fingerprint = f.fingerprint;
 ";
 
+/// The decision log becomes the source of truth for verdicts, and the table a
+/// cache of it: events are identified by content (`event_id`), ordered by
+/// time, and no longer reference findings, since a teammate's verdict may
+/// arrive before this machine has seen the finding. A verdict now carries the
+/// semantic version of its rule and a digest of its evidence, and stops
+/// suppressing when either moves; mechanical findings are never suppressed.
+/// Findings keep the sighting a review will snapshot, and can go inactive.
+///
+/// Rows from `V1` keep a `legacy-<n>` id and have no semantic version or
+/// digest, which a verdict treats as matching anything.
+const V2: &str = "
+DROP VIEW finding_states;
+DROP VIEW suppressions;
+DROP VIEW latest_verdicts;
+DROP TRIGGER review_events_append_only_update;
+DROP TRIGGER review_events_append_only_delete;
+
+ALTER TABLE findings RENAME COLUMN severity TO last_severity;
+ALTER TABLE findings ADD COLUMN tier TEXT;
+ALTER TABLE findings ADD COLUMN last_options TEXT NOT NULL DEFAULT '{}';
+ALTER TABLE findings ADD COLUMN last_commit TEXT;
+ALTER TABLE findings ADD COLUMN last_dirty INTEGER;
+ALTER TABLE findings ADD COLUMN lighthouse_version TEXT;
+ALTER TABLE findings ADD COLUMN catalog_version TEXT;
+ALTER TABLE findings ADD COLUMN rule_version TEXT;
+ALTER TABLE findings ADD COLUMN pattern_hash TEXT;
+ALTER TABLE findings ADD COLUMN evidence_digest TEXT;
+ALTER TABLE findings ADD COLUMN inactive_at TEXT;
+
+CREATE TABLE review_events_v2 (
+    event_id            TEXT PRIMARY KEY,
+    fingerprint         TEXT NOT NULL,
+    rule_id             TEXT NOT NULL,
+    rule_version        TEXT,
+    pattern_hash        TEXT,
+    catalog_version     TEXT,
+    lighthouse_version  TEXT,
+    pattern_fingerprint TEXT,
+    verdict             TEXT NOT NULL CHECK (verdict IN ('confirmed', 'rejected', 'deferred')),
+    reason_code         TEXT NOT NULL,
+    reason_text         TEXT,
+    reviewer_kind       TEXT NOT NULL CHECK (reviewer_kind IN ('agent', 'human')),
+    reviewer_id         TEXT,
+    language            TEXT,
+    scope               TEXT,
+    evidence_digest     TEXT,
+    feature_snapshot    TEXT NOT NULL,
+    git_commit          TEXT,
+    timestamp           TEXT NOT NULL,
+    CHECK (
+        (verdict = 'confirmed' AND reason_code IN ('fixed', 'accepted-debt', 'none')) OR
+        (verdict = 'rejected' AND reason_code IN ('false-positive', 'intentional-exception',
+            'scope-too-broad', 'project-allowed', 'not-worth-fixing')) OR
+        (verdict = 'deferred' AND reason_code = 'none')
+    )
+);
+INSERT INTO review_events_v2 (event_id, fingerprint, rule_id, pattern_hash, catalog_version,
+    pattern_fingerprint, verdict, reason_code, reason_text, reviewer_kind, reviewer_id, language,
+    scope, feature_snapshot, git_commit, timestamp)
+SELECT 'legacy-' || id, fingerprint, rule_id, rule_version, catalog_version,
+    pattern_fingerprint, verdict, reason_code, reason_text, reviewer_kind, reviewer_id, language,
+    scope, feature_snapshot, git_commit, timestamp
+FROM review_events;
+DROP TABLE review_events;
+ALTER TABLE review_events_v2 RENAME TO review_events;
+
+CREATE INDEX review_events_fingerprint ON review_events (fingerprint, timestamp);
+CREATE INDEX review_events_rule ON review_events (rule_id);
+CREATE TRIGGER review_events_append_only_update BEFORE UPDATE ON review_events
+BEGIN SELECT RAISE(ABORT, 'review_events is append-only'); END;
+CREATE TRIGGER review_events_append_only_delete BEFORE DELETE ON review_events
+BEGIN SELECT RAISE(ABORT, 'review_events is append-only'); END;
+
+CREATE VIEW latest_verdicts AS
+SELECT e.fingerprint, e.event_id, e.verdict, e.reason_code, e.rule_version, e.evidence_digest
+FROM review_events e
+WHERE e.event_id = (
+    SELECT x.event_id FROM review_events x WHERE x.fingerprint = e.fingerprint
+    ORDER BY x.timestamp DESC, x.event_id DESC LIMIT 1
+);
+
+CREATE VIEW standings AS
+SELECT f.fingerprint, l.reason_code, (l.reason_code = 'scope-too-broad') AS narrowing,
+    CASE
+        WHEN f.last_severity = 'error' THEN 'unsuppressible'
+        WHEN l.rule_version IS NOT NULL AND f.rule_version IS NOT NULL
+             AND l.rule_version <> f.rule_version THEN 'rule-changed'
+        WHEN l.evidence_digest IS NOT NULL AND f.evidence_digest IS NOT NULL
+             AND l.evidence_digest <> f.evidence_digest THEN 'evidence-changed'
+        ELSE 'suppressed'
+    END AS standing
+FROM findings f
+JOIN latest_verdicts l ON l.fingerprint = f.fingerprint
+WHERE l.verdict = 'rejected';
+
+CREATE VIEW finding_states AS
+SELECT f.*, l.verdict AS review_verdict, l.reason_code AS review_reason,
+       s.standing AS standing, COALESCE(s.narrowing, 0) AS narrowing
+FROM findings f
+LEFT JOIN latest_verdicts l ON l.fingerprint = f.fingerprint
+LEFT JOIN standings s ON s.fingerprint = f.fingerprint;
+";
+
 /// The schema version this build writes.
 pub(crate) fn current() -> usize {
     MIGRATIONS.len()
 }
 
-/// Brings the database up to date; a database written by a newer build is
+/// Brings the database up to date. The version is read again after taking
+/// the write lock, so two processes opening a fresh database take turns and
+/// the second finds nothing to do; a database written by a newer build is
 /// refused rather than guessed at.
 pub(crate) fn migrate(conn: &mut Connection) -> Result<(), Error> {
-    let found = version(conn)?;
+    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let found = version(&tx)?;
     if found > current() {
         return Err(Error::NewerSchema {
             found,
@@ -94,11 +206,10 @@ pub(crate) fn migrate(conn: &mut Connection) -> Result<(), Error> {
         });
     }
     for (index, sql) in MIGRATIONS.iter().enumerate().skip(found) {
-        let tx = conn.transaction()?;
         tx.execute_batch(sql)?;
         tx.execute_batch(&format!("PRAGMA user_version = {}", index + 1))?;
-        tx.commit()?;
     }
+    tx.commit()?;
     Ok(())
 }
 

@@ -139,6 +139,9 @@ fn init_keeps_the_store_out_of_version_control() {
     lighthouse(existing.path()).arg("init").assert().success();
     assert_eq!(ignore(&existing), "target\n.lighthouse/*.db*\n");
 
+    let attributes = fs::read_to_string(fresh.path().join(".gitattributes")).unwrap();
+    assert_eq!(attributes, ".lighthouse/decisions.jsonl merge=union\n");
+
     let ignoring = tempfile::tempdir().unwrap();
     fs::write(ignoring.path().join(".gitignore"), ".lighthouse/*.db*\n").unwrap();
     lighthouse(ignoring.path()).arg("init").assert().success();

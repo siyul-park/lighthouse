@@ -5,19 +5,28 @@ use std::path::{Path, PathBuf};
 
 use crate::{Result, git::git};
 
-/// Files changed in the working tree against HEAD: modified, added, renamed
-/// (to their new name) and untracked. Project-relative, sorted.
+/// Files changed in the working tree against HEAD: modified, added, deleted,
+/// renamed (under both names) and untracked. A deleted file stays in the
+/// report scope so that the findings it had can be resolved. Project-relative,
+/// sorted.
 pub fn changed(root: &Path) -> Result<Vec<PathBuf>> {
     let mut files = tracked(
         root,
-        &["diff", "--name-only", "--diff-filter=ACMRT", "-z", "HEAD"],
+        &[
+            "diff",
+            "--name-only",
+            "--no-renames",
+            "--diff-filter=ACMRTD",
+            "-z",
+            "HEAD",
+        ],
     )?;
     files.extend(untracked(root)?);
     finish(root, files)
 }
 
 /// Files changed since the merge base of `base` and HEAD, in the working tree,
-/// plus untracked files.
+/// deleted and renamed ones included, plus untracked files.
 pub fn since(root: &Path, base: &str) -> Result<Vec<PathBuf>> {
     let merge_base = git(root, &["merge-base", base, "HEAD"])?;
     let merge_base = merge_base.trim();
@@ -26,7 +35,8 @@ pub fn since(root: &Path, base: &str) -> Result<Vec<PathBuf>> {
         &[
             "diff",
             "--name-only",
-            "--diff-filter=ACMRT",
+            "--no-renames",
+            "--diff-filter=ACMRTD",
             "-z",
             merge_base,
         ],

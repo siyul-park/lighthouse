@@ -77,9 +77,31 @@ impl Session {
 
     /// The bundled catalog with the project's layer on top.
     pub fn catalog(&self) -> Result<Catalog> {
-        match &self.local {
-            Some(local) => Ok(Catalog::overlay(Catalog::bundled(), local)?),
-            None => Ok(Catalog::bundled().clone()),
-        }
+        layered(self.local.as_ref())
+    }
+}
+
+/// The project root as commands that need no plugins see it: the directory of
+/// the `lighthouse.toml` found upward from the current directory, else the
+/// current directory. Nothing of the project is loaded, so a broken rule or
+/// catalog cannot get in the way.
+pub fn project_root() -> Result<PathBuf> {
+    let here = env::current_dir()?;
+    match Config::discover(&here)? {
+        Some((path, _)) => Ok(path.parent().ok_or("config path has no parent")?.to_owned()),
+        None => Ok(here),
+    }
+}
+
+/// The catalog of the project at `root`: the bundled one with the project's
+/// layer on top. Fails when the project's layer is broken.
+pub fn catalog_at(root: &Path) -> Result<Catalog> {
+    layered(load_local(root)?.as_ref())
+}
+
+fn layered(local: Option<&Catalog>) -> Result<Catalog> {
+    match local {
+        Some(local) => Ok(Catalog::overlay(Catalog::bundled(), local)?),
+        None => Ok(Catalog::bundled().clone()),
     }
 }

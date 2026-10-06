@@ -168,8 +168,10 @@ fn a_rejected_verdict_keeps_the_finding_out_of_later_reports() {
     assert_eq!(event["language"], "rust");
     assert_eq!(event["scope"], "symbol");
     assert_eq!(event["label"], "separate");
-    assert_eq!(event["feature_snapshot"]["facts"]["callers"], 1);
-    assert_eq!(event["evidence"]["callers"], 1);
+    assert_eq!(event["snapshot"]["facts"]["callers"], 1);
+    assert_eq!(event["snapshot"]["evidence"]["callers"], 1);
+    assert_eq!(event["snapshot"]["v"], 1);
+    assert_eq!(event["snapshot"]["dirty"], false);
     assert_eq!(event["rule_version"].as_str().unwrap().len(), 16);
     assert_eq!(event["catalog_version"].as_str().unwrap().len(), 16);
 
@@ -475,4 +477,386 @@ fn limit_trims_agent_output_and_is_refused_for_other_formats() {
         .assert()
         .code(2)
         .stderr("lighthouse: --limit applies to the agent formats only\n");
+}
+
+fn git_in(dir: &TempDir, args: &[&str]) {
+    let status = std::process::Command::new("git")
+        .args([
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "-c",
+            "commit.gpgsign=false",
+        ])
+        .args(args)
+        .current_dir(dir.path())
+        .status()
+        .unwrap();
+    assert!(status.success(), "git {args:?}");
+}
+
+fn error_level(dir: &TempDir) {
+    let config = dir.path().join("lighthouse.toml");
+    let text = fs::read_to_string(&config).unwrap();
+    fs::write(
+        config,
+        format!("{text}[rules]\n\"design/exported-doc\" = \"error\"\n"),
+    )
+    .unwrap();
+}
+
+#[test]
+fn a_mechanical_finding_stays_reported_whatever_the_verdict() {
+    let dir = rust_project(&[("src/lib.rs", "pub fn run() {}\n")]);
+    error_level(&dir);
+    lighthouse(dir.path()).arg("check").assert().code(1);
+    let fingerprint = fingerprint_of(&dir, "design/exported-doc");
+    let out = lighthouse(dir.path())
+        .args([
+            "review",
+            "resolve",
+            &fingerprint,
+            "--verdict",
+            "rejected",
+            "--reason",
+            "intentional-exception",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert!(
+        String::from_utf8(out.stdout)
+            .unwrap()
+            .contains("mechanical finding")
+    );
+
+    let check = lighthouse(dir.path())
+        .args(["check", "--format", "agent"])
+        .output()
+        .unwrap();
+    assert_eq!(check.status.code(), Some(1));
+    let text = String::from_utf8(check.stdout).unwrap();
+    assert!(
+        text.contains("note:        rejected as intentional-exception \u{2014} mechanical findings are not suppressible; fix the rule"),
+        "{text}"
+    );
+    let notice = String::from_utf8(check.stderr).unwrap();
+    assert!(
+        notice.contains("mechanical findings are not suppressible"),
+        "{notice}"
+    );
+    assert_eq!(listing(&dir, "suppressed").len(), 0);
+    assert_eq!(listing(&dir, "open").len(), 1);
+}
+
+#[test]
+fn a_verdict_expires_when_the_evidence_it_judged_changes() {
+    let dir = rust_project(&[("src/lib.rs", HELPER)]);
+    lighthouse(dir.path()).arg("check").assert().success();
+    let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
+    lighthouse(dir.path())
+        .args([
+            "review",
+            "resolve",
+            &fingerprint,
+            "--verdict",
+            "rejected",
+            "--reason",
+            "false-positive",
+        ])
+        .assert()
+        .success();
+    let quiet = stdout(lighthouse(dir.path()).arg("check"));
+    assert!(!quiet.contains("private-helper-callers"), "{quiet}");
+
+    let grown = HELPER.replace(
+        "if x > 10 { 10 } else { x }",
+        "let y = x;\n    if y > 10 { 10 } else { y }",
+    );
+    write(&dir, "src/lib.rs", &grown);
+    let out = lighthouse(dir.path())
+        .args(["check", "--format", "agent"])
+        .output()
+        .unwrap();
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("private-helper-callers"), "{text}");
+    assert!(
+        text.contains("note:        verdict expired: evidence changed"),
+        "{text}"
+    );
+    let notice = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        notice.contains("verdict expired: evidence changed"),
+        "{notice}"
+    );
+}
+
+#[test]
+fn the_reviewer_comes_from_flags_then_the_environment_then_a_human() {
+    let dir = rust_project(&[("src/lib.rs", HELPER)]);
+    lighthouse(dir.path()).arg("check").assert().success();
+    let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
+    let resolve = |envs: &[(&str, &str)], flags: &[&str]| {
+        let mut cmd = lighthouse(dir.path());
+        cmd.env_remove("LIGHTHOUSE_REVIEWER_KIND")
+            .env_remove("LIGHTHOUSE_REVIEWER")
+            .env("USER", "dana");
+        for (key, value) in envs {
+            cmd.env(key, value);
+        }
+        cmd.args(["review", "resolve", &fingerprint, "--verdict", "deferred"])
+            .args(flags)
+            .assert()
+            .success();
+    };
+    resolve(&[], &[]);
+    resolve(
+        &[
+            ("LIGHTHOUSE_REVIEWER_KIND", "agent"),
+            ("LIGHTHOUSE_REVIEWER", "hook"),
+        ],
+        &[],
+    );
+    resolve(
+        &[
+            ("LIGHTHOUSE_REVIEWER_KIND", "agent"),
+            ("LIGHTHOUSE_REVIEWER", "hook"),
+        ],
+        &["--reviewer-kind", "human", "--reviewer-id", "ana"],
+    );
+    let history = records(&stdout(lighthouse(dir.path()).args([
+        "review",
+        "history",
+        &fingerprint,
+        "--format",
+        "json",
+    ])));
+    let who: Vec<_> = history
+        .iter()
+        .map(|e| {
+            (
+                e["reviewer_kind"].as_str().unwrap(),
+                e["reviewer_id"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(who.len(), 3);
+    assert!(who.contains(&("human", "dana")), "{who:?}");
+    assert!(who.contains(&("agent", "hook")), "{who:?}");
+    assert!(who.contains(&("human", "ana")), "{who:?}");
+
+    lighthouse(dir.path())
+        .env("LIGHTHOUSE_REVIEWER_KIND", "robot")
+        .args(["review", "resolve", &fingerprint, "--verdict", "deferred"])
+        .assert()
+        .code(2);
+}
+
+#[test]
+fn the_decision_log_carries_a_verdict_to_a_clone_without_the_cache() {
+    let author = rust_project(&[("src/lib.rs", HELPER)]);
+    lighthouse(author.path()).arg("check").assert().success();
+    let fingerprint = fingerprint_of(&author, "design/private-helper-callers");
+    lighthouse(author.path())
+        .args([
+            "review",
+            "resolve",
+            &fingerprint,
+            "--verdict",
+            "rejected",
+            "--reason",
+            "project-allowed",
+        ])
+        .assert()
+        .success();
+    let log = fs::read_to_string(author.path().join(".lighthouse/decisions.jsonl")).unwrap();
+    assert_eq!(log.lines().count(), 1);
+
+    let clone = rust_project(&[("src/lib.rs", HELPER)]);
+    fs::create_dir_all(clone.path().join(".lighthouse")).unwrap();
+    fs::write(clone.path().join(".lighthouse/decisions.jsonl"), &log).unwrap();
+    let out = lighthouse(clone.path()).arg("check").output().unwrap();
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(!text.contains("private-helper-callers"), "{text}");
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("1 finding(s) suppressed")
+    );
+    let history = records(&stdout(lighthouse(clone.path()).args([
+        "review",
+        "history",
+        &fingerprint,
+        "--format",
+        "json",
+    ])));
+    assert_eq!(history[0]["reason"], "project-allowed");
+}
+
+#[test]
+fn resolve_refuses_a_finding_that_was_seen_again_and_warns_about_a_resolved_one() {
+    let dir = rust_project(&[("src/lib.rs", HELPER)]);
+    lighthouse(dir.path()).arg("check").assert().success();
+    let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
+    lighthouse(dir.path())
+        .args([
+            "review",
+            "resolve",
+            &fingerprint,
+            "--verdict",
+            "deferred",
+            "--seen",
+            "2000-01-01T00:00:00.000Z",
+        ])
+        .assert()
+        .code(2)
+        .stderr(predicates::str::contains("read it again before judging"));
+
+    write(&dir, "src/lib.rs", DOCUMENTED);
+    lighthouse(dir.path()).arg("check").assert().success();
+    let out = lighthouse(dir.path())
+        .args([
+            "review",
+            "resolve",
+            &fingerprint,
+            "--verdict",
+            "confirmed",
+            "--reason",
+            "fixed",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("warning: the finding was already resolved")
+    );
+}
+
+#[test]
+fn history_says_when_nothing_was_reviewed_and_resolve_survives_a_broken_catalog() {
+    let dir = rust_project(&[("src/lib.rs", HELPER)]);
+    lighthouse(dir.path()).arg("check").assert().success();
+    let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
+    lighthouse(dir.path())
+        .args(["review", "history", &fingerprint])
+        .assert()
+        .success()
+        .stdout("")
+        .stderr(predicates::str::contains("no reviews recorded"));
+
+    fs::create_dir_all(dir.path().join(".lighthouse/rules")).unwrap();
+    fs::write(
+        dir.path().join(".lighthouse/rules/broken.yaml"),
+        "id: [not, a, pattern\n",
+    )
+    .unwrap();
+    let out = lighthouse(dir.path())
+        .args(["review", "resolve", &fingerprint, "--verdict", "deferred"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("versions are not recorded")
+    );
+    let history = records(&stdout(lighthouse(dir.path()).args([
+        "review",
+        "history",
+        &fingerprint,
+        "--format",
+        "json",
+    ])));
+    assert!(history[0].get("rule_version").is_none());
+}
+
+#[test]
+fn findings_of_a_rule_taken_out_of_the_config_are_inactive_and_can_be_pruned() {
+    let dir = rust_project(&[("src/lib.rs", HELPER)]);
+    lighthouse(dir.path()).arg("check").assert().success();
+    assert_eq!(listing(&dir, "open").len(), 2);
+    let plugin = lighthouse_testkit::lang_rust();
+    fs::write(
+        dir.path().join("lighthouse.toml"),
+        format!(
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n",
+            plugin.to_str().unwrap()
+        ),
+    )
+    .unwrap();
+    lighthouse(dir.path()).arg("check").assert().success();
+    let inactive = listing(&dir, "inactive");
+    assert_eq!(rules(&inactive), ["design/private-helper-callers"]);
+    assert_eq!(rules(&listing(&dir, "open")), ["design/exported-doc"]);
+    let out = stdout(lighthouse(dir.path()).args(["review", "list", "--status", "inactive"]));
+    assert!(out.contains("\tinactive\t"), "{out}");
+
+    let pruned = stdout(lighthouse(dir.path()).args(["review", "prune", "--older-than", "30"]));
+    assert!(pruned.contains("removed 0"), "{pruned}");
+    let pruned = stdout(lighthouse(dir.path()).args(["review", "prune"]));
+    assert!(pruned.contains("removed 1"), "{pruned}");
+    assert!(listing(&dir, "inactive").is_empty());
+}
+
+#[test]
+fn changed_resolves_the_findings_of_a_deleted_file() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join("lighthouse.toml"),
+        "plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"warn\", max = 3 }\n",
+    )
+    .unwrap();
+    fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\n").unwrap();
+    fs::write(dir.path().join(".gitignore"), ".lighthouse/*.db*\n").unwrap();
+    git_in(&dir, &["init", "-q", "-b", "main"]);
+    git_in(&dir, &["add", "."]);
+    git_in(&dir, &["commit", "-q", "-m", "base"]);
+    lighthouse(dir.path()).arg("check").assert().success();
+    assert_eq!(listing(&dir, "open").len(), 1);
+
+    fs::remove_file(dir.path().join("big.txt")).unwrap();
+    lighthouse(dir.path())
+        .args(["check", "--changed"])
+        .assert()
+        .success();
+    assert!(listing(&dir, "open").is_empty());
+    assert_eq!(listing(&dir, "resolved").len(), 1);
+}
+
+#[test]
+fn source_annotations_allow_findings_and_are_counted() {
+    let allowed =
+        "// lighthouse:allow design/exported-doc -- documented at its origin\npub fn run() {}\n";
+    let dir = rust_project(&[("src/lib.rs", allowed)]);
+    let out = lighthouse(dir.path())
+        .args(["check", "--strict"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(String::from_utf8(out.stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(out.stderr)
+            .unwrap()
+            .contains("1 finding(s) allowed by source annotations")
+    );
+    let agent = stdout(lighthouse(dir.path()).args(["check", "--format", "agent"]));
+    assert!(agent.contains("0 suppressed, 1 allowed"), "{agent}");
+
+    let config = dir.path().join("lighthouse.toml");
+    let text = fs::read_to_string(&config).unwrap();
+    let with_core = text
+        .replace("\"design\"]", "\"design\", \"core\"]")
+        .replace("extends = [", "extends = [\"core/recommended\", ");
+    fs::write(config, with_core).unwrap();
+    let stale = "// lighthouse:allow design/exported-doc -- stale\n/// Runs.\npub fn run() {}\n";
+    write(&dir, "src/lib.rs", stale);
+    let text = stdout(lighthouse(dir.path()).arg("check"));
+    assert!(text.contains("warn core/unused-allow"), "{text}");
 }

@@ -12,6 +12,13 @@ pub fn head(root: &Path) -> Option<String> {
         .map(|out| out.trim().to_owned())
 }
 
+/// Whether tracked files differ from the commit the working tree is at.
+/// Untracked files do not count; `false` when there is no repository.
+pub fn dirty(root: &Path) -> bool {
+    git(root, &["status", "--porcelain", "--untracked-files=no"])
+        .is_ok_and(|out| !out.trim().is_empty())
+}
+
 /// Runs `git -C root args` and returns its stdout.
 pub fn git(root: &Path, args: &[&str]) -> Result<String> {
     let output = Command::new("git")

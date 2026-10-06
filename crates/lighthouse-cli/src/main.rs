@@ -8,7 +8,7 @@ use std::{
 
 use clap::{Parser, Subcommand};
 use lighthouse_config::FILE_NAME;
-use lighthouse_engine::Engine;
+use lighthouse_engine::{Engine, Outcome};
 use lighthouse_report::{Briefing, Format, render_with};
 use review::ReviewCommand;
 use session::Session;
@@ -26,6 +26,10 @@ const DEFAULT_CONFIG: &str = "plugins = [\"core\"]\nextends = [\"core/recommende
 /// What `init` keeps out of version control: the store is a local cache of
 /// one machine's checks and reviews.
 const STORE_IGNORE: &str = ".lighthouse/*.db*";
+
+/// The decision log is committed; branches that both appended merge by
+/// keeping the lines of both.
+const LOG_ATTRIBUTES: &str = ".lighthouse/decisions.jsonl merge=union";
 
 #[derive(Parser)]
 #[command(name = "lighthouse", version, about = "Design-quality linter")]
@@ -95,6 +99,10 @@ enum Command {
         config: Option<PathBuf>,
     },
     /// Review the findings `check` remembers and record verdicts on them.
+    ///
+    /// Exit codes of every subcommand: 0 on success, 2 on a usage or runtime
+    /// error (unknown or ambiguous fingerprint, a reason that does not fit the
+    /// verdict, a finding seen again since --seen, an unusable store).
     Review {
         #[command(subcommand)]
         command: ReviewCommand,
@@ -242,56 +250,28 @@ fn check(
     let session = Session::load(config)?;
     let (registry, plugins) = session.registry()?;
     let root = session.root.clone();
-    let catalog = briefed(options.format)
-        .then(|| session.catalog())
-        .transpose()?;
+    let catalog = session.catalog()?;
     let engine = Engine::new(registry, session.config, &root)?.with_incomplete(plugins.incomplete);
-    let files = match (reported.changed, reported.diff) {
-        (true, _) => Some(scope::changed(&root)?),
-        (_, Some(base)) => Some(scope::since(&root, base)?),
-        _ => None,
-    };
-    let mut outcome = match files {
-        Some(files) => {
-            let files = within(&root, paths, files)?;
-            eprintln!(
-                "lighthouse: reporting {} changed file(s); the whole project is analyzed",
-                files.len()
-            );
-            engine.check_files(&files, only)?
-        }
-        None => {
-            let default = [PathBuf::from(".")];
-            let paths = if paths.is_empty() {
-                &default[..]
-            } else {
-                paths
-            };
-            engine.check(paths, only)?
-        }
-    };
-    for notice in &plugins.notices {
+    let mut outcome = analyze(&engine, &root, paths, reported, only)?;
+    for notice in plugins.notices.iter().chain(&outcome.notices) {
         eprintln!("lighthouse: {notice}");
     }
-    for notice in &outcome.notices {
-        eprintln!("lighthouse: {notice}");
-    }
-    let suppressed = if options.store {
-        findings::remember(&root, &mut outcome)
+    let remembered = if options.store {
+        findings::remember(&root, &catalog, &mut outcome)
     } else {
-        0
+        findings::Remembered::default()
     };
-    if suppressed > 0 {
-        eprintln!(
-            "lighthouse: {suppressed} finding(s) suppressed by review verdicts (`lighthouse review list --status suppressed`)"
-        );
+    let allowed = outcome.allowed.len();
+    if allowed > 0 {
+        eprintln!("lighthouse: {allowed} finding(s) allowed by source annotations");
     }
     let briefing = Briefing {
-        catalog: catalog.as_ref(),
+        catalog: briefed(options.format).then_some(&catalog),
         facts: Some(&outcome.facts),
-        suppressed,
+        notes: Some(&remembered.notes),
+        suppressed: remembered.suppressed,
+        allowed,
         limit: options.limit,
-        ..Briefing::default()
     };
     print!(
         "{}",
@@ -303,6 +283,37 @@ fn check(
         )
     );
     Ok(outcome.exit_code(options.strict, options.allow_incomplete))
+}
+
+/// Runs the engine over the project and reports what the paths or the git
+/// scope select.
+fn analyze(
+    engine: &Engine,
+    root: &Path,
+    paths: &[PathBuf],
+    reported: Reported,
+    only: &[String],
+) -> Result<Outcome> {
+    let files = match (reported.changed, reported.diff) {
+        (true, _) => Some(scope::changed(root)?),
+        (_, Some(base)) => Some(scope::since(root, base)?),
+        _ => None,
+    };
+    if let Some(files) = files {
+        let files = within(root, paths, files)?;
+        eprintln!(
+            "lighthouse: reporting {} changed file(s); the whole project is analyzed",
+            files.len()
+        );
+        return Ok(engine.check_files(&files, only)?);
+    }
+    let default = [PathBuf::from(".")];
+    let paths = if paths.is_empty() {
+        &default[..]
+    } else {
+        paths
+    };
+    Ok(engine.check(paths, only)?)
 }
 
 /// Whether the format draws on the catalog.
@@ -345,23 +356,26 @@ fn init() -> Result<u8> {
     }
     fs::write(&path, DEFAULT_CONFIG)?;
     println!("wrote {}", path.display());
-    if ignore_store(&path.with_file_name(".gitignore"))? {
+    if ensure_line(&path.with_file_name(".gitignore"), STORE_IGNORE)? {
         println!("added {STORE_IGNORE} to .gitignore");
+    }
+    if ensure_line(&path.with_file_name(".gitattributes"), LOG_ATTRIBUTES)? {
+        println!("added the decision log to .gitattributes (merge=union)");
     }
     Ok(0)
 }
 
-/// Adds the store to the ignore file, creating it if needed; false when the
-/// file already ignores it.
-fn ignore_store(path: &Path) -> Result<bool> {
+/// Adds `line` to the file, creating it if needed; false when the file
+/// already has it.
+fn ensure_line(path: &Path, line: &str) -> Result<bool> {
     let mut text = fs::read_to_string(path).unwrap_or_default();
-    if text.lines().any(|line| line.trim() == STORE_IGNORE) {
+    if text.lines().any(|existing| existing.trim() == line) {
         return Ok(false);
     }
     if !text.is_empty() && !text.ends_with('\n') {
         text.push('\n');
     }
-    text.push_str(STORE_IGNORE);
+    text.push_str(line);
     text.push('\n');
     fs::write(path, text)?;
     Ok(true)
