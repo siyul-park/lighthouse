@@ -7,59 +7,50 @@ import (
 	"github.com/siyul-park/lighthouse/plugins/lang-go/sdk"
 )
 
-func (b *builder) testCase(d *ast.FuncDecl, id string, list []usage) {
-	info := b.u.info()
+// subtests finds the deepest chain of `t.Run(name, func...)` calls inside one
+// another.
+type subtests struct {
+	info    *types.Info
+	depth   int
+	deepest int
+}
+
+// testCaseOf describes the test entry point d, whose body references usages.
+func testCaseOf(d *ast.FuncDecl, id string, usages []usage, info *types.Info) sdk.TestCase {
 	style := styleScenario
 	if isTable(d.Body, info) {
 		style = styleTable
 	}
 	targets := []string{}
 	seen := map[string]bool{}
-	for _, use := range list {
+	for _, use := range usages {
 		if (use.kind == edgeCalls || use.kind == edgeReferences) && !seen[use.to] {
 			seen[use.to] = true
 			targets = append(targets, use.to)
 		}
 	}
-	b.frag.Tests = append(b.frag.Tests, sdk.TestCase{
-		Symbol:  id,
-		Nesting: runDepth(d.Body, info),
-		Style:   style,
-		Targets: targets,
-	})
+	walker := &subtests{info: info}
+	ast.Walk(walker, d.Body)
+	return sdk.TestCase{Symbol: id, Nesting: walker.deepest, Style: style, Targets: targets}
 }
 
-// runDepth is the deepest chain of `t.Run(name, func...)` calls inside one
-// another.
-func runDepth(body *ast.BlockStmt, info *types.Info) int {
-	r := &runs{info: info}
-	ast.Walk(r, body)
-	return r.deepest
-}
-
-type runs struct {
-	info    *types.Info
-	depth   int
-	deepest int
-}
-
-func (r *runs) Visit(n ast.Node) ast.Visitor {
+func (s *subtests) Visit(n ast.Node) ast.Visitor {
 	call, ok := n.(*ast.CallExpr)
-	if !ok || !isRun(call, r.info) {
-		return r
+	if !ok || !isSubtest(call, s.info) {
+		return s
 	}
-	r.depth++
-	r.deepest = max(r.deepest, r.depth)
-	ast.Walk(r, call.Fun)
+	s.depth++
+	s.deepest = max(s.deepest, s.depth)
+	ast.Walk(s, call.Fun)
 	for _, arg := range call.Args {
-		ast.Walk(r, arg)
+		ast.Walk(s, arg)
 	}
-	r.depth--
+	s.depth--
 	return nil
 }
 
-// isRun reports a call of testing's Run with a function literal last.
-func isRun(call *ast.CallExpr, info *types.Info) bool {
+// isSubtest reports a call of testing's Run with a function literal last.
+func isSubtest(call *ast.CallExpr, info *types.Info) bool {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok || len(call.Args) < 2 {
 		return false
@@ -72,10 +63,7 @@ func isRun(call *ast.CallExpr, info *types.Info) bool {
 		return false
 	}
 	fn, ok := s.Obj().(*types.Func)
-	if !ok || fn.Name() != "Run" || fn.Pkg() == nil || fn.Pkg().Path() != "testing" {
-		return false
-	}
-	return true
+	return ok && fn.Name() == "Run" && fn.Pkg() != nil && fn.Pkg().Path() == "testing"
 }
 
 // isTable reports a range over a collection of structs written in the test

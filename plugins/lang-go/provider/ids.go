@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/siyul-park/lighthouse/plugins/lang-go/sdk"
 )
@@ -35,19 +36,16 @@ const (
 	styleScenario = "scenario"
 )
 
-// target is a kind-less symbol id: module::owner::name.
-func target(module string, parts ...string) string {
-	return module + "::" + strings.Join(parts, "::")
-}
+var testEntryPrefixes = []string{"Test", "Benchmark", "Fuzz", "Example"}
 
 // symbolID is the project-stable id: module::owner::name#kind.
 func symbolID(kind, module string, parts ...string) string {
 	return target(module, parts...) + "#" + kind
 }
 
-func position(fset *token.FileSet, pos token.Pos) sdk.Position {
-	p := fset.Position(pos)
-	return sdk.Position{Line: p.Line, Col: p.Column}
+// target is a kind-less symbol id: module::owner::name.
+func target(module string, parts ...string) string {
+	return module + "::" + strings.Join(parts, "::")
 }
 
 // span covers from..to inside from's file. After a syntax error the parser can
@@ -61,6 +59,11 @@ func span(fset *token.FileSet, from, to token.Pos) sdk.Span {
 	return sdk.Span{Start: position(fset, from), End: position(fset, to)}
 }
 
+func position(fset *token.FileSet, pos token.Pos) sdk.Position {
+	p := fset.Position(pos)
+	return sdk.Position{Line: p.Line, Col: p.Column}
+}
+
 func docText(groups ...*ast.CommentGroup) string {
 	for _, g := range groups {
 		if g != nil {
@@ -72,25 +75,15 @@ func docText(groups ...*ast.CommentGroup) string {
 	return ""
 }
 
-// isTestName reports Test, Benchmark, Fuzz and Example entry points of go
-// test: the prefix is not followed by a lowercase letter.
-func isTestName(name string) bool {
-	for _, prefix := range []string{"Test", "Benchmark", "Fuzz", "Example"} {
-		if rest, ok := strings.CutPrefix(name, prefix); ok && !startsLower(rest) {
-			return true
+// isTestEntry reports a name of go test's entry-point form: one of the
+// prefixes not followed by a lowercase letter.
+func isTestEntry(name string, prefixes ...string) bool {
+	for _, prefix := range prefixes {
+		if rest, ok := strings.CutPrefix(name, prefix); ok {
+			if r, _ := utf8.DecodeRuneInString(rest); !unicode.IsLower(r) {
+				return true
+			}
 		}
-	}
-	return false
-}
-
-func isTestCaseName(name string) bool {
-	rest, ok := strings.CutPrefix(name, "Test")
-	return ok && !startsLower(rest)
-}
-
-func startsLower(s string) bool {
-	for _, r := range s {
-		return unicode.IsLower(r)
 	}
 	return false
 }

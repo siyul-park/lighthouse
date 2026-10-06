@@ -10,8 +10,6 @@ import (
 	"strings"
 )
 
-const maxBody = 256 << 20
-
 // Message is one JSON-RPC 2.0 message: a request or notification (Method), or
 // a response (Result or Error).
 type Message struct {
@@ -23,43 +21,20 @@ type Message struct {
 	Error   *ResponseError   `json:"error,omitempty"`
 }
 
+// ResponseError is the error object of a JSON-RPC response.
 type ResponseError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
+const maxBody = 256 << 20
+
 // ReadMessage reads one Content-Length framed message. It returns io.EOF at a
 // clean end of input.
 func ReadMessage(r *bufio.Reader) (*Message, error) {
-	length := -1
-	first := true
-	for {
-		line, err := r.ReadString('\n')
-		if err != nil {
-			if err == io.EOF && first && line == "" {
-				return nil, io.EOF
-			}
-			return nil, fmt.Errorf("sdk: reading header: %w", unexpected(err))
-		}
-		first = false
-		line = strings.TrimRight(line, "\r\n")
-		if line == "" {
-			break
-		}
-		name, value, ok := strings.Cut(line, ":")
-		if !ok {
-			return nil, fmt.Errorf("sdk: malformed header %q", line)
-		}
-		if strings.EqualFold(name, "Content-Length") {
-			n, err := strconv.Atoi(strings.TrimSpace(value))
-			if err != nil || n < 0 {
-				return nil, fmt.Errorf("sdk: malformed header %q", line)
-			}
-			length = n
-		}
-	}
-	if length < 0 {
-		return nil, errors.New("sdk: missing Content-Length")
+	length, err := readLength(r)
+	if err != nil {
+		return nil, err
 	}
 	if length > maxBody {
 		return nil, fmt.Errorf("sdk: message of %d bytes is too large", length)
@@ -87,6 +62,40 @@ func WriteMessage(w io.Writer, m *Message) error {
 	}
 	_, err = w.Write(body)
 	return err
+}
+
+// readLength consumes the header block and returns its Content-Length.
+func readLength(r *bufio.Reader) (int, error) {
+	length := -1
+	for first := true; ; first = false {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			if err == io.EOF && first && line == "" {
+				return 0, io.EOF
+			}
+			return 0, fmt.Errorf("sdk: reading header: %w", unexpected(err))
+		}
+		line = strings.TrimRight(line, "\r\n")
+		if line == "" {
+			break
+		}
+		name, value, ok := strings.Cut(line, ":")
+		if !ok {
+			return 0, fmt.Errorf("sdk: malformed header %q", line)
+		}
+		if !strings.EqualFold(name, "Content-Length") {
+			continue
+		}
+		n, err := strconv.Atoi(strings.TrimSpace(value))
+		if err != nil || n < 0 {
+			return 0, fmt.Errorf("sdk: malformed header %q", line)
+		}
+		length = n
+	}
+	if length < 0 {
+		return 0, errors.New("sdk: missing Content-Length")
+	}
+	return length, nil
 }
 
 // unexpected turns an end of input inside a message into an error that

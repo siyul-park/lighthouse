@@ -8,18 +8,18 @@ import (
 	"io"
 )
 
+// Handler implements the methods of a language provider.
+type Handler interface {
+	Initialize(InitializeParams) (InitializeResult, error)
+	Index(IndexParams) (IndexResult, error)
+}
+
 const (
 	codeParse    = -32700
 	codeMethod   = -32601
 	codeParams   = -32602
 	codeInternal = -32603
 )
-
-// Handler implements the methods of a language provider.
-type Handler interface {
-	Initialize(InitializeParams) (InitializeResult, error)
-	Index(IndexParams) (IndexResult, error)
-}
 
 // Serve answers requests from r on w until the host sends `exit` or closes
 // the input. It returns nil after a `shutdown` followed by `exit`, and an
@@ -73,13 +73,13 @@ func dispatch(h Handler, m *Message, shutdown *bool) (result json.RawMessage, re
 		if err := json.Unmarshal(m.Params, &p); err != nil {
 			return nil, &ResponseError{Code: codeParams, Message: err.Error()}
 		}
-		return reply(h.Initialize(p))
+		return marshal(h.Initialize(p))
 	case "index":
 		var p IndexParams
 		if err := json.Unmarshal(m.Params, &p); err != nil {
 			return nil, &ResponseError{Code: codeParams, Message: err.Error()}
 		}
-		return reply(h.Index(p))
+		return marshal(h.Index(p))
 	case "shutdown":
 		*shutdown = true
 		return json.RawMessage("null"), nil
@@ -88,7 +88,7 @@ func dispatch(h Handler, m *Message, shutdown *bool) (result json.RawMessage, re
 	}
 }
 
-func reply[T any](value T, err error) (json.RawMessage, *ResponseError) {
+func marshal[T any](value T, err error) (json.RawMessage, *ResponseError) {
 	if err != nil {
 		return nil, &ResponseError{Code: codeInternal, Message: err.Error()}
 	}
