@@ -99,6 +99,7 @@ examples:
   - name: test-file
     language: go
     kind: valid
+    canonical: true
     files:
       - path: sample_test.go
         body: |-
@@ -218,6 +219,7 @@ examples:
   - name: rust-test-file
     language: rust
     kind: valid
+    canonical: true
     files:
       - path: tests/helper.rs
         body: |-

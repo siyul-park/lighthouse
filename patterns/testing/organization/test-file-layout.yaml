@@ -97,6 +97,7 @@ examples:
   - name: fixtures-tests-helpers
     language: go
     kind: valid
+    canonical: true
     files:
       - path: go.mod
         body: |-
@@ -129,6 +130,7 @@ examples:
   - name: rust-fixtures-tests-helpers
     language: rust
     kind: valid
+    canonical: true
     files:
       - path: src/lib.rs
         body: |-

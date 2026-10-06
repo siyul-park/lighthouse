@@ -59,6 +59,7 @@ examples:
   - name: check-that-does-more
     language: go
     kind: valid
+    canonical: true
     files:
       - path: go.mod
         body: |-
@@ -90,6 +91,7 @@ examples:
   - name: rust-assert-macros
     language: rust
     kind: valid
+    canonical: true
     files:
       - path: src/lib.rs
         body: |-

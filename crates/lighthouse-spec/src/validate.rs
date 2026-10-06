@@ -67,6 +67,7 @@ pub(crate) fn pattern(pattern: &Pattern) -> Result<(), Error> {
         .examples
         .iter()
         .try_for_each(|e| example(pattern, e))?;
+    canonical(pattern)?;
     implementation(pattern, checkable)
 }
 
@@ -121,6 +122,23 @@ fn example(pattern: &Pattern, example: &Example) -> Result<(), Error> {
     pattern
         .resolve_options(&example.options, Some(&example.language))
         .map(drop)
+}
+
+/// A language has at most one canonical example per kind.
+fn canonical(pattern: &Pattern) -> Result<(), Error> {
+    let mut seen = BTreeSet::new();
+    for example in pattern.examples.iter().filter(|e| e.canonical) {
+        if !seen.insert((example.language.as_str(), example.kind.to_string())) {
+            return Err(Error::invalid(
+                &pattern.id,
+                format!(
+                    "more than one canonical {} example for language `{}`",
+                    example.kind, example.language
+                ),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn implementation(pattern: &Pattern, checkable: bool) -> Result<(), Error> {

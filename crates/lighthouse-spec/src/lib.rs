@@ -11,7 +11,7 @@ pub use catalog::Catalog;
 pub use error::Error;
 pub use model::{
     Content, Enforcement, Example, ExampleFile, Expect, Implementation, Kind, OptionSpec,
-    OptionType, Pack, Pattern, Scope, Section,
+    OptionType, Pack, Pattern, Scope, Section, tier,
 };
 pub use render::{docs, pattern_markdown};
 pub use rule::PatternRule;

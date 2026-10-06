@@ -230,6 +230,10 @@ pub struct Example {
     pub language: String,
     pub kind: Kind,
     pub files: Vec<ExampleFile>,
+    /// The example that best shows the pattern in its language; at most one
+    /// per language and kind. Agent output prefers it.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub canonical: bool,
     /// Diagnostics an invalid example must produce.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub expect: Vec<Expect>,
@@ -287,6 +291,20 @@ impl Pattern {
     /// a verdict can say which version of the rule it judged.
     pub fn version(&self) -> String {
         short_hash(&serde_json::to_string(self).expect("a pattern serializes"))
+    }
+
+    /// Identifies what the pattern demands: the hash of its requirement,
+    /// enforcement, options and implementation. Wording, examples and tuning
+    /// notes do not change it, so a verdict stays valid across edits that
+    /// leave the decision alone.
+    pub fn semantic_version(&self) -> String {
+        let decision = serde_json::json!({
+            "requirement": self.requirement.split_whitespace().collect::<Vec<_>>().join(" "),
+            "enforcement": self.enforcement,
+            "options": self.options,
+            "implementation": self.implementation,
+        });
+        short_hash(&decision.to_string())
     }
 
     /// Defaults filled in and configured keys checked against the declared
@@ -348,6 +366,22 @@ pub struct Pack {
     pub title: String,
     pub intro: String,
     pub sections: Vec<Section>,
+}
+
+/// How a finding is decided: the pattern's enforcement, or, for a rule
+/// without a pattern, what its severity implies.
+pub fn tier(severity: Severity, pattern: Option<&Pattern>) -> &'static str {
+    match pattern.map(|p| p.enforcement) {
+        Some(Enforcement::Mechanical) => "mechanical",
+        Some(Enforcement::Heuristic) => "heuristic",
+        Some(Enforcement::Judgment) => "judgment",
+        Some(Enforcement::Doc) | None => match severity {
+            Severity::Error => "mechanical",
+            Severity::Warn => "heuristic",
+            Severity::Review => "judgment",
+            Severity::Info => "evidence",
+        },
+    }
 }
 
 /// The first eight bytes of the SHA-256 of `text`, in hex.

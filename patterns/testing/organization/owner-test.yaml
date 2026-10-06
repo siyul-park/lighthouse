@@ -153,6 +153,7 @@ examples:
   - name: no-tests-at-all
     language: go
     kind: valid
+    canonical: true
     files:
       - path: store.go
         body: |-
@@ -183,6 +184,7 @@ examples:
   - name: rust-valid
     language: rust
     kind: valid
+    canonical: true
     files:
       - path: src/lib.rs
         body: |-

@@ -108,6 +108,7 @@ examples:
   - name: below-thresholds
     language: go
     kind: valid
+    canonical: true
     files:
       - path: sample.go
         body: |-
@@ -206,6 +207,7 @@ examples:
   - name: rust-dispatcher
     language: rust
     kind: valid
+    canonical: true
     options:
       cyclomatic: 1
       statements: 1

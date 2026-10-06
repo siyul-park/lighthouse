@@ -74,6 +74,7 @@ examples:
   - name: primary-concept
     language: go
     kind: valid
+    canonical: true
     files:
       - path: example.go
         body: |-
@@ -97,6 +98,7 @@ examples:
   - name: rust-valid
     language: rust
     kind: valid
+    canonical: true
     options:
       kinds: [type]
     files:

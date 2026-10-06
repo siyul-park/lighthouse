@@ -104,6 +104,7 @@ examples:
   - name: constructor-called-by-method
     language: go
     kind: valid
+    canonical: true
     files:
       - path: example.go
         body: |-
@@ -146,6 +147,7 @@ examples:
   - name: rust-shared-by-a-free-function
     language: rust
     kind: valid
+    canonical: true
     files:
       - path: src/lib.rs
         body: |-

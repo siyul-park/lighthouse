@@ -279,6 +279,33 @@ mod validation {
     }
 
     #[test]
+    fn at_most_one_canonical_example_per_language_and_kind() {
+        let example = |name: &str, language: &str, canonical: bool| {
+            format!(
+                "  - name: {name}\n    language: {language}\n    kind: valid\n    canonical: {canonical}\n    files: [{{ path: a, body: x }}]\n"
+            )
+        };
+        let one = format!(
+            "examples:\n{}{}",
+            example("a", "go", true),
+            example("b", "rust", true)
+        );
+        Catalog::from_files(pattern_with(&one)).unwrap();
+        let two = format!(
+            "examples:\n{}{}",
+            example("a", "go", true),
+            example("b", "go", true)
+        );
+        rejected(pattern_with(&two), "more than one canonical");
+        let marked_once = format!(
+            "examples:\n{}{}",
+            example("a", "go", true),
+            example("b", "go", false)
+        );
+        Catalog::from_files(pattern_with(&marked_once)).unwrap();
+    }
+
+    #[test]
     fn example_rules_are_enforced() {
         let file = |extra: &str| {
             format!("examples:\n  - name: e\n    language: go\n    kind: valid\n{extra}")
@@ -600,6 +627,7 @@ mod write {
                 language: "go".into(),
                 kind: Kind::Invalid,
                 files: vec![ExampleFile::inline("a.go", "package a\n\nfunc F() {}")],
+                canonical: false,
                 expect: vec![Expect {
                     line: 3,
                     message: Some("F".into()),
@@ -611,6 +639,7 @@ mod write {
                 language: "go".into(),
                 kind: Kind::Valid,
                 files: vec![ExampleFile::inline("a.go", "package a")],
+                canonical: false,
                 expect: Vec::new(),
                 options: Map::new(),
             },
@@ -674,4 +703,54 @@ fn catalog_version_changes_with_any_pattern() {
     let catalog = Catalog::bundled();
     assert_eq!(catalog.version(), Catalog::bundled().version());
     assert_ne!(catalog.version(), Catalog::default().version());
+}
+
+#[test]
+fn semantic_version_ignores_wording_examples_and_tuning() {
+    let pattern = bundled("design/coupling-signal");
+    let mut reworded = pattern.clone();
+    reworded.intent.push_str(" More prose.");
+    reworded.examples.clear();
+    reworded.tuning.clear();
+    reworded.requirement = format!("  {}  ", reworded.requirement.replace(' ', "  "));
+    assert_eq!(reworded.semantic_version(), pattern.semantic_version());
+    assert_ne!(reworded.version(), pattern.version());
+
+    let mut stricter = pattern.clone();
+    stricter.requirement.push_str(" Always.");
+    assert_ne!(stricter.semantic_version(), pattern.semantic_version());
+    let mut tuned = pattern.clone();
+    tuned.enforcement = Enforcement::Judgment;
+    assert_ne!(tuned.semantic_version(), pattern.semantic_version());
+}
+
+#[test]
+fn tier_follows_enforcement_then_severity() {
+    let heuristic = bundled("design/private-helper-callers");
+    assert_eq!(
+        lighthouse_spec::tier(Severity::Review, Some(heuristic)),
+        "heuristic"
+    );
+    assert_eq!(lighthouse_spec::tier(Severity::Error, None), "mechanical");
+    assert_eq!(lighthouse_spec::tier(Severity::Info, None), "evidence");
+}
+
+#[test]
+fn implemented_patterns_mark_one_canonical_example_per_language() {
+    for pattern in Catalog::bundled().patterns() {
+        for language in ["go", "rust"] {
+            let valid = |e: &&lighthouse_spec::Example| {
+                e.language == language && e.kind == lighthouse_spec::Kind::Valid
+            };
+            if pattern.implementation.is_none() || !pattern.examples.iter().any(|e| valid(&e)) {
+                continue;
+            }
+            let marked = pattern
+                .examples
+                .iter()
+                .filter(valid)
+                .filter(|e| e.canonical);
+            assert_eq!(marked.count(), 1, "{} {language}", pattern.id);
+        }
+    }
 }

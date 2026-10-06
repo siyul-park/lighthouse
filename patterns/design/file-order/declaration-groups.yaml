@@ -109,6 +109,7 @@ examples:
   - name: valid
     language: go
     kind: valid
+    canonical: true
     files:
       - path: example.go
         body: |-
@@ -194,6 +195,7 @@ examples:
   - name: rust-valid
     language: rust
     kind: valid
+    canonical: true
     files:
       - path: src/lib.rs
         body: |-
