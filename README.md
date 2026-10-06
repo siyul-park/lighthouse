@@ -1,64 +1,174 @@
 # Lighthouse
 
-Design-quality linter written in Rust. One rule set across languages, delivered
-as a feedback loop for agents and humans. The core knows zero languages and
-zero rules: languages, analyzers, rules and presets all arrive through one
-`Plugin` contract, and bundled plugins use the same contract as external ones.
+**Lighthouse continuously turns codebase design decisions into executable rules.**
 
-## Architecture
+Every codebase accumulates design decisions: which way dependencies point, who owns
+which state, what a test is allowed to touch, when a helper deserves to exist. Most of
+them live in review threads, style docs and people's heads, so they are made again and
+again, and broken again and again, by humans and coding agents alike.
 
-```
- frontends:  CLI ── LSP server ── MCP server ── Skill/hooks
-                 \      |          /
-                  engine (orchestrator)
-     config ─ plugin host ─ scheduler ─ baseline/ratchet ─ reporters
-        |                       |
-   language providers      analyzer DAG ──> rules ──> diagnostics / review tasks
-   (tree-sitter + LSP)      (metrics, facts)              |
-        \_____________ index (SQLite, .lighthouse/) ______/
-                       files·symbols·edges·metrics·findings history·snapshots
-```
+Lighthouse records those decisions, turns them into rules that can be replayed against
+any change, and applies them to every decision that follows.
 
-## Status: phase 1b (Go vertical slice)
-
-Implemented: workspace, unified code model types, plugin contract with
-in-process registry (analyzer DAG), `lighthouse.toml` config with presets and
-overrides, engine, text/json/SARIF reporters, CLI (`check`, `rule list`,
-`explain`, `init`, `docs`) and the bundled plugins:
-
-- `lang-go`: tree-sitter Go provider (`lighthouse-lang-go`, queries in
-  `crates/lighthouse-lang-go/queries`), syntactic resolution, no `semantic-edges`.
-- `core`: `core/max-file-lines`.
-- `metrics`: analyzers `size`, `cyclomatic`, `cognitive`, `nesting`, `fan`,
-  language-neutral over the UCM.
-- `design`: `design/complexity-signal`, `design/coupling-signal`,
-  `design/exported-doc`, `design/single-use-wrapper`.
-
-Control flow reaches analyzers as normalized events: a provider fills
-`FunctionSummary::flow` with `FlowKind` constructs (if, else-if, else, switch,
-loop, catch, jump, boolean-operator run, recursion), each with its nesting level
-(nested functions count as nesting). `cyclomatic` is `decisions + 1`;
-`cognitive` follows Campbell, SonarSource 2018, from the events alone.
-
-Pattern catalog (`patterns/`, crate `lighthouse-spec`) is the single source of
-truth for rule metadata, option defaults, examples and `docs/patterns/*.md`;
-`lighthouse docs generate` rewrites the docs and `lighthouse docs check` fails
-when they are stale. `RuleTester` (crate `lighthouse-engine`) runs every
-implemented pattern's examples through the engine. `lighthouse rule list --all`
-shows every pattern as implemented, unimplemented or doc; `lighthouse explain
-<pattern-id>` prints intent, requirement and examples.
-
-Not yet: language servers, SQLite index, MCP/LSP frontends.
-
-## Usage
-
-```
-lighthouse init
-lighthouse check [paths] [--format text|json|sarif] [--strict] [--rules a,b] [--config file]
-lighthouse rule list [--all]
-lighthouse docs generate [--out docs]
-lighthouse docs check
-lighthouse explain core/max-file-lines
+```text
+            ┌──────────────────────── decide once ────────────────────────┐
+            │                                                             │
+   change ──▶ check ──▶ finding ──▶ review ──▶ verdict ──▶ pattern memory ─┤
+     ▲          │      (evidence)   (agent      (kept       (similar code, │
+     │          │                    or human)   forever)    past verdicts)│
+     │          ▼                                                          ▼
+     └──── fix ◀── feedback                         rule proposal ──▶ rule test ──▶ new rule
+                                                                                      │
+            ◀──────────────────────── apply everywhere ───────────────────────────────┘
 ```
 
-Exit codes: see `Outcome::exit_code` in `lighthouse-engine`.
+## System 1 for your agents
+
+A coding agent reasons slowly and expensively, and forgets what it concluded once the
+session ends. Lighthouse is the fast, cheap, reproducible layer underneath: the
+judgments the agent (or a reviewer) already made, compiled into rules that run in
+milliseconds on every edit. The agent stays System 2, deliberate and creative.
+Lighthouse is System 1: the codebase's trained intuition.
+
+Every judgment that System 2 makes is stored, and the ones that keep recurring are
+promoted into System 1.
+
+## What the loop looks like
+
+An agent edits a file. A hook runs `lighthouse check` on what changed and hands back
+structured feedback rather than a bare lint line (agent output format, arriving with the MCP and hook integration):
+
+```text
+internal/jit/compile/compile.go:350:1: warn design/coupling-signal:
+  function coordinates 14 collaborators in its package
+  evidence: fan_in=2 fan_out=14 statements=61
+  requirement: coupling is judged from fan-in and fan-out within a package (review signal)
+```
+
+The agent fixes it, or it records a verdict: `rejected: intentional-exception` with a
+reason. That verdict is kept with a snapshot of the evidence, so the same structure is
+never asked about twice. When structurally similar code keeps getting the same
+verdict and no rule covers it, Lighthouse proposes one. The proposal carries the
+occurrences, the verdicts and valid/invalid examples. It must pass the existing rule
+fixtures before anyone approves it.
+
+Rules come from a **pattern catalog**: one canonical specification per decision, from
+which the checks, the human-readable docs ([docs/patterns](docs/patterns)) and the
+agent instructions are all generated. Docs, linter and agent can no longer disagree.
+
+```yaml
+id: design/single-use-wrapper
+title: Inline single-use wrappers
+intent: A forwarding wrapper adds a name without adding meaning.
+scope: symbol
+requirement: >-
+  A simple single-use wrapper SHOULD be inlined unless its name expresses a
+  real policy or mechanic; complex one-use mechanics require review rather
+  than mechanical removal.
+enforcement: heuristic     # mechanical → error · heuristic → warn · judgment → review
+evidence: [callee, callers]
+implementation:
+  builtin: design/single-use-wrapper
+examples: [...]            # executable valid/invalid fixtures, run by RuleTester
+```
+
+## How a decision becomes a rule
+
+A decision can be enforced in three forms. A pattern climbs from the left to the right
+as evidence accumulates, and every step is gated by offline evaluation on held-out
+verdicts and by the rule's fixtures.
+
+| Form | How it judges | When it is used |
+| --- | --- | --- |
+| **judged** | the requirement in natural language, evaluated by a pluggable decision model | the decision is real but nobody can write it down precisely yet |
+| **learned** | a gradient-boosted tree model trained on stored verdicts and feature snapshots | enough labelled cases exist and the boundary is statistical |
+| **deterministic** | a mechanical check or a heuristic expression over the code model | the boundary can be stated exactly; this is the goal of every pattern |
+
+Rules define what is true. Models only estimate confidence and priority. Nothing is
+enabled, suppressed or promoted without passing the same evaluation pipeline, and that
+pipeline is exposed to agents through the CLI and MCP, so an agent writing a new rule
+evaluates it exactly the way Lighthouse does.
+
+## Why not another linter
+
+| | Formatters and linters | Agent-time scanners | Lighthouse |
+| --- | --- | --- | --- |
+| Checks code against rules | yes | yes | yes |
+| Runs while an agent writes | no | yes | yes |
+| Design-level structure (ownership, dependency direction, cohesion, test contracts) | rarely | rarely | the focus |
+| One rule set across languages, realized per language | no | partly | yes |
+| Remembers every review verdict | no | no | yes |
+| Turns recurring verdicts into new or tighter rules | no | no | yes |
+| Rules, docs and agent instructions share one source | no | no | yes |
+
+Precision comes before recall. A design rule that cries wolf gets ignored, so heuristic
+rules default to high thresholds, judgment calls become review tasks instead of
+errors, and each rule's precision is measured from its verdicts. Noisy rules generate
+proposals to narrow or demote themselves.
+
+## Quick start
+
+```sh
+cargo install --path crates/lighthouse-cli   # the `lighthouse` binary
+make plugins                                  # builds language plugins into target/plugins/
+
+lighthouse init                               # writes lighthouse.toml
+lighthouse check                              # analyze the project
+lighthouse explain design/single-use-wrapper  # intent, requirement, examples
+lighthouse rule list --all                    # every pattern and its status
+```
+
+A minimal `lighthouse.toml` for a Go project:
+
+```toml
+plugins = [{ id = "lang-go", path = "target/plugins/lang-go" }, "design"]
+extends = ["design/recommended"]
+
+[rules]
+"design/complexity-signal" = { level = "warn", cognitive = 30 }
+```
+
+Exit codes: `0` clean, `1` findings, `2` usage or configuration error, `3` analysis
+incomplete. "Not checked" never counts as "passed".
+
+## Concepts
+
+- **Pattern catalog** (`patterns/`): the canonical design decisions, with intent,
+  requirement, scope, enforcement tier, options, per-language tuning and executable
+  examples. Packs today: `design` and `testing`. Projects can overlay their own.
+- **Unified code model**: modules, symbols, edges, control-flow summaries and test
+  cases. Rules state their intent once, and each language realizes it in its own
+  terms.
+- **Language plugins**: each language is analyzed by a separate process written in
+  that language, using its own toolchain. The Go plugin uses `go/packages` and
+  `go/types`. Plugins speak a small, versioned
+  [stdio JSON-RPC protocol](docs/plugin-protocol.md), so a provider for a new
+  language never needs Rust.
+- **Analysis scope versus report scope**: `check [paths]`, `--changed` and hook
+  scopes filter what is reported. Analysis always covers what the semantics require.
+  See [docs/architecture.md](docs/architecture.md).
+- **Beyond code**: the engine is built around artifacts and decisions, not syntax.
+  Source code is the first domain; documents, design files and other stored artifacts
+  are next.
+
+## Status
+
+| Area | Available now | Next |
+| --- | --- | --- |
+| Pattern catalog | `design` and `testing` packs from a real style guide, generated docs, overlays | more executable examples |
+| Languages | Go (semantic, over RPC) | Rust, TypeScript, Python |
+| Analysis | size, cyclomatic, cognitive (SonarSource), nesting, fan-in/out | dependency direction, cycles, clones, cohesion |
+| Rules | complexity, coupling, exported docs, single-use wrappers | declarative CEL rules, test-contract rules |
+| Agent loop | CLI with text, JSON and SARIF output | agent output format, MCP server, Skill, hooks |
+| Memory | | verdict store, pattern index, similarity search |
+| Evolution | | coverage analysis, rule proposals, judged and learned rule forms |
+| Editors | | LSP server |
+
+## Documentation
+
+- [Pattern catalog, rendered](docs/patterns): every decision Lighthouse knows
+- [Architecture](docs/architecture.md): core model, scopes and incomplete analysis
+- [Plugin protocol](docs/plugin-protocol.md): writing a language plugin in any language
+
+Development: `make test` builds the plugins and runs the test suite. The Go plugin
+pins its toolchain in `plugins/lang-go/.go-version`.
