@@ -410,6 +410,9 @@
         {
           "flow": [],
           "max_nesting": 0,
+          "param_types": [
+            ".::Service"
+          ],
           "params": 1,
           "returns": 1,
           "statements": 2,
@@ -420,6 +423,9 @@
         {
           "flow": [],
           "max_nesting": 0,
+          "param_types": [
+            ".::Service"
+          ],
           "params": 1,
           "returns": 1,
           "statements": 1,

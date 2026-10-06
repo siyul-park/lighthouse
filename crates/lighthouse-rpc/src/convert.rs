@@ -249,6 +249,7 @@ fn function(f: wire::FunctionSummary) -> Result<core::FunctionSummary, String> {
         flow: f.flow.into_iter().map(flow).collect(),
         clone_fingerprint: f.clone_fingerprint.map(core::Fingerprint::from_raw),
         forwards_to: f.forwards_to.map(core::Target::Path),
+        param_types: f.param_types,
         manual_assertions: f.manual_assertions,
     })
 }

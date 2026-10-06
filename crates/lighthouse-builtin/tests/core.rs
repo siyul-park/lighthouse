@@ -190,6 +190,7 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
             "design/no-exported-mutable-global",
             "design/no-redundant-qualifiers",
             "design/private-helper-callers",
+            "design/receiver-owned-behavior",
             "design/related-symbols-close",
             "design/section-banners",
             "design/single-use-wrapper"

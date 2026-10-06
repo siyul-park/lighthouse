@@ -1261,7 +1261,7 @@ Applies to private functions and methods (items without `pub`); a trait impl met
 
 ### Behavior lives with its owner
 
-`design/receiver-owned-behavior` · scope `symbol` · enforcement `judgment` · severity `review`
+`design/receiver-owned-behavior` · scope `symbol` · enforcement `heuristic` · severity `warn`
 
 **Intent**
 
@@ -1271,9 +1271,142 @@ Where a function lives tells readers who owns the behavior.
 
 Methods SHOULD express receiver-owned behavior; free functions SHOULD express construction or behavior with no natural receiver.
 
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `constructor_prefixes` | list | `["New","new"]`; rust: `["new"]` | A function named like one of these, or one of these followed by a word, is a constructor and has no receiver yet. |
+| `require_owner_param` | bool | `false` | Report only functions that take a value of the owner type as a parameter, the strongest sign that the owner should be the receiver. By default a function that takes one or calls or references the owner or one of its members is reported; a function that does neither is a helper with no more to do with the owner than with any other type. |
+
+**Invalid example: only-one-owner-calls (go)**
+
+```go
+package sample
+
+type Store struct{ items []int }
+
+func (s *Store) Total() int { return sum(s) }
+
+func (s *Store) Count() int { return len(s.items) + sum(s) - sum(s) }
+
+func sum(s *Store) int {
+	total := 0
+	for _, i := range s.items {
+		total += i
+	}
+	return total
+}
+```
+
+**Valid example: shared-by-a-free-function (go)**
+
+```go
+package sample
+
+type Store struct{ items []int }
+
+func (s *Store) Total() int { return sum(s) }
+
+func Sum(s *Store) int { return sum(s) }
+
+func sum(s *Store) int {
+	total := 0
+	for _, i := range s.items {
+		total += i
+	}
+	return total
+}
+```
+
+**Valid example: helper-unrelated-to-the-owner (go)**
+
+```go
+package sample
+
+type Store struct{ items []int }
+
+func (s *Store) Total() int { return sum(s.items) }
+
+func sum(items []int) int {
+	total := 0
+	for _, i := range items {
+		total += i
+	}
+	return total
+}
+```
+
+**Valid example: constructor-called-by-method (go)**
+
+```go
+package sample
+
+type Store struct{ items []int }
+
+func (s *Store) Reset() *Store { return newStore() }
+
+func newStore() *Store { return &Store{items: []int{}} }
+```
+
+**Invalid example: rust-only-one-owner-calls (rust)**
+
+```rust
+pub struct Store {
+    items: Vec<i32>,
+}
+
+impl Store {
+    pub fn total(&self) -> i32 {
+        sum(self)
+    }
+
+    pub fn count(&self) -> i32 {
+        self.items.len() as i32 + sum(self)
+    }
+}
+
+fn sum(store: &Store) -> i32 {
+    let mut total = 0;
+    for i in &store.items {
+        total += i;
+    }
+    total
+}
+```
+
+**Valid example: rust-shared-by-a-free-function (rust)**
+
+```rust
+pub struct Store {
+    items: Vec<i32>,
+}
+
+impl Store {
+    pub fn total(&self) -> i32 {
+        sum(self)
+    }
+}
+
+pub fn total_of(store: &Store) -> i32 {
+    sum(store)
+}
+
+fn sum(store: &Store) -> i32 {
+    let mut total = 0;
+    for i in &store.items {
+        total += i;
+    }
+    total
+}
+```
+
 **Tuning: go**
 
-Free functions are package functions.
+A private package function with at least one production caller, every caller being a method of one type, never used as a value and not named like a constructor, is reported. Test callers do not count. A function called by any other function, or by methods of two types, is not judged.
+
+**Tuning: rust**
+
+The same for a private free function and the methods of one `impl` target type. Parameter types are not resolved for Rust, so `takes_owner_param` is always false there.
 
 ### One abstraction level per function
 

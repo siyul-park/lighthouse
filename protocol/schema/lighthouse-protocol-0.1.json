@@ -308,6 +308,13 @@
           "minimum": 0,
           "type": "integer"
         },
+        "param_types": {
+          "description": "Project types named by the parameters, receiver excluded, as kind-less\nsymbol ids (`module::name`). Added in 0.1 before 1.0; empty when the\nplugin does not resolve parameter types.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "params": {
           "format": "uint32",
           "minimum": 0,

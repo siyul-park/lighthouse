@@ -305,6 +305,10 @@ pub struct FunctionSummary {
     /// The body is a single call that passes the receiver and every parameter
     /// on, in order.
     pub forwards_to: Option<Target>,
+    /// Project types named by the parameters, receiver excluded, as kind-less
+    /// symbol ids (`module::name`).
+    #[serde(default)]
+    pub param_types: Vec<String>,
     /// Checks written out by hand in a test file's function: an `if` that
     /// compares and whose only effect is to fail the test.
     #[serde(default)]

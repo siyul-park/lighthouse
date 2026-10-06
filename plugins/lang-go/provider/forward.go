@@ -3,6 +3,7 @@ package provider
 import (
 	"go/ast"
 	"go/types"
+	"slices"
 )
 
 // forwardTarget names the call a function body consists of when that call
@@ -110,4 +111,25 @@ func passesOn(t *ast.FuncType, args []ast.Expr) bool {
 		}
 	}
 	return true
+}
+
+// paramTypes are the project types the parameters name, as kind-less symbol
+// ids, in order of first appearance.
+func paramTypes(sig *ast.FuncType, info *types.Info, res *resolver) []string {
+	var out []string
+	for _, field := range sig.Params.List {
+		t := info.TypeOf(field.Type)
+		if t == nil {
+			continue
+		}
+		owner, ok := namedType(t)
+		if !ok || !res.inProject(owner.Pkg()) {
+			continue
+		}
+		to := target(res.module(owner.Pkg()), owner.Name())
+		if !slices.Contains(out, to) {
+			out = append(out, to)
+		}
+	}
+	return out
 }

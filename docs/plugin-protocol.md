@@ -192,6 +192,10 @@ statements in the body, case clauses counting as statements), `top_level`
 the body) and `forwards_to` (set when the body is one call that passes the
 receiver and every parameter on, in order, naming the callee).
 
+`param_types` (optional) lists the project types the parameters name, receiver
+excluded, as kind-less symbol ids (`module::Type`), so rules can ask whether a
+function takes a value of some type.
+
 `manual_assertions` (optional, test files only) counts the checks a function
 writes out by hand: an `if` with no `else` whose condition compares or negates
 and whose only effect is to fail the test (in Go, through the `testing`

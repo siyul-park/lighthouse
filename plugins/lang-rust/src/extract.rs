@@ -609,6 +609,7 @@ impl Extractor<'_> {
             flow: facts.flow,
             clone_fingerprint: None,
             forwards_to: facts.forwards_to,
+            param_types: Vec::new(),
             manual_assertions: 0,
         });
         if let Some(attrs) = test {

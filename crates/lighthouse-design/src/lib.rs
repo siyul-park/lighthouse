@@ -7,6 +7,7 @@ mod helpers;
 mod layout;
 mod order;
 mod qualifier;
+mod receiver;
 mod related;
 mod wrapper;
 
@@ -38,6 +39,7 @@ impl Plugin for Design {
             helpers::rule(),
             order::rule(),
             qualifier::rule(),
+            receiver::rule(),
             related::rule(),
             wrapper::rule(),
         ];

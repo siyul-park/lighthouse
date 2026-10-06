@@ -147,6 +147,7 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 		Tokens:           u.tokens(d.Body),
 		Flow:             f.events,
 		ForwardsTo:       forwardTarget(d, u.info(), u.res),
+		ParamTypes:       paramTypes(d.Type, u.info(), u.res),
 		ManualAssertions: manual,
 	})
 	if isTestCase {

@@ -343,6 +343,11 @@ pub struct FunctionSummary {
     /// Reserved: normalized fingerprint for clone detection.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clone_fingerprint: Option<String>,
+    /// Project types named by the parameters, receiver excluded, as kind-less
+    /// symbol ids (`module::name`). Added in 0.1 before 1.0; empty when the
+    /// plugin does not resolve parameter types.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub param_types: Vec<String>,
     /// Checks of a test file's function written out by hand: an `if` that
     /// compares and whose only effect is to fail the test. Added in 0.1
     /// before 1.0; zero when the plugin does not count them.

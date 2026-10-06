@@ -147,6 +147,7 @@ impl World {
             flow: flow.to_vec(),
             clone_fingerprint: None,
             forwards_to: None,
+            param_types: Vec::new(),
             manual_assertions: 0,
         });
     }

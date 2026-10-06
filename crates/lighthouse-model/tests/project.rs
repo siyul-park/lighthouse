@@ -81,6 +81,7 @@ fn summary(symbol: &Symbol, forwards_to: Option<Target>) -> FunctionSummary {
         flow: Vec::new(),
         clone_fingerprint: None,
         forwards_to,
+        param_types: Vec::new(),
         manual_assertions: 0,
     }
 }

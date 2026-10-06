@@ -161,17 +161,18 @@ type Flow struct {
 
 // FunctionSummary is the measured shape of one function or method.
 type FunctionSummary struct {
-	Symbol           string `json:"symbol"`
-	MaxNesting       int    `json:"max_nesting"`
-	Statements       int    `json:"statements"`
-	TopLevel         int    `json:"top_level"`
-	Params           int    `json:"params"`
-	Returns          int    `json:"returns"`
-	Tokens           int    `json:"tokens"`
-	Flow             []Flow `json:"flow"`
-	CloneFingerprint string `json:"clone_fingerprint,omitempty"`
-	ForwardsTo       string `json:"forwards_to,omitempty"`
-	ManualAssertions int    `json:"manual_assertions,omitempty"`
+	Symbol           string   `json:"symbol"`
+	MaxNesting       int      `json:"max_nesting"`
+	Statements       int      `json:"statements"`
+	TopLevel         int      `json:"top_level"`
+	Params           int      `json:"params"`
+	Returns          int      `json:"returns"`
+	Tokens           int      `json:"tokens"`
+	Flow             []Flow   `json:"flow"`
+	CloneFingerprint string   `json:"clone_fingerprint,omitempty"`
+	ForwardsTo       string   `json:"forwards_to,omitempty"`
+	ParamTypes       []string `json:"param_types,omitempty"`
+	ManualAssertions int      `json:"manual_assertions,omitempty"`
 }
 
 // TestCase describes how a test entry point is written and what it targets.
