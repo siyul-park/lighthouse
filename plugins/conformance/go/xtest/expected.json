@@ -1,0 +1,279 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "pkg"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "testing"
+        },
+        {
+          "from": {
+            "module": "pkg"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg::TestHelper#test"
+        },
+        {
+          "from": {
+            "symbol": "pkg::TestHelper#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": "pkg::helper"
+        }
+      ],
+      "file": {
+        "path": "pkg/inside_test.go"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "pkg::TestHelper#test",
+          "tokens": 16,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "pkg",
+          "path": "pkg"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "pkg/inside_test.go",
+          "id": "pkg::TestHelper#test",
+          "kind": "test",
+          "name": "TestHelper",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "pkg::TestHelper#test",
+          "targets": [
+            "pkg::helper"
+          ]
+        }
+      ]
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "pkg"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg::Run#function"
+        },
+        {
+          "from": {
+            "symbol": "pkg::Run#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": "pkg::helper"
+        },
+        {
+          "from": {
+            "module": "pkg"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg::helper#function"
+        }
+      ],
+      "file": {
+        "path": "pkg/pkg.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "forwards_to": "pkg::helper",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "pkg::Run#function",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "pkg::helper#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "pkg",
+          "path": "pkg"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Run does the work.",
+          "file": "pkg/pkg.go",
+          "id": "pkg::Run#function",
+          "kind": "function",
+          "name": "Run",
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "pkg/pkg.go",
+          "id": "pkg::helper#function",
+          "kind": "function",
+          "name": "helper",
+          "span": {
+            "end": {
+              "col": 31,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "pkg[test]"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "testing"
+        },
+        {
+          "from": {
+            "module": "pkg[test]"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "pkg"
+        },
+        {
+          "from": {
+            "module": "pkg[test]"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg[test]::TestRun#test"
+        },
+        {
+          "from": {
+            "symbol": "pkg[test]::TestRun#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": "pkg::Run"
+        }
+      ],
+      "file": {
+        "path": "pkg/pkg_test.go"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "pkg[test]::TestRun#test",
+          "tokens": 18,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "pkg_test",
+          "path": "pkg[test]",
+          "test_of": "pkg"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "pkg/pkg_test.go",
+          "id": "pkg[test]::TestRun#test",
+          "kind": "test",
+          "name": "TestRun",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "pkg[test]::TestRun#test",
+          "targets": [
+            "pkg::Run"
+          ]
+        }
+      ]
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

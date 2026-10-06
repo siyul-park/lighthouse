@@ -1,12 +1,15 @@
 mod rules;
 
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 pub use globset::GlobSet;
 use globset::{GlobBuilder, GlobSetBuilder};
+use lighthouse_model::Options;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -32,11 +35,48 @@ pub enum Error {
     UnknownPreset(String),
 }
 
+/// A plugin listed in `plugins`: a bare id, or `{ id, path, timeout }`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+enum RawPlugin {
+    Id(String),
+    Detailed(PluginRef),
+}
+
+/// A listed plugin. `path` (relative to the config directory) names the
+/// plugin directory explicitly instead of searching the plugin locations;
+/// `timeout` is the per-request limit in seconds for process plugins.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PluginRef {
+    pub id: String,
+    #[serde(default)]
+    pub path: Option<PathBuf>,
+    #[serde(default, rename = "timeout")]
+    timeout_secs: Option<u64>,
+}
+
+impl PluginRef {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            path: None,
+            timeout_secs: None,
+        }
+    }
+
+    pub fn timeout(&self) -> Option<Duration> {
+        self.timeout_secs.map(Duration::from_secs)
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Raw {
     #[serde(default)]
-    plugins: Vec<String>,
+    plugins: Vec<RawPlugin>,
+    #[serde(default)]
+    languages: BTreeMap<String, Options>,
     #[serde(default)]
     extends: Vec<String>,
     #[serde(default)]
@@ -73,7 +113,8 @@ impl Override {
 /// Parsed `lighthouse.toml`.
 #[derive(Debug)]
 pub struct Config {
-    plugins: Vec<String>,
+    plugins: Vec<PluginRef>,
+    languages: BTreeMap<String, Options>,
     extends: Vec<String>,
     rules: Rules,
     overrides: Vec<Override>,
@@ -94,7 +135,15 @@ impl Config {
             })
             .collect::<Result<_, Error>>()?;
         Ok(Self {
-            plugins: raw.plugins,
+            plugins: raw
+                .plugins
+                .into_iter()
+                .map(|p| match p {
+                    RawPlugin::Id(id) => PluginRef::new(id),
+                    RawPlugin::Detailed(plugin) => plugin,
+                })
+                .collect(),
+            languages: raw.languages,
             extends: raw.extends,
             rules: raw.rules,
             overrides,
@@ -120,8 +169,18 @@ impl Config {
         Ok(None)
     }
 
-    pub fn plugins(&self) -> &[String] {
+    pub fn plugins(&self) -> &[PluginRef] {
         &self.plugins
+    }
+
+    /// Whether `id` is listed in `plugins`.
+    pub fn lists(&self, id: &str) -> bool {
+        self.plugins.iter().any(|p| p.id == id)
+    }
+
+    /// `[languages.<id>]` options handed to the language's provider.
+    pub fn languages(&self) -> &BTreeMap<String, Options> {
+        &self.languages
     }
 
     pub fn extends(&self) -> &[String] {

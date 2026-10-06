@@ -1,0 +1,91 @@
+{
+  "fragments": [
+    {
+      "edges": [],
+      "file": {
+        "path": "os_linux.go"
+      },
+      "functions": [],
+      "modules": [],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Name#function"
+        }
+      ],
+      "file": {
+        "path": "os_windows.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::Name#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "excluded",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "file": "os_windows.go",
+          "id": ".::Name#function",
+          "kind": "function",
+          "name": "Name",
+          "span": {
+            "end": {
+              "col": 40,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [],
+      "file": {
+        "path": "testdata/sample.go"
+      },
+      "functions": [],
+      "modules": [],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "edges": [],
+      "file": {
+        "path": "vendor/dep/dep.go"
+      },
+      "functions": [],
+      "modules": [],
+      "symbols": [],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [
+    "1 file(s) excluded by build constraints, e.g. os_linux.go; select another context with [languages.go] tags or env"
+  ]
+}

@@ -1,0 +1,455 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Add#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Double#function"
+        }
+      ],
+      "file": {
+        "path": "calc.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::Add#function",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::Double#function",
+          "tokens": 6,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "testcases",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Add adds.",
+          "file": "calc.go",
+          "id": ".::Add#function",
+          "kind": "function",
+          "name": "Add",
+          "span": {
+            "end": {
+              "col": 40,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Double doubles.",
+          "file": "calc.go",
+          "id": ".::Double#function",
+          "kind": "function",
+          "name": "Double",
+          "span": {
+            "end": {
+              "col": 40,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "testing"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::TestAddTable#test"
+        },
+        {
+          "from": {
+            "symbol": ".::TestAddTable#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Add"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::TestNested#test"
+        },
+        {
+          "from": {
+            "symbol": ".::TestNested#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Double"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::TestPlain#test"
+        },
+        {
+          "from": {
+            "symbol": ".::TestPlain#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::helper"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Testing#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::helper#function"
+        },
+        {
+          "from": {
+            "symbol": ".::helper#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Add"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::BenchmarkAdd#test"
+        },
+        {
+          "from": {
+            "symbol": ".::BenchmarkAdd#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Add"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::ExampleDouble#test"
+        },
+        {
+          "from": {
+            "symbol": ".::ExampleDouble#test"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Double"
+        }
+      ],
+      "file": {
+        "path": "calc_test.go"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "kind": "if",
+              "nesting": 2
+            }
+          ],
+          "max_nesting": 3,
+          "params": 1,
+          "returns": 0,
+          "statements": 5,
+          "symbol": ".::TestAddTable#test",
+          "tokens": 81,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 2,
+          "params": 1,
+          "returns": 0,
+          "statements": 3,
+          "symbol": ".::TestNested#test",
+          "tokens": 42,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": ".::helper",
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": ".::TestPlain#test",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": ".::Testing#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": ".::helper#function",
+          "tokens": 10,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 0,
+          "statements": 2,
+          "symbol": ".::BenchmarkAdd#test",
+          "tokens": 23,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": ".::ExampleDouble#test",
+          "tokens": 8,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "testcases",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "file": "calc_test.go",
+          "id": ".::TestAddTable#test",
+          "kind": "test",
+          "name": "TestAddTable",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "calc_test.go",
+          "id": ".::TestNested#test",
+          "kind": "test",
+          "name": "TestNested",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "calc_test.go",
+          "id": ".::TestPlain#test",
+          "kind": "test",
+          "name": "TestPlain",
+          "span": {
+            "end": {
+              "col": 43,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 22
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "calc_test.go",
+          "id": ".::Testing#function",
+          "kind": "function",
+          "name": "Testing",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 24
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "calc_test.go",
+          "id": ".::helper#function",
+          "kind": "function",
+          "name": "helper",
+          "span": {
+            "end": {
+              "col": 44,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 26
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "calc_test.go",
+          "id": ".::BenchmarkAdd#test",
+          "kind": "test",
+          "name": "BenchmarkAdd",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "calc_test.go",
+          "id": ".::ExampleDouble#test",
+          "kind": "test",
+          "name": "ExampleDouble",
+          "span": {
+            "end": {
+              "col": 39,
+              "line": 34
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 1,
+          "style": "table",
+          "symbol": ".::TestAddTable#test",
+          "targets": [
+            ".::Add"
+          ]
+        },
+        {
+          "nesting": 2,
+          "style": "scenario",
+          "symbol": ".::TestNested#test",
+          "targets": [
+            ".::Double"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": ".::TestPlain#test",
+          "targets": [
+            ".::helper"
+          ]
+        }
+      ]
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

@@ -1,7 +1,7 @@
 mod diagnostic;
 mod ucm;
 
-pub use diagnostic::{Diagnostic, Fingerprint, Severity, UnknownSeverity};
+pub use diagnostic::{Diagnostic, Fingerprint, Incomplete, Severity, UnknownSeverity};
 pub use ucm::{
     Capability, Edge, EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Module, Node,
     Position, Project, Resolution, Span, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle,

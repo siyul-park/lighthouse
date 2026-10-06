@@ -1,0 +1,113 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "other"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "other::B#function"
+        }
+      ],
+      "file": {
+        "path": "other/b.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "other::B#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "other",
+          "path": "other"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "other/b.go",
+          "id": "other::B#function",
+          "kind": "function",
+          "name": "B",
+          "span": {
+            "end": {
+              "col": 12,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "pkg"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "pkg::A#function"
+        }
+      ],
+      "file": {
+        "path": "pkg/a.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "pkg::A#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "pkg",
+          "path": "pkg"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "A is exported.",
+          "file": "pkg/a.go",
+          "id": "pkg::A#function",
+          "kind": "function",
+          "name": "A",
+          "span": {
+            "end": {
+              "col": 12,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

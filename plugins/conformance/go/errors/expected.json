@@ -1,0 +1,164 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Fine#function"
+        }
+      ],
+      "file": {
+        "path": "ok.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::Fine#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "errors",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Fine compiles.",
+          "file": "ok.go",
+          "id": ".::Fine#function",
+          "kind": "function",
+          "name": "Fine",
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "syntax"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "syntax::f#function"
+        }
+      ],
+      "file": {
+        "path": "syntax/bad.go"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "name": "syntax",
+          "path": "syntax"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "syntax/bad.go",
+          "id": "syntax::f#function",
+          "kind": "function",
+          "name": "f",
+          "span": {
+            "end": {
+              "col": 11,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::broken#function"
+        }
+      ],
+      "file": {
+        "path": "typed.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::broken#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "errors",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "file": "typed.go",
+          "id": ".::broken#function",
+          "kind": "function",
+          "name": "broken",
+          "span": {
+            "end": {
+              "col": 37,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [
+    {
+      "path": "syntax/bad.go",
+      "reason": "3:9: expected ')', found '{' (+3 more error(s))"
+    },
+    {
+      "path": "typed.go",
+      "reason": "3:28: undefined: missing"
+    }
+  ],
+  "notices": []
+}

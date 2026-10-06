@@ -1,20 +1,31 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use lighthouse_config::{Config, RuleConfig, Rules};
 use lighthouse_engine::{Engine, Error};
 use lighthouse_model::{
-    Capability, Diagnostic, File, Fingerprint, Fragment, Options, Position, Severity, Span,
+    Capability, Diagnostic, Fingerprint, Fragment, Incomplete, Options, Position, Severity, Span,
 };
 use lighthouse_plugin::{
-    Analyzer, Conventions, Ctx, Error as PluginError, LanguageProvider, Manifest, Plugin, Preset,
-    Registry, Rule, RuleMeta, Scope, Workspace,
+    Analyzer, Conventions, Ctx, Error as PluginError, Indexed, LanguageProvider, Manifest, Plugin,
+    Preset, Registry, Rule, RuleMeta, Scope, Source, Workspace,
 };
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
+/// Records the size of every batch it is asked to index.
+type Batches = Arc<Mutex<Vec<usize>>>;
+
 struct Any {
     globs: Vec<String>,
+    /// Files with this suffix are reported incomplete.
     fail_on: &'static str,
+    /// A batch containing a file with this suffix fails as a whole.
+    crash_on: &'static str,
+    batches: Batches,
 }
 
 impl LanguageProvider for Any {
@@ -32,14 +43,27 @@ impl LanguageProvider for Any {
     fn capabilities(&self) -> &[Capability] {
         &[]
     }
-    fn index(&self, _: &Workspace, file: &File, _: &str) -> Result<Fragment, PluginError> {
-        if file.path.to_string_lossy().ends_with(self.fail_on) {
-            return Err(PluginError::Failed("cannot index".to_owned()));
+    fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, PluginError> {
+        self.batches.lock().unwrap().push(files.len());
+        let ends = |s: &Source, suffix: &str| s.file.path.to_string_lossy().ends_with(suffix);
+        if files.iter().any(|s| ends(s, self.crash_on)) {
+            return Err(PluginError::Failed("plugin crashed".to_owned()));
         }
-        Ok(Fragment {
-            files: vec![file.clone()],
-            ..Fragment::default()
-        })
+        let mut indexed = Indexed::default();
+        for source in files {
+            if ends(source, self.fail_on) {
+                indexed.incomplete.push(Incomplete {
+                    path: Some(source.file.path.clone()),
+                    reason: "cannot index".to_owned(),
+                });
+                continue;
+            }
+            indexed.fragments.push(Fragment {
+                files: vec![source.file.clone()],
+                ..Fragment::default()
+            });
+        }
+        Ok(indexed)
     }
 }
 
@@ -111,6 +135,8 @@ impl Rule for Fake {
 
 struct FakePlugin {
     fail_on: &'static str,
+    crash_on: &'static str,
+    batches: Batches,
 }
 
 impl Plugin for FakePlugin {
@@ -124,6 +150,8 @@ impl Plugin for FakePlugin {
         vec![Box::new(Any {
             globs: vec!["**".to_owned()],
             fail_on: self.fail_on,
+            crash_on: self.crash_on,
+            batches: Arc::clone(&self.batches),
         })]
     }
     fn analyzers(&self) -> Vec<Box<dyn Analyzer>> {
@@ -160,9 +188,69 @@ impl Plugin for FakePlugin {
 }
 
 fn registry(fail_on: &'static str) -> Registry {
+    batched(fail_on, "!").0
+}
+
+fn batched(fail_on: &'static str, crash_on: &'static str) -> (Registry, Batches) {
+    let batches = Batches::default();
     let mut registry = Registry::default();
-    registry.register(&FakePlugin { fail_on }).unwrap();
     registry
+        .register(&FakePlugin {
+            fail_on,
+            crash_on,
+            batches: Arc::clone(&batches),
+        })
+        .unwrap();
+    (registry, batches)
+}
+
+/// A fallback provider, as a plain-text plugin would be.
+struct Fallback;
+
+impl LanguageProvider for Fallback {
+    fn id(&self) -> &str {
+        "bin"
+    }
+    fn globs(&self) -> &[String] {
+        static ALL: std::sync::LazyLock<Vec<String>> =
+            std::sync::LazyLock::new(|| vec!["**".to_owned()]);
+        &ALL
+    }
+    fn conventions(&self) -> Conventions {
+        Conventions::default()
+    }
+    fn capabilities(&self) -> &[Capability] {
+        &[]
+    }
+    fn fallback(&self) -> bool {
+        true
+    }
+    fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, PluginError> {
+        Ok(Indexed {
+            fragments: files
+                .iter()
+                .map(|s| Fragment {
+                    files: vec![s.file.clone()],
+                    ..Fragment::default()
+                })
+                .collect(),
+            ..Indexed::default()
+        })
+    }
+}
+
+struct FallbackPlugin;
+
+impl Plugin for FallbackPlugin {
+    fn manifest(&self) -> Manifest {
+        Manifest {
+            id: "bin".to_owned(),
+            version: "0".to_owned(),
+        }
+    }
+    fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
+        vec![Box::new(Fallback)]
+    }
 }
 
 fn project(files: &[(&str, &[u8])]) -> TempDir {
@@ -264,7 +352,7 @@ fn missing_capability_skips_with_notice() {
 }
 
 #[test]
-fn invalid_utf8_and_index_failures_become_notices() {
+fn unreadable_and_unindexed_files_are_incomplete_not_notices() {
     let dir = project(&[
         ("ok.txt", b"1"),
         ("bin.dat", &[0xff, 0xfe]),
@@ -274,8 +362,24 @@ fn invalid_utf8_and_index_failures_become_notices() {
     let out = engine
         .check(&root(&dir), &["fake/each".to_owned()])
         .unwrap();
-    assert!(out.notices.contains("bin.dat: skipped, not valid UTF-8"));
-    assert!(out.notices.contains("bad.skip: skipped, cannot index"));
+    let gaps: Vec<_> = out
+        .incomplete
+        .iter()
+        .map(|i| {
+            (
+                i.path.as_deref().and_then(|p| p.to_str()),
+                i.reason.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        gaps,
+        [
+            (Some("bad.skip"), "cannot index"),
+            (Some("bin.dat"), "not valid UTF-8"),
+        ]
+    );
+    assert!(out.notices.is_empty(), "{:?}", out.notices);
     assert!(
         out.diagnostics
             .iter()
@@ -284,7 +388,54 @@ fn invalid_utf8_and_index_failures_become_notices() {
 }
 
 #[test]
-fn paths_outside_the_root_are_skipped_with_notice() {
+fn non_utf8_data_claimed_only_by_a_fallback_provider_is_a_notice() {
+    let dir = project(&[("ok.txt", b"1"), ("image.png", &[0xff, 0xfe])]);
+    let mut registry = Registry::default();
+    registry.register(&FallbackPlugin).unwrap();
+    let engine = Engine::new(
+        registry,
+        Config::parse("plugins = [\"bin\"]").unwrap(),
+        dir.path(),
+    )
+    .unwrap();
+    let out = engine.check(&root(&dir), &[]).unwrap();
+    assert!(out.incomplete.is_empty());
+    assert!(out.notices.contains("image.png: skipped, not valid UTF-8"));
+}
+
+#[test]
+fn a_failed_provider_makes_its_whole_batch_incomplete_in_one_entry() {
+    let dir = project(&[("a.txt", b"1"), ("b.txt", b"2"), ("boom.crash", b"3")]);
+    let (registry, batches) = batched("!", ".crash");
+    let engine = Engine::new(registry, Config::parse(ALL).unwrap(), dir.path()).unwrap();
+    let out = engine
+        .check(&root(&dir), &["fake/each".to_owned()])
+        .unwrap();
+    assert!(out.diagnostics.is_empty());
+    assert_eq!(out.incomplete.len(), 1);
+    let gap = &out.incomplete[0];
+    assert_eq!(gap.path, None);
+    assert!(
+        gap.reason.contains("language `any` failed"),
+        "{}",
+        gap.reason
+    );
+    assert!(gap.reason.contains("3 file(s)") && gap.reason.contains("plugin crashed"));
+    assert_eq!(*batches.lock().unwrap(), [3]);
+}
+
+#[test]
+fn each_provider_is_called_once_with_all_its_files() {
+    let dir = project(&[("a/x.txt", b"1"), ("b/y.txt", b"2"), ("z.txt", b"3")]);
+    let (registry, batches) = batched("!", "!");
+    let engine = Engine::new(registry, Config::parse(ALL).unwrap(), dir.path()).unwrap();
+    engine.check(&root(&dir), &[]).unwrap();
+    engine.check(&[dir.path().join("a")], &[]).unwrap();
+    assert_eq!(*batches.lock().unwrap(), [3, 3]);
+}
+
+#[test]
+fn paths_outside_the_root_are_incomplete() {
     let dir = project(&[("x.txt", b"1")]);
     let outside = project(&[("y.txt", b"1")]);
     let out = engine(&dir, ALL)
@@ -292,8 +443,10 @@ fn paths_outside_the_root_are_skipped_with_notice() {
         .check(&[outside.path().to_owned()], &["fake/each".to_owned()])
         .unwrap();
     assert!(out.diagnostics.is_empty());
-    assert_eq!(out.notices.len(), 1);
-    assert!(out.notices.iter().next().unwrap().contains("outside"));
+    assert!(out.notices.is_empty());
+    assert_eq!(out.incomplete.len(), 1);
+    assert!(out.incomplete[0].reason.contains("outside"));
+    assert_eq!(out.incomplete[0].path.as_deref(), Some(outside.path()));
 }
 
 #[test]
@@ -323,7 +476,7 @@ fn exit_code_follows_severity_and_strict() {
             .unwrap()
             .check(&root(&dir), &[])
             .unwrap()
-            .exit_code(strict)
+            .exit_code(strict, false)
     };
     assert_eq!(code("error", false), 1);
     assert_eq!(code("warn", false), 0);
@@ -331,6 +484,22 @@ fn exit_code_follows_severity_and_strict() {
     assert_eq!(code("review", true), 0);
     assert_eq!(code("info", true), 0);
     assert_eq!(code("off", true), 0);
+}
+
+#[test]
+fn incomplete_analysis_exits_3_before_findings_unless_allowed() {
+    let dir = project(&[("x.txt", b"1"), ("bad.skip", b"x")]);
+    let engine = Engine::new(registry(".skip"), Config::parse(ALL).unwrap(), dir.path()).unwrap();
+    let out = engine
+        .check(&root(&dir), &["fake/each".to_owned()])
+        .unwrap();
+    assert_eq!(out.diagnostics[0].severity, Severity::Error);
+    assert_eq!(
+        out.exit_code(false, false),
+        lighthouse_engine::EXIT_INCOMPLETE
+    );
+    assert_eq!(out.exit_code(true, false), 3);
+    assert_eq!(out.exit_code(false, true), 1);
 }
 
 #[test]

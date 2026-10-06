@@ -1,0 +1,1 @@
+{ "go": { "env": { "GOOS": "windows", "GOARCH": "amd64" } } }

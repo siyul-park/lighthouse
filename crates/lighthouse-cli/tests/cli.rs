@@ -28,7 +28,7 @@ fn check_reports_warning_and_passes_without_strict() {
         .arg("check")
         .assert()
         .success()
-        .stdout("big.txt:7:1: warn core/max-file-lines: file has 8 lines, limit is 6\n");
+        .stdout("big.txt:7:1: warn core/max-file-lines: file has 8 lines, limit is 6\nsummary: 0 error, 1 warn, 0 review, 0 incomplete\n");
 }
 
 #[test]
@@ -255,28 +255,117 @@ fn docs_check_reports_unreadable_output_as_an_error() {
         .code(2);
 }
 
-#[test]
-fn config_flag_checks_the_current_directory_with_another_config_file() {
+/// A Go project and a config listing the Go plugin built from source; `None`
+/// after a skip message when no Go toolchain is available.
+fn go_project(source: &str) -> Option<(TempDir, std::path::PathBuf)> {
+    let plugin = lighthouse_testkit::lang_go()?;
     let project = tempfile::tempdir().unwrap();
     fs::write(project.path().join("go.mod"), "module example.com/app\n").unwrap();
+    fs::write(project.path().join("api.go"), source).unwrap();
+    let config = project.path().join("lighthouse.toml");
     fs::write(
-        project.path().join("api.go"),
-        "package app\n\nfunc Open() {}\n",
+        &config,
+        format!(
+            "plugins = [{{ id = \"lang-go\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n",
+            plugin.to_str().unwrap()
+        ),
     )
     .unwrap();
+    Some((project, config))
+}
+
+#[test]
+fn go_files_are_analyzed_by_the_go_plugin_over_rpc() {
+    let Some((project, _)) = go_project("package app\n\nfunc Open() {}\n") else {
+        return;
+    };
+    lighthouse(project.path())
+        .arg("check")
+        .assert()
+        .success()
+        .stdout("api.go:3:1: warn design/exported-doc: exported function Open must have a doc comment\nsummary: 0 error, 1 warn, 0 review, 0 incomplete\n");
+}
+
+#[test]
+fn incomplete_analysis_exits_3_and_says_so_in_every_format() {
+    let Some((project, _)) = go_project("package app\n\nfunc Open( {\n") else {
+        return;
+    };
+    let out = lighthouse(project.path()).arg("check").output().unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert!(stdout.contains("api.go: incomplete: "), "{stdout}");
+
+    let out = lighthouse(project.path())
+        .args(["check", "--format", "sarif"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    let sarif: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        sarif["runs"][0]["invocations"][0]["executionSuccessful"],
+        false
+    );
+
+    let out = lighthouse(project.path())
+        .args(["check", "--allow-incomplete"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert!(
+        String::from_utf8(out.stdout)
+            .unwrap()
+            .contains("incomplete")
+    );
+}
+
+#[test]
+fn reporting_paths_do_not_narrow_the_analysis_of_incomplete_files() {
+    let Some((project, _)) = go_project("package app\n\nfunc Open( {\n") else {
+        return;
+    };
+    fs::create_dir(project.path().join("sub")).unwrap();
+    fs::write(project.path().join("sub/ok.go"), "package sub\n").unwrap();
+    lighthouse(project.path())
+        .args(["check", "sub"])
+        .assert()
+        .code(3);
+}
+
+#[test]
+fn a_plugin_listed_but_missing_is_a_usage_error() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join("lighthouse.toml"),
+        "plugins = [\"nowhere\"]\n",
+    )
+    .unwrap();
+    lighthouse(dir.path()).arg("check").assert().code(2);
+}
+
+#[test]
+fn config_flag_checks_the_current_directory_with_another_config_file() {
+    let Some((project, _)) = go_project("package app\n\nfunc Open() {}\n") else {
+        return;
+    };
+    let plugin = lighthouse_testkit::lang_go().unwrap();
     let elsewhere = tempfile::tempdir().unwrap();
     let config = elsewhere.path().join("lh.toml");
     fs::write(
         &config,
-        "plugins = [\"lang-go\", \"design\"]\nextends = [\"design/recommended\"]\n",
+        format!(
+            "plugins = [{{ id = \"lang-go\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n",
+            plugin.to_str().unwrap()
+        ),
     )
     .unwrap();
+    fs::remove_file(project.path().join("lighthouse.toml")).unwrap();
     lighthouse(project.path())
         .args(["check", "--config"])
         .arg(&config)
         .assert()
         .success()
-        .stdout("api.go:3:1: warn design/exported-doc: exported function Open must have a doc comment\n");
+        .stdout("api.go:3:1: warn design/exported-doc: exported function Open must have a doc comment\nsummary: 0 error, 1 warn, 0 review, 0 incomplete\n");
     lighthouse(project.path())
         .args(["check", "--config", "missing.toml"])
         .assert()

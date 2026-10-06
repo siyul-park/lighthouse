@@ -21,7 +21,7 @@ fn file() -> File {
 fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagnostic>, Error> {
     let registry = lighthouse_builtin::registry();
     let file = file();
-    let ws = Workspace { root: ".".into() };
+    let ws = Workspace::new(".");
     let project = Project::merge([Fragment::default()]);
     let mut facts = Facts::new();
     let ctx = |facts: &Facts| -> Result<Vec<_>, Error> {
@@ -100,7 +100,7 @@ fn rule_validates_options() {
 fn missing_fact_is_a_distinct_error() {
     let registry = lighthouse_builtin::registry();
     let file = file();
-    let ws = Workspace { root: ".".into() };
+    let ws = Workspace::new(".");
     let project = Project::default();
     let facts = Facts::new();
     let ctx = Ctx {
@@ -162,15 +162,15 @@ fn default_limit_comes_from_the_catalog() {
 }
 
 #[test]
-fn fallback_text_provider_is_tried_after_language_providers() {
+fn bundled_plugins_provide_only_the_fallback_text_language() {
     let registry = lighthouse_builtin::registry();
     let plugins: Vec<_> = registry.plugins().collect();
-    assert_eq!(plugins, ["core", "lang-go", "metrics", "design"]);
+    assert_eq!(plugins, ["core", "metrics", "design"]);
     let languages: Vec<_> = registry
         .languages()
         .map(|(_, l)| l.id().to_owned())
         .collect();
-    assert_eq!(languages, ["go", "text"]);
+    assert_eq!(languages, ["text"]);
     let design: Vec<_> = registry
         .rules()
         .filter(|r| lighthouse_plugin::plugin_of(&r.meta().id) == "design")

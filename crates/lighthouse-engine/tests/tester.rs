@@ -1,10 +1,10 @@
 use lighthouse_engine::RuleTester;
 use lighthouse_model::{
-    Capability, Diagnostic, File, Fingerprint, Fragment, Options, Position, Severity, Span,
+    Capability, Diagnostic, Fingerprint, Fragment, Options, Position, Severity, Span,
 };
 use lighthouse_plugin::{
-    Conventions, Ctx, Error, LanguageProvider, Manifest, Plugin, Registry, Rule, RuleMeta, Scope,
-    Workspace,
+    Conventions, Ctx, Error, Indexed, LanguageProvider, Manifest, Plugin, Registry, Rule, RuleMeta,
+    Scope, Source, Workspace,
 };
 use lighthouse_spec::Catalog;
 
@@ -25,10 +25,16 @@ impl LanguageProvider for Notes {
     fn capabilities(&self) -> &[Capability] {
         &[]
     }
-    fn index(&self, _: &Workspace, file: &File, _: &str) -> Result<Fragment, Error> {
-        Ok(Fragment {
-            files: vec![file.clone()],
-            ..Fragment::default()
+    fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
+        Ok(Indexed {
+            fragments: files
+                .iter()
+                .map(|s| Fragment {
+                    files: vec![s.file.clone()],
+                    ..Fragment::default()
+                })
+                .collect(),
+            ..Indexed::default()
         })
     }
 }

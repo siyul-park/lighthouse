@@ -93,14 +93,16 @@ impl Registry {
         self.plugins.iter().any(|m| m.id == id)
     }
 
-    /// With the owning plugin id: regular providers in registration order,
-    /// then fallback providers; the first provider matching a file wins.
+    /// With the owning plugin id: regular providers by descending priority
+    /// (registration order among equals), then fallback providers; the first
+    /// provider matching a file wins.
     pub fn languages(&self) -> impl Iterator<Item = (&str, &dyn LanguageProvider)> {
-        let (regular, fallback): (Vec<_>, Vec<_>) = self
+        let (mut regular, fallback): (Vec<_>, Vec<_>) = self
             .languages
             .iter()
             .map(|(p, l)| (p.as_str(), l.as_ref()))
             .partition(|(_, l)| !l.fallback());
+        regular.sort_by_key(|(_, l)| std::cmp::Reverse(l.priority()));
         regular.into_iter().chain(fallback)
     }
 

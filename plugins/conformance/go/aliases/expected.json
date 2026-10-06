@@ -1,0 +1,303 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Store#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Store#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Store::data#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Repo#type"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Handler#type"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Reader#interface"
+        },
+        {
+          "from": {
+            "symbol": ".::Reader#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Reader::Read#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Store#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Store::Read#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Store::Read#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Store::data"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::use#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::count#function"
+        },
+        {
+          "from": {
+            "symbol": ".::count#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Store::Read"
+        }
+      ],
+      "file": {
+        "path": "aliases.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::Store::Read#method",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::use#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::count#function",
+          "tokens": 8,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "aliases",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Store keeps values.",
+          "file": "aliases.go",
+          "id": ".::Store#type",
+          "kind": "type",
+          "name": "Store",
+          "span": {
+            "end": {
+              "col": 41,
+              "line": 4
+            },
+            "start": {
+              "col": 6,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "aliases.go",
+          "id": ".::Store::data#field",
+          "kind": "field",
+          "name": "data",
+          "owner": ".::Store#type",
+          "span": {
+            "end": {
+              "col": 39,
+              "line": 4
+            },
+            "start": {
+              "col": 20,
+              "line": 4
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "Repo is another name for Store.",
+          "file": "aliases.go",
+          "id": ".::Repo#type",
+          "kind": "type",
+          "name": "Repo",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 7
+            },
+            "start": {
+              "col": 6,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Handler is a callback shape.",
+          "file": "aliases.go",
+          "id": ".::Handler#type",
+          "kind": "type",
+          "name": "Handler",
+          "span": {
+            "end": {
+              "col": 34,
+              "line": 10
+            },
+            "start": {
+              "col": 6,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Reader reads values.",
+          "file": "aliases.go",
+          "id": ".::Reader#interface",
+          "kind": "interface",
+          "name": "Reader",
+          "span": {
+            "end": {
+              "col": 38,
+              "line": 13
+            },
+            "start": {
+              "col": 6,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "aliases.go",
+          "id": ".::Reader::Read#method",
+          "kind": "method",
+          "name": "Read",
+          "owner": ".::Reader#interface",
+          "span": {
+            "end": {
+              "col": 36,
+              "line": 13
+            },
+            "start": {
+              "col": 26,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Read returns the value count; its receiver is spelled through the alias.",
+          "file": "aliases.go",
+          "id": ".::Store::Read#method",
+          "kind": "method",
+          "name": "Read",
+          "owner": ".::Store#type",
+          "span": {
+            "end": {
+              "col": 49,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "aliases.go",
+          "id": ".::use#function",
+          "kind": "function",
+          "name": "use",
+          "span": {
+            "end": {
+              "col": 44,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "aliases.go",
+          "id": ".::count#function",
+          "kind": "function",
+          "name": "count",
+          "span": {
+            "end": {
+              "col": 43,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

@@ -25,8 +25,24 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Check files and print diagnostics.
+    /// Check the project and print diagnostics.
+    ///
+    /// PATHS select which diagnostics are reported, not what is analyzed: the
+    /// whole project is always analyzed, because rules and language providers
+    /// need more than the reported files (callers, packages, build context).
+    ///
+    /// Exit codes: 0 clean, 1 findings at or above the failing level, 2 usage
+    /// or runtime error, 3 the analysis was incomplete (a file could not be
+    /// read or loaded, a plugin crashed or timed out). "Not checked" is never
+    /// "passed"; --allow-incomplete reports it but does not fail on it.
+    ///
+    /// Plugins named by the config are started and run with your privileges,
+    /// like build scripts: only check projects whose config you trust. A plugin
+    /// that cannot start, or that is not the protocol version or identity its
+    /// entry names, is an error (exit 2); one that starts but crashes, times out
+    /// or answers badly is reported as incomplete (exit 3).
     Check {
+        /// Where to report diagnostics; the whole project is analyzed anyway.
         #[arg(default_value = ".")]
         paths: Vec<PathBuf>,
         #[arg(long, default_value = "text")]
@@ -34,6 +50,10 @@ enum Command {
         /// Fail on warnings too.
         #[arg(long)]
         strict: bool,
+        /// Exit by findings even when the analysis was incomplete; the
+        /// incompleteness is still printed.
+        #[arg(long)]
+        allow_incomplete: bool,
         /// Run only these fully qualified rule ids.
         #[arg(long, value_delimiter = ',')]
         rules: Vec<String>,
@@ -99,9 +119,19 @@ fn run(cli: Cli) -> Result<u8> {
             paths,
             format,
             strict,
+            allow_incomplete,
             rules,
             config,
-        } => check(&paths, format, strict, &rules, config.as_deref()),
+        } => check(
+            &paths,
+            Options {
+                format,
+                strict,
+                allow_incomplete,
+            },
+            &rules,
+            config.as_deref(),
+        ),
         Command::Rule {
             command: RuleCommand::List { all },
         } => rules::list(all),
@@ -114,10 +144,15 @@ fn run(cli: Cli) -> Result<u8> {
     }
 }
 
-fn check(
-    paths: &[PathBuf],
+struct Options {
     format: Format,
     strict: bool,
+    allow_incomplete: bool,
+}
+
+fn check(
+    paths: &[PathBuf],
+    options: Options,
     only: &[String],
     config: Option<&Path>,
 ) -> Result<u8> {
@@ -130,12 +165,27 @@ fn check(
             (config, root)
         }
     };
-    let outcome = Engine::new(lighthouse_builtin::registry(), config, &root)?.check(paths, only)?;
+    let mut registry = lighthouse_builtin::registry();
+    let plugins = lighthouse_rpc::register(
+        &mut registry,
+        &config,
+        &root,
+        &lighthouse_rpc::search_dirs(&root),
+    )?;
+    let outcome = Engine::new(registry, config, &root)?
+        .with_incomplete(plugins.incomplete)
+        .check(paths, only)?;
+    for notice in &plugins.notices {
+        eprintln!("lighthouse: {notice}");
+    }
     for notice in &outcome.notices {
         eprintln!("lighthouse: {notice}");
     }
-    print!("{}", render(format, &outcome.diagnostics));
-    Ok(outcome.exit_code(strict))
+    print!(
+        "{}",
+        render(options.format, &outcome.diagnostics, &outcome.incomplete)
+    );
+    Ok(outcome.exit_code(options.strict, options.allow_incomplete))
 }
 
 fn init() -> Result<u8> {

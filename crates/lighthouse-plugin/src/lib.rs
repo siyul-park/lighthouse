@@ -3,7 +3,9 @@ mod registry;
 use std::{collections::BTreeMap, path::PathBuf};
 
 use lighthouse_config::Rules;
-use lighthouse_model::{Capability, Diagnostic, File, Fragment, Options, Project, Severity};
+use lighthouse_model::{
+    Capability, Diagnostic, File, Fragment, Incomplete, Options, Project, Severity,
+};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use thiserror::Error;
@@ -45,10 +47,21 @@ pub struct Manifest {
     pub version: String,
 }
 
-/// Where the checked project lives.
+/// Where the checked project lives and how each language is configured.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Workspace {
     pub root: PathBuf,
+    /// Per-language options from the configuration, keyed by language id.
+    pub languages: BTreeMap<String, Options>,
+}
+
+impl Workspace {
+    pub fn new(root: impl Into<PathBuf>) -> Self {
+        Self {
+            root: root.into(),
+            languages: BTreeMap::new(),
+        }
+    }
 }
 
 /// Fact key: analyzer id and scope key (file path, or empty for project scope).
@@ -95,6 +108,23 @@ pub struct Conventions {
     pub test_globs: Vec<String>,
 }
 
+/// A file handed to a provider with its text as read by the engine.
+#[derive(Debug, Clone, Copy)]
+pub struct Source<'a> {
+    pub file: &'a File,
+    pub text: &'a str,
+}
+
+/// What a provider produced for a batch of files.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Indexed {
+    pub fragments: Vec<Fragment>,
+    /// Things the user should see that do not make the analysis incomplete.
+    pub notices: Vec<String>,
+    /// Files or scopes that could not be analyzed.
+    pub incomplete: Vec<Incomplete>,
+}
+
 pub trait LanguageProvider: Send + Sync {
     fn id(&self) -> &str;
     fn globs(&self) -> &[String];
@@ -104,7 +134,13 @@ pub trait LanguageProvider: Send + Sync {
     fn fallback(&self) -> bool {
         false
     }
-    fn index(&self, ws: &Workspace, file: &File, text: &str) -> Result<Fragment, Error>;
+    /// Among regular providers the higher priority claims a file first.
+    fn priority(&self) -> i32 {
+        0
+    }
+    /// Indexes every file of this provider in one call. An `Err` means the
+    /// whole batch failed; every file is then incomplete.
+    fn index(&self, ws: &Workspace, files: &[Source]) -> Result<Indexed, Error>;
 }
 
 pub trait Analyzer: Send + Sync {

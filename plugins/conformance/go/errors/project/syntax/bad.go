@@ -1,0 +1,3 @@
+package syntax
+
+func f( {

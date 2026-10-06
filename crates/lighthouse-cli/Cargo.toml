@@ -11,6 +11,7 @@ lighthouse-engine.workspace = true
 lighthouse-builtin.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-report.workspace = true
+lighthouse-rpc.workspace = true
 lighthouse-spec.workspace = true
 
 [[bin]]
@@ -21,3 +22,4 @@ path = "src/main.rs"
 serde_json.workspace = true
 assert_cmd.workspace = true
 tempfile.workspace = true
+lighthouse-testkit = { path = "../lighthouse-testkit" }

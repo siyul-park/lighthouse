@@ -1,0 +1,122 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::flavor#const"
+        }
+      ],
+      "file": {
+        "path": "fast.go"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "name": "tags",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "file": "fast.go",
+          "id": ".::flavor#const",
+          "kind": "const",
+          "name": "flavor",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 5
+            },
+            "start": {
+              "col": 7,
+              "line": 5
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Mode#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Mode#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::flavor"
+        }
+      ],
+      "file": {
+        "path": "mode.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::Mode#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "tags",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Mode names the build flavor.",
+          "file": "mode.go",
+          "id": ".::Mode#function",
+          "kind": "function",
+          "name": "Mode",
+          "span": {
+            "end": {
+              "col": 37,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [],
+      "file": {
+        "path": "slow.go"
+      },
+      "functions": [],
+      "modules": [],
+      "symbols": [],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [
+    "1 file(s) excluded by build constraints, e.g. slow.go; select another context with [languages.go] tags or env"
+  ]
+}

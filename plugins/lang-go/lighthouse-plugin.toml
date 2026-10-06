@@ -1,0 +1,3 @@
+id = "lang-go"
+version = "0.1.0"
+command = "./lang-go"

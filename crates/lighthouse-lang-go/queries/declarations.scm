@@ -1,8 +1,0 @@
-(package_clause (package_identifier) @package)
-(source_file (function_declaration) @function)
-(source_file (method_declaration) @method)
-(source_file (type_declaration (type_spec) @type) @group)
-(source_file (type_declaration (type_alias) @type) @group)
-(source_file (const_declaration (const_spec) @const) @group)
-(source_file (var_declaration (var_spec) @var) @group)
-(source_file (var_declaration (var_spec_list (var_spec) @var)) @group)

@@ -1,6 +1,6 @@
 ---
 source: crates/lighthouse-report/tests/render.rs
-expression: "render(Format::Sarif, &fixture())"
+expression: "render(Format::Sarif, &fixture(), &[])"
 ---
 {
   "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
@@ -28,6 +28,12 @@ expression: "render(Format::Sarif, &fixture())"
           }
         }
       },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        }
+      ],
       "results": [
         {
           "ruleId": "core/max-file-lines",

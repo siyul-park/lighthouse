@@ -1,10 +1,8 @@
 use lighthouse_config::{RuleConfig, Rules};
-use lighthouse_model::{
-    Capability, Diagnostic, File, Fingerprint, Fragment, Options, Position, Span,
-};
+use lighthouse_model::{Capability, Diagnostic, Fingerprint, Fragment, Options, Position, Span};
 use lighthouse_plugin::{
-    Analyzer, Conventions, Ctx, Error, LanguageProvider, Manifest, Plugin, Preset, Rule, RuleMeta,
-    Scope, Workspace,
+    Analyzer, Conventions, Ctx, Error, Indexed, LanguageProvider, Manifest, Plugin, Preset, Rule,
+    RuleMeta, Scope, Source, Workspace,
 };
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
@@ -85,10 +83,17 @@ impl LanguageProvider for Text {
         true
     }
 
-    fn index(&self, _: &Workspace, file: &File, _: &str) -> Result<Fragment, Error> {
-        Ok(Fragment {
-            files: vec![file.clone()],
-            ..Fragment::default()
+    fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
+        let fragments = files
+            .iter()
+            .map(|source| Fragment {
+                files: vec![source.file.clone()],
+                ..Fragment::default()
+            })
+            .collect();
+        Ok(Indexed {
+            fragments,
+            ..Indexed::default()
         })
     }
 }

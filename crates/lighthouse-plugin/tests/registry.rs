@@ -1,7 +1,7 @@
-use lighthouse_model::{Capability, File, Fragment};
+use lighthouse_model::Capability;
 use lighthouse_plugin::{
-    Analyzer, Conventions, Ctx, Error, LanguageProvider, Manifest, Plugin, Registry, Scope,
-    Workspace,
+    Analyzer, Conventions, Ctx, Error, Indexed, LanguageProvider, Manifest, Plugin, Registry,
+    Scope, Source, Workspace,
 };
 use serde_json::Value;
 
@@ -145,6 +145,7 @@ fn plugins_are_listed_in_registration_order() {
 struct Lang {
     id: &'static str,
     fallback: bool,
+    priority: i32,
 }
 
 impl LanguageProvider for Lang {
@@ -163,12 +164,15 @@ impl LanguageProvider for Lang {
     fn fallback(&self) -> bool {
         self.fallback
     }
-    fn index(&self, _: &Workspace, _: &File, _: &str) -> Result<Fragment, Error> {
-        Ok(Fragment::default())
+    fn priority(&self) -> i32 {
+        self.priority
+    }
+    fn index(&self, _: &Workspace, _: &[Source]) -> Result<Indexed, Error> {
+        Ok(Indexed::default())
     }
 }
 
-struct Langs(&'static str, &'static [(&'static str, bool)]);
+struct Langs(&'static str, &'static [(&'static str, bool, i32)]);
 
 impl Plugin for Langs {
     fn manifest(&self) -> Manifest {
@@ -180,7 +184,13 @@ impl Plugin for Langs {
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
         self.1
             .iter()
-            .map(|&(id, fallback)| Box::new(Lang { id, fallback }) as Box<dyn LanguageProvider>)
+            .map(|&(id, fallback, priority)| {
+                Box::new(Lang {
+                    id,
+                    fallback,
+                    priority,
+                }) as Box<dyn LanguageProvider>
+            })
             .collect()
     }
 }
@@ -188,13 +198,31 @@ impl Plugin for Langs {
 #[test]
 fn fallback_providers_come_after_regular_ones_whatever_the_registration_order() {
     let mut registry = Registry::default();
-    registry.register(&Langs("a", &[("text", true)])).unwrap();
     registry
-        .register(&Langs("b", &[("go", false), ("py", false)]))
+        .register(&Langs("a", &[("text", true, 0)]))
+        .unwrap();
+    registry
+        .register(&Langs("b", &[("go", false, 0), ("py", false, 0)]))
         .unwrap();
     let ids: Vec<_> = registry
         .languages()
         .map(|(_, l)| l.id().to_owned())
         .collect();
     assert_eq!(ids, ["go", "py", "text"]);
+}
+
+#[test]
+fn higher_priority_providers_come_first_and_ties_keep_registration_order() {
+    let mut registry = Registry::default();
+    registry
+        .register(&Langs("a", &[("low", false, 0), ("tie", false, 5)]))
+        .unwrap();
+    registry
+        .register(&Langs("b", &[("high", false, 9), ("tie2", false, 5)]))
+        .unwrap();
+    let ids: Vec<_> = registry
+        .languages()
+        .map(|(_, l)| l.id().to_owned())
+        .collect();
+    assert_eq!(ids, ["high", "tie", "tie2", "low"]);
 }

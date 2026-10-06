@@ -1,0 +1,112 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Root#function"
+        }
+      ],
+      "file": {
+        "path": "root.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": ".::Root#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "modules",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "file": "root.go",
+          "id": ".::Root#function",
+          "kind": "function",
+          "name": "Root",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "tools"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "tools::Tool#function"
+        }
+      ],
+      "file": {
+        "path": "tools/tool.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "tools::Tool#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "tools",
+          "path": "tools"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "tools/tool.go",
+          "id": "tools::Tool#function",
+          "kind": "function",
+          "name": "Tool",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

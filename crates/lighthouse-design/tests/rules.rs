@@ -9,7 +9,7 @@ use lighthouse_model::{
     Resolution, Span, Symbol, SymbolId, SymbolKind, Target, Visibility,
 };
 use lighthouse_plugin::{
-    Conventions, Error, LanguageProvider, Manifest, Plugin, Registry, Workspace,
+    Conventions, Error, Indexed, LanguageProvider, Manifest, Plugin, Registry, Source, Workspace,
 };
 use serde_json::{Value, json};
 
@@ -33,8 +33,17 @@ impl LanguageProvider for Wire {
     fn capabilities(&self) -> &[Capability] {
         &[]
     }
-    fn index(&self, _: &Workspace, _: &File, text: &str) -> Result<Fragment, Error> {
-        serde_json::from_str(text).map_err(|e| Error::Failed(e.to_string()))
+    fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
+        let fragments = files
+            .iter()
+            .map(|source| {
+                serde_json::from_str(source.text).map_err(|e| Error::Failed(e.to_string()))
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(Indexed {
+            fragments,
+            ..Indexed::default()
+        })
     }
 }
 

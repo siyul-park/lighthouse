@@ -1,0 +1,242 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "cmd/app"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "fmt"
+        },
+        {
+          "from": {
+            "module": "cmd/app"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "internal/text"
+        },
+        {
+          "from": {
+            "module": "cmd/app"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "cmd/app::Version#var"
+        },
+        {
+          "from": {
+            "module": "cmd/app"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "cmd/app::Greeting#function"
+        },
+        {
+          "from": {
+            "symbol": "cmd/app::Greeting#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": "internal/text::Count"
+        },
+        {
+          "from": {
+            "module": "cmd/app"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "cmd/app::main#function"
+        },
+        {
+          "from": {
+            "symbol": "cmd/app::main#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": "cmd/app::Greeting"
+        }
+      ],
+      "file": {
+        "path": "cmd/app/main.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "cmd/app::Greeting#function",
+          "tokens": 14,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "cmd/app::main#function",
+          "tokens": 10,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "main",
+          "path": "cmd/app"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Version is exported but nothing can import a main package.",
+          "file": "cmd/app/main.go",
+          "id": "cmd/app::Version#var",
+          "kind": "var",
+          "name": "Version",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 10
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "Greeting is built at start.",
+          "file": "cmd/app/main.go",
+          "id": "cmd/app::Greeting#function",
+          "kind": "function",
+          "name": "Greeting",
+          "span": {
+            "end": {
+              "col": 69,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "cmd/app/main.go",
+          "id": "cmd/app::main#function",
+          "kind": "function",
+          "name": "main",
+          "span": {
+            "end": {
+              "col": 40,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "internal/text"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "internal/text::Count#function"
+        },
+        {
+          "from": {
+            "module": "internal/text"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "internal/text::hidden#function"
+        }
+      ],
+      "file": {
+        "path": "internal/text/words.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "internal/text::Count#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "internal/text::hidden#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "helpers",
+          "path": "internal/text"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Count counts words.",
+          "file": "internal/text/words.go",
+          "id": "internal/text::Count#function",
+          "kind": "function",
+          "name": "Count",
+          "span": {
+            "end": {
+              "col": 43,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "internal/text/words.go",
+          "id": "internal/text::hidden#function",
+          "kind": "function",
+          "name": "hidden",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

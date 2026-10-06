@@ -1,6 +1,7 @@
 use std::path::Path;
+use std::time::Duration;
 
-use lighthouse_config::{Config, Error, RuleConfig, Rules, glob_set};
+use lighthouse_config::{Config, Error, PluginRef, RuleConfig, Rules, glob_set};
 use lighthouse_model::Severity;
 
 fn rule(level: Option<Severity>, options: &[(&str, i64)]) -> RuleConfig {
@@ -167,5 +168,27 @@ fn discover_walks_up_to_the_nearest_file() {
     std::fs::write(dir.path().join("lighthouse.toml"), "plugins = [\"core\"]").unwrap();
     let (path, config) = Config::discover(&nested).unwrap().unwrap();
     assert_eq!(path, dir.path().join("lighthouse.toml"));
-    assert_eq!(config.plugins(), ["core"]);
+    assert_eq!(config.plugins(), [PluginRef::new("core")]);
+}
+
+#[test]
+fn plugins_accept_ids_and_tables_and_languages_carry_options() {
+    let config = Config::parse(
+        r#"
+plugins = ["core", { id = "lang-go", path = "tools/go", timeout = 30 }]
+
+[languages.go]
+tags = ["integration"]
+"#,
+    )
+    .unwrap();
+    let plugins = config.plugins();
+    assert_eq!(plugins[0], PluginRef::new("core"));
+    assert_eq!(plugins[1].id, "lang-go");
+    assert_eq!(plugins[1].path.as_deref(), Some(Path::new("tools/go")));
+    assert_eq!(plugins[1].timeout(), Some(Duration::from_secs(30)));
+    assert!(config.lists("lang-go") && !config.lists("design"));
+    assert_eq!(config.languages()["go"]["tags"][0], "integration");
+    assert!(Config::parse("plugins = [{ path = \"x\" }]").is_err());
+    assert!(Config::parse("plugins = [{ id = \"x\", other = 1 }]").is_err());
 }

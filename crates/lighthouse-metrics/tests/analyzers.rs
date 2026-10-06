@@ -62,7 +62,7 @@ fn call(from: &Symbol, to: &Symbol) -> Edge {
 fn run<T: DeserializeOwned>(project: &Project, analyzer: &str, path: &str) -> Vec<Measured<T>> {
     let metrics = Metrics.analyzers();
     let analyzer = metrics.iter().find(|a| a.id() == analyzer).unwrap();
-    let ws = Workspace { root: ".".into() };
+    let ws = Workspace::new(".");
     let file = file(path, false);
     let facts = Facts::new();
     let ctx = Ctx {

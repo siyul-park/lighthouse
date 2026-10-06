@@ -1,0 +1,733 @@
+{
+  "$defs": {
+    "Call": {
+      "properties": {
+        "params": {
+          "$ref": "#/$defs/InitializeParams"
+        },
+        "result": {
+          "$ref": "#/$defs/InitializeResult"
+        }
+      },
+      "required": [
+        "params",
+        "result"
+      ],
+      "type": "object"
+    },
+    "Call2": {
+      "properties": {
+        "params": {
+          "$ref": "#/$defs/IndexParams"
+        },
+        "result": {
+          "$ref": "#/$defs/IndexResult"
+        }
+      },
+      "required": [
+        "params",
+        "result"
+      ],
+      "type": "object"
+    },
+    "ClientInfo": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "type": "object"
+    },
+    "Context": {
+      "properties": {
+        "options": {
+          "additionalProperties": true,
+          "default": {},
+          "description": "Per-language options from `[languages.<id>]`, keyed by language id.",
+          "type": "object"
+        },
+        "overlays": {
+          "description": "Reserved, see [`Overlay`].",
+          "items": {
+            "$ref": "#/$defs/Overlay"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Conventions": {
+      "properties": {
+        "test_globs": {
+          "default": [],
+          "description": "Globs of test files.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Edge": {
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/Node"
+        },
+        "kind": {
+          "$ref": "#/$defs/EdgeKind"
+        },
+        "resolution": {
+          "$ref": "#/$defs/Resolution"
+        },
+        "to": {
+          "description": "A module path, a symbol id, or a kind-less symbol id\n(`module::owner::name`) that names exactly one symbol.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "from",
+        "to",
+        "resolution"
+      ],
+      "type": "object"
+    },
+    "EdgeKind": {
+      "enum": [
+        "calls",
+        "references",
+        "imports",
+        "contains",
+        "implements",
+        "accesses-private"
+      ],
+      "type": "string"
+    },
+    "FileInfo": {
+      "properties": {
+        "generated": {
+          "description": "The file is machine-generated.",
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "FileRef": {
+      "properties": {
+        "hash": {
+          "description": "SHA-256 of the file content, lowercase hex.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Project-relative, `/`-separated.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "hash"
+      ],
+      "type": "object"
+    },
+    "Flow": {
+      "description": "A control-flow construct and the number of enclosing nesting constructs,\nnested functions included, around it.",
+      "properties": {
+        "arms": {
+          "description": "`switch`: arms other than the default arm.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/FlowKind"
+        },
+        "nesting": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "operators": {
+          "description": "`logic`: operators in the run.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "returning": {
+          "description": "`switch`: every arm, default included, is a single return.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "nesting"
+      ],
+      "type": "object"
+    },
+    "FlowKind": {
+      "enum": [
+        "if",
+        "else-if",
+        "else",
+        "switch",
+        "loop",
+        "catch",
+        "jump",
+        "logic",
+        "recursion"
+      ],
+      "type": "string"
+    },
+    "Fragment": {
+      "description": "Code-model contribution of one file.",
+      "properties": {
+        "edges": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Edge"
+          },
+          "type": "array"
+        },
+        "file": {
+          "$ref": "#/$defs/FileInfo"
+        },
+        "functions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/FunctionSummary"
+          },
+          "type": "array"
+        },
+        "modules": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Module"
+          },
+          "type": "array"
+        },
+        "symbols": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Symbol"
+          },
+          "type": "array"
+        },
+        "tests": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/TestCase"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "file"
+      ],
+      "type": "object"
+    },
+    "FunctionSummary": {
+      "properties": {
+        "clone_fingerprint": {
+          "description": "Reserved: normalized fingerprint for clone detection.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "flow": {
+          "description": "Control-flow constructs in source order.",
+          "items": {
+            "$ref": "#/$defs/Flow"
+          },
+          "type": "array"
+        },
+        "forwards_to": {
+          "description": "Target of the call the body consists of when it passes the receiver and\nevery parameter on, in order.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_nesting": {
+          "description": "Deepest level of nested constructs; a flat body is 0.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "params": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "returns": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "statements": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "symbol": {
+          "type": "string"
+        },
+        "tokens": {
+          "description": "Leaf tokens of the body.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "top_level": {
+          "description": "Statements directly in the body, not in nested blocks.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "symbol",
+        "max_nesting",
+        "statements",
+        "top_level",
+        "params",
+        "returns",
+        "tokens",
+        "flow"
+      ],
+      "type": "object"
+    },
+    "Incomplete": {
+      "properties": {
+        "path": {
+          "description": "Project-relative path; absent when the gap is not tied to one file.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "type": "object"
+    },
+    "IndexParams": {
+      "description": "Index request. A provider receives every file of one language in one\nrequest and decides which packages or modules it must load to analyze\nthem; analysis scope is never narrowed to a subset of the project.",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/Context",
+          "default": {
+            "options": {}
+          }
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/FileRef"
+          },
+          "type": "array"
+        },
+        "language": {
+          "description": "Id of the language the files belong to.",
+          "type": "string"
+        },
+        "project": {
+          "$ref": "#/$defs/ProjectRef"
+        }
+      },
+      "required": [
+        "project",
+        "language",
+        "files"
+      ],
+      "type": "object"
+    },
+    "IndexResult": {
+      "properties": {
+        "fragments": {
+          "description": "One fragment per analyzed file, ordered by path.",
+          "items": {
+            "$ref": "#/$defs/Fragment"
+          },
+          "type": "array"
+        },
+        "incomplete": {
+          "default": [],
+          "description": "Files or scopes that could not be analyzed. A file listed here may\nstill have a fragment with whatever could be recovered.",
+          "items": {
+            "$ref": "#/$defs/Incomplete"
+          },
+          "type": "array"
+        },
+        "notices": {
+          "default": [],
+          "description": "Messages that leave the analysis complete.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "fragments"
+      ],
+      "type": "object"
+    },
+    "InitializeParams": {
+      "description": "First request, sent by the host. Fields of protocol messages are camelCase;\nfields of the code model are snake_case.",
+      "properties": {
+        "clientInfo": {
+          "$ref": "#/$defs/ClientInfo"
+        },
+        "protocolVersion": {
+          "type": "string"
+        },
+        "root": {
+          "description": "Absolute path of the project root.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "root",
+        "protocolVersion",
+        "clientInfo"
+      ],
+      "type": "object"
+    },
+    "InitializeResult": {
+      "properties": {
+        "id": {
+          "description": "Plugin id; must equal the `id` of its `lighthouse-plugin.toml`.",
+          "type": "string"
+        },
+        "languages": {
+          "items": {
+            "$ref": "#/$defs/Language"
+          },
+          "type": "array"
+        },
+        "protocolVersion": {
+          "description": "Must equal the host's protocol version.",
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "protocolVersion",
+        "languages"
+      ],
+      "type": "object"
+    },
+    "Language": {
+      "properties": {
+        "capabilities": {
+          "default": [],
+          "description": "Known value: `semantic-edges`. Hosts ignore unknown values.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "conventions": {
+          "$ref": "#/$defs/Conventions",
+          "default": {
+            "test_globs": []
+          }
+        },
+        "fallback": {
+          "description": "A fallback language claims a file only when no other language does.",
+          "type": "boolean"
+        },
+        "globs": {
+          "description": "Project-relative path globs; `*` and `?` never cross `/`, a `**`\ncomponent matches any number of directories.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "priority": {
+          "default": 0,
+          "description": "Among providers matching a file, the higher priority wins.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "globs"
+      ],
+      "type": "object"
+    },
+    "Module": {
+      "description": "Package, directory or namespace; `path` identifies it project-wide.",
+      "properties": {
+        "name": {
+          "description": "Name the language gives the module, such as a Go package name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "test_of": {
+          "description": "Path of the module whose public surface this one tests from outside.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "Node": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "module": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "module"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "symbol": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "symbol"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Overlay": {
+      "description": "Reserved: the content of an unsaved file. Hosts do not send overlays in\n0.1; providers read files from disk.",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "text"
+      ],
+      "type": "object"
+    },
+    "Position": {
+      "description": "1-based line and column; the column counts bytes.",
+      "properties": {
+        "col": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "line": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "line",
+        "col"
+      ],
+      "type": "object"
+    },
+    "ProjectRef": {
+      "properties": {
+        "root": {
+          "description": "Absolute path of the project root.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "root"
+      ],
+      "type": "object"
+    },
+    "Resolution": {
+      "enum": [
+        "semantic",
+        "syntactic"
+      ],
+      "type": "string"
+    },
+    "Span": {
+      "description": "`end` is exclusive.",
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/Position"
+        },
+        "start": {
+          "$ref": "#/$defs/Position"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "type": "object"
+    },
+    "Symbol": {
+      "properties": {
+        "doc": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "file": {
+          "description": "Project-relative path of the declaring file.",
+          "type": "string"
+        },
+        "id": {
+          "description": "`module::owner::name#kind`, see docs/plugin-protocol.md.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SymbolKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "owner": {
+          "description": "Id of the enclosing type or interface.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "visibility": {
+          "$ref": "#/$defs/Visibility"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "visibility",
+        "file",
+        "span",
+        "name"
+      ],
+      "type": "object"
+    },
+    "SymbolKind": {
+      "enum": [
+        "function",
+        "method",
+        "type",
+        "field",
+        "const",
+        "var",
+        "interface",
+        "test"
+      ],
+      "type": "string"
+    },
+    "TestCase": {
+      "properties": {
+        "nesting": {
+          "description": "Depth of nested sub-tests.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "style": {
+          "$ref": "#/$defs/TestStyle"
+        },
+        "symbol": {
+          "type": "string"
+        },
+        "targets": {
+          "description": "Symbols the test calls or references, as edge targets.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "symbol",
+        "nesting",
+        "style",
+        "targets"
+      ],
+      "type": "object"
+    },
+    "TestStyle": {
+      "enum": [
+        "table",
+        "scenario"
+      ],
+      "type": "string"
+    },
+    "Visibility": {
+      "enum": [
+        "public",
+        "private",
+        "internal"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Every method with its params and result. Exists to anchor the schema.",
+  "properties": {
+    "index": {
+      "$ref": "#/$defs/Call2"
+    },
+    "initialize": {
+      "$ref": "#/$defs/Call"
+    }
+  },
+  "required": [
+    "initialize",
+    "index"
+  ],
+  "title": "Methods",
+  "type": "object"
+}

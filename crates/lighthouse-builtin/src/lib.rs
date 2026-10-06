@@ -4,9 +4,8 @@ use lighthouse_plugin::{Plugin, Registry};
 
 /// Registry holding every bundled plugin.
 pub fn registry() -> Registry {
-    let bundled: [&dyn Plugin; 4] = [
+    let bundled: [&dyn Plugin; 3] = [
         &core_plugin::Core,
-        &lighthouse_lang_go::LangGo,
         &lighthouse_metrics::Metrics,
         &lighthouse_design::Design,
     ];

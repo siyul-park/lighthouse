@@ -1,0 +1,7 @@
+---
+source: crates/lighthouse-report/tests/render.rs
+expression: "render(Format::Text, &[], &gaps())"
+---
+incomplete: language `go` failed, 3 file(s) not analyzed: timed out
+src/b c/é#1.go: incomplete: type error
+summary: 0 error, 0 warn, 0 review, 2 incomplete

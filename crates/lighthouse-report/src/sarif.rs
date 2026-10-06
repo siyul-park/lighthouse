@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use lighthouse_model::{Diagnostic, Severity};
+use lighthouse_model::{Diagnostic, Incomplete, Severity};
 use serde::Serialize;
 
 const SCHEMA: &str = "https://json.schemastore.org/sarif-2.1.0.json";
@@ -20,7 +20,35 @@ struct Log<'a> {
 struct Run<'a> {
     tool: Tool<'a>,
     original_uri_base_ids: BTreeMap<&'static str, BaseId>,
+    invocations: [Invocation<'a>; 1],
     results: Vec<SarifResult<'a>>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Invocation<'a> {
+    execution_successful: bool,
+    tool_execution_notifications: Vec<Notification<'a>>,
+}
+
+#[derive(Serialize)]
+struct Notification<'a> {
+    level: &'static str,
+    message: Message<'a>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    locations: Vec<NotificationLocation>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NotificationLocation {
+    physical_location: ArtifactOnly,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ArtifactOnly {
+    artifact_location: Artifact,
 }
 
 #[derive(Serialize)]
@@ -89,6 +117,25 @@ struct Region {
     end_column: u32,
 }
 
+fn notification(item: &Incomplete) -> Notification<'_> {
+    Notification {
+        level: "error",
+        message: Message { text: &item.reason },
+        locations: item
+            .path
+            .iter()
+            .map(|path| NotificationLocation {
+                physical_location: ArtifactOnly {
+                    artifact_location: Artifact {
+                        uri: encode(&path.to_string_lossy().replace('\\', "/")),
+                        uri_base_id: SRCROOT,
+                    },
+                },
+            })
+            .collect(),
+    }
+}
+
 fn level(severity: Severity) -> &'static str {
     match severity {
         Severity::Error => "error",
@@ -111,7 +158,7 @@ fn encode(path: &str) -> String {
     out
 }
 
-pub fn render(diagnostics: &[Diagnostic]) -> String {
+pub fn render(diagnostics: &[Diagnostic], incomplete: &[Incomplete]) -> String {
     let rules: BTreeSet<&str> = diagnostics.iter().map(|d| d.rule_id.as_str()).collect();
     let log = Log {
         schema: SCHEMA,
@@ -125,6 +172,10 @@ pub fn render(diagnostics: &[Diagnostic]) -> String {
                     },
                 },
             )]),
+            invocations: [Invocation {
+                execution_successful: incomplete.is_empty(),
+                tool_execution_notifications: incomplete.iter().map(notification).collect(),
+            }],
             tool: Tool {
                 driver: Driver {
                     name: "lighthouse",

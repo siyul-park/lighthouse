@@ -80,6 +80,14 @@ impl SymbolId {
         &self.0
     }
 
+    /// Accepts an id built elsewhere, such as by a plugin: `module::name`
+    /// parts ending in `#kind` with a known kind.
+    pub fn parse(id: &str) -> Option<Self> {
+        let (head, kind) = id.rsplit_once('#')?;
+        let kind = SymbolKind::ALL.iter().any(|k| k.as_str() == kind);
+        (kind && head.contains("::")).then(|| Self(id.to_owned()))
+    }
+
     /// Path of the module that declares the symbol.
     pub fn module(&self) -> &str {
         self.0
@@ -102,6 +110,17 @@ pub enum SymbolKind {
 }
 
 impl SymbolKind {
+    const ALL: [Self; 8] = [
+        Self::Function,
+        Self::Method,
+        Self::Type,
+        Self::Field,
+        Self::Const,
+        Self::Var,
+        Self::Interface,
+        Self::Test,
+    ];
+
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Function => "function",
@@ -161,6 +180,11 @@ pub enum EdgeKind {
     Imports,
     Contains,
     Implements,
+    /// Use of a member that its language keeps private, from outside the unit
+    /// that owns it. What the unit is depends on the language: a type, a
+    /// module, a package. Providers emit it only where such a use is possible;
+    /// Go cannot reach an unexported member from another package, so the Go
+    /// provider emits none.
     AccessesPrivate,
 }
 

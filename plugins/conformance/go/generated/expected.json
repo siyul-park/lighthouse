@@ -1,0 +1,123 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Generated#function"
+        }
+      ],
+      "file": {
+        "generated": true,
+        "path": "gen.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": ".::Generated#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "generated",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "file": "gen.go",
+          "id": ".::Generated#function",
+          "kind": "function",
+          "name": "Generated",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Plain#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Plain#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Generated"
+        }
+      ],
+      "file": {
+        "path": "plain.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "forwards_to": ".::Generated",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": ".::Plain#function",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "generated",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Plain is written by hand.",
+          "file": "plain.go",
+          "id": ".::Plain#function",
+          "kind": "function",
+          "name": "Plain",
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

@@ -1,0 +1,641 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "io"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Logger#interface"
+        },
+        {
+          "from": {
+            "symbol": ".::Logger#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Logger::Log#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Closer#interface"
+        },
+        {
+          "from": {
+            "symbol": ".::Closer#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Closer::Close#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::LogCloser#interface"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Base#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Base#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Base::prefix#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Base#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Base::Log#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Base::Log#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Base::prefix"
+        },
+        {
+          "from": {
+            "symbol": ".::Base#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Base::Close#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Service#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Service::Base#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Service::Reader#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Service::name#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::run#function"
+        },
+        {
+          "from": {
+            "symbol": ".::run#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Base::Log"
+        },
+        {
+          "from": {
+            "symbol": ".::run#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Base::Close"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::peek#function"
+        },
+        {
+          "from": {
+            "symbol": ".::peek#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Service::name"
+        },
+        {
+          "from": {
+            "symbol": ".::peek#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Base::prefix"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::build#function"
+        },
+        {
+          "from": {
+            "symbol": ".::build#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Service::Base"
+        },
+        {
+          "from": {
+            "symbol": ".::build#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Service::name"
+        },
+        {
+          "from": {
+            "symbol": ".::build#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Service"
+        },
+        {
+          "from": {
+            "symbol": ".::build#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Base::prefix"
+        },
+        {
+          "from": {
+            "symbol": ".::build#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Base"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::closeAll#function"
+        },
+        {
+          "from": {
+            "symbol": ".::closeAll#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Closer::Close"
+        },
+        {
+          "from": {
+            "symbol": ".::Base#type"
+          },
+          "kind": "implements",
+          "resolution": "semantic",
+          "to": ".::LogCloser"
+        },
+        {
+          "from": {
+            "symbol": ".::Service#type"
+          },
+          "kind": "implements",
+          "resolution": "semantic",
+          "to": ".::LogCloser"
+        }
+      ],
+      "file": {
+        "path": "embedded.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": ".::Base::Log#method",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::Base::Close#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 2,
+          "symbol": ".::run#function",
+          "tokens": 14,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::peek#function",
+          "tokens": 10,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::build#function",
+          "tokens": 20,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 0,
+          "statements": 2,
+          "symbol": ".::closeAll#function",
+          "tokens": 18,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "embedded",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Logger writes lines.",
+          "file": "embedded.go",
+          "id": ".::Logger#interface",
+          "kind": "interface",
+          "name": "Logger",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 6,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "embedded.go",
+          "id": ".::Logger::Log#method",
+          "kind": "method",
+          "name": "Log",
+          "owner": ".::Logger#interface",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 7
+            },
+            "start": {
+              "col": 2,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Closer releases resources.",
+          "file": "embedded.go",
+          "id": ".::Closer#interface",
+          "kind": "interface",
+          "name": "Closer",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 6,
+              "line": 11
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "embedded.go",
+          "id": ".::Closer::Close#method",
+          "kind": "method",
+          "name": "Close",
+          "owner": ".::Closer#interface",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 12
+            },
+            "start": {
+              "col": 2,
+              "line": 12
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "LogCloser does both.",
+          "file": "embedded.go",
+          "id": ".::LogCloser#interface",
+          "kind": "interface",
+          "name": "LogCloser",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 19
+            },
+            "start": {
+              "col": 6,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Base provides the shared behavior.",
+          "file": "embedded.go",
+          "id": ".::Base#type",
+          "kind": "type",
+          "name": "Base",
+          "span": {
+            "end": {
+              "col": 34,
+              "line": 22
+            },
+            "start": {
+              "col": 6,
+              "line": 22
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "embedded.go",
+          "id": ".::Base::prefix#field",
+          "kind": "field",
+          "name": "prefix",
+          "owner": ".::Base#type",
+          "span": {
+            "end": {
+              "col": 32,
+              "line": 22
+            },
+            "start": {
+              "col": 19,
+              "line": 22
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "Log writes a line.",
+          "file": "embedded.go",
+          "id": ".::Base::Log#method",
+          "kind": "method",
+          "name": "Log",
+          "owner": ".::Base#type",
+          "span": {
+            "end": {
+              "col": 54,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 25
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Close does nothing.",
+          "file": "embedded.go",
+          "id": ".::Base::Close#method",
+          "kind": "method",
+          "name": "Close",
+          "owner": ".::Base#type",
+          "span": {
+            "end": {
+              "col": 44,
+              "line": 28
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Service embeds its base by pointer and a reader from another package.",
+          "file": "embedded.go",
+          "id": ".::Service#type",
+          "kind": "type",
+          "name": "Service",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 35
+            },
+            "start": {
+              "col": 6,
+              "line": 31
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "embedded.go",
+          "id": ".::Service::Base#field",
+          "kind": "field",
+          "name": "Base",
+          "owner": ".::Service#type",
+          "span": {
+            "end": {
+              "col": 7,
+              "line": 32
+            },
+            "start": {
+              "col": 2,
+              "line": 32
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "embedded.go",
+          "id": ".::Service::Reader#field",
+          "kind": "field",
+          "name": "Reader",
+          "owner": ".::Service#type",
+          "span": {
+            "end": {
+              "col": 11,
+              "line": 33
+            },
+            "start": {
+              "col": 2,
+              "line": 33
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "embedded.go",
+          "id": ".::Service::name#field",
+          "kind": "field",
+          "name": "name",
+          "owner": ".::Service#type",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 34
+            },
+            "start": {
+              "col": 2,
+              "line": 34
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "embedded.go",
+          "id": ".::run#function",
+          "kind": "function",
+          "name": "run",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 37
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "embedded.go",
+          "id": ".::peek#function",
+          "kind": "function",
+          "name": "peek",
+          "span": {
+            "end": {
+              "col": 58,
+              "line": 42
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "embedded.go",
+          "id": ".::build#function",
+          "kind": "function",
+          "name": "build",
+          "span": {
+            "end": {
+              "col": 82,
+              "line": 44
+            },
+            "start": {
+              "col": 1,
+              "line": 44
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "embedded.go",
+          "id": ".::closeAll#function",
+          "kind": "function",
+          "name": "closeAll",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 50
+            },
+            "start": {
+              "col": 1,
+              "line": 46
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

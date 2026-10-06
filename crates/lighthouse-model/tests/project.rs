@@ -270,3 +270,19 @@ fn references_index_lists_value_uses_not_calls() {
     assert!(project.references(&a.id).is_empty());
     assert_eq!(project.callers(&c.id), std::slice::from_ref(&a.id));
 }
+
+#[test]
+fn symbol_ids_built_elsewhere_must_follow_the_format() {
+    let ok = SymbolId::parse("internal/store::Store::Get#method").unwrap();
+    assert_eq!(ok.module(), "internal/store");
+    assert!(SymbolId::parse("pkg::Run#test").is_some());
+    for bad in [
+        "nope",
+        "pkg::Run",
+        "pkg::Run#",
+        "pkg::Run#thing",
+        "pkg#function",
+    ] {
+        assert!(SymbolId::parse(bad).is_none(), "{bad}");
+    }
+}

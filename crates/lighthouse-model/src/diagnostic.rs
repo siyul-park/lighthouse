@@ -67,6 +67,11 @@ impl Fingerprint {
         Self(hex(&hash.finalize()))
     }
 
+    /// Adopts a fingerprint computed elsewhere, such as by a plugin.
+    pub fn from_raw(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
     /// Distinguishes the `n`th (0-based) repeat of an otherwise identical finding.
     pub fn occurrence(&self, n: usize) -> Self {
         if n == 0 {
@@ -121,4 +126,14 @@ impl Diagnostic {
             fix: None,
         }
     }
+}
+
+/// Part of the analysis scope that could not be analyzed: a file, or the
+/// whole run of a provider when `path` is `None`. Never silent: "not checked"
+/// is not "passed".
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct Incomplete {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<PathBuf>,
+    pub reason: String,
 }

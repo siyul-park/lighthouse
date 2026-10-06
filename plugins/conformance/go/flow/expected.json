@@ -1,0 +1,885 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Tree#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Tree#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Tree::left#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Tree#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Tree::right#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Tree#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Tree::value#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::chain#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::labeled#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::selects#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::fact#function"
+        },
+        {
+          "from": {
+            "symbol": ".::fact#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::fact"
+        },
+        {
+          "from": {
+            "symbol": ".::Tree#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Tree::Sum#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Tree::Sum#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Tree::value"
+        },
+        {
+          "from": {
+            "symbol": ".::Tree::Sum#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Tree::Sum"
+        },
+        {
+          "from": {
+            "symbol": ".::Tree::Sum#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Tree::left"
+        },
+        {
+          "from": {
+            "symbol": ".::Tree::Sum#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Tree::right"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::name#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::mixed#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::logic#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::closures#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::jump#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::typed#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::wrap#function"
+        },
+        {
+          "from": {
+            "symbol": ".::wrap#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::inner"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::reorder#function"
+        },
+        {
+          "from": {
+            "symbol": ".::reorder#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::inner"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::inner#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Tree#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Tree::left0#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Tree::left0#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Tree::child"
+        },
+        {
+          "from": {
+            "symbol": ".::Tree#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Tree::child#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Tree::child#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Tree::left"
+        }
+      ],
+      "file": {
+        "path": "flow.go"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "else-if",
+              "nesting": 0
+            },
+            {
+              "kind": "else",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 2,
+          "returns": 1,
+          "statements": 4,
+          "symbol": ".::chain#function",
+          "tokens": 24,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "kind": "loop",
+              "nesting": 1
+            },
+            {
+              "kind": "if",
+              "nesting": 2
+            },
+            {
+              "kind": "jump",
+              "nesting": 3
+            }
+          ],
+          "max_nesting": 3,
+          "params": 1,
+          "returns": 1,
+          "statements": 7,
+          "symbol": ".::labeled#function",
+          "tokens": 48,
+          "top_level": 3
+        },
+        {
+          "flow": [
+            {
+              "arms": 3,
+              "kind": "switch",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 3,
+          "returns": 1,
+          "statements": 9,
+          "symbol": ".::selects#function",
+          "tokens": 32,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "recursion",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 3,
+          "symbol": ".::fact#function",
+          "tokens": 19,
+          "top_level": 2
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "recursion",
+              "nesting": 0
+            },
+            {
+              "kind": "recursion",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 0,
+          "returns": 1,
+          "statements": 3,
+          "symbol": ".::Tree::Sum#method",
+          "tokens": 30,
+          "top_level": 2
+        },
+        {
+          "flow": [
+            {
+              "arms": 2,
+              "kind": "switch",
+              "nesting": 0,
+              "returning": true
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 7,
+          "symbol": ".::name#function",
+          "tokens": 22,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "arms": 1,
+              "kind": "switch",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 6,
+          "symbol": ".::mixed#function",
+          "tokens": 17,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "logic",
+              "nesting": 0,
+              "operators": 2
+            },
+            {
+              "kind": "logic",
+              "nesting": 0,
+              "operators": 1
+            },
+            {
+              "kind": "logic",
+              "nesting": 0,
+              "operators": 1
+            },
+            {
+              "kind": "logic",
+              "nesting": 0,
+              "operators": 1
+            }
+          ],
+          "max_nesting": 1,
+          "params": 4,
+          "returns": 1,
+          "statements": 3,
+          "symbol": ".::logic#function",
+          "tokens": 23,
+          "top_level": 2
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 1
+            },
+            {
+              "kind": "if",
+              "nesting": 2
+            }
+          ],
+          "max_nesting": 3,
+          "params": 1,
+          "returns": 1,
+          "statements": 6,
+          "symbol": ".::closures#function",
+          "tokens": 31,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "jump",
+              "nesting": 1
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 4,
+          "symbol": ".::jump#function",
+          "tokens": 16,
+          "top_level": 3
+        },
+        {
+          "flow": [
+            {
+              "arms": 2,
+              "kind": "switch",
+              "nesting": 0,
+              "returning": true
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 6,
+          "symbol": ".::typed#function",
+          "tokens": 22,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "forwards_to": ".::inner",
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::wrap#function",
+          "tokens": 10,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::reorder#function",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::inner#function",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": ".::Tree::child",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::Tree::left0#method",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::Tree::child#method",
+          "tokens": 6,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "flow",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "file": "flow.go",
+          "id": ".::Tree#type",
+          "kind": "type",
+          "name": "Tree",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 6,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::Tree::left#field",
+          "kind": "field",
+          "name": "left",
+          "owner": ".::Tree#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 4
+            },
+            "start": {
+              "col": 2,
+              "line": 4
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::Tree::right#field",
+          "kind": "field",
+          "name": "right",
+          "owner": ".::Tree#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 4
+            },
+            "start": {
+              "col": 8,
+              "line": 4
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::Tree::value#field",
+          "kind": "field",
+          "name": "value",
+          "owner": ".::Tree#type",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 5
+            },
+            "start": {
+              "col": 2,
+              "line": 5
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::chain#function",
+          "kind": "function",
+          "name": "chain",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::labeled#function",
+          "kind": "function",
+          "name": "labeled",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 30
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::selects#function",
+          "kind": "function",
+          "name": "selects",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 43
+            },
+            "start": {
+              "col": 1,
+              "line": 32
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::fact#function",
+          "kind": "function",
+          "name": "fact",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 50
+            },
+            "start": {
+              "col": 1,
+              "line": 45
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::Tree::Sum#method",
+          "kind": "method",
+          "name": "Sum",
+          "owner": ".::Tree#type",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 57
+            },
+            "start": {
+              "col": 1,
+              "line": 52
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::name#function",
+          "kind": "function",
+          "name": "name",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 68
+            },
+            "start": {
+              "col": 1,
+              "line": 59
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::mixed#function",
+          "kind": "function",
+          "name": "mixed",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 78
+            },
+            "start": {
+              "col": 1,
+              "line": 70
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::logic#function",
+          "kind": "function",
+          "name": "logic",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 85
+            },
+            "start": {
+              "col": 1,
+              "line": 80
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::closures#function",
+          "kind": "function",
+          "name": "closures",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 97
+            },
+            "start": {
+              "col": 1,
+              "line": 87
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::jump#function",
+          "kind": "function",
+          "name": "jump",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 106
+            },
+            "start": {
+              "col": 1,
+              "line": 99
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::typed#function",
+          "kind": "function",
+          "name": "typed",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 116
+            },
+            "start": {
+              "col": 1,
+              "line": 108
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::wrap#function",
+          "kind": "function",
+          "name": "wrap",
+          "span": {
+            "end": {
+              "col": 63,
+              "line": 118
+            },
+            "start": {
+              "col": 1,
+              "line": 118
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::reorder#function",
+          "kind": "function",
+          "name": "reorder",
+          "span": {
+            "end": {
+              "col": 50,
+              "line": 120
+            },
+            "start": {
+              "col": 1,
+              "line": 120
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::inner#function",
+          "kind": "function",
+          "name": "inner",
+          "span": {
+            "end": {
+              "col": 60,
+              "line": 122
+            },
+            "start": {
+              "col": 1,
+              "line": 122
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::Tree::left0#method",
+          "kind": "method",
+          "name": "left0",
+          "owner": ".::Tree#type",
+          "span": {
+            "end": {
+              "col": 50,
+              "line": 124
+            },
+            "start": {
+              "col": 1,
+              "line": 124
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "flow.go",
+          "id": ".::Tree::child#method",
+          "kind": "method",
+          "name": "child",
+          "owner": ".::Tree#type",
+          "span": {
+            "end": {
+              "col": 47,
+              "line": 126
+            },
+            "start": {
+              "col": 1,
+              "line": 126
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

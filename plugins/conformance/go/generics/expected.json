@@ -1,0 +1,419 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Number#interface"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Stack#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Stack#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Stack::items#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Stack#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Stack::Push#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Stack::Push#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Stack::items"
+        },
+        {
+          "from": {
+            "symbol": ".::Stack#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Stack::Len#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Stack::Len#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Stack::items"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Map#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Sum#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::lengths#function"
+        },
+        {
+          "from": {
+            "symbol": ".::lengths#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Map"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::total#function"
+        },
+        {
+          "from": {
+            "symbol": ".::total#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Sum"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::fill#function"
+        },
+        {
+          "from": {
+            "symbol": ".::fill#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "to": ".::Stack"
+        },
+        {
+          "from": {
+            "symbol": ".::fill#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Stack::Push"
+        },
+        {
+          "from": {
+            "symbol": ".::fill#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "to": ".::Stack::Len"
+        }
+      ],
+      "file": {
+        "path": "generics.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": ".::Stack::Push#method",
+          "tokens": 14,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::Stack::Len#method",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 2,
+          "returns": 1,
+          "statements": 4,
+          "symbol": ".::Map#function",
+          "tokens": 39,
+          "top_level": 3
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 4,
+          "symbol": ".::Sum#function",
+          "tokens": 19,
+          "top_level": 3
+        },
+        {
+          "flow": [],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 2,
+          "symbol": ".::lengths#function",
+          "tokens": 26,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::total#function",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 3,
+          "symbol": ".::fill#function",
+          "tokens": 23,
+          "top_level": 3
+        }
+      ],
+      "modules": [
+        {
+          "name": "generics",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Number is a numeric constraint.",
+          "file": "generics.go",
+          "id": ".::Number#interface",
+          "kind": "interface",
+          "name": "Number",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 6,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Stack holds values of one type.",
+          "file": "generics.go",
+          "id": ".::Stack#type",
+          "kind": "type",
+          "name": "Stack",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 11
+            },
+            "start": {
+              "col": 6,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "generics.go",
+          "id": ".::Stack::items#field",
+          "kind": "field",
+          "name": "items",
+          "owner": ".::Stack#type",
+          "span": {
+            "end": {
+              "col": 11,
+              "line": 10
+            },
+            "start": {
+              "col": 2,
+              "line": 10
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "Push adds an item.",
+          "file": "generics.go",
+          "id": ".::Stack::Push#method",
+          "kind": "method",
+          "name": "Push",
+          "owner": ".::Stack#type",
+          "span": {
+            "end": {
+              "col": 68,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 14
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Len counts the items.",
+          "file": "generics.go",
+          "id": ".::Stack::Len#method",
+          "kind": "method",
+          "name": "Len",
+          "owner": ".::Stack#type",
+          "span": {
+            "end": {
+              "col": 53,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Map applies f to every item.",
+          "file": "generics.go",
+          "id": ".::Map#function",
+          "kind": "function",
+          "name": "Map",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Sum adds numbers.",
+          "file": "generics.go",
+          "id": ".::Sum#function",
+          "kind": "function",
+          "name": "Sum",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 35
+            },
+            "start": {
+              "col": 1,
+              "line": 29
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "generics.go",
+          "id": ".::lengths#function",
+          "kind": "function",
+          "name": "lengths",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 37
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "generics.go",
+          "id": ".::total#function",
+          "kind": "function",
+          "name": "total",
+          "span": {
+            "end": {
+              "col": 46,
+              "line": 41
+            },
+            "start": {
+              "col": 1,
+              "line": 41
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "generics.go",
+          "id": ".::fill#function",
+          "kind": "function",
+          "name": "fill",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 47
+            },
+            "start": {
+              "col": 1,
+              "line": 43
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}
