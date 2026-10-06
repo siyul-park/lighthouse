@@ -1,0 +1,414 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "closed"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "closed::Handle#type"
+        },
+        {
+          "from": {
+            "symbol": "closed::Handle#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "closed::Handle::id#field"
+        },
+        {
+          "from": {
+            "symbol": "closed::Handle#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "closed::Handle::id#method"
+        },
+        {
+          "from": {
+            "symbol": "closed::Handle::id#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "closed::Handle::id#field"
+        }
+      ],
+      "file": {
+        "path": "closed/src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "closed::Handle::id#method",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "closed",
+          "path": "closed"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "closed/src/lib.rs",
+          "id": "closed::Handle#type",
+          "kind": "type",
+          "name": "Handle",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "closed/src/lib.rs",
+          "id": "closed::Handle::id#field",
+          "kind": "field",
+          "name": "id",
+          "owner": "closed::Handle#type",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "closed/src/lib.rs",
+          "id": "closed::Handle::id#method",
+          "kind": "method",
+          "name": "id",
+          "owner": "closed::Handle#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "consumer"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "shared"
+        },
+        {
+          "from": {
+            "module": "consumer"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "consumer::identify#function"
+        },
+        {
+          "from": {
+            "symbol": "consumer::identify#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "shared::Handle::id#method"
+        }
+      ],
+      "file": {
+        "path": "consumer/src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "consumer::identify#function",
+          "tokens": 7,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "consumer",
+          "path": "consumer"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "consumer/src/lib.rs",
+          "id": "consumer::identify#function",
+          "kind": "function",
+          "name": "identify",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "open"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "open::Handle#type"
+        },
+        {
+          "from": {
+            "symbol": "open::Handle#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "open::Handle::id#field"
+        },
+        {
+          "from": {
+            "symbol": "open::Handle#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "open::Handle::id#method"
+        },
+        {
+          "from": {
+            "symbol": "open::Handle::id#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "open::Handle::id#field"
+        }
+      ],
+      "file": {
+        "path": "open/src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "open::Handle::id#method",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "open",
+          "path": "open"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "open/src/lib.rs",
+          "id": "open::Handle#type",
+          "kind": "type",
+          "name": "Handle",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "open/src/lib.rs",
+          "id": "open::Handle::id#field",
+          "kind": "field",
+          "name": "id",
+          "owner": "open::Handle#type",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "open/src/lib.rs",
+          "id": "open::Handle::id#method",
+          "kind": "method",
+          "name": "id",
+          "owner": "open::Handle#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "shared"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "shared::Handle#type"
+        },
+        {
+          "from": {
+            "symbol": "shared::Handle#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "shared::Handle::id#field"
+        },
+        {
+          "from": {
+            "symbol": "shared::Handle#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "shared::Handle::id#method"
+        },
+        {
+          "from": {
+            "symbol": "shared::Handle::id#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "shared::Handle::id#field"
+        }
+      ],
+      "file": {
+        "path": "shared/src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "shared::Handle::id#method",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "shared",
+          "path": "shared"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "shared/src/lib.rs",
+          "id": "shared::Handle#type",
+          "kind": "type",
+          "name": "Handle",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "shared/src/lib.rs",
+          "id": "shared::Handle::id#field",
+          "kind": "field",
+          "name": "id",
+          "owner": "shared::Handle#type",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "shared/src/lib.rs",
+          "id": "shared::Handle::id#method",
+          "kind": "method",
+          "name": "id",
+          "owner": "shared::Handle#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

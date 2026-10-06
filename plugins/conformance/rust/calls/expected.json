@@ -1,0 +1,848 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "calls"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "std"
+        },
+        {
+          "from": {
+            "module": "calls"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "serde"
+        },
+        {
+          "from": {
+            "module": "calls"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "calls/math"
+        },
+        {
+          "from": {
+            "module": "calls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::Counter#type"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::Counter::count#field"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::Counter::label#field"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::Counter::new#method"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter::new#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "calls::Counter#type"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter::new#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "calls::Counter::count#field"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter::new#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "calls::Counter::label#field"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::Counter::bump#method"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter::bump#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "calls::Counter::count#field"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter::bump#method"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "calls::Counter::double#method"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::Counter::double#method"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter::double#method"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "calls/math::square#function"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter::double#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "calls::Counter::count#field"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter::double#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "calls/math::SCALE#const"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::Counter::load#method"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter::load#method"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "calls::Counter::read#method"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::Counter::read#method"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::Counter::get#method"
+        },
+        {
+          "from": {
+            "symbol": "calls::Counter::get#method"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "calls::Counter::load#method"
+        },
+        {
+          "from": {
+            "module": "calls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::helper#function"
+        },
+        {
+          "from": {
+            "module": "calls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::wrapper#function"
+        },
+        {
+          "from": {
+            "symbol": "calls::wrapper#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "calls::helper#function"
+        },
+        {
+          "from": {
+            "module": "calls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::apply#function"
+        },
+        {
+          "from": {
+            "symbol": "calls::apply#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "calls::helper#function"
+        },
+        {
+          "from": {
+            "module": "calls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::unknown#function"
+        },
+        {
+          "from": {
+            "symbol": "calls::unknown#function"
+          },
+          "kind": "references",
+          "resolution": "heuristic",
+          "to": "calls::Counter::double#method"
+        },
+        {
+          "from": {
+            "module": "calls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::literal#function"
+        },
+        {
+          "from": {
+            "symbol": "calls::literal#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "calls::Counter#type"
+        },
+        {
+          "from": {
+            "symbol": "calls::literal#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "calls::Counter::count#field"
+        },
+        {
+          "from": {
+            "symbol": "calls::literal#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "calls::Counter::label#field"
+        },
+        {
+          "from": {
+            "module": "calls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::map#function"
+        },
+        {
+          "from": {
+            "module": "calls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::typed#function"
+        },
+        {
+          "from": {
+            "symbol": "calls::typed#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "calls::Counter::bump#method"
+        },
+        {
+          "from": {
+            "module": "calls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls::chain#function"
+        },
+        {
+          "from": {
+            "symbol": "calls::chain#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "calls::Counter::new#method"
+        },
+        {
+          "from": {
+            "symbol": "calls::chain#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "calls::Counter::bump#method"
+        },
+        {
+          "from": {
+            "symbol": "calls::chain#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "calls::Counter::count#field"
+        },
+        {
+          "from": {
+            "module": "calls/math"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls/math::SCALE#const"
+        },
+        {
+          "from": {
+            "module": "calls/math"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "calls/math::square#function"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "calls::Counter::new#method",
+          "tokens": 17,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 2,
+          "symbol": "calls::Counter::bump#method",
+          "tokens": 13,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "calls::Counter::double#method",
+          "tokens": 12,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "calls::Counter::read#method",
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "calls::Counter::load#method",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "calls::Counter::read#method",
+          "tokens": 3,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "calls::Counter::load#method",
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "calls::Counter::get#method",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "calls::helper#function",
+          "tokens": 3,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "calls::helper#function",
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "calls::wrapper#function",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "calls::apply#function",
+          "tokens": 16,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "calls::unknown#function",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 2,
+          "symbol": "calls::literal#function",
+          "tokens": 22,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "calls::map#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "calls::typed#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 3,
+          "symbol": "calls::chain#function",
+          "tokens": 21,
+          "top_level": 3
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "calls/math::square#function",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "calls",
+          "path": "calls"
+        },
+        {
+          "name": "math",
+          "path": "calls/math"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/lib.rs",
+          "id": "calls::Counter#type",
+          "kind": "type",
+          "name": "Counter",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::Counter::count#field",
+          "kind": "field",
+          "name": "count",
+          "owner": "calls::Counter#type",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 17
+            },
+            "start": {
+              "col": 5,
+              "line": 17
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::Counter::label#field",
+          "kind": "field",
+          "name": "label",
+          "owner": "calls::Counter#type",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 18
+            },
+            "start": {
+              "col": 5,
+              "line": 18
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::Counter::new#method",
+          "kind": "method",
+          "name": "new",
+          "owner": "calls::Counter#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 27
+            },
+            "start": {
+              "col": 5,
+              "line": 22
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::Counter::bump#method",
+          "kind": "method",
+          "name": "bump",
+          "owner": "calls::Counter#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 32
+            },
+            "start": {
+              "col": 5,
+              "line": 29
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::Counter::double#method",
+          "kind": "method",
+          "name": "double",
+          "owner": "calls::Counter#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 36
+            },
+            "start": {
+              "col": 5,
+              "line": 34
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::Counter::load#method",
+          "kind": "method",
+          "name": "load",
+          "owner": "calls::Counter#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 40
+            },
+            "start": {
+              "col": 5,
+              "line": 38
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::Counter::read#method",
+          "kind": "method",
+          "name": "read",
+          "owner": "calls::Counter#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 44
+            },
+            "start": {
+              "col": 5,
+              "line": 42
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::Counter::get#method",
+          "kind": "method",
+          "name": "get",
+          "owner": "calls::Counter#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 48
+            },
+            "start": {
+              "col": 5,
+              "line": 46
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::helper#function",
+          "kind": "function",
+          "name": "helper",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 53
+            },
+            "start": {
+              "col": 1,
+              "line": 51
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::wrapper#function",
+          "kind": "function",
+          "name": "wrapper",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 57
+            },
+            "start": {
+              "col": 1,
+              "line": 55
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::apply#function",
+          "kind": "function",
+          "name": "apply",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 61
+            },
+            "start": {
+              "col": 1,
+              "line": 59
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::unknown#function",
+          "kind": "function",
+          "name": "unknown",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 65
+            },
+            "start": {
+              "col": 1,
+              "line": 63
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::literal#function",
+          "kind": "function",
+          "name": "literal",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 73
+            },
+            "start": {
+              "col": 1,
+              "line": 67
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::map#function",
+          "kind": "function",
+          "name": "map",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 77
+            },
+            "start": {
+              "col": 1,
+              "line": 75
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::typed#function",
+          "kind": "function",
+          "name": "typed",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 81
+            },
+            "start": {
+              "col": 1,
+              "line": 79
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls::chain#function",
+          "kind": "function",
+          "name": "chain",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 87
+            },
+            "start": {
+              "col": 1,
+              "line": 83
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls/math::SCALE#const",
+          "kind": "const",
+          "name": "SCALE",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "calls/math::square#function",
+          "kind": "function",
+          "name": "square",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

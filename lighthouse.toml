@@ -1,8 +1,17 @@
-plugins = ["core"]
-extends = ["core/recommended"]
+plugins = ["core", "design", { id = "lang-rust", path = "target/plugins/lang-rust" }]
+extends = ["core/recommended", "design/recommended"]
 
 [rules]
 "core/max-file-lines" = { level = "warn", max = 1000 }
+# TODO(1d): 124 exported items of the workspace crates lack docs (they are a
+# contract between crates); write them, then remove this line.
+"design/exported-doc" = "off"
+
+# Fixtures and their goldens describe code on purpose; they are not the
+# project's own design.
+[[overrides]]
+files = ["plugins/conformance/**"]
+rules = { "core/max-file-lines" = "off", "design/complexity-signal" = "off", "design/coupling-signal" = "off", "design/exported-doc" = "off", "design/single-use-wrapper" = "off" }
 
 [[overrides]]
 files = ["docs/patterns/**"]

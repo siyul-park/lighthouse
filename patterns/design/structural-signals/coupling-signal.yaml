@@ -36,6 +36,12 @@ options:
     default: 15
     description: Statement count of a coordinator.
 citation: Henry and Kafura 1981, information flow
+tuning:
+  rust: >-
+    The unit is the Rust module (a `mod` and every inline module are distinct
+    units). Methods count with their impl's type; calls through a receiver whose
+    type is not written in the code are not seen, so fan counts are lower
+    bounds.
 implementation:
   builtin: design/coupling-signal
 examples:
@@ -105,3 +111,97 @@ examples:
 
           func a() { hub() }
           func b() { hub() }
+  - name: rust-hub
+    language: rust
+    kind: invalid
+    options:
+      hub_fan_in: 2
+      hub_fan_out: 2
+      hub_statements: 1
+    files:
+      - path: src/lib.rs
+        body: |-
+          fn hub() {
+              left();
+              right();
+          }
+
+          fn left() {}
+          fn right() {}
+
+          fn a() {
+              hub();
+          }
+          fn b() {
+              hub();
+          }
+    expect:
+      - line: 1
+  - name: rust-coordinator
+    language: rust
+    kind: invalid
+    options:
+      hub_fan_in: 100
+      coordinator_fan_out: 3
+      coordinator_max_fan_in: 0
+      coordinator_statements: 3
+    files:
+      - path: src/lib.rs
+        body: |-
+          fn run() {
+              one();
+              two();
+              three();
+          }
+
+          fn one() {}
+          fn two() {}
+          fn three() {}
+    expect:
+      - line: 1
+  - name: rust-ordinary-fan
+    language: rust
+    kind: valid
+    files:
+      - path: src/lib.rs
+        body: |-
+          fn hub() {
+              left();
+              right();
+          }
+
+          fn left() {}
+          fn right() {}
+
+          fn a() {
+              hub();
+          }
+          fn b() {
+              hub();
+          }
+  - name: rust-service-used-across-modules
+    language: rust
+    kind: valid
+    options:
+      hub_fan_in: 2
+      hub_fan_out: 2
+      hub_statements: 1
+    files:
+      - path: src/lib.rs
+        body: |-
+          mod service {
+              pub fn serve() {
+                  super::left();
+                  super::right();
+              }
+          }
+
+          fn left() {}
+          fn right() {}
+
+          pub fn a() {
+              service::serve();
+          }
+          pub fn b() {
+              service::serve();
+          }

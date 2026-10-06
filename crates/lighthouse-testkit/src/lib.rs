@@ -8,6 +8,7 @@ use std::{
 };
 
 static LANG_GO: OnceLock<Option<PathBuf>> = OnceLock::new();
+static LANG_RUST: OnceLock<PathBuf> = OnceLock::new();
 
 fn workspace() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -90,4 +91,39 @@ fn install_manifest(source: &Path, out: &Path, goroot: &str) {
         fs::write(&tmp, text).unwrap();
     }
     fs::rename(&tmp, out.join("lighthouse-plugin.toml")).expect("install plugin manifest");
+}
+
+/// Directory of the `lang-rust` plugin (manifest and binary), built once per
+/// process with the cargo that runs the tests; a failing build panics.
+pub fn lang_rust() -> PathBuf {
+    LANG_RUST.get_or_init(build_lang_rust).clone()
+}
+
+fn build_lang_rust() -> PathBuf {
+    let cargo = env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+    let status = Command::new(&cargo)
+        .args(["build", "-p", "lang-rust"])
+        .current_dir(workspace())
+        .status()
+        .expect("run cargo build");
+    assert!(status.success(), "cargo build of lang-rust failed");
+    let target = env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| workspace().join("target"));
+    let built = target
+        .join("debug")
+        .join(format!("lang-rust{}", env::consts::EXE_SUFFIX));
+    let out = workspace().join("target/plugins-test/lang-rust");
+    fs::create_dir_all(&out).expect("create plugin dir");
+    let tmp = out.join(format!("lang-rust.{}.tmp", std::process::id()));
+    fs::copy(&built, &tmp).expect("copy plugin binary");
+    fs::rename(&tmp, out.join("lang-rust")).expect("install plugin binary");
+    let manifest = out.join(format!("manifest.{}.tmp", std::process::id()));
+    fs::copy(
+        workspace().join("plugins/lang-rust/lighthouse-plugin.toml"),
+        &manifest,
+    )
+    .expect("copy plugin manifest");
+    fs::rename(&manifest, out.join("lighthouse-plugin.toml")).expect("install plugin manifest");
+    out
 }

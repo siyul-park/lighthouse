@@ -1,0 +1,155 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "generated/gen"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "generated/gen::table#function"
+        }
+      ],
+      "file": {
+        "generated": true,
+        "path": "src/gen.rs"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "arms": 2,
+              "kind": "switch",
+              "nesting": 0,
+              "returning": true
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 4,
+          "symbol": "generated/gen::table#function",
+          "tokens": 18,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "gen",
+          "path": "generated/gen"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/gen.rs",
+          "id": "generated/gen::table#function",
+          "kind": "function",
+          "name": "table",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "generated"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "generated/plain"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "name": "generated",
+          "path": "generated"
+        }
+      ],
+      "symbols": [],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "generated/plain"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "generated/plain::plain#function"
+        },
+        {
+          "from": {
+            "symbol": "generated/plain::plain#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "generated/gen::table#function"
+        }
+      ],
+      "file": {
+        "path": "src/plain.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "generated/plain::plain#function",
+          "tokens": 10,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "plain",
+          "path": "generated/plain"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Plain code.",
+          "file": "src/plain.rs",
+          "id": "generated/plain::plain#function",
+          "kind": "function",
+          "name": "plain",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [
+    "1 `include!` invocation(s) paste code that is not analyzed, e.g. in src/gen.rs"
+  ]
+}

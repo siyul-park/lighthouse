@@ -44,6 +44,13 @@ options:
     default: 30
     description: Statement count of the cognitive signal.
 citation: "McCabe 1976; Campbell, Cognitive Complexity (SonarSource 2018)"
+tuning:
+  rust: >-
+    `if`, `else if`, `if let`, `let ... else`, `while`, `for` and `loop` count as
+    in other languages; a `match` counts its arms other than a wildcard or
+    binding arm; `?` adds nothing; closures and `async` blocks nest what they
+    contain. A function that is one `match` whose arms are single values (in
+    return position) or `return`s is a table in code form and is not reported.
 implementation:
   builtin: design/complexity-signal
 examples:
@@ -133,4 +140,121 @@ examples:
           	default:
           		return "many"
           	}
+          }
+  - name: rust-many-branches
+    language: rust
+    kind: invalid
+    options:
+      cyclomatic: 4
+      statements: 7
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub fn classify(n: i32) -> &'static str {
+              if n < 0 {
+                  return "negative";
+              }
+              if n == 0 {
+                  return "zero";
+              }
+              if n < 10 {
+                  return "small";
+              }
+              "large"
+          }
+    expect:
+      - line: 1
+  - name: rust-deep-loops
+    language: rust
+    kind: invalid
+    options:
+      cognitive: 6
+      cognitive_statements: 6
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub fn scan(rows: &[Vec<i32>]) -> i32 {
+              let mut total = 0;
+              for row in rows {
+                  for v in row {
+                      if *v > 0 {
+                          total += *v;
+                      }
+                  }
+              }
+              total
+          }
+    expect:
+      - line: 1
+  - name: rust-below-thresholds
+    language: rust
+    kind: valid
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub fn classify(n: i32) -> &'static str {
+              if n < 0 {
+                  return "negative";
+              }
+              if n == 0 {
+                  return "zero";
+              }
+              "positive"
+          }
+  - name: rust-dispatcher
+    language: rust
+    kind: valid
+    options:
+      cyclomatic: 1
+      statements: 1
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub fn name(k: u8) -> &'static str {
+              match k {
+                  0 => "zero",
+                  1 => "one",
+                  _ => "many",
+              }
+          }
+  - name: rust-closure-and-question-mark
+    language: rust
+    kind: valid
+    options:
+      cyclomatic: 3
+      statements: 4
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub fn parse_all(items: &[&str]) -> Result<Vec<u32>, std::num::ParseIntError> {
+              let mut out = Vec::new();
+              for item in items {
+                  out.push(item.parse::<u32>()?);
+              }
+              Ok(out)
+          }
+  - name: rust-inline-test-module
+    language: rust
+    kind: valid
+    options:
+      cyclomatic: 2
+      statements: 2
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub fn add(a: i32, b: i32) -> i32 {
+              a + b
+          }
+
+          #[cfg(test)]
+          mod tests {
+              fn helper(n: i32) -> i32 {
+                  if n > 0 {
+                      return n;
+                  }
+                  if n < 0 {
+                      return -n;
+                  }
+                  0
+              }
           }

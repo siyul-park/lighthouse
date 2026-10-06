@@ -344,6 +344,112 @@ func name(k int) string {
 }
 ```
 
+**Invalid example: rust-many-branches (rust)**
+
+Options: `cyclomatic` = `4`, `statements` = `7`
+
+```rust
+pub fn classify(n: i32) -> &'static str {
+    if n < 0 {
+        return "negative";
+    }
+    if n == 0 {
+        return "zero";
+    }
+    if n < 10 {
+        return "small";
+    }
+    "large"
+}
+```
+
+**Invalid example: rust-deep-loops (rust)**
+
+Options: `cognitive` = `6`, `cognitive_statements` = `6`
+
+```rust
+pub fn scan(rows: &[Vec<i32>]) -> i32 {
+    let mut total = 0;
+    for row in rows {
+        for v in row {
+            if *v > 0 {
+                total += *v;
+            }
+        }
+    }
+    total
+}
+```
+
+**Valid example: rust-below-thresholds (rust)**
+
+```rust
+pub fn classify(n: i32) -> &'static str {
+    if n < 0 {
+        return "negative";
+    }
+    if n == 0 {
+        return "zero";
+    }
+    "positive"
+}
+```
+
+**Valid example: rust-dispatcher (rust)**
+
+Options: `cyclomatic` = `1`, `statements` = `1`
+
+```rust
+pub fn name(k: u8) -> &'static str {
+    match k {
+        0 => "zero",
+        1 => "one",
+        _ => "many",
+    }
+}
+```
+
+**Valid example: rust-closure-and-question-mark (rust)**
+
+Options: `cyclomatic` = `3`, `statements` = `4`
+
+```rust
+pub fn parse_all(items: &[&str]) -> Result<Vec<u32>, std::num::ParseIntError> {
+    let mut out = Vec::new();
+    for item in items {
+        out.push(item.parse::<u32>()?);
+    }
+    Ok(out)
+}
+```
+
+**Valid example: rust-inline-test-module (rust)**
+
+Options: `cyclomatic` = `2`, `statements` = `2`
+
+```rust
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+#[cfg(test)]
+mod tests {
+    fn helper(n: i32) -> i32 {
+        if n > 0 {
+            return n;
+        }
+        if n < 0 {
+            return -n;
+        }
+        0
+    }
+}
+```
+
+**Tuning: rust**
+
+`if`, `else if`, `if let`, `let ... else`, `while`, `for` and `loop` count as in other languages; a `match` counts its arms other than a wildcard or binding arm; `?` adds nothing; closures and `async` blocks nest what they contain. A function that is one `match` whose arms are single values (in return position) or `return`s is a table in code form and is not reported.
+
 **Method**
 
 McCabe 1976; Campbell, Cognitive Complexity (SonarSource 2018)
@@ -424,6 +530,89 @@ func right() {}
 func a() { hub() }
 func b() { hub() }
 ```
+
+**Invalid example: rust-hub (rust)**
+
+Options: `hub_fan_in` = `2`, `hub_fan_out` = `2`, `hub_statements` = `1`
+
+```rust
+fn hub() {
+    left();
+    right();
+}
+
+fn left() {}
+fn right() {}
+
+fn a() {
+    hub();
+}
+fn b() {
+    hub();
+}
+```
+
+**Invalid example: rust-coordinator (rust)**
+
+Options: `coordinator_fan_out` = `3`, `coordinator_max_fan_in` = `0`, `coordinator_statements` = `3`, `hub_fan_in` = `100`
+
+```rust
+fn run() {
+    one();
+    two();
+    three();
+}
+
+fn one() {}
+fn two() {}
+fn three() {}
+```
+
+**Valid example: rust-ordinary-fan (rust)**
+
+```rust
+fn hub() {
+    left();
+    right();
+}
+
+fn left() {}
+fn right() {}
+
+fn a() {
+    hub();
+}
+fn b() {
+    hub();
+}
+```
+
+**Valid example: rust-service-used-across-modules (rust)**
+
+Options: `hub_fan_in` = `2`, `hub_fan_out` = `2`, `hub_statements` = `1`
+
+```rust
+mod service {
+    pub fn serve() {
+        super::left();
+        super::right();
+    }
+}
+
+fn left() {}
+fn right() {}
+
+pub fn a() {
+    service::serve();
+}
+pub fn b() {
+    service::serve();
+}
+```
+
+**Tuning: rust**
+
+The unit is the Rust module (a `mod` and every inline module are distinct units). Methods count with their impl's type; calls through a receiver whose type is not written in the code are not seen, so fan counts are lower bounds.
 
 **Method**
 
@@ -603,6 +792,193 @@ func TestLoad(t *testing.T) {
 	s.load("k")
 }
 ```
+
+**Invalid example: rust-invalid (rust)**
+
+```rust
+pub struct Store {
+    data: Vec<u8>,
+}
+
+impl Store {
+    fn load(&self, k: usize) -> u8 {
+        self.read(k)
+    }
+
+    fn read(&self, k: usize) -> u8 {
+        self.data[k]
+    }
+
+    pub fn get(&self, k: usize) -> u8 {
+        self.load(k)
+    }
+}
+```
+
+**Valid example: rust-valid (rust)**
+
+```rust
+pub struct Store {
+    closed: bool,
+    data: Vec<u8>,
+}
+
+impl Store {
+    fn load(&self, k: usize) -> u8 {
+        if self.closed {
+            return 0;
+        }
+        self.read(k)
+    }
+
+    fn read(&self, k: usize) -> u8 {
+        self.data[k]
+    }
+
+    pub fn get(&self, k: usize) -> u8 {
+        self.load(k)
+    }
+}
+```
+
+**Valid example: rust-used-as-value (rust)**
+
+```rust
+pub struct Store {
+    data: Vec<u8>,
+}
+
+impl Store {
+    fn load(&self, k: usize) -> u8 {
+        self.read(k)
+    }
+
+    fn read(&self, k: usize) -> u8 {
+        self.data[k]
+    }
+
+    pub fn get(&self, k: usize) -> u8 {
+        self.load(k)
+    }
+
+    pub fn loader(&self) -> fn(&Store, usize) -> u8 {
+        Store::load
+    }
+}
+```
+
+**Valid example: rust-adds-an-argument (rust)**
+
+```rust
+pub struct Store {
+    data: Vec<u8>,
+}
+
+impl Store {
+    fn load(&self, k: usize) -> u8 {
+        self.read(k, true)
+    }
+
+    fn read(&self, k: usize, fresh: bool) -> u8 {
+        if fresh { self.data[k] } else { 0 }
+    }
+
+    pub fn get(&self, k: usize) -> u8 {
+        self.load(k)
+    }
+}
+```
+
+**Valid example: rust-called-from-a-test (rust)**
+
+```rust
+pub struct Store {
+    data: Vec<u8>,
+}
+
+impl Store {
+    fn load(&self, k: usize) -> u8 {
+        self.read(k)
+    }
+
+    fn read(&self, k: usize) -> u8 {
+        self.data[k]
+    }
+
+    pub fn get(&self, k: usize) -> u8 {
+        self.load(k)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loads() {
+        let s = Store { data: vec![1] };
+        s.load(0);
+    }
+}
+```
+
+**Valid example: rust-trait-method (rust)**
+
+```rust
+pub trait Reader {
+    fn read_one(&self, k: usize) -> u8;
+}
+
+pub struct Store {
+    data: Vec<u8>,
+}
+
+impl Reader for Store {
+    fn read_one(&self, k: usize) -> u8 {
+        self.read(k)
+    }
+}
+
+impl Store {
+    fn read(&self, k: usize) -> u8 {
+        self.data[k]
+    }
+}
+
+pub fn use_it(r: &dyn Reader) -> u8 {
+    r.read_one(0)
+}
+```
+
+**Valid example: rust-caller-through-unknown-receiver (rust)**
+
+```rust
+pub struct Store {
+    data: Vec<u8>,
+}
+
+impl Store {
+    fn load(&self, k: usize) -> u8 {
+        self.read(k)
+    }
+
+    fn read(&self, k: usize) -> u8 {
+        self.data[k]
+    }
+
+    pub fn get(&self, k: usize) -> u8 {
+        self.load(k)
+    }
+}
+
+pub fn elsewhere(store: &external::Handle) -> u8 {
+    store.load(0)
+}
+```
+
+**Tuning: rust**
+
+Applies to private functions and methods (items without `pub`); a trait impl method is as visible as its trait and is not a candidate. Calls are resolved syntactically, so a method call on a receiver whose type is not written in the code is recorded as a possible use of every private method of that name in the crate, and keeps such a method from being reported.
 
 ### Behavior lives with its owner
 
@@ -1210,7 +1586,8 @@ Exported symbols SHOULD have doc comments in the language's standard form. Publi
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `exempt_methods` | list | `["String","Error","Unwrap"]` | Method names that implement well-known interfaces and need no doc comment of their own. |
+| `exempt_interface_methods` | bool | `false`; rust: `true` | Do not require docs on a method that implements a documented method of an interface (or trait) the project declares, since it is documented where the interface declares it. |
+| `exempt_methods` | list | `["String","Error","Unwrap"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]` | Method names that implement well-known interfaces and need no doc comment of their own. |
 | `include_internal` | bool | `false` | Also require docs for symbols exported only inside the project, such as under an internal path. |
 | `kinds` | list | `["function","method","type","interface","const","var"]` | Symbol kinds that must be documented when exported. |
 
@@ -1285,9 +1662,208 @@ const (
 func helper() {}
 ```
 
+**Invalid example: rust-undocumented (rust)**
+
+```rust
+pub struct Store;
+
+impl Store {
+    pub fn get(&self) -> i32 {
+        0
+    }
+}
+
+pub fn make() -> Store {
+    Store
+}
+
+pub trait Source {
+    fn read(&self) -> i32;
+}
+
+pub const LIMIT: u32 = 3;
+
+pub static DEFAULT: u32 = 4;
+```
+
+**Valid example: rust-well-known-trait-methods (rust)**
+
+```rust
+use std::fmt;
+
+/// A failure code.
+pub struct Code(pub u32);
+
+impl fmt::Display for Code {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for Code {}
+
+impl Default for Code {
+    fn default() -> Self {
+        Code(0)
+    }
+}
+```
+
+**Valid example: rust-trait-impl-shows-trait-docs (rust)**
+
+```rust
+/// Something that can be read.
+pub trait Source {
+    /// Reads the next value.
+    fn read(&self) -> i32;
+}
+
+/// A constant source.
+pub struct Fixed;
+
+impl Source for Fixed {
+    fn read(&self) -> i32 {
+        1
+    }
+}
+```
+
+**Valid example: rust-generated-file (rust)**
+
+```rust
+// @generated by a tool. DO NOT EDIT.
+
+pub fn generated() {}
+```
+
+**Valid example: rust-test-file (rust)**
+
+```rust
+pub fn helper() {}
+```
+
+**Valid example: rust-documented (rust)**
+
+```rust
+/// Store keeps values.
+pub struct Store;
+
+impl Store {
+    /// Get returns the stored value.
+    pub fn get(&self) -> i32 {
+        0
+    }
+
+    fn hidden(&self) {}
+}
+
+struct Private;
+
+impl Private {
+    pub fn run(&self) {}
+}
+
+pub(crate) fn crate_wide() {}
+
+mod inner {
+    pub fn unreachable_from_outside() {}
+}
+
+/// Limits bound the store.
+pub const MIN: u32 = 1;
+
+fn helper() {}
+```
+
+**Valid example: rust-binary-crate (rust)**
+
+```rust
+pub fn exposed_in_name_only() {}
+
+fn main() {
+    exposed_in_name_only();
+}
+```
+
+**Valid example: rust-project-trait-impl (rust)**
+
+```rust
+/// Something that can be read.
+pub trait Source {
+    /// Reads the next value.
+    fn read(&self) -> i32;
+}
+
+/// A constant source.
+pub struct Fixed;
+
+impl Source for Fixed {
+    fn read(&self) -> i32 {
+        1
+    }
+}
+```
+
+**Invalid example: rust-impl-of-an-undocumented-trait-method (rust)**
+
+```rust
+/// Something that can be read.
+pub trait Source {
+    fn read(&self) -> i32;
+}
+
+/// A constant source.
+pub struct Fixed;
+
+impl Source for Fixed {
+    fn read(&self) -> i32 {
+        1
+    }
+}
+```
+
+**Valid example: rust-inline-test-module (rust)**
+
+```rust
+/// Adds.
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+#[cfg(test)]
+mod tests {
+    pub fn helper() {}
+
+    pub struct Fixture;
+}
+```
+
+**Valid example: rust-publish-false (rust)**
+
+`Cargo.toml`
+
+```rust
+[package]
+name = "sample"
+version = "0.1.0"
+publish = false
+```
+
+`src/lib.rs`
+
+```rust
+pub struct Internal;
+
+pub fn only_inside_the_project() {}
+```
+
 **Tuning: go**
 
 Normal Go doc comments beginning with the symbol name.
+
+**Tuning: rust**
+
+Doc comments (`///`, `#[doc]`) on items reachable from outside the library crate: `pub` items whose modules are all `pub` or that a `pub use` re-exports. Items in binary crates, in tests and in `pub(crate)` positions are not exported. A trait impl method without docs of its own shows the documentation of the trait's method, as rustdoc does; a method that implements a method of a trait declared in the project is documented where the trait declares it, and the methods of the standard traits (`fmt`, `from`, `default`, `drop`, ...) need none. The public items of a library that cannot be published (`publish = false`) are importable only inside the project and count as internal, unless another package of the project depends on the library: then its public items are a contract between packages and stay public (`[languages.rust] unpublished = "auto" | "public" | "internal"`). Code in an inline `#[cfg(test)]` module is test code.
 
 ## Generated and Platform Code
 

@@ -1,0 +1,1015 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "visibility"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "visibility/inner"
+        },
+        {
+          "from": {
+            "module": "visibility"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Open#type"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Open#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Open::a#field"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Open#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Open::b#field"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Open#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Open::c#field"
+        },
+        {
+          "from": {
+            "module": "visibility"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Shared#type"
+        },
+        {
+          "from": {
+            "module": "visibility"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Hidden#type"
+        },
+        {
+          "from": {
+            "module": "visibility"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Kind#type"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Kind#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Kind::A#field"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Kind#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Kind::B#field"
+        },
+        {
+          "from": {
+            "module": "visibility"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Tr#interface"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Tr#interface"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Tr::m#method"
+        },
+        {
+          "from": {
+            "module": "visibility"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::LIMIT#const"
+        },
+        {
+          "from": {
+            "module": "visibility"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::SOFT#const"
+        },
+        {
+          "from": {
+            "module": "visibility"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::COUNT#var"
+        },
+        {
+          "from": {
+            "module": "visibility"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::open#function"
+        },
+        {
+          "from": {
+            "module": "visibility"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::crate_wide#function"
+        },
+        {
+          "from": {
+            "module": "visibility"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::private#function"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Open#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Open::get#method"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Open::get#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "visibility::Open::a#field"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Open#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Open::soft#method"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Open::soft#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "visibility::Open::b#field"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Open#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Open::hide#method"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Open::hide#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "visibility::Open::c#field"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Open#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility::Open::Tr::m#method"
+        },
+        {
+          "from": {
+            "symbol": "visibility::Open#type"
+          },
+          "kind": "implements",
+          "resolution": "syntactic",
+          "to": "visibility::Tr#interface"
+        },
+        {
+          "from": {
+            "module": "visibility/inner"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility/inner::exposed_internal#function"
+        },
+        {
+          "from": {
+            "module": "visibility/inner"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility/inner::scoped#function"
+        },
+        {
+          "from": {
+            "module": "visibility/inner"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility/inner::reexported#function"
+        },
+        {
+          "from": {
+            "module": "visibility/inner"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility/inner::up#function"
+        },
+        {
+          "from": {
+            "module": "visibility/outer"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility/outer::deep#function"
+        },
+        {
+          "from": {
+            "module": "visibility/outer"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility/outer::parent#function"
+        },
+        {
+          "from": {
+            "module": "visibility/outer"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility/outer::own#function"
+        },
+        {
+          "from": {
+            "module": "visibility/tests"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility/tests::helper#function"
+        },
+        {
+          "from": {
+            "module": "visibility/tests"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "visibility/tests::t#test"
+        },
+        {
+          "from": {
+            "symbol": "visibility/tests::t#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "visibility/tests::helper#function"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "visibility::open#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "visibility::crate_wide#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "visibility::private#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "visibility::Open::get#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "visibility::Open::soft#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "visibility::Open::hide#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "visibility::Open::Tr::m#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "visibility/inner::exposed_internal#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "visibility/inner::scoped#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "visibility/inner::reexported#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "visibility/inner::up#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "visibility/outer::deep#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "visibility/outer::parent#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "visibility/outer::own#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "visibility/tests::helper#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "forwards_to": "visibility/tests::helper#function",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "visibility/tests::t#test",
+          "tokens": 6,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "visibility",
+          "path": "visibility"
+        },
+        {
+          "name": "inner",
+          "path": "visibility/inner"
+        },
+        {
+          "name": "outer",
+          "path": "visibility/outer"
+        },
+        {
+          "name": "tests",
+          "path": "visibility/tests",
+          "test_of": "visibility"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Open#type",
+          "kind": "type",
+          "name": "Open",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Open::a#field",
+          "kind": "field",
+          "name": "a",
+          "owner": "visibility::Open#type",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Open::b#field",
+          "kind": "field",
+          "name": "b",
+          "owner": "visibility::Open#type",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 3
+            },
+            "start": {
+              "col": 5,
+              "line": 3
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Open::c#field",
+          "kind": "field",
+          "name": "c",
+          "owner": "visibility::Open#type",
+          "span": {
+            "end": {
+              "col": 10,
+              "line": 4
+            },
+            "start": {
+              "col": 5,
+              "line": 4
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Shared#type",
+          "kind": "type",
+          "name": "Shared",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Hidden#type",
+          "kind": "type",
+          "name": "Hidden",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Kind#type",
+          "kind": "type",
+          "name": "Kind",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Kind::A#field",
+          "kind": "field",
+          "name": "A",
+          "owner": "visibility::Kind#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 12
+            },
+            "start": {
+              "col": 5,
+              "line": 12
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Kind::B#field",
+          "kind": "field",
+          "name": "B",
+          "owner": "visibility::Kind#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 13
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Tr#interface",
+          "kind": "interface",
+          "name": "Tr",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Tr::m#method",
+          "kind": "method",
+          "name": "m",
+          "owner": "visibility::Tr#interface",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 17
+            },
+            "start": {
+              "col": 5,
+              "line": 17
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::LIMIT#const",
+          "kind": "const",
+          "name": "LIMIT",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::SOFT#const",
+          "kind": "const",
+          "name": "SOFT",
+          "span": {
+            "end": {
+              "col": 32,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 21
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::COUNT#var",
+          "kind": "var",
+          "name": "COUNT",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 22
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::open#function",
+          "kind": "function",
+          "name": "open",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 24
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::crate_wide#function",
+          "kind": "function",
+          "name": "crate_wide",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 25
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::private#function",
+          "kind": "function",
+          "name": "private",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 26
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Open::get#method",
+          "kind": "method",
+          "name": "get",
+          "owner": "visibility::Open#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 46
+            },
+            "start": {
+              "col": 5,
+              "line": 44
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Open::soft#method",
+          "kind": "method",
+          "name": "soft",
+          "owner": "visibility::Open#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 49
+            },
+            "start": {
+              "col": 5,
+              "line": 47
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Open::hide#method",
+          "kind": "method",
+          "name": "hide",
+          "owner": "visibility::Open#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 52
+            },
+            "start": {
+              "col": 5,
+              "line": 50
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility::Open::Tr::m#method",
+          "kind": "method",
+          "name": "m",
+          "owner": "visibility::Open#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 56
+            },
+            "start": {
+              "col": 5,
+              "line": 56
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility/inner::exposed_internal#function",
+          "kind": "function",
+          "name": "exposed_internal",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 29
+            },
+            "start": {
+              "col": 5,
+              "line": 29
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility/inner::scoped#function",
+          "kind": "function",
+          "name": "scoped",
+          "span": {
+            "end": {
+              "col": 40,
+              "line": 30
+            },
+            "start": {
+              "col": 5,
+              "line": 30
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility/inner::reexported#function",
+          "kind": "function",
+          "name": "reexported",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 31
+            },
+            "start": {
+              "col": 5,
+              "line": 31
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility/inner::up#function",
+          "kind": "function",
+          "name": "up",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 32
+            },
+            "start": {
+              "col": 5,
+              "line": 32
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility/outer::deep#function",
+          "kind": "function",
+          "name": "deep",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 38
+            },
+            "start": {
+              "col": 5,
+              "line": 38
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility/outer::parent#function",
+          "kind": "function",
+          "name": "parent",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 39
+            },
+            "start": {
+              "col": 5,
+              "line": 39
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility/outer::own#function",
+          "kind": "function",
+          "name": "own",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 40
+            },
+            "start": {
+              "col": 5,
+              "line": 40
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility/tests::helper#function",
+          "kind": "function",
+          "name": "helper",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 61
+            },
+            "start": {
+              "col": 5,
+              "line": 61
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "visibility/tests::t#test",
+          "kind": "test",
+          "name": "t",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 66
+            },
+            "start": {
+              "col": 5,
+              "line": 64
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "visibility/tests::t#test",
+          "targets": [
+            "visibility/tests::helper#function"
+          ]
+        }
+      ]
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

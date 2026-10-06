@@ -191,8 +191,14 @@ pub enum EdgeKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Resolution {
+    /// The target comes from type information.
     Semantic,
+    /// The target comes from names alone.
     Syntactic,
+    /// A guess: the source may use the target. Callers, callees and other
+    /// counting analyses ignore such edges; [`Project::references`] keeps them
+    /// so a rule asking "might this be used" fails safe.
+    Heuristic,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -438,29 +444,49 @@ impl Project {
         at.iter().map(|&i| &self.all.symbols[i])
     }
 
-    /// Whether the symbol is declared in a test file.
+    /// Whether the symbol is test code: declared in a test file, or in a module
+    /// that exists to test another (`test_of`), such as an inline `#[cfg(test)]`
+    /// module in a production file.
     pub fn in_test(&self, id: &SymbolId) -> bool {
-        self.symbol(id)
+        let in_test_file = self
+            .symbol(id)
             .and_then(|s| self.file(&s.file))
-            .is_some_and(|f| f.test)
+            .is_some_and(|f| f.test);
+        in_test_file
+            || self
+                .module(id.module())
+                .is_some_and(|m| m.test_of.is_some())
+    }
+
+    /// The module with this path.
+    pub fn module(&self, path: &str) -> Option<&Module> {
+        let at = self
+            .all
+            .modules
+            .binary_search_by(|m| m.path.as_str().cmp(path))
+            .ok()?;
+        self.all.modules.get(at)
     }
 
     pub fn function(&self, id: &SymbolId) -> Option<&FunctionSummary> {
         self.all.functions.get(*self.index.functions.get(id)?)
     }
 
-    /// Distinct symbols with a resolved `calls` edge to `id`, excluding itself.
+    /// Distinct symbols with a resolved, non-heuristic `calls` edge to `id`,
+    /// excluding itself.
     pub fn callers(&self, id: &SymbolId) -> &[SymbolId] {
         self.index.callers.get(id).map_or(&[], Vec::as_slice)
     }
 
     /// Distinct symbols with a resolved `references` edge to `id`, excluding
-    /// itself: every use of `id` as a value rather than a call.
+    /// itself: every use of `id` as a value rather than a call. Heuristic edges
+    /// are included: they say a symbol might be used.
     pub fn references(&self, id: &SymbolId) -> &[SymbolId] {
         self.index.references.get(id).map_or(&[], Vec::as_slice)
     }
 
-    /// Distinct symbols `id` has a resolved `calls` edge to, excluding itself.
+    /// Distinct symbols `id` has a resolved, non-heuristic `calls` edge to,
+    /// excluding itself.
     pub fn callees(&self, id: &SymbolId) -> &[SymbolId] {
         self.index.callees.get(id).map_or(&[], Vec::as_slice)
     }
@@ -488,7 +514,9 @@ impl Index {
                 continue;
             };
             match edge.kind {
-                EdgeKind::Calls if from != to => calls.insert((from, to)),
+                EdgeKind::Calls if from != to && edge.resolution != Resolution::Heuristic => {
+                    calls.insert((from, to))
+                }
                 EdgeKind::References if from != to => references.insert((from, to)),
                 _ => false,
             };

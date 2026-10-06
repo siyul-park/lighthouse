@@ -57,7 +57,8 @@ fn skipped(ctx: &Ctx) -> bool {
     })
 }
 
-/// Functions and methods with a body declared in the focused file.
+/// Functions and methods with a body declared in the focused file, outside
+/// test modules.
 fn functions<'a>(ctx: &Ctx<'a>) -> Vec<&'a Symbol> {
     let Some((file, _)) = ctx.file else {
         return Vec::new();
@@ -67,6 +68,7 @@ fn functions<'a>(ctx: &Ctx<'a>) -> Vec<&'a Symbol> {
         .symbols_in(path)
         .filter(|s| matches!(s.kind, SymbolKind::Function | SymbolKind::Method))
         .filter(|s| ctx.project.function(&s.id).is_some())
+        .filter(|s| !ctx.project.in_test(&s.id))
         .collect()
 }
 

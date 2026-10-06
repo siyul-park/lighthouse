@@ -1,0 +1,1039 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "impls"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "std"
+        },
+        {
+          "from": {
+            "module": "impls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Stack#type"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Stack::items#field"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Stack::limit#field"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Stack::EMPTY#const"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Stack::new#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack::new#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "impls::Stack#type"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack::new#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "impls::Stack::items#field"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack::new#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "impls::Stack::limit#field"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Stack::push#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack::push#method"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "impls::Stack::check#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack::push#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "impls::Stack::items#field"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Stack::check#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack::check#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "impls::Stack::limit#field"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Stack::Display::fmt#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Stack::Display::fmt#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "impls::Stack::items#field"
+        },
+        {
+          "from": {
+            "module": "impls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Named#interface"
+        },
+        {
+          "from": {
+            "symbol": "impls::Named#interface"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Named::name#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Named#interface"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Named::shout#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Named::shout#method"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "impls::Named::name#method"
+        },
+        {
+          "from": {
+            "module": "impls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Aged#interface"
+        },
+        {
+          "from": {
+            "symbol": "impls::Aged#interface"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Aged::name#method"
+        },
+        {
+          "from": {
+            "module": "impls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Dog#type"
+        },
+        {
+          "from": {
+            "symbol": "impls::Dog#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Dog::Named::name#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Dog#type"
+          },
+          "kind": "implements",
+          "resolution": "syntactic",
+          "to": "impls::Named#interface"
+        },
+        {
+          "from": {
+            "symbol": "impls::Dog#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Dog::Aged::name#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Dog#type"
+          },
+          "kind": "implements",
+          "resolution": "syntactic",
+          "to": "impls::Aged#interface"
+        },
+        {
+          "from": {
+            "symbol": "impls::Dog#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Dog::bark#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Dog::bark#method"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "impls::Named::shout#method"
+        },
+        {
+          "from": {
+            "module": "impls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Meters#type"
+        },
+        {
+          "from": {
+            "symbol": "impls::Meters#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Meters::From<f64>::from#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Meters::From<f64>::from#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "impls::Meters#type"
+        },
+        {
+          "from": {
+            "symbol": "impls::Meters#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Meters::From<u32>::from#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Meters::From<u32>::from#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "impls::Meters#type"
+        },
+        {
+          "from": {
+            "module": "impls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Summary#interface"
+        },
+        {
+          "from": {
+            "symbol": "impls::Summary#interface"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Summary::summary#method"
+        },
+        {
+          "from": {
+            "module": "impls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::T::Summary::summary#method"
+        },
+        {
+          "from": {
+            "module": "impls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::String::Named::name#method"
+        },
+        {
+          "from": {
+            "module": "impls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Marker#type"
+        },
+        {
+          "from": {
+            "symbol": "impls::Marker#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Marker::Summary::summary#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Marker#type"
+          },
+          "kind": "implements",
+          "resolution": "syntactic",
+          "to": "impls::Summary#interface"
+        },
+        {
+          "from": {
+            "module": "impls"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::build#function"
+        },
+        {
+          "from": {
+            "symbol": "impls::build#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "impls::Stack::new#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::build#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "impls::Stack::push#method"
+        },
+        {
+          "from": {
+            "symbol": "impls::Dog#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "impls::Dog::wag#method"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "impls::Stack::new#method",
+          "tokens": 15,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "impls::Stack::push#method",
+          "tokens": 17,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "impls::Stack::check#method",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "impls::Stack::Display::fmt#method",
+          "tokens": 13,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "impls::Named::shout#method",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "impls::Dog::Named::name#method",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "impls::Dog::Aged::name#method",
+          "tokens": 3,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "impls::Named::shout#method",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "impls::Dog::bark#method",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "impls::Meters::From<f64>::from#method",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "impls::Meters::From<u32>::from#method",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "impls::T::Summary::summary#method",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "impls::String::Named::name#method",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "impls::Marker::Summary::summary#method",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 3,
+          "symbol": "impls::build#function",
+          "tokens": 21,
+          "top_level": 3
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "impls::Dog::wag#method",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "impls",
+          "path": "impls"
+        },
+        {
+          "name": "other",
+          "path": "impls/other"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "A bounded stack.",
+          "file": "src/lib.rs",
+          "id": "impls::Stack#type",
+          "kind": "type",
+          "name": "Stack",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Stack::items#field",
+          "kind": "field",
+          "name": "items",
+          "owner": "impls::Stack#type",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 5
+            },
+            "start": {
+              "col": 5,
+              "line": 5
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Stack::limit#field",
+          "kind": "field",
+          "name": "limit",
+          "owner": "impls::Stack#type",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Stack::EMPTY#const",
+          "kind": "const",
+          "name": "EMPTY",
+          "owner": "impls::Stack#type",
+          "span": {
+            "end": {
+              "col": 32,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "An empty stack.",
+          "file": "src/lib.rs",
+          "id": "impls::Stack::new#method",
+          "kind": "method",
+          "name": "new",
+          "owner": "impls::Stack#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 18
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Stack::push#method",
+          "kind": "method",
+          "name": "push",
+          "owner": "impls::Stack#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 23
+            },
+            "start": {
+              "col": 5,
+              "line": 20
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Stack::check#method",
+          "kind": "method",
+          "name": "check",
+          "owner": "impls::Stack#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 27
+            },
+            "start": {
+              "col": 5,
+              "line": 25
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Stack::Display::fmt#method",
+          "kind": "method",
+          "name": "fmt",
+          "owner": "impls::Stack#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 33
+            },
+            "start": {
+              "col": 5,
+              "line": 31
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Things with a name.",
+          "file": "src/lib.rs",
+          "id": "impls::Named#interface",
+          "kind": "interface",
+          "name": "Named",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 44
+            },
+            "start": {
+              "col": 1,
+              "line": 37
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "The name.",
+          "file": "src/lib.rs",
+          "id": "impls::Named::name#method",
+          "kind": "method",
+          "name": "name",
+          "owner": "impls::Named#interface",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 39
+            },
+            "start": {
+              "col": 5,
+              "line": 39
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Named::shout#method",
+          "kind": "method",
+          "name": "shout",
+          "owner": "impls::Named#interface",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 43
+            },
+            "start": {
+              "col": 5,
+              "line": 41
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Aged#interface",
+          "kind": "interface",
+          "name": "Aged",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 48
+            },
+            "start": {
+              "col": 1,
+              "line": 46
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Aged::name#method",
+          "kind": "method",
+          "name": "name",
+          "owner": "impls::Aged#interface",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 47
+            },
+            "start": {
+              "col": 5,
+              "line": 47
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Dog#type",
+          "kind": "type",
+          "name": "Dog",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 50
+            },
+            "start": {
+              "col": 1,
+              "line": 50
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "The name.",
+          "file": "src/lib.rs",
+          "id": "impls::Dog::Named::name#method",
+          "kind": "method",
+          "name": "name",
+          "owner": "impls::Dog#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 55
+            },
+            "start": {
+              "col": 5,
+              "line": 53
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Dog::Aged::name#method",
+          "kind": "method",
+          "name": "name",
+          "owner": "impls::Dog#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 61
+            },
+            "start": {
+              "col": 5,
+              "line": 59
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Dog::bark#method",
+          "kind": "method",
+          "name": "bark",
+          "owner": "impls::Dog#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 67
+            },
+            "start": {
+              "col": 5,
+              "line": 65
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Meters#type",
+          "kind": "type",
+          "name": "Meters",
+          "span": {
+            "end": {
+              "col": 28,
+              "line": 70
+            },
+            "start": {
+              "col": 1,
+              "line": 70
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Meters::From<f64>::from#method",
+          "kind": "method",
+          "name": "from",
+          "owner": "impls::Meters#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 75
+            },
+            "start": {
+              "col": 5,
+              "line": 73
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Meters::From<u32>::from#method",
+          "kind": "method",
+          "name": "from",
+          "owner": "impls::Meters#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 81
+            },
+            "start": {
+              "col": 5,
+              "line": 79
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Summary#interface",
+          "kind": "interface",
+          "name": "Summary",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 86
+            },
+            "start": {
+              "col": 1,
+              "line": 84
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Summary::summary#method",
+          "kind": "method",
+          "name": "summary",
+          "owner": "impls::Summary#interface",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 85
+            },
+            "start": {
+              "col": 5,
+              "line": 85
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::T::Summary::summary#method",
+          "kind": "method",
+          "name": "summary",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 91
+            },
+            "start": {
+              "col": 5,
+              "line": 89
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "The name.",
+          "file": "src/lib.rs",
+          "id": "impls::String::Named::name#method",
+          "kind": "method",
+          "name": "name",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 97
+            },
+            "start": {
+              "col": 5,
+              "line": 95
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Marker#type",
+          "kind": "type",
+          "name": "Marker",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 106
+            },
+            "start": {
+              "col": 1,
+              "line": 106
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Marker::Summary::summary#method",
+          "kind": "method",
+          "name": "summary",
+          "owner": "impls::Marker#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 111
+            },
+            "start": {
+              "col": 5,
+              "line": 109
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::build#function",
+          "kind": "function",
+          "name": "build",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 118
+            },
+            "start": {
+              "col": 1,
+              "line": 114
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "impls::Dog::wag#method",
+          "kind": "method",
+          "name": "wag",
+          "owner": "impls::Dog#type",
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 102
+            },
+            "start": {
+              "col": 9,
+              "line": 102
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

@@ -407,6 +407,7 @@ fn every_implemented_pattern_passes_its_catalog_examples() {
     let registry = || registry(&go_plugin().expect("checked above"));
     let failures =
         lighthouse_engine::RuleTester::new(registry, lighthouse_spec::Catalog::bundled())
+            .language("go")
             .check_all();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

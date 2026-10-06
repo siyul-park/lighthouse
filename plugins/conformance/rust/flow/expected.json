@@ -1,0 +1,857 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::branches#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::guarded#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::dispatcher#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::explicit_returns#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::side_effects#function"
+        },
+        {
+          "from": {
+            "symbol": "flow::side_effects#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "flow::touch#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::touch#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::statements_in_arms#function"
+        },
+        {
+          "from": {
+            "symbol": "flow::statements_in_arms#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "flow::touch#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::let_else#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::if_let#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::loops#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::closures#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::question#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::logic#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::factorial#function"
+        },
+        {
+          "from": {
+            "symbol": "flow::factorial#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "flow::factorial#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::Walker#type"
+        },
+        {
+          "from": {
+            "symbol": "flow::Walker#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::Walker::walk#method"
+        },
+        {
+          "from": {
+            "symbol": "flow::Walker::walk#method"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "flow::Walker::walk#method"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::outer#function"
+        },
+        {
+          "from": {
+            "symbol": "flow::outer#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "flow::outer::inner#function"
+        },
+        {
+          "from": {
+            "symbol": "flow::outer#function"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::outer::inner#function"
+        },
+        {
+          "from": {
+            "module": "flow"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "flow::asyncs#function"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "else-if",
+              "nesting": 0
+            },
+            {
+              "kind": "else",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 4,
+          "symbol": "flow::branches#function",
+          "tokens": 21,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "arms": 3,
+              "kind": "switch",
+              "nesting": 0,
+              "returning": true
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 4,
+          "symbol": "flow::guarded#function",
+          "tokens": 30,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "arms": 2,
+              "kind": "switch",
+              "nesting": 0,
+              "returning": true
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 4,
+          "symbol": "flow::dispatcher#function",
+          "tokens": 18,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "arms": 1,
+              "kind": "switch",
+              "nesting": 0,
+              "returning": true
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 3,
+          "symbol": "flow::explicit_returns#function",
+          "tokens": 16,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "arms": 1,
+              "kind": "switch",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 0,
+          "statements": 3,
+          "symbol": "flow::side_effects#function",
+          "tokens": 18,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "flow::touch#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [
+            {
+              "arms": 1,
+              "kind": "switch",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 5,
+          "symbol": "flow::statements_in_arms#function",
+          "tokens": 19,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 3,
+          "symbol": "flow::let_else#function",
+          "tokens": 17,
+          "top_level": 2
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "else",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 3,
+          "symbol": "flow::if_let#function",
+          "tokens": 17,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "kind": "loop",
+              "nesting": 1
+            },
+            {
+              "kind": "if",
+              "nesting": 2
+            },
+            {
+              "kind": "jump",
+              "nesting": 3
+            },
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "kind": "loop",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 3,
+          "params": 1,
+          "returns": 1,
+          "statements": 11,
+          "symbol": "flow::loops#function",
+          "tokens": 56,
+          "top_level": 5
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 1
+            },
+            {
+              "kind": "else",
+              "nesting": 1
+            }
+          ],
+          "max_nesting": 2,
+          "params": 1,
+          "returns": 1,
+          "statements": 4,
+          "symbol": "flow::closures#function",
+          "tokens": 33,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 2,
+          "symbol": "flow::question#function",
+          "tokens": 20,
+          "top_level": 2
+        },
+        {
+          "flow": [
+            {
+              "kind": "logic",
+              "nesting": 0,
+              "operators": 2
+            },
+            {
+              "kind": "logic",
+              "nesting": 0,
+              "operators": 1
+            }
+          ],
+          "max_nesting": 0,
+          "params": 3,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "flow::logic#function",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "else",
+              "nesting": 0
+            },
+            {
+              "kind": "recursion",
+              "nesting": 1
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "statements": 3,
+          "symbol": "flow::factorial#function",
+          "tokens": 20,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "recursion",
+              "nesting": 1
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "flow::Walker::walk#method",
+          "tokens": 17,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "flow::outer#function",
+          "tokens": 14,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "flow::outer::inner#function",
+          "tokens": 3,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 1
+            },
+            {
+              "kind": "else",
+              "nesting": 1
+            }
+          ],
+          "max_nesting": 2,
+          "params": 0,
+          "returns": 1,
+          "statements": 5,
+          "symbol": "flow::asyncs#function",
+          "tokens": 21,
+          "top_level": 2
+        }
+      ],
+      "modules": [
+        {
+          "name": "flow",
+          "path": "flow"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/lib.rs",
+          "id": "flow::branches#function",
+          "kind": "function",
+          "name": "branches",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::guarded#function",
+          "kind": "function",
+          "name": "guarded",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::dispatcher#function",
+          "kind": "function",
+          "name": "dispatcher",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::explicit_returns#function",
+          "kind": "function",
+          "name": "explicit_returns",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 27
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::side_effects#function",
+          "kind": "function",
+          "name": "side_effects",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::touch#function",
+          "kind": "function",
+          "name": "touch",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 41
+            },
+            "start": {
+              "col": 1,
+              "line": 41
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::statements_in_arms#function",
+          "kind": "function",
+          "name": "statements_in_arms",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 51
+            },
+            "start": {
+              "col": 1,
+              "line": 43
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::let_else#function",
+          "kind": "function",
+          "name": "let_else",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 58
+            },
+            "start": {
+              "col": 1,
+              "line": 53
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::if_let#function",
+          "kind": "function",
+          "name": "if_let",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 62
+            },
+            "start": {
+              "col": 1,
+              "line": 60
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::loops#function",
+          "kind": "function",
+          "name": "loops",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 81
+            },
+            "start": {
+              "col": 1,
+              "line": 64
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::closures#function",
+          "kind": "function",
+          "name": "closures",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 93
+            },
+            "start": {
+              "col": 1,
+              "line": 83
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::question#function",
+          "kind": "function",
+          "name": "question",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 98
+            },
+            "start": {
+              "col": 1,
+              "line": 95
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::logic#function",
+          "kind": "function",
+          "name": "logic",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 102
+            },
+            "start": {
+              "col": 1,
+              "line": 100
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::factorial#function",
+          "kind": "function",
+          "name": "factorial",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 106
+            },
+            "start": {
+              "col": 1,
+              "line": 104
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::Walker#type",
+          "kind": "type",
+          "name": "Walker",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 108
+            },
+            "start": {
+              "col": 1,
+              "line": 108
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::Walker::walk#method",
+          "kind": "method",
+          "name": "walk",
+          "owner": "flow::Walker#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 115
+            },
+            "start": {
+              "col": 5,
+              "line": 111
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::outer#function",
+          "kind": "function",
+          "name": "outer",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 123
+            },
+            "start": {
+              "col": 1,
+              "line": 118
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::outer::inner#function",
+          "kind": "function",
+          "name": "inner",
+          "owner": "flow::outer#function",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 121
+            },
+            "start": {
+              "col": 5,
+              "line": 119
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "flow::asyncs#function",
+          "kind": "function",
+          "name": "asyncs",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 130
+            },
+            "start": {
+              "col": 1,
+              "line": 125
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

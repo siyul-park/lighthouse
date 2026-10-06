@@ -198,6 +198,7 @@ fn edge(e: wire::Edge) -> Result<core::Edge, String> {
         resolution: match e.resolution {
             wire::Resolution::Semantic => core::Resolution::Semantic,
             wire::Resolution::Syntactic => core::Resolution::Syntactic,
+            wire::Resolution::Heuristic => core::Resolution::Heuristic,
         },
     })
 }

@@ -1,7 +1,9 @@
 mod frame;
+mod serve;
 mod wire;
 
 pub use frame::{ErrorObject, FrameError, Id, Message, read_message, write_message};
+pub use serve::{Handler, ServeError, serve};
 pub use wire::{
     Call, ClientInfo, Context, Conventions, Edge, EdgeKind, FileInfo, FileRef, Flow, FlowKind,
     Fragment, FunctionSummary, Incomplete, IndexParams, IndexResult, InitializeParams,

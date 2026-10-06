@@ -1,0 +1,215 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "app[bin:app]"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "core_lib"
+        },
+        {
+          "from": {
+            "module": "app[bin:app]"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "app[bin:app]::main#function"
+        },
+        {
+          "from": {
+            "symbol": "app[bin:app]::main#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "core_lib::make#function"
+        },
+        {
+          "from": {
+            "symbol": "app[bin:app]::main#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "core_lib::Thing::size#method"
+        },
+        {
+          "from": {
+            "symbol": "app[bin:app]::main#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "core_lib::Thing#type"
+        }
+      ],
+      "file": {
+        "path": "app/src/main.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 3,
+          "symbol": "app[bin:app]::main#function",
+          "tokens": 27,
+          "top_level": 3
+        }
+      ],
+      "modules": [
+        {
+          "name": "app[bin:app]",
+          "path": "app[bin:app]"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "app/src/main.rs",
+          "id": "app[bin:app]::main#function",
+          "kind": "function",
+          "name": "main",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "core_lib"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "core_lib::Thing#type"
+        },
+        {
+          "from": {
+            "symbol": "core_lib::Thing#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "core_lib::Thing::size#method"
+        },
+        {
+          "from": {
+            "module": "core_lib"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "core_lib::make#function"
+        },
+        {
+          "from": {
+            "symbol": "core_lib::make#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "core_lib::Thing#type"
+        }
+      ],
+      "file": {
+        "path": "core-lib/src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "core_lib::Thing::size#method",
+          "tokens": 3,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "core_lib::make#function",
+          "tokens": 3,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "core_lib",
+          "path": "core_lib"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "A thing.",
+          "file": "core-lib/src/lib.rs",
+          "id": "core_lib::Thing#type",
+          "kind": "type",
+          "name": "Thing",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "core-lib/src/lib.rs",
+          "id": "core_lib::Thing::size#method",
+          "kind": "method",
+          "name": "size",
+          "owner": "core_lib::Thing#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 7
+            },
+            "start": {
+              "col": 5,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Makes a thing.",
+          "file": "core-lib/src/lib.rs",
+          "id": "core_lib::make#function",
+          "kind": "function",
+          "name": "make",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

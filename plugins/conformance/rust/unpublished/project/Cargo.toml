@@ -1,0 +1,6 @@
+[workspace]
+members = ["closed", "shared", "consumer", "open"]
+resolver = "3"
+
+[workspace.package]
+publish = false

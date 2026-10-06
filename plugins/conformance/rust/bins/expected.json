@@ -1,0 +1,260 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "bins[bin:tool]"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "bins"
+        },
+        {
+          "from": {
+            "module": "bins[bin:tool]"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "bins[bin:tool]::main#function"
+        },
+        {
+          "from": {
+            "symbol": "bins[bin:tool]::main#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "bins::api#function"
+        }
+      ],
+      "file": {
+        "path": "src/bin/tool.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "forwards_to": "bins::api#function",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "bins[bin:tool]::main#function",
+          "tokens": 6,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "bins[bin:tool]",
+          "path": "bins[bin:tool]"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/bin/tool.rs",
+          "id": "bins[bin:tool]::main#function",
+          "kind": "function",
+          "name": "main",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "bins[bin:bins]/cli"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "bins[bin:bins]/cli::run#function"
+        },
+        {
+          "from": {
+            "symbol": "bins[bin:bins]/cli::run#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "bins::api#function"
+        }
+      ],
+      "file": {
+        "path": "src/cli.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "bins[bin:bins]/cli::run#function",
+          "tokens": 11,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "cli",
+          "path": "bins[bin:bins]/cli"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/cli.rs",
+          "id": "bins[bin:bins]/cli::run#function",
+          "kind": "function",
+          "name": "run",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "bins"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "bins::api#function"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "bins::api#function",
+          "tokens": 3,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "bins",
+          "path": "bins"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "The library surface.",
+          "file": "src/lib.rs",
+          "id": "bins::api#function",
+          "kind": "function",
+          "name": "api",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "bins[bin:bins]"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "bins[bin:bins]::main#function"
+        },
+        {
+          "from": {
+            "symbol": "bins[bin:bins]::main#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "bins::api#function"
+        },
+        {
+          "from": {
+            "symbol": "bins[bin:bins]::main#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "bins[bin:bins]/cli::run#function"
+        }
+      ],
+      "file": {
+        "path": "src/main.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "bins[bin:bins]::main#function",
+          "tokens": 20,
+          "top_level": 2
+        }
+      ],
+      "modules": [
+        {
+          "name": "bins[bin:bins]",
+          "path": "bins[bin:bins]"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/main.rs",
+          "id": "bins[bin:bins]::main#function",
+          "kind": "function",
+          "name": "main",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

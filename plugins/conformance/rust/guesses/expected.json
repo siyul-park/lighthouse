@@ -1,0 +1,613 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "guesses"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::A#type"
+        },
+        {
+          "from": {
+            "module": "guesses"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::B#type"
+        },
+        {
+          "from": {
+            "module": "guesses"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::C#type"
+        },
+        {
+          "from": {
+            "module": "guesses"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::D#type"
+        },
+        {
+          "from": {
+            "module": "guesses"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::E#type"
+        },
+        {
+          "from": {
+            "symbol": "guesses::A#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::A::run#method"
+        },
+        {
+          "from": {
+            "symbol": "guesses::A#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::A::tick#method"
+        },
+        {
+          "from": {
+            "symbol": "guesses::A#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::A::once#method"
+        },
+        {
+          "from": {
+            "symbol": "guesses::B#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::B::run#method"
+        },
+        {
+          "from": {
+            "symbol": "guesses::B#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::B::tick#method"
+        },
+        {
+          "from": {
+            "symbol": "guesses::C#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::C::run#method"
+        },
+        {
+          "from": {
+            "symbol": "guesses::D#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::D::run#method"
+        },
+        {
+          "from": {
+            "symbol": "guesses::E#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::E::run#method"
+        },
+        {
+          "from": {
+            "module": "guesses"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::common#function"
+        },
+        {
+          "from": {
+            "module": "guesses"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::few#function"
+        },
+        {
+          "from": {
+            "symbol": "guesses::few#function"
+          },
+          "kind": "references",
+          "resolution": "heuristic",
+          "to": "guesses::A::tick#method"
+        },
+        {
+          "from": {
+            "symbol": "guesses::few#function"
+          },
+          "kind": "references",
+          "resolution": "heuristic",
+          "to": "guesses::B::tick#method"
+        },
+        {
+          "from": {
+            "module": "guesses"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::single#function"
+        },
+        {
+          "from": {
+            "symbol": "guesses::single#function"
+          },
+          "kind": "references",
+          "resolution": "heuristic",
+          "to": "guesses::A::once#method"
+        },
+        {
+          "from": {
+            "module": "guesses"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::exact#function"
+        },
+        {
+          "from": {
+            "symbol": "guesses::exact#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "guesses::A::tick#method"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "guesses::A::run#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "guesses::A::tick#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "guesses::A::once#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "guesses::B::run#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "guesses::B::tick#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "guesses::C::run#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "guesses::D::run#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "guesses::E::run#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "guesses::common#function",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "guesses::few#function",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "guesses::single#function",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "guesses::exact#function",
+          "tokens": 8,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "guesses",
+          "path": "guesses"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::A#type",
+          "kind": "type",
+          "name": "A",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::B#type",
+          "kind": "type",
+          "name": "B",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::C#type",
+          "kind": "type",
+          "name": "C",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::D#type",
+          "kind": "type",
+          "name": "D",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::E#type",
+          "kind": "type",
+          "name": "E",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::A::run#method",
+          "kind": "method",
+          "name": "run",
+          "owner": "guesses::A#type",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::A::tick#method",
+          "kind": "method",
+          "name": "tick",
+          "owner": "guesses::A#type",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 9
+            },
+            "start": {
+              "col": 5,
+              "line": 9
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::A::once#method",
+          "kind": "method",
+          "name": "once",
+          "owner": "guesses::A#type",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 10
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::B::run#method",
+          "kind": "method",
+          "name": "run",
+          "owner": "guesses::B#type",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 13
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::B::tick#method",
+          "kind": "method",
+          "name": "tick",
+          "owner": "guesses::B#type",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 14
+            },
+            "start": {
+              "col": 5,
+              "line": 14
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::C::run#method",
+          "kind": "method",
+          "name": "run",
+          "owner": "guesses::C#type",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 17
+            },
+            "start": {
+              "col": 5,
+              "line": 17
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::D::run#method",
+          "kind": "method",
+          "name": "run",
+          "owner": "guesses::D#type",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 20
+            },
+            "start": {
+              "col": 5,
+              "line": 20
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::E::run#method",
+          "kind": "method",
+          "name": "run",
+          "owner": "guesses::E#type",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 23
+            },
+            "start": {
+              "col": 5,
+              "line": 23
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "Five private `run` methods: too common to guess.",
+          "file": "src/lib.rs",
+          "id": "guesses::common#function",
+          "kind": "function",
+          "name": "common",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 29
+            },
+            "start": {
+              "col": 1,
+              "line": 27
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Two private `tick` methods: both are possible targets.",
+          "file": "src/lib.rs",
+          "id": "guesses::few#function",
+          "kind": "function",
+          "name": "few",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 34
+            },
+            "start": {
+              "col": 1,
+              "line": 32
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "One private `once` method.",
+          "file": "src/lib.rs",
+          "id": "guesses::single#function",
+          "kind": "function",
+          "name": "single",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 37
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "The receiver is known, so the call is exact and nothing is guessed.",
+          "file": "src/lib.rs",
+          "id": "guesses::exact#function",
+          "kind": "function",
+          "name": "exact",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 44
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

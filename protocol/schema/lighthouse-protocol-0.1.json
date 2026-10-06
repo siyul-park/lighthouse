@@ -587,11 +587,23 @@
       "type": "object"
     },
     "Resolution": {
-      "enum": [
-        "semantic",
-        "syntactic"
-      ],
-      "type": "string"
+      "oneOf": [
+        {
+          "const": "semantic",
+          "description": "The target comes from type information.",
+          "type": "string"
+        },
+        {
+          "const": "syntactic",
+          "description": "The target comes from names alone.",
+          "type": "string"
+        },
+        {
+          "const": "heuristic",
+          "description": "A guess: the edge says the source may use the target, never that it\ndoes. Analyzers that count calls or dependencies ignore such edges; a\nrule asking whether something might be used may honor them.",
+          "type": "string"
+        }
+      ]
     },
     "Span": {
       "description": "`end` is exclusive.",

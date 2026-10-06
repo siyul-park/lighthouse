@@ -22,65 +22,90 @@ pub fn plugin_of(id: &str) -> &str {
     id.split_once('/').map_or(id, |(plugin, _)| plugin)
 }
 
+/// Every id a plugin contributes must be qualified with the plugin's own id.
+fn check_prefixes(
+    plugin: &str,
+    analyzers: &[Box<dyn Analyzer>],
+    rules: &[Box<dyn Rule>],
+    presets: &[Preset],
+) -> Result<(), Error> {
+    let ids = analyzers
+        .iter()
+        .map(|a| a.id())
+        .chain(rules.iter().map(|r| r.meta().id.as_str()))
+        .chain(presets.iter().map(|p| p.id.as_str()));
+    for item in ids {
+        if plugin_of(item) != plugin || !item.contains('/') {
+            return Err(Error::Prefix {
+                plugin: plugin.to_owned(),
+                id: item.to_owned(),
+            });
+        }
+    }
+    Ok(())
+}
+
 impl Registry {
     /// Registers atomically: on error nothing from `plugin` is kept.
     pub fn register(&mut self, plugin: &dyn Plugin) -> Result<(), Error> {
         let manifest = plugin.manifest();
-        let id = manifest.id.clone();
-        let id = id.as_str();
-        if self.has_plugin(id) {
-            return Err(Error::Duplicate(id.to_owned()));
+        if self.has_plugin(&manifest.id) {
+            return Err(Error::Duplicate(manifest.id));
         }
         let languages = plugin.languages();
         let analyzers = plugin.analyzers();
         let rules = plugin.rules();
         let presets = plugin.presets();
+        self.check_languages(&languages)?;
+        check_prefixes(&manifest.id, &analyzers, &rules, &presets)?;
+        self.check_unique(&analyzers, &rules, &presets)?;
 
-        for l in &languages {
-            if self.languages.iter().any(|(_, x)| x.id() == l.id()) {
-                return Err(Error::Duplicate(l.id().to_owned()));
-            }
-        }
-        let ids = analyzers
-            .iter()
-            .map(|a| a.id())
-            .chain(rules.iter().map(|r| r.meta().id.as_str()))
-            .chain(presets.iter().map(|p| p.id.as_str()));
-        for item in ids {
-            if plugin_of(item) != id || !item.contains('/') {
-                return Err(Error::Prefix {
-                    plugin: id.to_owned(),
-                    id: item.to_owned(),
-                });
-            }
-        }
-        let mut seen = BTreeSet::new();
-        for a in &analyzers {
-            if self.analyzers.contains_key(a.id()) || !seen.insert(a.id()) {
-                return Err(Error::Duplicate(a.id().to_owned()));
-            }
-        }
-        for r in &rules {
-            let rule = r.meta().id.as_str();
-            if self.rules.contains_key(rule) || !seen.insert(rule) {
-                return Err(Error::Duplicate(rule.to_owned()));
-            }
-        }
-        for p in &presets {
-            if self.presets.contains_key(&p.id) || !seen.insert(p.id.as_str()) {
-                return Err(Error::Duplicate(p.id.clone()));
-            }
-        }
-
+        let id = manifest.id.clone();
         self.plugins.push(manifest);
         self.languages
-            .extend(languages.into_iter().map(|l| (id.to_owned(), l)));
+            .extend(languages.into_iter().map(|l| (id.clone(), l)));
         self.analyzers
             .extend(analyzers.into_iter().map(|a| (a.id().to_owned(), a)));
         self.rules
             .extend(rules.into_iter().map(|r| (r.meta().id.clone(), r)));
         self.presets
             .extend(presets.into_iter().map(|p| (p.id.clone(), p)));
+        Ok(())
+    }
+
+    fn check_languages(&self, languages: &[Box<dyn LanguageProvider>]) -> Result<(), Error> {
+        for l in languages {
+            if self.languages.iter().any(|(_, x)| x.id() == l.id()) {
+                return Err(Error::Duplicate(l.id().to_owned()));
+            }
+        }
+        Ok(())
+    }
+
+    /// No id may exist already or repeat within the plugin.
+    fn check_unique(
+        &self,
+        analyzers: &[Box<dyn Analyzer>],
+        rules: &[Box<dyn Rule>],
+        presets: &[Preset],
+    ) -> Result<(), Error> {
+        let mut seen = BTreeSet::new();
+        for a in analyzers {
+            if self.analyzers.contains_key(a.id()) || !seen.insert(a.id()) {
+                return Err(Error::Duplicate(a.id().to_owned()));
+            }
+        }
+        for r in rules {
+            let rule = r.meta().id.as_str();
+            if self.rules.contains_key(rule) || !seen.insert(rule) {
+                return Err(Error::Duplicate(rule.to_owned()));
+            }
+        }
+        for p in presets {
+            if self.presets.contains_key(&p.id) || !seen.insert(p.id.as_str()) {
+                return Err(Error::Duplicate(p.id.clone()));
+            }
+        }
         Ok(())
     }
 

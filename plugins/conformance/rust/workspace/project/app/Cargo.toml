@@ -1,0 +1,8 @@
+[package]
+name = "app"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+core-lib = { path = "../core-lib" }
+renamed = { path = "../core-lib", package = "core-lib" }

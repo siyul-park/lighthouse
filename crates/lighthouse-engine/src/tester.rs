@@ -7,17 +7,32 @@ use serde_json::Value;
 
 use crate::Engine;
 
+/// Language of examples that need no language provider.
+const NEUTRAL: &str = "text";
+
 /// Runs the examples of catalog patterns through the whole engine, the way
 /// `lighthouse check` would see them. The registry is built per example
 /// because an engine owns its registry.
 pub struct RuleTester<'a> {
     registry: fn() -> Registry,
     catalog: &'a Catalog,
+    language: Option<String>,
 }
 
 impl<'a> RuleTester<'a> {
     pub fn new(registry: fn() -> Registry, catalog: &'a Catalog) -> Self {
-        Self { registry, catalog }
+        Self {
+            registry,
+            catalog,
+            language: None,
+        }
+    }
+
+    /// Runs only the examples written for `language`; a registry usually
+    /// holds the provider of one language.
+    pub fn language(mut self, language: &str) -> Self {
+        self.language = Some(language.to_owned());
+        self
     }
 
     /// Failures of every implemented pattern; empty when all examples hold.
@@ -30,15 +45,35 @@ impl<'a> RuleTester<'a> {
     }
 
     /// Failures of one pattern's examples, each prefixed `<id> <example>:`.
+    /// With a language filter, a pattern that has no example for that language
+    /// (and no language-neutral `text` example) is itself a failure: an
+    /// implemented rule must show what it does in every language under test.
     pub fn check(&self, pattern: &Pattern) -> Vec<String> {
-        pattern
+        let selected: Vec<&Example> = pattern
             .examples
             .iter()
+            .filter(|example| self.selects(example))
+            .collect();
+        if selected.is_empty() && self.language.is_some() {
+            return vec![format!(
+                "{}: no example for language `{}`",
+                pattern.id,
+                self.language.as_deref().unwrap_or_default()
+            )];
+        }
+        selected
+            .into_iter()
             .filter_map(|example| {
                 let failure = self.run(pattern, example).err()?;
                 Some(format!("{} {}: {failure}", pattern.id, example.name))
             })
             .collect()
+    }
+
+    fn selects(&self, example: &Example) -> bool {
+        self.language
+            .as_ref()
+            .is_none_or(|language| *language == example.language || example.language == NEUTRAL)
     }
 
     fn run(&self, pattern: &Pattern, example: &Example) -> Result<(), String> {

@@ -1,0 +1,644 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "modules"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "modules/util"
+        },
+        {
+          "from": {
+            "module": "modules"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "modules/nested/deep"
+        },
+        {
+          "from": {
+            "module": "modules"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "modules/shapes"
+        },
+        {
+          "from": {
+            "module": "modules"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "modules::run#function"
+        },
+        {
+          "from": {
+            "symbol": "modules::run#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "modules/shapes::Circle#type"
+        },
+        {
+          "from": {
+            "symbol": "modules::run#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "modules/shapes::Square#type"
+        },
+        {
+          "from": {
+            "symbol": "modules::run#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "modules/util::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "modules::run#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "modules/shapes/square::side#function"
+        },
+        {
+          "from": {
+            "symbol": "modules::run#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "modules/nested/deep::f#function"
+        },
+        {
+          "from": {
+            "symbol": "modules::run#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "modules/special::special#function"
+        },
+        {
+          "from": {
+            "module": "modules"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "modules::platform_name#function"
+        },
+        {
+          "from": {
+            "symbol": "modules::platform_name#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "modules/platform::name#function"
+        },
+        {
+          "from": {
+            "module": "modules/nested/deep"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "modules/nested/deep::f#function"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 2,
+          "symbol": "modules::run#function",
+          "tokens": 38,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "forwards_to": "modules/platform::name#function",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "modules::platform_name#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "modules/nested/deep::f#function",
+          "tokens": 3,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "modules",
+          "path": "modules"
+        },
+        {
+          "name": "nested",
+          "path": "modules/nested"
+        },
+        {
+          "name": "deep",
+          "path": "modules/nested/deep"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/lib.rs",
+          "id": "modules::run#function",
+          "kind": "function",
+          "name": "run",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "modules::platform_name#function",
+          "kind": "function",
+          "name": "platform_name",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 30
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "modules/nested/deep::f#function",
+          "kind": "function",
+          "name": "f",
+          "span": {
+            "end": {
+              "col": 10,
+              "line": 8
+            },
+            "start": {
+              "col": 9,
+              "line": 6
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "modules/platform"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "modules/platform::name#function"
+        }
+      ],
+      "file": {
+        "path": "src/other/platform.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "modules/platform::name#function",
+          "tokens": 3,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "platform",
+          "path": "modules/platform"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/other/platform.rs",
+          "id": "modules/platform::name#function",
+          "kind": "function",
+          "name": "name",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "modules/special"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "modules/special::special#function"
+        }
+      ],
+      "file": {
+        "path": "src/other/special.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "modules/special::special#function",
+          "tokens": 3,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "special",
+          "path": "modules/special"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/other/special.rs",
+          "id": "modules/special::special#function",
+          "kind": "function",
+          "name": "special",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "modules/shapes"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "modules/util"
+        },
+        {
+          "from": {
+            "module": "modules/shapes"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "modules/shapes::Circle#type"
+        },
+        {
+          "from": {
+            "module": "modules/shapes"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "modules/shapes::Square#type"
+        },
+        {
+          "from": {
+            "module": "modules/shapes"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "modules/shapes::area#function"
+        },
+        {
+          "from": {
+            "symbol": "modules/shapes::area#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "modules/util::helper#function"
+        }
+      ],
+      "file": {
+        "path": "src/shapes/mod.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "forwards_to": "modules/util::helper#function",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "modules/shapes::area#function",
+          "tokens": 5,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "shapes",
+          "path": "modules/shapes"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/shapes/mod.rs",
+          "id": "modules/shapes::Circle#type",
+          "kind": "type",
+          "name": "Circle",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/shapes/mod.rs",
+          "id": "modules/shapes::Square#type",
+          "kind": "type",
+          "name": "Square",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/shapes/mod.rs",
+          "id": "modules/shapes::area#function",
+          "kind": "function",
+          "name": "area",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "modules/shapes/square"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "modules/shapes"
+        },
+        {
+          "from": {
+            "module": "modules/shapes/square"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "modules/util"
+        },
+        {
+          "from": {
+            "module": "modules/shapes/square"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "modules/shapes/square::side#function"
+        },
+        {
+          "from": {
+            "symbol": "modules/shapes/square::side#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "modules/shapes::Circle#type"
+        },
+        {
+          "from": {
+            "symbol": "modules/shapes/square::side#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "modules/util::helper#function"
+        }
+      ],
+      "file": {
+        "path": "src/shapes/square.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 2,
+          "symbol": "modules/shapes/square::side#function",
+          "tokens": 10,
+          "top_level": 2
+        }
+      ],
+      "modules": [
+        {
+          "name": "square",
+          "path": "modules/shapes/square"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/shapes/square.rs",
+          "id": "modules/shapes/square::side#function",
+          "kind": "function",
+          "name": "side",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "modules/util"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "modules/util::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "modules/util::helper#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "modules/util/hidden::secret#function"
+        }
+      ],
+      "file": {
+        "path": "src/util.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "forwards_to": "modules/util/hidden::secret#function",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "modules/util::helper#function",
+          "tokens": 7,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "util",
+          "path": "modules/util"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/util.rs",
+          "id": "modules/util::helper#function",
+          "kind": "function",
+          "name": "helper",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "modules/util/hidden"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "modules/util/hidden::secret#function"
+        }
+      ],
+      "file": {
+        "path": "src/util/hidden.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "modules/util/hidden::secret#function",
+          "tokens": 3,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "hidden",
+          "path": "modules/util/hidden"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/util/hidden.rs",
+          "id": "modules/util/hidden::secret#function",
+          "kind": "function",
+          "name": "secret",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

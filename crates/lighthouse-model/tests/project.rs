@@ -286,3 +286,23 @@ fn symbol_ids_built_elsewhere_must_follow_the_format() {
         assert!(SymbolId::parse(bad).is_none(), "{bad}");
     }
 }
+
+#[test]
+fn heuristic_edges_are_possible_uses_not_calls() {
+    let a = symbol("a", "f");
+    let b = symbol("a", "g");
+    let guess = |kind| Edge {
+        kind,
+        from: Node::Symbol(a.id.clone()),
+        to: Target::Path(b.id.as_str().to_owned()),
+        resolution: Resolution::Heuristic,
+    };
+    let project = Project::merge([Fragment {
+        symbols: vec![a.clone(), b.clone()],
+        edges: vec![guess(EdgeKind::Calls), guess(EdgeKind::References)],
+        ..Fragment::default()
+    }]);
+    assert!(project.callers(&b.id).is_empty());
+    assert!(project.callees(&a.id).is_empty());
+    assert_eq!(project.references(&b.id), [a.id]);
+}

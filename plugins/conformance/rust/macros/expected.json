@@ -1,0 +1,364 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "macros"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "macros::helper#function"
+        },
+        {
+          "from": {
+            "module": "macros"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "macros::other#function"
+        },
+        {
+          "from": {
+            "module": "macros"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "macros::hidden#function"
+        },
+        {
+          "from": {
+            "module": "macros"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "macros::std_macros#function"
+        },
+        {
+          "from": {
+            "symbol": "macros::std_macros#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "macros::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "macros::std_macros#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "macros::other#function"
+        },
+        {
+          "from": {
+            "module": "macros"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "macros::user_macro#function"
+        },
+        {
+          "from": {
+            "symbol": "macros::user_macro#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "macros::helper#function"
+        },
+        {
+          "from": {
+            "module": "macros"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "macros::unreadable_macro#function"
+        },
+        {
+          "from": {
+            "module": "macros"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "macros::Derived#type"
+        },
+        {
+          "from": {
+            "module": "macros"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "macros::attributed#function"
+        },
+        {
+          "from": {
+            "module": "macros"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "macros::entry#function"
+        },
+        {
+          "from": {
+            "symbol": "macros::entry#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "macros::helper#function"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "macros::helper#function",
+          "tokens": 3,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "macros::other#function",
+          "tokens": 3,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "macros::hidden#function",
+          "tokens": 3,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 4,
+          "symbol": "macros::std_macros#function",
+          "tokens": 42,
+          "top_level": 4
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "macros::user_macro#function",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "macros::unreadable_macro#function",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "macros::attributed#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "forwards_to": "macros::helper#function",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "macros::entry#function",
+          "tokens": 6,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "macros",
+          "path": "macros"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/lib.rs",
+          "id": "macros::helper#function",
+          "kind": "function",
+          "name": "helper",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "macros::other#function",
+          "kind": "function",
+          "name": "other",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "macros::hidden#function",
+          "kind": "function",
+          "name": "hidden",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "macros::std_macros#function",
+          "kind": "function",
+          "name": "std_macros",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 24
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "macros::user_macro#function",
+          "kind": "function",
+          "name": "user_macro",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 28
+            },
+            "start": {
+              "col": 1,
+              "line": 26
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "macros::unreadable_macro#function",
+          "kind": "function",
+          "name": "unreadable_macro",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 30
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "macros::Derived#type",
+          "kind": "type",
+          "name": "Derived",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 35
+            },
+            "start": {
+              "col": 1,
+              "line": 35
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "macros::attributed#function",
+          "kind": "function",
+          "name": "attributed",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 39
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "macros::entry#function",
+          "kind": "function",
+          "name": "entry",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 44
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [
+    "macros are not expanded: 1 file(s) define `macro_rules!` macros and 1 macro invocation(s) were not read (item position, or arguments that are not expressions), e.g. src/lib.rs"
+  ]
+}

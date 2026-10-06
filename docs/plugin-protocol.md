@@ -63,7 +63,10 @@ absolute. Result:
   `references`, `implements` and `accesses-private` edges are resolved by the
   language's own semantic analysis (types, scopes), not by name matching. A rule
   that requires a capability is skipped, with a notice, for languages without it.
-  Hosts ignore capability names they do not know.
+  Hosts ignore capability names they do not know. A provider without
+  `semantic-edges` is syntactic: its edges come from names (and, where marked,
+  guesses), which makes its caller and reference sets lower bounds; no separate
+  capability announces that.
 
 ### `index` (request)
 
@@ -101,8 +104,10 @@ Result `{ fragments, notices, incomplete }`:
 ### `shutdown` (request) and `exit` (notification)
 
 `shutdown` is answered with `null`; the plugin then waits for `exit` and
-terminates with code 0. A plugin whose input closes without `exit` terminates
-with a non-zero code.
+terminates with code 0. A plugin whose input closes before `shutdown` was
+answered terminates with a non-zero code; input that closes after `shutdown` (a
+host that went away) is a clean stop for providers built on the Rust server loop,
+and tolerated by hosts.
 
 ## Errors and failure handling
 
@@ -166,8 +171,11 @@ import path, because the dependency itself is the fact.
 | `implements` | type satisfies an interface declared in the project |
 | `accesses-private` | use of a member the language keeps private from outside the unit that owns it; the unit (type, module, package) is language-dependent, and a provider emits it only where such a use is possible |
 
-`resolution` is `semantic` when the target comes from type information and
-`syntactic` when it comes from names alone.
+`resolution` is `semantic` when the target comes from type information,
+`syntactic` when it comes from names alone, and `heuristic` for a guess: the
+edge says the source *may* use the target. The host ignores heuristic `calls`
+edges when it counts callers and callees (fan-in, fan-out, caller lists) but
+keeps heuristic `references`, so a rule asking "might this be used" fails safe.
 
 ### Function summaries and control flow
 
@@ -267,3 +275,104 @@ type-checks with `go/types`.
   `internal` directory are `internal`.
 - Load, parse and type errors become `incomplete` entries per file, with
   `line:col: message`.
+
+## `lang-rust`
+
+Reads sources with `syn` and `proc-macro2`; it resolves names itself and never
+runs cargo, a build script or the compiler, so analysis needs no network, no lock
+file and no toolchain. Its capability list is empty: every edge has
+`resolution: "syntactic"`, and rules that require `semantic-edges` are skipped for
+Rust with a notice.
+
+- Context: `[languages.rust]` accepts `unpublished` (`"auto"`, the default,
+  `"public"` or `"internal"`); unknown keys are an `incomplete` entry.
+  `unpublished` decides what the `pub` items of a library with `publish = false`
+  are: with `auto` they stay `public` when another package of the project
+  depends on the library (a contract between packages) and are `internal`
+  otherwise.
+- Packages and targets come from `Cargo.toml` (read with a TOML parser): the
+  nearest manifest with a `[package]` above a file governs it. Targets are the
+  library (`src/lib.rs` or `[lib] path`), binaries (`src/main.rs`, `src/bin/*`,
+  `[[bin]]`), integration tests (`tests/*.rs`, `tests/*/main.rs`), examples,
+  benches and the build script. Files no manifest governs form one synthetic
+  package named `workspace` with the standard layout under the project root.
+  Dependencies on other packages of the project, including renamed ones
+  (`package = "..."`) and workspace members, resolve through the extern prelude;
+  `publish = false` (also inherited from `[workspace.package]`) marks a package
+  without outside consumers.
+- Modules follow `mod` declarations: `name.rs`, `name/mod.rs`, `#[path]`, nested
+  inline modules, with the directory rules of mod-rs and non-mod-rs files. Every
+  `cfg` branch is followed. A `mod` with no file, or a file that does not parse,
+  is an `incomplete` entry (with `line:col` for syntax errors); the file still has
+  a fragment. A file that no crate target reaches is a notice, or an
+  `incomplete` entry when another file of the project failed to parse, because
+  the tree may then be cut short. A file shared by several targets (`mod common;`
+  in each file of `tests/`) is analyzed once, as part of the first target, and
+  named by a notice; the other targets resolve the module to it. `testdata` and
+  hidden directories are skipped with empty fragments.
+- Module paths use `/`, as the id format forbids `::` in a module: the library is
+  the package name (`lighthouse_model`), its modules `lighthouse_model/ucm`;
+  other targets are `pkg[bin:name]`, `pkg[test:name]`, `pkg[example:name]`,
+  `pkg[bench:name]` and `pkg[build:build-script]`. A `[test:...]` module has
+  `test_of` set to the library. A `#[cfg(test)] mod` is a module of its own
+  (a `tests` module inside its parent) with `test_of` set to the module around
+  it, so its symbols count as test code for rules even though its file is not a
+  test file; files under `tests/` and `tests.rs` are test files by convention.
+  A function is a test when an attribute's whole path is one of `test`,
+  `tokio::test`, `async_std::test`, `actix_rt::test`, `actix_web::test`,
+  `sqlx::test`, `rstest`, `rstest::rstest`, `test_case`, `test_case::test_case`
+  or the wasm-bindgen test attribute; `other::test` is not.
+- Symbols: functions, `#[test]`/`#[tokio::test]`/`rstest`/`test_case` functions
+  (`test`), structs, enums, unions and type aliases (`type`), traits
+  (`interface`), named fields and enum variants (`field`), constants and
+  `static`s (`const`, `var`). Everything declared in an `impl` or trait is a
+  `method`, associated functions included, owned by the impl's type (or the
+  trait). A trait impl method's id carries the trait with its arguments
+  (`m::Meters::From<f64>::from`) so impls never collide; an impl for a type
+  outside the project or a blanket impl has no `owner` and names the written
+  type in the id. Functions declared inside a body are `function` symbols owned
+  by the enclosing function. `macro_rules!` definitions are not symbols.
+- Visibility: `pub` is `public` when every module up to the crate root is `pub`
+  or the item is re-exported by a `pub use` of a reachable module, else
+  `internal`; `pub(crate)`, `pub(super)`, `pub(in ..)` are `internal`; no
+  keyword is `private`. Binary, test, example and bench crates are all `private`,
+  like Go's `main`; the `pub` items of a library with `publish = false` are
+  `internal` (like Go's `internal` packages) unless a sibling package depends on
+  it, see `unpublished` above. Members are capped by their owner;
+  enum variants and trait methods have their owner's visibility; a trait impl
+  method has the visibility of the trait (and type).
+- A trait impl method without docs shows the docs of the trait's method, as
+  rustdoc does. Doc comments are `///` and `#[doc = ".."]` text.
+- Edges: `calls` and `references` from function bodies to project symbols
+  resolved through `use` trees (globs, renames, `self`, `super`, `crate`, local
+  `use`), the `mod` tree and impl blocks: `foo()`, `module::f()`, `Type::assoc()`,
+  `Self::f()`, `Trait::m(x)`, and `x.m()` when the receiver type is written in the
+  code: `self`, typed parameters and `let`s (behind references, `Box`/`Arc`/`Rc`,
+  `dyn Trait`, `impl Trait` and generic bounds), struct literals, calls of
+  functions with a declared return type, and fields of known types. A method call
+  on any other receiver emits no `calls` edge; it emits `heuristic` `references`
+  edges to the non-`pub` inherent methods of that name in the same crate, unless
+  more than three share the name, so a rule that counts callers fails safe. `implements` runs from a type to a project trait (not
+  emitted for an empty impl in a file other than the type's). `imports` runs
+  between modules, and to the crate name for dependencies outside the project.
+  `accesses-private` is never emitted.
+- Flow follows the model's mapping: `if`/`else if`/`else`, `if let`, `let ... else`
+  (an `if`), `match` as one `switch` whose `arms` exclude a wildcard or binding
+  arm and which is `returning` when every arm is a single value or `return` and
+  the match is in return position (or all arms `return`), `loop`/`while`/`for`,
+  labeled `break`/`continue` as `jump`, runs of `&&`/`||` as `logic`, a call of the
+  enclosing function as `recursion`; `?` emits nothing; closures and `async`
+  blocks raise nesting. Every `match` arm counts as a statement, like a Go case.
+- Tests: a `table` test loops over a literal array or `vec!` of tuples or
+  structs (directly or through a `let`), or carries several `rstest` `#[case]` or
+  `test_case` attributes; others are `scenario`; `nesting` is always 0. `targets`
+  are the calls and references of the body in order of first use.
+- Macros are never expanded. The arguments of macro invocations are read as
+  expressions when they parse as such (`assert_eq!`, `println!`, `vec!`,
+  `matches!` and user macros taking expressions), so the calls inside are seen;
+  anything else, `macro_rules!` bodies and code from `include!` are invisible.
+  One notice per run counts the files that define `macro_rules!` and the
+  invocations that were not read (item position, or arguments that are not
+  expressions) with an example; `include!` has a notice of its own. Attribute macros and derives leave the item as
+  written. A file whose header comment says `@generated` or `DO NOT EDIT` has
+  `generated` set.

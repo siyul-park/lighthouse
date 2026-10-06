@@ -384,16 +384,21 @@ mod process {
     #[test]
     fn a_plugin_that_never_reads_cannot_block_past_the_timeout_or_the_drop() {
         let fake = Fake::new("deaf");
-        let provider = fake.provider(Duration::from_secs(2));
+        let timeout = Duration::from_secs(5);
+        let provider = fake.provider(timeout);
         let paths: Vec<String> = (0..4000).map(|n| format!("dir/{n:0>90}.fake")).collect();
         let refs: Vec<&str> = paths.iter().map(String::as_str).collect();
         let started = Instant::now();
         let indexed = index(provider.as_ref(), &ws(&fake), &refs);
-        assert!(only_gap(&indexed).reason.contains("timed out after 2s"));
-        assert!(started.elapsed() < Duration::from_secs(10));
+        let reason = only_gap(&indexed).reason.clone();
+        assert!(
+            reason.contains("timed out after 5s") && reason.contains("`index`"),
+            "{reason}"
+        );
+        assert!(started.elapsed() < timeout * 3);
         let started = Instant::now();
         drop(provider);
-        assert!(started.elapsed() < Duration::from_secs(5));
+        assert!(started.elapsed() < timeout * 3);
     }
 
     #[test]

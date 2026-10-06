@@ -156,7 +156,7 @@ incomplete. "Not checked" never counts as "passed".
 | Area | Available now | Next |
 | --- | --- | --- |
 | Pattern catalog | `design` and `testing` packs from a real style guide, generated docs, overlays | more executable examples |
-| Languages | Go (semantic, over RPC) | Rust, TypeScript, Python |
+| Languages | Go (semantic), Rust (syntactic), both over RPC | TypeScript, Python |
 | Analysis | size, cyclomatic, cognitive (SonarSource), nesting, fan-in/out | dependency direction, cycles, clones, cohesion |
 | Rules | complexity, coupling, exported docs, single-use wrappers | declarative CEL rules, test-contract rules |
 | Agent loop | CLI with text, JSON and SARIF output | agent output format, MCP server, Skill, hooks |

@@ -1,0 +1,970 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "layout"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout::add#function"
+        },
+        {
+          "from": {
+            "module": "layout"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout::private_sum#function"
+        },
+        {
+          "from": {
+            "module": "layout/tests"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "layout"
+        },
+        {
+          "from": {
+            "module": "layout/tests"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout/tests::adds#test"
+        },
+        {
+          "from": {
+            "symbol": "layout/tests::adds#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "layout::add#function"
+        },
+        {
+          "from": {
+            "module": "layout/tests"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout/tests::adds_many#test"
+        },
+        {
+          "from": {
+            "symbol": "layout/tests::adds_many#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "layout::add#function"
+        },
+        {
+          "from": {
+            "module": "layout/tests"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout/tests::sums_privately#test"
+        },
+        {
+          "from": {
+            "symbol": "layout/tests::sums_privately#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "layout::private_sum#function"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "layout::add#function",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "layout::private_sum#function",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "layout/tests::adds#test",
+          "tokens": 15,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 0,
+          "returns": 0,
+          "statements": 2,
+          "symbol": "layout/tests::adds_many#test",
+          "tokens": 43,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "layout/tests::sums_privately#test",
+          "tokens": 18,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "layout",
+          "path": "layout"
+        },
+        {
+          "name": "tests",
+          "path": "layout/tests",
+          "test_of": "layout"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Adds two numbers.",
+          "file": "src/lib.rs",
+          "id": "layout::add#function",
+          "kind": "function",
+          "name": "add",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "layout::private_sum#function",
+          "kind": "function",
+          "name": "private_sum",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "layout/tests::adds#test",
+          "kind": "test",
+          "name": "adds",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 17
+            },
+            "start": {
+              "col": 5,
+              "line": 15
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "layout/tests::adds_many#test",
+          "kind": "test",
+          "name": "adds_many",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 24
+            },
+            "start": {
+              "col": 5,
+              "line": 20
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "layout/tests::sums_privately#test",
+          "kind": "test",
+          "name": "sums_privately",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 29
+            },
+            "start": {
+              "col": 5,
+              "line": 27
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "layout/tests::adds#test",
+          "targets": [
+            "layout::add#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "table",
+          "symbol": "layout/tests::adds_many#test",
+          "targets": [
+            "layout::add#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "layout/tests::sums_privately#test",
+          "targets": [
+            "layout::private_sum#function"
+          ]
+        }
+      ]
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "layout/more"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "layout"
+        },
+        {
+          "from": {
+            "module": "layout/more"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout/more::from_a_file_module#test"
+        },
+        {
+          "from": {
+            "symbol": "layout/more::from_a_file_module#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "layout::add#function"
+        }
+      ],
+      "file": {
+        "path": "src/more.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "layout/more::from_a_file_module#test",
+          "tokens": 9,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "more",
+          "path": "layout/more",
+          "test_of": "layout"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/more.rs",
+          "id": "layout/more::from_a_file_module#test",
+          "kind": "test",
+          "name": "from_a_file_module",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "layout/more::from_a_file_module#test",
+          "targets": [
+            "layout::add#function"
+          ]
+        }
+      ]
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "layout[test:integration]/common"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]/common::two#function"
+        }
+      ],
+      "file": {
+        "path": "tests/common/mod.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "layout[test:integration]/common::two#function",
+          "tokens": 3,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "common",
+          "path": "layout[test:integration]/common",
+          "test_of": "layout"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "tests/common/mod.rs",
+          "id": "layout[test:integration]/common::two#function",
+          "kind": "function",
+          "name": "two",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "layout[test:integration]"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "layout"
+        },
+        {
+          "from": {
+            "module": "layout[test:integration]"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]::Case#type"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::Case#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]::Case::a#field"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::Case#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]::Case::b#field"
+        },
+        {
+          "from": {
+            "module": "layout[test:integration]"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]::through_the_public_api#test"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::through_the_public_api#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "layout::add#function"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::through_the_public_api#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]/common::two#function"
+        },
+        {
+          "from": {
+            "module": "layout[test:integration]"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]::table_of_structs#test"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::table_of_structs#test"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]::Case#type"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::table_of_structs#test"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]::Case::a#field"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::table_of_structs#test"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]::Case::b#field"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::table_of_structs#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "layout::add#function"
+        },
+        {
+          "from": {
+            "module": "layout[test:integration]"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]::async_case#test"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::async_case#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "layout::add#function"
+        },
+        {
+          "from": {
+            "module": "layout[test:integration]"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]::cases_by_attribute#test"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::cases_by_attribute#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "layout::add#function"
+        },
+        {
+          "from": {
+            "module": "layout[test:integration]"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]::test_case_by_path#test"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::test_case_by_path#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "layout::add#function"
+        },
+        {
+          "from": {
+            "module": "layout[test:integration]"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]::one_case_is_a_scenario#test"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::one_case_is_a_scenario#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "layout::add#function"
+        },
+        {
+          "from": {
+            "module": "layout[test:integration]"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]::not_a_test_by_path#function"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::not_a_test_by_path#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "layout::add#function"
+        }
+      ],
+      "file": {
+        "path": "tests/integration.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "layout[test:integration]::through_the_public_api#test",
+          "tokens": 19,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 0,
+          "returns": 0,
+          "statements": 3,
+          "symbol": "layout[test:integration]::table_of_structs#test",
+          "tokens": 55,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "layout[test:integration]::async_case#test",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "layout[test:integration]::cases_by_attribute#test",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "forwards_to": "layout::add#function",
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "layout[test:integration]::test_case_by_path#test",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "layout[test:integration]::one_case_is_a_scenario#test",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "layout[test:integration]::not_a_test_by_path#function",
+          "tokens": 9,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "layout[test:integration]",
+          "path": "layout[test:integration]",
+          "test_of": "layout"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "tests/integration.rs",
+          "id": "layout[test:integration]::Case#type",
+          "kind": "type",
+          "name": "Case",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "tests/integration.rs",
+          "id": "layout[test:integration]::Case::a#field",
+          "kind": "field",
+          "name": "a",
+          "owner": "layout[test:integration]::Case#type",
+          "span": {
+            "end": {
+              "col": 11,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "tests/integration.rs",
+          "id": "layout[test:integration]::Case::b#field",
+          "kind": "field",
+          "name": "b",
+          "owner": "layout[test:integration]::Case#type",
+          "span": {
+            "end": {
+              "col": 11,
+              "line": 7
+            },
+            "start": {
+              "col": 5,
+              "line": 7
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "tests/integration.rs",
+          "id": "layout[test:integration]::through_the_public_api#test",
+          "kind": "test",
+          "name": "through_the_public_api",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "tests/integration.rs",
+          "id": "layout[test:integration]::table_of_structs#test",
+          "kind": "test",
+          "name": "table_of_structs",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "tests/integration.rs",
+          "id": "layout[test:integration]::async_case#test",
+          "kind": "test",
+          "name": "async_case",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "tests/integration.rs",
+          "id": "layout[test:integration]::cases_by_attribute#test",
+          "kind": "test",
+          "name": "cases_by_attribute",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 33
+            },
+            "start": {
+              "col": 1,
+              "line": 31
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "tests/integration.rs",
+          "id": "layout[test:integration]::test_case_by_path#test",
+          "kind": "test",
+          "name": "test_case_by_path",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 37
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "tests/integration.rs",
+          "id": "layout[test:integration]::one_case_is_a_scenario#test",
+          "kind": "test",
+          "name": "one_case_is_a_scenario",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 45
+            },
+            "start": {
+              "col": 1,
+              "line": 43
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "tests/integration.rs",
+          "id": "layout[test:integration]::not_a_test_by_path#function",
+          "kind": "function",
+          "name": "not_a_test_by_path",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 50
+            },
+            "start": {
+              "col": 1,
+              "line": 48
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "layout[test:integration]::through_the_public_api#test",
+          "targets": [
+            "layout::add#function",
+            "layout[test:integration]/common::two#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "table",
+          "symbol": "layout[test:integration]::table_of_structs#test",
+          "targets": [
+            "layout[test:integration]::Case#type",
+            "layout[test:integration]::Case::a#field",
+            "layout[test:integration]::Case::b#field",
+            "layout::add#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "layout[test:integration]::async_case#test",
+          "targets": [
+            "layout::add#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "table",
+          "symbol": "layout[test:integration]::cases_by_attribute#test",
+          "targets": [
+            "layout::add#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "table",
+          "symbol": "layout[test:integration]::test_case_by_path#test",
+          "targets": [
+            "layout::add#function"
+          ]
+        },
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "layout[test:integration]::one_case_is_a_scenario#test",
+          "targets": [
+            "layout::add#function"
+          ]
+        }
+      ]
+    },
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "layout[test:other]"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "layout[test:other]::shares_the_helper#test"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:other]::shares_the_helper#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "to": "layout[test:integration]/common::two#function"
+        }
+      ],
+      "file": {
+        "path": "tests/other.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "forwards_to": "layout[test:integration]/common::two#function",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "layout[test:other]::shares_the_helper#test",
+          "tokens": 8,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "layout[test:other]",
+          "path": "layout[test:other]",
+          "test_of": "layout"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "tests/other.rs",
+          "id": "layout[test:other]::shares_the_helper#test",
+          "kind": "test",
+          "name": "shares_the_helper",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "layout[test:other]::shares_the_helper#test",
+          "targets": [
+            "layout[test:integration]/common::two#function"
+          ]
+        }
+      ]
+    }
+  ],
+  "incomplete": [],
+  "notices": [
+    "1 file(s) belong to several crate targets (a `mod` shared by tests, for example) and are analyzed once, as part of the first target, e.g. tests/common/mod.rs"
+  ]
+}

@@ -1,0 +1,291 @@
+{
+  "fragments": [
+    {
+      "edges": [
+        {
+          "from": {
+            "module": "reexports"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "reexports/inner"
+        },
+        {
+          "from": {
+            "module": "reexports"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "reexports/named"
+        },
+        {
+          "from": {
+            "module": "reexports/inner"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "reexports/inner::A#type"
+        },
+        {
+          "from": {
+            "module": "reexports/inner"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "reexports/inner::f#function"
+        },
+        {
+          "from": {
+            "module": "reexports/inner"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "reexports/inner::hidden#function"
+        },
+        {
+          "from": {
+            "module": "reexports/inner/deeper"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "reexports/inner/deeper::g#function"
+        },
+        {
+          "from": {
+            "module": "reexports/inner/open"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "reexports/inner/open::h#function"
+        },
+        {
+          "from": {
+            "module": "reexports/named"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "reexports/named::n#function"
+        },
+        {
+          "from": {
+            "module": "reexports/named"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "reexports/named::unexported#function"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "reexports/inner::f#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "reexports/inner::hidden#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "reexports/inner/deeper::g#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "reexports/inner/open::h#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "reexports/named::n#function",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "reexports/named::unexported#function",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "reexports",
+          "path": "reexports"
+        },
+        {
+          "name": "inner",
+          "path": "reexports/inner"
+        },
+        {
+          "name": "deeper",
+          "path": "reexports/inner/deeper"
+        },
+        {
+          "name": "open",
+          "path": "reexports/inner/open"
+        },
+        {
+          "name": "named",
+          "path": "reexports/named"
+        }
+      ],
+      "symbols": [
+        {
+          "file": "src/lib.rs",
+          "id": "reexports/inner::A#type",
+          "kind": "type",
+          "name": "A",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "reexports/inner::f#function",
+          "kind": "function",
+          "name": "f",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 4
+            },
+            "start": {
+              "col": 5,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "reexports/inner::hidden#function",
+          "kind": "function",
+          "name": "hidden",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "reexports/inner/deeper::g#function",
+          "kind": "function",
+          "name": "g",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 9
+            },
+            "start": {
+              "col": 9,
+              "line": 9
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "reexports/inner/open::h#function",
+          "kind": "function",
+          "name": "h",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 13
+            },
+            "start": {
+              "col": 9,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "reexports/named::n#function",
+          "kind": "function",
+          "name": "n",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 18
+            },
+            "start": {
+              "col": 5,
+              "line": 18
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "reexports/named::unexported#function",
+          "kind": "function",
+          "name": "unexported",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 19
+            },
+            "start": {
+              "col": 5,
+              "line": 19
+            }
+          },
+          "visibility": "internal"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

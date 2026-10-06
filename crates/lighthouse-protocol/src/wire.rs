@@ -240,7 +240,7 @@ pub enum Node {
     Symbol(String),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum EdgeKind {
     Calls,
@@ -251,11 +251,17 @@ pub enum EdgeKind {
     AccessesPrivate,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Resolution {
+    /// The target comes from type information.
     Semantic,
+    /// The target comes from names alone.
     Syntactic,
+    /// A guess: the edge says the source may use the target, never that it
+    /// does. Analyzers that count calls or dependencies ignore such edges; a
+    /// rule asking whether something might be used may honor them.
+    Heuristic,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

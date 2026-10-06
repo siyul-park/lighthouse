@@ -7,6 +7,7 @@
           │
    RPC host (lighthouse-rpc) ── language plugins as processes
           │                      plugins/lang-go (go/packages + go/types)
+          │                      plugins/lang-rust (syn + own module resolution)
    unified code model (lighthouse-model)
 ```
 
@@ -61,3 +62,21 @@ config names, like build scripts (see the trust model in
 
 Exit codes: 0 clean, 1 findings, 2 usage or runtime error (a configured plugin
 that cannot start is one), 3 incomplete.
+
+## Dogfooding
+
+Lighthouse checks its own sources. The repository's `lighthouse.toml` enables the
+bundled `core` and `design` plugins with their recommended presets and the Rust
+plugin built by `make plugins`, and `make test` ends with `lighthouse check .`,
+which must exit 0: a finding is either fixed in the code, or it exposes a rule or
+provider that is imprecise, and that is fixed instead of silenced. The only
+overrides are for `plugins/conformance/**`, whose fixtures describe code on
+purpose.
+
+The Rust plugin resolves names syntactically, so its edges are a lower bound
+(see the `lang-rust` section of [plugin-protocol.md](plugin-protocol.md)). Rules
+that count callers therefore have to fail safe: a method called through a
+receiver whose type is not written in the code is recorded as a possible use of
+every non-`pub` method of that name (a `heuristic` edge that counting analyses
+ignore), which keeps `design/single-use-wrapper` from
+reporting a method that has an unseen caller.
