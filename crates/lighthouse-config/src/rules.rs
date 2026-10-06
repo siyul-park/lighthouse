@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use lighthouse_model::{Options, Severity};
 use serde::{Deserialize, Deserializer, de};
 
+/// Rule id to its configured level and options.
 pub type Rules = BTreeMap<String, RuleConfig>;
 
 /// `"warn"`, `"off"`, or `{ level = "warn", max = 10 }`.
@@ -41,13 +42,6 @@ impl<'de> Deserialize<'de> for RuleConfig {
     }
 }
 
-fn level_of(s: &str) -> Result<Option<Severity>, String> {
-    if s == "off" {
-        return Ok(None);
-    }
-    s.parse().map(Some).map_err(|e| format!("{e} or off"))
-}
-
 /// Later level replaces the earlier one; options merge per key, later wins.
 pub(crate) fn merge(into: &mut Rules, from: &Rules) {
     for (id, next) in from {
@@ -61,4 +55,11 @@ pub(crate) fn merge(into: &mut Rules, from: &Rules) {
             }
         }
     }
+}
+
+fn level_of(s: &str) -> Result<Option<Severity>, String> {
+    if s == "off" {
+        return Ok(None);
+    }
+    s.parse().map(Some).map_err(|e| format!("{e} or off"))
 }

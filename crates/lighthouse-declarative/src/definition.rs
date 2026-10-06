@@ -9,7 +9,7 @@ use crate::Error;
 /// What a rule looks at; each choice binds one variable of the same name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Select {
+pub(crate) enum Select {
     Symbol,
     Function,
     Edge,
@@ -20,7 +20,7 @@ pub enum Select {
 
 impl Select {
     /// Edges and modules are judged once over the project; the rest per file.
-    pub fn scope(self) -> Scope {
+    pub(crate) fn scope(self) -> Scope {
         match self {
             Self::Edge | Self::Module => Scope::Project,
             _ => Scope::File,
@@ -29,14 +29,15 @@ impl Select {
 
     /// The variable the selected value is bound to. `function` is reserved
     /// in CEL, so functions are `func`.
-    pub fn variable(self) -> &'static str {
+    pub(crate) fn variable(self) -> &'static str {
         match self {
             Self::Function => "func",
             other => other.name(),
         }
     }
 
-    pub fn name(self) -> &'static str {
+    /// The spelling used in rule files and in messages.
+    pub(crate) fn name(self) -> &'static str {
         match self {
             Self::Symbol => "symbol",
             Self::Function => "function",
@@ -51,7 +52,7 @@ impl Select {
 /// The text of a rule file.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Definition {
+pub(crate) struct Definition {
     pub select: Select,
     /// CEL; true for a violation.
     #[serde(rename = "where")]

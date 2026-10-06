@@ -40,6 +40,8 @@ impl Enforcement {
     }
 }
 
+/// Whether an example must produce no diagnostics (`valid`) or exactly those
+/// listed in `expect` (`invalid`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
@@ -47,6 +49,7 @@ pub enum Kind {
     Invalid,
 }
 
+/// The JSON type the values of an option must have; `Float` accepts any number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum OptionType {
@@ -147,6 +150,7 @@ pub struct ExampleFile {
 }
 
 impl ExampleFile {
+    /// A file whose text is `body`, written in the pattern file itself.
     pub fn inline(path: &str, body: &str) -> Self {
         Self {
             path: path.to_owned(),
@@ -216,6 +220,8 @@ pub struct Expect {
     pub message: Option<String>,
 }
 
+/// A fixture project for one language and what a rule must report on it:
+/// nothing for `valid`, the diagnostics of `expect` for `invalid`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Example {
@@ -231,6 +237,8 @@ pub struct Example {
     pub options: Map<String, Value>,
 }
 
+/// One catalog entry: a requirement with its enforcement, options and
+/// examples. Rules take their metadata and option defaults from it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Pattern {
@@ -266,11 +274,9 @@ pub struct Pattern {
     pub strict: bool,
 }
 
-fn is_false(value: &bool) -> bool {
-    !value
-}
-
 impl Pattern {
+    /// The override if the pattern has one, else the default of its enforcement;
+    /// `None` for a `doc` pattern.
     pub fn severity(&self) -> Option<Severity> {
         self.severity_override
             .or_else(|| self.enforcement.default_severity())
@@ -319,6 +325,7 @@ impl OptionType {
     }
 }
 
+/// An ordered group of patterns within a pack.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Section {
     pub id: String,
@@ -327,6 +334,7 @@ pub struct Section {
     pub patterns: Vec<Pattern>,
 }
 
+/// An ordered set of sections; the pack id is the prefix of its pattern ids.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Pack {
     pub id: String,
@@ -349,3 +357,7 @@ display!(Scope { Symbol => "symbol", File => "file", Module => "module", Project
 display!(Enforcement { Mechanical => "mechanical", Heuristic => "heuristic", Judgment => "judgment", Doc => "doc" });
 display!(Kind { Valid => "valid", Invalid => "invalid" });
 display!(OptionType { Int => "int", Float => "float", Bool => "bool", String => "string", List => "list" });
+
+fn is_false(value: &bool) -> bool {
+    !value
+}

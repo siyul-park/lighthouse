@@ -91,16 +91,6 @@ impl Naming {
     }
 }
 
-/// Modules whose tests count for `module`: itself, and those that test it.
-fn testing_modules(project: &Project, module: &str) -> Vec<String> {
-    project
-        .modules
-        .iter()
-        .filter(|m| m.path == module || m.test_of.as_deref() == Some(module))
-        .map(|m| m.path.clone())
-        .collect()
-}
-
 /// Whether some test module tests `module` or an ancestor of it, with tests.
 pub(crate) fn has_tests(project: &Project, module: &str) -> bool {
     project.modules.iter().any(|m| {
@@ -111,11 +101,6 @@ pub(crate) fn has_tests(project: &Project, module: &str) -> bool {
                 .is_some_and(|rest| rest.starts_with('/'));
         covers && !project.tests_in(&m.path).is_empty()
     })
-}
-
-fn test_name(id: &SymbolId) -> Option<&str> {
-    let (head, _) = id.as_str().rsplit_once('#')?;
-    head.rsplit("::").next()
 }
 
 pub(crate) fn snake(name: &str) -> String {
@@ -133,4 +118,19 @@ pub(crate) fn snake(name: &str) -> String {
         out.extend(c.to_lowercase());
     }
     out
+}
+
+/// Modules whose tests count for `module`: itself, and those that test it.
+fn testing_modules(project: &Project, module: &str) -> Vec<String> {
+    project
+        .modules
+        .iter()
+        .filter(|m| m.path == module || m.test_of.as_deref() == Some(module))
+        .map(|m| m.path.clone())
+        .collect()
+}
+
+fn test_name(id: &SymbolId) -> Option<&str> {
+    let (head, _) = id.as_str().rsplit_once('#')?;
+    head.rsplit("::").next()
 }

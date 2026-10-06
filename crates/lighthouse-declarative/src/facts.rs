@@ -17,10 +17,6 @@ pub(crate) fn visibility(v: Visibility) -> &'static str {
     }
 }
 
-fn path(p: &Path) -> String {
-    p.to_string_lossy().into_owned()
-}
-
 pub(crate) fn symbol(project: &Project, s: &Symbol) -> Value {
     let owner = s.owner.as_ref().and_then(|o| project.symbol(o));
     let lang = project
@@ -91,16 +87,6 @@ pub(crate) fn test(project: &Project, s: &Symbol, case: &TestCase) -> Value {
     value
 }
 
-fn node(project: &Project, n: &Node) -> Value {
-    match n {
-        Node::Module(m) => json!({ "kind": "module", "id": m, "module": m, "name": m }),
-        Node::Symbol(id) => {
-            let name = project.symbol(id).map_or("", |s| s.name.as_str());
-            json!({ "kind": "symbol", "id": id.as_str(), "module": id.module(), "name": name })
-        }
-    }
-}
-
 pub(crate) fn edge(project: &Project, e: &Edge) -> Value {
     let to = match &e.to {
         Target::Resolved(n) => node(project, n),
@@ -114,8 +100,7 @@ pub(crate) fn edge(project: &Project, e: &Edge) -> Value {
     })
 }
 
-pub(crate) fn module(project: &Project, m: &Module, files: usize, symbols: usize) -> Value {
-    let _ = project;
+pub(crate) fn module(m: &Module, files: usize, symbols: usize) -> Value {
     json!({
         "path": m.path,
         "name": m.name.clone().unwrap_or_else(|| m.path.clone()),
@@ -140,4 +125,18 @@ pub(crate) fn file(project: &Project, f: &lighthouse_model::File, text: &str) ->
         "symbols": symbols,
         "functions": functions,
     })
+}
+
+fn path(p: &Path) -> String {
+    p.to_string_lossy().into_owned()
+}
+
+fn node(project: &Project, n: &Node) -> Value {
+    match n {
+        Node::Module(m) => json!({ "kind": "module", "id": m, "module": m, "name": m }),
+        Node::Symbol(id) => {
+            let name = project.symbol(id).map_or("", |s| s.name.as_str());
+            json!({ "kind": "symbol", "id": id.as_str(), "module": id.module(), "name": name })
+        }
+    }
 }

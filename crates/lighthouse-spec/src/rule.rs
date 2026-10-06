@@ -67,7 +67,36 @@ where
             options: PhantomData,
         }
     }
+}
 
+impl<O, F> Rule for PatternRule<O, F>
+where
+    O: DeserializeOwned + Send + Sync,
+    F: Fn(&RuleMeta, &Ctx, O) -> Result<Vec<Diagnostic>, Error> + Send + Sync,
+{
+    /// The metadata of the pattern the rule was built from.
+    fn meta(&self) -> &RuleMeta {
+        &self.meta
+    }
+
+    /// Accepts the options when they resolve against the pattern's declared
+    /// options: known keys of the declared types.
+    fn validate(&self, options: &Options) -> Result<(), Error> {
+        self.resolve(options, None).map(drop)
+    }
+
+    /// Resolves the options for the focused file's language, then runs the check.
+    fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, Error> {
+        let language = ctx.file.map(|(file, _)| file.lang.as_str());
+        (self.check)(&self.meta, ctx, self.resolve(options, language)?)
+    }
+}
+
+impl<O, F> PatternRule<O, F>
+where
+    O: DeserializeOwned,
+    F: Fn(&RuleMeta, &Ctx, O) -> Result<Vec<Diagnostic>, Error> + Send + Sync,
+{
     fn resolve(&self, configured: &Options, language: Option<&str>) -> Result<O, Error> {
         let fail = |message: String| Error::Options {
             rule: self.meta.id.clone(),
@@ -78,24 +107,5 @@ where
             .resolve_options(configured, language)
             .map_err(|e| fail(e.to_string()))?;
         serde_json::from_value(Value::Object(resolved)).map_err(|e| fail(e.to_string()))
-    }
-}
-
-impl<O, F> Rule for PatternRule<O, F>
-where
-    O: DeserializeOwned + Send + Sync,
-    F: Fn(&RuleMeta, &Ctx, O) -> Result<Vec<Diagnostic>, Error> + Send + Sync,
-{
-    fn meta(&self) -> &RuleMeta {
-        &self.meta
-    }
-
-    fn validate(&self, options: &Options) -> Result<(), Error> {
-        self.resolve(options, None).map(drop)
-    }
-
-    fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, Error> {
-        let language = ctx.file.map(|(file, _)| file.lang.as_str());
-        (self.check)(&self.meta, ctx, self.resolve(options, language)?)
     }
 }

@@ -15,8 +15,10 @@ use thiserror::Error;
 
 pub use rules::{RuleConfig, Rules};
 
+/// Name of the configuration file discovered in a project directory.
 pub const FILE_NAME: &str = "lighthouse.toml";
 
+/// Failure to read, parse or apply a configuration; every variant names the offending input.
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("{}: {source}", path.display())]
@@ -57,6 +59,7 @@ pub struct PluginRef {
 }
 
 impl PluginRef {
+    /// A listed plugin with no explicit path and no timeout override.
     pub fn new(id: impl Into<String>) -> Self {
         Self {
             id: id.into(),
@@ -65,6 +68,7 @@ impl PluginRef {
         }
     }
 
+    /// The per-request limit, if one was configured.
     pub fn timeout(&self) -> Option<Duration> {
         self.timeout_secs.map(Duration::from_secs)
     }
@@ -121,6 +125,7 @@ pub struct Config {
 }
 
 impl Config {
+    /// Parses `text` as a `lighthouse.toml`; unknown fields and invalid globs are errors.
     pub fn parse(text: &str) -> Result<Self, Error> {
         let raw: Raw = toml::from_str(text)?;
         let overrides = raw
@@ -150,6 +155,7 @@ impl Config {
         })
     }
 
+    /// Reads and parses the file at `path`.
     pub fn load(path: &Path) -> Result<Self, Error> {
         let text = fs::read_to_string(path).map_err(|source| Error::Io {
             path: path.to_owned(),
@@ -169,6 +175,7 @@ impl Config {
         Ok(None)
     }
 
+    /// Listed plugins in declaration order; bare ids become [`PluginRef::new`].
     pub fn plugins(&self) -> &[PluginRef] {
         &self.plugins
     }
@@ -183,6 +190,7 @@ impl Config {
         &self.languages
     }
 
+    /// Preset ids named in `extends`, in declaration order.
     pub fn extends(&self) -> &[String] {
         &self.extends
     }
@@ -216,13 +224,6 @@ impl Config {
     }
 }
 
-fn globs(patterns: &[String]) -> Result<Option<GlobSet>, Error> {
-    if patterns.is_empty() {
-        return Ok(None);
-    }
-    glob_set(patterns).map(Some)
-}
-
 /// Compiles path globs. `*` and `?` never cross `/`; `**` as a whole path
 /// component matches any number of directories (so `**` matches every path).
 pub fn glob_set<I>(patterns: I) -> Result<GlobSet, Error>
@@ -248,4 +249,11 @@ where
         pattern: all.join(", "),
         source,
     })
+}
+
+fn globs(patterns: &[String]) -> Result<Option<GlobSet>, Error> {
+    if patterns.is_empty() {
+        return Ok(None);
+    }
+    glob_set(patterns).map(Some)
 }

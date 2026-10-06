@@ -9,12 +9,14 @@ use lighthouse_model::{Diagnostic, Fingerprint, Symbol};
 use lighthouse_plugin::{Ctx, Manifest, Plugin, Preset, Rule, RuleMeta};
 use serde_json::Value;
 
+/// Id of the plugin and prefix of every rule it provides.
 pub const ID: &str = "testing";
 
 /// The test-contract rules of the `testing` pattern pack.
 pub struct Testing;
 
 impl Plugin for Testing {
+    /// The plugin id with this crate's version.
     fn manifest(&self) -> Manifest {
         Manifest {
             id: ID.to_owned(),
@@ -22,6 +24,7 @@ impl Plugin for Testing {
         }
     }
 
+    /// Every rule of the `testing` pack.
     fn rules(&self) -> Vec<Box<dyn Rule>> {
         vec![
             assertions::rule(),
@@ -32,6 +35,7 @@ impl Plugin for Testing {
         ]
     }
 
+    /// The standard presets over the pack's rules.
     fn presets(&self) -> Vec<Preset> {
         let rules = self.rules();
         Preset::standard("testing", rules.iter().map(|rule| rule.meta()))

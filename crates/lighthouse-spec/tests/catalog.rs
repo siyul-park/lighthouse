@@ -1,6 +1,6 @@
 use lighthouse_model::Severity;
 use lighthouse_plugin::Scope as RunScope;
-use lighthouse_spec::{Catalog, Content, Enforcement, Error, Pattern, Scope};
+use lighthouse_spec::{Catalog, Content, Enforcement, Error, ExampleFile, Pattern, Scope};
 use serde_json::{Map, json};
 
 fn bundled(id: &str) -> &'static Pattern {
@@ -16,7 +16,7 @@ fn bundled_catalog_has_core_design_and_testing_packs() {
 }
 
 #[test]
-fn severity_derives_from_enforcement_unless_overridden() {
+fn enforcement_default_severity() {
     let cases = [
         (Enforcement::Mechanical, Some(Severity::Error)),
         (Enforcement::Heuristic, Some(Severity::Warn)),
@@ -24,16 +24,21 @@ fn severity_derives_from_enforcement_unless_overridden() {
         (Enforcement::Doc, None),
     ];
     for (enforcement, want) in cases {
+        let enforcement: Enforcement = enforcement;
         assert_eq!(enforcement.default_severity(), want, "{enforcement}");
     }
-    let mut pattern = bundled("design/error-identity").clone();
+}
+
+#[test]
+fn pattern_severity() {
+    let mut pattern: Pattern = bundled("design/error-identity").clone();
     assert_eq!(pattern.severity(), Some(Severity::Warn));
     pattern.severity_override = Some(Severity::Error);
     assert_eq!(pattern.severity(), Some(Severity::Error));
 }
 
 #[test]
-fn scopes_map_to_run_scopes() {
+fn scope_rule_scope() {
     let cases = [
         (Scope::Symbol, RunScope::File),
         (Scope::File, RunScope::File),
@@ -42,12 +47,13 @@ fn scopes_map_to_run_scopes() {
         (Scope::Project, RunScope::Project),
     ];
     for (scope, want) in cases {
+        let scope: Scope = scope;
         assert_eq!(scope.rule_scope(), want, "{scope}");
     }
 }
 
 #[test]
-fn rule_meta_exists_only_for_implemented_patterns() {
+fn pattern_rule_meta() {
     let meta = bundled("core/max-file-lines").rule_meta().unwrap();
     assert_eq!(meta.id, "core/max-file-lines");
     assert_eq!(meta.severity, Severity::Warn);
@@ -61,8 +67,8 @@ fn rule_meta_exists_only_for_implemented_patterns() {
 }
 
 #[test]
-fn options_resolve_defaults_languages_and_reject_bad_input() {
-    let mut pattern = bundled("core/max-file-lines").clone();
+fn pattern_resolve_options() {
+    let mut pattern: Pattern = bundled("core/max-file-lines").clone();
     pattern
         .options
         .get_mut("max")
@@ -97,12 +103,13 @@ fn options_resolve_defaults_languages_and_reject_bad_input() {
 }
 
 #[test]
-fn source_examples_are_loaded_next_to_inline_ones() {
+fn example_file_text() {
     let files = &bundled("design/error-identity").examples[0].files;
     assert!(matches!(files[0].content, Content::File(_)));
     assert!(files[0].text().contains("fmt.Errorf"));
-    let inline = &bundled("design/single-use-wrapper").examples[0].files[0];
+    let inline: &ExampleFile = &bundled("design/single-use-wrapper").examples[0].files[0];
     assert!(matches!(inline.content, Content::Inline(_)));
+    assert_eq!(ExampleFile::inline("a.go", "package a").text(), "package a");
 }
 
 #[test]
@@ -118,6 +125,21 @@ fn implemented_patterns_carry_runnable_examples() {
             pattern.id
         );
     }
+}
+
+#[test]
+fn catalog_declarative() {
+    let rule = "id: local/probe\ntitle: P\nintent: i\nscope: symbol\nrequirement: A MUST b.\nenforcement: mechanical\nevidence: [x]\nexamples:\n  - name: bad\n    language: text\n    kind: invalid\n    files: [{ path: a.txt, body: x }]\n    expect: [{ line: 1 }]\n  - name: good\n    language: text\n    kind: valid\n    files: [{ path: a.txt, body: x }]\nrule:\n  select: symbol\n  where: 'true'\n  message: x\n";
+    let files = std::collections::BTreeMap::from([("probe.yaml".to_owned(), rule.to_owned())]);
+    let catalog: Catalog = Catalog::from_local(files).unwrap();
+    assert!(
+        catalog
+            .declarative("probe.yaml")
+            .unwrap()
+            .contains("select: symbol")
+    );
+    assert_eq!(catalog.declarative("absent.yaml"), None);
+    assert_eq!(Catalog::bundled().declarative("absent.yaml"), None);
 }
 
 mod fixture {

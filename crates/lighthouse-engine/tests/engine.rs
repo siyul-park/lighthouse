@@ -1,11 +1,11 @@
 use std::{
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
 use lighthouse_config::{Config, RuleConfig, Rules};
-use lighthouse_engine::{Engine, Error};
+use lighthouse_engine::{Engine, Error, Outcome};
 use lighthouse_model::{
     Capability, Diagnostic, Fingerprint, Fragment, Incomplete, Options, Position, Severity, Span,
 };
@@ -300,7 +300,7 @@ fn project_scope_analyzer_sees_every_file_even_when_reporting_a_subset() {
 }
 
 #[test]
-fn file_scope_reports_are_relative_sorted_and_subset_filtered() {
+fn outcome() {
     let dir = project(&[("a/x.txt", b"1"), ("b/y.txt", b"2")]);
     let engine = engine(
         &dir,
@@ -469,15 +469,13 @@ fn only_must_name_an_enabled_rule() {
 }
 
 #[test]
-fn exit_code_follows_severity_and_strict() {
-    let dir = project(&[("x.txt", b"1")]);
+fn outcome_exit_code() {
+    let dir = project(&[("x.txt", b"1"), ("bad.skip", b"x")]);
     let code = |level: &str, strict| {
         let toml = format!("plugins = [\"fake\"]\n[rules]\n\"fake/each\" = \"{level}\"\n");
-        engine(&dir, &toml)
-            .unwrap()
-            .check(&root(&dir), &[])
-            .unwrap()
-            .exit_code(strict, false)
+        let engine: Engine = engine(&dir, &toml).unwrap();
+        let out: Outcome = engine.check(&root(&dir), &[]).unwrap();
+        out.exit_code(strict, false)
     };
     assert_eq!(code("error", false), 1);
     assert_eq!(code("warn", false), 0);
@@ -485,13 +483,9 @@ fn exit_code_follows_severity_and_strict() {
     assert_eq!(code("review", true), 0);
     assert_eq!(code("info", true), 0);
     assert_eq!(code("off", true), 0);
-}
 
-#[test]
-fn incomplete_analysis_exits_3_before_findings_unless_allowed() {
-    let dir = project(&[("x.txt", b"1"), ("bad.skip", b"x")]);
     let engine = Engine::new(registry(".skip"), Config::parse(ALL).unwrap(), dir.path()).unwrap();
-    let out = engine
+    let out: Outcome = engine
         .check(&root(&dir), &["fake/each".to_owned()])
         .unwrap();
     assert_eq!(out.diagnostics[0].severity, Severity::Error);
@@ -548,4 +542,39 @@ fn languages_come_only_from_listed_plugins() {
         .unwrap();
     assert!(out.diagnostics.is_empty());
     assert!(out.notices.is_empty());
+}
+
+#[test]
+fn engine_check_files() {
+    let dir = project(&[("a/x.txt", b"1"), ("b/y.txt", b"2")]);
+    let engine: Engine = engine(
+        &dir,
+        "plugins = [\"fake\"]\n[rules]\n\"fake/each\" = \"error\"\n",
+    )
+    .unwrap();
+    let out = engine
+        .check_files(&[PathBuf::from("b/y.txt")], &[])
+        .unwrap();
+    assert!(!out.diagnostics.is_empty());
+    assert!(
+        out.diagnostics
+            .iter()
+            .all(|d| d.file == Path::new("b/y.txt"))
+    );
+    assert!(engine.check_files(&[], &[]).unwrap().diagnostics.is_empty());
+}
+
+#[test]
+fn engine_with_incomplete() {
+    let dir = project(&[("x.txt", b"1")]);
+    let gap = Incomplete {
+        path: None,
+        reason: "plugin failed to start".to_owned(),
+    };
+    let engine: Engine = engine(&dir, ALL).unwrap();
+    let engine = engine.with_incomplete(vec![gap.clone()]);
+    for _ in 0..2 {
+        let out = engine.check(&root(&dir), &[]).unwrap();
+        assert_eq!(out.incomplete, std::slice::from_ref(&gap));
+    }
 }

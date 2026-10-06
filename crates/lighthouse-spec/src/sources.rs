@@ -3,6 +3,8 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
+const KEYWORDS: [&str; 3] = ["MUST", "SHOULD", "MAY"];
+
 /// One normative line of a source document and where it went.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -25,61 +27,59 @@ pub(crate) struct Bullet {
     pub text: String,
 }
 
-const KEYWORDS: [&str; 3] = ["MUST", "SHOULD", "MAY"];
-
-/// Normative lines of a Markdown document: list items (`-`, `*`, numbered)
-/// with their indented continuation lines, table body rows, and any other
-/// single line holding an RFC keyword. Fenced code is skipped. Prose that
-/// wraps over several lines is not joined; write such rules as list items.
-pub(crate) fn extract(doc: &str, markdown: &str) -> Vec<Bullet> {
-    let lines: Vec<&str> = markdown.lines().collect();
-    let mut out = Out::new(doc);
-    let mut heading = String::new();
-    let mut fence: Option<char> = None;
-    let mut open: Option<(String, String, bool)> = None;
-    for (i, raw) in lines.iter().enumerate() {
-        let line = raw.trim();
-        if let Some(marker) = fence_marker(line) {
-            out.finish(open.take());
-            fence = match fence {
-                None => Some(marker),
-                Some(f) if f == marker => None,
-                other => other,
-            };
-            continue;
-        }
-        if fence.is_some() || line.is_empty() {
-            out.finish(open.take());
-            continue;
-        }
-        if let Some((_, text, true)) = open.as_mut()
-            && raw.starts_with(char::is_whitespace)
-            && list_item(line).is_none()
-            && !line.starts_with(['|', '#'])
-        {
-            text.push(' ');
-            text.push_str(line);
-            continue;
-        }
-        out.finish(open.take());
-        if line.starts_with('#') {
-            heading = slug(line.trim_start_matches('#'));
-            continue;
-        }
-        let next = lines.get(i + 1).map(|l| l.trim());
-        open = normative(line, next).map(|(text, wraps)| (heading.clone(), text, wraps));
-    }
-    out.finish(open.take());
-    out.bullets
-}
-
-struct Out<'a> {
+pub(crate) struct Extractor<'a> {
     doc: &'a str,
     seen: BTreeMap<String, usize>,
     bullets: Vec<Bullet>,
 }
 
-impl<'a> Out<'a> {
+impl<'a> Extractor<'a> {
+    /// Normative lines of a Markdown document: list items (`-`, `*`, numbered)
+    /// with their indented continuation lines, table body rows, and any other
+    /// single line holding an RFC keyword. Fenced code is skipped. Prose that
+    /// wraps over several lines is not joined; write such rules as list items.
+    pub(crate) fn extract(doc: &'a str, markdown: &str) -> Vec<Bullet> {
+        let lines: Vec<&str> = markdown.lines().collect();
+        let mut out = Self::new(doc);
+        let mut heading = String::new();
+        let mut fence: Option<char> = None;
+        let mut open: Option<(String, String, bool)> = None;
+        for (i, raw) in lines.iter().enumerate() {
+            let line = raw.trim();
+            if let Some(marker) = fence_marker(line) {
+                out.finish(open.take());
+                fence = match fence {
+                    None => Some(marker),
+                    Some(f) if f == marker => None,
+                    other => other,
+                };
+                continue;
+            }
+            if fence.is_some() || line.is_empty() {
+                out.finish(open.take());
+                continue;
+            }
+            if let Some((_, text, true)) = open.as_mut()
+                && raw.starts_with(char::is_whitespace)
+                && list_item(line).is_none()
+                && !line.starts_with(['|', '#'])
+            {
+                text.push(' ');
+                text.push_str(line);
+                continue;
+            }
+            out.finish(open.take());
+            if line.starts_with('#') {
+                heading = slug(line.trim_start_matches('#'));
+                continue;
+            }
+            let next = lines.get(i + 1).map(|l| l.trim());
+            open = normative(line, next).map(|(text, wraps)| (heading.clone(), text, wraps));
+        }
+        out.finish(open.take());
+        out.bullets
+    }
+
     fn new(doc: &'a str) -> Self {
         Self {
             doc,
@@ -101,9 +101,9 @@ impl<'a> Out<'a> {
     }
 }
 
-fn hash(text: &str) -> String {
-    let digest = Sha256::digest(text.as_bytes());
-    digest[..4].iter().map(|b| format!("{b:02x}")).collect()
+pub(crate) fn has_keyword(line: &str) -> bool {
+    line.split(|c: char| !c.is_ascii_alphanumeric())
+        .any(|word| KEYWORDS.contains(&word))
 }
 
 fn fence_marker(line: &str) -> Option<char> {
@@ -151,11 +151,6 @@ fn cells(row: &str) -> String {
     cells.join(" | ")
 }
 
-pub(crate) fn has_keyword(line: &str) -> bool {
-    line.split(|c: char| !c.is_ascii_alphanumeric())
-        .any(|word| KEYWORDS.contains(&word))
-}
-
 fn slug(heading: &str) -> String {
     let words: Vec<_> = heading
         .split(|c: char| !c.is_ascii_alphanumeric())
@@ -165,67 +160,7 @@ fn slug(heading: &str) -> String {
     words.join("-")
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn texts(markdown: &str) -> Vec<String> {
-        extract("d", markdown).into_iter().map(|b| b.text).collect()
-    }
-
-    #[test]
-    fn takes_list_items_numbered_items_and_table_body_rows() {
-        let markdown =
-            "## Part\n\n- first\n* second\n\n1. numbered\n\n| H | V |\n| --- | --- |\n| a | b |\n";
-        assert_eq!(texts(markdown), ["first", "second", "numbered", "a | b"]);
-    }
-
-    #[test]
-    fn joins_indented_continuation_lines_into_the_bullet() {
-        let markdown = "## Part\n\n- first line\n  wraps here\n    and here\n- next\n";
-        assert_eq!(texts(markdown), ["first line wraps here and here", "next"]);
-    }
-
-    #[test]
-    fn nested_indented_items_stay_separate() {
-        assert_eq!(texts("- outer\n  - inner\n"), ["outer", "inner"]);
-    }
-
-    #[test]
-    fn takes_single_line_prose_only_with_an_rfc_keyword() {
-        let markdown = "Plain prose.\n\nThis MUST be kept.\n\nShould not count.\n";
-        assert_eq!(texts(markdown), ["This MUST be kept."]);
-    }
-
-    #[test]
-    fn skips_backtick_and_tilde_fences() {
-        let markdown = "```\n- a\n```\n~~~\n- b\n- c MUST\n~~~\n- d\n";
-        assert_eq!(texts(markdown), ["d"]);
-    }
-
-    #[test]
-    fn refs_follow_content_not_position() {
-        let a = extract("d", "## H\n- one\n- two\n");
-        let b = extract("d", "## H\n- two\n- one\n");
-        let find = |bullets: &[Bullet], text: &str| {
-            bullets
-                .iter()
-                .find(|b| b.text == text)
-                .unwrap()
-                .reference
-                .clone()
-        };
-        assert_eq!(find(&a, "one"), find(&b, "one"));
-        assert_ne!(find(&a, "one"), find(&a, "two"));
-        assert!(find(&a, "one").starts_with("d#h-"));
-    }
-
-    #[test]
-    fn repeated_text_under_one_heading_gets_distinct_refs() {
-        let refs: Vec<_> = extract("d", "## H\n- same\n- same\n")
-            .into_iter()
-            .map(|b| b.reference)
-            .collect();
-        assert_ne!(refs[0], refs[1]);
-    }
+fn hash(text: &str) -> String {
+    let digest = Sha256::digest(text.as_bytes());
+    digest[..4].iter().map(|b| format!("{b:02x}")).collect()
 }

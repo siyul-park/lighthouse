@@ -5,7 +5,7 @@ use lighthouse_spec::Catalog;
 use crate::Error;
 
 /// Where a project keeps its own rules, relative to the project root.
-pub const LOCAL_DIR: &str = ".lighthouse/rules";
+const LOCAL_DIR: &str = ".lighthouse/rules";
 
 /// The catalog layer of `<root>/.lighthouse/rules/*.yaml`; `None` when the
 /// directory does not exist.

@@ -123,7 +123,7 @@ fn tests_are_selected_with_their_targets() {
 }
 
 #[test]
-fn a_rule_file_that_is_wrong_is_refused_with_the_reason() {
+fn error() {
     let cases = [
         (
             "symbol",
@@ -191,5 +191,42 @@ fn local_files_need_the_local_prefix_a_rule_section_and_inline_examples() {
             .unwrap_err()
             .to_string()
             .contains("rule:")
+    );
+}
+
+#[test]
+fn declarative_is_empty() {
+    let probe = local("symbol", "select: symbol\nwhere: 'true'\nmessage: x").unwrap();
+    assert!(!probe.is_empty());
+    let elsewhere = Declarative::from_catalog("elsewhere", Catalog::bundled()).unwrap();
+    assert!(elsewhere.is_empty());
+}
+
+#[test]
+fn declarative_bundled_rules() {
+    assert!(!Declarative::bundled_rules("design").is_empty());
+    assert!(Declarative::bundled_rules("elsewhere").is_empty());
+}
+
+#[test]
+fn load_local() {
+    let root = tempfile::tempdir().unwrap();
+    assert!(
+        lighthouse_declarative::load_local(root.path())
+            .unwrap()
+            .is_none()
+    );
+
+    let dir = root.path().join(".lighthouse/rules");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("notes.txt"), "not a rule").unwrap();
+    std::fs::write(dir.join("bad.yaml"), "id: other/x\n").unwrap();
+    assert!(lighthouse_declarative::load_local(root.path()).is_err());
+
+    std::fs::remove_file(dir.join("bad.yaml")).unwrap();
+    assert!(
+        lighthouse_declarative::load_local(root.path())
+            .unwrap()
+            .is_some()
     );
 }

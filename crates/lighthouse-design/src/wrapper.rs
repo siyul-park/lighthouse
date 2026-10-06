@@ -19,29 +19,6 @@ pub(crate) fn rule() -> Box<dyn Rule> {
     Box::new(PatternRule::new(ID, &[], check))
 }
 
-fn check(meta: &RuleMeta, ctx: &Ctx, _: NoOptions) -> Result<Vec<Diagnostic>, Error> {
-    if skipped(ctx) {
-        return Ok(Vec::new());
-    }
-    let project = ctx.project;
-    let mut found = Vec::new();
-    for symbol in functions(ctx) {
-        let Some(target) = forwarded(project, symbol) else {
-            continue;
-        };
-        found.push(finding(
-            meta,
-            symbol,
-            format!(
-                "private helper {} is a single-use forwarding wrapper; inline it",
-                symbol.name
-            ),
-            json!({ "callee": target.as_str(), "callers": project.callers(&symbol.id).len() }),
-        ));
-    }
-    Ok(found)
-}
-
 /// The private target a private undocumented wrapper only forwards to. The
 /// wrapper must have exactly one caller, test callers included, and no use as
 /// a value; a method named like an interface method may be reached through
@@ -79,6 +56,29 @@ pub(crate) fn satisfies_interface(project: &Project, wrapper: &Symbol) -> bool {
                     .and_then(|o| project.symbol(o))
                     .is_some_and(|o| o.kind == SymbolKind::Interface)
         })
+}
+
+fn check(meta: &RuleMeta, ctx: &Ctx, _: NoOptions) -> Result<Vec<Diagnostic>, Error> {
+    if skipped(ctx) {
+        return Ok(Vec::new());
+    }
+    let project = ctx.project;
+    let mut found = Vec::new();
+    for symbol in functions(ctx) {
+        let Some(target) = forwarded(project, symbol) else {
+            continue;
+        };
+        found.push(finding(
+            meta,
+            symbol,
+            format!(
+                "private helper {} is a single-use forwarding wrapper; inline it",
+                symbol.name
+            ),
+            json!({ "callee": target.as_str(), "callers": project.callers(&symbol.id).len() }),
+        ));
+    }
+    Ok(found)
 }
 
 fn reaches(project: &Project, from: &SymbolId, goal: &SymbolId) -> bool {

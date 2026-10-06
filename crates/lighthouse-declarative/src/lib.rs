@@ -12,9 +12,8 @@ mod rule;
 use lighthouse_plugin::{Manifest, Plugin, Rule};
 use lighthouse_spec::{Catalog, Implementation};
 
-pub use definition::{Definition, Select};
-pub use local::{LOCAL_DIR, load_local};
-pub use rule::DeclarativeRule;
+pub use local::load_local;
+use rule::DeclarativeRule;
 
 /// Why a declarative rule could not be built.
 #[derive(Debug, thiserror::Error)]
@@ -65,6 +64,7 @@ impl Declarative {
         })
     }
 
+    /// Whether the pack has no declarative rules.
     pub fn is_empty(&self) -> bool {
         self.definitions.is_empty()
     }
@@ -79,6 +79,7 @@ impl Declarative {
 }
 
 impl Plugin for Declarative {
+    /// The pack id with this crate's version.
     fn manifest(&self) -> Manifest {
         Manifest {
             id: self.id.clone(),
@@ -86,6 +87,7 @@ impl Plugin for Declarative {
         }
     }
 
+    /// One rule per declarative pattern, in catalog order.
     fn rules(&self) -> Vec<Box<dyn Rule>> {
         self.definitions
             .iter()
@@ -94,6 +96,7 @@ impl Plugin for Declarative {
             .collect()
     }
 
+    /// The standard presets over this pack's rules.
     fn presets(&self) -> Vec<lighthouse_plugin::Preset> {
         lighthouse_plugin::Preset::standard(&self.id, self.definitions.iter().map(|r| r.meta()))
     }

@@ -33,8 +33,23 @@ fn resolve(text: &str, path: &str, lang: &str) -> Rules {
         .unwrap()
 }
 
+const LAYERED: &str = r#"
+[rules]
+"core/a" = "warn"
+[[overrides]]
+files = ["internal/**"]
+rules = { "core/a" = "error" }
+[[overrides]]
+languages = ["go"]
+rules = { "core/a" = "info" }
+[[overrides]]
+files = ["internal/**"]
+languages = ["go"]
+rules = { "core/a" = "review" }
+"#;
+
 #[test]
-fn rules_override_extends() {
+fn config_resolve() {
     let got = resolve(
         r#"
 extends = ["core/recommended"]
@@ -48,21 +63,15 @@ extends = ["core/recommended"]
     assert_eq!(got["core/a"], rule(Some(Severity::Error), &[("max", 9)]));
     assert_eq!(got["core/b"], rule(Some(Severity::Info), &[]));
     assert_eq!(got["core/c"], rule(Some(Severity::Review), &[]));
-}
 
-#[test]
-fn level_only_entry_keeps_inherited_options() {
     let got = resolve(
         "extends = [\"core/recommended\"]\n[rules]\n\"core/a\" = \"error\"\n",
         "x.rs",
         "rust",
     );
     assert_eq!(got["core/a"], rule(Some(Severity::Error), &[("max", 5)]));
-}
 
-#[test]
-fn options_merge_per_key_across_extends_rules_and_overrides() {
-    let presets = |_: &str| {
+    let single = |_: &str| {
         Some(Rules::from([(
             "core/a".to_owned(),
             rule(Some(Severity::Warn), &[("max", 5), ("depth", 1)]),
@@ -80,7 +89,7 @@ rules = { "core/a" = { level = "error", depth = 7 } }
     )
     .unwrap();
     let got = config
-        .resolve(Path::new("src/x.rs"), "rust", &presets)
+        .resolve(Path::new("src/x.rs"), "rust", &single)
         .unwrap();
     assert_eq!(
         got["core/a"],
@@ -89,10 +98,25 @@ rules = { "core/a" = { level = "error", depth = 7 } }
             &[("max", 9), ("depth", 7), ("extra", 2)]
         )
     );
+
+    let got = resolve("[rules]\n\"core/a\" = \"off\"\n", "x.rs", "rust");
+    assert_eq!(got["core/a"].level, None);
+
+    let level = |path, lang| resolve(LAYERED, path, lang)["core/a"].level;
+    assert_eq!(level("pkg/x.rs", "rust"), Some(Severity::Warn));
+    assert_eq!(level("internal/x.rs", "rust"), Some(Severity::Error));
+    assert_eq!(level("pkg/x.go", "go"), Some(Severity::Info));
+    assert_eq!(level("internal/x.go", "go"), Some(Severity::Review));
+
+    let config = Config::parse("extends = [\"nope/x\"]").unwrap();
+    let err = config
+        .resolve(Path::new("x"), "text", &presets)
+        .unwrap_err();
+    assert!(matches!(err, Error::UnknownPreset(id) if id == "nope/x"));
 }
 
 #[test]
-fn star_stays_within_a_directory_and_double_star_crosses_them() {
+fn glob_set_star_stays_within_a_directory_and_double_star_crosses_them() {
     let set = glob_set(["*.rs"]).unwrap();
     assert!(set.is_match("a.rs"));
     assert!(!set.is_match("src/a.rs"));
@@ -103,55 +127,19 @@ fn star_stays_within_a_directory_and_double_star_crosses_them() {
 }
 
 #[test]
-fn off_disables_a_rule() {
-    let got = resolve("[rules]\n\"core/a\" = \"off\"\n", "x.rs", "rust");
-    assert_eq!(got["core/a"].level, None);
-}
-
-#[test]
-fn overrides_apply_in_order_by_files_and_language() {
-    let text = r#"
-[rules]
-"core/a" = "warn"
-[[overrides]]
-files = ["internal/**"]
-rules = { "core/a" = "error" }
-[[overrides]]
-languages = ["go"]
-rules = { "core/a" = "info" }
-[[overrides]]
-files = ["internal/**"]
-languages = ["go"]
-rules = { "core/a" = "review" }
-"#;
-    let level = |path, lang| resolve(text, path, lang)["core/a"].level;
-    assert_eq!(level("pkg/x.rs", "rust"), Some(Severity::Warn));
-    assert_eq!(level("internal/x.rs", "rust"), Some(Severity::Error));
-    assert_eq!(level("pkg/x.go", "go"), Some(Severity::Info));
-    assert_eq!(level("internal/x.go", "go"), Some(Severity::Review));
-}
-
-#[test]
-fn unknown_preset_is_an_error() {
-    let config = Config::parse("extends = [\"nope/x\"]").unwrap();
-    let err = config
-        .resolve(Path::new("x"), "text", &presets)
-        .unwrap_err();
-    assert!(matches!(err, Error::UnknownPreset(id) if id == "nope/x"));
-}
-
-#[test]
-fn invalid_input_names_the_problem() {
+fn config_parse() {
     let msg = |text: &str| Config::parse(text).unwrap_err().to_string();
     assert!(msg("[rules]\n\"a/b\" = \"loud\"").contains("unknown severity `loud`"));
     assert!(msg("[rules]\n\"a/b\" = { max = 1 }").contains("requires a string `level`"));
     assert!(msg("[rules]\n\"a/b\" = 3").contains("level string or a table"));
     assert!(msg("bogus = 1").contains("unknown field `bogus`"));
     assert!(msg("[[overrides]]\nfiles = [\"[\"]").contains("invalid glob `[`"));
+    assert!(Config::parse("plugins = [{ path = \"x\" }]").is_err());
+    assert!(Config::parse("plugins = [{ id = \"x\", other = 1 }]").is_err());
 }
 
 #[test]
-fn configured_covers_rules_and_overrides() {
+fn config_configured() {
     let config = Config::parse(
         "[rules]\n\"a/x\" = \"warn\"\n[[overrides]]\nrules = { \"b/y\" = \"off\" }\n",
     )
@@ -161,7 +149,7 @@ fn configured_covers_rules_and_overrides() {
 }
 
 #[test]
-fn discover_walks_up_to_the_nearest_file() {
+fn config_discover_walks_up_to_the_nearest_file() {
     let dir = tempfile::tempdir().unwrap();
     let nested = dir.path().join("a/b");
     std::fs::create_dir_all(&nested).unwrap();
@@ -172,23 +160,47 @@ fn discover_walks_up_to_the_nearest_file() {
 }
 
 #[test]
-fn plugins_accept_ids_and_tables_and_languages_carry_options() {
-    let config = Config::parse(
-        r#"
-plugins = ["core", { id = "lang-go", path = "tools/go", timeout = 30 }]
+fn config_load() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("lighthouse.toml");
+    assert!(matches!(Config::load(&path), Err(Error::Io { .. })));
+    std::fs::write(&path, "extends = [\"core/recommended\"]").unwrap();
+    assert_eq!(Config::load(&path).unwrap().extends(), ["core/recommended"]);
+}
 
-[languages.go]
-tags = ["integration"]
-"#,
+#[test]
+fn config_plugins() {
+    let config = Config::parse(
+        "plugins = [\"core\", { id = \"lang-go\", path = \"tools/go\", timeout = 30 }]",
     )
     .unwrap();
     let plugins = config.plugins();
     assert_eq!(plugins[0], PluginRef::new("core"));
     assert_eq!(plugins[1].id, "lang-go");
     assert_eq!(plugins[1].path.as_deref(), Some(Path::new("tools/go")));
-    assert_eq!(plugins[1].timeout(), Some(Duration::from_secs(30)));
+}
+
+#[test]
+fn plugin_ref_timeout() {
+    let config = Config::parse("plugins = [\"a\", { id = \"b\", timeout = 30 }]").unwrap();
+    assert_eq!(config.plugins()[0].timeout(), None);
+    assert_eq!(config.plugins()[1].timeout(), Some(Duration::from_secs(30)));
+}
+
+#[test]
+fn config_lists() {
+    let config = Config::parse("plugins = [\"lang-go\"]").unwrap();
     assert!(config.lists("lang-go") && !config.lists("design"));
+}
+
+#[test]
+fn config_languages() {
+    let config = Config::parse("[languages.go]\ntags = [\"integration\"]\n").unwrap();
     assert_eq!(config.languages()["go"]["tags"][0], "integration");
-    assert!(Config::parse("plugins = [{ path = \"x\" }]").is_err());
-    assert!(Config::parse("plugins = [{ id = \"x\", other = 1 }]").is_err());
+}
+
+#[test]
+fn config_extends() {
+    let config = Config::parse("extends = [\"a/x\", \"b/y\"]").unwrap();
+    assert_eq!(config.extends(), ["a/x", "b/y"]);
 }

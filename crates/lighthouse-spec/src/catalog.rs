@@ -11,7 +11,7 @@ use serde_json::Value;
 use crate::{
     Content, Error, Example, Implementation, Pack, Pattern, Section,
     load::{self, Files},
-    sources::{Source, extract},
+    sources::{Extractor, Source},
     validate,
 };
 
@@ -19,6 +19,8 @@ const PACK_FILE: &str = "pack.yaml";
 const SECTION_FILE: &str = "section.yaml";
 const SOURCES_FILE: &str = "sources.yaml";
 
+/// A set of packs with the sources and declarative rule files they came from.
+/// A catalog is a layer: `overlay` stacks the project-local layer on the bundled one.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Catalog {
     pub packs: Vec<Pack>,
@@ -83,20 +85,21 @@ impl Catalog {
             .get_or_init(|| Self::from_files(load::embedded()).expect("bundled catalog is valid"))
     }
 
+    /// Reads and validates the catalog under `dir`; see [`Catalog::from_files`].
     pub fn load(dir: &Path) -> Result<Self, Error> {
         Self::from_files(load::read_dir(dir)?)
     }
 
     /// Builds a validated layer from files keyed by `/`-separated paths
-    /// relative to the catalog root. `sources.yaml` is optional. Pattern files holding `extends` become overrides, applied by
-    /// `overlay`.
+    /// relative to the catalog root. `sources.yaml` is optional. Pattern files
+    /// holding `extends` become overrides, applied by `overlay`.
     pub fn from_files(files: Files) -> Result<Self, Error> {
         let mut catalog = Self::default();
         for path in files.keys() {
             if let Some(id) = path.strip_suffix(&format!("/{PACK_FILE}"))
                 && !id.contains('/')
             {
-                load_pack(&files, id, &mut catalog)?;
+                catalog.load_pack(&files, id)?;
             }
         }
         if let Some(text) = files.get(SOURCES_FILE) {
@@ -117,30 +120,15 @@ impl Catalog {
         let mut catalog = Self::default();
         let mut patterns = Vec::new();
         for (name, text) in &files {
-            let mut doc: serde_norway::Mapping = parse(name, text)?;
+            let doc: serde_norway::Mapping = parse(name, text)?;
             if doc.contains_key("extends") {
                 let mut o: Override = parse(name, text)?;
                 o.examples = resolve_all(&files, "", &o.extends, o.examples)?;
                 catalog.overrides.push(o);
                 continue;
             }
-            let rule = doc
-                .remove("rule")
-                .ok_or_else(|| Error::layout(name, "a local rule file needs a `rule:` section"))?;
-            doc.insert(
-                "implementation".into(),
-                serde_norway::from_str(&format!("declarative: {name:?}"))
-                    .map_err(|e| Error::layout(name, e.to_string()))?,
-            );
-            let pattern: Pattern = serde_norway::from_value(doc.into())
-                .map_err(|e| Error::layout(name, e.to_string()))?;
-            if !pattern.id.starts_with("local/") {
-                return Err(Error::layout(
-                    name,
-                    format!("id is `{}`, a local rule is `local/<name>`", pattern.id),
-                ));
-            }
-            catalog.rules.insert(name.clone(), dump(&rule)?);
+            let (pattern, rule) = local_rule(name, doc)?;
+            catalog.rules.insert(name.clone(), rule);
             patterns.push(pattern);
         }
         if !patterns.is_empty() {
@@ -257,7 +245,7 @@ impl Catalog {
     pub fn verify_sources(&self, docs: &BTreeMap<String, String>) -> Result<(), Error> {
         let mut want: BTreeMap<String, String> = BTreeMap::new();
         for (doc, markdown) in docs {
-            for bullet in extract(doc, markdown) {
+            for bullet in Extractor::extract(doc, markdown) {
                 want.insert(bullet.reference, bullet.text);
             }
         }
@@ -289,6 +277,7 @@ impl Catalog {
         ))
     }
 
+    /// Every pattern in pack, section and file order.
     pub fn patterns(&self) -> impl Iterator<Item = &Pattern> {
         self.packs
             .iter()
@@ -296,9 +285,69 @@ impl Catalog {
             .flat_map(|s| &s.patterns)
     }
 
+    /// The pattern with this `<pack>/<name>` id.
     pub fn pattern(&self, id: &str) -> Option<&Pattern> {
         self.patterns().find(|p| p.id == id)
     }
+
+    fn load_pack(&mut self, files: &Files, id: &str) -> Result<(), Error> {
+        let path = format!("{id}/{PACK_FILE}");
+        let file: PackFile = parse(&path, &files[&path])?;
+        expect(&path, id, &file.id)?;
+        check_order(&path, &file.sections, &sections_in(files, id))?;
+        let mut sections = Vec::new();
+        for name in &file.sections {
+            sections.push(self.load_section(files, id, name)?);
+        }
+        self.packs.push(Pack {
+            id: file.id,
+            title: file.title,
+            intro: file.intro,
+            sections,
+        });
+        Ok(())
+    }
+
+    fn load_section(&mut self, files: &Files, pack: &str, name: &str) -> Result<Section, Error> {
+        let path = format!("{pack}/{name}/{SECTION_FILE}");
+        let file: SectionFile = parse(&path, &files[&path])?;
+        expect(&path, name, &file.id)?;
+        check_order(&path, &file.patterns, &patterns_in(files, pack, name))?;
+        let mut patterns = Vec::new();
+        for pattern in &file.patterns {
+            match load_pattern(files, pack, name, pattern)? {
+                Loaded::Pattern(p) => patterns.push(*p),
+                Loaded::Override(o) => self.overrides.push(o),
+            }
+        }
+        Ok(Section {
+            id: file.id,
+            title: file.title,
+            intro: file.intro,
+            patterns,
+        })
+    }
+}
+
+/// The pattern of a local rule file and the text of its `rule:` section.
+fn local_rule(name: &str, mut doc: serde_norway::Mapping) -> Result<(Pattern, String), Error> {
+    let rule = doc
+        .remove("rule")
+        .ok_or_else(|| Error::layout(name, "a local rule file needs a `rule:` section"))?;
+    doc.insert(
+        "implementation".into(),
+        serde_norway::from_str(&format!("declarative: {name:?}"))
+            .map_err(|e| Error::layout(name, e.to_string()))?,
+    );
+    let pattern: Pattern =
+        serde_norway::from_value(doc.into()).map_err(|e| Error::layout(name, e.to_string()))?;
+    if !pattern.id.starts_with("local/") {
+        return Err(Error::layout(
+            name,
+            format!("id is `{}`, a local rule is `local/<name>`", pattern.id),
+        ));
+    }
+    Ok((pattern, dump(&rule)?))
 }
 
 fn merge_sections(into: &mut Pack, from: &Pack) {
@@ -363,49 +412,6 @@ fn parse<T: DeserializeOwned>(path: &str, text: &str) -> Result<T, Error> {
     serde_norway::from_str(text).map_err(|e| Error::Parse {
         path: path.to_owned(),
         message: e.to_string(),
-    })
-}
-
-fn load_pack(files: &Files, id: &str, catalog: &mut Catalog) -> Result<(), Error> {
-    let path = format!("{id}/{PACK_FILE}");
-    let file: PackFile = parse(&path, &files[&path])?;
-    expect(&path, id, &file.id)?;
-    check_order(&path, &file.sections, &sections_in(files, id))?;
-    let mut sections = Vec::new();
-    for name in &file.sections {
-        sections.push(load_section(files, id, name, catalog)?);
-    }
-    catalog.packs.push(Pack {
-        id: file.id,
-        title: file.title,
-        intro: file.intro,
-        sections,
-    });
-    Ok(())
-}
-
-fn load_section(
-    files: &Files,
-    pack: &str,
-    name: &str,
-    catalog: &mut Catalog,
-) -> Result<Section, Error> {
-    let path = format!("{pack}/{name}/{SECTION_FILE}");
-    let file: SectionFile = parse(&path, &files[&path])?;
-    expect(&path, name, &file.id)?;
-    check_order(&path, &file.patterns, &patterns_in(files, pack, name))?;
-    let mut patterns = Vec::new();
-    for pattern in &file.patterns {
-        match load_pattern(files, pack, name, pattern)? {
-            Loaded::Pattern(p) => patterns.push(*p),
-            Loaded::Override(o) => catalog.overrides.push(o),
-        }
-    }
-    Ok(Section {
-        id: file.id,
-        title: file.title,
-        intro: file.intro,
-        patterns,
     })
 }
 

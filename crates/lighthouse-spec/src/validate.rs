@@ -70,6 +70,10 @@ pub(crate) fn pattern(pattern: &Pattern) -> Result<(), Error> {
     implementation(pattern, checkable)
 }
 
+pub(crate) fn relative(path: &str) -> bool {
+    !path.is_empty() && !path.starts_with('/') && path.split('/').all(|part| part != "..")
+}
+
 fn options(pattern: &Pattern) -> Result<(), Error> {
     for (key, spec) in &pattern.options {
         let values = std::iter::once(&spec.default).chain(spec.per_language.values());
@@ -144,10 +148,6 @@ fn implementation(pattern: &Pattern, checkable: bool) -> Result<(), Error> {
         ));
     }
     Ok(())
-}
-
-pub(crate) fn relative(path: &str) -> bool {
-    !path.is_empty() && !path.starts_with('/') && path.split('/').all(|part| part != "..")
 }
 
 fn kebab(name: &str) -> Result<(), Error> {

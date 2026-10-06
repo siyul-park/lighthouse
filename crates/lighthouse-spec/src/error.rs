@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+/// Why a catalog could not be read, built, validated or written; every
+/// variant names the offending file or pattern.
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("cannot read {path}: {source}")]

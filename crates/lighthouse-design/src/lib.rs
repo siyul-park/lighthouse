@@ -17,11 +17,14 @@ use lighthouse_model::{Diagnostic, Fingerprint, Symbol, SymbolKind};
 use lighthouse_plugin::{Ctx, Manifest, Plugin, Preset, Rule, RuleMeta};
 use serde_json::Value;
 
+/// Id of the plugin and prefix of every rule it provides.
 pub const ID: &str = "design";
 
+/// The design rules plugin: the rules of the bundled `design` pack.
 pub struct Design;
 
 impl Plugin for Design {
+    /// The plugin id with this crate's version.
     fn manifest(&self) -> Manifest {
         Manifest {
             id: ID.to_owned(),
@@ -29,6 +32,7 @@ impl Plugin for Design {
         }
     }
 
+    /// Every rule of the pack, native and declarative.
     fn rules(&self) -> Vec<Box<dyn Rule>> {
         let mut rules = vec![
             banner::rule(),
@@ -47,6 +51,7 @@ impl Plugin for Design {
         rules
     }
 
+    /// The standard presets over the pack's rules.
     fn presets(&self) -> Vec<Preset> {
         let rules = self.rules();
         Preset::standard(ID, rules.iter().map(|rule| rule.meta()))

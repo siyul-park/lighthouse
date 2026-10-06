@@ -38,20 +38,6 @@ pub(crate) fn declarations<'a>(ctx: &Ctx<'a>) -> Vec<Vec<&'a Symbol>> {
     modules.into_iter().map(|(_, list)| list).collect()
 }
 
-fn is_declaration(project: &Project, symbol: &Symbol) -> bool {
-    use SymbolKind::{Const, Function, Interface, Method, Type, Var};
-    if !matches!(
-        symbol.kind,
-        Type | Interface | Const | Var | Function | Method
-    ) {
-        return false;
-    }
-    match symbol.owner.as_ref().and_then(|o| project.symbol(o)) {
-        None => true,
-        Some(owner) => owner.kind == Type && matches!(symbol.kind, Method | Const | Var),
-    }
-}
-
 /// Visible beyond its own scope: public, or public inside the project.
 pub(crate) fn exposed(symbol: &Symbol) -> bool {
     symbol.visibility != Visibility::Private
@@ -83,4 +69,18 @@ pub(crate) fn has_word_prefix(name: &str, prefix: &str) -> bool {
             .next()
             .is_none_or(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit())
     })
+}
+
+fn is_declaration(project: &Project, symbol: &Symbol) -> bool {
+    use SymbolKind::{Const, Function, Interface, Method, Type, Var};
+    if !matches!(
+        symbol.kind,
+        Type | Interface | Const | Var | Function | Method
+    ) {
+        return false;
+    }
+    match symbol.owner.as_ref().and_then(|o| project.symbol(o)) {
+        None => true,
+        Some(owner) => owner.kind == Type && matches!(symbol.kind, Method | Const | Var),
+    }
 }

@@ -5,12 +5,22 @@ use std::{
 };
 
 use ignore::WalkBuilder;
-use lighthouse_config::{Config, GlobSet, glob_set};
+use lighthouse_config::{Config, GlobSet, Rules, glob_set};
 use lighthouse_model::{Diagnostic, File, Fragment, Incomplete, Project, Severity};
 use lighthouse_plugin::{Ctx, Facts, LanguageProvider, Registry, Rule, Scope, Source, Workspace};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
+/// Name of the file, in `.gitignore` syntax, that keeps files out of the
+/// analysis altogether, such as fixtures that are broken on purpose.
+pub const IGNORE_FILE: &str = ".lighthouseignore";
+
+/// Process exit code of a run whose analysis was incomplete.
+pub const EXIT_INCOMPLETE: u8 = 3;
+
+/// Why a run could not start or finish: invalid configuration, unknown or
+/// unlisted plugin or rule, or an unreadable path. Analysis gaps are not
+/// errors; they are [`Outcome::incomplete`].
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
@@ -29,20 +39,7 @@ pub enum Error {
     RuleNotEnabled(String),
 }
 
-fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error {
-    |source| Error::Io {
-        path: path.to_owned(),
-        source,
-    }
-}
-
-/// Name of the file, in `.gitignore` syntax, that keeps files out of the
-/// analysis altogether, such as fixtures that are broken on purpose.
-pub const IGNORE_FILE: &str = ".lighthouseignore";
-
-/// Process exit code of a run whose analysis was incomplete.
-pub const EXIT_INCOMPLETE: u8 = 3;
-
+/// The result of a run: findings, notices and the parts that were not analyzed.
 #[derive(Debug, Default)]
 pub struct Outcome {
     /// Sorted by file, line, column, rule; limited to the requested paths.
@@ -91,6 +88,8 @@ struct Input {
     language: usize,
 }
 
+/// A configured set of plugins that analyzes one project root. Running it does
+/// not modify the project or the engine.
 pub struct Engine {
     registry: Registry,
     config: Config,
@@ -107,52 +106,8 @@ pub struct Engine {
 impl Engine {
     /// `root` is the directory of `lighthouse.toml`; globs match paths relative to it.
     pub fn new(registry: Registry, config: Config, root: &Path) -> Result<Self, Error> {
-        for plugin in config.plugins() {
-            if !registry.has_plugin(&plugin.id) {
-                return Err(Error::UnknownPlugin(plugin.id.clone()));
-            }
-        }
-        registry.validate()?;
-        let listed = |id: &str| config.lists(lighthouse_plugin::plugin_of(id));
-        let mut entries: Vec<_> = config
-            .configured()
-            .map(|(id, c)| (id.to_owned(), c.options.clone()))
-            .collect();
-        for preset in config.extends() {
-            let preset = registry
-                .preset(preset)
-                .ok_or_else(|| lighthouse_config::Error::UnknownPreset(preset.clone()))?;
-            if !listed(&preset.id) {
-                return Err(Error::PluginNotListed(preset.id.clone()));
-            }
-            entries.extend(
-                preset
-                    .rules
-                    .iter()
-                    .map(|(id, c)| (id.clone(), c.options.clone())),
-            );
-        }
-        for (id, options) in &entries {
-            let rule = registry
-                .rule(id)
-                .ok_or_else(|| Error::UnknownRule(id.clone()))?;
-            if !listed(id) {
-                return Err(Error::PluginNotListed(id.clone()));
-            }
-            rule.validate(options)?;
-        }
-
-        let mut providers = Vec::new();
-        let mut languages = Vec::new();
-        for (plugin, provider) in registry.languages() {
-            if config.lists(plugin) {
-                providers.push(languages.len());
-            }
-            languages.push(Language {
-                files: glob_set(provider.globs())?,
-                tests: glob_set(provider.conventions().test_globs)?,
-            });
-        }
+        validate_config(&registry, &config)?;
+        let (providers, languages) = load_languages(&registry, &config)?;
         let ws = Workspace {
             root: root.canonicalize().map_err(io_error(root))?,
             languages: config.languages().clone(),
@@ -213,7 +168,7 @@ impl Engine {
             Reported::Files(files) => files.to_vec(),
         };
         let inputs = self.read(&mut outcome.notices, &mut incomplete);
-        let (inputs, project) = self.index(inputs, &mut outcome.notices, &mut incomplete);
+        let (inputs, project) = self.build_project(inputs, &mut outcome.notices, &mut incomplete);
         let facts = self.analyze(&selected, &inputs, &project)?;
         let mut found = self.apply(&selected, &inputs, &project, &facts, &mut outcome.notices)?;
 
@@ -237,10 +192,9 @@ impl Engine {
     }
 
     fn active_rules(&self) -> Result<BTreeSet<String>, Error> {
-        let presets = |id: &str| self.registry.preset(id).map(|p| p.rules.clone());
         let mut active: BTreeSet<String> = self
             .config
-            .resolve(Path::new(""), "", &presets)?
+            .resolve(Path::new(""), "", &|id| self.preset_rules(id))?
             .into_iter()
             .filter_map(|(id, c)| c.level.map(|_| id))
             .collect();
@@ -300,52 +254,63 @@ impl Engine {
                 });
                 continue;
             };
-            let Some(&language) = self
-                .providers
-                .iter()
-                .find(|&&i| self.languages[i].files.is_match(rel))
-            else {
-                continue;
-            };
-            let text = match fs::read_to_string(entry.path()) {
-                Ok(text) => text,
-                Err(e) if e.kind() == io::ErrorKind::InvalidData => {
-                    if self.provider(language).fallback() {
-                        notices.insert(format!("{}: skipped, not valid UTF-8", rel.display()));
-                    } else {
-                        incomplete.push(Incomplete {
-                            path: Some(rel.to_owned()),
-                            reason: "not valid UTF-8".to_owned(),
-                        });
-                    }
-                    continue;
-                }
-                Err(e) => {
-                    incomplete.push(Incomplete {
-                        path: Some(rel.to_owned()),
-                        reason: format!("unreadable: {e}"),
-                    });
-                    continue;
-                }
-            };
-            let file = File {
-                path: rel.to_owned(),
-                lang: self.provider(language).id().to_owned(),
-                hash: Sha256::digest(text.as_bytes())
-                    .iter()
-                    .map(|b| format!("{b:02x}"))
-                    .collect(),
-                generated: false,
-                test: self.languages[language].tests.is_match(rel),
-            };
-            inputs.push(Input {
-                file,
-                text,
-                language,
-            });
+            if let Some(input) = self.read_input(entry.path(), rel, notices, incomplete) {
+                inputs.push(input);
+            }
         }
         inputs.sort_by(|a, b| a.file.path.cmp(&b.file.path));
         inputs
+    }
+
+    /// Reads one file if a listed language claims it; a file that cannot be read
+    /// becomes an incomplete entry (or a notice for binary data) and is dropped.
+    fn read_input(
+        &self,
+        path: &Path,
+        rel: &Path,
+        notices: &mut BTreeSet<String>,
+        incomplete: &mut Vec<Incomplete>,
+    ) -> Option<Input> {
+        let &language = self
+            .providers
+            .iter()
+            .find(|&&i| self.languages[i].files.is_match(rel))?;
+        let text = match fs::read_to_string(path) {
+            Ok(text) => text,
+            Err(e) if e.kind() == io::ErrorKind::InvalidData => {
+                if self.provider(language).fallback() {
+                    notices.insert(format!("{}: skipped, not valid UTF-8", rel.display()));
+                } else {
+                    incomplete.push(Incomplete {
+                        path: Some(rel.to_owned()),
+                        reason: "not valid UTF-8".to_owned(),
+                    });
+                }
+                return None;
+            }
+            Err(e) => {
+                incomplete.push(Incomplete {
+                    path: Some(rel.to_owned()),
+                    reason: format!("unreadable: {e}"),
+                });
+                return None;
+            }
+        };
+        let file = File {
+            path: rel.to_owned(),
+            lang: self.provider(language).id().to_owned(),
+            hash: Sha256::digest(text.as_bytes())
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect(),
+            generated: false,
+            test: self.languages[language].tests.is_match(rel),
+        };
+        Some(Input {
+            file,
+            text,
+            language,
+        })
     }
 
     fn provider(&self, language: usize) -> &dyn LanguageProvider {
@@ -356,9 +321,9 @@ impl Engine {
             .expect("language index comes from the registry")
     }
 
-    /// Indexes each provider's files in one batch. Files a provider did not
+    /// Has each provider index its files in one batch and merges the fragments. Files a provider did not
     /// index drop out; the reason is recorded as incomplete.
-    fn index(
+    fn build_project(
         &self,
         inputs: Vec<Input>,
         notices: &mut BTreeSet<String>,
@@ -443,14 +408,26 @@ impl Engine {
         facts: &Facts,
         notices: &mut BTreeSet<String>,
     ) -> Result<Vec<Diagnostic>, Error> {
-        let presets = |id: &str| self.registry.preset(id).map(|p| p.rules.clone());
-        let mut found = Vec::new();
-        let languages: BTreeSet<usize> = inputs.iter().map(|i| i.language).collect();
+        let mut found = self.apply_file_rules(rules, inputs, project, facts, notices)?;
+        found.extend(self.apply_project_rules(rules, inputs, project, facts, notices)?);
+        Ok(found)
+    }
 
+    fn apply_file_rules(
+        &self,
+        rules: &[&dyn Rule],
+        inputs: &[Input],
+        project: &Project,
+        facts: &Facts,
+        notices: &mut BTreeSet<String>,
+    ) -> Result<Vec<Diagnostic>, Error> {
+        let mut found = Vec::new();
         for input in inputs {
             let resolved = self
                 .config
-                .resolve(&input.file.path, &input.file.lang, &presets)?;
+                .resolve(&input.file.path, &input.file.lang, &|id| {
+                    self.preset_rules(id)
+                })?;
             let provider = self.provider(input.language);
             for rule in rules.iter().filter(|r| r.meta().scope == Scope::File) {
                 let meta = rule.meta();
@@ -481,8 +458,22 @@ impl Engine {
                 }
             }
         }
+        Ok(found)
+    }
 
-        let resolved = self.config.resolve(Path::new(""), "", &presets)?;
+    fn apply_project_rules(
+        &self,
+        rules: &[&dyn Rule],
+        inputs: &[Input],
+        project: &Project,
+        facts: &Facts,
+        notices: &mut BTreeSet<String>,
+    ) -> Result<Vec<Diagnostic>, Error> {
+        let languages: BTreeSet<usize> = inputs.iter().map(|i| i.language).collect();
+        let resolved = self
+            .config
+            .resolve(Path::new(""), "", &|id| self.preset_rules(id))?;
+        let mut found = Vec::new();
         for rule in rules.iter().filter(|r| r.meta().scope == Scope::Project) {
             let meta = rule.meta();
             let Some(config) = resolved.get(&meta.id) else {
@@ -513,5 +504,75 @@ impl Engine {
             }
         }
         Ok(found)
+    }
+
+    fn preset_rules(&self, id: &str) -> Option<Rules> {
+        self.registry.preset(id).map(|p| p.rules.clone())
+    }
+}
+
+/// Rejects a configuration that names plugins, presets or rules the registry
+/// lacks, lists them inconsistently, or gives a rule invalid options.
+fn validate_config(registry: &Registry, config: &Config) -> Result<(), Error> {
+    for plugin in config.plugins() {
+        if !registry.has_plugin(&plugin.id) {
+            return Err(Error::UnknownPlugin(plugin.id.clone()));
+        }
+    }
+    registry.validate()?;
+    let listed = |id: &str| config.lists(lighthouse_plugin::plugin_of(id));
+    let mut entries: Vec<_> = config
+        .configured()
+        .map(|(id, c)| (id.to_owned(), c.options.clone()))
+        .collect();
+    for preset in config.extends() {
+        let preset = registry
+            .preset(preset)
+            .ok_or_else(|| lighthouse_config::Error::UnknownPreset(preset.clone()))?;
+        if !listed(&preset.id) {
+            return Err(Error::PluginNotListed(preset.id.clone()));
+        }
+        entries.extend(
+            preset
+                .rules
+                .iter()
+                .map(|(id, c)| (id.clone(), c.options.clone())),
+        );
+    }
+    for (id, options) in &entries {
+        let rule = registry
+            .rule(id)
+            .ok_or_else(|| Error::UnknownRule(id.clone()))?;
+        if !listed(id) {
+            return Err(Error::PluginNotListed(id.clone()));
+        }
+        rule.validate(options)?;
+    }
+    Ok(())
+}
+
+/// The language providers of the registry, and which of them listed plugins enable.
+fn load_languages(
+    registry: &Registry,
+    config: &Config,
+) -> Result<(Vec<usize>, Vec<Language>), Error> {
+    let mut providers = Vec::new();
+    let mut languages = Vec::new();
+    for (plugin, provider) in registry.languages() {
+        if config.lists(plugin) {
+            providers.push(languages.len());
+        }
+        languages.push(Language {
+            files: glob_set(provider.globs())?,
+            tests: glob_set(provider.conventions().test_globs)?,
+        });
+    }
+    Ok((providers, languages))
+}
+
+fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error {
+    |source| Error::Io {
+        path: path.to_owned(),
+        source,
     }
 }

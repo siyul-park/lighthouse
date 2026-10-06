@@ -20,6 +20,8 @@ pub struct RuleTester<'a> {
 }
 
 impl<'a> RuleTester<'a> {
+    /// A tester over `catalog` that builds a fresh registry from `registry` for
+    /// every example.
     pub fn new(registry: impl Fn() -> Registry + 'a, catalog: &'a Catalog) -> Self {
         Self {
             registry: Box::new(registry),

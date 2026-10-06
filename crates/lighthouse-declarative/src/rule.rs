@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use cel::{Context, Program};
-use lighthouse_model::{Diagnostic, Fingerprint, Options, Span, Symbol};
+use lighthouse_model::{Diagnostic, Fingerprint, Options, Project, Span, Symbol};
 use lighthouse_plugin::{Ctx, Error as PluginError, Rule, RuleMeta, Scope};
 use lighthouse_spec::Pattern;
 use serde_json::{Map, Value};
@@ -14,7 +14,7 @@ use crate::{
 
 /// A rule built from a pattern and its rule file.
 #[derive(Clone)]
-pub struct DeclarativeRule {
+pub(crate) struct DeclarativeRule {
     meta: RuleMeta,
     compiled: Arc<Compiled>,
 }
@@ -23,7 +23,7 @@ impl DeclarativeRule {
     /// Compiles the rule file `text` for `pattern`. The pattern's scope must
     /// agree with what the rule selects, and it declares no options: a
     /// declarative rule is tuned by editing its expression.
-    pub fn new(pattern: &Pattern, text: &str) -> Result<Self, Error> {
+    pub(crate) fn new(pattern: &Pattern, text: &str) -> Result<Self, Error> {
         let definition: Definition =
             serde_norway::from_str(text).map_err(|e| Error::invalid(&pattern.id, e.to_string()))?;
         let mut meta = pattern.rule_meta().ok_or_else(|| {
@@ -45,12 +45,133 @@ impl DeclarativeRule {
             meta,
         })
     }
+}
 
-    fn fail(&self, message: impl std::fmt::Display) -> PluginError {
-        PluginError::Failed(format!("{}: {message}", self.meta.id))
+impl Rule for DeclarativeRule {
+    /// The metadata of the pattern the rule was built from.
+    fn meta(&self) -> &RuleMeta {
+        &self.meta
     }
 
-    /// Evaluates the rule for one selected value; `at` is where a finding goes.
+    /// Rejects every option: a declarative rule is tuned by editing its expression.
+    fn validate(&self, options: &Options) -> Result<(), PluginError> {
+        match options.keys().next() {
+            None => Ok(()),
+            Some(key) => Err(PluginError::Options {
+                rule: self.meta.id.clone(),
+                message: format!("unknown option `{key}`: a declarative rule has none"),
+            }),
+        }
+    }
+
+    /// Runs once per file or once over the project, following the pattern's scope.
+    fn check(&self, ctx: &Ctx, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
+        match self.meta.scope {
+            Scope::File => self.check_file(ctx),
+            Scope::Project => self.check_project(ctx),
+        }
+    }
+}
+
+impl DeclarativeRule {
+    fn check_file(&self, ctx: &Ctx) -> Result<Vec<Diagnostic>, PluginError> {
+        let Some((file, text)) = ctx.file else {
+            return Ok(Vec::new());
+        };
+        let project = ctx.project;
+        let mut found = Vec::new();
+        match self.compiled.select {
+            Select::File => {
+                let at = top_of_file();
+                let value = facts::file(project, file, text);
+                found.extend(self.judge(
+                    &value,
+                    file.path.clone(),
+                    at,
+                    &file.path.to_string_lossy(),
+                )?);
+            }
+            Select::Symbol => {
+                for symbol in project.symbols_in(&file.path) {
+                    let value = facts::symbol(project, symbol);
+                    found.extend(self.judge_symbol(symbol, &value)?);
+                }
+            }
+            Select::Function => {
+                for symbol in project.symbols_in(&file.path) {
+                    if let Some(value) = facts::function(project, symbol) {
+                        found.extend(self.judge_symbol(symbol, &value)?);
+                    }
+                }
+            }
+            Select::Test => {
+                for symbol in project.symbols_in(&file.path) {
+                    if let Some(case) = project.test(&symbol.id) {
+                        let value = facts::test(project, symbol, case);
+                        found.extend(self.judge_symbol(symbol, &value)?);
+                    }
+                }
+            }
+            Select::Edge | Select::Module => {}
+        }
+        Ok(found)
+    }
+
+    fn check_project(&self, ctx: &Ctx) -> Result<Vec<Diagnostic>, PluginError> {
+        let project = ctx.project;
+        let first_file = module_anchors(project);
+        let mut found = Vec::new();
+        match self.compiled.select {
+            Select::Module => {
+                for module in &project.modules {
+                    let Some((anchor, count)) = first_file.get(module.path.as_str()) else {
+                        continue;
+                    };
+                    let files = project
+                        .files
+                        .iter()
+                        .filter(|f| {
+                            project
+                                .symbols_in(&f.path)
+                                .any(|s| s.id.module() == module.path)
+                        })
+                        .count();
+                    let value = facts::module(module, files, *count);
+                    found.extend(self.judge(
+                        &value,
+                        anchor.file.clone(),
+                        top_of_file(),
+                        &module.path,
+                    )?);
+                }
+            }
+            Select::Edge => {
+                for edge in &project.edges {
+                    let anchor = match &edge.from {
+                        lighthouse_model::Node::Symbol(id) => project.symbol(id),
+                        lighthouse_model::Node::Module(m) => {
+                            first_file.get(m.as_str()).map(|(s, _)| *s)
+                        }
+                    };
+                    let Some(anchor) = anchor else { continue };
+                    let value = facts::edge(project, edge);
+                    let key = format!("{:?}->{:?}", edge.from, edge.to);
+                    found.extend(self.judge(&value, anchor.file.clone(), anchor.span, &key)?);
+                }
+            }
+            _ => {}
+        }
+        Ok(found)
+    }
+    fn judge_symbol(
+        &self,
+        symbol: &Symbol,
+        value: &Value,
+    ) -> Result<Option<Diagnostic>, PluginError> {
+        self.judge(value, symbol.file.clone(), symbol.span, symbol.id.as_str())
+    }
+
+    /// Evaluates the rule for one selected value; a finding is reported at `span` of `file`.
     fn judge(
         &self,
         value: &Value,
@@ -94,139 +215,29 @@ impl DeclarativeRule {
         program.execute(context).map_err(|e| self.fail(e))
     }
 
-    fn symbol_found(
-        &self,
-        symbol: &Symbol,
-        value: &Value,
-    ) -> Result<Option<Diagnostic>, PluginError> {
-        self.judge(value, symbol.file.clone(), symbol.span, symbol.id.as_str())
+    fn fail(&self, message: impl std::fmt::Display) -> PluginError {
+        PluginError::Failed(format!("{}: {message}", self.meta.id))
     }
+}
 
-    fn check_file(&self, ctx: &Ctx) -> Result<Vec<Diagnostic>, PluginError> {
-        let Some((file, text)) = ctx.file else {
-            return Ok(Vec::new());
-        };
-        let project = ctx.project;
-        let mut found = Vec::new();
-        match self.compiled.select {
-            Select::File => {
-                let at = top_of_file();
-                let value = facts::file(project, file, text);
-                found.extend(self.judge(
-                    &value,
-                    file.path.clone(),
-                    at,
-                    &file.path.to_string_lossy(),
-                )?);
-            }
-            Select::Symbol => {
-                for symbol in project.symbols_in(&file.path) {
-                    let value = facts::symbol(project, symbol);
-                    found.extend(self.symbol_found(symbol, &value)?);
-                }
-            }
-            Select::Function => {
-                for symbol in project.symbols_in(&file.path) {
-                    if let Some(value) = facts::function(project, symbol) {
-                        found.extend(self.symbol_found(symbol, &value)?);
-                    }
-                }
-            }
-            Select::Test => {
-                for symbol in project.symbols_in(&file.path) {
-                    if let Some(case) = project.test(&symbol.id) {
-                        let value = facts::test(project, symbol, case);
-                        found.extend(self.symbol_found(symbol, &value)?);
-                    }
-                }
-            }
-            Select::Edge | Select::Module => {}
+/// The symbol of each module that sorts first by file and position, with the
+/// module's symbol count; project-scope findings are reported there.
+fn module_anchors(project: &Project) -> BTreeMap<&str, (&Symbol, usize)> {
+    let mut anchors: BTreeMap<&str, (&Symbol, usize)> = BTreeMap::new();
+    for symbol in &project.symbols {
+        let entry = anchors.entry(symbol.id.module()).or_insert((symbol, 0));
+        entry.1 += 1;
+        if (&symbol.file, symbol.span.start) < (&entry.0.file, entry.0.span.start) {
+            entry.0 = symbol;
         }
-        Ok(found)
     }
-
-    fn check_project(&self, ctx: &Ctx) -> Result<Vec<Diagnostic>, PluginError> {
-        let project = ctx.project;
-        let mut first_file: BTreeMap<&str, (&Symbol, usize)> = BTreeMap::new();
-        for symbol in &project.symbols {
-            let entry = first_file.entry(symbol.id.module()).or_insert((symbol, 0));
-            entry.1 += 1;
-            if (&symbol.file, symbol.span.start) < (&entry.0.file, entry.0.span.start) {
-                entry.0 = symbol;
-            }
-        }
-        let mut found = Vec::new();
-        match self.compiled.select {
-            Select::Module => {
-                for module in &project.modules {
-                    let Some((anchor, count)) = first_file.get(module.path.as_str()) else {
-                        continue;
-                    };
-                    let files = project
-                        .files
-                        .iter()
-                        .filter(|f| {
-                            project
-                                .symbols_in(&f.path)
-                                .any(|s| s.id.module() == module.path)
-                        })
-                        .count();
-                    let value = facts::module(project, module, files, *count);
-                    found.extend(self.judge(
-                        &value,
-                        anchor.file.clone(),
-                        top_of_file(),
-                        &module.path,
-                    )?);
-                }
-            }
-            Select::Edge => {
-                for edge in &project.edges {
-                    let anchor = match &edge.from {
-                        lighthouse_model::Node::Symbol(id) => project.symbol(id),
-                        lighthouse_model::Node::Module(m) => {
-                            first_file.get(m.as_str()).map(|(s, _)| *s)
-                        }
-                    };
-                    let Some(anchor) = anchor else { continue };
-                    let value = facts::edge(project, edge);
-                    let key = format!("{:?}->{:?}", edge.from, edge.to);
-                    found.extend(self.judge(&value, anchor.file.clone(), anchor.span, &key)?);
-                }
-            }
-            _ => {}
-        }
-        Ok(found)
-    }
+    anchors
 }
 
 /// The start of a file, where findings that belong to a whole file go.
 fn top_of_file() -> Span {
     let p = lighthouse_model::Position { line: 1, col: 1 };
     Span { start: p, end: p }
-}
-
-impl Rule for DeclarativeRule {
-    fn meta(&self) -> &RuleMeta {
-        &self.meta
-    }
-
-    fn validate(&self, options: &Options) -> Result<(), PluginError> {
-        match options.keys().next() {
-            None => Ok(()),
-            Some(key) => Err(PluginError::Options {
-                rule: self.meta.id.clone(),
-                message: format!("unknown option `{key}`: a declarative rule has none"),
-            }),
-        }
-    }
-
-    fn check(&self, ctx: &Ctx, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
-        match self.meta.scope {
-            Scope::File => self.check_file(ctx),
-            Scope::Project => self.check_project(ctx),
-        }
-    }
 }
 
 fn render(value: &cel::Value) -> String {

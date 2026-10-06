@@ -266,3 +266,18 @@ fn engine_errors_in_an_example_are_failures_not_panics() {
         "{failures:?}"
     );
 }
+
+#[test]
+fn rule_tester_check() {
+    let catalog = catalog(HOLDING);
+    let pattern = catalog.pattern("fake/marker").unwrap();
+    assert!(
+        RuleTester::new(registry, &catalog)
+            .check(pattern)
+            .is_empty()
+    );
+    let failures = RuleTester::new(registry, &catalog)
+        .language("go")
+        .check(pattern);
+    assert_eq!(failures, ["fake/marker: no example for language `go`"]);
+}
