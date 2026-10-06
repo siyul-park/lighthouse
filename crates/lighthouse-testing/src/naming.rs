@@ -1,7 +1,7 @@
 //! Which test names an owner test: the convention that ties a top-level test
 //! function to one public symbol.
 
-use lighthouse_model::{Project, Symbol, SymbolId, SymbolKind, TestCase};
+use lighthouse_model::{Module, Project, Symbol, SymbolId, SymbolKind, TestCase};
 use serde::Deserialize;
 
 #[derive(Deserialize, Clone)]
@@ -13,6 +13,11 @@ pub(crate) struct Naming {
     pub snake_case: bool,
     /// `TestGet_Missing` is another owner of `Get`, not a case of it.
     pub variant_tests: bool,
+    /// The tests of a module that tests an ancestor module also name the
+    /// symbols of the nested module (the integration tests of a crate test
+    /// all of it). Only owner-test reads it.
+    #[serde(default)]
+    pub ancestor_tests: bool,
 }
 
 /// How a test name maps to a symbol.
@@ -32,9 +37,43 @@ impl Naming {
         project: &'p Project,
         symbol: &Symbol,
     ) -> Vec<(&'p TestCase, Match)> {
+        self.mapped(
+            project,
+            symbol,
+            testing_modules(project, symbol.id.module()),
+        )
+    }
+
+    /// Like [`Naming::owner_tests`], but with `ancestor_tests` also the tests
+    /// of a module that tests an ancestor of the symbol's module, so the
+    /// integration tests of a crate root count for every module of the crate,
+    /// including the private ones whose public items the root re-exports.
+    pub(crate) fn credited_tests<'p>(
+        &self,
+        project: &'p Project,
+        symbol: &Symbol,
+    ) -> Vec<(&'p TestCase, Match)> {
         let module = symbol.id.module();
+        if !self.ancestor_tests {
+            return self.owner_tests(project, symbol);
+        }
+        let modules = project
+            .modules
+            .iter()
+            .filter(|m| m.path == module || tests_ancestor(m, module))
+            .map(|m| m.path.clone())
+            .collect();
+        self.mapped(project, symbol, modules)
+    }
+
+    fn mapped<'p>(
+        &self,
+        project: &'p Project,
+        symbol: &Symbol,
+        modules: Vec<String>,
+    ) -> Vec<(&'p TestCase, Match)> {
         let mut found = Vec::new();
-        for tests in testing_modules(project, module) {
+        for tests in modules {
             for test in project.tests_in(&tests) {
                 if let Some(kind) = self.maps(project, test, symbol) {
                     found.push((test, kind));
@@ -128,6 +167,17 @@ fn testing_modules(project: &Project, module: &str) -> Vec<String> {
         .filter(|m| m.path == module || m.test_of.as_deref() == Some(module))
         .map(|m| m.path.clone())
         .collect()
+}
+
+/// Whether `tests` tests `module` or a module that contains it (a nested
+/// module path, `crate/a/b` inside `crate`).
+fn tests_ancestor(tests: &Module, module: &str) -> bool {
+    tests.test_of.as_deref().is_some_and(|tested| {
+        tested == module
+            || module
+                .strip_prefix(tested)
+                .is_some_and(|rest| rest.starts_with('/'))
+    })
 }
 
 fn test_name(id: &SymbolId) -> Option<&str> {

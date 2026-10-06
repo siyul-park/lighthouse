@@ -3,7 +3,7 @@
 #[path = "../../lighthouse-design/tests/support/mod.rs"]
 mod support;
 
-use lighthouse_model::{EdgeKind, Symbol, SymbolKind, Visibility};
+use lighthouse_model::{EdgeKind, Resolution, Symbol, SymbolKind, Visibility};
 use lighthouse_testing::Testing;
 use serde_json::{Value, json};
 use support::{Subject, World};
@@ -207,4 +207,61 @@ fn owner_test_exempts_data_types_and_trait_impl_methods() {
     );
     let all = w.names(&check(&w, OWNER, json!({ "include_data_types": true })));
     assert_eq!(all, ["Data", "Object"]);
+}
+
+/// A crate `c` with a private submodule `c::sub` that declares `parse`, and an
+/// integration-test module of the crate root with the named tests.
+fn crate_with_submodule(tests: &[&str]) -> (World, Symbol) {
+    let mut w = World::default();
+    w.module("c", None, None);
+    w.module("c/sub", None, None);
+    w.module("c[test:api]", None, Some("c"));
+    let parse = w.func("c/sub", "parse", "c/sub.ucm");
+    for name in tests {
+        let test = w.symbol("c[test:api]", name, SymbolKind::Test, "c/tests/api.ucm");
+        w.test_case(&test, &[]);
+    }
+    (w, parse)
+}
+
+fn rust_naming() -> Value {
+    json!({ "test_prefix": "", "snake_case": true, "variant_tests": false, "ancestor_tests": true })
+}
+
+#[test]
+fn owner_test_credits_integration_tests_of_the_crate_root_to_its_submodules() {
+    let (w, _) = crate_with_submodule(&["parse"]);
+    assert!(check(&w, OWNER, rust_naming()).is_empty());
+    let (w, _) = crate_with_submodule(&["other"]);
+    assert_eq!(w.names(&check(&w, OWNER, rust_naming())), ["parse"]);
+}
+
+#[test]
+fn owner_test_accepts_a_heuristic_reference_from_test_code() {
+    let (mut w, parse) = crate_with_submodule(&["other"]);
+    let test = w
+        .symbols
+        .iter()
+        .find(|s| s.name == "other")
+        .unwrap()
+        .clone();
+    w.edge(EdgeKind::References, &test, &parse);
+    w.edges.last_mut().unwrap().resolution = Resolution::Heuristic;
+    assert!(check(&w, OWNER, rust_naming()).is_empty());
+}
+
+#[test]
+fn owner_test_credits_ancestor_tests_only_when_asked() {
+    let (w, _) = crate_with_submodule(&["parse"]);
+    let mut options = rust_naming();
+    options["ancestor_tests"] = json!(false);
+    assert_eq!(w.names(&check(&w, OWNER, options)), ["parse"]);
+}
+
+#[test]
+fn single_owner_keeps_names_within_one_module() {
+    let (w, _) = crate_with_submodule(&["parse"]);
+    let mut options = rust_naming();
+    options.as_object_mut().unwrap().remove("ancestor_tests");
+    assert!(check(&w, SINGLE, options).is_empty());
 }

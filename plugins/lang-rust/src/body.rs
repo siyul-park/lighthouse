@@ -20,6 +20,10 @@ use crate::{
 /// guess about an unknown receiver to mean anything.
 const MAX_GUESSED_CANDIDATES: usize = 3;
 
+/// The same limit for `pub` methods, which tests reach through values the
+/// provider cannot type.
+const MAX_GUESSED_PUBLIC_CANDIDATES: usize = 8;
+
 /// A call or reference found in a body.
 pub struct Use {
     pub kind: EdgeKind,
@@ -722,26 +726,38 @@ impl<'i> Walker<'i> {
         }
     }
 
-    /// A method call on a value of unknown type may reach any non-`pub`
-    /// inherent method of that name in the crate. Such candidates are recorded
-    /// as heuristic references, never as calls, so a rule counting callers does
-    /// not mistake a method with an unseen caller for an unused one. A name
-    /// shared by more than a few methods says nothing and is skipped.
+    /// A method call on a value of unknown type may reach any inherent method
+    /// of that name in the crate. Such candidates are recorded as heuristic
+    /// references, never as calls, so a rule counting callers does not mistake
+    /// a method with an unseen caller for an unused one. A name shared by more
+    /// than a few methods says nothing and is skipped; a `pub` method is
+    /// guessed at a wider limit, since only tests that exercise it matter.
     fn may_reference(&mut self, name: &str) {
+        let crates = &self.idx.tree.crates;
         let krate = self.idx.tree.mods[self.cx.module].krate;
-        let Some(candidates) = self.idx.private_methods.get(name) else {
-            return;
-        };
-        let ids: Vec<String> = candidates
-            .iter()
-            .filter(|(_, module)| self.idx.tree.mods[*module].krate == krate)
-            .map(|(id, _)| id.clone())
-            .collect();
-        if ids.len() > MAX_GUESSED_CANDIDATES {
-            return;
+        let mut private = Vec::new();
+        let mut public = Vec::new();
+        for (id, module, is_public) in self.idx.inherent_methods.get(name).into_iter().flatten() {
+            let other = self.idx.tree.mods[*module].krate;
+            // An integration test is a crate of its own, in the package of the
+            // library it exercises.
+            if *is_public && crates[other].package == crates[krate].package && *id != self.id {
+                public.push(id.clone());
+            } else if !is_public && other == krate {
+                private.push(id.clone());
+            }
         }
-        for id in ids {
-            self.record(EdgeKind::References, id, Resolution::Heuristic);
+        let guesses = [
+            (private, MAX_GUESSED_CANDIDATES),
+            (public, MAX_GUESSED_PUBLIC_CANDIDATES),
+        ];
+        for (ids, limit) in guesses {
+            if ids.len() > limit {
+                continue;
+            }
+            for id in ids {
+                self.record(EdgeKind::References, id, Resolution::Heuristic);
+            }
         }
     }
 

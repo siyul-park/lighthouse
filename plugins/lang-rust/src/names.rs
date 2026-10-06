@@ -132,9 +132,9 @@ pub struct Index<'t> {
     pub sigs: HashMap<String, Sig>,
     pub variant_owner: HashMap<String, Sym>,
     pub trait_docs: HashMap<String, String>,
-    /// Inherent methods that are not `pub`, by name: the candidates of a call
-    /// whose receiver type is unknown.
-    pub private_methods: HashMap<String, Vec<(String, ModId)>>,
+    /// Inherent methods by name, with whether each is `pub`: the candidates of
+    /// a call whose receiver type is unknown.
+    pub inherent_methods: HashMap<String, Vec<(String, ModId, bool)>>,
     pub exported: HashSet<String>,
     pub exported_mods: HashSet<ModId>,
     children: HashMap<(ModId, String), ModId>,
@@ -163,7 +163,7 @@ impl<'t> Index<'t> {
             sigs: HashMap::new(),
             variant_owner: HashMap::new(),
             trait_docs: HashMap::new(),
-            private_methods: HashMap::new(),
+            inherent_methods: HashMap::new(),
             exported: HashSet::new(),
             exported_mods: HashSet::new(),
             children,
@@ -417,11 +417,12 @@ impl<'t> Index<'t> {
                     generics_of(&sig.generics, Some(&generics)),
                 );
                 self.sigs.insert(id.clone(), signature(sig, cx));
-                if i.trait_.is_none() && declared != Vis::Pub {
-                    self.private_methods
+                if i.trait_.is_none() {
+                    let public = declared == Vis::Pub;
+                    self.inherent_methods
                         .entry(name.clone())
                         .or_default()
-                        .push((id.clone(), module));
+                        .push((id.clone(), module, public));
                 }
             }
             if let Some(o) = &owner {

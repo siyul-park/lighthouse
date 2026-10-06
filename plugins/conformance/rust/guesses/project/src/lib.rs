@@ -42,3 +42,19 @@ pub fn single(x: &external::Thing) {
 pub fn exact(a: &A) {
     a.tick();
 }
+
+pub struct P;
+pub struct Q;
+
+impl P {
+    pub fn register(&self) {}
+}
+impl Q {
+    pub fn register(&self) {}
+}
+
+/// Two `pub` `register` methods: a call on an unknown receiver may exercise
+/// either, which is what an owner test looks for.
+pub fn exercise(x: &external::Thing) {
+    x.register();
+}

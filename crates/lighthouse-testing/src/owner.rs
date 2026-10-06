@@ -41,7 +41,7 @@ fn check(meta: &RuleMeta, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>
         if !candidate(project, symbol, &options) || !has_tests(project, symbol.id.module()) {
             continue;
         }
-        if !options.naming.owner_tests(project, symbol).is_empty() || touched(project, symbol) {
+        if !options.naming.credited_tests(project, symbol).is_empty() || touched(project, symbol) {
             continue;
         }
         found.push(finding(
@@ -95,7 +95,9 @@ fn data_only(project: &Project, symbol: &Symbol) -> bool {
         })
 }
 
-/// Whether test code uses the symbol, or a member of it.
+/// Whether test code uses the symbol, or a member of it. Heuristic references
+/// count: a call through a receiver of unknown type may reach the symbol, and
+/// this rule only warns, so missing an owner test is the mistake to avoid.
 fn touched(project: &Project, symbol: &Symbol) -> bool {
     let used_by_tests = |id| {
         project

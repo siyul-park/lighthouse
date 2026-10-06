@@ -399,6 +399,7 @@ Each public symbol SHOULD have one top-level test function, and exported contrac
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
+| `ancestor_tests` | bool | `false`; rust: `true` | Count the tests of a module that tests an ancestor module as tests of the nested module too: the integration tests of a Rust crate test all of it, private modules whose items the root re-exports included. |
 | `exempt_methods` | list | `["String","Error","Unwrap","GoString"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]` | Method names that implement well-known interfaces. |
 | `include_data_types` | bool | `false` | Also require owner tests for types that declare no method; such a type is specified by the functions that build and read it. |
 | `include_internal` | bool | `false` | Also require owner tests for symbols public only inside the project. |
@@ -539,13 +540,98 @@ fn get() {
 }
 ```
 
+**Invalid example: rust-submodule-invalid (rust)**
+
+`src/lib.rs`
+
+```rust
+mod shapes;
+
+pub use shapes::{area, perimeter};
+```
+
+`src/shapes.rs`
+
+```rust
+pub fn area() -> u8 {
+    1
+}
+
+pub fn perimeter() -> u8 {
+    4
+}
+```
+
+`tests/shapes.rs`
+
+```rust
+#[test]
+fn area() {
+    assert_eq!(workspace::area(), 1);
+}
+```
+
+**Valid example: rust-reexport-from-private-module (rust)**
+
+`src/lib.rs`
+
+```rust
+mod shapes;
+
+pub use shapes::area;
+```
+
+`src/shapes.rs`
+
+```rust
+pub fn area() -> u8 {
+    1
+}
+```
+
+`tests/shapes.rs`
+
+```rust
+#[test]
+fn area() {
+    assert_eq!(workspace::area(), 1);
+}
+```
+
+**Valid example: rust-method-on-unknown-receiver (rust)**
+
+`src/lib.rs`
+
+```rust
+pub struct Registry;
+
+impl Registry {
+    pub fn register(&self) {}
+}
+
+pub fn get() -> u8 {
+    1
+}
+```
+
+`tests/registry.rs`
+
+```rust
+#[test]
+fn get() {
+    assert_eq!(workspace::get(), 1);
+    let registry = unknown::build();
+    registry.register();
+}
+```
+
 **Tuning: go**
 
 The owner of a function or type is `TestName`, of a method `TestType_Method`. A symbol that no test names and no test code calls or references is reported; a type counts as tested when one of its members is. Only modules that have tests are judged. Types without methods and interfaces are not required to have one.
 
 **Tuning: rust**
 
-The owner of a function or type is the test named after it in snake case (`get`, `store`), of a method `type_method`. A public item that no test code, in `tests/` or inline, calls or references is reported, in crates that have tests. Methods of trait impls and types without methods are not required to have one.
+The owner of a function or type is the test named after it in snake case (`get`, `store`), of a method `type_method`. A public item that no test code, in `tests/` or inline, calls or references is reported, in crates that have tests. The integration tests of a crate count for every module of it, including public items that the crate root re-exports from private modules, and a method call on a value of unknown type counts for the public methods of that name. Methods of trait impls and types without methods are not required to have one.
 
 ### One owner test per public symbol
 

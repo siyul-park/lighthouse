@@ -57,6 +57,20 @@
             }
           },
           "text": "/// The receiver is known, so the call is exact and nothing is guessed."
+        },
+        {
+          "attached_to": "guesses::exercise#function",
+          "span": {
+            "end": {
+              "col": 51,
+              "line": 57
+            },
+            "start": {
+              "col": 1,
+              "line": 56
+            }
+          },
+          "text": "/// Two `pub` `register` methods: a call on an unknown receiver may exercise\n/// either, which is what an owner test looks for."
         }
       ],
       "edges": [
@@ -227,6 +241,62 @@
           "kind": "calls",
           "resolution": "syntactic",
           "to": "guesses::A::tick#method"
+        },
+        {
+          "from": {
+            "module": "guesses"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::P#type"
+        },
+        {
+          "from": {
+            "module": "guesses"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::Q#type"
+        },
+        {
+          "from": {
+            "symbol": "guesses::P#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::P::register#method"
+        },
+        {
+          "from": {
+            "symbol": "guesses::Q#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::Q::register#method"
+        },
+        {
+          "from": {
+            "module": "guesses"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "guesses::exercise#function"
+        },
+        {
+          "from": {
+            "symbol": "guesses::exercise#function"
+          },
+          "kind": "references",
+          "resolution": "heuristic",
+          "to": "guesses::P::register#method"
+        },
+        {
+          "from": {
+            "symbol": "guesses::exercise#function"
+          },
+          "kind": "references",
+          "resolution": "heuristic",
+          "to": "guesses::Q::register#method"
         }
       ],
       "file": {
@@ -350,6 +420,36 @@
           "returns": 0,
           "statements": 1,
           "symbol": "guesses::exact#function",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "guesses::P::register#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "guesses::Q::register#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "guesses::exercise#function",
           "tokens": 8,
           "top_level": 1
         }
@@ -658,6 +758,94 @@
             "start": {
               "col": 1,
               "line": 42
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::P#type",
+          "kind": "type",
+          "name": "P",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 46
+            },
+            "start": {
+              "col": 1,
+              "line": 46
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::Q#type",
+          "kind": "type",
+          "name": "Q",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 47
+            },
+            "start": {
+              "col": 1,
+              "line": 47
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::P::register#method",
+          "kind": "method",
+          "name": "register",
+          "owner": "guesses::P#type",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 50
+            },
+            "start": {
+              "col": 5,
+              "line": 50
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "src/lib.rs",
+          "id": "guesses::Q::register#method",
+          "kind": "method",
+          "name": "register",
+          "owner": "guesses::Q#type",
+          "span": {
+            "end": {
+              "col": 30,
+              "line": 53
+            },
+            "start": {
+              "col": 5,
+              "line": 53
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Two `pub` `register` methods: a call on an unknown receiver may exercise\neither, which is what an owner test looks for.",
+          "file": "src/lib.rs",
+          "id": "guesses::exercise#function",
+          "kind": "function",
+          "name": "exercise",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 60
+            },
+            "start": {
+              "col": 1,
+              "line": 58
             }
           },
           "visibility": "public"

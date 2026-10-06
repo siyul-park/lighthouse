@@ -30,6 +30,15 @@ options:
       suffix to the symbol's own name restates the same contract.
     per_language:
       rust: false
+  ancestor_tests:
+    type: bool
+    default: false
+    description: >-
+      Count the tests of a module that tests an ancestor module as tests of
+      the nested module too: the integration tests of a Rust crate test all of
+      it, private modules whose items the root re-exports included.
+    per_language:
+      rust: true
   kinds:
     type: list
     default: [function, method, type]
@@ -63,7 +72,10 @@ tuning:
     The owner of a function or type is the test named after it in snake case
     (`get`, `store`), of a method `type_method`. A public item that no test
     code, in `tests/` or inline, calls or references is reported, in crates
-    that have tests. Methods of trait impls and types without methods are not
+    that have tests. The integration tests of a crate count for every module
+    of it, including public items that the crate root re-exports from private
+    modules, and a method call on a value of unknown type counts for the
+    public methods of that name. Methods of trait impls and types without methods are not
     required to have one.
 implementation:
   builtin: testing/owner-test
@@ -182,4 +194,73 @@ examples:
           #[test]
           fn get() {
               assert_eq!(workspace::get(), 1);
+          }
+  - name: rust-submodule-invalid
+    language: rust
+    kind: invalid
+    files:
+      - path: src/lib.rs
+        body: |-
+          mod shapes;
+
+          pub use shapes::{area, perimeter};
+      - path: src/shapes.rs
+        body: |-
+          pub fn area() -> u8 {
+              1
+          }
+
+          pub fn perimeter() -> u8 {
+              4
+          }
+      - path: tests/shapes.rs
+        body: |-
+          #[test]
+          fn area() {
+              assert_eq!(workspace::area(), 1);
+          }
+    expect:
+      - line: 5
+  - name: rust-reexport-from-private-module
+    language: rust
+    kind: valid
+    files:
+      - path: src/lib.rs
+        body: |-
+          mod shapes;
+
+          pub use shapes::area;
+      - path: src/shapes.rs
+        body: |-
+          pub fn area() -> u8 {
+              1
+          }
+      - path: tests/shapes.rs
+        body: |-
+          #[test]
+          fn area() {
+              assert_eq!(workspace::area(), 1);
+          }
+  - name: rust-method-on-unknown-receiver
+    language: rust
+    kind: valid
+    files:
+      - path: src/lib.rs
+        body: |-
+          pub struct Registry;
+
+          impl Registry {
+              pub fn register(&self) {}
+          }
+
+          pub fn get() -> u8 {
+              1
+          }
+      - path: tests/registry.rs
+        body: |-
+          #[test]
+          fn get() {
+              assert_eq!(workspace::get(), 1);
+              let registry = unknown::build();
+              registry.register();
           }
