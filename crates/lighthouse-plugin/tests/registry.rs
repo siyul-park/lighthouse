@@ -117,7 +117,7 @@ fn registry_register() {
     ));
     assert!(!registry.has_plugin("t"));
 
-    Registry::register(&mut registry, &graph(&[("t/a", &[])])).unwrap();
+    registry.register(&graph(&[("t/a", &[])])).unwrap();
     assert!(matches!(
         registry.register(&graph(&[("t/b", &[])])),
         Err(Error::Duplicate(_))

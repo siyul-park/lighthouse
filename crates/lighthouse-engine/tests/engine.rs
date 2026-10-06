@@ -5,7 +5,7 @@ use std::{
 };
 
 use lighthouse_config::{Config, RuleConfig, Rules};
-use lighthouse_engine::{Engine, Error, Outcome};
+use lighthouse_engine::{Engine, Error};
 use lighthouse_model::{
     Capability, Diagnostic, Fingerprint, Fragment, Incomplete, Options, Position, Severity, Span,
 };
@@ -473,9 +473,11 @@ fn outcome_exit_code() {
     let dir = project(&[("x.txt", b"1"), ("bad.skip", b"x")]);
     let code = |level: &str, strict| {
         let toml = format!("plugins = [\"fake\"]\n[rules]\n\"fake/each\" = \"{level}\"\n");
-        let engine: Engine = engine(&dir, &toml).unwrap();
-        let out: Outcome = engine.check(&root(&dir), &[]).unwrap();
-        out.exit_code(strict, false)
+        engine(&dir, &toml)
+            .unwrap()
+            .check(&root(&dir), &[])
+            .unwrap()
+            .exit_code(strict, false)
     };
     assert_eq!(code("error", false), 1);
     assert_eq!(code("warn", false), 0);
@@ -485,7 +487,7 @@ fn outcome_exit_code() {
     assert_eq!(code("off", true), 0);
 
     let engine = Engine::new(registry(".skip"), Config::parse(ALL).unwrap(), dir.path()).unwrap();
-    let out: Outcome = engine
+    let out = engine
         .check(&root(&dir), &["fake/each".to_owned()])
         .unwrap();
     assert_eq!(out.diagnostics[0].severity, Severity::Error);
@@ -547,7 +549,7 @@ fn languages_come_only_from_listed_plugins() {
 #[test]
 fn engine_check_files() {
     let dir = project(&[("a/x.txt", b"1"), ("b/y.txt", b"2")]);
-    let engine: Engine = engine(
+    let engine = engine(
         &dir,
         "plugins = [\"fake\"]\n[rules]\n\"fake/each\" = \"error\"\n",
     )
@@ -571,7 +573,7 @@ fn engine_with_incomplete() {
         path: None,
         reason: "plugin failed to start".to_owned(),
     };
-    let engine: Engine = engine(&dir, ALL).unwrap();
+    let engine = engine(&dir, ALL).unwrap();
     let engine = engine.with_incomplete(vec![gap.clone()]);
     for _ in 0..2 {
         let out = engine.check(&root(&dir), &[]).unwrap();

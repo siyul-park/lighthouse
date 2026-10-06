@@ -45,35 +45,7 @@ impl DeclarativeRule {
             meta,
         })
     }
-}
 
-impl Rule for DeclarativeRule {
-    /// The metadata of the pattern the rule was built from.
-    fn meta(&self) -> &RuleMeta {
-        &self.meta
-    }
-
-    /// Rejects every option: a declarative rule is tuned by editing its expression.
-    fn validate(&self, options: &Options) -> Result<(), PluginError> {
-        match options.keys().next() {
-            None => Ok(()),
-            Some(key) => Err(PluginError::Options {
-                rule: self.meta.id.clone(),
-                message: format!("unknown option `{key}`: a declarative rule has none"),
-            }),
-        }
-    }
-
-    /// Runs once per file or once over the project, following the pattern's scope.
-    fn check(&self, ctx: &Ctx, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
-        match self.meta.scope {
-            Scope::File => self.check_file(ctx),
-            Scope::Project => self.check_project(ctx),
-        }
-    }
-}
-
-impl DeclarativeRule {
     fn check_file(&self, ctx: &Ctx) -> Result<Vec<Diagnostic>, PluginError> {
         let Some((file, text)) = ctx.file else {
             return Ok(Vec::new());
@@ -217,6 +189,32 @@ impl DeclarativeRule {
 
     fn fail(&self, message: impl std::fmt::Display) -> PluginError {
         PluginError::Failed(format!("{}: {message}", self.meta.id))
+    }
+}
+
+impl Rule for DeclarativeRule {
+    /// The metadata of the pattern the rule was built from.
+    fn meta(&self) -> &RuleMeta {
+        &self.meta
+    }
+
+    /// Rejects every option: a declarative rule is tuned by editing its expression.
+    fn validate(&self, options: &Options) -> Result<(), PluginError> {
+        match options.keys().next() {
+            None => Ok(()),
+            Some(key) => Err(PluginError::Options {
+                rule: self.meta.id.clone(),
+                message: format!("unknown option `{key}`: a declarative rule has none"),
+            }),
+        }
+    }
+
+    /// Runs once per file or once over the project, following the pattern's scope.
+    fn check(&self, ctx: &Ctx, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
+        match self.meta.scope {
+            Scope::File => self.check_file(ctx),
+            Scope::Project => self.check_project(ctx),
+        }
     }
 }
 

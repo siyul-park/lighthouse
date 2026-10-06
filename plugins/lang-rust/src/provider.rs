@@ -182,9 +182,9 @@ fn index_files(params: &IndexParams, options: &Options) -> IndexResult {
         let mut fragment = empty_fragment(rel);
         match (found.of.get(rel), tree.file_of(&normalize(&root.join(rel)))) {
             (_, Some(file)) => {
-                let extracted = extract::Extracted::of(&idx, file);
-                macros.add(rel, &extracted.stats);
-                fragment = extracted.fragment;
+                let (extracted, stats) = extract::fragment(&idx, file);
+                macros.add(rel, &stats);
+                fragment = extracted;
             }
             (Some(Err(reason)), None) => {
                 incomplete.insert((Some(rel.clone()), reason.clone()));

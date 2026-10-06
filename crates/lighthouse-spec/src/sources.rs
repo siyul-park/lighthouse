@@ -27,59 +27,13 @@ pub(crate) struct Bullet {
     pub text: String,
 }
 
-pub(crate) struct Extractor<'a> {
+struct Out<'a> {
     doc: &'a str,
     seen: BTreeMap<String, usize>,
     bullets: Vec<Bullet>,
 }
 
-impl<'a> Extractor<'a> {
-    /// Normative lines of a Markdown document: list items (`-`, `*`, numbered)
-    /// with their indented continuation lines, table body rows, and any other
-    /// single line holding an RFC keyword. Fenced code is skipped. Prose that
-    /// wraps over several lines is not joined; write such rules as list items.
-    pub(crate) fn extract(doc: &'a str, markdown: &str) -> Vec<Bullet> {
-        let lines: Vec<&str> = markdown.lines().collect();
-        let mut out = Self::new(doc);
-        let mut heading = String::new();
-        let mut fence: Option<char> = None;
-        let mut open: Option<(String, String, bool)> = None;
-        for (i, raw) in lines.iter().enumerate() {
-            let line = raw.trim();
-            if let Some(marker) = fence_marker(line) {
-                out.finish(open.take());
-                fence = match fence {
-                    None => Some(marker),
-                    Some(f) if f == marker => None,
-                    other => other,
-                };
-                continue;
-            }
-            if fence.is_some() || line.is_empty() {
-                out.finish(open.take());
-                continue;
-            }
-            if let Some((_, text, true)) = open.as_mut()
-                && raw.starts_with(char::is_whitespace)
-                && list_item(line).is_none()
-                && !line.starts_with(['|', '#'])
-            {
-                text.push(' ');
-                text.push_str(line);
-                continue;
-            }
-            out.finish(open.take());
-            if line.starts_with('#') {
-                heading = slug(line.trim_start_matches('#'));
-                continue;
-            }
-            let next = lines.get(i + 1).map(|l| l.trim());
-            open = normative(line, next).map(|(text, wraps)| (heading.clone(), text, wraps));
-        }
-        out.finish(open.take());
-        out.bullets
-    }
-
+impl<'a> Out<'a> {
     fn new(doc: &'a str) -> Self {
         Self {
             doc,
@@ -99,6 +53,52 @@ impl<'a> Extractor<'a> {
         let reference = if *n == 1 { base } else { format!("{base}-{n}") };
         self.bullets.push(Bullet { reference, text });
     }
+}
+
+/// Normative lines of a Markdown document: list items (`-`, `*`, numbered)
+/// with their indented continuation lines, table body rows, and any other
+/// single line holding an RFC keyword. Fenced code is skipped. Prose that
+/// wraps over several lines is not joined; write such rules as list items.
+pub(crate) fn extract(doc: &str, markdown: &str) -> Vec<Bullet> {
+    let lines: Vec<&str> = markdown.lines().collect();
+    let mut out = Out::new(doc);
+    let mut heading = String::new();
+    let mut fence: Option<char> = None;
+    let mut open: Option<(String, String, bool)> = None;
+    for (i, raw) in lines.iter().enumerate() {
+        let line = raw.trim();
+        if let Some(marker) = fence_marker(line) {
+            out.finish(open.take());
+            fence = match fence {
+                None => Some(marker),
+                Some(f) if f == marker => None,
+                other => other,
+            };
+            continue;
+        }
+        if fence.is_some() || line.is_empty() {
+            out.finish(open.take());
+            continue;
+        }
+        if let Some((_, text, true)) = open.as_mut()
+            && raw.starts_with(char::is_whitespace)
+            && list_item(line).is_none()
+            && !line.starts_with(['|', '#'])
+        {
+            text.push(' ');
+            text.push_str(line);
+            continue;
+        }
+        out.finish(open.take());
+        if line.starts_with('#') {
+            heading = slug(line.trim_start_matches('#'));
+            continue;
+        }
+        let next = lines.get(i + 1).map(|l| l.trim());
+        open = normative(line, next).map(|(text, wraps)| (heading.clone(), text, wraps));
+    }
+    out.finish(open.take());
+    out.bullets
 }
 
 pub(crate) fn has_keyword(line: &str) -> bool {

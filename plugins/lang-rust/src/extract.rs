@@ -11,7 +11,7 @@ use quote::ToTokens;
 use syn::{Attribute, Block, Item};
 
 use crate::{
-    body::{Facts, Home},
+    body::{self, Home},
     comments,
     names::{
         Generics, Index, ModId, Ns, Res, Sym, TyCx, ViaTrait, generics_of, is_test_fn, symbol_id,
@@ -29,43 +29,6 @@ pub struct MacroStats {
     /// Invocations that were not read: item position, or arguments that are
     /// not expressions.
     pub unread: u32,
-}
-
-/// The fragment of one file with what its macros kept from the analysis.
-pub struct Extracted {
-    pub fragment: Fragment,
-    pub stats: MacroStats,
-}
-
-impl Extracted {
-    /// Reads every module that lives in `file` of the project.
-    pub fn of(idx: &Index, file: usize) -> Self {
-        let src = &idx.tree.files[file];
-        let mut out = Extractor {
-            idx,
-            file,
-            src,
-            frag: Fragment {
-                file: FileInfo {
-                    path: src.rel.clone(),
-                    generated: src.generated,
-                },
-                ..Fragment::default()
-            },
-            seen: HashSet::new(),
-            stats: MacroStats::default(),
-        };
-        for m in 0..idx.tree.mods.len() {
-            if idx.tree.mods[m].file == file {
-                out.module(m);
-            }
-        }
-        out.frag.comments = comments::scan(&src.text, &out.frag.symbols);
-        Self {
-            fragment: out.frag,
-            stats: out.stats,
-        }
-    }
 }
 
 struct Extractor<'a> {
@@ -236,7 +199,7 @@ impl Extractor<'_> {
         block: &Block,
         test: Option<&[Attribute]>,
     ) {
-        let facts = Facts::of(self.idx, home, sig, block);
+        let facts = body::analyze(self.idx, home, sig, block);
         self.stats.unread += facts.unread_macros;
         for u in &facts.uses {
             self.edge_as(
@@ -671,6 +634,33 @@ struct ImplCtx {
 }
 
 /// The more restricted of two visibilities.
+/// The fragment of one file, with what its macros kept from the analysis:
+/// every module that lives in `file` of the project.
+pub fn fragment(idx: &Index, file: usize) -> (Fragment, MacroStats) {
+    let src = &idx.tree.files[file];
+    let mut out = Extractor {
+        idx,
+        file,
+        src,
+        frag: Fragment {
+            file: FileInfo {
+                path: src.rel.clone(),
+                generated: src.generated,
+            },
+            ..Fragment::default()
+        },
+        seen: HashSet::new(),
+        stats: MacroStats::default(),
+    };
+    for m in 0..idx.tree.mods.len() {
+        if idx.tree.mods[m].file == file {
+            out.module(m);
+        }
+    }
+    out.frag.comments = comments::scan(&src.text, &out.frag.symbols);
+    (out.frag, out.stats)
+}
+
 fn cap(a: Visibility, b: Visibility) -> Visibility {
     if rank(a) >= rank(b) { a } else { b }
 }

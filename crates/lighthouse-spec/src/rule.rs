@@ -67,6 +67,18 @@ where
             options: PhantomData,
         }
     }
+
+    fn resolve(&self, configured: &Options, language: Option<&str>) -> Result<O, Error> {
+        let fail = |message: String| Error::Options {
+            rule: self.meta.id.clone(),
+            message,
+        };
+        let resolved = self
+            .pattern
+            .resolve_options(configured, language)
+            .map_err(|e| fail(e.to_string()))?;
+        serde_json::from_value(Value::Object(resolved)).map_err(|e| fail(e.to_string()))
+    }
 }
 
 impl<O, F> Rule for PatternRule<O, F>
@@ -89,23 +101,5 @@ where
     fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, Error> {
         let language = ctx.file.map(|(file, _)| file.lang.as_str());
         (self.check)(&self.meta, ctx, self.resolve(options, language)?)
-    }
-}
-
-impl<O, F> PatternRule<O, F>
-where
-    O: DeserializeOwned,
-    F: Fn(&RuleMeta, &Ctx, O) -> Result<Vec<Diagnostic>, Error> + Send + Sync,
-{
-    fn resolve(&self, configured: &Options, language: Option<&str>) -> Result<O, Error> {
-        let fail = |message: String| Error::Options {
-            rule: self.meta.id.clone(),
-            message,
-        };
-        let resolved = self
-            .pattern
-            .resolve_options(configured, language)
-            .map_err(|e| fail(e.to_string()))?;
-        serde_json::from_value(Value::Object(resolved)).map_err(|e| fail(e.to_string()))
     }
 }

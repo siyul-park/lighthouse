@@ -418,7 +418,7 @@ impl Project {
     /// never fails: what it drops or leaves ambiguous is reported by [`Project::notices`].
     pub fn merge(parts: impl IntoIterator<Item = Fragment>) -> Self {
         let (mut all, mut notices) = sorted_union(parts);
-        let ambiguous = Resolver::resolve_all(&mut all);
+        let ambiguous = resolve_all(&mut all);
         if ambiguous > 0 {
             notices.push(format!(
                 "{ambiguous} edge target(s) matched several symbols and stayed unresolved"
@@ -615,47 +615,6 @@ struct Resolver<'a> {
     ambiguous: Cell<usize>,
 }
 
-impl Resolver<'_> {
-    /// Resolves edge, test and forwarding targets in place, drops duplicate edges,
-    /// and returns how many targets stayed ambiguous.
-    fn resolve_all(all: &mut Fragment) -> usize {
-        let resolver = Resolver::new(all);
-        let resolved: Vec<Target> = all
-            .edges
-            .iter()
-            .map(|e| resolver.resolve(&e.to, e.kind == EdgeKind::Calls))
-            .collect();
-        let targets: Vec<Vec<Target>> = all
-            .tests
-            .iter()
-            .map(|t| {
-                t.targets
-                    .iter()
-                    .map(|x| resolver.resolve(x, false))
-                    .collect()
-            })
-            .collect();
-        let forwards: Vec<Option<Target>> = all
-            .functions
-            .iter()
-            .map(|f| f.forwards_to.as_ref().map(|t| resolver.resolve(t, true)))
-            .collect();
-        let ambiguous = resolver.ambiguous.get();
-        for (edge, to) in all.edges.iter_mut().zip(resolved) {
-            edge.to = to;
-        }
-        let mut seen = HashSet::new();
-        all.edges.retain(|e| seen.insert(e.clone()));
-        for (test, targets) in all.tests.iter_mut().zip(targets) {
-            test.targets = targets;
-        }
-        for (function, to) in all.functions.iter_mut().zip(forwards) {
-            function.forwards_to = to;
-        }
-        ambiguous
-    }
-}
-
 impl<'a> Resolver<'a> {
     fn new(all: &'a Fragment) -> Self {
         let mut bare: BTreeMap<&str, Vec<(&SymbolId, SymbolKind)>> = BTreeMap::new();
@@ -704,6 +663,45 @@ impl<'a> Resolver<'a> {
         self.ambiguous.set(self.ambiguous.get() + 1);
         target.clone()
     }
+}
+
+/// Resolves edge, test and forwarding targets in place, drops duplicate edges,
+/// and returns how many targets stayed ambiguous.
+fn resolve_all(all: &mut Fragment) -> usize {
+    let resolver = Resolver::new(all);
+    let resolved: Vec<Target> = all
+        .edges
+        .iter()
+        .map(|e| resolver.resolve(&e.to, e.kind == EdgeKind::Calls))
+        .collect();
+    let targets: Vec<Vec<Target>> = all
+        .tests
+        .iter()
+        .map(|t| {
+            t.targets
+                .iter()
+                .map(|x| resolver.resolve(x, false))
+                .collect()
+        })
+        .collect();
+    let forwards: Vec<Option<Target>> = all
+        .functions
+        .iter()
+        .map(|f| f.forwards_to.as_ref().map(|t| resolver.resolve(t, true)))
+        .collect();
+    let ambiguous = resolver.ambiguous.get();
+    for (edge, to) in all.edges.iter_mut().zip(resolved) {
+        edge.to = to;
+    }
+    let mut seen = HashSet::new();
+    all.edges.retain(|e| seen.insert(e.clone()));
+    for (test, targets) in all.tests.iter_mut().zip(targets) {
+        test.targets = targets;
+    }
+    for (function, to) in all.functions.iter_mut().zip(forwards) {
+        function.forwards_to = to;
+    }
+    ambiguous
 }
 
 /// The fragments concatenated, sorted and deduplicated by identity, with a

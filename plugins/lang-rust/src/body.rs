@@ -45,26 +45,6 @@ pub struct Facts {
     pub forwards_to: Option<String>,
 }
 
-impl Facts {
-    /// Walks `block` and summarizes the calls, flow and counts of the body.
-    pub fn of(idx: &Index, home: &Home, sig: &syn::Signature, block: &Block) -> Self {
-        let mut walker = Walker::new(idx, home, sig);
-        walker.mark_tail(block);
-        walker.bind_params(sig);
-        walker.visit_block(block);
-        let forwards_to = walker.forwards(sig, block);
-        Facts {
-            uses: walker.uses,
-            unread_macros: walker.unread_macros,
-            flow: walker.flow,
-            max_nesting: walker.deepest,
-            statements: walker.count,
-            nested: walker.nested,
-            forwards_to,
-        }
-    }
-}
-
 /// Where a function lives: the module of its id, its owner path parts and the
 /// type context its signature is read in.
 pub struct Home {
@@ -853,6 +833,24 @@ impl<'i> Walker<'i> {
             }
             _ => None,
         }
+    }
+}
+
+/// Walks `block` and summarizes the calls, flow and counts of the body.
+pub fn analyze(idx: &Index, home: &Home, sig: &syn::Signature, block: &Block) -> Facts {
+    let mut walker = Walker::new(idx, home, sig);
+    walker.mark_tail(block);
+    walker.bind_params(sig);
+    walker.visit_block(block);
+    let forwards_to = walker.forwards(sig, block);
+    Facts {
+        uses: walker.uses,
+        unread_macros: walker.unread_macros,
+        flow: walker.flow,
+        max_nesting: walker.deepest,
+        statements: walker.count,
+        nested: walker.nested,
+        forwards_to,
     }
 }
 

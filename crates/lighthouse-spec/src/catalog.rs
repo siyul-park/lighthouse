@@ -11,7 +11,7 @@ use serde_json::Value;
 use crate::{
     Content, Error, Example, Implementation, Pack, Pattern, Section,
     load::{self, Files},
-    sources::{Extractor, Source},
+    sources::{Source, extract},
     validate,
 };
 
@@ -245,7 +245,7 @@ impl Catalog {
     pub fn verify_sources(&self, docs: &BTreeMap<String, String>) -> Result<(), Error> {
         let mut want: BTreeMap<String, String> = BTreeMap::new();
         for (doc, markdown) in docs {
-            for bullet in Extractor::extract(doc, markdown) {
+            for bullet in extract(doc, markdown) {
                 want.insert(bullet.reference, bullet.text);
             }
         }

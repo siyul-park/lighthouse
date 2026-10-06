@@ -55,10 +55,7 @@ fn symbol_kind_as_str() {
         SymbolKind::Interface,
     ] {
         let id = SymbolId::new("m", &[], "x", kind);
-        assert!(
-            id.as_str()
-                .ends_with(&format!("#{}", SymbolKind::as_str(kind)))
-        );
+        assert!(id.as_str().ends_with(&format!("#{}", kind.as_str())));
     }
 }
 

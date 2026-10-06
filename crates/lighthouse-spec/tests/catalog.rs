@@ -24,14 +24,13 @@ fn enforcement_default_severity() {
         (Enforcement::Doc, None),
     ];
     for (enforcement, want) in cases {
-        let enforcement: Enforcement = enforcement;
         assert_eq!(enforcement.default_severity(), want, "{enforcement}");
     }
 }
 
 #[test]
 fn pattern_severity() {
-    let mut pattern: Pattern = bundled("design/error-identity").clone();
+    let mut pattern = bundled("design/error-identity").clone();
     assert_eq!(pattern.severity(), Some(Severity::Warn));
     pattern.severity_override = Some(Severity::Error);
     assert_eq!(pattern.severity(), Some(Severity::Error));
@@ -47,7 +46,6 @@ fn scope_rule_scope() {
         (Scope::Project, RunScope::Project),
     ];
     for (scope, want) in cases {
-        let scope: Scope = scope;
         assert_eq!(scope.rule_scope(), want, "{scope}");
     }
 }
@@ -68,7 +66,7 @@ fn pattern_rule_meta() {
 
 #[test]
 fn pattern_resolve_options() {
-    let mut pattern: Pattern = bundled("core/max-file-lines").clone();
+    let mut pattern = bundled("core/max-file-lines").clone();
     pattern
         .options
         .get_mut("max")
@@ -107,7 +105,7 @@ fn example_file_text() {
     let files = &bundled("design/error-identity").examples[0].files;
     assert!(matches!(files[0].content, Content::File(_)));
     assert!(files[0].text().contains("fmt.Errorf"));
-    let inline: &ExampleFile = &bundled("design/single-use-wrapper").examples[0].files[0];
+    let inline = &bundled("design/single-use-wrapper").examples[0].files[0];
     assert!(matches!(inline.content, Content::Inline(_)));
     assert_eq!(ExampleFile::inline("a.go", "package a").text(), "package a");
 }
@@ -131,7 +129,7 @@ fn implemented_patterns_carry_runnable_examples() {
 fn catalog_declarative() {
     let rule = "id: local/probe\ntitle: P\nintent: i\nscope: symbol\nrequirement: A MUST b.\nenforcement: mechanical\nevidence: [x]\nexamples:\n  - name: bad\n    language: text\n    kind: invalid\n    files: [{ path: a.txt, body: x }]\n    expect: [{ line: 1 }]\n  - name: good\n    language: text\n    kind: valid\n    files: [{ path: a.txt, body: x }]\nrule:\n  select: symbol\n  where: 'true'\n  message: x\n";
     let files = std::collections::BTreeMap::from([("probe.yaml".to_owned(), rule.to_owned())]);
-    let catalog: Catalog = Catalog::from_local(files).unwrap();
+    let catalog = Catalog::from_local(files).unwrap();
     assert!(
         catalog
             .declarative("probe.yaml")
