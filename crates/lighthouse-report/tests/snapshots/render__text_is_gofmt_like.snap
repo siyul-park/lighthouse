@@ -1,0 +1,6 @@
+---
+source: crates/lighthouse-report/tests/render.rs
+expression: "render(Format::Text, &fixture())"
+---
+src/a.txt:11:1: warn core/max-file-lines: file has 12 lines, limit is 10
+src/b c/é#1.txt:2:5: error demo/boom: boom

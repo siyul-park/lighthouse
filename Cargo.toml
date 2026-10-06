@@ -1,0 +1,28 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+assert_cmd = "2"
+clap = { version = "4", features = ["derive"] }
+globset = "0.4"
+ignore = "0.4"
+insta = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
+thiserror = "2"
+toml = "0.9"
+
+lighthouse-builtin = { path = "crates/lighthouse-builtin" }
+lighthouse-config = { path = "crates/lighthouse-config" }
+lighthouse-engine = { path = "crates/lighthouse-engine" }
+lighthouse-model = { path = "crates/lighthouse-model" }
+lighthouse-plugin = { path = "crates/lighthouse-plugin" }
+lighthouse-report = { path = "crates/lighthouse-report" }

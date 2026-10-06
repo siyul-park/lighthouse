@@ -1,0 +1,12 @@
+[package]
+name = "lighthouse-plugin"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+lighthouse-model.workspace = true
+lighthouse-config.workspace = true

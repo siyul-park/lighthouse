@@ -1,0 +1,5 @@
+plugins = ["core"]
+extends = ["core/recommended"]
+
+[rules]
+"core/max-file-lines" = { level = "warn", max = 1000 }
