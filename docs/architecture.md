@@ -292,6 +292,32 @@ first, original order kept) and a `... N more` tail or a `truncated` record; the
 always counts everything. Both formats end with a summary, printed for clean runs too,
 with the incomplete, suppressed and allowed counts, so silence is never read as success.
 
+## Frontends
+
+The CLI, the MCP server and the agent hooks are frontends over one shared layer,
+`lighthouse-session`: it loads a project (configuration, local rules, catalog),
+runs a check and remembers it, records verdicts, tests and authors rules, and
+renders the agent skill. A frontend parses its own input and prints the result;
+it holds no logic of its own, so a verdict recorded through MCP, the CLI or a
+hook is the same event in the same log.
+
+```
+ lighthouse-cli ── check, review, rule, docs, init --agent, hook claude-code
+ lighthouse-mcp ── `lighthouse mcp`: tools and resources over stdio (rmcp)
+        └── lighthouse-session ── engine, store, spec, declarative, rpc, report
+```
+
+Rule authoring is gated: `rule_create` and `rule_update` build the candidate
+local layer in memory, compile its rules and run every example through the whole
+engine; the file under `.lighthouse/rules` is written (through a temporary name)
+only when all of that passes, so a rejection leaves the project untouched.
+
+The agent skill is generated from the catalog and the configuration
+(`lighthouse docs generate` writes `skills/lighthouse/SKILL.md`, `docs check`
+covers it; `init --agent claude-code` writes the project's own copy): the loop,
+rules of conduct, how to query rules, and a digest of the active patterns.
+See [agents.md](agents.md).
+
 ## Dogfooding
 
 Lighthouse checks its own sources. The repository's `lighthouse.toml` enables the

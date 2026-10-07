@@ -603,3 +603,25 @@ fn outcome_states_report_scope_rules_that_ran_and_subject_facts() {
     let files = engine.check_files(&["a/x.txt".into()], &[]).unwrap();
     assert_eq!(files.reported, [PathBuf::from("a/x.txt")]);
 }
+
+#[test]
+fn active_rules() {
+    let registry = registry("!");
+    let config = |toml: &str| Config::parse(toml).unwrap();
+    let from_preset = lighthouse_engine::active_rules(
+        &registry,
+        &config("plugins = [\"fake\"]\nextends = [\"fake/p\"]\n"),
+    )
+    .unwrap();
+    assert_eq!(from_preset.into_iter().collect::<Vec<_>>(), ["fake/each"]);
+
+    let set_by_entry = lighthouse_engine::active_rules(
+        &registry,
+        &config("plugins = [\"fake\"]\n[rules]\n\"fake/all\" = \"warn\"\n"),
+    )
+    .unwrap();
+    assert_eq!(set_by_entry.into_iter().collect::<Vec<_>>(), ["fake/all"]);
+
+    let unknown = lighthouse_engine::active_rules(&registry, &config("extends = [\"nope/p\"]\n"));
+    assert!(unknown.is_err());
+}

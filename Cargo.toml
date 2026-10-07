@@ -18,6 +18,7 @@ include_dir = "0.7"
 insta = "1"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"
+rmcp = { version = "3.5.1", default-features = false, features = ["server", "transport-io"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 schemars = { version = "1", default-features = false, features = ["derive", "std"] }
 serde = { version = "1", features = ["derive"] }
@@ -27,6 +28,7 @@ sha2 = "0.10"
 syn = { version = "2", features = ["full", "visit"] }
 tempfile = "3"
 thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 toml = "0.9"
 
 lighthouse-builtin = { path = "crates/lighthouse-builtin" }
@@ -34,12 +36,14 @@ lighthouse-config = { path = "crates/lighthouse-config" }
 lighthouse-declarative = { path = "crates/lighthouse-declarative" }
 lighthouse-design = { path = "crates/lighthouse-design" }
 lighthouse-engine = { path = "crates/lighthouse-engine" }
+lighthouse-mcp = { path = "crates/lighthouse-mcp" }
 lighthouse-metrics = { path = "crates/lighthouse-metrics" }
 lighthouse-model = { path = "crates/lighthouse-model" }
 lighthouse-plugin = { path = "crates/lighthouse-plugin" }
 lighthouse-protocol = { path = "crates/lighthouse-protocol" }
 lighthouse-report = { path = "crates/lighthouse-report" }
 lighthouse-rpc = { path = "crates/lighthouse-rpc" }
+lighthouse-session = { path = "crates/lighthouse-session" }
 lighthouse-spec = { path = "crates/lighthouse-spec" }
 lighthouse-store = { path = "crates/lighthouse-store" }
 lighthouse-testing = { path = "crates/lighthouse-testing" }

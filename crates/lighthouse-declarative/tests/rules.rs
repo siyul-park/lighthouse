@@ -230,3 +230,27 @@ fn load_local() {
             .is_some()
     );
 }
+
+#[test]
+fn local_files_and_local_dir() {
+    let root = tempfile::tempdir().unwrap();
+    assert_eq!(
+        lighthouse_declarative::local_dir(root.path()),
+        root.path().join(".lighthouse/rules")
+    );
+    assert!(
+        lighthouse_declarative::local_files(root.path())
+            .unwrap()
+            .is_none()
+    );
+
+    let dir = lighthouse_declarative::local_dir(root.path());
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("a.yaml"), "id: local/a\n").unwrap();
+    std::fs::write(dir.join("notes.txt"), "not a rule").unwrap();
+    let files = lighthouse_declarative::local_files(root.path())
+        .unwrap()
+        .unwrap();
+    assert_eq!(files.keys().collect::<Vec<_>>(), ["a.yaml"]);
+    assert_eq!(files["a.yaml"], "id: local/a\n");
+}

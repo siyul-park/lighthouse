@@ -15,6 +15,11 @@ use lighthouse_spec::Catalog;
 
 use crate::Result;
 
+/// What `init` writes and what a project without a config is checked with.
+pub const DEFAULT_CONFIG: &str = "plugins = [\"core\"]\nextends = [\"core/recommended\"]\n";
+
+/// A project as the frontends open it: its configuration, its root directory
+/// and its local rules layer.
 pub struct Session {
     pub config: Config,
     pub root: PathBuf,
@@ -35,19 +40,34 @@ impl Session {
         Self::open(config, false)
     }
 
-    fn open(config: Option<&Path>, required: bool) -> Result<Self> {
-        let (config, root) = match config {
-            Some(path) => (Config::load(path)?, env::current_dir()?),
-            None if !required && Config::discover(&env::current_dir()?)?.is_none() => {
-                (Config::parse("plugins = [\"core\"]")?, env::current_dir()?)
-            }
-            None => {
-                let (path, config) = Config::discover(&env::current_dir()?)?
-                    .ok_or_else(|| format!("no {FILE_NAME} found (run `lighthouse init`)"))?;
+    /// The project that `dir` or a directory above it configures with a
+    /// `lighthouse.toml`; `None` when there is none, an error when the config
+    /// or the local rules are broken. Unlike `load`, it never reads the
+    /// process's current directory, so a hook can name the project it was
+    /// started for.
+    pub fn find_in(dir: &Path) -> Result<Option<Self>> {
+        match Config::discover(dir)? {
+            Some((path, config)) => {
                 let root = path.parent().ok_or("config path has no parent")?.to_owned();
-                (config, root)
+                Ok(Some(Self::assemble(config, root)?))
             }
-        };
+            None => Ok(None),
+        }
+    }
+
+    fn open(config: Option<&Path>, required: bool) -> Result<Self> {
+        let here = env::current_dir()?;
+        if let Some(path) = config {
+            return Self::assemble(Config::load(path)?, here);
+        }
+        match Self::find_in(&here)? {
+            Some(session) => Ok(session),
+            None if required => Err(format!("no {FILE_NAME} found (run `lighthouse init`)").into()),
+            None => Self::assemble(Config::parse(DEFAULT_CONFIG)?, here),
+        }
+    }
+
+    fn assemble(config: Config, root: PathBuf) -> Result<Self> {
         let local = load_local(&root)?;
         Ok(Self {
             config,
@@ -59,13 +79,7 @@ impl Session {
     /// The bundled and local plugins plus the language plugins the config
     /// lists, which are started here.
     pub fn registry(&self) -> Result<(Registry, Registered)> {
-        let mut registry = lighthouse_builtin::registry();
-        if let Some(local) = &self.local {
-            let plugin = Declarative::from_catalog("local", local)?;
-            if !plugin.is_empty() {
-                registry.register(&plugin)?;
-            }
-        }
+        let mut registry = self.in_process_registry()?;
         let registered = lighthouse_rpc::register(
             &mut registry,
             &self.config,
@@ -73,6 +87,26 @@ impl Session {
             &lighthouse_rpc::search_dirs(&self.root),
         )?;
         Ok((registry, registered))
+    }
+
+    /// The same project with another local layer, such as a candidate that
+    /// has not been written yet.
+    pub fn with_local(self, local: Option<Catalog>) -> Self {
+        Self { local, ..self }
+    }
+
+    /// Plugins that run in this process only: the bundled ones and the local
+    /// rules. Nothing is started, so it is cheap and cannot fail on a
+    /// language plugin.
+    pub fn in_process_registry(&self) -> Result<Registry> {
+        let mut registry = lighthouse_builtin::registry();
+        if let Some(local) = &self.local {
+            let plugin = Declarative::from_catalog("local", local)?;
+            if !plugin.is_empty() {
+                registry.register(&plugin)?;
+            }
+        }
+        Ok(registry)
     }
 
     /// The bundled catalog with the project's layer on top.

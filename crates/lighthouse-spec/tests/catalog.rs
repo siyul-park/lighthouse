@@ -754,3 +754,63 @@ fn implemented_patterns_mark_one_canonical_example_per_language() {
         }
     }
 }
+
+#[test]
+fn local_rule_text_and_write_local_round_trip_through_the_local_layer() {
+    let pattern: Pattern = serde_norway::from_str(
+        "id: local/probe\ntitle: Probe\nintent: A probe.\nscope: file\nrequirement: A probe MUST hold.\nenforcement: mechanical\nevidence: [path]\nexamples:\n  - name: bad\n    language: text\n    kind: invalid\n    files: [{ path: a.txt, body: x }]\n    expect: [{ line: 1 }]\n  - name: good\n    language: text\n    kind: valid\n    files: [{ path: a.txt, body: x }]\nimplementation: { declarative: \"probe.yaml\" }\n",
+    )
+    .unwrap();
+    let rule = json!({ "select": "file", "where": "true", "message": "m" });
+    let text = Catalog::local_rule_text(&pattern, &rule).unwrap();
+    assert!(!text.contains("implementation"), "{text}");
+    assert!(text.contains("rule:"), "{text}");
+
+    let dir = tempfile::tempdir().unwrap();
+    let rules = dir.path().join("nested/rules");
+    Catalog::write_local(&rules, "probe", &text).unwrap();
+    let written = std::fs::read_to_string(rules.join("probe.yaml")).unwrap();
+    assert_eq!(written, text);
+    assert!(!rules.join("probe.yaml.tmp").exists());
+
+    let layer = Catalog::from_local([("probe.yaml".to_owned(), written)].into()).unwrap();
+    assert_eq!(layer.pattern("local/probe").unwrap().title, "Probe");
+    assert!(Catalog::write_local(&rules.join("probe.yaml/x"), "y", "z").is_err());
+}
+
+#[test]
+fn write_local_refuses_names_and_targets_that_leave_the_directory() {
+    for name in [
+        "", "../evil", "a/b", "a\\b", "..", "a..b", ".hidden", "Upper", "x y",
+    ] {
+        assert!(!Catalog::local_name_ok(name), "{name:?}");
+    }
+    for name in ["short-notes", "a.b_c-1", "9lives"] {
+        assert!(Catalog::local_name_ok(name), "{name:?}");
+    }
+
+    let dir = tempfile::tempdir().unwrap();
+    let rules = dir.path().join("rules");
+    for name in ["../evil", "a/b", ""] {
+        assert!(Catalog::write_local(&rules, name, "x").is_err(), "{name:?}");
+    }
+    assert!(!dir.path().join("evil.yaml").exists());
+
+    std::fs::create_dir_all(&rules).unwrap();
+    let outside = dir.path().join("elsewhere.yaml");
+    std::fs::write(&outside, "keep").unwrap();
+    std::os::unix::fs::symlink(&outside, rules.join("linked.yaml")).unwrap();
+    assert!(Catalog::write_local(&rules, "linked", "overwritten").is_err());
+    assert_eq!(std::fs::read_to_string(&outside).unwrap(), "keep");
+}
+
+#[test]
+fn write_atomic_replaces_a_file_and_leaves_no_temporary() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("a.json");
+    lighthouse_spec::write_atomic(&path, "one").unwrap();
+    lighthouse_spec::write_atomic(&path, "two").unwrap();
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "two");
+    let names: Vec<_> = std::fs::read_dir(dir.path()).unwrap().collect();
+    assert_eq!(names.len(), 1);
+}

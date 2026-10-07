@@ -12,7 +12,7 @@ mod rule;
 use lighthouse_plugin::{Manifest, Plugin, Rule};
 use lighthouse_spec::{Catalog, Implementation};
 
-pub use local::load_local;
+pub use local::{load_local, local_dir, local_files};
 use rule::DeclarativeRule;
 
 /// Why a declarative rule could not be built.

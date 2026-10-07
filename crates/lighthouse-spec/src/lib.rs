@@ -7,7 +7,7 @@ mod rule;
 mod sources;
 mod validate;
 
-pub use catalog::Catalog;
+pub use catalog::{Catalog, write_atomic};
 pub use error::Error;
 pub use model::{
     Content, Enforcement, Example, ExampleFile, Expect, Implementation, Kind, OptionSpec,

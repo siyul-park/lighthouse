@@ -6,7 +6,7 @@ use std::{fmt::Write, str::FromStr};
 use lighthouse_model::{Diagnostic, Incomplete, Severity};
 use thiserror::Error;
 
-pub use agent::Briefing;
+pub use agent::{AgentReport, Briefing, agent_report};
 
 /// Output format of [`render`]; parsed from `text`, `json`, `sarif`, `agent`
 /// or `agent-json`.

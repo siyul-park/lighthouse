@@ -35,6 +35,17 @@ pub struct Briefing<'a> {
     pub limit: Option<usize>,
 }
 
+/// The agent records as typed data: the findings that fit `briefing.limit`,
+/// the gaps, how many findings were left out, and the reasons table when a
+/// shown finding asks for review.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AgentReport {
+    pub findings: Vec<Value>,
+    pub incomplete: Vec<Value>,
+    pub omitted: usize,
+    pub reasons: Option<Value>,
+}
+
 #[derive(Serialize)]
 struct Location {
     path: String,
@@ -135,6 +146,33 @@ pub(crate) fn text(
     out
 }
 
+/// Builds the [`AgentReport`] that [`json_lines`] prints.
+pub fn agent_report(
+    diagnostics: &[Diagnostic],
+    incomplete: &[Incomplete],
+    briefing: &Briefing,
+) -> AgentReport {
+    let (shown, omitted) = select(diagnostics, briefing.limit);
+    let width = prefix_len(&shown);
+    let findings = shown
+        .iter()
+        .map(|d| serde_json::to_value(finding(d, briefing, width)).expect("finding serializes"))
+        .collect();
+    let incomplete = incomplete
+        .iter()
+        .map(|item| json!({ "type": "incomplete", "path": item.path, "reason": item.reason }))
+        .collect();
+    AgentReport {
+        findings,
+        incomplete,
+        omitted,
+        reasons: shown
+            .iter()
+            .any(|d| d.severity == Severity::Review)
+            .then(reasons),
+    }
+}
+
 /// One JSON object per line: findings, incomplete entries, a `truncated`
 /// record when `limit` left findings out, then the summary, each tagged with
 /// `type`. The summary carries the reasons table once, when a shown finding
@@ -144,17 +182,15 @@ pub(crate) fn json_lines(
     incomplete: &[Incomplete],
     briefing: &Briefing,
 ) -> String {
-    let (shown, omitted) = select(diagnostics, briefing.limit);
-    let width = prefix_len(&shown);
-    let mut lines: Vec<String> = shown
+    let report = agent_report(diagnostics, incomplete, briefing);
+    let mut lines: Vec<String> = report
+        .findings
         .iter()
-        .map(|d| serde_json::to_string(&finding(d, briefing, width)).expect("finding serializes"))
+        .chain(&report.incomplete)
+        .map(Value::to_string)
         .collect();
-    lines.extend(incomplete.iter().map(|item| {
-        json!({ "type": "incomplete", "path": item.path, "reason": item.reason }).to_string()
-    }));
-    if omitted > 0 {
-        lines.push(json!({ "type": "truncated", "omitted": omitted }).to_string());
+    if report.omitted > 0 {
+        lines.push(json!({ "type": "truncated", "omitted": report.omitted }).to_string());
     }
     let count = |s: Severity| diagnostics.iter().filter(|d| d.severity == s).count();
     let mut summary = json!({
@@ -166,8 +202,8 @@ pub(crate) fn json_lines(
         "suppressed": briefing.suppressed,
         "allowed": briefing.allowed,
     });
-    if shown.iter().any(|d| d.severity == Severity::Review) {
-        summary["reasons"] = reasons();
+    if let Some(reasons) = report.reasons {
+        summary["reasons"] = reasons;
     }
     lines.push(summary.to_string());
     lines.iter().map(|line| format!("{line}\n")).collect()

@@ -389,3 +389,29 @@ fn expected_structure_prefers_canonical_then_a_match_then_the_shortest_then_tuni
     );
     assert_eq!(expected_basis(&pattern_with("", ""), "function"), None);
 }
+
+#[test]
+fn agent_report_has_the_records_the_json_lines_print() {
+    let catalog = Catalog::bundled();
+    let briefing = Briefing {
+        catalog: Some(catalog),
+        limit: Some(1),
+        ..Briefing::default()
+    };
+    let findings = [coupling(), helper()];
+    let gaps = [Incomplete {
+        path: None,
+        reason: "plugin crashed".to_owned(),
+    }];
+    let report = lighthouse_report::agent_report(&findings, &gaps, &briefing);
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(report.findings[0]["type"], "finding");
+    assert_eq!(report.omitted, 1);
+    assert_eq!(report.incomplete[0]["reason"], "plugin crashed");
+    assert!(report.reasons.is_none(), "the review finding was left out");
+
+    let all = lighthouse_report::agent_report(&findings, &[], &Briefing::default());
+    assert_eq!(all.findings.len(), 2);
+    assert_eq!(all.omitted, 0);
+    assert!(all.reasons.is_some());
+}

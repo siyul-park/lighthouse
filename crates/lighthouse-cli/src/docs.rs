@@ -4,13 +4,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lighthouse_session::{Session, skill_for};
 use lighthouse_spec::Catalog;
 
 use crate::Result;
 
 const PATTERNS_DIR: &str = "patterns";
 
-pub fn generate(out: &Path) -> Result<u8> {
+pub fn generate(out: &Path, skill: &Path) -> Result<u8> {
     let docs = lighthouse_spec::docs(Catalog::bundled());
     for orphan in orphans(out, &docs)? {
         fs::remove_file(&orphan)?;
@@ -24,10 +25,20 @@ pub fn generate(out: &Path) -> Result<u8> {
         fs::write(&target, text)?;
         println!("wrote {}", target.display());
     }
+    if let Some(dir) = skill.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    fs::write(skill, skill_text()?)?;
+    println!("wrote {}", skill.display());
     Ok(0)
 }
 
-pub fn check(out: &Path) -> Result<u8> {
+/// The agent skill of this project: its catalog and configuration.
+fn skill_text() -> Result<String> {
+    skill_for(&Session::load_or_default(None)?)
+}
+
+pub fn check(out: &Path, skill: &Path) -> Result<u8> {
     let docs = lighthouse_spec::docs(Catalog::bundled());
     let mut problems = Vec::new();
     for (path, text) in &docs {
@@ -43,6 +54,14 @@ pub fn check(out: &Path) -> Result<u8> {
     }
     for orphan in orphans(out, &docs)? {
         problems.push(format!("{} is not generated", orphan.display()));
+    }
+    match fs::read_to_string(skill) {
+        Ok(current) if current == skill_text()? => {}
+        Ok(_) => problems.push(format!("{} is stale", skill.display())),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            problems.push(format!("{} is missing", skill.display()));
+        }
+        Err(e) => return Err(format!("cannot read {}: {e}", skill.display()).into()),
     }
     for problem in &problems {
         eprintln!("lighthouse: {problem}");

@@ -1,8 +1,12 @@
 use std::{
     collections::BTreeMap,
     fs,
+    io::Write,
     path::{Path, PathBuf},
-    sync::OnceLock,
+    sync::{
+        OnceLock,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -240,6 +244,67 @@ impl Catalog {
         Ok(())
     }
 
+    /// The text of a project-local rule file: `pattern` without an
+    /// implementation (the loader adds it) and `rule`, the declarative rule
+    /// definition, under `rule:`.
+    pub fn local_rule_text(pattern: &Pattern, rule: &Value) -> Result<String, Error> {
+        let mut doc = serde_norway::to_value(Pattern {
+            implementation: None,
+            ..pattern.clone()
+        })
+        .map_err(|e| Error::invalid(&pattern.id, e.to_string()))?;
+        let rule =
+            serde_norway::to_value(rule).map_err(|e| Error::invalid(&pattern.id, e.to_string()))?;
+        let map = doc
+            .as_mapping_mut()
+            .ok_or_else(|| Error::invalid(&pattern.id, "a pattern is a mapping"))?;
+        map.insert("rule".into(), rule);
+        dump(&doc)
+    }
+
+    /// Whether `name` can be the file name of a local layer file: it starts
+    /// with a lowercase letter or digit and goes on with lowercase letters,
+    /// digits, `.`, `_` and `-`, and has no `..`. Slashes, backslashes and
+    /// empty names never pass, so a name cannot leave the directory.
+    pub fn local_name_ok(name: &str) -> bool {
+        let mut chars = name.chars();
+        chars
+            .next()
+            .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+            && chars.all(|c| {
+                c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_' | '-')
+            })
+            && !name.contains("..")
+    }
+
+    /// Writes a local layer file `<dir>/<name>.yaml` atomically (see
+    /// `write_atomic`). A name that fails `local_name_ok`, and a target that
+    /// does not resolve to a file directly inside `dir`, are refused.
+    pub fn write_local(dir: &Path, name: &str, text: &str) -> Result<(), Error> {
+        if !Self::local_name_ok(name) {
+            return Err(Error::invalid(
+                name,
+                "a local rule file name is lowercase letters, digits, `.`, `_` and `-`, without `..`",
+            ));
+        }
+        let io = |path: &Path, source| Error::Io {
+            path: path.display().to_string(),
+            source,
+        };
+        fs::create_dir_all(dir).map_err(|e| io(dir, e))?;
+        let path = dir.join(format!("{name}.yaml"));
+        let inside = path
+            .parent()
+            .map(Path::canonicalize)
+            .transpose()
+            .map_err(|e| io(dir, e))?
+            == Some(dir.canonicalize().map_err(|e| io(dir, e))?);
+        if !inside {
+            return Err(Error::invalid(name, "resolves outside the rules directory"));
+        }
+        write_atomic(&path, text)
+    }
+
     /// Fails unless `sources.yaml` lists exactly the normative lines of the
     /// given documents, keyed by document name (`coding-patterns` for refs
     /// like `coding-patterns#...`).
@@ -338,6 +403,44 @@ impl Catalog {
             patterns,
         })
     }
+}
+
+/// Writes `text` to `path` through a uniquely named temporary file in the same
+/// directory, flushed to disk before it is renamed over `path`, so a reader
+/// sees the old file or the new one and a failure leaves no partial file. A
+/// `path` that is a symlink is refused rather than followed or replaced.
+pub fn write_atomic(path: &Path, text: &str) -> Result<(), Error> {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let io = |source| Error::Io {
+        path: path.display().to_string(),
+        source,
+    };
+    if fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Err(Error::invalid(
+            &path.display().to_string(),
+            "is a symlink; edit its target by hand",
+        ));
+    }
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let tmp = path.with_file_name(format!(
+        ".{name}.{}.{}.tmp",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    let written = (|| {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)?;
+        file.write_all(text.as_bytes())?;
+        file.sync_all()?;
+        fs::rename(&tmp, path)
+    })();
+    if let Err(e) = written {
+        let _ = fs::remove_file(&tmp);
+        return Err(io(e));
+    }
+    Ok(())
 }
 
 /// The pattern of a local rule file and the text of its `rule:` section.

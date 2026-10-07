@@ -1,28 +1,21 @@
 //! `lighthouse review`: the findings the store remembers and the verdicts on
 //! them.
 
-use std::{env, fmt::Write, path::Path};
+use std::{fmt::Write, path::Path};
 
 use clap::{Subcommand, ValueEnum};
 use lighthouse_model::{Reason, ReviewerKind, Verdict};
-use lighthouse_spec::{Catalog, Pattern};
+use lighthouse_session::{Recorded, Reviewer, existing_store, head, project_root, record_verdict};
 use lighthouse_store::{
-    Filter, FindingRecord, NewReview, ReviewEvent, Stamp, Standing, State, StatusFilter, Store,
+    Filter, FindingRecord, NewReview, ReviewEvent, Standing, StatusFilter, Store,
 };
 use serde_json::{Value, json};
 
-use crate::{
-    Result, git,
-    session::{catalog_at, project_root},
-};
+use crate::Result;
 
 /// Characters of a fingerprint that listings show; any unambiguous prefix
 /// names a finding.
 const SHORT: usize = 12;
-/// Environment variables that say who is reviewing when no flag does. Tools
-/// that run reviews for an agent (hooks, an MCP server) set both.
-const KIND_VAR: &str = "LIGHTHOUSE_REVIEWER_KIND";
-const ID_VAR: &str = "LIGHTHOUSE_REVIEWER";
 
 #[derive(Subcommand)]
 pub enum ReviewCommand {
@@ -113,12 +106,6 @@ pub enum Format {
     Json,
 }
 
-/// Who is reviewing: the flag, else the environment, else a human.
-struct Reviewer {
-    kind: ReviewerKind,
-    id: Option<String>,
-}
-
 pub fn run(command: ReviewCommand) -> Result<u8> {
     let root = project_root()?;
     match command {
@@ -136,12 +123,12 @@ pub fn run(command: ReviewCommand) -> Result<u8> {
         ReviewCommand::Show {
             fingerprint,
             format,
-        } => show(&existing(&root)?, &fingerprint, format),
+        } => show(&existing_store(&root)?, &fingerprint, format),
         ReviewCommand::History {
             fingerprint,
             format,
-        } => history(&existing(&root)?, &fingerprint, format),
-        ReviewCommand::Prune { older_than } => prune(&mut existing(&root)?, older_than),
+        } => history(&existing_store(&root)?, &fingerprint, format),
+        ReviewCommand::Prune { older_than } => prune(&mut existing_store(&root)?, older_than),
         ReviewCommand::Resolve {
             fingerprint,
             verdict,
@@ -151,7 +138,7 @@ pub fn run(command: ReviewCommand) -> Result<u8> {
             reviewer_id,
             seen,
         } => {
-            let reviewer = reviewer(reviewer_kind, reviewer_id)?;
+            let reviewer = Reviewer::from_env(reviewer_kind, reviewer_id)?;
             let review = NewReview {
                 fingerprint,
                 verdict,
@@ -159,32 +146,13 @@ pub fn run(command: ReviewCommand) -> Result<u8> {
                 reason_text: note,
                 reviewer_kind: reviewer.kind,
                 reviewer_id: reviewer.id,
-                commit: git::head(&root),
+                commit: head(&root),
                 expect_seen: seen,
                 lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
             };
-            resolve(&root, &mut existing(&root)?, &review)
+            resolve(&root, &mut existing_store(&root)?, &review)
         }
     }
-}
-
-/// The store, which must already exist: nothing is remembered before a check.
-fn existing(root: &Path) -> Result<Store> {
-    Store::open_existing(root)?
-        .ok_or_else(|| "no findings recorded yet (run `lighthouse check`)".into())
-}
-
-fn reviewer(kind: Option<ReviewerKind>, id: Option<String>) -> Result<Reviewer> {
-    let kind = match (kind, env::var(KIND_VAR)) {
-        (Some(kind), _) => kind,
-        (None, Ok(text)) => text.parse().map_err(|e| format!("{KIND_VAR}: {e}"))?,
-        (None, Err(_)) => ReviewerKind::Human,
-    };
-    let id = id
-        .or_else(|| env::var(ID_VAR).ok())
-        .or_else(|| env::var("USER").ok())
-        .filter(|id| !id.is_empty());
-    Ok(Reviewer { kind, id })
 }
 
 fn list(store: &Store, rule: Option<String>, status: Status, format: Format) -> Result<u8> {
@@ -234,18 +202,19 @@ fn prune(store: &mut Store, older_than: Option<u32>) -> Result<u8> {
     Ok(0)
 }
 
-/// Records the verdict, stamping it with the versions of the finding's rule
-/// when the catalog can be read; a broken catalog is a warning, not a failure.
 fn resolve(root: &Path, store: &mut Store, review: &NewReview) -> Result<u8> {
-    let catalog = catalog_at(root)
-        .inspect_err(|e| {
-            eprintln!(
-                "lighthouse: the catalog cannot be read ({e}); rule and catalog versions are not recorded"
-            );
-        })
-        .ok();
-    let resolved = store.resolve(review, |finding| stamp(catalog.as_ref(), finding))?;
-    let (event, finding) = (&resolved.event, &resolved.finding);
+    let Recorded {
+        event,
+        warnings,
+        standing,
+        catalog_error,
+        ..
+    } = record_verdict(root, store, review)?;
+    if let Some(e) = catalog_error {
+        eprintln!(
+            "lighthouse: the catalog cannot be read ({e}); rule and catalog versions are not recorded"
+        );
+    }
     println!(
         "recorded {} ({}) for {} {}",
         event.verdict,
@@ -253,14 +222,10 @@ fn resolve(root: &Path, store: &mut Store, review: &NewReview) -> Result<u8> {
         short(&event.fingerprint),
         event.rule_id
     );
-    for warning in warnings(finding) {
+    for warning in warnings {
         eprintln!("lighthouse: warning: {warning}");
     }
-    match store
-        .standings()?
-        .get(&event.fingerprint)
-        .map(|j| j.standing)
-    {
+    match standing {
         Some(Standing::Suppressed) => println!(
             "later checks keep this finding out of the report while its rule and evidence stay as they are; `lighthouse review list --status suppressed` lists it"
         ),
@@ -270,39 +235,6 @@ fn resolve(root: &Path, store: &mut Store, review: &NewReview) -> Result<u8> {
         _ => {}
     }
     Ok(0)
-}
-
-fn stamp(catalog: Option<&Catalog>, finding: &FindingRecord) -> Stamp {
-    let Some(catalog) = catalog else {
-        return Stamp::default();
-    };
-    let pattern = catalog.pattern(&finding.rule_id);
-    Stamp {
-        rule_version: pattern.map(Pattern::semantic_version),
-        pattern_hash: pattern.map(Pattern::version),
-        catalog_version: Some(catalog.version()),
-        scope: pattern.map(|p| p.scope.to_string()),
-    }
-}
-
-/// What the reviewer should know about the finding they just judged.
-fn warnings(finding: &FindingRecord) -> Vec<String> {
-    let mut warnings = Vec::new();
-    match finding.state() {
-        State::Resolved => warnings.push(
-            "the finding was already resolved: no complete run reports it any more, so the verdict only matters if it comes back".to_owned(),
-        ),
-        State::Inactive => warnings.push(
-            "the finding's rule is no longer enabled by the configuration".to_owned(),
-        ),
-        State::Open | State::Suppressed => {}
-    }
-    if finding.facts.get("ordinal") == Some(&Value::Bool(true)) {
-        warnings.push(
-            "this finding's identity rests on its position among identical findings, so the verdict may stop matching when one of them is added or removed".to_owned(),
-        );
-    }
-    warnings
 }
 
 /// One line per finding: fingerprint, rule, severity, location, state, latest

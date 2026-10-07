@@ -7,10 +7,24 @@ use crate::Error;
 /// Where a project keeps its own rules, relative to the project root.
 const LOCAL_DIR: &str = ".lighthouse/rules";
 
+/// Where a project keeps its own rules: `<root>/.lighthouse/rules`.
+pub fn local_dir(root: &Path) -> std::path::PathBuf {
+    root.join(LOCAL_DIR)
+}
+
 /// The catalog layer of `<root>/.lighthouse/rules/*.yaml`; `None` when the
 /// directory does not exist.
 pub fn load_local(root: &Path) -> Result<Option<Catalog>, Error> {
-    let dir = root.join(LOCAL_DIR);
+    match local_files(root)? {
+        Some(files) => Ok(Some(Catalog::from_local(files)?)),
+        None => Ok(None),
+    }
+}
+
+/// The texts of `<root>/.lighthouse/rules/*.yaml` by file name; `None` when
+/// the directory does not exist.
+pub fn local_files(root: &Path) -> Result<Option<BTreeMap<String, String>>, Error> {
+    let dir = local_dir(root);
     if !dir.is_dir() {
         return Ok(None);
     }
@@ -31,5 +45,5 @@ pub fn load_local(root: &Path) -> Result<Option<Catalog>, Error> {
             files.insert(name, text);
         }
     }
-    Ok(Some(Catalog::from_local(files)?))
+    Ok(Some(files))
 }

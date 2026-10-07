@@ -18,6 +18,8 @@ pub struct Remembered {
     pub suppressed: usize,
     /// Why a finding is reported although a verdict was recorded on it.
     pub notes: BTreeMap<Fingerprint, String>,
+    /// What the user should know about how the store was used.
+    pub messages: Vec<String>,
 }
 
 /// Records the run in the project's store and removes the findings whose
@@ -27,14 +29,16 @@ pub struct Remembered {
 /// be used never fails the check: it is reported, and verdicts already
 /// recorded are still applied read-only.
 pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut Outcome) -> Remembered {
+    let mut remembered = Remembered::default();
     let judged = match record(root, catalog, outcome) {
         Ok(judged) => judged,
         Err(e) => {
-            eprintln!("lighthouse: findings not recorded: {e}");
+            remembered
+                .messages
+                .push(format!("findings not recorded: {e}"));
             read_only(root)
         }
     };
-    let mut remembered = Remembered::default();
     outcome.diagnostics.retain(|d| {
         let Some(judgment) = judged.get(d.fingerprint.as_str()) else {
             return true;
@@ -50,7 +54,7 @@ pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut Outcome) -> Rememb
             }
         }
     });
-    announce(&remembered);
+    announce(&mut remembered);
     remembered
 }
 
@@ -67,12 +71,12 @@ fn note(judgment: &Judgment) -> Option<String> {
     }
 }
 
-fn announce(remembered: &Remembered) {
+fn announce(remembered: &mut Remembered) {
     if remembered.suppressed > 0 {
-        eprintln!(
-            "lighthouse: {} finding(s) suppressed by review verdicts (`lighthouse review list --status suppressed`)",
+        remembered.messages.push(format!(
+            "{} finding(s) suppressed by review verdicts (`lighthouse review list --status suppressed`)",
             remembered.suppressed
-        );
+        ));
     }
     let count = |text: &str| {
         remembered
@@ -81,6 +85,7 @@ fn announce(remembered: &Remembered) {
             .filter(|n| n.contains(text))
             .count()
     };
+    let mut messages = Vec::new();
     for (text, what) in [
         ("rule changed", "verdict expired: rule changed"),
         ("evidence changed", "verdict expired: evidence changed"),
@@ -91,9 +96,10 @@ fn announce(remembered: &Remembered) {
     ] {
         let found = count(text);
         if found > 0 {
-            eprintln!("lighthouse: {found} finding(s) reported again, {what}");
+            messages.push(format!("{found} finding(s) reported again, {what}"));
         }
     }
+    remembered.messages.extend(messages);
 }
 
 fn record(

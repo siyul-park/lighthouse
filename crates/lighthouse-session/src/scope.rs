@@ -10,6 +10,7 @@ use crate::{Result, git::git};
 /// report scope so that the findings it had can be resolved. Project-relative,
 /// sorted.
 pub fn changed(root: &Path) -> Result<Vec<PathBuf>> {
+    let against = base_of_changes(root)?;
     let mut files = tracked(
         root,
         &[
@@ -18,7 +19,7 @@ pub fn changed(root: &Path) -> Result<Vec<PathBuf>> {
             "--no-renames",
             "--diff-filter=ACMRTD",
             "-z",
-            "HEAD",
+            &against,
         ],
     )?;
     files.extend(untracked(root)?);
@@ -28,7 +29,10 @@ pub fn changed(root: &Path) -> Result<Vec<PathBuf>> {
 /// Files changed since the merge base of `base` and HEAD, in the working tree,
 /// deleted and renamed ones included, plus untracked files.
 pub fn since(root: &Path, base: &str) -> Result<Vec<PathBuf>> {
-    let merge_base = git(root, &["merge-base", base, "HEAD"])?;
+    if base.starts_with('-') {
+        return Err(format!("`{base}` is not a git ref").into());
+    }
+    let merge_base = git(root, &["merge-base", "--", base, "HEAD"])?;
     let merge_base = merge_base.trim();
     let mut files = tracked(
         root,
@@ -43,6 +47,19 @@ pub fn since(root: &Path, base: &str) -> Result<Vec<PathBuf>> {
     )?;
     files.extend(untracked(root)?);
     finish(root, files)
+}
+
+/// What the working tree is compared with: HEAD, or, in a repository with no
+/// commit yet, the empty tree (so every tracked and untracked file is changed).
+/// Not being in a repository is an error.
+fn base_of_changes(root: &Path) -> Result<String> {
+    if git(root, &["rev-parse", "--verify", "--quiet", "HEAD"]).is_ok() {
+        return Ok("HEAD".to_owned());
+    }
+    git(root, &["rev-parse", "--git-dir"])?;
+    Ok(git(root, &["hash-object", "-t", "tree", "--stdin"])?
+        .trim()
+        .to_owned())
 }
 
 fn untracked(root: &Path) -> Result<Vec<String>> {

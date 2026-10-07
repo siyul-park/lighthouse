@@ -149,7 +149,7 @@ impl Engine {
             active: BTreeSet::new(),
             startup: Vec::new(),
         };
-        engine.active = engine.active_rules()?;
+        engine.active = active_rules(&engine.registry, &engine.config)?;
         Ok(engine)
     }
 
@@ -280,18 +280,6 @@ impl Engine {
             options.insert(d.fingerprint.clone(), found.unwrap_or_default());
         }
         Ok(options)
-    }
-
-    fn active_rules(&self) -> Result<BTreeSet<String>, Error> {
-        let mut active: BTreeSet<String> = self
-            .config
-            .resolve(Path::new(""), "", &|id| self.preset_rules(id))?
-            .into_iter()
-            .filter_map(|(id, c)| c.level.map(|_| id))
-            .collect();
-        let overridden = self.config.configured().filter(|(_, c)| c.level.is_some());
-        active.extend(overridden.map(|(id, _)| id.to_owned()));
-        Ok(active)
     }
 
     /// Report paths relative to the root; those outside it are incomplete.
@@ -600,6 +588,21 @@ impl Engine {
     fn preset_rules(&self, id: &str) -> Option<Rules> {
         self.registry.preset(id).map(|p| p.rules.clone())
     }
+}
+
+/// The rules the configuration enables for at least one file: the presets it
+/// extends and the entries it sets, resolved over the registry.
+pub fn active_rules(registry: &Registry, config: &Config) -> Result<BTreeSet<String>, Error> {
+    let mut active: BTreeSet<String> = config
+        .resolve(Path::new(""), "", &|id| {
+            registry.preset(id).map(|p| p.rules.clone())
+        })?
+        .into_iter()
+        .filter_map(|(id, c)| c.level.map(|_| id))
+        .collect();
+    let overridden = config.configured().filter(|(_, c)| c.level.is_some());
+    active.extend(overridden.map(|(id, _)| id.to_owned()));
+    Ok(active)
 }
 
 /// Rejects a configuration that names plugins, presets or rules the registry

@@ -1,27 +1,23 @@
 use std::{
-    env,
-    error::Error,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
     process::ExitCode,
 };
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use lighthouse_config::FILE_NAME;
-use lighthouse_engine::{Engine, Outcome};
-use lighthouse_report::{Briefing, Format, render_with};
+use lighthouse_report::{Format, render_with};
+use lighthouse_session::{CheckRequest, DEFAULT_CONFIG, Session};
 use review::ReviewCommand;
-use session::Session;
 
 mod docs;
-mod findings;
-mod git;
+mod hook;
 mod review;
 mod rules;
-mod scope;
-mod session;
+mod setup;
 
-const DEFAULT_CONFIG: &str = "plugins = [\"core\"]\nextends = [\"core/recommended\"]\n";
+/// Where `docs generate` writes the agent skill.
+const SKILL_PATH: &str = "skills/lighthouse/SKILL.md";
 
 /// What `init` keeps out of version control: the store is a local cache of
 /// one machine's checks and reviews.
@@ -120,7 +116,43 @@ enum Command {
         command: DocsCommand,
     },
     /// Write a default lighthouse.toml in the current directory.
-    Init,
+    ///
+    /// With --agent the project is also wired for a coding agent: the MCP
+    /// server, the hooks and the skill are merged into the agent's own
+    /// files without overwriting anything you wrote, and running it again
+    /// changes nothing. An existing lighthouse.toml is kept in that case.
+    Init {
+        /// Set up this coding agent as well.
+        #[arg(long, value_enum)]
+        agent: Option<Agent>,
+    },
+    /// Serve the Model Context Protocol on stdio, for coding agents: tools to
+    /// check, explain, review and author rules, and resources for the
+    /// catalog. Verdicts recorded through it are reviews by an `agent`
+    /// (the id is $LIGHTHOUSE_REVIEWER, else the client's name).
+    Mcp,
+    /// Entry points for agent hooks. Reads the hook payload on stdin.
+    Hook {
+        #[command(subcommand)]
+        agent: HookAgent,
+    },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Agent {
+    ClaudeCode,
+}
+
+#[derive(Subcommand)]
+enum HookAgent {
+    /// Claude Code hooks (see docs/agents.md).
+    ClaudeCode {
+        #[arg(value_enum)]
+        event: hook::Event,
+        /// Say that the analysis was incomplete but do not block on it.
+        #[arg(long)]
+        allow_incomplete: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -149,19 +181,24 @@ enum RuleCommand {
 
 #[derive(Subcommand)]
 enum DocsCommand {
-    /// Write the pattern docs.
+    /// Write the pattern docs and the agent skill.
     Generate {
         #[arg(long, default_value = "docs")]
         out: PathBuf,
+        /// Where the generated agent skill goes.
+        #[arg(long, default_value = SKILL_PATH)]
+        skill: PathBuf,
     },
-    /// Exit 1 when the pattern docs are stale.
+    /// Exit 1 when the pattern docs or the agent skill are stale.
     Check {
         #[arg(long, default_value = "docs")]
         out: PathBuf,
+        #[arg(long, default_value = SKILL_PATH)]
+        skill: PathBuf,
     },
 }
 
-type Result<T> = std::result::Result<T, Box<dyn Error>>;
+type Result<T> = lighthouse_session::Result<T>;
 
 struct Options {
     format: Format,
@@ -230,10 +267,21 @@ fn run(cli: Cli) -> Result<u8> {
         } => rules::test(&ids, language.as_deref(), config.as_deref()),
         Command::Explain { id } => rules::explain(&id),
         Command::Docs { command } => match command {
-            DocsCommand::Generate { out } => docs::generate(&out),
-            DocsCommand::Check { out } => docs::check(&out),
+            DocsCommand::Generate { out, skill } => docs::generate(&out, &skill),
+            DocsCommand::Check { out, skill } => docs::check(&out, &skill),
         },
-        Command::Init => init(),
+        Command::Init { agent } => init(agent),
+        Command::Mcp => {
+            lighthouse_mcp::serve()?;
+            Ok(0)
+        }
+        Command::Hook {
+            agent:
+                HookAgent::ClaudeCode {
+                    event,
+                    allow_incomplete,
+                },
+        } => Ok(hook::run(event, allow_incomplete)),
     }
 }
 
@@ -247,73 +295,28 @@ fn check(
     if options.limit.is_some() && !briefed(options.format) {
         return Err("--limit applies to the agent formats only".into());
     }
-    let session = Session::load(config)?;
-    let (registry, plugins) = session.registry()?;
-    let root = session.root.clone();
-    let catalog = session.catalog()?;
-    let engine = Engine::new(registry, session.config, &root)?.with_incomplete(plugins.incomplete);
-    let mut outcome = analyze(&engine, &root, paths, reported, only)?;
-    for notice in plugins.notices.iter().chain(&outcome.notices) {
-        eprintln!("lighthouse: {notice}");
-    }
-    let remembered = if options.store {
-        findings::remember(&root, &catalog, &mut outcome)
-    } else {
-        findings::Remembered::default()
+    let request = CheckRequest {
+        paths: paths.to_vec(),
+        changed: reported.changed,
+        diff: reported.diff.map(str::to_owned),
+        rules: only.to_vec(),
+        store: options.store,
     };
-    let allowed = outcome.allowed.len();
-    if allowed > 0 {
-        eprintln!("lighthouse: {allowed} finding(s) allowed by source annotations");
+    let checked = lighthouse_session::check(Session::load(config)?, &request)?;
+    for message in &checked.messages {
+        eprintln!("lighthouse: {message}");
     }
-    let briefing = Briefing {
-        catalog: briefed(options.format).then_some(&catalog),
-        facts: Some(&outcome.facts),
-        notes: Some(&remembered.notes),
-        suppressed: remembered.suppressed,
-        allowed,
-        limit: options.limit,
-    };
+    let outcome = &checked.outcome;
     print!(
         "{}",
         render_with(
             options.format,
             &outcome.diagnostics,
             &outcome.incomplete,
-            &briefing
+            &checked.briefing(briefed(options.format), options.limit)
         )
     );
     Ok(outcome.exit_code(options.strict, options.allow_incomplete))
-}
-
-/// Runs the engine over the project and reports what the paths or the git
-/// scope select.
-fn analyze(
-    engine: &Engine,
-    root: &Path,
-    paths: &[PathBuf],
-    reported: Reported,
-    only: &[String],
-) -> Result<Outcome> {
-    let files = match (reported.changed, reported.diff) {
-        (true, _) => Some(scope::changed(root)?),
-        (_, Some(base)) => Some(scope::since(root, base)?),
-        _ => None,
-    };
-    if let Some(files) = files {
-        let files = within(root, paths, files)?;
-        eprintln!(
-            "lighthouse: reporting {} changed file(s); the whole project is analyzed",
-            files.len()
-        );
-        return Ok(engine.check_files(&files, only)?);
-    }
-    let default = [PathBuf::from(".")];
-    let paths = if paths.is_empty() {
-        &default[..]
-    } else {
-        paths
-    };
-    Ok(engine.check(paths, only)?)
 }
 
 /// Whether the format draws on the catalog.
@@ -321,50 +324,29 @@ fn briefed(format: Format) -> bool {
     matches!(format, Format::Agent | Format::AgentJson)
 }
 
-/// The changed files that also lie under the given paths, when there are any.
-fn within(root: &Path, paths: &[PathBuf], files: Vec<PathBuf>) -> Result<Vec<PathBuf>> {
-    if paths.is_empty() {
-        return Ok(files);
-    }
-    let root = root.canonicalize()?;
-    let mut scopes = Vec::new();
-    for path in paths {
-        let absolute = path.canonicalize()?;
-        scopes.push(
-            absolute
-                .strip_prefix(&root)
-                .map(Path::to_owned)
-                .map_err(|_| {
-                    format!(
-                        "{} is outside the project root {}",
-                        path.display(),
-                        root.display()
-                    )
-                })?,
-        );
-    }
-    Ok(files
-        .into_iter()
-        .filter(|f| scopes.iter().any(|s| f.starts_with(s)))
-        .collect())
-}
-
-fn init() -> Result<u8> {
-    let path = env::current_dir()?.join(FILE_NAME);
+fn init(agent: Option<Agent>) -> Result<u8> {
+    let dir = env::current_dir()?;
+    let path = dir.join(FILE_NAME);
     if path.exists() {
-        return Err(format!("{} already exists", path.display()).into());
+        if agent.is_none() {
+            return Err(format!("{} already exists", path.display()).into());
+        }
+        println!("kept {}", path.display());
+    } else {
+        fs::write(&path, DEFAULT_CONFIG)?;
+        println!("wrote {}", path.display());
+        if ensure_line(&path.with_file_name(".gitignore"), STORE_IGNORE)? {
+            println!("added {STORE_IGNORE} to .gitignore");
+        }
+        if ensure_line(&path.with_file_name(".gitattributes"), LOG_ATTRIBUTES)? {
+            println!("added the decision log to .gitattributes (merge=union)");
+        }
     }
-    fs::write(&path, DEFAULT_CONFIG)?;
-    println!("wrote {}", path.display());
-    if ensure_line(&path.with_file_name(".gitignore"), STORE_IGNORE)? {
-        println!("added {STORE_IGNORE} to .gitignore");
-    }
-    if ensure_line(&path.with_file_name(".gitattributes"), LOG_ATTRIBUTES)? {
-        println!("added the decision log to .gitattributes (merge=union)");
+    if let Some(Agent::ClaudeCode) = agent {
+        setup::claude_code(&dir)?;
     }
     Ok(0)
 }
-
 /// Adds `line` to the file, creating it if needed; false when the file
 /// already has it.
 fn ensure_line(path: &Path, line: &str) -> Result<bool> {
