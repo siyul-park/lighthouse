@@ -12,66 +12,37 @@ Intro of the pack.
 
 Intro of the section.
 
+| id | title | enforcement | fix | requirement |
+| --- | --- | --- | --- | --- |
+| [`demo/alpha`](#alpha-holds) | Alpha holds | mechanical→error |  |  |
+| `demo/beta` | Beta is advice | doc |  | Beta SHOULD be considered. |
+
 ### Alpha holds
 
-`demo/alpha` · scope `symbol` · enforcement `mechanical` · severity `error`
+`demo/alpha` · symbol · mechanical→error
 
-**Intent**
-
-Keeps alpha true.
-
-**Requirement**
+*Keeps alpha true.*
 
 Alpha MUST hold.
 
-**Exceptions**
+Exceptions: Generated code.
 
-Generated code.
+Tuning (go): Go spells it differently.
 
-**Options**
+Method: Someone 2001
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `limit` | int | `3`; go: `5` | How many. |
+| option | default | meaning |
+| --- | --- | --- |
+| `limit` | `3`; go: `5` | How many. |
 
-**Invalid example: broken (go)**
-
-Options: `limit` = `1`
-
-`a.go`
-
-```go
+```go invalid a.go
 broken()
 ```
 
-`b.go`
-
-```go
+```go invalid b.go
 also()
 ```
 
-**Valid example: fine (go)**
-
-```go
+```go valid
 fine()
 ```
-
-**Tuning: go**
-
-Go spells it differently.
-
-**Method**
-
-Someone 2001
-
-### Beta is advice
-
-`demo/beta` · scope `project` · enforcement `doc` · severity `none`
-
-**Intent**
-
-Advises beta.
-
-**Requirement**
-
-Beta SHOULD be considered.

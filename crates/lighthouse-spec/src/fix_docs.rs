@@ -176,26 +176,25 @@ pub fn fix_operations_markdown(keys: &[(String, String)]) -> String {
          what gets worse. Expressions are CEL over `finding` (`rule`, `message`, \
          `file`, `span`, `symbol`, `evidence`, `fingerprint`, `facts`), `symbol` (the \
          finding's symbol, as in declarative rules) and `options` (the options the \
-         rule ran with).\n\n"
+         rule ran with). Every operation also takes `when` (CEL bool): the \
+         operation is skipped when it is false.\n\n"
     );
     for op in OPERATIONS {
         let _ = write!(out, "## `{}`\n\n{}\n\n", op.name, op.summary);
-        let _ = writeln!(out, "| Parameter | Type | Required | Description |");
-        let _ = writeln!(out, "| --- | --- | --- | --- |");
-        for p in op.params {
+        let _ = writeln!(out, "| param | type | meaning |");
+        let _ = writeln!(out, "| --- | --- | --- |");
+        for p in op.params.iter().filter(|p| p.name != WHEN.name) {
+            let required = if p.required { ", required" } else { "" };
             let _ = writeln!(
                 out,
-                "| `{}` | {} | {} | {} |",
-                p.name,
-                p.ty,
-                if p.required { "yes" } else { "no" },
-                p.description
+                "| `{}` | {}{required} | {} |",
+                p.name, p.ty, p.description
             );
         }
         let _ = write!(out, "\n```yaml\n{}\n```\n\n", op.example);
     }
     out.push_str("## Order keys\n\nKeys for `reorder.by`, registered by plugins.\n\n");
-    let _ = writeln!(out, "| Key | Orders by |");
+    let _ = writeln!(out, "| key | orders by |");
     let _ = writeln!(out, "| --- | --- |");
     for (id, description) in keys {
         let _ = writeln!(out, "| `{id}` | {description} |");

@@ -4,6 +4,7 @@ mod fix;
 mod fix_docs;
 mod load;
 mod model;
+mod pack_docs;
 mod render;
 mod rule;
 mod sources;

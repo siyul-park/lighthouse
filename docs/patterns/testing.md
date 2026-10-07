@@ -8,93 +8,40 @@ Tests are the executable specification of a feature. They define the contracts, 
 
 Tests are the executable specification of a feature: they should show what the public contract promises, not how the implementation happens to work.
 
-### Tests show the public contract
-
-`testing/shows-public-contract` · scope `test` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-A test that documents internals breaks when internals change.
-
-**Requirement**
-
-A test MUST show public usage and promised behavior.
-
-### Structure serves the contract
-
-`testing/structure-serves-contract` · scope `test` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-Test structure shaped by coverage or implementation hides the specification.
-
-**Requirement**
-
-Test structure MUST serve the contract rather than implementation shape or coverage.
-
-### A case exposes its target
-
-`testing/case-exposes-target` · scope `test` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-A reader should see what is called, with what, and what is expected.
-
-**Requirement**
-
-A test MUST expose the target, input, operation, and expected result in the case; the target and its behavior MUST remain visible.
-
-### A case is a behavior
-
-`testing/case-is-behavior` · scope `test` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-Cases named after branches test the implementation, not the promise.
-
-**Requirement**
-
-A case MUST represent behavior, not a branch or implementation path, and MUST contain the behavior it claims to specify.
+| id | title | enforcement | fix | requirement |
+| --- | --- | --- | --- | --- |
+| `testing/shows-public-contract` | Tests show the public contract | judgment→review |  | A test MUST show public usage and promised behavior. |
+| `testing/structure-serves-contract` | Structure serves the contract | judgment→review |  | Test structure MUST serve the contract rather than implementation shape or coverage. |
+| `testing/case-exposes-target` | A case exposes its target | judgment→review |  | A test MUST expose the target, input, operation, and expected result in the case; the target and its behavior MUST remain visible. |
+| `testing/case-is-behavior` | A case is a behavior | judgment→review |  | A case MUST represent behavior, not a branch or implementation path, and MUST contain the behavior it claims to specify. |
 
 ## Public Boundary
 
 Contract tests should prove behavior through the same public boundary available to callers.
 
+| id | title | enforcement | fix | requirement |
+| --- | --- | --- | --- | --- |
+| [`testing/external-test-package`](#contract-tests-live-outside-the-target) | Contract tests live outside the target | mechanical→error |  |  |
+| [`testing/no-private-symbol-access`](#tests-do-not-reach-private-symbols) | Tests do not reach private symbols | mechanical→error |  |  |
+| [`testing/no-hiding-wrappers`](#helpers-do-not-hide-the-target-call) | Helpers do not hide the target call | mechanical→error |  |  |
+
 ### Contract tests live outside the target
 
-`testing/external-test-package` · scope `test` · enforcement `mechanical` · severity `error`
+`testing/external-test-package` · test · mechanical→error
 
-**Intent**
-
-Living outside the target makes private access impossible rather than discouraged.
-
-**Requirement**
+*Living outside the target makes private access impossible rather than discouraged.*
 
 Feature contract tests MUST use only the target's public symbols and MUST live outside the target's private scope.
 
-**Invalid example: invalid (go)**
+Tuning (go): Tests live in `package <target>_test`. A test file inside the target package is reported when it uses an unexported symbol of that package; one that only uses exported symbols is left alone.
 
-`go.mod`
+Tuning (python): Contract tests import only the package's public API.
 
-```go
-module example.com/store
+Tuning (rust): Contract tests are integration tests under `tests/`. Inline `#[cfg(test)]` unit tests are never reported: the provider cannot tell a `pub(crate)` item from a `pub` one of an unpublished crate, so it cannot say that such a test could have lived in `tests/`.
 
-go 1.26
-```
+Tuning (typescript): Contract tests import only the package's public exports.
 
-`store.go`
-
-```go
-package store
-
-func get() int { return 1 }
-
-func Get() int { return get() }
-```
-
-`store_test.go`
-
-```go
+```go invalid store_test.go
 package store
 
 import "testing"
@@ -106,67 +53,7 @@ func TestGet(t *testing.T) {
 }
 ```
 
-**Valid example: valid (go)**
-
-`go.mod`
-
-```go
-module example.com/store
-
-go 1.26
-```
-
-`store.go`
-
-```go
-package store
-
-func get() int { return 1 }
-
-func Get() int { return get() }
-```
-
-`store_test.go`
-
-```go
-package store_test
-
-import (
-	"testing"
-
-	"example.com/store"
-)
-
-func TestGet(t *testing.T) {
-	if store.Get() != 1 {
-		t.Fatal("get")
-	}
-}
-```
-
-**Valid example: internal-test-of-the-public-api (go)**
-
-`go.mod`
-
-```go
-module example.com/store
-
-go 1.26
-```
-
-`store.go`
-
-```go
-package store
-
-func get() int { return 1 }
-
-func Get() int { return get() }
-```
-
-`store_test.go`
-
-```go
+```go valid store_test.go
 package store
 
 import "testing"
@@ -178,76 +65,21 @@ func TestGet(t *testing.T) {
 }
 ```
 
-**Valid example: rust-valid (rust)**
-
-`src/lib.rs`
-
-```rust
-fn hidden() -> u8 {
-    1
-}
-
-pub fn get() -> u8 {
-    hidden()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn hidden_is_one() {
-        assert_eq!(hidden(), 1);
-    }
-}
-```
-
-`tests/store.rs`
-
-```rust
-#[test]
-fn get_is_one() {
-    assert_eq!(workspace::get(), 1);
-}
-```
-
-**Tuning: go**
-
-Tests live in `package <target>_test`. A test file inside the target package is reported when it uses an unexported symbol of that package; one that only uses exported symbols is left alone.
-
-**Tuning: python**
-
-Contract tests import only the package's public API.
-
-**Tuning: rust**
-
-Contract tests are integration tests under `tests/`. Inline `#[cfg(test)]` unit tests are never reported: the provider cannot tell a `pub(crate)` item from a `pub` one of an unpublished crate, so it cannot say that such a test could have lived in `tests/`.
-
-**Tuning: typescript**
-
-Contract tests import only the package's public exports.
+Also: rust
 
 ### Tests do not reach private symbols
 
-`testing/no-private-symbol-access` · scope `test` · enforcement `mechanical` · severity `error`
+`testing/no-private-symbol-access` · test · mechanical→error
 
-**Intent**
-
-Private-symbol tests freeze the implementation.
-
-**Requirement**
+*Private-symbol tests freeze the implementation.*
 
 Tests MUST NOT reference private symbols of the target; private-symbol testing MUST be resolved at the public boundary rather than by exposing internals solely for tests.
 
 ### Helpers do not hide the target call
 
-`testing/no-hiding-wrappers` · scope `test` · enforcement `mechanical` · severity `error`
+`testing/no-hiding-wrappers` · test · mechanical→error
 
-**Intent**
-
-A helper that wraps the call hides the very thing being specified.
-
-**Requirement**
+*A helper that wraps the call hides the very thing being specified.*
 
 Wrappers, builders, or helpers MUST NOT hide the target call or result being specified, and MUST NOT be added merely for reuse. Setup helpers MAY exist only when the specified behavior remains visible.
 
@@ -255,51 +87,24 @@ Wrappers, builders, or helpers MUST NOT hide the target call or result being spe
 
 A readable test is a small, direct specification whose behavior can be understood without following test infrastructure.
 
-### Table data stays simple
-
-`testing/simple-table-data` · scope `test` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-A table that needs its own logic is no longer a specification.
-
-**Requirement**
-
-Table data and generation code MUST remain simple enough to read as specification.
+| id | title | enforcement | fix | requirement |
+| --- | --- | --- | --- | --- |
+| `testing/simple-table-data` | Table data stays simple | judgment→review |  | Table data and generation code MUST remain simple enough to read as specification. |
+| [`testing/standard-assertions`](#assertions-use-the-standard-library) | Assertions use the standard library | heuristic→warn |  |  |
 
 ### Assertions use the standard library
 
-`testing/standard-assertions` · scope `test` · enforcement `heuristic` · severity `warn`
+`testing/standard-assertions` · test · heuristic→warn
 
-**Intent**
-
-A hand-written compare-and-fail repeats what the project's assertion library already states, with worse failure output.
-
-**Requirement**
+*A hand-written compare-and-fail repeats what the project's assertion library already states, with worse failure output.*
 
 Tests SHOULD assert through the project's standard assertion library, and a test helper SHOULD NOT reimplement a comparison and failure that the library already provides.
 
-**Invalid example: hand-written-comparison (go)**
+Tuning (go): The library is `github.com/stretchr/testify/require`. A function of a test file that has an `if` with no `else` whose condition compares or negates and whose only effect is `t.Fatal`, `t.Fatalf`, `t.Error`, `t.Errorf`, `t.Fail` or `t.FailNow` is reported with the number of such checks. A check that does more than fail, such as one that also returns, is not a plain assertion.
 
-`go.mod`
+Tuning (rust): Use `assert_eq!`, `assert_ne!` and `assert!` with a message instead of helpers that compare and `panic!`. Not enforced for Rust, whose provider does not count hand-written checks.
 
-```go
-module example.com/store
-
-go 1.26
-```
-
-`store.go`
-
-```go
-package store
-
-func Get() int { return 1 }
-```
-
-`store_test.go`
-
-```go
+```go invalid store_test.go
 package store_test
 
 import (
@@ -315,27 +120,7 @@ func TestGet(t *testing.T) {
 }
 ```
 
-**Valid example: check-that-does-more (go)**
-
-`go.mod`
-
-```go
-module example.com/store
-
-go 1.26
-```
-
-`store.go`
-
-```go
-package store
-
-func Get() int { return 1 }
-```
-
-`store_test.go`
-
-```go
+```go valid store_test.go
 package store_test
 
 import (
@@ -353,74 +138,55 @@ func TestGet(t *testing.T) {
 }
 ```
 
-**Valid example: rust-assert-macros (rust)**
-
-```rust
-pub fn get() -> i32 {
-    1
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn get_returns_one() {
-        assert_eq!(get(), 1);
-    }
-}
-```
-
-**Tuning: go**
-
-The library is `github.com/stretchr/testify/require`. A function of a test file that has an `if` with no `else` whose condition compares or negates and whose only effect is `t.Fatal`, `t.Fatalf`, `t.Error`, `t.Errorf`, `t.Fail` or `t.FailNow` is reported with the number of such checks. A check that does more than fail, such as one that also returns, is not a plain assertion.
-
-**Tuning: rust**
-
-Use `assert_eq!`, `assert_ne!` and `assert!` with a message instead of helpers that compare and `panic!`. Not enforced for Rust, whose provider does not count hand-written checks.
+Also: rust
 
 ## Organization
 
 Test structure should provide one obvious owner for each public contract and keep case structure shallow.
 
+| id | title | enforcement | fix | requirement |
+| --- | --- | --- | --- | --- |
+| [`testing/owner-test`](#every-public-symbol-has-an-owner-test) | Every public symbol has an owner test | heuristic→warn |  |  |
+| [`testing/single-owner-test`](#one-owner-test-per-public-symbol) | One owner test per public symbol | mechanical→error |  |  |
+| [`testing/test-file-layout`](#a-test-file-reads-fixtures-tests-helpers) | A test file reads fixtures, tests, helpers | mechanical→error | safe |  |
+| [`testing/case-depth`](#cases-are-at-most-two-levels-deep) | Cases are at most two levels deep | mechanical→error |  |  |
+| [`testing/table-for-same-behavior`](#tables-for-one-behavior-over-many-inputs) | Tables for one behavior over many inputs | judgment→review |  |  |
+| `testing/scenario-per-behavior` | One case per scenario | judgment→review |  | Different scenarios MUST use one case per scenario, named for the behavior it states. |
+| [`testing/single-case-style`](#one-case-style-and-one-writing-style) | One case style and one writing style | heuristic→warn |  |  |
+| `testing/assertions-in-cases` | Assertions belong to cases | judgment→review |  | Assertions outside cases SHOULD describe setup, preconditions, or test-wide invariants, not case behavior. |
+| [`testing/polling-outlives-teardown`](#polling-does-not-outlive-teardown) | Polling does not outlive teardown | mechanical→error |  |  |
+| `testing/polling-conditions-are-pure` | Polling conditions only observe | judgment→review |  | Polling conditions MUST return readiness and observed results or errors only; assertions belong after readiness is established. |
+
 ### Every public symbol has an owner test
 
-`testing/owner-test` · scope `test` · enforcement `heuristic` · severity `warn`
+`testing/owner-test` · test · heuristic→warn
 
-**Intent**
-
-A contract without an owner test has no place to read or extend its specification.
-
-**Requirement**
+*A contract without an owner test has no place to read or extend its specification.*
 
 Each public symbol SHOULD have one top-level test function, and exported contracts MUST have an owning test.
 
-**Options**
+Tuning (go): The owner of a function or type is `TestName`, of a method `TestType_Method`. A symbol that no test names and no test code calls or references is reported; a type counts as tested when one of its members is. Only modules that have tests are judged. Types without methods and interfaces are not required to have one.
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `ancestor_tests` | bool | `false`; rust: `true` | Count the tests of a module that tests an ancestor module as tests of the nested module too: the integration tests of a Rust crate test all of it, private modules whose items the root re-exports included. |
-| `exempt_methods` | list | `["String","Error","Unwrap","GoString"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]` | Method names that implement well-known interfaces. |
-| `include_data_types` | bool | `false` | Also require owner tests for types that declare no method; such a type is specified by the functions that build and read it. |
-| `include_internal` | bool | `false` | Also require owner tests for symbols public only inside the project. |
-| `kinds` | list | `["function","method","type"]` | Kinds of public symbols that need an owner test. Interfaces are tested through their implementations and are left out by default. |
-| `snake_case` | bool | `false`; rust: `true` | Compare names in snake case, as Rust tests are written. |
-| `test_prefix` | string | `"Test"`; rust: `""` | Prefix of the name of an owner test; a test without it is not one. |
-| `variant_tests` | bool | `true`; rust: `false` | Count `TestGet_Missing` as a second owner of `Get`; a name that adds a suffix to the symbol's own name restates the same contract. |
+Tuning (rust): The owner of a function or type is the test named after it in snake case (`get`, `store`), of a method `type_method`. A public item that no test code, in `tests/` or inline, calls or references is reported, in crates that have tests. The integration tests of a crate count for every module of it, including public items that the crate root re-exports from private modules, and a method call on a value of unknown type counts for the public methods of that name. Methods of trait impls and types without methods are not required to have one.
 
-**Invalid example: invalid (go)**
+| option | default | meaning |
+| --- | --- | --- |
+| `ancestor_tests` | `false`; rust: `true` | Count the tests of a module that tests an ancestor module as tests of the nested module too: the integration tests of a Rust crate test all of it, private modules whose items the root re-exports included. |
+| `exempt_methods` | `["String","Error","Unwrap","GoString"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]` | Method names that implement well-known interfaces. |
+| `include_data_types` | `false` | Also require owner tests for types that declare no method; such a type is specified by the functions that build and read it. |
+| `include_internal` | `false` | Also require owner tests for symbols public only inside the project. |
+| `kinds` | `["function","method","type"]` | Kinds of public symbols that need an owner test. Interfaces are tested through their implementations and are left out by default. |
+| `snake_case` | `false`; rust: `true` | Compare names in snake case, as Rust tests are written. |
+| `test_prefix` | `"Test"`; rust: `""` | Prefix of the name of an owner test; a test without it is not one. |
+| `variant_tests` | `true`; rust: `false` | Count `TestGet_Missing` as a second owner of `Get`; a name that adds a suffix to the symbol's own name restates the same contract. |
 
-`go.mod`
-
-```go
+```go invalid go.mod
 module example.com/store
 
 go 1.26
 ```
 
-`store.go`
-
-```go
+```go invalid store.go
 package store
 
 func Get() int { return 1 }
@@ -428,9 +194,7 @@ func Get() int { return 1 }
 func Put() int { return 2 }
 ```
 
-`store_test.go`
-
-```go
+```go invalid store_test.go
 package store_test
 
 import (
@@ -446,234 +210,39 @@ func TestGet(t *testing.T) {
 }
 ```
 
-**Valid example: valid (go)**
-
-`go.mod`
-
-```go
-module example.com/store
-
-go 1.26
-```
-
-`store.go`
-
-```go
-package store
-
-func Get() int { return 1 }
-
-func Put() int { return 2 }
-```
-
-`store_test.go`
-
-```go
-package store_test
-
-import (
-	"testing"
-
-	"example.com/store"
-)
-
-func TestGet(t *testing.T) {
-	if store.Get() != 1 {
-		t.Fatal("get")
-	}
-}
-
-func TestPutFlow(t *testing.T) {
-	if store.Put() != 2 {
-		t.Fatal("put")
-	}
-}
-```
-
-**Valid example: no-tests-at-all (go)**
-
-```go
+```go valid
 package store
 
 func Get() int { return 1 }
 ```
 
-**Invalid example: rust-invalid (rust)**
-
-`src/lib.rs`
-
-```rust
-pub fn get() -> u8 {
-    1
-}
-
-pub fn put() -> u8 {
-    2
-}
-```
-
-`tests/store.rs`
-
-```rust
-#[test]
-fn get() {
-    assert_eq!(workspace::get(), 1);
-}
-```
-
-**Valid example: rust-valid (rust)**
-
-`src/lib.rs`
-
-```rust
-pub fn get() -> u8 {
-    1
-}
-```
-
-`tests/store.rs`
-
-```rust
-#[test]
-fn get() {
-    assert_eq!(workspace::get(), 1);
-}
-```
-
-**Invalid example: rust-submodule-invalid (rust)**
-
-`src/lib.rs`
-
-```rust
-mod shapes;
-
-pub use shapes::{area, perimeter};
-```
-
-`src/shapes.rs`
-
-```rust
-pub fn area() -> u8 {
-    1
-}
-
-pub fn perimeter() -> u8 {
-    4
-}
-```
-
-`tests/shapes.rs`
-
-```rust
-#[test]
-fn area() {
-    assert_eq!(workspace::area(), 1);
-}
-```
-
-**Valid example: rust-reexport-from-private-module (rust)**
-
-`src/lib.rs`
-
-```rust
-mod shapes;
-
-pub use shapes::area;
-```
-
-`src/shapes.rs`
-
-```rust
-pub fn area() -> u8 {
-    1
-}
-```
-
-`tests/shapes.rs`
-
-```rust
-#[test]
-fn area() {
-    assert_eq!(workspace::area(), 1);
-}
-```
-
-**Valid example: rust-method-on-unknown-receiver (rust)**
-
-`src/lib.rs`
-
-```rust
-pub struct Registry;
-
-impl Registry {
-    pub fn register(&self) {}
-}
-
-pub fn get() -> u8 {
-    1
-}
-```
-
-`tests/registry.rs`
-
-```rust
-#[test]
-fn get() {
-    assert_eq!(workspace::get(), 1);
-    let registry = unknown::build();
-    registry.register();
-}
-```
-
-**Tuning: go**
-
-The owner of a function or type is `TestName`, of a method `TestType_Method`. A symbol that no test names and no test code calls or references is reported; a type counts as tested when one of its members is. Only modules that have tests are judged. Types without methods and interfaces are not required to have one.
-
-**Tuning: rust**
-
-The owner of a function or type is the test named after it in snake case (`get`, `store`), of a method `type_method`. A public item that no test code, in `tests/` or inline, calls or references is reported, in crates that have tests. The integration tests of a crate count for every module of it, including public items that the crate root re-exports from private modules, and a method call on a value of unknown type counts for the public methods of that name. Methods of trait impls and types without methods are not required to have one.
+Also: rust
 
 ### One owner test per public symbol
 
-`testing/single-owner-test` · scope `test` · enforcement `mechanical` · severity `error`
+`testing/single-owner-test` · test · mechanical→error
 
-**Intent**
-
-Several semantic owners split one contract across places and let them contradict.
-
-**Requirement**
+*Several semantic owners split one contract across places and let them contradict.*
 
 A public symbol MUST NOT have multiple semantic owner test functions.
 
-**Options**
+Tuning (go): `TestGet` and `TestGet_Missing` both own `Get`: the second is a case of the first, written with `t.Run`. A name matches the longest symbol it starts with, so `TestStore_Get_Missing` belongs to the method `Get`, not to the type `Store`.
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `snake_case` | bool | `false`; rust: `true` | Compare names in snake case, as Rust tests are written. |
-| `test_prefix` | string | `"Test"`; rust: `""` | Prefix of the name of an owner test; a test without it is not one. |
-| `variant_tests` | bool | `true`; rust: `false` | Count `TestGet_Missing` as a second owner of `Get`; a name that adds a suffix to the symbol's own name restates the same contract. |
+Tuning (rust): A test is an owner of the item it is named after in snake case. Rust tests are many small functions, so names that merely extend a symbol's name are not owners; two tests with exactly the name of one item (in different test crates, or inline and in `tests/`) are.
 
-**Invalid example: invalid (go)**
+| option | default | meaning |
+| --- | --- | --- |
+| `snake_case` | `false`; rust: `true` | Compare names in snake case, as Rust tests are written. |
+| `test_prefix` | `"Test"`; rust: `""` | Prefix of the name of an owner test; a test without it is not one. |
+| `variant_tests` | `true`; rust: `false` | Count `TestGet_Missing` as a second owner of `Get`; a name that adds a suffix to the symbol's own name restates the same contract. |
 
-`go.mod`
-
-```go
-module example.com/store
-
-go 1.26
-```
-
-`store.go`
-
-```go
+```go invalid store.go
 package store
 
 func Get() int { return 1 }
 ```
 
-`store_test.go`
-
-```go
+```go invalid store_test.go
 package store_test
 
 import (
@@ -695,19 +264,7 @@ func TestGet_Missing(t *testing.T) {
 }
 ```
 
-**Valid example: valid (go)**
-
-`go.mod`
-
-```go
-module example.com/store
-
-go 1.26
-```
-
-`store.go`
-
-```go
+```go valid store.go
 package store
 
 type Store struct{}
@@ -715,9 +272,7 @@ type Store struct{}
 func (s *Store) Get() int { return 1 }
 ```
 
-`store_test.go`
-
-```go
+```go valid store_test.go
 package store_test
 
 import (
@@ -739,575 +294,152 @@ func TestStore_Get(t *testing.T) {
 }
 ```
 
-**Invalid example: rust-invalid (rust)**
-
-`src/lib.rs`
-
-```rust
-pub fn get() -> u8 {
-    1
-}
-```
-
-`tests/first.rs`
-
-```rust
-#[test]
-fn get() {
-    assert_eq!(workspace::get(), 1);
-}
-```
-
-`tests/second.rs`
-
-```rust
-#[test]
-fn get() {
-    assert_eq!(workspace::get(), 1);
-}
-```
-
-**Valid example: rust-valid (rust)**
-
-`src/lib.rs`
-
-```rust
-pub fn get() -> u8 {
-    1
-}
-```
-
-`tests/store.rs`
-
-```rust
-#[test]
-fn get() {
-    assert_eq!(workspace::get(), 1);
-}
-
-#[test]
-fn get_is_stable() {
-    assert_eq!(workspace::get(), workspace::get());
-}
-```
-
-**Tuning: go**
-
-`TestGet` and `TestGet_Missing` both own `Get`: the second is a case of the first, written with `t.Run`. A name matches the longest symbol it starts with, so `TestStore_Get_Missing` belongs to the method `Get`, not to the type `Store`.
-
-**Tuning: rust**
-
-A test is an owner of the item it is named after in snake case. Rust tests are many small functions, so names that merely extend a symbol's name are not owners; two tests with exactly the name of one item (in different test crates, or inline and in `tests/`) are.
+Also: rust
 
 ### A test file reads fixtures, tests, helpers
 
-`testing/test-file-layout` · scope `test` · enforcement `mechanical` · severity `error`
+`testing/test-file-layout` · test · mechanical→error · fix: safe
 
-**Intent**
-
-A test file reads top-down: what the tests use, then the specification, then how it checks.
-
-**Requirement**
+*A test file reads top-down: what the tests use, then the specification, then how it checks.*
 
 A test file MUST declare its fixtures (test types, constants, variables and the functions that build them without the test framework's handle) above its tests, and its test helpers (functions that take the test framework's handle and are called from tests) below the tests that use them. Fixtures keep the declaration-group order among themselves and sit next to the fixtures they compose.
 
-**Fix**
+Tuning (go): A fixture is a type, constant, variable or function without a `*testing.T`, `*testing.B`, `*testing.F` or `testing.TB` parameter; a helper is a function with one. Fixtures follow `design/declaration-groups`. Methods are judged with their type. Test entry points are `Test`, `Benchmark`, `Fuzz` and `Example` functions; a helper that no test or helper of the same file uses may sit anywhere below the fixtures.
 
-Fixable: `safe` · operations move, move. See [fix operations](fix-operations.md).
+Tuning (rust): The same reading order applies to a `#[cfg(test)]` module and to files of `tests/`: fixtures and builders first, then the `#[test]` functions, then the helpers that check. It is not enforced for Rust, whose provider does not tell fixtures from helpers.
 
-**Invalid example: fixture-after-test (go)**
-
-`go.mod`
-
-```go
-module example.com/store
-
-go 1.26
+```diff
+--- a/store_test.go
++++ b/store_test.go
+@@ -7,4 +7,6 @@
+ )
+ 
++const want = 1
++
+ func TestGet(t *testing.T) {
+ 	if store.Get() != want {
+@@ -12,4 +14,2 @@
+ 	}
+ }
+-
+-const want = 1
 ```
 
-`store.go`
-
-```go
-package store
-
-func Get() int { return 1 }
-```
-
-`store_test.go`
-
-```go
-package store_test
-
-import (
-	"testing"
-
-	"example.com/store"
-)
-
-func TestGet(t *testing.T) {
-	if store.Get() != want {
-		t.Fatal("get")
-	}
-}
-
-const want = 1
-```
-
-Fixed `store_test.go`:
-
-```go
-package store_test
-
-import (
-	"testing"
-
-	"example.com/store"
-)
-
-const want = 1
-
-func TestGet(t *testing.T) {
-	if store.Get() != want {
-		t.Fatal("get")
-	}
-}
-```
-
-**Invalid example: helper-above-its-test (go)**
-
-`go.mod`
-
-```go
-module example.com/store
-
-go 1.26
-```
-
-`store.go`
-
-```go
-package store
-
-func Get() int { return 1 }
-```
-
-`store_test.go`
-
-```go
-package store_test
-
-import (
-	"testing"
-
-	"example.com/store"
-)
-
-func checkGet(t *testing.T) {
-	t.Helper()
-	_ = store.Get()
-}
-
-func TestGet(t *testing.T) { checkGet(t) }
-```
-
-Fixed `store_test.go`:
-
-```go
-package store_test
-
-import (
-	"testing"
-
-	"example.com/store"
-)
-
-func TestGet(t *testing.T) { checkGet(t) }
-
-func checkGet(t *testing.T) {
-	t.Helper()
-	_ = store.Get()
-}
-```
-
-**Valid example: fixtures-tests-helpers (go)**
-
-`go.mod`
-
-```go
-module example.com/store
-
-go 1.26
-```
-
-`store.go`
-
-```go
-package store
-
-func Get() int { return 1 }
-```
-
-`store_test.go`
-
-```go
-package store_test
-
-import (
-	"testing"
-
-	"example.com/store"
-)
-
-const want = 1
-
-func TestGet(t *testing.T) { checkGet(t, want) }
-
-func checkGet(t *testing.T, want int) {
-	t.Helper()
-	_ = store.Get() + want
-}
-```
-
-**Valid example: rust-fixtures-tests-helpers (rust)**
-
-```rust
-pub fn get() -> i32 {
-    1
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const WANT: i32 = 1;
-
-    #[test]
-    fn get_returns_one() {
-        check(get());
-    }
-
-    fn check(got: i32) {
-        assert_eq!(got, WANT);
-    }
-}
-```
-
-**Tuning: go**
-
-A fixture is a type, constant, variable or function without a `*testing.T`, `*testing.B`, `*testing.F` or `testing.TB` parameter; a helper is a function with one. Fixtures follow `design/declaration-groups`. Methods are judged with their type. Test entry points are `Test`, `Benchmark`, `Fuzz` and `Example` functions; a helper that no test or helper of the same file uses may sit anywhere below the fixtures.
-
-**Tuning: rust**
-
-The same reading order applies to a `#[cfg(test)]` module and to files of `tests/`: fixtures and builders first, then the `#[test]` functions, then the helpers that check. It is not enforced for Rust, whose provider does not tell fixtures from helpers.
+Also: rust
 
 ### Cases are at most two levels deep
 
-`testing/case-depth` · scope `test` · enforcement `mechanical` · severity `error`
+`testing/case-depth` · test · mechanical→error
 
-**Intent**
-
-Deep nesting hides which behavior a case specifies.
-
-**Requirement**
+*Deep nesting hides which behavior a case specifies.*
 
 Test structure MUST have at most two levels: the test function and its direct cases.
 
-**Tuning: go**
+Tuning (go): Counts `t.Run` nesting.
 
-Counts `t.Run` nesting.
+Tuning (python): Counts class and function nesting.
 
-**Tuning: python**
-
-Counts class and function nesting.
-
-**Tuning: typescript**
-
-Counts `describe` and `it` nesting.
+Tuning (typescript): Counts `describe` and `it` nesting.
 
 ### Tables for one behavior over many inputs
 
-`testing/table-for-same-behavior` · scope `test` · enforcement `judgment` · severity `review`
+`testing/table-for-same-behavior` · test · judgment→review
 
-**Intent**
-
-A table says the behavior is the same and only the data differs.
-
-**Requirement**
+*A table says the behavior is the same and only the data differs.*
 
 Same behavior over many inputs MUST use one inline table of named inputs and expected outputs, each entry one case; cases that specify the same behavior MUST be merged into one case or one table.
 
-**Tuning: go**
-
-Use an inline anonymous struct table.
-
-### One case per scenario
-
-`testing/scenario-per-behavior` · scope `test` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-Different scenarios are different specifications and need different names.
-
-**Requirement**
-
-Different scenarios MUST use one case per scenario, named for the behavior it states.
+Tuning (go): Use an inline anonymous struct table.
 
 ### One case style and one writing style
 
-`testing/single-case-style` · scope `test` · enforcement `heuristic` · severity `warn`
+`testing/single-case-style` · test · heuristic→warn
 
-**Intent**
-
-Table and scenario cases answer different questions and mixed styles force readers to relearn the test at every step.
-
-**Requirement**
+*Table and scenario cases answer different questions and mixed styles force readers to relearn the test at every step.*
 
 A test function MUST use either table cases or scenario cases, never both, and SHOULD use one case style per level. Tests MUST NOT mix different writing styles or abstraction levels at one level.
 
-### Assertions belong to cases
-
-`testing/assertions-in-cases` · scope `test` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-Assertions outside cases blur which behavior failed.
-
-**Requirement**
-
-Assertions outside cases SHOULD describe setup, preconditions, or test-wide invariants, not case behavior.
-
 ### Polling does not outlive teardown
 
-`testing/polling-outlives-teardown` · scope `test` · enforcement `mechanical` · severity `error`
+`testing/polling-outlives-teardown` · test · mechanical→error
 
-**Intent**
-
-Polling that continues after teardown races with released resources.
-
-**Requirement**
+*Polling that continues after teardown races with released resources.*
 
 Readiness polling MUST NOT outlive teardown or retain resources after the case closes them.
-
-### Polling conditions only observe
-
-`testing/polling-conditions-are-pure` · scope `test` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-Assertions inside a poll hide whether readiness or behavior failed.
-
-**Requirement**
-
-Polling conditions MUST return readiness and observed results or errors only; assertions belong after readiness is established.
 
 ## F.I.R.S.T.
 
 F.I.R.S.T. keeps tests reliable evidence rather than intermittent diagnostics.
 
+| id | title | enforcement | fix | requirement |
+| --- | --- | --- | --- | --- |
+| [`testing/first-properties`](#fast-independent-repeatable-self-validating-timely) | Fast, independent, repeatable, self-validating, timely | judgment→review |  |  |
+| [`testing/independent-tests`](#tests-do-not-depend-on-hidden-state) | Tests do not depend on hidden state | heuristic→warn |  |  |
+
 ### Fast, independent, repeatable, self-validating, timely
 
-`testing/first-properties` · scope `test` · enforcement `judgment` · severity `review`
+`testing/first-properties` · test · judgment→review
 
-**Intent**
-
-Unreliable tests train people to ignore failures.
-
-**Requirement**
+*Unreliable tests train people to ignore failures.*
 
 Tests MUST be Fast, Independent, Repeatable, Self-validating, and Timely.
 
-**Method**
-
-Martin, Clean Code, chapter 9
+Method: Martin, Clean Code, chapter 9
 
 ### Tests do not depend on hidden state
 
-`testing/independent-tests` · scope `test` · enforcement `heuristic` · severity `warn`
+`testing/independent-tests` · test · heuristic→warn
 
-**Intent**
-
-Order-dependent or manual tests fail intermittently.
-
-**Requirement**
+*Order-dependent or manual tests fail intermittently.*
 
 Tests MUST NOT depend on other tests, uncontrolled mutable state, manual inspection, or unnecessary setup.
 
-**Method**
-
-van Deursen et al. 2001; Peruma et al., tsDetect 2020
+Method: van Deursen et al. 2001; Peruma et al., tsDetect 2020
 
 ## TDD
 
 TDD separates the required behavior from its implementation by making the smallest missing contract fail before the implementation is generalized.
 
-### Smallest failing contract first
-
-`testing/red-green-cycle` · scope `test` · enforcement `doc` · severity `none`
-
-**Intent**
-
-Seeing the contract fail first proves the test can fail.
-
-**Requirement**
-
-For each behavior change, the agent MUST state the contract and invariants, write the narrowest falsifying test, observe the expected failure when practical, implement the smallest owning change, and run focused checks followed by applicable structural and repository gates.
-
-### Cover every contract dimension
-
-`testing/cover-contract-dimensions` · scope `test` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-Untested failure and boundary behavior is unspecified behavior.
-
-**Requirement**
-
-Tests MUST cover applicable success, failure, boundaries, ownership and lifecycle, compatibility, parity, and architecture contracts.
-
-### Use the lowest layer that proves it
-
-`testing/lowest-proving-layer` · scope `test` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-Higher layers are slower and fail for more reasons.
-
-**Requirement**
-
-The lowest test layer that proves the contract MUST be used.
-
-### No structure-only tests
-
-`testing/no-structure-only-tests` · scope `test` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-Tests of implementation details fail on refactors and prove nothing.
-
-**Requirement**
-
-Structure-only tests MUST NOT be added merely to exercise implementation details.
+| id | title | enforcement | fix | requirement |
+| --- | --- | --- | --- | --- |
+| `testing/red-green-cycle` | Smallest failing contract first | doc |  | For each behavior change, the agent MUST state the contract and invariants, write the narrowest falsifying test, observe the expected failure when practical, implement the smallest owning change, and run focused checks followed by applicable structural and repository gates. |
+| `testing/cover-contract-dimensions` | Cover every contract dimension | judgment→review |  | Tests MUST cover applicable success, failure, boundaries, ownership and lifecycle, compatibility, parity, and architecture contracts. |
+| `testing/lowest-proving-layer` | Use the lowest layer that proves it | judgment→review |  | The lowest test layer that proves the contract MUST be used. |
+| `testing/no-structure-only-tests` | No structure-only tests | judgment→review |  | Structure-only tests MUST NOT be added merely to exercise implementation details. |
 
 ## Evidence
 
 Different test layers prove different facts; evidence is complete only when each required fact has an appropriate proof.
 
-### Coverage proves reachability
-
-`testing/coverage-is-reachability` · scope `project` · enforcement `doc` · severity `none`
-
-**Intent**
-
-Coverage shows code ran, not that behavior is right.
-
-**Requirement**
-
-Coverage proves reachability, not quality or completeness. When no red phase is available, coverage SHOULD prove execution without changing production behavior to manufacture failure.
-
-### Each layer proves its own facts
-
-`testing/evidence-by-layer` · scope `project` · enforcement `doc` · severity `none`
-
-**Intent**
-
-Using the wrong layer either over-claims or leaves facts unproven.
-
-**Requirement**
-
-Each required fact MUST be proven by the layer that owns it: public tests prove exported behavior, errors, and lifecycle; parity tests prove equivalent public behavior across distinct execution paths; golden tests prove exact low-level output for a specified input shape; async tests prove publication, shutdown, and race behavior; fuzz tests prove bounded trust-boundary or differential properties; integration tests prove public end-to-end behavior.
-
-### Test parity across execution paths
-
-`testing/parity-across-paths` · scope `project` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-Two paths for one contract can silently diverge.
-
-**Requirement**
-
-Parity MUST be tested wherever multiple execution paths are required to implement the same public contract.
-
-### Golden output is independent
-
-`testing/independent-golden-output` · scope `test` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-Golden output produced by the implementation only proves it is stable.
-
-**Requirement**
-
-Golden tests MUST define expected low-level output independently of the implementation that produced it, with the required complete output and metadata checks.
+| id | title | enforcement | fix | requirement |
+| --- | --- | --- | --- | --- |
+| `testing/coverage-is-reachability` | Coverage proves reachability | doc |  | Coverage proves reachability, not quality or completeness. When no red phase is available, coverage SHOULD prove execution without changing production behavior to manufacture failure. |
+| `testing/evidence-by-layer` | Each layer proves its own facts | doc |  | Each required fact MUST be proven by the layer that owns it: public tests prove exported behavior, errors, and lifecycle; parity tests prove equivalent public behavior across distinct execution paths; golden tests prove exact low-level output for a specified input shape; async tests prove publication, shutdown, and race behavior; fuzz tests prove bounded trust-boundary or differential properties; integration tests prove public end-to-end behavior. |
+| `testing/parity-across-paths` | Test parity across execution paths | judgment→review |  | Parity MUST be tested wherever multiple execution paths are required to implement the same public contract. |
+| `testing/independent-golden-output` | Golden output is independent | judgment→review |  | Golden tests MUST define expected low-level output independently of the implementation that produced it, with the required complete output and metadata checks. |
 
 ## Validation
 
 Validation should start with the smallest useful falsification and expand only as far as the affected contract requires.
 
-### Run the smallest falsifying check first
-
-`testing/smallest-check-first` · scope `project` · enforcement `doc` · severity `none`
-
-**Intent**
-
-Fast feedback finds most problems.
-
-**Requirement**
-
-The smallest falsifying check MUST be run first.
-
-### Expand validation to the contract
-
-`testing/expand-validation-to-contract` · scope `project` · enforcement `doc` · severity `none`
-
-**Intent**
-
-Validation breadth follows what the change can break.
-
-**Requirement**
-
-Package, race, coverage, architecture, and repository checks MUST be applied when relevant; only genuinely inapplicable checks MAY be skipped, and the reason MUST be stated.
+| id | title | enforcement | fix | requirement |
+| --- | --- | --- | --- | --- |
+| `testing/smallest-check-first` | Run the smallest falsifying check first | doc |  | The smallest falsifying check MUST be run first. |
+| `testing/expand-validation-to-contract` | Expand validation to the contract | doc |  | Package, race, coverage, architecture, and repository checks MUST be applied when relevant; only genuinely inapplicable checks MAY be skipped, and the reason MUST be stated. |
 
 ## Completeness
 
 A complete change has evidence for every contract that the change affects, including cross-layer and architecture-specific obligations.
 
-### Architecture-specific contracts need specific evidence
-
-`testing/architecture-specific-evidence` · scope `project` · enforcement `judgment` · severity `review`
-
-**Intent**
-
-Generic tests cannot prove contracts that only exist on one architecture.
-
-**Requirement**
-
-Architecture-specific contracts MUST have architecture-specific evidence.
-
-### Freshness is a repository gate
-
-`testing/freshness-gates-are-separate` · scope `project` · enforcement `doc` · severity `none`
-
-**Intent**
-
-Generated output and docs drift independent of test coverage.
-
-**Requirement**
-
-Generated output and documentation freshness MUST be enforced as repository gates, not as test-completeness rules.
+| id | title | enforcement | fix | requirement |
+| --- | --- | --- | --- | --- |
+| `testing/architecture-specific-evidence` | Architecture-specific contracts need specific evidence | judgment→review |  | Architecture-specific contracts MUST have architecture-specific evidence. |
+| `testing/freshness-gates-are-separate` | Freshness is a repository gate | doc |  | Generated output and documentation freshness MUST be enforced as repository gates, not as test-completeness rules. |
 
 ## Ownership
 
 Test contracts and structure have one owner and should remain independent of incidental implementation details.
 
-### One owner per concern
-
-`testing/single-owner-per-concern` · scope `project` · enforcement `doc` · severity `none`
-
-**Intent**
-
-A concern restated in two places drifts apart.
-
-**Requirement**
-
-Each concern, such as test contracts and structure or general test code style, MUST have exactly one owning document; other documents MUST reference it instead of restating it.
+| id | title | enforcement | fix | requirement |
+| --- | --- | --- | --- | --- |
+| `testing/single-owner-per-concern` | One owner per concern | doc |  | Each concern, such as test contracts and structure or general test code style, MUST have exactly one owning document; other documents MUST reference it instead of restating it. |

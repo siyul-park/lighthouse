@@ -11,18 +11,17 @@ fix:
   ops: [...]          # or command: {...}
 ```
 
-The `ops` kind is a list of the generic operations below. Operations state edits over code-model nodes; the orchestrator lowers them to text edits with the spans the language provider reports, formats, re-checks and rolls back what gets worse. Expressions are CEL over `finding` (`rule`, `message`, `file`, `span`, `symbol`, `evidence`, `fingerprint`, `facts`), `symbol` (the finding's symbol, as in declarative rules) and `options` (the options the rule ran with).
+The `ops` kind is a list of the generic operations below. Operations state edits over code-model nodes; the orchestrator lowers them to text edits with the spans the language provider reports, formats, re-checks and rolls back what gets worse. Expressions are CEL over `finding` (`rule`, `message`, `file`, `span`, `symbol`, `evidence`, `fingerprint`, `facts`), `symbol` (the finding's symbol, as in declarative rules) and `options` (the options the rule ran with). Every operation also takes `when` (CEL bool): the operation is skipped when it is false.
 
 ## `move`
 
 Relocates a declaration, with its leading doc comments and attributes, next to another one. Both must live in the same container (the same file level, the same impl or class body); the blank-line separation of the moved block is kept.
 
-| Parameter | Type | Required | Description |
-| --- | --- | --- | --- |
-| `node` | CEL symbol id | yes | The declaration to move. |
-| `before` | CEL symbol id | no | Place the declaration right before this one. Exactly one of `before` and `after`. |
-| `after` | CEL symbol id | no | Place the declaration right after this one. |
-| `when` | CEL bool | no | Skips the operation when false. |
+| param | type | meaning |
+| --- | --- | --- |
+| `node` | CEL symbol id, required | The declaration to move. |
+| `before` | CEL symbol id | Place the declaration right before this one. Exactly one of `before` and `after`. |
+| `after` | CEL symbol id | Place the declaration right after this one. |
 
 ```yaml
 - op: move
@@ -34,11 +33,10 @@ Relocates a declaration, with its leading doc comments and attributes, next to a
 
 Sorts the declarations of a container by order keys, stably: a declaration moves only as far as the keys demand, and declarations a key does not order stay in the place they occupy. The first key decides, the next ones break ties.
 
-| Parameter | Type | Required | Description |
-| --- | --- | --- | --- |
-| `scope` | `file` or `owner` | yes | `file`: every declaration of the finding's file; each container (the file level, an `impl` or class body) is sorted on its own. `owner`: only the members of the finding symbol's owner. |
-| `by` | list of order keys | yes | Registered keys, `plugin/name`; the table below lists them. |
-| `when` | CEL bool | no | Skips the operation when false. |
+| param | type | meaning |
+| --- | --- | --- |
+| `scope` | `file` or `owner`, required | `file`: every declaration of the finding's file; each container (the file level, an `impl` or class body) is sorted on its own. `owner`: only the members of the finding symbol's owner. |
+| `by` | list of order keys, required | Registered keys, `plugin/name`; the table below lists them. |
 
 ```yaml
 - op: reorder
@@ -50,12 +48,11 @@ Sorts the declarations of a container by order keys, stably: a declaration moves
 
 Removes a declaration with its extent, or a range of text such as a comment. A range that fills whole lines takes the lines, and one blank line when that would leave two.
 
-| Parameter | Type | Required | Description |
-| --- | --- | --- | --- |
-| `node` | CEL symbol id | no | The declaration to remove. Either `node`, or `file` and `span`. |
-| `file` | CEL string | no | Project-relative path of the range's file. |
-| `span` | CEL span | no | `{start: {line, col}, end: {line, col}}`, 1-based, columns in bytes, end exclusive. |
-| `when` | CEL bool | no | Skips the operation when false. |
+| param | type | meaning |
+| --- | --- | --- |
+| `node` | CEL symbol id | The declaration to remove. Either `node`, or `file` and `span`. |
+| `file` | CEL string | Project-relative path of the range's file. |
+| `span` | CEL span | `{start: {line, col}, end: {line, col}}`, 1-based, columns in bytes, end exclusive. |
 
 ```yaml
 - op: delete
@@ -67,11 +64,10 @@ Removes a declaration with its extent, or a range of text such as a comment. A r
 
 Renames a symbol at its declaration and at every reference site. Declined unless the provider reports reference sites and every reference edge to the symbol is semantic.
 
-| Parameter | Type | Required | Description |
-| --- | --- | --- | --- |
-| `symbol` | CEL symbol id | yes | The symbol to rename. |
-| `name` | template | yes | The new name; `{{ cel }}` holes are replaced. |
-| `when` | CEL bool | no | Skips the operation when false. |
+| param | type | meaning |
+| --- | --- | --- |
+| `symbol` | CEL symbol id, required | The symbol to rename. |
+| `name` | template, required | The new name; `{{ cel }}` holes are replaced. |
 
 ```yaml
 - op: rename
@@ -83,12 +79,11 @@ Renames a symbol at its declaration and at every reference site. Declined unless
 
 Replaces a range of text; an empty range inserts. The escape hatch for what the other operations do not state.
 
-| Parameter | Type | Required | Description |
-| --- | --- | --- | --- |
-| `file` | CEL string | yes | Project-relative path. |
-| `span` | CEL span | yes | The range to replace. |
-| `text` | template | yes | The new text; `{{ cel }}` holes are replaced. |
-| `when` | CEL bool | no | Skips the operation when false. |
+| param | type | meaning |
+| --- | --- | --- |
+| `file` | CEL string, required | Project-relative path. |
+| `span` | CEL span, required | The range to replace. |
+| `text` | template, required | The new text; `{{ cel }}` holes are replaced. |
 
 ```yaml
 - op: replace
@@ -101,7 +96,7 @@ Replaces a range of text; an empty range inserts. The escape hatch for what the 
 
 Keys for `reorder.by`, registered by plugins.
 
-| Key | Orders by |
+| key | orders by |
 | --- | --- |
 | `design/group` | the declaration group of `design/declaration-groups`, from public contract to private mechanics |
 

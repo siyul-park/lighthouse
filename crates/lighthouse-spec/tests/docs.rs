@@ -100,3 +100,88 @@ fn committed_docs_match_the_bundled_catalog() {
         );
     }
 }
+
+fn fixed_fixture() -> Catalog {
+    let files = [
+        (
+            "demo/pack.yaml",
+            "id: demo\ntitle: Demo Patterns\nintro: Intro.\nsections: [one]\n",
+        ),
+        (
+            "demo/one/section.yaml",
+            "id: one\ntitle: One\nintro: Intro.\npatterns: [gamma]\n",
+        ),
+        (
+            "demo/one/gamma.yaml",
+            "id: demo/gamma
+title: Gamma order
+intent: Orders gamma.
+scope: file
+requirement: Gamma MUST come first.
+enforcement: mechanical
+evidence: [name]
+implementation:
+  builtin: p/a
+fix:
+  safety: safe
+  ops:
+    - { op: delete, node: finding.symbol }
+examples:
+  - name: bad
+    language: go
+    kind: invalid
+    files: [{ path: a.go, source: testdata/bad.go }]
+    fixed: [{ path: a.go, body: 'second()\\nfirst()' }]
+    expect: [{ line: 1 }]
+  - name: good
+    language: go
+    kind: valid
+    files: [{ path: a.go, body: 'good()' }]
+  - name: bad rust
+    language: rust
+    kind: invalid
+    files: [{ path: a.rs, source: testdata/bad.rs }]
+    expect: [{ line: 1 }]
+  - name: inline
+    language: python
+    kind: valid
+    files: [{ path: a.py, body: 'pass' }]
+",
+        ),
+        ("demo/one/testdata/bad.go", "first()\nsecond()\n"),
+        ("demo/one/testdata/bad.rs", "first();\n"),
+    ];
+    Catalog::from_files(
+        files
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect::<BTreeMap<_, _>>(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_fixable_pattern_shows_a_diff_and_links_other_languages() {
+    let text = docs(&fixed_fixture())["patterns/demo.md"].clone();
+    assert!(
+        text.contains("`demo/gamma` · file · mechanical→error · fix: safe"),
+        "{text}"
+    );
+    assert!(text.contains("```diff\n--- a/a.go\n+++ b/a.go\n"), "{text}");
+    assert!(text.contains("+second()"), "{text}");
+    assert!(!text.contains("```go valid"), "{text}");
+    assert!(
+        text.contains("Also: rust ([invalid](../../patterns/demo/one/testdata/bad.rs)), python"),
+        "{text}"
+    );
+}
+
+#[test]
+fn short_decisions_are_rows_and_entries_are_linked() {
+    let text = docs(&fixture())["patterns/demo.md"].clone();
+    assert!(
+        text.contains("| `demo/beta` | Beta is advice | doc |  | Beta SHOULD be considered. |")
+    );
+    assert!(text.contains("| [`demo/alpha`](#alpha-holds) |"));
+    assert!(!text.contains("### Beta is advice"));
+}
