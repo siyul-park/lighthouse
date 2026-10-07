@@ -11,7 +11,7 @@ use crate::Error;
 /// in, it drops the triggers and the views over the table, creates the new
 /// table, copies every row across, drops the old table, renames the new one,
 /// and recreates indexes, triggers and views. `V2` does exactly that.
-const MIGRATIONS: &[&str] = &[V1, V2];
+const MIGRATIONS: &[&str] = &[V1, V2, V3];
 
 /// Findings and the append-only review log. Locators, evidence and facts are
 /// JSON text, so nothing here assumes the artifact is code.
@@ -185,6 +185,26 @@ SELECT f.*, l.verdict AS review_verdict, l.reason_code AS review_reason,
 FROM findings f
 LEFT JOIN latest_verdicts l ON l.fingerprint = f.fingerprint
 LEFT JOIN standings s ON s.fingerprint = f.fingerprint;
+";
+
+/// Fixes the orchestrator applied: which fixer changed the code for which
+/// finding. A record of what happened to this checkout, kept in the local
+/// cache next to the sightings; it is not a decision, so it stays out of the
+/// shared decision log.
+const V3: &str = "
+CREATE TABLE fix_events (
+    event_id           TEXT PRIMARY KEY,
+    fingerprint        TEXT NOT NULL,
+    rule_id            TEXT NOT NULL,
+    fixer              TEXT NOT NULL,
+    safety             TEXT NOT NULL CHECK (safety IN ('safe', 'suggested')),
+    description        TEXT NOT NULL,
+    files              TEXT NOT NULL,
+    git_commit         TEXT,
+    lighthouse_version TEXT,
+    timestamp          TEXT NOT NULL
+);
+CREATE INDEX fix_events_fingerprint ON fix_events (fingerprint, timestamp);
 ";
 
 /// The schema version this build writes.

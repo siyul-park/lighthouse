@@ -225,6 +225,46 @@ pub fn scan(text: &str, symbols: &[Symbol]) -> Vec<Comment> {
         .collect()
 }
 
+/// Draws each symbol's extent up over the comments that lead it: a standalone
+/// comment that ends on the line before the extent starts, again and again,
+/// so a plain comment above doc comments and attributes is the item's too.
+pub fn widen_extents(text: &str, comments: &[Comment], symbols: &mut [Symbol]) {
+    let lines: Vec<&str> = text.split('\n').collect();
+    let standalone = |c: &Comment| {
+        lines
+            .get(c.span.start.line as usize - 1)
+            .and_then(|l| l.get(..c.span.start.col as usize - 1))
+            .is_some_and(|before| before.trim().is_empty())
+    };
+    for symbol in symbols {
+        let Some(extent) = &mut symbol.extent else {
+            continue;
+        };
+        while let Some(comment) = comments
+            .iter()
+            .find(|c| c.span.end.line + 1 == extent.start.line && standalone(c) && leads(&c.text))
+        {
+            extent.start = comment.span.start;
+        }
+    }
+}
+
+/// Whether a comment can belong to the item below it: not an inner doc comment
+/// (`//!`, `/*!`), which documents the module around, and not a banner, whose
+/// line is a run of rule characters or a section marker.
+fn leads(text: &str) -> bool {
+    if text.starts_with("//!") || text.starts_with("/*!") {
+        return false;
+    }
+    let rule = |c: char| "-=*~_+".contains(c);
+    let banner = text.lines().all(|line| {
+        let body = line.trim().trim_start_matches(['/', '*', '#', '!']).trim();
+        let run = body.chars().take_while(|&c| rule(c)).count();
+        body.is_empty() || run >= 3 || body.starts_with("MARK:") || body.starts_with("#region")
+    });
+    !banner
+}
+
 fn attached(lines: &[&str], end_line: u32, symbols: &[Symbol]) -> Option<String> {
     let end = end_line as usize;
     let next = symbols
@@ -316,5 +356,60 @@ mod tests {
         assert_eq!(found[0].text, "/* a /* b */ c */");
         assert_eq!((found[0].span.start.line, found[0].span.start.col), (2, 1));
         assert_eq!((found[0].span.end.line, found[0].span.end.col), (2, 18));
+    }
+
+    fn symbol_at(from: (u32, u32), to: (u32, u32)) -> Symbol {
+        let at = |(line, col)| Position { line, col };
+        let span = Span {
+            start: at(from),
+            end: at(to),
+        };
+        Symbol {
+            id: "m::f#function".to_owned(),
+            kind: lighthouse_protocol::SymbolKind::Function,
+            visibility: lighthouse_protocol::Visibility::Private,
+            owner: None,
+            file: "a.rs".to_owned(),
+            span,
+            extent: Some(span),
+            doc: None,
+            name: "f".to_owned(),
+            role: None,
+        }
+    }
+
+    #[test]
+    fn an_extent_grows_over_every_standalone_comment_that_leads_it() {
+        let source = "// far\n\n// a\n// b\n/// doc\nfn f() {}\n";
+        let mut symbols = [symbol_at((5, 1), (6, 8))];
+
+        widen_extents(source, &scan(source, &symbols), &mut symbols);
+
+        let start = symbols[0].extent.unwrap().start;
+        assert_eq!((start.line, start.col), (3, 1), "the blank line stops it");
+    }
+
+    #[test]
+    fn inner_docs_and_banners_stay_out_of_an_extent() {
+        let inner = "//! module docs\nfn f() {}\n";
+        let banner = "// ---- Helpers ----\nfn f() {}\n";
+        let marker = "// MARK: - Helpers\nfn f() {}\n";
+        let prose = "// ---- not a banner: it explains\n// the item\nfn f() {}\n";
+
+        for (source, line, want) in [(inner, 2, 2), (banner, 2, 2), (marker, 2, 2), (prose, 3, 1)] {
+            let mut symbols = [symbol_at((line, 1), (line, 8))];
+            widen_extents(source, &scan(source, &symbols), &mut symbols);
+            assert_eq!(symbols[0].extent.unwrap().start.line, want, "{source}");
+        }
+    }
+
+    #[test]
+    fn a_comment_that_trails_code_does_not_belong_to_the_next_item() {
+        let source = "let x = 1; // trailing\nfn f() {}\n";
+        let mut symbols = [symbol_at((2, 1), (2, 10))];
+
+        widen_extents(source, &scan(source, &symbols), &mut symbols);
+
+        assert_eq!(symbols[0].extent.unwrap().start.line, 2);
     }
 }

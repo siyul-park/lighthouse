@@ -46,7 +46,12 @@ const GO: Lang = Lang {
     manifest_id: "lang-go",
     globs: &["**/*.go"],
     test_globs: &["**/*_test.go"],
-    capabilities: &[wire::SEMANTIC_EDGES],
+    capabilities: &[
+        wire::SEMANTIC_EDGES,
+        wire::EXTENT,
+        wire::REFERENCE_SITES,
+        wire::OVERLAYS,
+    ],
 };
 
 const RUST: Lang = Lang {
@@ -58,7 +63,7 @@ const RUST: Lang = Lang {
     manifest_id: "lang-rust",
     globs: &["**/*.rs"],
     test_globs: &["**/tests/**/*.rs", "**/tests.rs", "**/benches/**/*.rs"],
-    capabilities: &[],
+    capabilities: &[wire::EXTENT, wire::REFERENCE_SITES, wire::OVERLAYS],
 };
 
 const LANGS: [&Lang; 2] = [&GO, &RUST];
@@ -117,6 +122,17 @@ fn index(
     options: &Value,
     files: &[String],
 ) -> Value {
+    index_overlaid(plugin, root, language, options, files, None)
+}
+
+fn index_overlaid(
+    plugin: &mut Plugin,
+    root: &Path,
+    language: &str,
+    options: &Value,
+    files: &[String],
+    overlays: Option<Vec<wire::Overlay>>,
+) -> Value {
     let params = IndexParams {
         project: wire::ProjectRef {
             root: root.to_string_lossy().into_owned(),
@@ -136,7 +152,7 @@ fn index(
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect::<BTreeMap<_, _>>(),
-            overlays: None,
+            overlays,
         },
     };
     plugin.call::<Value>(wire::INDEX, params)
@@ -322,6 +338,80 @@ fn framing_survives_bodies_larger_than_one_read_and_mixed_case_headers() {
         let result: wire::IndexResult = plugin.call(wire::INDEX, params);
         assert_eq!(result.fragments.len(), files.len());
         assert!(serde_json::to_vec(&result).unwrap().len() > 500_000);
+        assert_eq!(plugin.finish(), Some(0));
+    }
+}
+
+/// An overlay stands in for the file: the provider indexes its text, never the
+/// disk, and the file on disk is left as it was.
+#[test]
+fn overlays_replace_the_text_a_provider_reads() {
+    for (lang, file, added, symbol) in [
+        (
+            &GO,
+            "extents.go",
+            "\nfunc Added() int { return 1 }\n",
+            "::Added#function",
+        ),
+        (
+            &RUST,
+            "src/lib.rs",
+            "\npub fn added() -> u8 {\n    1\n}\n",
+            "::added#function",
+        ),
+    ] {
+        let Some(dir) = (lang.plugin)() else {
+            continue;
+        };
+        let root = workspace()
+            .join("plugins/conformance")
+            .join(lang.id)
+            .join("extents/project")
+            .canonicalize()
+            .unwrap();
+        let on_disk = fs::read_to_string(root.join(file)).unwrap();
+        let mut sources = Vec::new();
+        files(&root, &root, lang.ext, &mut sources);
+        let ids = |result: &Value| -> Vec<String> {
+            result["fragments"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .flat_map(|f| f["symbols"].as_array().unwrap().iter())
+                .map(|s| s["id"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let mut plugin = Plugin::start(&dir, &root);
+        plugin.initialize(&root);
+
+        let plain = index(&mut plugin, &root, lang.id, &json!({}), &sources);
+        let overlaid = index_overlaid(
+            &mut plugin,
+            &root,
+            lang.id,
+            &json!({}),
+            &sources,
+            Some(vec![wire::Overlay {
+                path: file.to_owned(),
+                text: format!("{on_disk}{added}"),
+            }]),
+        );
+
+        assert!(
+            !ids(&plain).iter().any(|id| id.ends_with(symbol)),
+            "{}",
+            lang.id
+        );
+        assert!(
+            ids(&overlaid).iter().any(|id| id.ends_with(symbol)),
+            "{}",
+            lang.id
+        );
+        assert!(
+            overlaid["incomplete"].as_array().unwrap().is_empty(),
+            "{overlaid}"
+        );
+        assert_eq!(fs::read_to_string(root.join(file)).unwrap(), on_disk);
         assert_eq!(plugin.finish(), Some(0));
     }
 }

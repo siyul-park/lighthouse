@@ -35,6 +35,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 38,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "os_linux.go",
           "id": ".::Name#function",
           "kind": "function",

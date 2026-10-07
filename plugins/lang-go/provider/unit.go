@@ -30,7 +30,17 @@ type unit struct {
 	main     bool
 	internal bool
 	test     bool
-	edges    map[sdk.Edge]bool
+	edges    map[edgeKey]bool
+	cmap     ast.CommentMap
+}
+
+// edgeKey identifies an emitted edge: the same relation at another site is
+// another edge.
+type edgeKey struct {
+	kind, to string
+	from     sdk.Node
+	site     sdk.Span
+	sited    bool
 }
 
 func newUnit(rel string, file *ast.File, pkg *packages.Package, src []byte, res *resolver) *unit {
@@ -47,7 +57,8 @@ func newUnit(rel string, file *ast.File, pkg *packages.Package, src []byte, res 
 		main:     file.Name.Name == "main",
 		internal: hasComponent(dir, "internal"),
 		test:     strings.HasSuffix(rel, "_test.go"),
-		edges:    map[sdk.Edge]bool{},
+		edges:    map[edgeKey]bool{},
+		cmap:     ast.NewCommentMap(pkg.Fset, file, file.Comments),
 	}
 	if u.test && strings.HasSuffix(file.Name.Name, "_test") {
 		u.module = dir + moduleSuffixTest
@@ -104,7 +115,7 @@ func (u *unit) function(d *ast.FuncDecl) {
 			idName = "init:" + path.Base(u.rel) + ":" + strconv.Itoa(position(u.fset, d.Pos()).Line)
 		}
 		id := symbolID(kind, u.module, idName)
-		u.symbol(kind, name, "", id, d.Pos(), d.End(), doc)
+		u.symbol(kind, name, "", id, d.Pos(), d.End(), doc, u.extent(d))
 		if u.test && kind == kindFunction {
 			u.frag.Symbols[len(u.frag.Symbols)-1].Role = u.functionRole(d)
 		}
@@ -116,7 +127,7 @@ func (u *unit) function(d *ast.FuncDecl) {
 		return
 	}
 	id := symbolID(kindMethod, u.module, owner, name)
-	u.symbol(kindMethod, name, symbolID(kindType, u.module, owner), id, d.Pos(), d.End(), doc)
+	u.symbol(kindMethod, name, symbolID(kindType, u.module, owner), id, d.Pos(), d.End(), doc, u.extent(d))
 	u.summarize(d, id, false)
 }
 
@@ -126,10 +137,8 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 	if d.Body == nil {
 		return
 	}
-	usages := u.usages(d)
-	for _, use := range usages {
-		u.edge(use.kind, sdk.Node{Symbol: id}, use.to)
-	}
+	usages, occurrences := u.usages(d)
+	u.siteEdges(id, occurrences)
 	f := newFlow(d, u.info())
 	ast.Walk(f, d.Body)
 	params, returns := signature(d.Type)
@@ -152,6 +161,15 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 	})
 	if isTestCase {
 		u.frag.Tests = append(u.frag.Tests, testCaseOf(d, id, usages, u.info()))
+	}
+}
+
+// siteEdges emits an edge for every place a function uses something, each
+// with the span of the identifier that names the target.
+func (u *unit) siteEdges(from string, occurrences []occurrence) {
+	for _, use := range occurrences {
+		site := span(u.fset, use.at.Pos(), use.at.End())
+		u.edgeAt(use.kind, sdk.Node{Symbol: from}, use.to, &site)
 	}
 }
 
@@ -203,12 +221,16 @@ func (u *unit) general(d *ast.GenDecl) {
 			if d.Tok == token.CONST {
 				kind = kindConst
 			}
+			var extent *sdk.Span
+			if len(s.Names) == 1 {
+				extent = u.specExtent(d, s)
+			}
 			for _, name := range s.Names {
 				if name.Name == "_" {
 					continue
 				}
 				id := symbolID(kind, u.module, name.Name)
-				u.symbol(kind, name.Name, "", id, name.Pos(), s.End(), docText(s.Doc, d.Doc))
+				u.symbol(kind, name.Name, "", id, name.Pos(), s.End(), docText(s.Doc, d.Doc), extent)
 			}
 		}
 	}
@@ -224,7 +246,7 @@ func (u *unit) typeSpec(s *ast.TypeSpec, d *ast.GenDecl) {
 		kind = kindInterface
 	}
 	id := symbolID(kind, u.module, name)
-	u.symbol(kind, name, "", id, s.Pos(), s.End(), docText(s.Doc, d.Doc))
+	u.symbol(kind, name, "", id, s.Pos(), s.End(), docText(s.Doc, d.Doc), u.specExtent(d, s))
 	switch t := s.Type.(type) {
 	case *ast.StructType:
 		u.fields(t, name, id)
@@ -240,7 +262,7 @@ func (u *unit) fields(t *ast.StructType, owner, ownerID string) {
 			name := baseName(field.Type)
 			if name != "" && name != "_" {
 				id := symbolID(kindField, u.module, owner, name)
-				u.symbol(kindField, name, ownerID, id, field.Pos(), field.End(), doc)
+				u.symbol(kindField, name, ownerID, id, field.Pos(), field.End(), doc, u.extent(field))
 			}
 			continue
 		}
@@ -249,7 +271,11 @@ func (u *unit) fields(t *ast.StructType, owner, ownerID string) {
 				continue
 			}
 			id := symbolID(kindField, u.module, owner, name.Name)
-			u.symbol(kindField, name.Name, ownerID, id, name.Pos(), field.End(), doc)
+			var extent *sdk.Span
+			if len(field.Names) == 1 {
+				extent = u.extent(field)
+			}
+			u.symbol(kindField, name.Name, ownerID, id, name.Pos(), field.End(), doc, extent)
 		}
 	}
 }
@@ -258,7 +284,11 @@ func (u *unit) interfaceMethods(t *ast.InterfaceType, owner, ownerID string) {
 	for _, method := range t.Methods.List {
 		for _, name := range method.Names {
 			id := symbolID(kindMethod, u.module, owner, name.Name)
-			u.symbol(kindMethod, name.Name, ownerID, id, name.Pos(), method.End(), docText(method.Doc))
+			var extent *sdk.Span
+			if len(method.Names) == 1 {
+				extent = u.extent(method)
+			}
+			u.symbol(kindMethod, name.Name, ownerID, id, name.Pos(), method.End(), docText(method.Doc), extent)
 		}
 	}
 }
@@ -274,7 +304,7 @@ func (u *unit) functionRole(d *ast.FuncDecl) string {
 	return roleFixture
 }
 
-func (u *unit) symbol(kind, name, owner, id string, from, to token.Pos, doc string) {
+func (u *unit) symbol(kind, name, owner, id string, from, to token.Pos, doc string, extent *sdk.Span) {
 	u.frag.Symbols = append(u.frag.Symbols, sdk.Symbol{
 		ID:         id,
 		Kind:       kind,
@@ -282,6 +312,7 @@ func (u *unit) symbol(kind, name, owner, id string, from, to token.Pos, doc stri
 		Owner:      owner,
 		File:       u.rel,
 		Span:       span(u.fset, from, to),
+		Extent:     extent,
 		Doc:        doc,
 		Name:       name,
 		Role:       u.declarationRole(kind, owner),
@@ -306,12 +337,21 @@ func (u *unit) declarationRole(kind, owner string) string {
 	}
 }
 
-func (u *unit) edge(kind string, from sdk.Node, to string) {
-	e := sdk.Edge{Kind: kind, From: from, To: to, Resolution: resolutionSemantic}
-	if !u.edges[e] {
-		u.edges[e] = true
-		u.frag.Edges = append(u.frag.Edges, e)
+func (u *unit) edge(kind string, from sdk.Node, to string) { u.edgeAt(kind, from, to, nil) }
+
+// edgeAt emits an edge once per distinct relation and site.
+func (u *unit) edgeAt(kind string, from sdk.Node, to string, site *sdk.Span) {
+	key := edgeKey{kind: kind, from: from, to: to}
+	if site != nil {
+		key.site, key.sited = *site, true
 	}
+	if u.edges[key] {
+		return
+	}
+	u.edges[key] = true
+	u.frag.Edges = append(u.frag.Edges, sdk.Edge{
+		Kind: kind, From: from, To: to, Resolution: resolutionSemantic, Site: site,
+	})
 }
 
 // visibility follows Go's capitalization, tightened by where the symbol

@@ -7,6 +7,7 @@ publish.workspace = true
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+lighthouse-declarative.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-spec.workspace = true

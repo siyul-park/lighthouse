@@ -1,5 +1,5 @@
 use lighthouse_model::{Diagnostic, Module, Symbol, SymbolKind};
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
@@ -20,7 +20,7 @@ pub(crate) fn rule() -> Box<dyn Rule> {
 /// A top-level exported name that carries the name of its module as a prefix
 /// or suffix repeats
 /// what every caller already writes: `provider.ProviderConfig`.
-fn check(meta: &RuleMeta, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
+fn check(meta: &RuleManifest, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
     if skipped(ctx) {
         return Ok(Vec::new());
     }

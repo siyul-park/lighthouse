@@ -3,17 +3,20 @@
 //! own catalog layer.
 
 use std::{
-    env,
+    env, fs,
     path::{Path, PathBuf},
 };
 
 use lighthouse_config::{Config, FILE_NAME};
-use lighthouse_declarative::{Declarative, load_local};
+use lighthouse_declarative::{Declarative, load_local, local_files};
 use lighthouse_plugin::Registry;
 use lighthouse_rpc::Registered;
-use lighthouse_spec::Catalog;
+use lighthouse_spec::{Catalog, FixKind};
 
-use crate::Result;
+use crate::{
+    Result,
+    trust::{Basis, Command},
+};
 
 /// What `init` writes and what a project without a config is checked with.
 pub const DEFAULT_CONFIG: &str = "plugins = [\"core\"]\nextends = [\"core/recommended\"]\n";
@@ -25,6 +28,9 @@ pub struct Session {
     pub root: PathBuf,
     /// The catalog layer of `.lighthouse/rules`, when the project has one.
     pub local: Option<Catalog>,
+    /// What the project asks to be trusted for, computed from the same bytes
+    /// the configuration and the rules were loaded from.
+    pub basis: Basis,
 }
 
 impl Session {
@@ -46,33 +52,49 @@ impl Session {
     /// process's current directory, so a hook can name the project it was
     /// started for.
     pub fn find_in(dir: &Path) -> Result<Option<Self>> {
-        match Config::discover(dir)? {
-            Some((path, config)) => {
-                let root = path.parent().ok_or("config path has no parent")?.to_owned();
-                Ok(Some(Self::assemble(config, root)?))
+        for ancestor in dir.ancestors() {
+            let path = ancestor.join(FILE_NAME);
+            if path.is_file() {
+                let text =
+                    fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+                return Ok(Some(Self::assemble(&text, ancestor.to_owned())?));
             }
-            None => Ok(None),
         }
+        Ok(None)
+    }
+
+    /// Whether the user trusts this project to run the commands it names.
+    pub fn trusted(&self) -> bool {
+        self.basis.trusted(&self.root)
     }
 
     fn open(config: Option<&Path>, required: bool) -> Result<Self> {
         let here = env::current_dir()?;
         if let Some(path) = config {
-            return Self::assemble(Config::load(path)?, here);
+            let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+            return Self::assemble(&text, here);
         }
         match Self::find_in(&here)? {
             Some(session) => Ok(session),
             None if required => Err(format!("no {FILE_NAME} found (run `lighthouse init`)").into()),
-            None => Self::assemble(Config::parse(DEFAULT_CONFIG)?, here),
+            None => Self::assemble(DEFAULT_CONFIG, here),
         }
     }
 
-    fn assemble(config: Config, root: PathBuf) -> Result<Self> {
-        let local = load_local(&root)?;
+    /// Builds the session from the text of `lighthouse.toml` and the rule
+    /// files read here, once: what is parsed is what trust is judged on.
+    fn assemble(text: &str, root: PathBuf) -> Result<Self> {
+        let config = Config::parse(text)?;
+        let files = local_files(&root)?;
+        let local = files.clone().map(Catalog::from_local).transpose()?;
+        let catalog = layered(local.as_ref())?;
+        let commands = commands(&config, &catalog);
+        let basis = Basis::of(&root, text, &files.unwrap_or_default(), &commands);
         Ok(Self {
             config,
             root,
             local,
+            basis,
         })
     }
 
@@ -92,7 +114,12 @@ impl Session {
     /// The same project with another local layer, such as a candidate that
     /// has not been written yet.
     pub fn with_local(self, local: Option<Catalog>) -> Self {
-        Self { local, ..self }
+        // The candidate was never read by the user, so it is never trusted.
+        Self {
+            local,
+            basis: Basis::default(),
+            ..self
+        }
     }
 
     /// Plugins that run in this process only: the bundled ones and the local
@@ -131,6 +158,29 @@ pub fn project_root() -> Result<PathBuf> {
 /// layer on top. Fails when the project's layer is broken.
 pub fn catalog_at(root: &Path) -> Result<Catalog> {
     layered(load_local(root)?.as_ref())
+}
+
+/// Every command the project would run: the formatters of its configuration
+/// and the command fixers of its catalog.
+fn commands(config: &Config, catalog: &Catalog) -> Vec<Command> {
+    let mut found: Vec<Command> = config
+        .formatters()
+        .map(|(language, f)| Command {
+            what: format!("formatter for {language}: {}", f.argv.join(" ")),
+            argv: f.argv.clone(),
+        })
+        .collect();
+    for pattern in catalog.patterns() {
+        if let Some(fix) = &pattern.fix
+            && let FixKind::Command(command) = &fix.kind
+        {
+            found.push(Command {
+                what: format!("fixer of {}: {}", pattern.id, command.argv.join(" ")),
+                argv: command.argv.clone(),
+            });
+        }
+    }
+    found
 }
 
 fn layered(local: Option<&Catalog>) -> Result<Catalog> {

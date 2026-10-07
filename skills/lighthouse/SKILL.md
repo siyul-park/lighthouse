@@ -18,7 +18,12 @@ remembered with its reason and is not raised again.
 2. **Understand** each finding: it carries the requirement, the evidence and an
    expected structure. For more, read the pattern: MCP resource
    `lighthouse://patterns/<id>`, tool `explain`, or `lighthouse explain <id>`.
-3. **Fix** the code, then **recheck**. A run that reports `incomplete` did not
+3. **Fix** the code, then **recheck**. Findings of a rule marked `fixable` in
+   the digest below can be fixed for you: MCP tool `fix` (by `fingerprints` or
+   `paths`, `dry_run` first to see the diff), or `lighthouse check --fix`.
+   Only safe fixes of mechanical rules apply by default; `unsafe_fixes` also
+   applies suggested ones. Every fix is verified and rolled back if it makes
+   the file worse. Review the diff like any other change. A run that reports `incomplete` did not
    check everything: it is not a pass.
 4. **Judge** review-tier findings (`review_tasks`): fix them, or record a
    verdict with `review_resolve`. `confirmed` means the finding is right
@@ -53,26 +58,26 @@ Do not memorize rule text; ask for it when a finding names a rule.
 
 ## Active patterns (19)
 
-Tiers: mechanical (error), heuristic (warn), judgment (review).
+Tiers: mechanical (error), heuristic (warn), judgment (review). `fixable: safe|suggested` marks a rule with a fixer.
 
 ### core
 
 - `core/max-file-lines` (heuristic) Files stay below a line limit
 - `core/annotation-reason` (mechanical) An allow annotation states its reason
-- `core/unused-allow` (heuristic) Allow annotations suppress something
+- `core/unused-allow` (heuristic, fixable: suggested) Allow annotations suppress something
 
 ### design
 
-- `design/related-symbols-close` (heuristic) Collaborators stay close
+- `design/related-symbols-close` (heuristic, fixable: suggested) Collaborators stay close
 - `design/complexity-signal` (heuristic) Complexity is a review signal
 - `design/coupling-signal` (heuristic) Coupling is a review signal
 - `design/single-use-wrapper` (heuristic) Inline single-use wrappers
 - `design/receiver-owned-behavior` (heuristic) Behavior lives with its owner
-- `design/callers-before-callees` (heuristic) Callers before callees
+- `design/callers-before-callees` (heuristic, fixable: suggested) Callers before callees
 - `design/no-redundant-qualifiers` (heuristic) No redundant qualifiers
 - `design/no-exported-mutable-global` (heuristic) No exported mutable global
-- `design/declaration-groups` (mechanical) Declarations follow ownership groups
-- `design/section-banners` (heuristic) Comments do not label sections
+- `design/declaration-groups` (mechanical, fixable: safe) Declarations follow ownership groups
+- `design/section-banners` (heuristic, fixable: suggested) Comments do not label sections
 - `design/exported-doc` (heuristic) Exported symbols are documented
 
 ### testing
@@ -81,4 +86,4 @@ Tiers: mechanical (error), heuristic (warn), judgment (review).
 - `testing/standard-assertions` (heuristic) Assertions use the standard library
 - `testing/owner-test` (heuristic) Every public symbol has an owner test
 - `testing/single-owner-test` (mechanical) One owner test per public symbol
-- `testing/test-file-layout` (mechanical) A test file reads fixtures, tests, helpers
+- `testing/test-file-layout` (mechanical, fixable: safe) A test file reads fixtures, tests, helpers

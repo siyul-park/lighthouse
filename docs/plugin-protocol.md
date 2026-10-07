@@ -34,8 +34,19 @@ fields. Fields of protocol messages are camelCase (`protocolVersion`,
 `clientInfo`); fields of the code model keep the model's snake_case names
 (`test_of`, `max_nesting`).
 
-Reserved for later versions, not implemented in 0.1: `context.overlays`
-(content of unsaved files; hosts do not send it), `clone_fingerprint`, and
+`extent` on symbols, `site` on edges and the capabilities `extent` and
+`reference-sites` were added to 0.1 before 1.0, as optional fields: a plugin that
+sends none of them is still a valid 0.1 plugin, and hosts ignore what they do not
+know. They make fixes possible (see "Fixing" in [architecture.md](architecture.md)).
+
+`context.overlays` is real: a list of `{ path, text }` that stand in for requested
+files. A provider MUST analyze the overlay text instead of the file on disk for those
+paths and MUST NOT read the disk for them; the files on disk are never touched. A fix
+run verifies candidate edits this way, and writes only after they pass. `lang-go`
+passes them to `go/packages` as its `Overlay`, `lang-rust` reads them in place of the
+files.
+
+Reserved for later versions, not implemented in 0.1: `clone_fingerprint`, and
 further methods for rules and analyzers.
 
 ## Methods
@@ -59,10 +70,23 @@ absolute. Result:
   claims files no other language claims.
 - `conventions.test_globs` mark test files for the whole host: rules skip or
   target them by this flag.
+- Each entry of `languages` is the language's **provider manifest**
+  (`ProviderManifest`): `id`, `globs`, `priority`, `fallback`, `conventions` and
+  `capabilities`. It is what the host's `LanguageProvider::manifest()` returns, field
+  for field; the plugin's own identity (`id`, `version`) is the plugin manifest.
 - `capabilities` list what the provider guarantees. `semantic-edges`: `calls`,
   `references`, `implements` and `accesses-private` edges are resolved by the
   language's own semantic analysis (types, scopes), not by name matching. A rule
   that requires a capability is skipped, with a notice, for languages without it.
+  `overlays`: the provider analyzes the `overlays` of an index request instead of the
+  files on disk; a host declines fixes in files of a provider without it (bundled
+  providers declare it).
+  `complete-references`: every reference to a symbol, in signatures, fields and
+  receivers too, is an edge with a `site`, so a rename cannot miss one; no bundled
+  provider declares it yet.
+  `extent`: every declaration symbol carries its `extent`. `reference-sites`: every
+  edge that comes from a use in code carries its `site`. A fix that needs a capability
+  the file's provider lacks is declined, never guessed.
   Hosts ignore capability names they do not know. A provider without
   `semantic-edges` is syntactic: its edges come from names (and, where marked,
   guesses), which makes its caller and reference sets lower bounds; no separate
@@ -156,10 +180,17 @@ internal error. The host treats failures as follows, always turning them into
   constants, variables and functions that need no handle). Test entry points
   are `test` symbols and carry no role; methods and fields carry none either.
 - `span`: 1-based `line`, 1-based `col` counted in bytes, `end` exclusive.
+- `extent` (optional, capability `extent`): the whole declaration, from its first
+  leading doc comment, attribute or annotation to its last token. Comments that lead it
+  with no blank line between, and a comment that trails it on its last line, belong to
+  it. A declaration that is one spec of a parenthesized group (a Go `const ( ... )`)
+  has the spec's own lines, which a host never moves out of its group. A symbol whose
+  declaration it shares with another (Go `var a, b = 1, 2`) has no extent. Moving or
+  deleting a declaration takes exactly this range.
 
 ### Edges
 
-`{ kind, from, to, resolution }`. `from` is `{ "module": path }` or
+`{ kind, from, to, resolution, site? }`. `from` is `{ "module": path }` or
 `{ "symbol": id }`. `to` is a string: a module path, a full symbol id, or a
 kind-less id (`module::owner::name`) which the host resolves when it names
 exactly one symbol (for `calls`, exactly one function or method). Providers
@@ -176,6 +207,12 @@ import path, because the dependency itself is the fact.
 | `references` | use as a value: function value, field, type, constant, variable |
 | `implements` | type satisfies an interface declared in the project |
 | `accesses-private` | use of a member the language keeps private from outside the unit that owns it; the unit (type, module, package) is language-dependent, and a provider emits it only where such a use is possible |
+
+`site` (optional, capability `reference-sites`) is the span of the identifier that names
+the target at the place of use, so a host can rename it. The same relation used at
+several places is one edge per place, and the host keeps one edge with every site. A
+provider reports sites for the edges it emits from function bodies; edges between
+modules and `contains` have none.
 
 `resolution` is `semantic` when the target comes from type information,
 `syntactic` when it comes from names alone, and `heuristic` for a guess: the
@@ -276,6 +313,10 @@ built plugin and validates every result against the schema.
 
 ## `lang-go`
 
+Reports `extent` (doc comments and the comment groups of the comment map that lead
+the declaration without a blank line, and a comment that trails it) and `reference-sites`
+(the identifier of every use `go/types` resolves, selector identifiers included).
+
 Loads packages with `golang.org/x/tools/go/packages` (tests included) and
 type-checks with `go/types`.
 
@@ -304,6 +345,10 @@ type-checks with `go/types`.
   `line:col: message`.
 
 ## `lang-rust`
+
+Reports `extent` (from the first outer attribute or doc comment, or the plain
+comment lines above them, to the last token) and `reference-sites` for the edges it
+resolves; they are syntactic or heuristic, so a host does not rename through them.
 
 Reads sources with `syn` and `proc-macro2`; it resolves names itself and never
 runs cargo, a build script or the compiler, so analysis needs no network, no lock

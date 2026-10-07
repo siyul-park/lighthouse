@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
-use crate::Error;
+use crate::{Error, Fix};
 
 /// What a pattern talks about. Mapping to the run scope of a rule is
 /// `Scope::rule_scope`.
@@ -240,6 +240,11 @@ pub struct Example {
     /// Rule options the example runs with.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub options: Map<String, Value>,
+    /// What an invalid example's files become when the pattern's fix is
+    /// applied: the files that change, each with its whole new text. Applying
+    /// the fix again must change nothing, and the rule must no longer fire.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fixed: Vec<ExampleFile>,
 }
 
 /// One catalog entry: a requirement with its enforcement, options and
@@ -271,6 +276,10 @@ pub struct Pattern {
     pub options: BTreeMap<String, OptionSpec>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub implementation: Option<Implementation>,
+    /// How the findings of the rule are fixed; the catalog is the one place
+    /// that says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix: Option<Fix>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub citation: Option<String>,
     /// Review-level advice that is too noisy for the `recommended` preset;

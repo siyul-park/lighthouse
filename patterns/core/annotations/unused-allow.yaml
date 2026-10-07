@@ -4,13 +4,25 @@ intent: An exception that no longer applies is noise that hides the next real on
 scope: file
 requirement: An allow annotation SHOULD suppress a finding; one whose rule no longer fires there, or is not enabled, SHOULD be removed.
 enforcement: heuristic
-evidence: [rules, reason]
+evidence: [rules, reason, annotation]
 implementation:
   builtin: core/unused-allow
+fix:
+  safety: suggested
+  ops:
+    - op: delete
+      file: finding.file
+      span: finding.evidence.annotation
 examples:
   - name: go-stale-allow
     language: go
     kind: invalid
+    fixed:
+      - path: example.go
+        body: |-
+          package sample
+
+          func open() {}
     files:
       - path: example.go
         body: |-
@@ -34,6 +46,10 @@ examples:
   - name: rust-stale-allow
     language: rust
     kind: invalid
+    fixed:
+      - path: src/lib.rs
+        body: |-
+          fn open() {}
     files:
       - path: src/lib.rs
         body: |-

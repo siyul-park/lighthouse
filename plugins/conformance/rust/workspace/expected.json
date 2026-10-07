@@ -25,6 +25,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 30,
+              "line": 4
+            },
+            "start": {
+              "col": 26,
+              "line": 4
+            }
+          },
           "to": "core_lib::make#function"
         },
         {
@@ -33,6 +43,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 5
+            },
+            "start": {
+              "col": 11,
+              "line": 5
+            }
+          },
           "to": "core_lib::Thing::size#method"
         },
         {
@@ -41,6 +61,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 24,
+              "line": 6
+            },
+            "start": {
+              "col": 19,
+              "line": 6
+            }
+          },
           "to": "core_lib::Thing#type"
         }
       ],
@@ -67,6 +97,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "app/src/main.rs",
           "id": "app[bin:app]::main#function",
           "kind": "function",
@@ -148,6 +188,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 10,
+              "line": 12
+            },
+            "start": {
+              "col": 5,
+              "line": 12
+            }
+          },
           "to": "core_lib::Thing#type"
         }
       ],
@@ -185,6 +235,16 @@
       "symbols": [
         {
           "doc": "A thing.",
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "file": "core-lib/src/lib.rs",
           "id": "core_lib::Thing#type",
           "kind": "type",
@@ -202,6 +262,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 7
+            },
+            "start": {
+              "col": 5,
+              "line": 5
+            }
+          },
           "file": "core-lib/src/lib.rs",
           "id": "core_lib::Thing::size#method",
           "kind": "method",
@@ -221,6 +291,16 @@
         },
         {
           "doc": "Makes a thing.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
           "file": "core-lib/src/lib.rs",
           "id": "core_lib::make#function",
           "kind": "function",

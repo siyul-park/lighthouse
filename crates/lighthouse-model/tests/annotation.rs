@@ -36,3 +36,16 @@ fn parse_reports_a_missing_reason_and_ignores_prose() {
     assert_eq!(ANNOTATION_REASON, "core/annotation-reason");
     assert_eq!(UNUSED_ALLOW, "core/unused-allow");
 }
+
+#[test]
+fn line_of_finds_the_line_that_holds_the_annotation() {
+    assert_eq!(
+        annotation::line_of("// lighthouse:allow design/a -- why"),
+        Some(0)
+    );
+    assert_eq!(
+        annotation::line_of("// Why:\n// lighthouse:allow design/a -- second line"),
+        Some(1)
+    );
+    assert_eq!(annotation::line_of("// just a comment"), None);
+}

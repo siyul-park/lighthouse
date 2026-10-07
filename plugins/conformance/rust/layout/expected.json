@@ -56,6 +56,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 16
+            },
+            "start": {
+              "col": 20,
+              "line": 16
+            }
+          },
           "to": "layout::add#function"
         },
         {
@@ -72,6 +82,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 22
+            },
+            "start": {
+              "col": 24,
+              "line": 22
+            }
+          },
           "to": "layout::add#function"
         },
         {
@@ -88,6 +108,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 31,
+              "line": 28
+            },
+            "start": {
+              "col": 20,
+              "line": 28
+            }
+          },
           "to": "layout::private_sum#function"
         }
       ],
@@ -165,6 +195,16 @@
       "symbols": [
         {
           "doc": "Adds two numbers.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "file": "src/lib.rs",
           "id": "layout::add#function",
           "kind": "function",
@@ -182,6 +222,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
           "file": "src/lib.rs",
           "id": "layout::private_sum#function",
           "kind": "function",
@@ -199,6 +249,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 17
+            },
+            "start": {
+              "col": 5,
+              "line": 14
+            }
+          },
           "file": "src/lib.rs",
           "id": "layout/tests::adds#test",
           "kind": "test",
@@ -216,6 +276,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 24
+            },
+            "start": {
+              "col": 5,
+              "line": 19
+            }
+          },
           "file": "src/lib.rs",
           "id": "layout/tests::adds_many#test",
           "kind": "test",
@@ -233,6 +303,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 29
+            },
+            "start": {
+              "col": 5,
+              "line": 26
+            }
+          },
           "file": "src/lib.rs",
           "id": "layout/tests::sums_privately#test",
           "kind": "test",
@@ -302,6 +382,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 8,
+              "line": 5
+            },
+            "start": {
+              "col": 5,
+              "line": 5
+            }
+          },
           "to": "layout::add#function"
         }
       ],
@@ -329,6 +419,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "src/more.rs",
           "id": "layout/more::from_a_file_module#test",
           "kind": "test",
@@ -393,6 +493,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "file": "tests/common/mod.rs",
           "id": "layout[test:integration]/common::two#function",
           "kind": "function",
@@ -461,6 +571,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 12
+            },
+            "start": {
+              "col": 16,
+              "line": 12
+            }
+          },
           "to": "layout::add#function"
         },
         {
@@ -469,6 +589,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 38,
+              "line": 12
+            },
+            "start": {
+              "col": 35,
+              "line": 12
+            }
+          },
           "to": "layout[test:integration]/common::two#function"
         },
         {
@@ -485,6 +615,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 26,
+              "line": 17
+            },
+            "start": {
+              "col": 22,
+              "line": 17
+            }
+          },
           "to": "layout[test:integration]::Case#type"
         },
         {
@@ -493,6 +633,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 30,
+              "line": 17
+            },
+            "start": {
+              "col": 29,
+              "line": 17
+            }
+          },
           "to": "layout[test:integration]::Case::a#field"
         },
         {
@@ -501,6 +651,70 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 36,
+              "line": 17
+            },
+            "start": {
+              "col": 35,
+              "line": 17
+            }
+          },
+          "to": "layout[test:integration]::Case::b#field"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::table_of_structs#test"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 47,
+              "line": 17
+            },
+            "start": {
+              "col": 43,
+              "line": 17
+            }
+          },
+          "to": "layout[test:integration]::Case#type"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::table_of_structs#test"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 51,
+              "line": 17
+            },
+            "start": {
+              "col": 50,
+              "line": 17
+            }
+          },
+          "to": "layout[test:integration]::Case::a#field"
+        },
+        {
+          "from": {
+            "symbol": "layout[test:integration]::table_of_structs#test"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 57,
+              "line": 17
+            },
+            "start": {
+              "col": 56,
+              "line": 17
+            }
+          },
           "to": "layout[test:integration]::Case::b#field"
         },
         {
@@ -509,6 +723,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 19
+            },
+            "start": {
+              "col": 20,
+              "line": 19
+            }
+          },
           "to": "layout::add#function"
         },
         {
@@ -525,6 +749,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 8,
+              "line": 25
+            },
+            "start": {
+              "col": 5,
+              "line": 25
+            }
+          },
           "to": "layout::add#function"
         },
         {
@@ -541,6 +775,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 8,
+              "line": 32
+            },
+            "start": {
+              "col": 5,
+              "line": 32
+            }
+          },
           "to": "layout::add#function"
         },
         {
@@ -557,6 +801,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 8,
+              "line": 38
+            },
+            "start": {
+              "col": 5,
+              "line": 38
+            }
+          },
           "to": "layout::add#function"
         },
         {
@@ -573,6 +827,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 8,
+              "line": 44
+            },
+            "start": {
+              "col": 5,
+              "line": 44
+            }
+          },
           "to": "layout::add#function"
         },
         {
@@ -589,6 +853,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 8,
+              "line": 49
+            },
+            "start": {
+              "col": 5,
+              "line": 49
+            }
+          },
           "to": "layout::add#function"
         }
       ],
@@ -682,6 +956,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
           "file": "tests/integration.rs",
           "id": "layout[test:integration]::Case#type",
           "kind": "type",
@@ -699,6 +983,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 11,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
           "file": "tests/integration.rs",
           "id": "layout[test:integration]::Case::a#field",
           "kind": "field",
@@ -717,6 +1011,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 11,
+              "line": 7
+            },
+            "start": {
+              "col": 5,
+              "line": 7
+            }
+          },
           "file": "tests/integration.rs",
           "id": "layout[test:integration]::Case::b#field",
           "kind": "field",
@@ -735,6 +1039,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
           "file": "tests/integration.rs",
           "id": "layout[test:integration]::through_the_public_api#test",
           "kind": "test",
@@ -752,6 +1066,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
           "file": "tests/integration.rs",
           "id": "layout[test:integration]::table_of_structs#test",
           "kind": "test",
@@ -769,6 +1093,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 23
+            }
+          },
           "file": "tests/integration.rs",
           "id": "layout[test:integration]::async_case#test",
           "kind": "test",
@@ -786,6 +1120,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 33
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
           "file": "tests/integration.rs",
           "id": "layout[test:integration]::cases_by_attribute#test",
           "kind": "test",
@@ -803,6 +1147,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 35
+            }
+          },
           "file": "tests/integration.rs",
           "id": "layout[test:integration]::test_case_by_path#test",
           "kind": "test",
@@ -820,6 +1174,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 45
+            },
+            "start": {
+              "col": 1,
+              "line": 41
+            }
+          },
           "file": "tests/integration.rs",
           "id": "layout[test:integration]::one_case_is_a_scenario#test",
           "kind": "test",
@@ -837,6 +1201,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 50
+            },
+            "start": {
+              "col": 1,
+              "line": 47
+            }
+          },
           "file": "tests/integration.rs",
           "id": "layout[test:integration]::not_a_test_by_path#function",
           "kind": "function",
@@ -926,6 +1300,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 5
+            },
+            "start": {
+              "col": 13,
+              "line": 5
+            }
+          },
           "to": "layout[test:integration]/common::two#function"
         }
       ],
@@ -954,6 +1338,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "tests/other.rs",
           "id": "layout[test:other]::shares_the_helper#test",
           "kind": "test",

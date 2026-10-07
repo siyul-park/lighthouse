@@ -25,6 +25,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 8,
+              "line": 4
+            },
+            "start": {
+              "col": 5,
+              "line": 4
+            }
+          },
           "to": "bins::api#function"
         }
       ],
@@ -52,6 +62,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "src/bin/tool.rs",
           "id": "bins[bin:tool]::main#function",
           "kind": "function",
@@ -88,6 +108,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 2
+            },
+            "start": {
+              "col": 19,
+              "line": 2
+            }
+          },
           "to": "bins::api#function"
         }
       ],
@@ -114,6 +144,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "file": "src/cli.rs",
           "id": "bins[bin:bins]/cli::run#function",
           "kind": "function",
@@ -184,6 +224,16 @@
       "symbols": [
         {
           "doc": "The library surface.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "file": "src/lib.rs",
           "id": "bins::api#function",
           "kind": "function",
@@ -220,6 +270,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 29,
+              "line": 4
+            },
+            "start": {
+              "col": 26,
+              "line": 4
+            }
+          },
           "to": "bins::api#function"
         },
         {
@@ -228,6 +288,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 13,
+              "line": 5
+            },
+            "start": {
+              "col": 10,
+              "line": 5
+            }
+          },
           "to": "bins[bin:bins]/cli::run#function"
         }
       ],
@@ -254,6 +324,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "src/main.rs",
           "id": "bins[bin:bins]::main#function",
           "kind": "function",

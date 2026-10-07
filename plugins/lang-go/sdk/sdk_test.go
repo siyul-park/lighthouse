@@ -28,7 +28,7 @@ func (h handler) Index(p sdk.IndexParams) (sdk.IndexResult, error) { return h.in
 func newHandler() handler {
 	return handler{
 		initialize: func(p sdk.InitializeParams) (sdk.InitializeResult, error) {
-			return sdk.InitializeResult{ID: "x", Version: "1", ProtocolVersion: sdk.ProtocolVersion, Languages: []sdk.Language{{ID: p.Root}}}, nil
+			return sdk.InitializeResult{ID: "x", Version: "1", ProtocolVersion: sdk.ProtocolVersion, Languages: []sdk.ProviderManifest{{ID: p.Root}}}, nil
 		},
 		index: func(p sdk.IndexParams) (sdk.IndexResult, error) {
 			if p.Language == "panic" {

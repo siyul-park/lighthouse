@@ -41,6 +41,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 20
+            },
+            "start": {
+              "col": 16,
+              "line": 20
+            }
+          },
           "to": "macros::helper#function"
         },
         {
@@ -49,6 +59,34 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 30,
+              "line": 21
+            },
+            "start": {
+              "col": 25,
+              "line": 21
+            }
+          },
+          "to": "macros::other#function"
+        },
+        {
+          "from": {
+            "symbol": "macros::std_macros#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 22
+            },
+            "start": {
+              "col": 20,
+              "line": 22
+            }
+          },
           "to": "macros::other#function"
         },
         {
@@ -65,6 +103,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 27
+            },
+            "start": {
+              "col": 13,
+              "line": 27
+            }
+          },
           "to": "macros::helper#function"
         },
         {
@@ -105,6 +153,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 43
+            },
+            "start": {
+              "col": 5,
+              "line": 43
+            }
+          },
           "to": "macros::helper#function"
         }
       ],
@@ -202,6 +260,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
           "file": "src/lib.rs",
           "id": "macros::helper#function",
           "kind": "function",
@@ -219,6 +287,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
           "file": "src/lib.rs",
           "id": "macros::other#function",
           "kind": "function",
@@ -236,6 +314,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
           "file": "src/lib.rs",
           "id": "macros::hidden#function",
           "kind": "function",
@@ -253,6 +341,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 24
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
           "file": "src/lib.rs",
           "id": "macros::std_macros#function",
           "kind": "function",
@@ -270,6 +368,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 28
+            },
+            "start": {
+              "col": 1,
+              "line": 26
+            }
+          },
           "file": "src/lib.rs",
           "id": "macros::user_macro#function",
           "kind": "function",
@@ -287,6 +395,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 30
+            }
+          },
           "file": "src/lib.rs",
           "id": "macros::unreadable_macro#function",
           "kind": "function",
@@ -304,6 +422,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 35
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
           "file": "src/lib.rs",
           "id": "macros::Derived#type",
           "kind": "type",
@@ -321,6 +449,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 23,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 37
+            }
+          },
           "file": "src/lib.rs",
           "id": "macros::attributed#function",
           "kind": "function",
@@ -338,6 +476,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 44
+            },
+            "start": {
+              "col": 1,
+              "line": 41
+            }
+          },
           "file": "src/lib.rs",
           "id": "macros::entry#function",
           "kind": "function",

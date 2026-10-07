@@ -58,6 +58,20 @@ pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut Outcome) -> Rememb
     remembered
 }
 
+/// Removes from `outcome` the findings that the committed decision log keeps
+/// out of reports, without recording anything: for runs that do not use the
+/// store but still honor what the team decided.
+pub fn apply_verdicts(root: &Path, outcome: &mut Outcome) -> usize {
+    let judged = read_only(root);
+    let before = outcome.diagnostics.len();
+    outcome.diagnostics.retain(|d| {
+        judged
+            .get(d.fingerprint.as_str())
+            .is_none_or(|j| note(j).is_some())
+    });
+    before - outcome.diagnostics.len()
+}
+
 /// Why a judged finding is reported anyway; `None` when it is suppressed.
 fn note(judgment: &Judgment) -> Option<String> {
     match judgment.standing {

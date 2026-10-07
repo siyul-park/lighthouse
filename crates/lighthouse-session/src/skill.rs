@@ -38,7 +38,11 @@ pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
             .filter(|p| active.contains(&p.id))
             .map(|p| {
                 let level = p.severity().map_or("doc", |s| tier(s, Some(p)));
-                format!("- `{}` ({level}) {}", p.id, p.title)
+                let fixable = p
+                    .fix
+                    .as_ref()
+                    .map_or(String::new(), |f| format!(", fixable: {}", f.safety));
+                format!("- `{}` ({level}{fixable}) {}", p.id, p.title)
             })
             .collect();
         if !lines.is_empty() {
@@ -47,7 +51,7 @@ pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
     }
     let total: usize = by_pack.iter().map(|(_, l)| l.len()).sum();
     let _ = writeln!(out, "\n## Active patterns ({total})\n");
-    out.push_str("Tiers: mechanical (error), heuristic (warn), judgment (review).\n");
+    out.push_str("Tiers: mechanical (error), heuristic (warn), judgment (review). `fixable: safe|suggested` marks a rule with a fixer.\n");
     for (pack, lines) in by_pack {
         let _ = writeln!(out, "\n### {pack}\n");
         for line in lines {

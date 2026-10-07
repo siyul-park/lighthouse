@@ -1,12 +1,14 @@
-use lighthouse_model::{Diagnostic, Symbol, SymbolKind};
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_model::{Diagnostic, Symbol, SymbolKind, SymbolRole};
+use std::sync::LazyLock;
+
+use lighthouse_plugin::{Ctx, Error, KeyCtx, OrderKey, OrderKeyManifest, Rule, RuleManifest};
 use lighthouse_spec::{Catalog, PatternRule};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
 use crate::{
     finding, generated,
-    layout::{declarations, exposed, has_word_prefix, owner_key},
+    layout::{declarations, exposed, has_word_prefix, is_declaration, owner_key},
 };
 
 const ID: &str = "design/declaration-groups";
@@ -19,6 +21,45 @@ struct Options {
     constructors_first: bool,
 }
 
+/// Orders declarations the way the `declaration-groups` rule does: by the
+/// index of their group in the rule's order. A declaration the order does not
+/// mention, test code and generated code have no rank and stay where they are.
+pub(crate) struct GroupKey;
+
+impl OrderKey for GroupKey {
+    fn manifest(&self) -> &OrderKeyManifest {
+        static MANIFEST: LazyLock<OrderKeyManifest> = LazyLock::new(|| {
+            OrderKeyManifest {
+            id: "design/group".to_owned(),
+            description: "the declaration group of `design/declaration-groups`, from public contract to private mechanics".to_owned(),
+        }
+        });
+        &MANIFEST
+    }
+
+    fn rank(&self, ctx: &KeyCtx, symbol: &Symbol) -> Result<Option<u64>, Error> {
+        let project = ctx.project;
+        let Some(file) = project.file(&symbol.file) else {
+            return Ok(None);
+        };
+        let judged = if file.test {
+            symbol.role == Some(SymbolRole::Fixture)
+        } else {
+            !project.in_test(&symbol.id)
+        };
+        if file.generated || !judged || !is_declaration(project, symbol) {
+            return Ok(None);
+        }
+        let configured = if ctx.rule == ID {
+            ctx.options.clone()
+        } else {
+            Map::new()
+        };
+        let group = group_index(Some(ctx.language), &configured)?;
+        Ok(group(symbol).map(|g| g as u64))
+    }
+}
+
 pub(crate) fn rule() -> Box<dyn Rule> {
     Box::new(PatternRule::new(ID, &[], check))
 }
@@ -27,7 +68,8 @@ pub(crate) fn rule() -> Box<dyn Rule> {
 /// rules whose verdict depends on where the order places a declaration.
 pub(crate) fn group_index(
     language: Option<&str>,
-) -> Result<impl Fn(&Symbol) -> Option<usize>, Error> {
+    configured: &Map<String, Value>,
+) -> Result<impl Fn(&Symbol) -> Option<usize> + use<>, Error> {
     let fail = |message: String| Error::Options {
         rule: ID.to_owned(),
         message,
@@ -36,14 +78,14 @@ pub(crate) fn group_index(
         .pattern(ID)
         .ok_or_else(|| fail("pattern missing from the bundled catalog".to_owned()))?;
     let resolved = pattern
-        .resolve_options(&Map::new(), language)
+        .resolve_options(configured, language)
         .map_err(|e| fail(e.to_string()))?;
     let options: Options =
         serde_json::from_value(Value::Object(resolved)).map_err(|e| fail(e.to_string()))?;
     Ok(move |symbol: &Symbol| group_of(symbol, &options))
 }
 
-fn check(meta: &RuleMeta, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
+fn check(meta: &RuleManifest, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
     if generated(ctx) {
         return Ok(Vec::new());
     }
@@ -106,7 +148,7 @@ fn is_constructor(name: &str, prefixes: &[String]) -> bool {
 /// Declarations whose group breaks the longest in-order run: the fewest
 /// declarations that, moved, would put the file in order.
 fn out_of_place(
-    meta: &lighthouse_plugin::RuleMeta,
+    meta: &lighthouse_plugin::RuleManifest,
     grouped: &[(&Symbol, usize)],
     options: &Options,
 ) -> Vec<Diagnostic> {
@@ -139,6 +181,7 @@ fn out_of_place(
                 "declaration": symbol.id.as_str(),
                 "group": name,
                 "expected_after": after,
+                "before": "",
             }),
         ));
     }
@@ -174,7 +217,11 @@ fn longest_in_order(groups: &[usize]) -> Vec<bool> {
 }
 
 /// A constructor-named method that follows another method of its owner.
-fn late_constructors(meta: &RuleMeta, module: &[&Symbol], options: &Options) -> Vec<Diagnostic> {
+fn late_constructors(
+    meta: &RuleManifest,
+    module: &[&Symbol],
+    options: &Options,
+) -> Vec<Diagnostic> {
     let methods: Vec<(&Symbol, String)> = module
         .iter()
         .filter(|s| s.kind == SymbolKind::Method)
@@ -202,6 +249,7 @@ fn late_constructors(meta: &RuleMeta, module: &[&Symbol], options: &Options) -> 
                 "declaration": symbol.id.as_str(),
                 "group": "constructor",
                 "expected_after": Option::<&str>::None,
+                "before": first.id.as_str(),
             }),
         ));
     }

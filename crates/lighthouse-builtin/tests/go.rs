@@ -37,7 +37,7 @@ fn measure(plugin: &Path, analyzer: &str, source: &str) -> BTreeMap<String, u32>
     let provider = registry
         .languages()
         .map(|(_, l)| l)
-        .find(|l| l.id() == "go")
+        .find(|l| l.manifest().id == "go")
         .unwrap();
     let file = File {
         path: "p.go".into(),

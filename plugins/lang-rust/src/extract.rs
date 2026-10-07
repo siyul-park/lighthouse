@@ -18,7 +18,7 @@ use crate::{
     },
     testcase,
     tree::{SourceFile, Vis, vis},
-    util::{count_tokens, doc_of, signature_counts, span_of},
+    util::{count_tokens, doc_of, extent_of, signature_counts, span_of},
 };
 
 /// What macros kept from the analysis in one file.
@@ -31,12 +31,21 @@ pub struct MacroStats {
     pub unread: u32,
 }
 
+/// An edge already reported: relation, resolution and site.
+type SeenEdge = (
+    EdgeKind,
+    String,
+    String,
+    Resolution,
+    Option<(u32, u32, u32, u32)>,
+);
+
 struct Extractor<'a> {
     idx: &'a Index<'a>,
     file: usize,
     src: &'a SourceFile,
     frag: Fragment,
-    seen: HashSet<(EdgeKind, String, String, Resolution)>,
+    seen: HashSet<SeenEdge>,
     stats: MacroStats,
 }
 
@@ -93,19 +102,29 @@ impl Extractor<'_> {
     }
 
     fn edge(&mut self, kind: EdgeKind, from: Node, to: String) {
-        self.edge_as(kind, from, to, Resolution::Syntactic);
+        self.edge_as(kind, from, to, Resolution::Syntactic, None);
     }
 
-    fn edge_as(&mut self, kind: EdgeKind, from: Node, to: String, resolution: Resolution) {
+    /// Reports an edge once per relation and site.
+    fn edge_as(
+        &mut self,
+        kind: EdgeKind,
+        from: Node,
+        to: String,
+        resolution: Resolution,
+        site: Option<Span>,
+    ) {
+        let at = site.map(|s| (s.start.line, s.start.col, s.end.line, s.end.col));
         if self
             .seen
-            .insert((kind, node_key(&from), to.clone(), resolution))
+            .insert((kind, node_key(&from), to.clone(), resolution, at))
         {
             self.frag.edges.push(Edge {
                 kind,
                 from,
                 to,
                 resolution,
+                site,
             });
         }
     }
@@ -149,6 +168,7 @@ impl Extractor<'_> {
                 visibility,
                 owner: None,
                 span: span_of(self.src, f),
+                extent: extent_of(self.src, f),
                 doc: doc_of(&f.attrs),
                 name: name.clone(),
             },
@@ -183,6 +203,7 @@ impl Extractor<'_> {
             owner: d.owner,
             file: self.src.rel.clone(),
             span: d.span,
+            extent: Some(d.extent),
             doc: d.doc,
             name: d.name,
             role: None,
@@ -199,14 +220,15 @@ impl Extractor<'_> {
         block: &Block,
         test: Option<&[Attribute]>,
     ) {
-        let facts = body::analyze(self.idx, home, sig, block);
+        let facts = body::analyze(self.idx, self.src, home, sig, block);
         self.stats.unread += facts.unread_macros;
-        for u in &facts.uses {
+        for u in &facts.sites {
             self.edge_as(
                 u.kind,
                 Node::Symbol(id.to_owned()),
                 u.to.clone(),
                 u.resolution,
+                Some(u.site),
             );
         }
         let top_level = block
@@ -260,6 +282,7 @@ impl Extractor<'_> {
                 visibility: Visibility::Private,
                 owner: Some(outer.to_owned()),
                 span: span_of(self.src, f),
+                extent: extent_of(self.src, f),
                 doc: doc_of(&f.attrs),
                 name,
             },
@@ -298,6 +321,7 @@ impl Extractor<'_> {
                 visibility,
                 owner: None,
                 span: span_of(self.src, item),
+                extent: extent_of(self.src, item),
                 doc: doc_of(attrs),
                 name: name.clone(),
             },
@@ -334,6 +358,7 @@ impl Extractor<'_> {
                     visibility,
                     owner: Some(owner.id.clone()),
                     span: span_of(self.src, field),
+                    extent: extent_of(self.src, field),
                     doc: doc_of(&field.attrs),
                     name,
                 },
@@ -353,6 +378,7 @@ impl Extractor<'_> {
                     visibility: owner.visibility,
                     owner: Some(owner.id.clone()),
                     span: span_of(self.src, variant),
+                    extent: extent_of(self.src, variant),
                     doc: doc_of(&variant.attrs),
                     name,
                 },
@@ -381,6 +407,7 @@ impl Extractor<'_> {
                 visibility,
                 owner: None,
                 span: span_of(self.src, item),
+                extent: extent_of(self.src, item),
                 doc: doc_of(attrs),
                 name,
             },
@@ -400,6 +427,7 @@ impl Extractor<'_> {
                 visibility,
                 owner: None,
                 span: span_of(self.src, t),
+                extent: extent_of(self.src, t),
                 doc: doc_of(&t.attrs),
                 name: name.clone(),
             },
@@ -423,6 +451,7 @@ impl Extractor<'_> {
                     visibility,
                     owner: Some(id.clone()),
                     span: span_of(self.src, f),
+                    extent: extent_of(self.src, f),
                     doc: doc_of(&f.attrs),
                     name: method.clone(),
                 },
@@ -521,6 +550,7 @@ impl Extractor<'_> {
                         visibility,
                         owner: ctx.owner.as_ref().map(|o| o.id.clone()),
                         span: span_of(self.src, c),
+                        extent: extent_of(self.src, c),
                         doc: doc_of(&c.attrs),
                         name,
                     },
@@ -547,6 +577,7 @@ impl Extractor<'_> {
                 visibility,
                 owner: ctx.owner.as_ref().map(|o| o.id.clone()),
                 span: span_of(self.src, f),
+                extent: extent_of(self.src, f),
                 doc,
                 name,
             },
@@ -605,6 +636,7 @@ struct Decl {
     visibility: Visibility,
     owner: Option<String>,
     span: Span,
+    extent: Span,
     doc: Option<String>,
     name: String,
 }
@@ -658,6 +690,7 @@ pub fn fragment(idx: &Index, file: usize) -> (Fragment, MacroStats) {
         }
     }
     out.frag.comments = comments::scan(&src.text, &out.frag.symbols);
+    comments::widen_extents(&src.text, &out.frag.comments, &mut out.frag.symbols);
     (out.frag, out.stats)
 }
 

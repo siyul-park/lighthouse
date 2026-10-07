@@ -1,8 +1,8 @@
 use std::{path::Path, sync::Arc, time::Duration};
 
-use lighthouse_model::{Capability, Incomplete};
+use lighthouse_model::Incomplete;
 use lighthouse_plugin::{
-    Conventions, Error, Indexed, LanguageProvider, Manifest, Plugin, Source, Workspace,
+    Error, Indexed, LanguageProvider, Plugin, PluginManifest, ProviderManifest, Source, Workspace,
 };
 use lighthouse_protocol as wire;
 use serde_json::Value;
@@ -11,8 +11,8 @@ use crate::{client::Client, convert, manifest::Found};
 
 /// A language plugin running as a separate process.
 pub struct RpcPlugin {
-    manifest: Manifest,
-    languages: Vec<wire::Language>,
+    manifest: PluginManifest,
+    languages: Vec<wire::ProviderManifest>,
     client: Arc<Client>,
 }
 
@@ -55,7 +55,7 @@ impl RpcPlugin {
             )));
         }
         Ok(Self {
-            manifest: Manifest {
+            manifest: PluginManifest {
                 id: result.id,
                 version: result.version,
             },
@@ -67,8 +67,8 @@ impl RpcPlugin {
 
 impl Plugin for RpcPlugin {
     /// The identity the process reported during the handshake.
-    fn manifest(&self) -> Manifest {
-        self.manifest.clone()
+    fn manifest(&self) -> &PluginManifest {
+        &self.manifest
     }
 
     /// One provider per language the process declared, all sharing its connection.
@@ -79,11 +79,7 @@ impl Plugin for RpcPlugin {
                 Box::new(Provider {
                     plugin: self.manifest.id.clone(),
                     language: language.clone(),
-                    capabilities: language
-                        .capabilities
-                        .iter()
-                        .filter_map(|c| convert::capability(c))
-                        .collect(),
+                    manifest: convert::provider_manifest(language),
                     client: Arc::clone(&self.client),
                 }) as Box<dyn LanguageProvider>
             })
@@ -93,36 +89,14 @@ impl Plugin for RpcPlugin {
 
 struct Provider {
     plugin: String,
-    language: wire::Language,
-    capabilities: Vec<Capability>,
+    language: wire::ProviderManifest,
+    manifest: ProviderManifest,
     client: Arc<Client>,
 }
 
 impl LanguageProvider for Provider {
-    fn id(&self) -> &str {
-        &self.language.id
-    }
-
-    fn globs(&self) -> &[String] {
-        &self.language.globs
-    }
-
-    fn conventions(&self) -> Conventions {
-        Conventions {
-            test_globs: self.language.conventions.test_globs.clone(),
-        }
-    }
-
-    fn capabilities(&self) -> &[Capability] {
-        &self.capabilities
-    }
-
-    fn fallback(&self) -> bool {
-        self.language.fallback
-    }
-
-    fn priority(&self) -> i32 {
-        self.language.priority
+    fn manifest(&self) -> &ProviderManifest {
+        &self.manifest
     }
 
     /// Never fails as a whole: a crash, timeout or malformed answer becomes an
@@ -167,8 +141,24 @@ impl Provider {
                     .iter()
                     .map(|(id, options)| (id.clone(), Value::Object(options.clone())))
                     .collect(),
-                overlays: None,
+                overlays: overlays_of(ws, files),
             },
         }
     }
+}
+
+/// The texts that stand in for requested files, for the `index` context; none
+/// when nothing is overlaid.
+fn overlays_of(ws: &Workspace, files: &[Source]) -> Option<Vec<wire::Overlay>> {
+    let found: Vec<wire::Overlay> = files
+        .iter()
+        .filter_map(|s| {
+            let text = ws.overlays.get(&s.file.path)?;
+            Some(wire::Overlay {
+                path: s.file.path.to_string_lossy().replace('\\', "/"),
+                text: text.clone(),
+            })
+        })
+        .collect();
+    (!found.is_empty()).then_some(found)
 }

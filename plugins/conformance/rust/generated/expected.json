@@ -57,6 +57,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "src/gen.rs",
           "id": "generated/gen::table#function",
           "kind": "function",
@@ -133,6 +143,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 3
+            },
+            "start": {
+              "col": 17,
+              "line": 3
+            }
+          },
           "to": "generated/gen::table#function"
         }
       ],
@@ -160,6 +180,16 @@
       "symbols": [
         {
           "doc": "Plain code.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "file": "src/plain.rs",
           "id": "generated/plain::plain#function",
           "kind": "function",

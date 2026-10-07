@@ -126,6 +126,34 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 42,
+              "line": 14
+            },
+            "start": {
+              "col": 37,
+              "line": 14
+            }
+          },
+          "to": ".::Stack::items"
+        },
+        {
+          "from": {
+            "symbol": ".::Stack::Push#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 59,
+              "line": 14
+            },
+            "start": {
+              "col": 54,
+              "line": 14
+            }
+          },
           "to": ".::Stack::items"
         },
         {
@@ -142,6 +170,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 50,
+              "line": 17
+            },
+            "start": {
+              "col": 45,
+              "line": 17
+            }
+          },
           "to": ".::Stack::items"
         },
         {
@@ -174,6 +212,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 12,
+              "line": 38
+            },
+            "start": {
+              "col": 9,
+              "line": 38
+            }
+          },
           "to": ".::Map"
         },
         {
@@ -190,6 +238,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 34,
+              "line": 41
+            },
+            "start": {
+              "col": 31,
+              "line": 41
+            }
+          },
           "to": ".::Sum"
         },
         {
@@ -206,6 +264,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 13,
+              "line": 44
+            },
+            "start": {
+              "col": 8,
+              "line": 44
+            }
+          },
           "to": ".::Stack"
         },
         {
@@ -214,6 +282,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 8,
+              "line": 45
+            },
+            "start": {
+              "col": 4,
+              "line": 45
+            }
+          },
           "to": ".::Stack::Push"
         },
         {
@@ -222,6 +300,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 46
+            },
+            "start": {
+              "col": 11,
+              "line": 46
+            }
+          },
           "to": ".::Stack::Len"
         }
       ],
@@ -319,6 +407,16 @@
       "symbols": [
         {
           "doc": "Number is a numeric constraint.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "generics.go",
           "id": ".::Number#interface",
           "kind": "interface",
@@ -337,6 +435,16 @@
         },
         {
           "doc": "Stack holds values of one type.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
           "file": "generics.go",
           "id": ".::Stack#type",
           "kind": "type",
@@ -354,6 +462,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 11,
+              "line": 10
+            },
+            "start": {
+              "col": 2,
+              "line": 10
+            }
+          },
           "file": "generics.go",
           "id": ".::Stack::items#field",
           "kind": "field",
@@ -373,6 +491,16 @@
         },
         {
           "doc": "Push adds an item.",
+          "extent": {
+            "end": {
+              "col": 68,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
           "file": "generics.go",
           "id": ".::Stack::Push#method",
           "kind": "method",
@@ -392,6 +520,16 @@
         },
         {
           "doc": "Len counts the items.",
+          "extent": {
+            "end": {
+              "col": 53,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
           "file": "generics.go",
           "id": ".::Stack::Len#method",
           "kind": "method",
@@ -411,6 +549,16 @@
         },
         {
           "doc": "Map applies f to every item.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
           "file": "generics.go",
           "id": ".::Map#function",
           "kind": "function",
@@ -429,6 +577,16 @@
         },
         {
           "doc": "Sum adds numbers.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 35
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
           "file": "generics.go",
           "id": ".::Sum#function",
           "kind": "function",
@@ -446,6 +604,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 37
+            }
+          },
           "file": "generics.go",
           "id": ".::lengths#function",
           "kind": "function",
@@ -463,6 +631,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 46,
+              "line": 41
+            },
+            "start": {
+              "col": 1,
+              "line": 41
+            }
+          },
           "file": "generics.go",
           "id": ".::total#function",
           "kind": "function",
@@ -480,6 +658,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 47
+            },
+            "start": {
+              "col": 1,
+              "line": 43
+            }
+          },
           "file": "generics.go",
           "id": ".::fill#function",
           "kind": "function",

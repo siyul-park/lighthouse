@@ -43,6 +43,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 4
+            },
+            "start": {
+              "col": 29,
+              "line": 4
+            }
+          },
           "to": ".::flavor"
         }
       ],
@@ -70,6 +80,16 @@
       "symbols": [
         {
           "doc": "Mode names the build flavor.",
+          "extent": {
+            "end": {
+              "col": 37,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "mode.go",
           "id": ".::Mode#function",
           "kind": "function",
@@ -127,6 +147,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
           "file": "slow.go",
           "id": ".::flavor#const",
           "kind": "const",

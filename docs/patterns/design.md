@@ -166,6 +166,10 @@ Strongly related symbols MUST be physically close; direct collaborators SHOULD b
 | --- | --- | --- | --- |
 | `visibility_groups` | bool | `true`; rust: `false` | The layout groups methods by visibility (public methods of all types, then private ones), so a method of another owner in the other visibility group does not separate an owner's methods. Set to false when a file puts every owner's methods together, as impl blocks do. |
 
+**Fix**
+
+Fixable: `suggested` · operations move. See [fix operations](fix-operations.md).
+
 **Invalid example: invalid (go)**
 
 ```go
@@ -182,6 +186,22 @@ func (b B) One() int { return 1 }
 func (a A) Two() int { return 2 }
 ```
 
+Fixed `example.go`:
+
+```go
+package sample
+
+type A struct{}
+
+type B struct{}
+
+func (a A) One() int { return 1 }
+
+func (a A) Two() int { return 2 }
+
+func (b B) One() int { return 1 }
+```
+
 **Invalid example: free-function-between (go)**
 
 ```go
@@ -194,6 +214,20 @@ func (a A) One() int { return 1 }
 func Other() int { return 0 }
 
 func (a A) Two() int { return 2 }
+```
+
+Fixed `example.go`:
+
+```go
+package sample
+
+type A struct{}
+
+func (a A) One() int { return 1 }
+
+func (a A) Two() int { return 2 }
+
+func Other() int { return 0 }
 ```
 
 **Valid example: valid (go)**
@@ -1438,6 +1472,10 @@ Declarations MUST be ordered for reading: callers before callees, related symbol
 | --- | --- | --- | --- |
 | `shared_after_last_caller` | bool | `false` | Require a helper used by several functions of its file to follow all of them, not only the first. |
 
+**Fix**
+
+Fixable: `suggested` · operations move. See [fix operations](fix-operations.md).
+
 **Invalid example: invalid (go)**
 
 ```go
@@ -1446,6 +1484,16 @@ package sample
 func helper() int { return 1 }
 
 func Run() int { return helper() }
+```
+
+Fixed `example.go`:
+
+```go
+package sample
+
+func Run() int { return helper() }
+
+func helper() int { return 1 }
 ```
 
 **Valid example: valid (go)**
@@ -1470,6 +1518,18 @@ func First() int { return leaf() }
 func leaf() int { return 1 }
 
 func Second() int { return leaf() + 1 }
+```
+
+Fixed `example.go`:
+
+```go
+package sample
+
+func First() int { return leaf() }
+
+func Second() int { return leaf() + 1 }
+
+func leaf() int { return 1 }
 ```
 
 **Valid example: used-elsewhere (go)**
@@ -1523,6 +1583,18 @@ fn helper() -> u8 {
 
 pub fn run() -> u8 {
     helper()
+}
+```
+
+Fixed `src/lib.rs`:
+
+```rust
+pub fn run() -> u8 {
+    helper()
+}
+
+fn helper() -> u8 {
+    1
 }
 ```
 
@@ -2240,6 +2312,10 @@ Top-level declarations in a file MUST follow the language's ownership-group orde
 | `groups` | list | `["public-type","private-type","public-const","private-const","var","init","public-function","constructor","public-method","hook","private-function"]`; rust: `["const","var","type","public-function","private-function"]` | The group order of a file, first to last. A declaration belongs to the first of its candidate groups that this list names; one the list does not name is not ordered. Groups: `public-type`, `private-type`, `type` (types and the members of a type together), `public-const`, `private-const`, `const`, `var`, `init`, `public-function`, `constructor`, `public-method`, `hook`, `private-function` (private functions and, where `type` is not listed, private methods). |
 | `hook_names` | list | `["Clone","String","GoString","Error","Unwrap","MarshalJSON","UnmarshalJSON","MarshalText","UnmarshalText","MarshalBinary","UnmarshalBinary"]`; rust: `[]` | Public methods that implement clone, conversion or interface hooks; they follow the other public methods. Names are kept to ones that are never ordinary behavior. |
 
+**Fix**
+
+Fixable: `safe` · operations move, reorder. See [fix operations](fix-operations.md).
+
 **Invalid example: invalid (go)**
 
 ```go
@@ -2250,6 +2326,18 @@ func helper() int { return 1 }
 type Service struct{}
 
 func (s *Service) Run() int { return helper() }
+```
+
+Fixed `example.go`:
+
+```go
+package sample
+
+type Service struct{}
+
+func (s *Service) Run() int { return helper() }
+
+func helper() int { return 1 }
 ```
 
 **Valid example: valid (go)**
@@ -2276,6 +2364,18 @@ func (s *Service) run() int { return 1 }
 func (s *Service) Run() int { return s.run() }
 ```
 
+Fixed `example.go`:
+
+```go
+package sample
+
+type Service struct{}
+
+func (s *Service) Run() int { return s.run() }
+
+func (s *Service) run() int { return 1 }
+```
+
 **Invalid example: init-after-functions (go)**
 
 ```go
@@ -2286,6 +2386,18 @@ var ready bool
 func Run() bool { return ready }
 
 func init() { ready = true }
+```
+
+Fixed `example.go`:
+
+```go
+package sample
+
+var ready bool
+
+func init() { ready = true }
+
+func Run() bool { return ready }
 ```
 
 **Valid example: groups-in-order (go)**
@@ -2324,6 +2436,16 @@ pub fn run() -> u8 {
 }
 
 pub struct Store;
+```
+
+Fixed `src/lib.rs`:
+
+```rust
+pub struct Store;
+
+pub fn run() -> u8 {
+    1
+}
 ```
 
 **Valid example: rust-valid (rust)**
@@ -2368,6 +2490,22 @@ impl Store {
 }
 ```
 
+Fixed `src/lib.rs`:
+
+```rust
+pub struct Store;
+
+impl Store {
+    pub fn new() -> Self {
+        Store
+    }
+
+    pub fn get(&self) -> u8 {
+        1
+    }
+}
+```
+
 **Invalid example: test-fixtures-out-of-order (go)**
 
 `go.mod`
@@ -2388,6 +2526,20 @@ import "testing"
 var limit = 3
 
 type sample struct{}
+
+func TestSample(t *testing.T) { _ = sample{} }
+```
+
+Fixed `store_test.go`:
+
+```go
+package store
+
+import "testing"
+
+type sample struct{}
+
+var limit = 3
 
 func TestSample(t *testing.T) { _ = sample{} }
 ```
@@ -2486,6 +2638,10 @@ A comment MUST NOT only label a section of code: banner lines such as `// ---- H
 | `min_run` | int | `3` | Rule characters in a row that make a banner line. |
 | `rule_chars` | string | `"-=*~_+"` | Characters a banner rule is drawn with. |
 
+**Fix**
+
+Fixable: `suggested` · operations delete. See [fix operations](fix-operations.md).
+
 **Invalid example: invalid (go)**
 
 ```go
@@ -2496,12 +2652,28 @@ package sample
 func helper() int { return 1 }
 ```
 
+Fixed `example.go`:
+
+```go
+package sample
+
+func helper() int { return 1 }
+```
+
 **Invalid example: marker (go)**
 
 ```go
 package sample
 
 // MARK: - Helpers
+
+func helper() int { return 1 }
+```
+
+Fixed `example.go`:
+
+```go
+package sample
 
 func helper() int { return 1 }
 ```
@@ -2528,6 +2700,12 @@ var x = 1 // --- not a banner: it trails code
 ```rust
 // ===== Types =====
 
+pub struct Store;
+```
+
+Fixed `src/lib.rs`:
+
+```rust
 pub struct Store;
 ```
 

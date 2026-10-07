@@ -1,5 +1,5 @@
 use lighthouse_model::{Diagnostic, SymbolKind, SymbolRole};
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
@@ -18,7 +18,7 @@ pub(crate) fn rule() -> Box<dyn Rule> {
 /// Functions of a test file that fail the test by hand after a comparison:
 /// tests that could assert, and helpers that reimplement an assertion. Only
 /// providers that count such checks (`manual_assertions`) can be judged.
-fn check(meta: &RuleMeta, ctx: &Ctx, _: NoOptions) -> Result<Vec<Diagnostic>, Error> {
+fn check(meta: &RuleManifest, ctx: &Ctx, _: NoOptions) -> Result<Vec<Diagnostic>, Error> {
     let Some((file, _)) = ctx.file else {
         return Ok(Vec::new());
     };

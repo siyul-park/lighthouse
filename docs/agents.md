@@ -53,9 +53,36 @@ value starting with `-` is refused).
 | `rule_create` | `pattern` (object or YAML/JSON text), `rule?`, `examples` | `id`, written `path`, test runs, whether the `local` plugin is listed |
 | `rule_update` | `id`, `patch` (JSON merge patch) | like `rule_create` |
 | `rule_test` | `ids?` | `ok`, counts, `failures` |
+| `fix` | `fingerprints?`, `paths?`, `rules?` (at least one), `dry_run?`, `unsafe_fixes?` | `dry_run`, `diff` (unified, every changed file), `applied` (`fingerprint`, `rule`, `fixer`, `safety`, `description`, `files`), `declined` (`fingerprint`, `rule`, `path`, `line`, `reason`), `rounds`, `messages` |
 
-`pattern_similar`, `rule_proposals` and `fix` are reserved for later phases and
-are not offered; calling them is an error that says so.
+`pattern_similar` and `rule_proposals` are reserved for later phases and are
+not offered; calling them is an error that says so.
+
+### Fixing
+
+`fix` applies the fixes that the catalog attaches to rules (`fixable: safe` or
+`suggested` in `rule_list`, `explain` and the skill; see "Fixing" in
+[architecture.md](architecture.md)). Name what to fix with `fingerprints` (from
+`check`; prefixes are accepted), `paths` (under the project root) or `rules`: a
+fix never defaults to the whole project. Use `dry_run` first: it returns the
+`diff` and leaves every file as it was. Only safe fixes of mechanical rules are
+applied unless `unsafe_fixes` is set; suggested ones are then judgment calls to
+review in the diff, and without it they come back in `declined` with the
+reason. Every applied fix has been formatted (the `[languages.<id>] formatter`
+of `lighthouse.toml`), re-checked and, for a file that gained an error or stopped
+being analyzable, rolled back, so `declined` also says what was undone and why.
+Findings that a verdict suppresses are never fixed, and a run refuses to start
+while the analysis is incomplete. The tool does not offer `fixer` (the CLI's
+`--fixer` override); commands run only in a project the user trusted with
+`lighthouse trust`, and without trust a command fix is declined and formatting is
+skipped. Trust is the user's, given at a terminal: `lighthouse trust` lists the
+commands and asks (`--yes` only after reading the list), and `init --agent claude-code`
+adds `Bash(lighthouse trust:*)` to the project's permission deny list so the agent cannot
+trust a project for you. Nothing is written until the whole run verified in memory, and
+a file that changed meanwhile is skipped and reported, with every file of a fix that
+spans it. Applied fixes
+are recorded in the local store (`fix_events`), and the findings they removed
+are resolved by the run that ends the fixing. Recheck with `check` afterwards.
 
 ### Resources
 
@@ -107,7 +134,9 @@ Example:
 `lighthouse hook claude-code <event> [--allow-incomplete]` reads the hook payload
 on stdin, enters its `cwd`, decides the report scope, runs the check and answers
 in Claude Code's format. The hook is dumb: what is a finding, and what blocks,
-is Lighthouse's judgment. A directory without `lighthouse.toml` is left alone
+is Lighthouse's judgment. **A hook never fixes**: it reports, and the agent or
+the user decides to run `fix` or `check --fix`; a hook that rewrote files under
+an editing agent would change the code the agent is reading. A directory without `lighthouse.toml` is left alone
 (silent, exit 0).
 
 Contract used (Claude Code hooks reference): the payload has `cwd`,

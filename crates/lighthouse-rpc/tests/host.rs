@@ -157,10 +157,10 @@ mod process {
             ("fake", "1.2")
         );
         let provider = plugin.languages().remove(0);
-        assert_eq!(provider.id(), "fake");
-        assert_eq!(provider.globs(), ["**/*.fake"]);
+        assert_eq!(provider.manifest().id, "fake");
+        assert_eq!(provider.manifest().globs, ["**/*.fake"]);
         assert_eq!(
-            provider.capabilities(),
+            provider.manifest().capabilities,
             [lighthouse_model::Capability::SemanticEdges],
             "unknown capabilities are ignored"
         );
@@ -607,17 +607,19 @@ fn an_id_that_is_also_built_in_is_an_error() {
 
 /// A registry that already holds an in-process plugin called `core`.
 fn lighthouse_builtin_stub() -> Registry {
-    struct Core;
+    struct Core(lighthouse_plugin::PluginManifest);
     impl Plugin for Core {
-        fn manifest(&self) -> lighthouse_plugin::Manifest {
-            lighthouse_plugin::Manifest {
-                id: "core".to_owned(),
-                version: "0".to_owned(),
-            }
+        fn manifest(&self) -> &lighthouse_plugin::PluginManifest {
+            &self.0
         }
     }
     let mut registry = Registry::default();
-    registry.register(&Core).unwrap();
+    registry
+        .register(&Core(lighthouse_plugin::PluginManifest {
+            id: "core".to_owned(),
+            version: "0".to_owned(),
+        }))
+        .unwrap();
     registry
 }
 

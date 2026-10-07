@@ -115,10 +115,10 @@ fn store_opens_a_migrated_cache_and_refuses_a_newer_one() {
     assert!(Store::open_existing(dir.path()).unwrap().is_none());
 
     let first = Store::open(dir.path()).unwrap();
-    assert_eq!(first.schema_version().unwrap(), 2);
+    assert_eq!(first.schema_version().unwrap(), 3);
     drop(first);
     let again = Store::open_existing(dir.path()).unwrap().unwrap();
-    assert_eq!(again.schema_version().unwrap(), 2);
+    assert_eq!(again.schema_version().unwrap(), 3);
     drop(again);
 
     Connection::open(Store::path_in(dir.path()))
@@ -130,7 +130,7 @@ fn store_opens_a_migrated_cache_and_refuses_a_newer_one() {
         error,
         Error::NewerSchema {
             found: 99,
-            supported: 2
+            supported: 3
         }
     ));
 }
@@ -164,7 +164,7 @@ fn processes_opening_a_fresh_cache_together_all_succeed() {
         })
         .collect();
     for handle in handles {
-        assert_eq!(handle.join().unwrap(), 2);
+        assert_eq!(handle.join().unwrap(), 3);
     }
 }
 
@@ -928,7 +928,7 @@ fn migration_rewrites_the_append_only_table_and_exports_old_verdicts_to_the_log(
     }
 
     let mut store = Store::open(dir.path()).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 2);
+    assert_eq!(store.schema_version().unwrap(), 3);
     let history = store.history("f1").unwrap();
     assert_eq!(history.len(), 1);
     assert!(history[0].id.starts_with("legacy-"));

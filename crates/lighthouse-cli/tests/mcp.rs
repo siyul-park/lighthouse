@@ -171,6 +171,7 @@ fn the_server_lists_its_tools_and_resources() {
         [
             "check",
             "explain",
+            "fix",
             "review_history",
             "review_resolve",
             "review_tasks",
@@ -180,7 +181,7 @@ fn the_server_lists_its_tools_and_resources() {
             "rule_update"
         ]
     );
-    let reserved = client.tool("fix", json!({}));
+    let reserved = client.tool("pattern_similar", json!({}));
     assert!(reserved.unwrap_err().contains("reserved"));
 
     let resources = client.request("resources/list", json!({}));
@@ -437,4 +438,105 @@ fn check_paths_stay_inside_the_project_and_diff_cannot_be_an_option() {
     assert_eq!(inside["status"], "findings");
     let option = client.tool("check", json!({ "diff": "--output=/tmp/lighthouse-pwned" }));
     assert!(option.unwrap_err().contains("not a git ref"));
+}
+
+const MISORDERED: &str = "pub fn run() -> u8 {\n    1\n}\n\npub struct Store;\n";
+const ORDERED: &str = "pub struct Store;\n\npub fn run() -> u8 {\n    1\n}\n";
+
+#[test]
+fn fix_needs_a_selector_and_stays_inside_the_project() {
+    let dir = rust_project();
+    let mut client = Client::start(dir.path());
+
+    let none = client.tool("fix", json!({})).unwrap_err();
+    assert!(none.contains("name what to fix"), "{none}");
+
+    let outside = client.tool("fix", json!({ "paths": ["/"] })).unwrap_err();
+    assert!(outside.contains("outside the project root"), "{outside}");
+}
+
+#[test]
+fn fix_previews_with_dry_run_then_applies_and_reports_both_lists() {
+    let dir = rust_project();
+    fs::write(dir.path().join("src/lib.rs"), MISORDERED).unwrap();
+    let mut client = Client::start(dir.path());
+
+    let preview = client
+        .tool("fix", json!({ "paths": ["src"], "dry_run": true }))
+        .unwrap();
+
+    assert_eq!(preview["dry_run"], true);
+    let diff = preview["diff"].as_str().unwrap();
+    assert!(
+        diff.contains("--- a/src/lib.rs") && diff.contains("+pub struct Store;"),
+        "{diff}"
+    );
+    assert_eq!(preview["applied"][0]["rule"], "design/declaration-groups");
+    assert_eq!(preview["applied"][0]["safety"], "safe");
+    assert_eq!(
+        fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),
+        MISORDERED
+    );
+
+    let applied = client.tool("fix", json!({ "paths": ["src"] })).unwrap();
+
+    assert_eq!(applied["dry_run"], false);
+    assert_eq!(applied["applied"].as_array().unwrap().len(), 1);
+    assert_eq!(applied["applied"][0]["files"][0], "src/lib.rs");
+    assert!(applied["declined"].is_array());
+    assert_eq!(
+        fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),
+        ORDERED
+    );
+    let after = client.tool("check", json!({})).unwrap();
+    let rules: Vec<&str> = after["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|f| f["rule"].as_str())
+        .collect();
+    assert!(!rules.contains(&"design/declaration-groups"), "{rules:?}");
+}
+
+#[test]
+fn fix_selects_by_fingerprint_and_holds_suggestions_back_until_asked() {
+    let dir = rust_project();
+    let banner = "// ===== Types =====\n\npub struct Store;\n";
+    fs::write(dir.path().join("src/lib.rs"), banner).unwrap();
+    let mut client = Client::start(dir.path());
+    let found = client.tool("check", json!({})).unwrap();
+    let finding = found["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["rule"] == "design/section-banners")
+        .unwrap_or_else(|| panic!("{found}"));
+    let fingerprint = finding["fingerprint"].as_str().unwrap();
+
+    let held = client
+        .tool("fix", json!({ "fingerprints": [fingerprint] }))
+        .unwrap();
+    assert!(held["applied"].as_array().unwrap().is_empty());
+    assert!(
+        held["declined"][0]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("`unsafe_fixes`")
+    );
+    assert_eq!(
+        fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),
+        banner
+    );
+
+    let done = client
+        .tool(
+            "fix",
+            json!({ "fingerprints": [fingerprint], "unsafe_fixes": true }),
+        )
+        .unwrap();
+    assert_eq!(done["applied"][0]["safety"], "suggested");
+    assert_eq!(
+        fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),
+        "pub struct Store;\n"
+    );
 }

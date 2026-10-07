@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use cel::{Context, Program};
 use lighthouse_model::{Diagnostic, Fingerprint, Options, Project, Span, Symbol};
-use lighthouse_plugin::{Ctx, Error as PluginError, Rule, RuleMeta, Scope};
+use lighthouse_plugin::{Ctx, Error as PluginError, Rule, RuleManifest, Scope};
 use lighthouse_spec::Pattern;
 use serde_json::{Map, Value};
 
@@ -15,7 +15,7 @@ use crate::{
 /// A rule built from a pattern and its rule file.
 #[derive(Clone)]
 pub(crate) struct DeclarativeRule {
-    meta: RuleMeta,
+    meta: RuleManifest,
     compiled: Arc<Compiled>,
 }
 
@@ -26,7 +26,7 @@ impl DeclarativeRule {
     pub(crate) fn new(pattern: &Pattern, text: &str) -> Result<Self, Error> {
         let definition: Definition =
             serde_norway::from_str(text).map_err(|e| Error::invalid(&pattern.id, e.to_string()))?;
-        let mut meta = pattern.rule_meta().ok_or_else(|| {
+        let mut meta = pattern.rule_manifest().ok_or_else(|| {
             Error::invalid(&pattern.id, "the pattern has no severity or implementation")
         })?;
         if meta.scope != definition.select.scope() {
@@ -198,7 +198,7 @@ impl DeclarativeRule {
 
 impl Rule for DeclarativeRule {
     /// The metadata of the pattern the rule was built from.
-    fn meta(&self) -> &RuleMeta {
+    fn manifest(&self) -> &RuleManifest {
         &self.meta
     }
 
@@ -222,6 +222,36 @@ impl Rule for DeclarativeRule {
     }
 }
 
+pub(crate) fn render(value: &cel::Value) -> String {
+    match value {
+        cel::Value::String(s) => s.to_string(),
+        cel::Value::Int(i) => i.to_string(),
+        cel::Value::UInt(u) => u.to_string(),
+        cel::Value::Float(f) => f.to_string(),
+        cel::Value::Bool(b) => b.to_string(),
+        cel::Value::Null => "null".to_owned(),
+        other => to_json(other).to_string(),
+    }
+}
+
+pub(crate) fn to_json(value: &cel::Value) -> Value {
+    match value {
+        cel::Value::String(s) => Value::String(s.to_string()),
+        cel::Value::Int(i) => Value::from(*i),
+        cel::Value::UInt(u) => Value::from(*u),
+        cel::Value::Float(f) => Value::from(*f),
+        cel::Value::Bool(b) => Value::Bool(*b),
+        cel::Value::List(items) => Value::Array(items.iter().map(to_json).collect()),
+        cel::Value::Map(map) => Value::Object(
+            map.map
+                .iter()
+                .map(|(k, v)| (k.to_string(), to_json(v)))
+                .collect(),
+        ),
+        _ => Value::Null,
+    }
+}
+
 /// The symbol of each module that sorts first by file and position, with the
 /// module's symbol count; project-scope findings are reported there.
 fn module_anchors(project: &Project) -> BTreeMap<&str, (&Symbol, usize)> {
@@ -240,34 +270,4 @@ fn module_anchors(project: &Project) -> BTreeMap<&str, (&Symbol, usize)> {
 fn top_of_file() -> Span {
     let p = lighthouse_model::Position { line: 1, col: 1 };
     Span { start: p, end: p }
-}
-
-fn render(value: &cel::Value) -> String {
-    match value {
-        cel::Value::String(s) => s.to_string(),
-        cel::Value::Int(i) => i.to_string(),
-        cel::Value::UInt(u) => u.to_string(),
-        cel::Value::Float(f) => f.to_string(),
-        cel::Value::Bool(b) => b.to_string(),
-        cel::Value::Null => "null".to_owned(),
-        other => to_json(other).to_string(),
-    }
-}
-
-fn to_json(value: &cel::Value) -> Value {
-    match value {
-        cel::Value::String(s) => Value::String(s.to_string()),
-        cel::Value::Int(i) => Value::from(*i),
-        cel::Value::UInt(u) => Value::from(*u),
-        cel::Value::Float(f) => Value::from(*f),
-        cel::Value::Bool(b) => Value::Bool(*b),
-        cel::Value::List(items) => Value::Array(items.iter().map(to_json).collect()),
-        cel::Value::Map(map) => Value::Object(
-            map.map
-                .iter()
-                .map(|(k, v)| (k.to_string(), to_json(v)))
-                .collect(),
-        ),
-        _ => Value::Null,
-    }
 }

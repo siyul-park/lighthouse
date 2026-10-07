@@ -99,6 +99,16 @@
       "symbols": [
         {
           "doc": "Run runs the thing.\nIt returns one.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
           "file": "c.go",
           "id": ".::Run#function",
           "kind": "function",
@@ -117,6 +127,16 @@
         },
         {
           "doc": "block comment",
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
           "file": "c.go",
           "id": ".::Block#var",
           "kind": "var",

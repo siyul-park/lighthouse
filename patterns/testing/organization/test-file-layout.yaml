@@ -28,10 +28,40 @@ tuning:
     not tell fixtures from helpers.
 implementation:
   builtin: testing/test-file-layout
+fix:
+  safety: safe
+  requires: [extent]
+  ops:
+    - op: move
+      when: finding.evidence.role == 'fixture'
+      node: finding.evidence.symbol
+      before: finding.evidence.before
+    - op: move
+      when: finding.evidence.role == 'test-helper'
+      node: finding.evidence.symbol
+      after: finding.evidence.after
 examples:
   - name: fixture-after-test
     language: go
     kind: invalid
+    fixed:
+      - path: store_test.go
+        body: |-
+          package store_test
+
+          import (
+          	"testing"
+
+          	"example.com/store"
+          )
+
+          const want = 1
+
+          func TestGet(t *testing.T) {
+          	if store.Get() != want {
+          		t.Fatal("get")
+          	}
+          }
     files:
       - path: go.mod
         body: |-
@@ -65,6 +95,23 @@ examples:
   - name: helper-above-its-test
     language: go
     kind: invalid
+    fixed:
+      - path: store_test.go
+        body: |-
+          package store_test
+
+          import (
+          	"testing"
+
+          	"example.com/store"
+          )
+
+          func TestGet(t *testing.T) { checkGet(t) }
+
+          func checkGet(t *testing.T) {
+          	t.Helper()
+          	_ = store.Get()
+          }
     files:
       - path: go.mod
         body: |-

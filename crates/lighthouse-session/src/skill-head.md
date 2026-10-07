@@ -18,7 +18,12 @@ remembered with its reason and is not raised again.
 2. **Understand** each finding: it carries the requirement, the evidence and an
    expected structure. For more, read the pattern: MCP resource
    `lighthouse://patterns/<id>`, tool `explain`, or `lighthouse explain <id>`.
-3. **Fix** the code, then **recheck**. A run that reports `incomplete` did not
+3. **Fix** the code, then **recheck**. Findings of a rule marked `fixable` in
+   the digest below can be fixed for you: MCP tool `fix` (by `fingerprints` or
+   `paths`, `dry_run` first to see the diff), or `lighthouse check --fix`.
+   Only safe fixes of mechanical rules apply by default; `unsafe_fixes` also
+   applies suggested ones. Every fix is verified and rolled back if it makes
+   the file worse. Review the diff like any other change. A run that reports `incomplete` did not
    check everything: it is not a pass.
 4. **Judge** review-tier findings (`review_tasks`): fix them, or record a
    verdict with `review_resolve`. `confirmed` means the finding is right

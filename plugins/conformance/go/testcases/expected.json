@@ -83,6 +83,16 @@
       "symbols": [
         {
           "doc": "Add adds.",
+          "extent": {
+            "end": {
+              "col": 40,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "calc.go",
           "id": ".::Add#function",
           "kind": "function",
@@ -101,6 +111,16 @@
         },
         {
           "doc": "Double doubles.",
+          "extent": {
+            "end": {
+              "col": 40,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
           "file": "calc.go",
           "id": ".::Double#function",
           "kind": "function",
@@ -145,6 +165,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 10,
+              "line": 9
+            },
+            "start": {
+              "col": 7,
+              "line": 9
+            }
+          },
           "to": ".::Add"
         },
         {
@@ -161,6 +191,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 49,
+              "line": 18
+            },
+            "start": {
+              "col": 43,
+              "line": 18
+            }
+          },
           "to": ".::Double"
         },
         {
@@ -177,6 +217,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 38,
+              "line": 22
+            },
+            "start": {
+              "col": 32,
+              "line": 22
+            }
+          },
           "to": ".::helper"
         },
         {
@@ -201,6 +251,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 36,
+              "line": 26
+            },
+            "start": {
+              "col": 33,
+              "line": 26
+            }
+          },
           "to": ".::Add"
         },
         {
@@ -217,6 +277,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 6,
+              "line": 30
+            },
+            "start": {
+              "col": 3,
+              "line": 30
+            }
+          },
           "to": ".::Add"
         },
         {
@@ -233,6 +303,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 34,
+              "line": 34
+            },
+            "start": {
+              "col": 28,
+              "line": 34
+            }
+          },
           "to": ".::Double"
         }
       ],
@@ -335,6 +415,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
           "file": "calc_test.go",
           "id": ".::TestAddTable#test",
           "kind": "test",
@@ -352,6 +442,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
           "file": "calc_test.go",
           "id": ".::TestNested#test",
           "kind": "test",
@@ -369,6 +469,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 43,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 22
+            }
+          },
           "file": "calc_test.go",
           "id": ".::TestPlain#test",
           "kind": "test",
@@ -386,6 +496,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 24
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
           "file": "calc_test.go",
           "id": ".::Testing#function",
           "kind": "function",
@@ -404,6 +524,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 44,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 26
+            }
+          },
           "file": "calc_test.go",
           "id": ".::helper#function",
           "kind": "function",
@@ -422,6 +552,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
           "file": "calc_test.go",
           "id": ".::BenchmarkAdd#test",
           "kind": "test",
@@ -439,6 +579,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 39,
+              "line": 34
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
           "file": "calc_test.go",
           "id": ".::ExampleDouble#test",
           "kind": "test",

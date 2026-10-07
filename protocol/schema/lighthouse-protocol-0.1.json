@@ -82,7 +82,7 @@
           "type": "object"
         },
         "overlays": {
-          "description": "Reserved, see [`Overlay`].",
+          "description": "Texts that replace requested files, see [`Overlay`]; absent when there\nare none.",
           "items": {
             "$ref": "#/$defs/Overlay"
           },
@@ -119,6 +119,17 @@
         },
         "resolution": {
           "$ref": "#/$defs/Resolution"
+        },
+        "site": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Span"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where the reference occurs: the span of the identifier that names the\ntarget (capability `reference-sites`). The same relation used at\nseveral places is one edge per place. Added in 0.1 before 1.0."
         },
         "to": {
           "description": "A module path, a symbol id, or a kind-less symbol id\n(`module::owner::name`) that names exactly one symbol.",
@@ -480,7 +491,7 @@
         },
         "languages": {
           "items": {
-            "$ref": "#/$defs/Language"
+            "$ref": "#/$defs/ProviderManifest"
           },
           "type": "array"
         },
@@ -497,50 +508,6 @@
         "version",
         "protocolVersion",
         "languages"
-      ],
-      "type": "object"
-    },
-    "Language": {
-      "description": "A language a plugin indexes and how the host routes files to it.",
-      "properties": {
-        "capabilities": {
-          "default": [],
-          "description": "Known value: `semantic-edges`. Hosts ignore unknown values.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "conventions": {
-          "$ref": "#/$defs/Conventions",
-          "default": {
-            "test_globs": []
-          }
-        },
-        "fallback": {
-          "description": "A fallback language claims a file only when no other language does.",
-          "type": "boolean"
-        },
-        "globs": {
-          "description": "Project-relative path globs; `*` and `?` never cross `/`, a `**`\ncomponent matches any number of directories.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "id": {
-          "type": "string"
-        },
-        "priority": {
-          "default": 0,
-          "description": "Among providers matching a file, the higher priority wins.",
-          "format": "int32",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "id",
-        "globs"
       ],
       "type": "object"
     },
@@ -600,7 +567,7 @@
       ]
     },
     "Overlay": {
-      "description": "Reserved: the content of an unsaved file. Hosts do not send overlays in\n0.1; providers read files from disk.",
+      "description": "The text that stands in for a file: a provider reads it instead of the\nfile on disk, and must not read the disk for that path. Hosts send overlays\nfor requested files only, as a fix run verifies edits before writing them.",
       "properties": {
         "path": {
           "type": "string"
@@ -648,6 +615,50 @@
       ],
       "type": "object"
     },
+    "ProviderManifest": {
+      "description": "What a language provider declares: the language it indexes, how the host\nroutes files to it and what it guarantees. A plugin's `initialize` result\nlists one per language.",
+      "properties": {
+        "capabilities": {
+          "default": [],
+          "description": "Known values: `semantic-edges`, `extent`, `reference-sites`,\n`complete-references`. Hosts\nignore unknown values.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "conventions": {
+          "$ref": "#/$defs/Conventions",
+          "default": {
+            "test_globs": []
+          }
+        },
+        "fallback": {
+          "description": "A fallback language claims a file only when no other language does.",
+          "type": "boolean"
+        },
+        "globs": {
+          "description": "Project-relative path globs; `*` and `?` never cross `/`, a `**`\ncomponent matches any number of directories.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "priority": {
+          "default": 0,
+          "description": "Among providers matching a file, the higher priority wins.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "globs"
+      ],
+      "type": "object"
+    },
     "Resolution": {
       "description": "How reliable an edge's target is.",
       "oneOf": [
@@ -692,6 +703,17 @@
             "string",
             "null"
           ]
+        },
+        "extent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Span"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The whole declaration, from its first leading doc comment, attribute\nor annotation to its last token (capability `extent`). A spec of a\ngrouped declaration, such as one constant of a Go `const (...)` block,\nhas the spec's own lines. Added in 0.1 before 1.0."
         },
         "file": {
           "description": "Project-relative path of the declaring file.",

@@ -20,14 +20,15 @@ type InitializeParams struct {
 
 // InitializeResult is the response of the `initialize` method.
 type InitializeResult struct {
-	ID              string     `json:"id"`
-	Version         string     `json:"version"`
-	ProtocolVersion string     `json:"protocolVersion"`
-	Languages       []Language `json:"languages"`
+	ID              string             `json:"id"`
+	Version         string             `json:"version"`
+	ProtocolVersion string             `json:"protocolVersion"`
+	Languages       []ProviderManifest `json:"languages"`
 }
 
-// Language is one language a plugin serves and how files select it.
-type Language struct {
+// ProviderManifest is what a language provider declares: the language a
+// plugin serves, how files select it and what it guarantees.
+type ProviderManifest struct {
 	ID           string      `json:"id"`
 	Globs        []string    `json:"globs"`
 	Priority     int         `json:"priority"`
@@ -131,9 +132,12 @@ type Symbol struct {
 	Owner      string `json:"owner,omitempty"`
 	File       string `json:"file"`
 	Span       Span   `json:"span"`
-	Doc        string `json:"doc,omitempty"`
-	Name       string `json:"name"`
-	Role       string `json:"role,omitempty"`
+	// Extent is the whole declaration, doc comments included; nil when the
+	// provider reports none for the symbol.
+	Extent *Span  `json:"extent,omitempty"`
+	Doc    string `json:"doc,omitempty"`
+	Name   string `json:"name"`
+	Role   string `json:"role,omitempty"`
 }
 
 // Node is a module or a symbol: exactly one field is set.
@@ -148,6 +152,8 @@ type Edge struct {
 	From       Node   `json:"from"`
 	To         string `json:"to"`
 	Resolution string `json:"resolution"`
+	// Site is the span of the identifier that names the target.
+	Site *Span `json:"site,omitempty"`
 }
 
 // Flow is one normalized control-flow event of a function body.
@@ -196,3 +202,12 @@ const ProtocolVersion = "0.1"
 
 // SemanticEdges names the capability of reporting type-resolved edges.
 const SemanticEdges = "semantic-edges"
+
+// Extent names the capability of reporting the full range of declarations.
+const Extent = "extent"
+
+// Overlays names the capability of analyzing overlay text instead of the disk.
+const Overlays = "overlays"
+
+// ReferenceSites names the capability of reporting where references occur.
+const ReferenceSites = "reference-sites"

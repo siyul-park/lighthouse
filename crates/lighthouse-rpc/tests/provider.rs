@@ -200,11 +200,20 @@ fn store() -> [(&'static str, &'static str); 2] {
 #[test]
 fn provider_claims_go_files_and_offers_semantic_edges() {
     let Some(f) = Fixture::new(&[]) else { return };
-    assert_eq!(f.provider.id(), "go");
-    assert_eq!(f.provider.globs(), ["**/*.go"]);
-    assert_eq!(f.provider.conventions().test_globs, ["**/*_test.go"]);
-    assert_eq!(f.provider.capabilities(), [Capability::SemanticEdges]);
-    assert!(!f.provider.fallback());
+    let manifest = f.provider.manifest();
+    assert_eq!(manifest.id, "go");
+    assert_eq!(manifest.globs, ["**/*.go"]);
+    assert_eq!(manifest.conventions.test_globs, ["**/*_test.go"]);
+    assert_eq!(
+        manifest.capabilities,
+        [
+            Capability::SemanticEdges,
+            Capability::Extent,
+            Capability::ReferenceSites,
+            Capability::Overlays
+        ]
+    );
+    assert!(!manifest.fallback);
 }
 
 #[test]

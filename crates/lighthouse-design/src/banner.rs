@@ -1,5 +1,5 @@
 use lighthouse_model::{Comment, Diagnostic, Fingerprint};
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
@@ -20,7 +20,7 @@ pub(crate) fn rule() -> Box<dyn Rule> {
 /// Comments made only of banner lines: a run of rule characters, optionally
 /// around a label, or a label marker such as `MARK:`. A comment that mixes
 /// banner lines with prose is documentation (a table, a code block) and passes.
-fn check(meta: &RuleMeta, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
+fn check(meta: &RuleManifest, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
     let Some((file, text)) = ctx.file else {
         return Ok(Vec::new());
     };

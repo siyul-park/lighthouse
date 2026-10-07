@@ -145,12 +145,24 @@ An exception that no longer applies is noise that hides the next real one.
 
 An allow annotation SHOULD suppress a finding; one whose rule no longer fires there, or is not enabled, SHOULD be removed.
 
+**Fix**
+
+Fixable: `suggested` · operations delete. See [fix operations](fix-operations.md).
+
 **Invalid example: go-stale-allow (go)**
 
 ```go
 package sample
 
 // lighthouse:allow design/exported-doc -- stale
+func open() {}
+```
+
+Fixed `example.go`:
+
+```go
+package sample
+
 func open() {}
 ```
 
@@ -167,6 +179,12 @@ func open() {}
 
 ```rust
 // lighthouse:allow design/exported-doc -- stale
+fn open() {}
+```
+
+Fixed `src/lib.rs`:
+
+```rust
 fn open() {}
 ```
 

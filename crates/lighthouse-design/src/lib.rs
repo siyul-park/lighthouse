@@ -11,10 +11,12 @@ mod receiver;
 mod related;
 mod wrapper;
 
-use std::path::Path;
+use std::{path::Path, sync::LazyLock};
 
 use lighthouse_model::{Diagnostic, Fingerprint, Symbol, SymbolKind};
-use lighthouse_plugin::{Ctx, Manifest, Plugin, Preset, Rule, RuleMeta};
+use lighthouse_plugin::{
+    Ctx, Fixer, OrderKey, Plugin, PluginManifest, PresetManifest, Rule, RuleManifest,
+};
 use serde_json::Value;
 
 /// Id of the plugin and prefix of every rule it provides.
@@ -25,11 +27,12 @@ pub struct Design;
 
 impl Plugin for Design {
     /// The plugin id with this crate's version.
-    fn manifest(&self) -> Manifest {
-        Manifest {
+    fn manifest(&self) -> &PluginManifest {
+        static MANIFEST: LazyLock<PluginManifest> = LazyLock::new(|| PluginManifest {
             id: ID.to_owned(),
             version: env!("CARGO_PKG_VERSION").to_owned(),
-        }
+        });
+        &MANIFEST
     }
 
     /// Every rule of the pack, native and declarative.
@@ -51,10 +54,20 @@ impl Plugin for Design {
         rules
     }
 
+    /// The fixes of the pack's patterns, compiled from the catalog.
+    fn fixers(&self) -> Vec<Box<dyn Fixer>> {
+        lighthouse_declarative::Declarative::bundled_fixers(ID)
+    }
+
+    /// The keys `reorder` fixes sort by.
+    fn order_keys(&self) -> Vec<Box<dyn OrderKey>> {
+        vec![Box::new(order::GroupKey)]
+    }
+
     /// The standard presets over the pack's rules.
-    fn presets(&self) -> Vec<Preset> {
+    fn presets(&self) -> Vec<PresetManifest> {
         let rules = self.rules();
-        Preset::standard(ID, rules.iter().map(|rule| rule.meta()))
+        PresetManifest::standard(ID, rules.iter().map(|rule| rule.manifest()))
     }
 }
 
@@ -84,7 +97,7 @@ fn functions<'a>(ctx: &Ctx<'a>) -> Vec<&'a Symbol> {
         .collect()
 }
 
-fn finding(meta: &RuleMeta, symbol: &Symbol, message: String, evidence: Value) -> Diagnostic {
+fn finding(meta: &RuleManifest, symbol: &Symbol, message: String, evidence: Value) -> Diagnostic {
     let fingerprint = Fingerprint::of(&meta.id, symbol.id.as_str(), "");
     let mut diagnostic = Diagnostic::new(
         &meta.id,

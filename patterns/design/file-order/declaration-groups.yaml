@@ -8,7 +8,7 @@ requirement: >-
   together and MUST precede non-initializer functions and methods. Within one
   type, constructors MUST precede other behavior.
 enforcement: mechanical
-evidence: [declaration, group, expected_after]
+evidence: [declaration, group, expected_after, before]
 options:
   groups:
     type: list
@@ -90,10 +90,32 @@ tuning:
     `pub(crate)`.
 implementation:
   builtin: design/declaration-groups
+fix:
+  safety: safe
+  requires: [extent]
+  ops:
+    - op: move
+      when: finding.evidence.before != ''
+      node: finding.evidence.declaration
+      before: finding.evidence.before
+    - op: reorder
+      when: finding.evidence.before == ''
+      scope: file
+      by: [design/group]
 examples:
   - name: invalid
     language: go
     kind: invalid
+    fixed:
+      - path: example.go
+        body: |-
+          package sample
+
+          type Service struct{}
+
+          func (s *Service) Run() int { return helper() }
+
+          func helper() int { return 1 }
     files:
       - path: example.go
         body: |-
@@ -123,6 +145,16 @@ examples:
   - name: private-method-before-public
     language: go
     kind: invalid
+    fixed:
+      - path: example.go
+        body: |-
+          package sample
+
+          type Service struct{}
+
+          func (s *Service) Run() int { return s.run() }
+
+          func (s *Service) run() int { return 1 }
     files:
       - path: example.go
         body: |-
@@ -138,6 +170,16 @@ examples:
   - name: init-after-functions
     language: go
     kind: invalid
+    fixed:
+      - path: example.go
+        body: |-
+          package sample
+
+          var ready bool
+
+          func init() { ready = true }
+
+          func Run() bool { return ready }
     files:
       - path: example.go
         body: |-
@@ -182,6 +224,14 @@ examples:
   - name: rust-invalid
     language: rust
     kind: invalid
+    fixed:
+      - path: src/lib.rs
+        body: |-
+          pub struct Store;
+
+          pub fn run() -> u8 {
+              1
+          }
     files:
       - path: src/lib.rs
         body: |-
@@ -223,6 +273,20 @@ examples:
   - name: rust-constructor-after-behavior
     language: rust
     kind: invalid
+    fixed:
+      - path: src/lib.rs
+        body: |-
+          pub struct Store;
+
+          impl Store {
+              pub fn new() -> Self {
+                  Store
+              }
+
+              pub fn get(&self) -> u8 {
+                  1
+              }
+          }
     files:
       - path: src/lib.rs
         body: |-
@@ -242,6 +306,18 @@ examples:
   - name: test-fixtures-out-of-order
     language: go
     kind: invalid
+    fixed:
+      - path: store_test.go
+        body: |-
+          package store
+
+          import "testing"
+
+          type sample struct{}
+
+          var limit = 3
+
+          func TestSample(t *testing.T) { _ = sample{} }
     files:
       - path: go.mod
         body: |-

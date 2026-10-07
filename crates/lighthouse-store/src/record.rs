@@ -337,3 +337,32 @@ impl ReviewEvent {
         &self.snapshot["evidence"]
     }
 }
+
+/// A fix to record: what a fixer changed for a finding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewFix {
+    pub fingerprint: String,
+    pub rule_id: String,
+    pub fixer: String,
+    /// `safe` or `suggested`.
+    pub safety: String,
+    pub description: String,
+    /// Project-relative paths of the files the fix changed.
+    pub files: Vec<String>,
+    pub commit: Option<String>,
+    pub lighthouse_version: String,
+}
+
+/// A recorded fix; `fixed by` the fixer named, when.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FixEvent {
+    pub id: String,
+    pub fingerprint: String,
+    pub rule_id: String,
+    pub fixer: String,
+    pub safety: String,
+    pub description: String,
+    pub files: Vec<String>,
+    pub commit: Option<String>,
+    pub timestamp: String,
+}

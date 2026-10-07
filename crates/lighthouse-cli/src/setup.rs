@@ -12,6 +12,9 @@ use crate::Result;
 const MCP_FILE: &str = ".mcp.json";
 const SETTINGS_FILE: &str = ".claude/settings.json";
 const SKILL_FILE: &str = ".claude/skills/lighthouse/SKILL.md";
+/// The permission rule that keeps an agent from trusting a project for the
+/// user: trust is the user's decision, made at a terminal.
+const DENY_TRUST: &str = "Bash(lighthouse trust:*)";
 const EDIT_TOOLS: &str = "Edit|Write|MultiEdit";
 const POST_COMMAND: &str = "lighthouse hook claude-code post-tool-use --allow-incomplete";
 const STOP_COMMAND: &str = "lighthouse hook claude-code stop --allow-incomplete";
@@ -76,13 +79,34 @@ fn hooks(path: &Path) -> Result<()> {
         groups.push(group);
         added.push(event);
     }
-    if added.is_empty() {
+    let denied = deny_trust(&mut doc, path)?;
+    if added.is_empty() && !denied {
         println!("{}: unchanged", path.display());
         return Ok(());
     }
     write_json(path, &doc)?;
-    println!("{}: added {} hook(s)", path.display(), added.join(" and "));
+    if !added.is_empty() {
+        println!("{}: added {} hook(s)", path.display(), added.join(" and "));
+    }
+    if denied {
+        println!("{}: denied `{DENY_TRUST}` to the agent", path.display());
+    }
     Ok(())
+}
+
+/// Adds the permission deny for `lighthouse trust`; false when it was there.
+fn deny_trust(doc: &mut Value, path: &Path) -> Result<bool> {
+    let permissions = object(doc, "permissions", path)?;
+    let deny = permissions
+        .entry("deny".to_owned())
+        .or_insert_with(|| json!([]))
+        .as_array_mut()
+        .ok_or_else(|| format!("{}: `permissions.deny` is not a list", path.display()))?;
+    if deny.iter().any(|rule| rule == DENY_TRUST) {
+        return Ok(false);
+    }
+    deny.push(json!(DENY_TRUST));
+    Ok(true)
 }
 
 /// Whether a matcher group already runs a Lighthouse hook.

@@ -2,7 +2,7 @@
 
 ```
  CLI ─ engine ─ config ─ reporters ─ store (.lighthouse/lighthouse.db)
-          │
+          │      └─ fix orchestrator (the only writer)
    plugin registry ── in-process plugins: core, metrics, design, testing,
           │            and `local` (declarative rules of the project)
           │
@@ -18,6 +18,27 @@ analyzers and rules read only that model. In-process providers and out-of-proces
 plugins (see [plugin-protocol.md](plugin-protocol.md)) implement the same
 `LanguageProvider` contract, which is project-level: the engine calls each
 provider once with all of its files.
+
+## Plugin kinds and manifests
+
+A plugin is a contract boundary, not a process boundary: bundled Rust code and
+out-of-process plugins satisfy the same traits. Every kind describes itself through
+`manifest()`, a static data struct, and keeps behavior in separate methods, the way
+`lighthouse-plugin.toml` describes a plugin process:
+
+| Kind | Manifest | Behavior |
+| --- | --- | --- |
+| `Plugin` | `PluginManifest { id, version }` | `languages`, `analyzers`, `rules`, `presets`, `fixers`, `order_keys` |
+| `LanguageProvider` | `ProviderManifest { id, globs, conventions, capabilities, fallback, priority }` | `index` |
+| `Analyzer` | `AnalyzerManifest { id, requires, scope }` | `run` |
+| `Rule` | `RuleManifest { id, severity, scope, description, docs, analyzers, capabilities, citation, strict }` | `validate`, `check` |
+| `Preset` | `PresetManifest { id, rules }` (pure data) | none |
+| `Fixer` | `FixerManifest { id, requires }` | `fix` |
+| `OrderKey` | `OrderKeyManifest { id, description }` | `rank` |
+
+The `initialize` result of a plugin process is its `PluginManifest` plus one
+`ProviderManifest` per language, field for field (see
+[plugin-protocol.md](plugin-protocol.md)).
 
 Dependency direction runs from the general to the specific:
 `model` ← `plugin` (contracts) ← `protocol` (wire types) ← `rpc` (host and the only
@@ -292,6 +313,218 @@ first, original order kept) and a `... N more` tail or a `truncated` record; the
 always counts everything. Both formats end with a summary, printed for clean runs too,
 with the incomplete, suppressed and allowed counts, so silence is never read as success.
 
+## Fixing
+
+A rule judges, a fixer proposes, the orchestrator executes. Rules never edit, fixers
+never apply, the orchestrator never judges. `check` stays pure: a fix is computed on
+demand, when `check --fix` or the MCP `fix` tool asks.
+
+**One canonical fix per rule.** The catalog is the single source that says how a rule is
+fixed: the optional `fix:` block of its pattern (see [Fixer spec](#fixer-spec)). The
+resolution is deterministic, `finding.rule` to `pattern.fix` to the fixer registered
+under the pattern's id; there is no list of competing fixers and no fallback chain.
+`--fixer <id>` is an explicit override that must name a registered fixer; it replaces the
+pattern's fixer for the selected findings, whose proposals count as `suggested`, and it
+is the way to use a fixer for a rule that has no `fix:`. Documentation, `explain` and the
+skill show `fixable: safe|suggested`.
+
+**Edit operations, not a round-trip IR.** Fixers do not rewrite source and there is no
+lift-transform-lower pipeline (that would need a code generator per language and lose
+comments and formatting). A fixer answers with `EditOp`s over code-model nodes, and the
+orchestrator lowers them to text edits with the spans providers report:
+
+| Operation | Meaning | Needs |
+| --- | --- | --- |
+| `Move { node, anchor: Before\|After(node) }` | relocate a declaration with its extent | `extent` |
+| `Delete { node }` | remove a declaration with its extent | `extent` |
+| `Reorder { owner, order }` | put declarations in this order within the places they occupy | `extent` |
+| `Rename { symbol, name }` | rename at the declaration and every reference site | `reference-sites`, every reference edge semantic |
+| `DeleteRange { file, span }` | remove text, such as a comment | none |
+| `Replace { file, span, text }` | replace text; an empty range inserts | none |
+
+`Symbol.extent` is the whole declaration (doc comments, attributes and annotations
+included; a Go spec of a parenthesized group has its own lines) and `Edge.site` is the
+span of the identifier at a reference: both are optional model fields reported by
+providers that declare the capabilities `extent` and `reference-sites`. A fixer whose
+required capability the file's provider lacks is declined before it is asked: never a
+guess. Moves work on whole lines. A moved block keeps its blank-line separation, and the
+text edit that removes it takes one adjacent blank line. A scan of brackets (comments,
+strings and characters skipped) tells which container a declaration sits in: a move
+needs both ends in the same one (the same file level, the same `impl` or class body), a
+`reorder` sorts each container on its own, and a member of a parenthesized group (Go's
+`const ( ... )`, whose order can carry meaning) is never moved. A declaration that shares
+its lines with other code is not moved alone (a block comment that opens after the closing
+brace counts as code). The scan reads comments and strings the way the file's language does
+(nested block comments and raw strings are Rust's; a backtick quotes in Go; an unknown
+language is read like C), which is a heuristic that the re-check backs up. Line endings
+follow the file: the dominant one (LF or CRLF) is used where an edit inserts a line.
+
+A `Rename` is refused unless the provider declares `complete-references` (every
+reference, in signatures, fields and receivers too, is an edge with a site), the symbol is
+private to its unit, the new name is an identifier that is no keyword and collides with no
+sibling declaration, and every reference edge is semantic and has a site. No bundled
+provider declares `complete-references` yet (Go lacks sites in signatures, fields and
+receivers, and Rust edges are syntactic), so a rename is declined everywhere for now; a
+catalog that uses `rename` must list `complete-references` in `requires`.
+
+**Containment.** Every file an operation or a command result names must be relative and
+normalized (no `..`, not absolute), a non-generated file of the analyzed project, and
+reached through no symlink; anything else is declined before any text is read.
+
+**Safety.** A proposal is `safe` or `suggested`. The pattern's `safety` caps what its
+fixer may claim: a fixer that returns `safe` for a `suggested` pattern is downgraded.
+`safe` is reserved for mechanical patterns (the catalog validation refuses it elsewhere).
+By default only safe fixes of mechanical rules are applied; `--unsafe-fixes` (MCP
+`unsafe_fixes`) also applies suggested ones. Eligibility is decided from the pattern before
+a fixer is asked, so a suggested fix, a command included, never even runs without
+`--unsafe-fixes`; the finding is reported as left alone, with the reason. `--fixer <id>`
+(CLI only, not offered by MCP) names a registered fixer for the selected findings and
+needs `--rules` or fingerprints.
+
+**The orchestrator** (`lighthouse-engine`, the only component that writes) runs rounds,
+at most five:
+
+1. check the whole project with every enabled rule; the run refuses to start when the
+   analysis is incomplete, because a fix that rests on a partial analysis is a guess;
+2. select the findings (paths, rules, fingerprints; never those a verdict suppresses),
+   ask each one's fixer for a proposal, lower it, and keep the proposals that do not
+   collide (safe ones first, then report order; a proposal with exactly the edits of a
+   kept one is covered by it);
+3. apply the edits to the texts **in memory** (a proposal whose own edits overlap is
+   declined; an out-of-range or overlapping edit is an error, never a panic);
+4. run the language's formatter, `[languages.<id>] formatter`, which follows the command
+   contract of fixes: exit `0` succeeds, stdout carries only the result, stderr is for
+   people, the environment is cleared to an allowlist plus the declared `env`, and a
+   timeout takes the process group down. Short form: `["gofmt", "-w"]` formats a scratch
+   copy of the file (its path appended, or filling a `{file}` argument), `inPlace`. Table
+   form: `{ argv = [...], stdin = "none|file", output = "inPlace|text", env = {...} }`;
+   with `stdin = "file"` and `output = "text"` the formatter filters the text and no scratch
+   file or module tree is needed (this repository uses `{ argv = ["rustfmt", "--edition",
+   "2024", "--emit", "stdout"], stdin = "file", output = "text" }` and `gofmt` the same way).
+   `{path}` is the file's real project-relative path, for tools like `--stdin-filepath`;
+   `inPlace` formatters get the settings files found between the file and the root
+   (`rustfmt.toml`, `.rustfmt.toml`, `.editorconfig`, `rust-toolchain.toml`) copied next to
+   their scratch copy, and stdin formatters find them from the project root, their working
+   directory. It runs only in a trusted project; otherwise it is skipped with a
+   note and verification still runs. The key is the host's and never reaches the provider;
+5. re-index and re-check **over overlays**: the engine reads the project with the
+   candidate texts standing in for the files (protocol `context.overlays`; nothing is
+   read from or written to those files). A changed file is dropped, back to its text
+   before the round, when its check got worse: more findings of error or warn severity for
+   some rule and owner (the symbol, else the file), a new gap in the analysis, or a
+   failed formatter; so is every file of a fix that spans files. Dropped fixes are
+   reported as declined.
+
+It stops when a round applies nothing, after five rounds, or when a round reaches a state
+an earlier one had (fixes that undo each other; the note names their rules).
+**Nothing touches the disk until the last round passed.** Then the write has two phases.
+First every changed file's hash is checked against the text the run analyzed (recorded when
+it was read), and a fix that spans a file that changed is skipped as a whole, all its files,
+before anything is written; those fixes are declined as changed concurrently. Then each file
+is written atomically (permissions kept), containment re-checked and the hash checked again
+right before the rename; if a write still fails, the files already written are put back and
+nothing counts as applied. A `--dry-run` never writes. A panic or Ctrl-C before the write
+leaves the disk as it was: there is no journal to restore. Declined fixes accumulate over
+the rounds without duplicates. A fix is declined, before its fixer is asked, in a file whose
+provider does not declare the `overlays` capability. Language plugins never verify fixes themselves:
+verification is the re-check on the code model. Each applied fix is recorded in the local
+store (`fix_events`: finding, rule, fixer, safety, description, files, commit), not in the
+shared decision log, because it records what happened to this checkout, not a decision;
+the run that ends the fixing resolves the findings the fixes removed.
+
+Bundled fixes: `design/declaration-groups` (a `reorder` by `design/group`, plus a `move`
+for constructors) and `testing/test-file-layout` (a `move` of a fixture above, or a helper
+below, the tests) are safe; `design/related-symbols-close` and
+`design/callers-before-callees` (a `move` next to the related symbol or the caller),
+`design/section-banners` and `core/unused-allow` (a `delete` of the comment or the
+annotation line) are suggested. An `impl` block is not a symbol, so
+reordering a Rust file cannot move one: such findings are declined and fixed by hand.
+`lighthouse check .` on this repository is clean, and `check --fix` brought it there.
+
+## Fixer spec
+
+The `fix:` block of a pattern is declarative and selects one fixer *kind*; every kind
+compiles into a provider of the single `Fixer` interface, the way declarative rules
+compile into `Rule`, and bundled fixers are such specs registered by their plugin through
+`Plugin::fixers()` under the pattern's id. Local rules in `.lighthouse/rules/*.yaml` carry
+a `fix:` too.
+
+```yaml
+fix:
+  safety: safe            # safe | suggested: the cap on what the fixer may claim
+  requires: [extent]      # optional provider capabilities; absent means declined
+  # exactly one of:
+  ops:                    # CEL over the finding and the code model
+    - op: move
+      node: finding.evidence.callee
+      after: finding.evidence.caller
+  command:
+    argv: ["gofmt", "-s", "-w", "{file}"]   # no shell
+    output: inPlace       # inPlace | text (the new file text on stdout)
+    stdin: none           # none | file
+    env: {}               # extra variables; the rest is cleared
+    timeout: 30s
+    scope: file           # edits outside the finding's file are refused
+  rpc: {}                 # reserved: a language plugin's own fix method; not yet supported
+```
+
+- **`ops`** is a list of generic operations: `move`, `reorder`, `delete`, `rename`,
+  `replace`. Each takes typed parameters, validated by the catalog; expressions are CEL over
+  `finding` (`rule`, `message`, `file`, `span`, `symbol`, `evidence`, `fingerprint`,
+  `facts`), `symbol` (the finding's symbol, as in declarative rules) and `options`, and an
+  optional `when` skips an operation. `text` and `name` are templates with `{{ cel }}`
+  holes. The operations, their parameters and the registered order keys of `reorder` are
+  generated into [patterns/fix-operations.md](patterns/fix-operations.md). Semantics that
+  need Rust (`reorder` sorting by a key such as `design/group`, registered by a plugin
+  through `Plugin::order_keys()`) live in the operation, not in per-rule code.
+- **`command`** is the simple text contract; structured data goes through `rpc`. It runs a
+  program without a shell in a scratch directory that holds a copy of the finding's file.
+  *Exit codes:* `0` succeeds with the result per `output` (an empty result changes nothing),
+  `1` declines with the reason taken from stderr, `>= 2`, a signal or a timeout is an error:
+  nothing is applied and the capped stderr goes into the notice. *Output:* `inPlace` diffs
+  the scratch copy against the original into the smallest whole-line `Replace`; `text` takes
+  the new file text from stdout, which carries only the result (stderr is never parsed).
+  *stdin:* `none` (default) or `file`, the target file's content; no request JSON is sent.
+  *Argv:* `{file}`, `{line}`, `{symbol}` and `{rule}` fill a whole argument each (no
+  embedding, no `{root}`; a value starting with `-` is refused); the working directory is the
+  scratch directory, and a symlink in the output is refused. *Environment:* cleared to
+  `PATH`, `HOME`, `LANG`, `TMPDIR`, plus the declared `env`, plus `LIGHTHOUSE_DECISION` (the
+  finding as JSON), `LIGHTHOUSE_OPTIONS` (the rule's options as JSON) and
+  `LIGHTHOUSE_API_VERSION`. *Limits:* a timeout sends SIGTERM to the process group, then
+  SIGKILL after a grace period, through the runner shared with the plugin host
+  (`lighthouse-process`); stdout and stderr are capped. The result goes through the same
+  containment, verify and rollback as any other fix.
+  **Trust:** commands (command fixers and `[languages.<id>] formatter`) run only in a
+  project the *user* trusts, whoever wrote them. `lighthouse trust` lists the formatters and
+  fixer commands it would trust and asks for confirmation on the terminal (without a
+  terminal it refuses unless `--yes` says the list was read; `init --agent claude-code`
+  adds `Bash(lighthouse trust:*)` to the agent's permission deny list); it records the
+  canonical root with a digest of `lighthouse.toml`, the rule files and the content of any
+  command program that lies inside the project (a program named by a relative path is the
+  project's own, run from the project root) in `~/.lighthouse/trust.toml`. Programs outside
+  the project (`gofmt`, `rustfmt`) are trusted by command line only. Every field of the digest
+  is tagged and length-prefixed, and it is computed from the very bytes the configuration
+  and rules were loaded from. Authoring candidates (`rule_create`) are never trusted (`$LIGHTHOUSE_HOME` replaces `~/.lighthouse`); any change to
+  either withdraws it, and `lighthouse trust --revoke` removes it. `LIGHTHOUSE_TRUST=1`
+  trusts every project, for CI. The repository cannot grant trust itself: a `[fix]` table
+  in `lighthouse.toml` is not accepted. Without trust a command fix is declined with a
+  message naming the command, and formatting is skipped with a note.
+- **Validation** (every catalog load, local layers included): exactly one kind; a pattern
+  with an implementation; `safe` only on mechanical patterns; every CEL expression and
+  template compiles; operation parameters are well-typed (one of `before`/`after`, `node`
+  or `file` and `span`, qualified order keys); a command has a program and a timeout;
+  `rename` lists `complete-references`; placeholders fill whole arguments; an `rpc` fix is
+  kept but only that rule's findings are declined as not yet supported (it does not fail
+  the pack); and the pattern has an invalid example with
+  `fixed`. The workspace tests also check that every bundled `fix` has its rule and a
+  registered fixer, that every `reorder` key is registered and that the `requires` list
+  covers what the operations need.
+- **Testing:** an invalid example may carry `fixed:`, the new text of each file that
+  changes. `lighthouse rule test` applies the fix to the example (suggested ones too),
+  asserts the files equal `fixed` (a final newline aside), checks that the rule no longer
+  fires and that applying the fix again changes nothing. `rule_create` and `rule_update`
+  run the same examples in their gate.
+
 ## Frontends
 
 The CLI, the MCP server and the agent hooks are frontends over one shared layer,
@@ -299,10 +532,12 @@ The CLI, the MCP server and the agent hooks are frontends over one shared layer,
 runs a check and remembers it, records verdicts, tests and authors rules, and
 renders the agent skill. A frontend parses its own input and prints the result;
 it holds no logic of its own, so a verdict recorded through MCP, the CLI or a
-hook is the same event in the same log.
+hook is the same event in the same log. Fixing is the same: `check --fix [--dry-run]
+[--unsafe-fixes] [--fixer <id>]` and the MCP `fix` tool call one session operation.
+Hooks never fix.
 
 ```
- lighthouse-cli ── check, review, rule, docs, init --agent, hook claude-code
+ lighthouse-cli ── check [--fix], review, rule, docs, init --agent, hook claude-code
  lighthouse-mcp ── `lighthouse mcp`: tools and resources over stdio (rmcp)
         └── lighthouse-session ── engine, store, spec, declarative, rpc, report
 ```

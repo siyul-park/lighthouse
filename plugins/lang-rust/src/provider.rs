@@ -3,13 +3,13 @@
 //! fragment per file.
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
     path::{Component, Path, PathBuf},
 };
 
 use lighthouse_protocol::{
     self as wire, Conventions, FileInfo, Fragment, Handler, Incomplete, IndexParams, IndexResult,
-    InitializeParams, InitializeResult, Language,
+    InitializeParams, InitializeResult, ProviderManifest,
 };
 use serde::Deserialize;
 
@@ -40,7 +40,7 @@ impl Handler for Provider {
             id: self.id.clone(),
             version: self.version.clone(),
             protocol_version: wire::VERSION.to_owned(),
-            languages: vec![Language {
+            languages: vec![ProviderManifest {
                 id: LANGUAGE.to_owned(),
                 globs: vec!["**/*.rs".to_owned()],
                 priority: 0,
@@ -52,7 +52,11 @@ impl Handler for Provider {
                         "**/benches/**/*.rs".to_owned(),
                     ],
                 },
-                capabilities: Vec::new(),
+                capabilities: vec![
+                    lighthouse_protocol::EXTENT.to_owned(),
+                    lighthouse_protocol::REFERENCE_SITES.to_owned(),
+                    lighthouse_protocol::OVERLAYS.to_owned(),
+                ],
             }],
         })
     }
@@ -174,7 +178,7 @@ fn index_files(params: &IndexParams, options: &Options) -> IndexResult {
     let mut notices = Vec::new();
 
     let found = packages(&root, &files);
-    let tree = module_tree(&root, &found.list, options);
+    let tree = module_tree(&root, &found.list, options, overlays(params, &root));
     let idx = Index::build(&tree, &found.list);
     let mut orphans = Vec::new();
     let mut macros = MacroSummary::default();
@@ -302,8 +306,25 @@ fn governor(
     Governor::Nobody
 }
 
-fn module_tree(root: &Path, packages: &[Package], options: &Options) -> Tree {
+/// The texts that stand in for files, by absolute path.
+fn overlays(params: &IndexParams, root: &Path) -> HashMap<PathBuf, String> {
+    params
+        .context
+        .overlays
+        .iter()
+        .flatten()
+        .map(|o| (normalize(&root.join(&o.path)), o.text.clone()))
+        .collect()
+}
+
+fn module_tree(
+    root: &Path,
+    packages: &[Package],
+    options: &Options,
+    overlays: HashMap<PathBuf, String>,
+) -> Tree {
     let mut tree = Tree::new(root);
+    tree.overlays = overlays;
     for r in roots(packages, options.unpublished) {
         tree.add_crate(r);
     }

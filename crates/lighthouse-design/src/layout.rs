@@ -71,7 +71,7 @@ pub(crate) fn has_word_prefix(name: &str, prefix: &str) -> bool {
     })
 }
 
-fn is_declaration(project: &Project, symbol: &Symbol) -> bool {
+pub(crate) fn is_declaration(project: &Project, symbol: &Symbol) -> bool {
     use SymbolKind::{Const, Function, Interface, Method, Type, Var};
     if !matches!(
         symbol.kind,

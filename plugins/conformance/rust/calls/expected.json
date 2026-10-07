@@ -65,6 +65,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 13,
+              "line": 23
+            },
+            "start": {
+              "col": 9,
+              "line": 23
+            }
+          },
           "to": "calls::Counter#type"
         },
         {
@@ -73,6 +83,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 24
+            },
+            "start": {
+              "col": 13,
+              "line": 24
+            }
+          },
           "to": "calls::Counter::count#field"
         },
         {
@@ -81,6 +101,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 25
+            },
+            "start": {
+              "col": 13,
+              "line": 25
+            }
+          },
           "to": "calls::Counter::label#field"
         },
         {
@@ -97,6 +127,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 30
+            },
+            "start": {
+              "col": 14,
+              "line": 30
+            }
+          },
           "to": "calls::Counter::count#field"
         },
         {
@@ -105,6 +145,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 31
+            },
+            "start": {
+              "col": 14,
+              "line": 31
+            }
+          },
           "to": "calls::Counter::double#method"
         },
         {
@@ -121,6 +171,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 35
+            },
+            "start": {
+              "col": 9,
+              "line": 35
+            }
+          },
           "to": "calls/math::square#function"
         },
         {
@@ -129,6 +189,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 35
+            },
+            "start": {
+              "col": 17,
+              "line": 35
+            }
+          },
           "to": "calls::Counter::count#field"
         },
         {
@@ -137,6 +207,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 37,
+              "line": 35
+            },
+            "start": {
+              "col": 32,
+              "line": 35
+            }
+          },
           "to": "calls/math::SCALE#const"
         },
         {
@@ -153,6 +233,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 39
+            },
+            "start": {
+              "col": 14,
+              "line": 39
+            }
+          },
           "to": "calls::Counter::read#method"
         },
         {
@@ -177,6 +267,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 47
+            },
+            "start": {
+              "col": 14,
+              "line": 47
+            }
+          },
           "to": "calls::Counter::load#method"
         },
         {
@@ -201,6 +301,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 56
+            },
+            "start": {
+              "col": 5,
+              "line": 56
+            }
+          },
           "to": "calls::helper#function"
         },
         {
@@ -217,6 +327,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 33,
+              "line": 60
+            },
+            "start": {
+              "col": 27,
+              "line": 60
+            }
+          },
           "to": "calls::helper#function"
         },
         {
@@ -233,6 +353,16 @@
           },
           "kind": "references",
           "resolution": "heuristic",
+          "site": {
+            "end": {
+              "col": 13,
+              "line": 64
+            },
+            "start": {
+              "col": 7,
+              "line": 64
+            }
+          },
           "to": "calls::Counter::double#method"
         },
         {
@@ -249,6 +379,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 68
+            },
+            "start": {
+              "col": 13,
+              "line": 68
+            }
+          },
           "to": "calls::Counter#type"
         },
         {
@@ -257,6 +397,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 69
+            },
+            "start": {
+              "col": 9,
+              "line": 69
+            }
+          },
           "to": "calls::Counter::count#field"
         },
         {
@@ -265,6 +415,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 70
+            },
+            "start": {
+              "col": 9,
+              "line": 70
+            }
+          },
           "to": "calls::Counter::label#field"
         },
         {
@@ -289,6 +449,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 80
+            },
+            "start": {
+              "col": 7,
+              "line": 80
+            }
+          },
           "to": "calls::Counter::bump#method"
         },
         {
@@ -305,6 +475,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 29,
+              "line": 84
+            },
+            "start": {
+              "col": 26,
+              "line": 84
+            }
+          },
           "to": "calls::Counter::new#method"
         },
         {
@@ -313,6 +493,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 85
+            },
+            "start": {
+              "col": 7,
+              "line": 85
+            }
+          },
           "to": "calls::Counter::bump#method"
         },
         {
@@ -321,6 +511,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 12,
+              "line": 86
+            },
+            "start": {
+              "col": 7,
+              "line": 86
+            }
+          },
           "to": "calls::Counter::count#field"
         },
         {
@@ -510,6 +710,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::Counter#type",
           "kind": "type",
@@ -527,6 +737,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 17
+            },
+            "start": {
+              "col": 5,
+              "line": 17
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::Counter::count#field",
           "kind": "field",
@@ -545,6 +765,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 18
+            },
+            "start": {
+              "col": 5,
+              "line": 18
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::Counter::label#field",
           "kind": "field",
@@ -563,6 +793,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 27
+            },
+            "start": {
+              "col": 5,
+              "line": 22
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::Counter::new#method",
           "kind": "method",
@@ -581,6 +821,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 32
+            },
+            "start": {
+              "col": 5,
+              "line": 29
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::Counter::bump#method",
           "kind": "method",
@@ -599,6 +849,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 36
+            },
+            "start": {
+              "col": 5,
+              "line": 34
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::Counter::double#method",
           "kind": "method",
@@ -617,6 +877,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 40
+            },
+            "start": {
+              "col": 5,
+              "line": 38
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::Counter::load#method",
           "kind": "method",
@@ -635,6 +905,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 44
+            },
+            "start": {
+              "col": 5,
+              "line": 42
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::Counter::read#method",
           "kind": "method",
@@ -653,6 +933,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 48
+            },
+            "start": {
+              "col": 5,
+              "line": 46
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::Counter::get#method",
           "kind": "method",
@@ -671,6 +961,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 53
+            },
+            "start": {
+              "col": 1,
+              "line": 51
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::helper#function",
           "kind": "function",
@@ -688,6 +988,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 57
+            },
+            "start": {
+              "col": 1,
+              "line": 55
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::wrapper#function",
           "kind": "function",
@@ -705,6 +1015,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 61
+            },
+            "start": {
+              "col": 1,
+              "line": 59
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::apply#function",
           "kind": "function",
@@ -722,6 +1042,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 65
+            },
+            "start": {
+              "col": 1,
+              "line": 63
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::unknown#function",
           "kind": "function",
@@ -739,6 +1069,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 73
+            },
+            "start": {
+              "col": 1,
+              "line": 67
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::literal#function",
           "kind": "function",
@@ -756,6 +1096,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 77
+            },
+            "start": {
+              "col": 1,
+              "line": 75
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::map#function",
           "kind": "function",
@@ -773,6 +1123,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 81
+            },
+            "start": {
+              "col": 1,
+              "line": 79
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::typed#function",
           "kind": "function",
@@ -790,6 +1150,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 87
+            },
+            "start": {
+              "col": 1,
+              "line": 83
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls::chain#function",
           "kind": "function",
@@ -807,6 +1177,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls/math::SCALE#const",
           "kind": "const",
@@ -824,6 +1204,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
           "file": "src/lib.rs",
           "id": "calls/math::square#function",
           "kind": "function",

@@ -1,10 +1,12 @@
+use std::sync::LazyLock;
+
 use lighthouse_model::{
     Capability, Diagnostic, Fingerprint, Fragment, Position, Span,
     annotation::{ANNOTATION_REASON, UNUSED_ALLOW},
 };
 use lighthouse_plugin::{
-    Analyzer, Conventions, Ctx, Error, Indexed, LanguageProvider, Manifest, Plugin, Preset, Rule,
-    RuleMeta, Scope, Source, Workspace,
+    Analyzer, AnalyzerManifest, Ctx, Error, Fixer, Indexed, LanguageProvider, Plugin,
+    PluginManifest, PresetManifest, ProviderManifest, Rule, RuleManifest, Scope, Source, Workspace,
 };
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
@@ -16,11 +18,12 @@ const MAX_FILE_LINES: &str = "core/max-file-lines";
 pub struct Core;
 
 impl Plugin for Core {
-    fn manifest(&self) -> Manifest {
-        Manifest {
+    fn manifest(&self) -> &PluginManifest {
+        static MANIFEST: LazyLock<PluginManifest> = LazyLock::new(|| PluginManifest {
             id: "core".to_owned(),
             version: env!("CARGO_PKG_VERSION").to_owned(),
-        }
+        });
+        &MANIFEST
     }
 
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
@@ -39,44 +42,36 @@ impl Plugin for Core {
         ]
     }
 
-    fn presets(&self) -> Vec<Preset> {
+    fn fixers(&self) -> Vec<Box<dyn Fixer>> {
+        lighthouse_declarative::Declarative::bundled_fixers("core")
+    }
+
+    fn presets(&self) -> Vec<PresetManifest> {
         let rules = self.rules();
-        Preset::standard("core", rules.iter().map(|rule| rule.meta()))
+        PresetManifest::standard("core", rules.iter().map(|rule| rule.manifest()))
     }
 }
 
 /// Fallback provider: every file is plain text.
 struct Text {
-    globs: Vec<String>,
+    manifest: ProviderManifest,
 }
 
 impl Text {
     fn new() -> Self {
         Self {
-            globs: vec!["**".to_owned()],
+            manifest: ProviderManifest {
+                fallback: true,
+                capabilities: vec![Capability::Overlays],
+                ..ProviderManifest::new("text", vec!["**".to_owned()])
+            },
         }
     }
 }
 
 impl LanguageProvider for Text {
-    fn id(&self) -> &str {
-        "text"
-    }
-
-    fn globs(&self) -> &[String] {
-        &self.globs
-    }
-
-    fn conventions(&self) -> Conventions {
-        Conventions::default()
-    }
-
-    fn capabilities(&self) -> &[Capability] {
-        &[]
-    }
-
-    fn fallback(&self) -> bool {
-        true
+    fn manifest(&self) -> &ProviderManifest {
+        &self.manifest
     }
 
     fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
@@ -97,16 +92,13 @@ impl LanguageProvider for Text {
 struct LineCount;
 
 impl Analyzer for LineCount {
-    fn id(&self) -> &str {
-        LINE_COUNT
-    }
-
-    fn requires(&self) -> &[String] {
-        &[]
-    }
-
-    fn scope(&self) -> Scope {
-        Scope::File
+    fn manifest(&self) -> &AnalyzerManifest {
+        static MANIFEST: LazyLock<AnalyzerManifest> = LazyLock::new(|| AnalyzerManifest {
+            id: LINE_COUNT.to_owned(),
+            requires: Vec::new(),
+            scope: Scope::File,
+        });
+        &MANIFEST
     }
 
     fn run(&self, ctx: &Ctx) -> Result<Value, Error> {
@@ -133,7 +125,7 @@ fn annotation_rule(id: &'static str) -> Box<dyn Rule> {
     Box::new(PatternRule::new(
         id,
         &[],
-        |_: &RuleMeta, _: &Ctx, _: Unconfigured| Ok(Vec::new()),
+        |_: &RuleManifest, _: &Ctx, _: Unconfigured| Ok(Vec::new()),
     ))
 }
 
@@ -141,7 +133,7 @@ fn max_file_lines() -> Box<dyn Rule> {
     Box::new(PatternRule::new(
         MAX_FILE_LINES,
         &[LINE_COUNT],
-        |meta: &RuleMeta, ctx: &Ctx, Limit { max }| {
+        |meta: &RuleManifest, ctx: &Ctx, Limit { max }| {
             let (file, _) = ctx
                 .file
                 .ok_or_else(|| Error::Failed("no file".to_owned()))?;

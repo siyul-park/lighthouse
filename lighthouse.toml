@@ -7,6 +7,13 @@ plugins = [
 ]
 extends = ["core/recommended", "design/recommended", "testing/recommended"]
 
+# What `lighthouse check --fix` runs on a file it changed.
+[languages.go]
+formatter = { argv = ["gofmt"], stdin = "file", output = "text" }
+
+[languages.rust]
+formatter = { argv = ["rustfmt", "--edition", "2024", "--emit", "stdout"], stdin = "file", output = "text" }
+
 [rules]
 "core/max-file-lines" = { level = "warn", max = 1000 }
 

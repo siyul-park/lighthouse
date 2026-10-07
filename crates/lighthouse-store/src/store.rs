@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
     thread,
     time::Duration,
 };
@@ -14,8 +15,8 @@ use rusqlite::{
 use serde_json::{Value, json};
 
 use crate::{
-    Error, Filter, FindingRecord, Judgment, LatestReview, NewReview, Observed, Resolved,
-    ReviewEvent, Run, RunSummary, Stamp, Standing, StatusFilter, Unchecked, digest, log,
+    Error, Filter, FindingRecord, FixEvent, Judgment, LatestReview, NewFix, NewReview, Observed,
+    Resolved, ReviewEvent, Run, RunSummary, Stamp, Standing, StatusFilter, Unchecked, digest, log,
     migrations,
 };
 
@@ -222,6 +223,81 @@ impl Store {
         insert_event(&tx, &event)?;
         tx.commit()?;
         Ok(Resolved { event, finding })
+    }
+
+    /// Records that a fixer changed the code for a finding. The record is
+    /// local: unlike a verdict it is not written to the decision log.
+    pub fn record_fix(&mut self, fix: &NewFix) -> Result<FixEvent, Error> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let timestamp = timestamp(&tx)?;
+        let files = serde_json::to_string(&fix.files)?;
+        static NONCE: AtomicU64 = AtomicU64::new(0);
+        let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
+        let id = digest::hash(
+            &format!(
+                "{}\0{}\0{}\0{files}\0{timestamp}\0{}\0{nonce}",
+                fix.fingerprint,
+                fix.fixer,
+                fix.description,
+                std::process::id()
+            ),
+            16,
+        );
+        tx.execute(
+            "INSERT OR IGNORE INTO fix_events (event_id, fingerprint, rule_id, fixer, safety, \
+                 description, files, git_commit, lighthouse_version, timestamp) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                id,
+                fix.fingerprint,
+                fix.rule_id,
+                fix.fixer,
+                fix.safety,
+                fix.description,
+                files,
+                fix.commit,
+                fix.lighthouse_version,
+                timestamp
+            ],
+        )?;
+        tx.commit()?;
+        Ok(FixEvent {
+            id,
+            fingerprint: fix.fingerprint.clone(),
+            rule_id: fix.rule_id.clone(),
+            fixer: fix.fixer.clone(),
+            safety: fix.safety.clone(),
+            description: fix.description.clone(),
+            files: fix.files.clone(),
+            commit: fix.commit.clone(),
+            timestamp,
+        })
+    }
+
+    /// The fixes recorded for a finding, oldest first.
+    pub fn fixes(&self, fingerprint: &str) -> Result<Vec<FixEvent>, Error> {
+        let mut stmt = self.conn.prepare(
+            "SELECT event_id, fingerprint, rule_id, fixer, safety, description, files, \
+                 git_commit, timestamp FROM fix_events WHERE fingerprint = ?1 \
+             ORDER BY timestamp, event_id",
+        )?;
+        let rows = stmt.query_map(params![fingerprint], |row| {
+            let files: String = row.get(6)?;
+            Ok(FixEvent {
+                id: row.get(0)?,
+                fingerprint: row.get(1)?,
+                rule_id: row.get(2)?,
+                fixer: row.get(3)?,
+                safety: row.get(4)?,
+                description: row.get(5)?,
+                files: serde_json::from_str(&files).unwrap_or_default(),
+                commit: row.get(7)?,
+                timestamp: row.get(8)?,
+            })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 
     /// Deletes findings that are resolved or inactive, were never reviewed and

@@ -1,29 +1,19 @@
 use lighthouse_engine::RuleTester;
 use lighthouse_model::{
-    Capability, Diagnostic, Fingerprint, Fragment, Options, Position, Severity, Span,
+    Capability, Diagnostic, EditOp, Fingerprint, FixOutcome, Fragment, Options, Position, Safety,
+    Severity, Span,
 };
 use lighthouse_plugin::{
-    Conventions, Ctx, Error, Indexed, LanguageProvider, Manifest, Plugin, Registry, Rule, RuleMeta,
-    Scope, Source, Workspace,
+    Ctx, Error, FixRequest, Fixer, FixerManifest, Indexed, LanguageProvider, Plugin,
+    PluginManifest, ProviderManifest, Registry, Rule, RuleManifest, Scope, Source, Workspace,
 };
 use lighthouse_spec::Catalog;
 
-struct Notes {
-    globs: Vec<String>,
-}
+struct Notes(ProviderManifest);
 
 impl LanguageProvider for Notes {
-    fn id(&self) -> &str {
-        "notes"
-    }
-    fn globs(&self) -> &[String] {
-        &self.globs
-    }
-    fn conventions(&self) -> Conventions {
-        Conventions::default()
-    }
-    fn capabilities(&self) -> &[Capability] {
-        &[]
+    fn manifest(&self) -> &ProviderManifest {
+        &self.0
     }
     fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
         Ok(Indexed {
@@ -41,11 +31,11 @@ impl LanguageProvider for Notes {
 
 /// Flags every line containing the configured word (default `TODO`).
 struct Marker {
-    meta: RuleMeta,
+    meta: RuleManifest,
 }
 
 impl Rule for Marker {
-    fn meta(&self) -> &RuleMeta {
+    fn manifest(&self) -> &RuleManifest {
         &self.meta
     }
 
@@ -87,25 +77,64 @@ impl Rule for Marker {
     }
 }
 
-struct Fake;
+/// Rewrites the flagged line, `TODO` into `DONE`.
+struct Done(FixerManifest);
+
+impl Fixer for Done {
+    fn manifest(&self) -> &FixerManifest {
+        &self.0
+    }
+
+    fn fix(&self, request: &FixRequest) -> Result<FixOutcome, Error> {
+        let line = request.finding.span.start.line;
+        let text = request
+            .text
+            .lines()
+            .nth(line as usize - 1)
+            .unwrap_or_default();
+        let at = |col: usize| Position {
+            line,
+            col: u32::try_from(col + 1).unwrap(),
+        };
+        Ok(FixOutcome::Proposed {
+            description: "done".to_owned(),
+            ops: vec![EditOp::Replace {
+                file: request.finding.file.clone(),
+                span: Span {
+                    start: at(0),
+                    end: at(text.len()),
+                },
+                text: text.replace("TODO", "DONE"),
+            }],
+            safety: Safety::Safe,
+        })
+    }
+}
+
+struct Fake(PluginManifest);
 
 impl Plugin for Fake {
-    fn manifest(&self) -> Manifest {
-        Manifest {
-            id: "fake".to_owned(),
-            version: "0".to_owned(),
-        }
+    fn manifest(&self) -> &PluginManifest {
+        &self.0
     }
 
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
-        vec![Box::new(Notes {
-            globs: vec!["**/*.txt".to_owned()],
-        })]
+        vec![Box::new(Notes(ProviderManifest {
+            capabilities: vec![Capability::Overlays],
+            ..ProviderManifest::new("notes", vec!["**/*.txt".to_owned()])
+        }))]
+    }
+
+    fn fixers(&self) -> Vec<Box<dyn Fixer>> {
+        vec![Box::new(Done(FixerManifest {
+            id: "fake/marker".to_owned(),
+            requires: Vec::new(),
+        }))]
     }
 
     fn rules(&self) -> Vec<Box<dyn Rule>> {
         vec![Box::new(Marker {
-            meta: RuleMeta {
+            meta: RuleManifest {
                 id: "fake/marker".to_owned(),
                 severity: Severity::Warn,
                 scope: Scope::File,
@@ -122,11 +151,20 @@ impl Plugin for Fake {
 
 fn registry() -> Registry {
     let mut registry = Registry::default();
-    registry.register(&Fake).unwrap();
+    registry
+        .register(&Fake(PluginManifest {
+            id: "fake".to_owned(),
+            version: "0".to_owned(),
+        }))
+        .unwrap();
     registry
 }
 
 fn catalog(examples: &str) -> Catalog {
+    catalog_with("", examples)
+}
+
+fn catalog_with(fix: &str, examples: &str) -> Catalog {
     let pattern = format!(
         "id: fake/marker
 title: Marker
@@ -142,7 +180,7 @@ options:
     description: Word to flag.
 implementation:
   builtin: fake/marker
-examples:
+{fix}examples:
 {examples}"
     );
     Catalog::from_files(
@@ -280,4 +318,79 @@ fn rule_tester_check() {
         .language("go")
         .check(pattern);
     assert_eq!(failures, ["fake/marker: no example for language `go`"]);
+}
+
+const FIX: &str = "fix:
+  safety: suggested
+  ops:
+    - op: delete
+      file: finding.file
+      span: finding.span
+";
+
+fn fixing(fixed: &str, again: &str) -> Catalog {
+    catalog_with(
+        FIX,
+        &format!(
+            "  - name: todo
+    language: notes
+    kind: invalid
+    files:
+      - path: a.txt
+        body: |-
+          fine
+          TODO later
+    expect:
+      - line: 2
+    fixed:
+      - path: a.txt
+        body: |-
+{fixed}
+  - name: ok
+    language: notes
+    kind: valid
+    files:
+      - path: a.txt
+        body: |-
+{again}
+"
+        ),
+    )
+}
+
+#[test]
+fn a_fix_example_passes_when_the_fix_gives_its_fixed_text_and_the_rule_stops_firing() {
+    let catalog = fixing("          fine\n          DONE later", "          fine");
+
+    let failures = RuleTester::new(registry, &catalog).check_all();
+
+    assert!(failures.is_empty(), "{failures:?}");
+}
+
+#[test]
+fn a_fix_example_fails_when_the_fixed_text_differs() {
+    let catalog = fixing("          fine\n          TODO later", "          fine");
+
+    let failures = RuleTester::new(registry, &catalog).check_all();
+
+    assert_eq!(failures.len(), 1, "{failures:?}");
+    assert!(
+        failures[0].contains("todo: fix of `a.txt` is not what `fixed` says"),
+        "{failures:?}"
+    );
+    assert!(failures[0].contains("+DONE later"));
+}
+
+#[test]
+fn a_fix_example_fails_when_the_fixer_applies_nothing() {
+    let catalog = fixing("          fine\n          DONE later", "          fine");
+
+    let failures = RuleTester::new(Registry::default, &catalog).check_all();
+
+    assert!(
+        failures
+            .iter()
+            .any(|f| f.contains("fix applied nothing") || f.contains("unknown rule")),
+        "{failures:?}"
+    );
 }

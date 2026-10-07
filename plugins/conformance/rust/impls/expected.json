@@ -114,6 +114,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 13,
+              "line": 14
+            },
+            "start": {
+              "col": 9,
+              "line": 14
+            }
+          },
           "to": "impls::Stack#type"
         },
         {
@@ -122,6 +132,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 15
+            },
+            "start": {
+              "col": 13,
+              "line": 15
+            }
+          },
           "to": "impls::Stack::items#field"
         },
         {
@@ -130,6 +150,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 16
+            },
+            "start": {
+              "col": 13,
+              "line": 16
+            }
+          },
           "to": "impls::Stack::limit#field"
         },
         {
@@ -146,6 +176,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 21
+            },
+            "start": {
+              "col": 14,
+              "line": 21
+            }
+          },
           "to": "impls::Stack::check#method"
         },
         {
@@ -154,6 +194,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 22
+            },
+            "start": {
+              "col": 14,
+              "line": 22
+            }
+          },
           "to": "impls::Stack::items#field"
         },
         {
@@ -170,6 +220,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 26
+            },
+            "start": {
+              "col": 22,
+              "line": 26
+            }
+          },
           "to": "impls::Stack::limit#field"
         },
         {
@@ -186,6 +246,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 37,
+              "line": 32
+            },
+            "start": {
+              "col": 32,
+              "line": 32
+            }
+          },
           "to": "impls::Stack::items#field"
         },
         {
@@ -218,6 +288,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 42
+            },
+            "start": {
+              "col": 14,
+              "line": 42
+            }
+          },
           "to": "impls::Named::name#method"
         },
         {
@@ -290,6 +370,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 66
+            },
+            "start": {
+              "col": 14,
+              "line": 66
+            }
+          },
           "to": "impls::Named::shout#method"
         },
         {
@@ -314,6 +404,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 74
+            },
+            "start": {
+              "col": 9,
+              "line": 74
+            }
+          },
           "to": "impls::Meters#type"
         },
         {
@@ -330,6 +430,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 80
+            },
+            "start": {
+              "col": 9,
+              "line": 80
+            }
+          },
           "to": "impls::Meters#type"
         },
         {
@@ -402,6 +512,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 31,
+              "line": 115
+            },
+            "start": {
+              "col": 28,
+              "line": 115
+            }
+          },
           "to": "impls::Stack::new#method"
         },
         {
@@ -410,6 +530,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 116
+            },
+            "start": {
+              "col": 11,
+              "line": 116
+            }
+          },
           "to": "impls::Stack::push#method"
         },
         {
@@ -590,6 +720,16 @@
       "symbols": [
         {
           "doc": "A bounded stack.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Stack#type",
           "kind": "type",
@@ -607,6 +747,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 5
+            },
+            "start": {
+              "col": 5,
+              "line": 5
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Stack::items#field",
           "kind": "field",
@@ -625,6 +775,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Stack::limit#field",
           "kind": "field",
@@ -643,6 +803,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 32,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 10
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Stack::EMPTY#const",
           "kind": "const",
@@ -662,6 +832,16 @@
         },
         {
           "doc": "An empty stack.",
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 18
+            },
+            "start": {
+              "col": 5,
+              "line": 12
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Stack::new#method",
           "kind": "method",
@@ -680,6 +860,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 23
+            },
+            "start": {
+              "col": 5,
+              "line": 20
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Stack::push#method",
           "kind": "method",
@@ -698,6 +888,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 27
+            },
+            "start": {
+              "col": 5,
+              "line": 25
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Stack::check#method",
           "kind": "method",
@@ -716,6 +916,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 33
+            },
+            "start": {
+              "col": 5,
+              "line": 31
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Stack::Display::fmt#method",
           "kind": "method",
@@ -735,6 +945,16 @@
         },
         {
           "doc": "Things with a name.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 44
+            },
+            "start": {
+              "col": 1,
+              "line": 36
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Named#interface",
           "kind": "interface",
@@ -753,6 +973,16 @@
         },
         {
           "doc": "The name.",
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 39
+            },
+            "start": {
+              "col": 5,
+              "line": 38
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Named::name#method",
           "kind": "method",
@@ -771,6 +1001,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 43
+            },
+            "start": {
+              "col": 5,
+              "line": 41
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Named::shout#method",
           "kind": "method",
@@ -789,6 +1029,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 48
+            },
+            "start": {
+              "col": 1,
+              "line": 46
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Aged#interface",
           "kind": "interface",
@@ -806,6 +1056,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 47
+            },
+            "start": {
+              "col": 5,
+              "line": 47
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Aged::name#method",
           "kind": "method",
@@ -824,6 +1084,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 50
+            },
+            "start": {
+              "col": 1,
+              "line": 50
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Dog#type",
           "kind": "type",
@@ -842,6 +1112,16 @@
         },
         {
           "doc": "The name.",
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 55
+            },
+            "start": {
+              "col": 5,
+              "line": 53
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Dog::Named::name#method",
           "kind": "method",
@@ -860,6 +1140,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 61
+            },
+            "start": {
+              "col": 5,
+              "line": 59
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Dog::Aged::name#method",
           "kind": "method",
@@ -878,6 +1168,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 67
+            },
+            "start": {
+              "col": 5,
+              "line": 65
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Dog::bark#method",
           "kind": "method",
@@ -896,6 +1196,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 28,
+              "line": 70
+            },
+            "start": {
+              "col": 1,
+              "line": 70
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Meters#type",
           "kind": "type",
@@ -913,6 +1223,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 75
+            },
+            "start": {
+              "col": 5,
+              "line": 73
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Meters::From<f64>::from#method",
           "kind": "method",
@@ -931,6 +1251,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 81
+            },
+            "start": {
+              "col": 5,
+              "line": 79
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Meters::From<u32>::from#method",
           "kind": "method",
@@ -949,6 +1279,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 86
+            },
+            "start": {
+              "col": 1,
+              "line": 84
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Summary#interface",
           "kind": "interface",
@@ -966,6 +1306,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 33,
+              "line": 85
+            },
+            "start": {
+              "col": 5,
+              "line": 85
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Summary::summary#method",
           "kind": "method",
@@ -984,6 +1334,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 91
+            },
+            "start": {
+              "col": 5,
+              "line": 89
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::T::Summary::summary#method",
           "kind": "method",
@@ -1002,6 +1362,16 @@
         },
         {
           "doc": "The name.",
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 97
+            },
+            "start": {
+              "col": 5,
+              "line": 95
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::String::Named::name#method",
           "kind": "method",
@@ -1019,6 +1389,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 106
+            },
+            "start": {
+              "col": 1,
+              "line": 106
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Marker#type",
           "kind": "type",
@@ -1036,6 +1416,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 111
+            },
+            "start": {
+              "col": 5,
+              "line": 109
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Marker::Summary::summary#method",
           "kind": "method",
@@ -1054,6 +1444,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 118
+            },
+            "start": {
+              "col": 1,
+              "line": 114
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::build#function",
           "kind": "function",
@@ -1071,6 +1471,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 29,
+              "line": 102
+            },
+            "start": {
+              "col": 9,
+              "line": 102
+            }
+          },
           "file": "src/lib.rs",
           "id": "impls::Dog::wag#method",
           "kind": "method",

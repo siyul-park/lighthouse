@@ -327,18 +327,7 @@ fn discard_line(reader: &mut impl BufRead) {
 }
 
 /// Kills a plugin that is still running together with everything it started,
-/// then collects it. A plugin that already exited is only collected: its
-/// process group id may have been reused.
+/// then collects it.
 fn reap(child: &mut Child) {
-    if matches!(child.try_wait(), Ok(None)) {
-        #[cfg(unix)]
-        if let Ok(pid) = i32::try_from(child.id()) {
-            // SAFETY: killpg only sends a signal to the group made at spawn.
-            unsafe {
-                libc::killpg(pid, libc::SIGKILL);
-            }
-        }
-        let _ = child.kill();
-    }
-    let _ = child.wait();
+    lighthouse_process::reap(child);
 }

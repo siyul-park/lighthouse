@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use lighthouse_model::{Diagnostic, Options};
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta, Scope as RunScope};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest, Scope as RunScope};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
@@ -21,9 +21,9 @@ impl Scope {
 impl Pattern {
     /// Rule metadata of an implemented pattern; `None` while it has no
     /// implementation. Analyzers and capabilities belong to the implementation.
-    pub fn rule_meta(&self) -> Option<RuleMeta> {
+    pub fn rule_manifest(&self) -> Option<RuleManifest> {
         self.implementation.as_ref()?;
-        Some(RuleMeta {
+        Some(RuleManifest {
             id: self.id.clone(),
             severity: self.severity()?,
             scope: self.scope.rule_scope(),
@@ -40,7 +40,7 @@ impl Pattern {
 /// A rule whose metadata and option defaults come from its catalog pattern.
 /// `check` receives the options resolved for the focused file's language.
 pub struct PatternRule<O, F> {
-    meta: RuleMeta,
+    meta: RuleManifest,
     pattern: &'static Pattern,
     check: F,
     options: PhantomData<fn() -> O>,
@@ -49,7 +49,7 @@ pub struct PatternRule<O, F> {
 impl<O, F> PatternRule<O, F>
 where
     O: DeserializeOwned,
-    F: Fn(&RuleMeta, &Ctx, O) -> Result<Vec<Diagnostic>, Error> + Send + Sync,
+    F: Fn(&RuleManifest, &Ctx, O) -> Result<Vec<Diagnostic>, Error> + Send + Sync,
 {
     /// Panics when the bundled catalog has no implemented pattern `id`.
     pub fn new(id: &str, analyzers: &[&str], check: F) -> Self {
@@ -57,7 +57,7 @@ where
             .pattern(id)
             .unwrap_or_else(|| panic!("bundled catalog defines {id}"));
         let mut meta = pattern
-            .rule_meta()
+            .rule_manifest()
             .unwrap_or_else(|| panic!("{id} is implemented"));
         meta.analyzers = analyzers.iter().map(|a| (*a).to_owned()).collect();
         Self {
@@ -84,10 +84,10 @@ where
 impl<O, F> Rule for PatternRule<O, F>
 where
     O: DeserializeOwned + Send + Sync,
-    F: Fn(&RuleMeta, &Ctx, O) -> Result<Vec<Diagnostic>, Error> + Send + Sync,
+    F: Fn(&RuleManifest, &Ctx, O) -> Result<Vec<Diagnostic>, Error> + Send + Sync,
 {
     /// The metadata of the pattern the rule was built from.
-    fn meta(&self) -> &RuleMeta {
+    fn manifest(&self) -> &RuleManifest {
         &self.meta
     }
 

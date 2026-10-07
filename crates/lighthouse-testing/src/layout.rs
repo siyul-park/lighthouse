@@ -1,5 +1,5 @@
 use lighthouse_model::{Diagnostic, Symbol, SymbolKind, SymbolRole};
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
@@ -18,7 +18,7 @@ pub(crate) fn rule() -> Box<dyn Rule> {
 /// Fixtures declared after the file's first test, and helpers declared before
 /// a test or helper of the same file that uses them. Only providers that tell
 /// a declaration's role (`fixture`, `test-helper`) can be judged.
-fn check(meta: &RuleMeta, ctx: &Ctx, _: NoOptions) -> Result<Vec<Diagnostic>, Error> {
+fn check(meta: &RuleManifest, ctx: &Ctx, _: NoOptions) -> Result<Vec<Diagnostic>, Error> {
     let Some((file, _)) = ctx.file else {
         return Ok(Vec::new());
     };

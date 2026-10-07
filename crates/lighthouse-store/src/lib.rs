@@ -16,7 +16,7 @@ mod store;
 
 pub use error::Error;
 pub use record::{
-    Filter, FindingRecord, Judgment, LatestReview, NewReview, Observed, Resolved, ReviewEvent, Run,
-    RunSummary, Stamp, Standing, State, StatusFilter, Unchecked,
+    Filter, FindingRecord, FixEvent, Judgment, LatestReview, NewFix, NewReview, Observed, Resolved,
+    ReviewEvent, Run, RunSummary, Stamp, Standing, State, StatusFilter, Unchecked,
 };
 pub use store::Store;

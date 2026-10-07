@@ -10,6 +10,12 @@ type usage struct {
 	to   string
 }
 
+// occurrence is a use at one place: the identifier that names the target.
+type occurrence struct {
+	usage
+	at ast.Node
+}
+
 // uses collects what one function body calls and references, resolved
 // through go/types, in order of first use.
 type uses struct {
@@ -18,6 +24,7 @@ type uses struct {
 	handled map[ast.Node]bool
 	seen    map[usage]bool
 	list    []usage
+	all     []occurrence
 }
 
 func (w *uses) Visit(n ast.Node) ast.Visitor {
@@ -60,7 +67,7 @@ func (w *uses) call(n *ast.CallExpr) {
 
 func (w *uses) ident(id *ast.Ident, kind string) {
 	if obj := w.info.Uses[id]; obj != nil {
-		w.object(obj, kind)
+		w.object(obj, kind, id)
 	}
 }
 
@@ -68,14 +75,14 @@ func (w *uses) selector(n *ast.SelectorExpr, kind string) {
 	s := w.info.Selections[n]
 	if s == nil {
 		if obj := w.info.Uses[n.Sel]; obj != nil {
-			w.object(obj, kind)
+			w.object(obj, kind, n.Sel)
 		}
 		return
 	}
 	switch s.Kind() {
 	case types.FieldVal:
 		if owner, ok := holder(s); ok {
-			w.field(owner, s.Obj())
+			w.field(owner, s.Obj(), n.Sel)
 		}
 	default:
 		fn, ok := s.Obj().(*types.Func)
@@ -86,7 +93,7 @@ func (w *uses) selector(n *ast.SelectorExpr, kind string) {
 		if !ok {
 			return
 		}
-		w.add(kind, to)
+		w.add(kind, to, n.Sel)
 	}
 }
 
@@ -111,14 +118,14 @@ func (w *uses) literal(n *ast.CompositeLit) {
 		}
 		if field, ok := w.info.Uses[key].(*types.Var); ok && field.IsField() {
 			w.handled[key] = true
-			w.field(owner, field)
+			w.field(owner, field, key)
 		}
 	}
 }
 
 // object records a use of a package-level object or method: a call stays a
 // call only for functions and methods.
-func (w *uses) object(obj types.Object, kind string) {
+func (w *uses) object(obj types.Object, kind string, at ast.Node) {
 	to, ok := w.res.object(obj)
 	if !ok {
 		return
@@ -126,24 +133,29 @@ func (w *uses) object(obj types.Object, kind string) {
 	if _, fn := obj.(*types.Func); !fn {
 		kind = edgeReferences
 	}
-	w.add(kind, to)
+	w.add(kind, to, at)
 }
 
-func (w *uses) field(owner *types.TypeName, field types.Object) {
+func (w *uses) field(owner *types.TypeName, field types.Object, at ast.Node) {
 	if to, ok := w.res.field(owner, field); ok {
-		w.add(edgeReferences, to)
+		w.add(edgeReferences, to, at)
 	}
 }
 
-func (w *uses) add(kind, to string) {
+// add records a use: once in the list of distinct uses, and every time as an
+// occurrence.
+func (w *uses) add(kind, to string, at ast.Node) {
 	u := usage{kind, to}
+	w.all = append(w.all, occurrence{u, at})
 	if !w.seen[u] {
 		w.seen[u] = true
 		w.list = append(w.list, u)
 	}
 }
 
-func (u *unit) usages(d *ast.FuncDecl) []usage {
+// usages are the distinct uses of a body in order of first use, and every
+// place a use occurs.
+func (u *unit) usages(d *ast.FuncDecl) ([]usage, []occurrence) {
 	w := &uses{
 		res:     u.res,
 		info:    u.info(),
@@ -151,7 +163,7 @@ func (u *unit) usages(d *ast.FuncDecl) []usage {
 		seen:    map[usage]bool{},
 	}
 	ast.Walk(w, d.Body)
-	return w.list
+	return w.list, w.all
 }
 
 // callee strips parentheses and explicit type arguments from a call's function.

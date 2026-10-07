@@ -37,7 +37,8 @@ impl ServerHandler for Lighthouse {
         )
         .with_instructions(
             "Lighthouse remembers this project's design decisions as rules. Call `check` after \
-             changing code; fix findings or judge review-tier ones with `review_resolve`. \
+             changing code; fix findings (`fix` does it for rules marked fixable, `dry_run` \
+             first) or judge review-tier ones with `review_resolve`. \
              Read lighthouse://patterns/{id} for the full text of a rule.",
         )
     }

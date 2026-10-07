@@ -49,6 +49,34 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 36
+            },
+            "start": {
+              "col": 14,
+              "line": 36
+            }
+          },
+          "to": "flow::touch#function"
+        },
+        {
+          "from": {
+            "symbol": "flow::side_effects#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 37
+            },
+            "start": {
+              "col": 14,
+              "line": 37
+            }
+          },
           "to": "flow::touch#function"
         },
         {
@@ -73,6 +101,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 46
+            },
+            "start": {
+              "col": 13,
+              "line": 46
+            }
+          },
           "to": "flow::touch#function"
         },
         {
@@ -137,6 +175,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 105
+            },
+            "start": {
+              "col": 32,
+              "line": 105
+            }
+          },
           "to": "flow::factorial#function"
         },
         {
@@ -161,6 +209,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 113
+            },
+            "start": {
+              "col": 18,
+              "line": 113
+            }
+          },
           "to": "flow::Walker::walk#method"
         },
         {
@@ -177,6 +235,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 10,
+              "line": 122
+            },
+            "start": {
+              "col": 5,
+              "line": 122
+            }
+          },
           "to": "flow::outer::inner#function"
         },
         {
@@ -525,6 +593,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::branches#function",
           "kind": "function",
@@ -542,6 +620,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::guarded#function",
           "kind": "function",
@@ -559,6 +647,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::dispatcher#function",
           "kind": "function",
@@ -576,6 +674,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 27
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::explicit_returns#function",
           "kind": "function",
@@ -593,6 +701,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::side_effects#function",
           "kind": "function",
@@ -610,6 +728,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 41
+            },
+            "start": {
+              "col": 1,
+              "line": 41
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::touch#function",
           "kind": "function",
@@ -627,6 +755,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 51
+            },
+            "start": {
+              "col": 1,
+              "line": 43
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::statements_in_arms#function",
           "kind": "function",
@@ -644,6 +782,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 58
+            },
+            "start": {
+              "col": 1,
+              "line": 53
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::let_else#function",
           "kind": "function",
@@ -661,6 +809,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 62
+            },
+            "start": {
+              "col": 1,
+              "line": 60
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::if_let#function",
           "kind": "function",
@@ -678,6 +836,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 81
+            },
+            "start": {
+              "col": 1,
+              "line": 64
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::loops#function",
           "kind": "function",
@@ -695,6 +863,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 93
+            },
+            "start": {
+              "col": 1,
+              "line": 83
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::closures#function",
           "kind": "function",
@@ -712,6 +890,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 98
+            },
+            "start": {
+              "col": 1,
+              "line": 95
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::question#function",
           "kind": "function",
@@ -729,6 +917,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 102
+            },
+            "start": {
+              "col": 1,
+              "line": 100
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::logic#function",
           "kind": "function",
@@ -746,6 +944,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 106
+            },
+            "start": {
+              "col": 1,
+              "line": 104
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::factorial#function",
           "kind": "function",
@@ -763,6 +971,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 108
+            },
+            "start": {
+              "col": 1,
+              "line": 108
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::Walker#type",
           "kind": "type",
@@ -780,6 +998,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 115
+            },
+            "start": {
+              "col": 5,
+              "line": 111
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::Walker::walk#method",
           "kind": "method",
@@ -798,6 +1026,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 123
+            },
+            "start": {
+              "col": 1,
+              "line": 118
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::outer#function",
           "kind": "function",
@@ -815,6 +1053,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 121
+            },
+            "start": {
+              "col": 5,
+              "line": 119
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::outer::inner#function",
           "kind": "function",
@@ -833,6 +1081,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 130
+            },
+            "start": {
+              "col": 1,
+              "line": 125
+            }
+          },
           "file": "src/lib.rs",
           "id": "flow::asyncs#function",
           "kind": "function",

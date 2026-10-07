@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
 use crate::{
-    Content, Error, Example, Implementation, Pack, Pattern, Section,
+    Content, Error, Example, ExampleFile, Implementation, Pack, Pattern, Section,
     load::{self, Files},
     model::short_hash,
     sources::{Source, extract},
@@ -410,6 +410,17 @@ impl Catalog {
 /// sees the old file or the new one and a failure leaves no partial file. A
 /// `path` that is a symlink is refused rather than followed or replaced.
 pub fn write_atomic(path: &Path, text: &str) -> Result<(), Error> {
+    write_atomic_guarded(path, text, &|| Ok(()))
+}
+
+/// Like [`write_atomic`], but `guard` is asked once the temporary file is
+/// complete, right before it is renamed over `path`; an `Err` abandons the
+/// write and leaves `path` as it was.
+pub fn write_atomic_guarded(
+    path: &Path,
+    text: &str,
+    guard: &dyn Fn() -> Result<(), String>,
+) -> Result<(), Error> {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let io = |source| Error::Io {
         path: path.display().to_string(),
@@ -434,6 +445,11 @@ pub fn write_atomic(path: &Path, text: &str) -> Result<(), Error> {
             .open(&tmp)?;
         file.write_all(text.as_bytes())?;
         file.sync_all()?;
+        // The replacement keeps the mode of the file it replaces.
+        if let Ok(meta) = fs::metadata(path) {
+            fs::set_permissions(&tmp, meta.permissions())?;
+        }
+        guard().map_err(std::io::Error::other)?;
         fs::rename(&tmp, path)
     })();
     if let Err(e) = written {
@@ -559,30 +575,39 @@ fn resolve_all(
     examples
         .into_iter()
         .map(|mut example| {
-            let mut resolved = Vec::new();
-            for file in std::mem::take(&mut example.files) {
-                let Content::File(source) = &file.content else {
-                    resolved.push(file);
-                    continue;
-                };
-                if !validate::relative(source) {
-                    return Err(Error::invalid(
-                        id,
-                        format!("example source `{source}` escapes its section"),
-                    ));
-                }
-                let text = files
-                    .get(&format!("{dir}/{source}"))
-                    .ok_or_else(|| {
-                        Error::invalid(id, format!("example source `{source}` does not exist"))
-                    })?
-                    .clone();
-                resolved.push(file.with_loaded(text));
-            }
-            example.files = resolved;
+            example.files = resolve_files(files, dir, id, std::mem::take(&mut example.files))?;
+            example.fixed = resolve_files(files, dir, id, std::mem::take(&mut example.fixed))?;
             Ok(example)
         })
         .collect()
+}
+
+/// Loads the text of the files that name a `source` in the catalog layer.
+fn resolve_files(
+    files: &Files,
+    dir: &str,
+    id: &str,
+    list: Vec<ExampleFile>,
+) -> Result<Vec<ExampleFile>, Error> {
+    let mut resolved = Vec::new();
+    for file in list {
+        let Content::File(source) = &file.content else {
+            resolved.push(file);
+            continue;
+        };
+        if !validate::relative(source) {
+            return Err(Error::invalid(
+                id,
+                format!("example source `{source}` escapes its section"),
+            ));
+        }
+        let text = files
+            .get(&format!("{dir}/{source}"))
+            .ok_or_else(|| Error::invalid(id, format!("example source `{source}` does not exist")))?
+            .clone();
+        resolved.push(file.with_loaded(text));
+    }
+    Ok(resolved)
 }
 
 fn expect(path: &str, expected: &str, found: &str) -> Result<(), Error> {

@@ -6,12 +6,37 @@ use std::{
 };
 
 use lighthouse_model as core;
-use lighthouse_plugin::{Indexed, Source};
+use lighthouse_plugin::{Conventions, Indexed, ProviderManifest, Source};
 use lighthouse_protocol as wire;
 
 /// Core capability for a wire capability name; unknown names are ignored.
 pub(crate) fn capability(name: &str) -> Option<core::Capability> {
-    (name == wire::SEMANTIC_EDGES).then_some(core::Capability::SemanticEdges)
+    match name {
+        wire::SEMANTIC_EDGES => Some(core::Capability::SemanticEdges),
+        wire::EXTENT => Some(core::Capability::Extent),
+        wire::REFERENCE_SITES => Some(core::Capability::ReferenceSites),
+        wire::COMPLETE_REFERENCES => Some(core::Capability::CompleteReferences),
+        wire::OVERLAYS => Some(core::Capability::Overlays),
+        _ => None,
+    }
+}
+
+/// The core manifest of a language a plugin declared in `initialize`.
+pub(crate) fn provider_manifest(language: &wire::ProviderManifest) -> ProviderManifest {
+    ProviderManifest {
+        id: language.id.clone(),
+        globs: language.globs.clone(),
+        conventions: Conventions {
+            test_globs: language.conventions.test_globs.clone(),
+        },
+        capabilities: language
+            .capabilities
+            .iter()
+            .filter_map(|c| capability(c))
+            .collect(),
+        fallback: language.fallback,
+        priority: language.priority,
+    }
 }
 
 /// Converts a result against the files that were requested. A fragment for a
@@ -157,6 +182,7 @@ fn symbol(s: wire::Symbol) -> Result<core::Symbol, String> {
         owner: s.owner.map(id).transpose()?,
         file: PathBuf::from(s.file),
         span: span(s.span),
+        extent: s.extent.map(span),
         doc: s.doc,
         name: s.name,
         role: s.role.map(role),
@@ -214,6 +240,7 @@ fn edge(e: wire::Edge) -> Result<core::Edge, String> {
             wire::Resolution::Syntactic => core::Resolution::Syntactic,
             wire::Resolution::Heuristic => core::Resolution::Heuristic,
         },
+        site: e.site.map(span),
     })
 }
 

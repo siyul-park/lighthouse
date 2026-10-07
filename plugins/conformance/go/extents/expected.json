@@ -1,0 +1,869 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": ".::Limit#const",
+          "span": {
+            "end": {
+              "col": 40,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Limit caps the work.\n//\n// It is documented over several lines."
+        },
+        {
+          "span": {
+            "end": {
+              "col": 61,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "text": "// A detached comment, a blank line away, belongs to nobody."
+        },
+        {
+          "span": {
+            "end": {
+              "col": 31,
+              "line": 10
+            },
+            "start": {
+              "col": 15,
+              "line": 10
+            }
+          },
+          "text": "// trailing note"
+        },
+        {
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "text": "// Mode is a group of constants."
+        },
+        {
+          "attached_to": ".::Fast#const",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 14
+            },
+            "start": {
+              "col": 2,
+              "line": 14
+            }
+          },
+          "text": "// Fast skips the checks."
+        },
+        {
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 16
+            },
+            "start": {
+              "col": 7,
+              "line": 16
+            }
+          },
+          "text": "// checks everything"
+        },
+        {
+          "attached_to": ".::Service#type",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 24
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "text": "// Service does the work."
+        },
+        {
+          "attached_to": ".::Service::name#field",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 26
+            },
+            "start": {
+              "col": 2,
+              "line": 26
+            }
+          },
+          "text": "// name identifies the service."
+        },
+        {
+          "attached_to": ".::Reader#interface",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 31
+            }
+          },
+          "text": "// Reader reads."
+        },
+        {
+          "attached_to": ".::Reader::Read#method",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 33
+            },
+            "start": {
+              "col": 2,
+              "line": 33
+            }
+          },
+          "text": "// Read reads once."
+        },
+        {
+          "attached_to": ".::Service::Run#method",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 37
+            },
+            "start": {
+              "col": 1,
+              "line": 37
+            }
+          },
+          "text": "// Run runs the service."
+        },
+        {
+          "attached_to": ".::Pair#type",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 45
+            },
+            "start": {
+              "col": 2,
+              "line": 45
+            }
+          },
+          "text": "// Pair holds two values."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Limit#const"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::plain#var"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Fast#const"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Slow#const"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::left#var"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::right#var"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::only#var"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Service#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Service::name#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Service::size#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Reader#interface"
+        },
+        {
+          "from": {
+            "symbol": ".::Reader#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Reader::Read#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Service#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Service::Run#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Service::Run#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 39
+            },
+            "start": {
+              "col": 11,
+              "line": 39
+            }
+          },
+          "to": ".::Service::size"
+        },
+        {
+          "from": {
+            "symbol": ".::Service::Run#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 39
+            },
+            "start": {
+              "col": 18,
+              "line": 39
+            }
+          },
+          "to": ".::Limit"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::helper#function"
+        },
+        {
+          "from": {
+            "symbol": ".::helper#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 33,
+              "line": 42
+            },
+            "start": {
+              "col": 28,
+              "line": 42
+            }
+          },
+          "to": ".::plain"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Pair#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Pair#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Pair::a#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Pair#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Pair::b#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Solo#type"
+        }
+      ],
+      "file": {
+        "path": "extents.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::Service::Run#method",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::helper#function",
+          "tokens": 4,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "extents",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Limit caps the work.\n\nIt is documented over several lines.",
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "extents.go",
+          "id": ".::Limit#const",
+          "kind": "const",
+          "name": "Limit",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 6
+            },
+            "start": {
+              "col": 7,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 31,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "file": "extents.go",
+          "id": ".::plain#var",
+          "kind": "var",
+          "name": "plain",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 10
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "Fast skips the checks.",
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 15
+            },
+            "start": {
+              "col": 2,
+              "line": 14
+            }
+          },
+          "file": "extents.go",
+          "id": ".::Fast#const",
+          "kind": "const",
+          "name": "Fast",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 15
+            },
+            "start": {
+              "col": 2,
+              "line": 15
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Mode is a group of constants.",
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 16
+            },
+            "start": {
+              "col": 2,
+              "line": 16
+            }
+          },
+          "file": "extents.go",
+          "id": ".::Slow#const",
+          "kind": "const",
+          "name": "Slow",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 16
+            },
+            "start": {
+              "col": 2,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "extents.go",
+          "id": ".::left#var",
+          "kind": "var",
+          "name": "left",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 20
+            },
+            "start": {
+              "col": 2,
+              "line": 20
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "extents.go",
+          "id": ".::right#var",
+          "kind": "var",
+          "name": "right",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 20
+            },
+            "start": {
+              "col": 8,
+              "line": 20
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 21
+            },
+            "start": {
+              "col": 2,
+              "line": 21
+            }
+          },
+          "file": "extents.go",
+          "id": ".::only#var",
+          "kind": "var",
+          "name": "only",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 21
+            },
+            "start": {
+              "col": 2,
+              "line": 21
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "Service does the work.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 29
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "file": "extents.go",
+          "id": ".::Service#type",
+          "kind": "type",
+          "name": "Service",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 29
+            },
+            "start": {
+              "col": 6,
+              "line": 25
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "name identifies the service.",
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 27
+            },
+            "start": {
+              "col": 2,
+              "line": 26
+            }
+          },
+          "file": "extents.go",
+          "id": ".::Service::name#field",
+          "kind": "field",
+          "name": "name",
+          "owner": ".::Service#type",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 27
+            },
+            "start": {
+              "col": 2,
+              "line": 27
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 10,
+              "line": 28
+            },
+            "start": {
+              "col": 2,
+              "line": 28
+            }
+          },
+          "file": "extents.go",
+          "id": ".::Service::size#field",
+          "kind": "field",
+          "name": "size",
+          "owner": ".::Service#type",
+          "span": {
+            "end": {
+              "col": 10,
+              "line": 28
+            },
+            "start": {
+              "col": 2,
+              "line": 28
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "Reader reads.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 35
+            },
+            "start": {
+              "col": 1,
+              "line": 31
+            }
+          },
+          "file": "extents.go",
+          "id": ".::Reader#interface",
+          "kind": "interface",
+          "name": "Reader",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 35
+            },
+            "start": {
+              "col": 6,
+              "line": 32
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Read reads once.",
+          "extent": {
+            "end": {
+              "col": 12,
+              "line": 34
+            },
+            "start": {
+              "col": 2,
+              "line": 33
+            }
+          },
+          "file": "extents.go",
+          "id": ".::Reader::Read#method",
+          "kind": "method",
+          "name": "Read",
+          "owner": ".::Reader#interface",
+          "span": {
+            "end": {
+              "col": 12,
+              "line": 34
+            },
+            "start": {
+              "col": 2,
+              "line": 34
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Run runs the service.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 37
+            }
+          },
+          "file": "extents.go",
+          "id": ".::Service::Run#method",
+          "kind": "method",
+          "name": "Run",
+          "owner": ".::Service#type",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 38
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 35,
+              "line": 42
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "file": "extents.go",
+          "id": ".::helper#function",
+          "kind": "function",
+          "name": "helper",
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 42
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "Pair holds two values.",
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 46
+            },
+            "start": {
+              "col": 2,
+              "line": 45
+            }
+          },
+          "file": "extents.go",
+          "id": ".::Pair#type",
+          "kind": "type",
+          "name": "Pair",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 46
+            },
+            "start": {
+              "col": 2,
+              "line": 46
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "extents.go",
+          "id": ".::Pair::a#field",
+          "kind": "field",
+          "name": "a",
+          "owner": ".::Pair#type",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 46
+            },
+            "start": {
+              "col": 15,
+              "line": 46
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "extents.go",
+          "id": ".::Pair::b#field",
+          "kind": "field",
+          "name": "b",
+          "owner": ".::Pair#type",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 46
+            },
+            "start": {
+              "col": 18,
+              "line": 46
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 47
+            },
+            "start": {
+              "col": 2,
+              "line": 47
+            }
+          },
+          "file": "extents.go",
+          "id": ".::Solo#type",
+          "kind": "type",
+          "name": "Solo",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 47
+            },
+            "start": {
+              "col": 2,
+              "line": 47
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

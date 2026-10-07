@@ -62,6 +62,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 32,
+              "line": 7
+            },
+            "start": {
+              "col": 28,
+              "line": 7
+            }
+          },
           "to": "traits::Shape::area#method"
         },
         {
@@ -110,6 +120,34 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 21
+            },
+            "start": {
+              "col": 20,
+              "line": 21
+            }
+          },
+          "to": "traits::Circle::r#field"
+        },
+        {
+          "from": {
+            "symbol": "traits::Circle::Shape::area#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 30,
+              "line": 21
+            },
+            "start": {
+              "col": 29,
+              "line": 21
+            }
+          },
           "to": "traits::Circle::r#field"
         },
         {
@@ -134,6 +172,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 26
+            },
+            "start": {
+              "col": 11,
+              "line": 26
+            }
+          },
           "to": "traits::Shape::describe#method"
         },
         {
@@ -150,6 +198,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 30
+            },
+            "start": {
+              "col": 11,
+              "line": 30
+            }
+          },
           "to": "traits::Shape::area#method"
         },
         {
@@ -166,6 +224,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 34
+            },
+            "start": {
+              "col": 11,
+              "line": 34
+            }
+          },
           "to": "traits::Shape::area#method"
         },
         {
@@ -182,6 +250,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 41
+            },
+            "start": {
+              "col": 11,
+              "line": 41
+            }
+          },
           "to": "traits::Shape::area#method"
         },
         {
@@ -198,6 +276,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 45
+            },
+            "start": {
+              "col": 12,
+              "line": 45
+            }
+          },
           "to": "traits::Shape::area#method"
         },
         {
@@ -230,6 +318,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 24,
+              "line": 54
+            },
+            "start": {
+              "col": 20,
+              "line": 54
+            }
+          },
           "to": "traits::Shape::area#method"
         },
         {
@@ -238,6 +336,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 54
+            },
+            "start": {
+              "col": 14,
+              "line": 54
+            }
+          },
           "to": "traits::Holder::inner#field"
         }
       ],
@@ -336,6 +444,16 @@
       "symbols": [
         {
           "doc": "A shape.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::Shape#interface",
           "kind": "interface",
@@ -354,6 +472,16 @@
         },
         {
           "doc": "Surface of the shape.",
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 4
+            },
+            "start": {
+              "col": 5,
+              "line": 3
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::Shape::area#method",
           "kind": "method",
@@ -372,6 +500,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::Shape::describe#method",
           "kind": "method",
@@ -390,6 +528,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::Solid#interface",
           "kind": "interface",
@@ -407,6 +555,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 29,
+              "line": 12
+            },
+            "start": {
+              "col": 5,
+              "line": 12
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::Solid::volume#method",
           "kind": "method",
@@ -425,6 +583,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::Circle#type",
           "kind": "type",
@@ -442,6 +610,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 16
+            },
+            "start": {
+              "col": 5,
+              "line": 16
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::Circle::r#field",
           "kind": "field",
@@ -461,6 +639,16 @@
         },
         {
           "doc": "Surface of the shape.",
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 22
+            },
+            "start": {
+              "col": 5,
+              "line": 20
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::Circle::Shape::area#method",
           "kind": "method",
@@ -479,6 +667,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 27
+            },
+            "start": {
+              "col": 1,
+              "line": 25
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::show#function",
           "kind": "function",
@@ -496,6 +694,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 29
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::show_impl#function",
           "kind": "function",
@@ -513,6 +721,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 35
+            },
+            "start": {
+              "col": 1,
+              "line": 33
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::show_generic#function",
           "kind": "function",
@@ -530,6 +748,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 42
+            },
+            "start": {
+              "col": 1,
+              "line": 37
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::show_where#function",
           "kind": "function",
@@ -547,6 +775,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 46
+            },
+            "start": {
+              "col": 1,
+              "line": 44
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::show_path#function",
           "kind": "function",
@@ -564,6 +802,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 50
+            },
+            "start": {
+              "col": 1,
+              "line": 48
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::Holder#type",
           "kind": "type",
@@ -581,6 +829,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 49
+            },
+            "start": {
+              "col": 5,
+              "line": 49
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::Holder::inner#field",
           "kind": "field",
@@ -599,6 +857,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 55
+            },
+            "start": {
+              "col": 5,
+              "line": 53
+            }
+          },
           "file": "src/lib.rs",
           "id": "traits::Holder::area#method",
           "kind": "method",

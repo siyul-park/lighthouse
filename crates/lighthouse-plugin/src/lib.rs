@@ -1,3 +1,4 @@
+mod fix;
 mod registry;
 
 use std::{collections::BTreeMap, path::PathBuf};
@@ -10,6 +11,9 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use thiserror::Error;
 
+pub use fix::{
+    FixPattern, FixRequest, Fixer, FixerManifest, KeyCtx, OrderKey, OrderKeyManifest, OrderKeys,
+};
 pub use registry::{Registry, plugin_of};
 
 /// Why registering a plugin, resolving analyzers, reading facts or running a
@@ -43,9 +47,11 @@ pub enum Scope {
     Project,
 }
 
-/// Identity of a plugin: `id` prefixes every analyzer, rule and preset it contributes.
+/// Identity of a plugin: `id` prefixes every analyzer, rule, preset and fixer
+/// it contributes. Every plugin kind describes itself through a manifest, a
+/// static value separate from the behavior of the kind.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Manifest {
+pub struct PluginManifest {
     pub id: String,
     pub version: String,
 }
@@ -56,6 +62,10 @@ pub struct Workspace {
     pub root: PathBuf,
     /// Per-language options from the configuration, keyed by language id.
     pub languages: BTreeMap<String, Options>,
+    /// Text that stands in for the file of the same project-relative path:
+    /// what a provider must read instead of the disk. Empty for a normal run;
+    /// a fix run checks candidate edits this way before anything is written.
+    pub overlays: BTreeMap<PathBuf, String>,
 }
 
 impl Workspace {
@@ -64,6 +74,7 @@ impl Workspace {
         Self {
             root: root.into(),
             languages: BTreeMap::new(),
+            overlays: BTreeMap::new(),
         }
     }
 }
@@ -105,6 +116,37 @@ pub struct Conventions {
     pub test_globs: Vec<String>,
 }
 
+/// What a language provider declares about itself: which files are its own and
+/// what it guarantees about them. The `initialize` result of a plugin process
+/// carries one per language, field for field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderManifest {
+    /// The language id, such as `go`.
+    pub id: String,
+    pub globs: Vec<String>,
+    pub conventions: Conventions,
+    pub capabilities: Vec<Capability>,
+    /// A fallback provider claims a file only when no other provider does.
+    pub fallback: bool,
+    /// Among regular providers the higher priority claims a file first.
+    pub priority: i32,
+}
+
+impl ProviderManifest {
+    /// A regular provider of `id` for `globs`, with no conventions or
+    /// capabilities; set those directly.
+    pub fn new(id: impl Into<String>, globs: Vec<String>) -> Self {
+        Self {
+            id: id.into(),
+            globs,
+            conventions: Conventions::default(),
+            capabilities: Vec::new(),
+            fallback: false,
+            priority: 0,
+        }
+    }
+}
+
 /// A file handed to a provider with its text as read by the engine.
 #[derive(Debug, Clone, Copy)]
 pub struct Source<'a> {
@@ -125,18 +167,7 @@ pub struct Indexed {
 /// Turns the files of one language into UCM fragments. Implementations must
 /// be thread-safe, and `index` must not read outside `files` and `ws`.
 pub trait LanguageProvider: Send + Sync {
-    fn id(&self) -> &str;
-    fn globs(&self) -> &[String];
-    fn conventions(&self) -> Conventions;
-    fn capabilities(&self) -> &[Capability];
-    /// A fallback provider claims a file only when no other provider does.
-    fn fallback(&self) -> bool {
-        false
-    }
-    /// Among regular providers the higher priority claims a file first.
-    fn priority(&self) -> i32 {
-        0
-    }
+    fn manifest(&self) -> &ProviderManifest;
     /// Indexes every file of this provider in one call. An `Err` means the
     /// whole batch failed; every file is then incomplete.
     fn index(&self, ws: &Workspace, files: &[Source]) -> Result<Indexed, Error>;
@@ -145,17 +176,25 @@ pub trait LanguageProvider: Send + Sync {
 /// Computes one fact, declared by `id`, from the project and the facts of its `requires`.
 /// `run` must be deterministic for equal inputs; the engine runs it once per `scope`.
 pub trait Analyzer: Send + Sync {
-    /// Fully qualified `plugin/name`.
-    fn id(&self) -> &str;
-    fn requires(&self) -> &[String];
-    fn scope(&self) -> Scope;
+    fn manifest(&self) -> &AnalyzerManifest;
     fn run(&self, ctx: &Ctx) -> Result<Value, Error>;
+}
+
+/// What an analyzer declares: the fact it computes, what that fact is
+/// computed from, and what it looks at.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnalyzerManifest {
+    /// Fully qualified `plugin/name`.
+    pub id: String,
+    /// Analyzers whose facts this one reads.
+    pub requires: Vec<String>,
+    pub scope: Scope,
 }
 
 /// Static description of a rule: its identity, default severity, scope and
 /// the analyzers and provider capabilities it depends on.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RuleMeta {
+pub struct RuleManifest {
     /// Fully qualified `plugin/name`.
     pub id: String,
     pub severity: Severity,
@@ -170,28 +209,32 @@ pub struct RuleMeta {
 }
 
 /// A check that turns facts into diagnostics. `validate` rejects bad options
-/// before any run; `check` must report only for the scope in `meta()`.
+/// before any run; `check` must report only for the scope in `manifest()`.
 pub trait Rule: Send + Sync {
-    fn meta(&self) -> &RuleMeta;
+    fn manifest(&self) -> &RuleManifest;
     fn validate(&self, options: &Options) -> Result<(), Error>;
     fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, Error>;
 }
 
-/// Named rule configuration, referenced from `extends`.
+/// Named rule configuration, referenced from `extends`. A preset is pure
+/// data, so it is its own manifest.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Preset {
+pub struct PresetManifest {
     /// Fully qualified `plugin/name`.
     pub id: String,
     pub rules: Rules,
 }
 
-impl Preset {
+impl PresetManifest {
     /// The presets of a plugin's rules: `<plugin>/recommended` holds every
     /// rule that is not `strict` at its default severity, and
     /// `<plugin>/strict` adds the rest, present only when some rule is strict.
-    pub fn standard<'a>(plugin: &str, metas: impl IntoIterator<Item = &'a RuleMeta>) -> Vec<Self> {
-        let metas: Vec<&RuleMeta> = metas.into_iter().collect();
-        let preset = |name: &str, include: fn(&RuleMeta) -> bool| Self {
+    pub fn standard<'a>(
+        plugin: &str,
+        metas: impl IntoIterator<Item = &'a RuleManifest>,
+    ) -> Vec<Self> {
+        let metas: Vec<&RuleManifest> = metas.into_iter().collect();
+        let preset = |name: &str, include: fn(&RuleManifest) -> bool| Self {
             id: format!("{plugin}/{name}"),
             rules: metas
                 .iter()
@@ -216,7 +259,7 @@ impl Preset {
 /// A bundle of language providers, analyzers, rules and presets, all of whose
 /// ids are qualified with `manifest().id`. Everything defaults to empty.
 pub trait Plugin {
-    fn manifest(&self) -> Manifest;
+    fn manifest(&self) -> &PluginManifest;
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
         Vec::new()
     }
@@ -226,7 +269,15 @@ pub trait Plugin {
     fn rules(&self) -> Vec<Box<dyn Rule>> {
         Vec::new()
     }
-    fn presets(&self) -> Vec<Preset> {
+    fn presets(&self) -> Vec<PresetManifest> {
+        Vec::new()
+    }
+    /// The fixers of the plugin's patterns; see [`Fixer`].
+    fn fixers(&self) -> Vec<Box<dyn Fixer>> {
+        Vec::new()
+    }
+    /// Ways to order declarations that fix operations may name.
+    fn order_keys(&self) -> Vec<Box<dyn OrderKey>> {
         Vec::new()
     }
 }

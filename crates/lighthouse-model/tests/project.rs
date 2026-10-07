@@ -18,6 +18,7 @@ fn symbol(module: &str, name: &str) -> Symbol {
         owner: None,
         file: format!("{module}/{name}.go").into(),
         span: at(),
+        extent: None,
         doc: None,
         name: name.to_owned(),
         role: None,
@@ -30,6 +31,7 @@ fn call(from: &Symbol, to: &str) -> Edge {
         from: Node::Symbol(from.id.clone()),
         to: Target::Path(to.to_owned()),
         resolution: Resolution::Syntactic,
+        site: None,
     }
 }
 
@@ -124,6 +126,7 @@ fn module_paths_and_duplicate_edges_are_handled() {
         from: Node::Module("a".to_owned()),
         to: Target::Path("b".to_owned()),
         resolution: Resolution::Syntactic,
+        site: None,
     };
     let fragment = |module: &str| Fragment {
         modules: vec![Module {
@@ -248,6 +251,7 @@ fn ambiguous_call_targets_prefer_callables_and_other_kinds_stay_unresolved_with_
         from: Node::Symbol(caller.id.clone()),
         to: Target::Path(to.to_owned()),
         resolution: Resolution::Syntactic,
+        site: None,
     };
     let project = Project::merge([Fragment {
         symbols: vec![caller.clone(), field, method.clone(), var, konst],
@@ -278,6 +282,7 @@ fn references_index_lists_value_uses_not_calls() {
         from: Node::Symbol(from.id.clone()),
         to: Target::Path(to.id.as_str().to_owned()),
         resolution: Resolution::Syntactic,
+        site: None,
     };
     let project = Project::merge([Fragment {
         symbols: vec![a.clone(), b.clone(), c.clone()],
@@ -318,6 +323,7 @@ fn heuristic_edges_are_possible_uses_not_calls() {
         from: Node::Symbol(a.id.clone()),
         to: Target::Path(b.id.as_str().to_owned()),
         resolution: Resolution::Heuristic,
+        site: None,
     };
     let project = Project::merge([Fragment {
         symbols: vec![a.clone(), b.clone()],

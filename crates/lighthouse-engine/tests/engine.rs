@@ -10,8 +10,9 @@ use lighthouse_model::{
     Capability, Diagnostic, Fingerprint, Fragment, Incomplete, Options, Position, Severity, Span,
 };
 use lighthouse_plugin::{
-    Analyzer, Conventions, Ctx, Error as PluginError, Indexed, LanguageProvider, Manifest, Plugin,
-    Preset, Registry, Rule, RuleMeta, Scope, Source, Workspace,
+    Analyzer, AnalyzerManifest, Conventions, Ctx, Error as PluginError, Indexed, LanguageProvider,
+    Plugin, PluginManifest, PresetManifest, ProviderManifest, Registry, Rule, RuleManifest, Scope,
+    Source, Workspace,
 };
 use serde_json::{Value, json};
 use tempfile::TempDir;
@@ -20,7 +21,7 @@ use tempfile::TempDir;
 type Batches = Arc<Mutex<Vec<usize>>>;
 
 struct Any {
-    globs: Vec<String>,
+    manifest: ProviderManifest,
     /// Files with this suffix are reported incomplete.
     fail_on: &'static str,
     /// A batch containing a file with this suffix fails as a whole.
@@ -29,19 +30,8 @@ struct Any {
 }
 
 impl LanguageProvider for Any {
-    fn id(&self) -> &str {
-        "any"
-    }
-    fn globs(&self) -> &[String] {
-        &self.globs
-    }
-    fn conventions(&self) -> Conventions {
-        Conventions {
-            test_globs: vec!["tests/**".to_owned()],
-        }
-    }
-    fn capabilities(&self) -> &[Capability] {
-        &[]
+    fn manifest(&self) -> &ProviderManifest {
+        &self.manifest
     }
     fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, PluginError> {
         self.batches.lock().unwrap().push(files.len());
@@ -68,17 +58,11 @@ impl LanguageProvider for Any {
 }
 
 /// Counts files in the merged project; project scope.
-struct CountFiles;
+struct CountFiles(AnalyzerManifest);
 
 impl Analyzer for CountFiles {
-    fn id(&self) -> &str {
-        "fake/count-files"
-    }
-    fn requires(&self) -> &[String] {
-        &[]
-    }
-    fn scope(&self) -> Scope {
-        Scope::Project
+    fn manifest(&self) -> &AnalyzerManifest {
+        &self.0
     }
     fn run(&self, ctx: &Ctx) -> Result<Value, PluginError> {
         Ok(json!(ctx.project.files.len()))
@@ -86,11 +70,11 @@ impl Analyzer for CountFiles {
 }
 
 struct Fake {
-    meta: RuleMeta,
+    meta: RuleManifest,
 }
 
-fn meta(id: &str, scope: Scope, analyzers: &[&str], capabilities: &[Capability]) -> RuleMeta {
-    RuleMeta {
+fn meta(id: &str, scope: Scope, analyzers: &[&str], capabilities: &[Capability]) -> RuleManifest {
+    RuleManifest {
         id: id.to_owned(),
         severity: Severity::Warn,
         scope,
@@ -104,7 +88,7 @@ fn meta(id: &str, scope: Scope, analyzers: &[&str], capabilities: &[Capability])
 }
 
 impl Rule for Fake {
-    fn meta(&self) -> &RuleMeta {
+    fn manifest(&self) -> &RuleManifest {
         &self.meta
     }
     fn validate(&self, options: &Options) -> Result<(), PluginError> {
@@ -135,28 +119,35 @@ impl Rule for Fake {
 }
 
 struct FakePlugin {
+    manifest: PluginManifest,
     fail_on: &'static str,
     crash_on: &'static str,
     batches: Batches,
 }
 
 impl Plugin for FakePlugin {
-    fn manifest(&self) -> Manifest {
-        Manifest {
-            id: "fake".to_owned(),
-            version: "0".to_owned(),
-        }
+    fn manifest(&self) -> &PluginManifest {
+        &self.manifest
     }
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
         vec![Box::new(Any {
-            globs: vec!["**".to_owned()],
+            manifest: ProviderManifest {
+                conventions: Conventions {
+                    test_globs: vec!["tests/**".to_owned()],
+                },
+                ..ProviderManifest::new("any", vec!["**".to_owned()])
+            },
             fail_on: self.fail_on,
             crash_on: self.crash_on,
             batches: Arc::clone(&self.batches),
         })]
     }
     fn analyzers(&self) -> Vec<Box<dyn Analyzer>> {
-        vec![Box::new(CountFiles)]
+        vec![Box::new(CountFiles(AnalyzerManifest {
+            id: "fake/count-files".to_owned(),
+            requires: Vec::new(),
+            scope: Scope::Project,
+        }))]
     }
     fn rules(&self) -> Vec<Box<dyn Rule>> {
         vec![
@@ -176,12 +167,12 @@ impl Plugin for FakePlugin {
             }),
         ]
     }
-    fn presets(&self) -> Vec<Preset> {
+    fn presets(&self) -> Vec<PresetManifest> {
         let each = RuleConfig {
             level: Some(Severity::Warn),
             options: Options::new(),
         };
-        vec![Preset {
+        vec![PresetManifest {
             id: "fake/p".to_owned(),
             rules: Rules::from([("fake/each".to_owned(), each)]),
         }]
@@ -197,6 +188,7 @@ fn batched(fail_on: &'static str, crash_on: &'static str) -> (Registry, Batches)
     let mut registry = Registry::default();
     registry
         .register(&FakePlugin {
+            manifest: plugin_manifest("fake"),
             fail_on,
             crash_on,
             batches: Arc::clone(&batches),
@@ -205,26 +197,28 @@ fn batched(fail_on: &'static str, crash_on: &'static str) -> (Registry, Batches)
     (registry, batches)
 }
 
+fn plugin_manifest(id: &str) -> PluginManifest {
+    PluginManifest {
+        id: id.to_owned(),
+        version: "0".to_owned(),
+    }
+}
+
 /// A fallback provider, as a plain-text plugin would be.
-struct Fallback;
+struct Fallback(ProviderManifest);
+
+impl Fallback {
+    fn new() -> Self {
+        Self(ProviderManifest {
+            fallback: true,
+            ..ProviderManifest::new("bin", vec!["**".to_owned()])
+        })
+    }
+}
 
 impl LanguageProvider for Fallback {
-    fn id(&self) -> &str {
-        "bin"
-    }
-    fn globs(&self) -> &[String] {
-        static ALL: std::sync::LazyLock<Vec<String>> =
-            std::sync::LazyLock::new(|| vec!["**".to_owned()]);
-        &ALL
-    }
-    fn conventions(&self) -> Conventions {
-        Conventions::default()
-    }
-    fn capabilities(&self) -> &[Capability] {
-        &[]
-    }
-    fn fallback(&self) -> bool {
-        true
+    fn manifest(&self) -> &ProviderManifest {
+        &self.0
     }
     fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, PluginError> {
         Ok(Indexed {
@@ -240,17 +234,14 @@ impl LanguageProvider for Fallback {
     }
 }
 
-struct FallbackPlugin;
+struct FallbackPlugin(PluginManifest);
 
 impl Plugin for FallbackPlugin {
-    fn manifest(&self) -> Manifest {
-        Manifest {
-            id: "bin".to_owned(),
-            version: "0".to_owned(),
-        }
+    fn manifest(&self) -> &PluginManifest {
+        &self.0
     }
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
-        vec![Box::new(Fallback)]
+        vec![Box::new(Fallback::new())]
     }
 }
 
@@ -392,7 +383,9 @@ fn unreadable_and_unindexed_files_are_incomplete_not_notices() {
 fn non_utf8_data_claimed_only_by_a_fallback_provider_is_a_notice() {
     let dir = project(&[("ok.txt", b"1"), ("image.png", &[0xff, 0xfe])]);
     let mut registry = Registry::default();
-    registry.register(&FallbackPlugin).unwrap();
+    registry
+        .register(&FallbackPlugin(plugin_manifest("bin")))
+        .unwrap();
     let engine = Engine::new(
         registry,
         Config::parse("plugins = [\"bin\"]").unwrap(),
@@ -624,4 +617,33 @@ fn active_rules() {
 
     let unknown = lighthouse_engine::active_rules(&registry, &config("extends = [\"nope/p\"]\n"));
     assert!(unknown.is_err());
+}
+
+#[test]
+fn hash_of_is_the_sha256_hex_the_model_records() {
+    assert_eq!(
+        lighthouse_engine::hash_of("abc"),
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    );
+}
+
+#[test]
+fn an_overlaid_check_reads_the_overlay_not_the_disk_and_leaves_the_disk_alone() {
+    let dir = project(&[("a.txt", b"on disk"), ("b.txt", b"other")]);
+    let engine = engine(&dir, ALL).unwrap();
+    let overlays = lighthouse_engine::Overlays::from([("a.txt".into(), "overlaid".to_owned())]);
+
+    let out = engine.check_overlaid(&[], &[], &overlays).unwrap();
+    let plain = engine.check(&[], &[]).unwrap();
+
+    let hash = |o: &lighthouse_engine::Outcome, f: &str| {
+        o.project.file(Path::new(f)).unwrap().hash.clone()
+    };
+    assert_eq!(hash(&out, "a.txt"), lighthouse_engine::hash_of("overlaid"));
+    assert_eq!(hash(&plain, "a.txt"), lighthouse_engine::hash_of("on disk"));
+    assert_eq!(hash(&out, "b.txt"), hash(&plain, "b.txt"));
+    assert_eq!(
+        fs::read_to_string(dir.path().join("a.txt")).unwrap(),
+        "on disk"
+    );
 }

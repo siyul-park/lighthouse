@@ -68,11 +68,54 @@ pub(crate) fn pattern(pattern: &Pattern) -> Result<(), Error> {
         .iter()
         .try_for_each(|e| example(pattern, e))?;
     canonical(pattern)?;
-    implementation(pattern, checkable)
+    implementation(pattern, checkable)?;
+    fix(pattern)
 }
 
 pub(crate) fn relative(path: &str) -> bool {
     !path.is_empty() && !path.starts_with('/') && path.split('/').all(|part| part != "..")
+}
+
+fn fix(pattern: &Pattern) -> Result<(), Error> {
+    let id = pattern.id.as_str();
+    if let Some(fix) = &pattern.fix {
+        crate::fix::validate(
+            id,
+            fix,
+            pattern.enforcement == Enforcement::Mechanical,
+            pattern.implementation.is_some(),
+        )?;
+        let fixed = pattern
+            .examples
+            .iter()
+            .any(|e| e.kind == Kind::Invalid && !e.fixed.is_empty());
+        if !fixed {
+            return Err(Error::invalid(
+                id,
+                "a fixable pattern needs an invalid example with `fixed`",
+            ));
+        }
+    }
+    for example in pattern.examples.iter().filter(|e| !e.fixed.is_empty()) {
+        let fail =
+            |reason: &str| Error::invalid(id, format!("example `{}`: {reason}", example.name));
+        if pattern.fix.is_none() {
+            return Err(fail("`fixed` needs a `fix` on the pattern"));
+        }
+        if example.kind != Kind::Invalid {
+            return Err(fail("only an invalid example has `fixed`"));
+        }
+        let mut seen = BTreeSet::new();
+        for file in &example.fixed {
+            if !example.files.iter().any(|f| f.path == file.path) || !seen.insert(&file.path) {
+                return Err(fail(&format!(
+                    "`fixed` file `{}` is not a file of the example, or is repeated",
+                    file.path
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn options(pattern: &Pattern) -> Result<(), Error> {

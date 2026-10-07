@@ -3,6 +3,7 @@
 //! schemas and as resources. Every verdict recorded here is an `agent` review.
 
 mod definitions;
+mod fix;
 mod resources;
 mod review;
 mod rules;

@@ -12,7 +12,7 @@ use crate::Result;
 const PATTERNS_DIR: &str = "patterns";
 
 pub fn generate(out: &Path, skill: &Path) -> Result<u8> {
-    let docs = lighthouse_spec::docs(Catalog::bundled());
+    let docs = generated();
     for orphan in orphans(out, &docs)? {
         fs::remove_file(&orphan)?;
         println!("removed {}", orphan.display());
@@ -33,13 +33,31 @@ pub fn generate(out: &Path, skill: &Path) -> Result<u8> {
     Ok(0)
 }
 
+/// Every generated page: one per pack, and the fix operations with the order
+/// keys the bundled plugins register.
+fn generated() -> BTreeMap<String, String> {
+    let mut docs = lighthouse_spec::docs(Catalog::bundled());
+    let keys: Vec<(String, String)> = lighthouse_builtin::registry()
+        .order_keys()
+        .map(|k| {
+            let manifest = k.manifest();
+            (manifest.id.clone(), manifest.description.clone())
+        })
+        .collect();
+    docs.insert(
+        format!("{PATTERNS_DIR}/fix-operations.md"),
+        lighthouse_spec::fix_operations_markdown(&keys),
+    );
+    docs
+}
+
 /// The agent skill of this project: its catalog and configuration.
 fn skill_text() -> Result<String> {
     skill_for(&Session::load_or_default(None)?)
 }
 
 pub fn check(out: &Path, skill: &Path) -> Result<u8> {
-    let docs = lighthouse_spec::docs(Catalog::bundled());
+    let docs = generated();
     let mut problems = Vec::new();
     for (path, text) in &docs {
         let target = out.join(path);

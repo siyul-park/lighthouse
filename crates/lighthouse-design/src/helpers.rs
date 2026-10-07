@@ -1,5 +1,5 @@
 use lighthouse_model::{Diagnostic, Visibility};
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
@@ -20,7 +20,7 @@ pub(crate) fn rule() -> Box<dyn Rule> {
 
 /// A private function or method with exactly one production caller, never
 /// used as a value. A forwarding wrapper is left to `single-use-wrapper`.
-fn check(meta: &RuleMeta, ctx: &Ctx, _: NoOptions) -> Result<Vec<Diagnostic>, Error> {
+fn check(meta: &RuleManifest, ctx: &Ctx, _: NoOptions) -> Result<Vec<Diagnostic>, Error> {
     if skipped(ctx) {
         return Ok(Vec::new());
     }

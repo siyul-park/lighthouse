@@ -35,6 +35,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "root.go",
           "id": ".::Root#function",
           "kind": "function",
@@ -89,6 +99,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "tools/tool.go",
           "id": "tools::Tool#function",
           "kind": "function",

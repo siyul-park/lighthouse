@@ -27,10 +27,25 @@ tuning:
     impls come first.
 implementation:
   builtin: design/callers-before-callees
+fix:
+  safety: suggested
+  requires: [extent]
+  ops:
+    - op: move
+      node: finding.evidence.callee
+      after: finding.evidence.caller
 examples:
   - name: invalid
     language: go
     kind: invalid
+    fixed:
+      - path: example.go
+        body: |-
+          package sample
+
+          func Run() int { return helper() }
+
+          func helper() int { return 1 }
     files:
       - path: example.go
         body: |-
@@ -56,6 +71,16 @@ examples:
   - name: shared-leaf-between-callers
     language: go
     kind: invalid
+    fixed:
+      - path: example.go
+        body: |-
+          package sample
+
+          func First() int { return leaf() }
+
+          func Second() int { return leaf() + 1 }
+
+          func leaf() int { return 1 }
     options:
       shared_after_last_caller: true
     files:
@@ -112,6 +137,16 @@ examples:
   - name: rust-invalid
     language: rust
     kind: invalid
+    fixed:
+      - path: src/lib.rs
+        body: |-
+          pub fn run() -> u8 {
+              helper()
+          }
+
+          fn helper() -> u8 {
+              1
+          }
     files:
       - path: src/lib.rs
         body: |-

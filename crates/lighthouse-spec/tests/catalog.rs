@@ -52,16 +52,20 @@ fn scope_rule_scope() {
 
 #[test]
 fn pattern_rule_meta() {
-    let meta = bundled("core/max-file-lines").rule_meta().unwrap();
+    let meta = bundled("core/max-file-lines").rule_manifest().unwrap();
     assert_eq!(meta.id, "core/max-file-lines");
     assert_eq!(meta.severity, Severity::Warn);
     assert_eq!(meta.scope, RunScope::File);
     assert!(
         bundled("design/no-private-types-in-public-api")
-            .rule_meta()
+            .rule_manifest()
             .is_none()
     );
-    assert!(bundled("design/signals-are-advisory").rule_meta().is_none());
+    assert!(
+        bundled("design/signals-are-advisory")
+            .rule_manifest()
+            .is_none()
+    );
 }
 
 #[test]
@@ -633,6 +637,7 @@ mod write {
                     message: Some("F".into()),
                 }],
                 options: Map::from_iter([("max".to_owned(), json!(1))]),
+                fixed: Vec::new(),
             },
             Example {
                 name: "good".into(),
@@ -642,6 +647,7 @@ mod write {
                 canonical: false,
                 expect: Vec::new(),
                 options: Map::new(),
+                fixed: Vec::new(),
             },
         ];
         pattern
@@ -813,4 +819,21 @@ fn write_atomic_replaces_a_file_and_leaves_no_temporary() {
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "two");
     let names: Vec<_> = std::fs::read_dir(dir.path()).unwrap().collect();
     assert_eq!(names.len(), 1);
+}
+
+#[test]
+fn write_atomic_guarded() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("a.txt");
+    std::fs::write(&path, "old").unwrap();
+
+    let refused =
+        lighthouse_spec::write_atomic_guarded(&path, "new", &|| Err("changed".to_owned()));
+    let allowed = lighthouse_spec::write_atomic_guarded(&path, "new", &|| Ok(()));
+
+    assert!(refused.unwrap_err().to_string().contains("changed"));
+    allowed.unwrap();
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
+    let leftovers = std::fs::read_dir(dir.path()).unwrap().count();
+    assert_eq!(leftovers, 1, "a refused write leaves no temporary file");
 }

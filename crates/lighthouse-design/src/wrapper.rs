@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use lighthouse_model::{
     Diagnostic, Node, Project, Symbol, SymbolId, SymbolKind, Target, Visibility,
 };
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
@@ -58,7 +58,7 @@ pub(crate) fn satisfies_interface(project: &Project, wrapper: &Symbol) -> bool {
         })
 }
 
-fn check(meta: &RuleMeta, ctx: &Ctx, _: NoOptions) -> Result<Vec<Diagnostic>, Error> {
+fn check(meta: &RuleManifest, ctx: &Ctx, _: NoOptions) -> Result<Vec<Diagnostic>, Error> {
     if skipped(ctx) {
         return Ok(Vec::new());
     }

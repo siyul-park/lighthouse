@@ -20,6 +20,7 @@ fn symbol(module: &str, name: &str, kind: SymbolKind, file: &str, lines: (u32, u
             start: at(lines.0),
             end: at(lines.1),
         },
+        extent: None,
         doc: None,
         name: name.to_owned(),
         role: None,
@@ -59,12 +60,16 @@ fn call(from: &Symbol, to: &Symbol) -> Edge {
         from: Node::Symbol(from.id.clone()),
         to: Target::Path(to.id.as_str().to_owned()),
         resolution: Resolution::Syntactic,
+        site: None,
     }
 }
 
 fn run<T: DeserializeOwned>(project: &Project, analyzer: &str, path: &str) -> Vec<Measured<T>> {
     let metrics = Metrics.analyzers();
-    let analyzer = metrics.iter().find(|a| a.id() == analyzer).unwrap();
+    let analyzer = metrics
+        .iter()
+        .find(|a| a.manifest().id == analyzer)
+        .unwrap();
     let ws = Workspace::new(".");
     let file = file(path, false);
     let facts = Facts::new();

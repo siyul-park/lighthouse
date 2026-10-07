@@ -180,6 +180,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 46,
+              "line": 25
+            },
+            "start": {
+              "col": 40,
+              "line": 25
+            }
+          },
           "to": ".::Base::prefix"
         },
         {
@@ -236,6 +246,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 7,
+              "line": 38
+            },
+            "start": {
+              "col": 4,
+              "line": 38
+            }
+          },
           "to": ".::Base::Log"
         },
         {
@@ -244,6 +264,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 39
+            },
+            "start": {
+              "col": 11,
+              "line": 39
+            }
+          },
           "to": ".::Base::Close"
         },
         {
@@ -260,6 +290,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 45,
+              "line": 42
+            },
+            "start": {
+              "col": 41,
+              "line": 42
+            }
+          },
           "to": ".::Service::name"
         },
         {
@@ -268,6 +308,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 56,
+              "line": 42
+            },
+            "start": {
+              "col": 50,
+              "line": 42
+            }
+          },
           "to": ".::Base::prefix"
         },
         {
@@ -284,6 +334,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 45,
+              "line": 44
+            },
+            "start": {
+              "col": 41,
+              "line": 44
+            }
+          },
           "to": ".::Service::Base"
         },
         {
@@ -292,6 +352,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 72,
+              "line": 44
+            },
+            "start": {
+              "col": 68,
+              "line": 44
+            }
+          },
           "to": ".::Service::name"
         },
         {
@@ -300,6 +370,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 40,
+              "line": 44
+            },
+            "start": {
+              "col": 33,
+              "line": 44
+            }
+          },
           "to": ".::Service"
         },
         {
@@ -308,6 +388,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 59,
+              "line": 44
+            },
+            "start": {
+              "col": 53,
+              "line": 44
+            }
+          },
           "to": ".::Base::prefix"
         },
         {
@@ -316,6 +406,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 52,
+              "line": 44
+            },
+            "start": {
+              "col": 48,
+              "line": 44
+            }
+          },
           "to": ".::Base"
         },
         {
@@ -332,6 +432,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 48
+            },
+            "start": {
+              "col": 12,
+              "line": 48
+            }
+          },
           "to": ".::Closer::Close"
         },
         {
@@ -436,6 +546,16 @@
       "symbols": [
         {
           "doc": "Logger writes lines.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
           "file": "embedded.go",
           "id": ".::Logger#interface",
           "kind": "interface",
@@ -453,6 +573,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 7
+            },
+            "start": {
+              "col": 2,
+              "line": 7
+            }
+          },
           "file": "embedded.go",
           "id": ".::Logger::Log#method",
           "kind": "method",
@@ -472,6 +602,16 @@
         },
         {
           "doc": "Closer releases resources.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
           "file": "embedded.go",
           "id": ".::Closer#interface",
           "kind": "interface",
@@ -489,6 +629,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 12
+            },
+            "start": {
+              "col": 2,
+              "line": 12
+            }
+          },
           "file": "embedded.go",
           "id": ".::Closer::Close#method",
           "kind": "method",
@@ -508,6 +658,16 @@
         },
         {
           "doc": "LogCloser does both.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
           "file": "embedded.go",
           "id": ".::LogCloser#interface",
           "kind": "interface",
@@ -526,6 +686,16 @@
         },
         {
           "doc": "Base provides the shared behavior.",
+          "extent": {
+            "end": {
+              "col": 34,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 21
+            }
+          },
           "file": "embedded.go",
           "id": ".::Base#type",
           "kind": "type",
@@ -543,6 +713,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 32,
+              "line": 22
+            },
+            "start": {
+              "col": 19,
+              "line": 22
+            }
+          },
           "file": "embedded.go",
           "id": ".::Base::prefix#field",
           "kind": "field",
@@ -562,6 +742,16 @@
         },
         {
           "doc": "Log writes a line.",
+          "extent": {
+            "end": {
+              "col": 54,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
           "file": "embedded.go",
           "id": ".::Base::Log#method",
           "kind": "method",
@@ -581,6 +771,16 @@
         },
         {
           "doc": "Close does nothing.",
+          "extent": {
+            "end": {
+              "col": 44,
+              "line": 28
+            },
+            "start": {
+              "col": 1,
+              "line": 27
+            }
+          },
           "file": "embedded.go",
           "id": ".::Base::Close#method",
           "kind": "method",
@@ -600,6 +800,16 @@
         },
         {
           "doc": "Service embeds its base by pointer and a reader from another package.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 35
+            },
+            "start": {
+              "col": 1,
+              "line": 30
+            }
+          },
           "file": "embedded.go",
           "id": ".::Service#type",
           "kind": "type",
@@ -617,6 +827,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 7,
+              "line": 32
+            },
+            "start": {
+              "col": 2,
+              "line": 32
+            }
+          },
           "file": "embedded.go",
           "id": ".::Service::Base#field",
           "kind": "field",
@@ -635,6 +855,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 11,
+              "line": 33
+            },
+            "start": {
+              "col": 2,
+              "line": 33
+            }
+          },
           "file": "embedded.go",
           "id": ".::Service::Reader#field",
           "kind": "field",
@@ -653,6 +883,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 34
+            },
+            "start": {
+              "col": 2,
+              "line": 34
+            }
+          },
           "file": "embedded.go",
           "id": ".::Service::name#field",
           "kind": "field",
@@ -671,6 +911,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 37
+            }
+          },
           "file": "embedded.go",
           "id": ".::run#function",
           "kind": "function",
@@ -688,6 +938,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 58,
+              "line": 42
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
           "file": "embedded.go",
           "id": ".::peek#function",
           "kind": "function",
@@ -705,6 +965,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 82,
+              "line": 44
+            },
+            "start": {
+              "col": 1,
+              "line": 44
+            }
+          },
           "file": "embedded.go",
           "id": ".::build#function",
           "kind": "function",
@@ -722,6 +992,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 50
+            },
+            "start": {
+              "col": 1,
+              "line": 46
+            }
+          },
           "file": "embedded.go",
           "id": ".::closeAll#function",
           "kind": "function",

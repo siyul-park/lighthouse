@@ -4,7 +4,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use lighthouse_protocol::{EdgeKind, Flow, FlowKind, Resolution, SymbolKind};
+use lighthouse_protocol::{EdgeKind, Flow, FlowKind, Resolution, Span, SymbolKind};
 use syn::{
     BinOp, Block, Expr, ExprCall, ExprClosure, ExprIf, ExprMatch, ExprMethodCall, ExprPath,
     ExprStruct, Item, Local, Member, Pat, Stmt, UnOp,
@@ -14,6 +14,8 @@ use syn::{
 use crate::{
     macros,
     names::{Index, Ns, Res, Sym, TyCx, UseEntry, flatten, symbol_id},
+    tree::SourceFile,
+    util::ident_span,
 };
 
 /// A method name shared by more private methods than this is too common for a
@@ -26,14 +28,23 @@ const MAX_GUESSED_PUBLIC_CANDIDATES: usize = 8;
 
 /// A call or reference found in a body.
 pub struct Use {
+    pub to: String,
+    pub resolution: Resolution,
+}
+
+/// A use at one place: the identifier that names the target.
+pub struct Occurrence {
     pub kind: EdgeKind,
     pub to: String,
     pub resolution: Resolution,
+    pub site: Span,
 }
 
 /// What the walk of one body found.
 pub struct Facts {
     pub uses: Vec<Use>,
+    /// Every place a use occurs, in walk order.
+    pub sites: Vec<Occurrence>,
     /// Macro invocations in the body whose arguments are not expressions.
     pub unread_macros: u32,
     pub flow: Vec<Flow>,
@@ -70,6 +81,7 @@ struct Scope {
 
 struct Walker<'i> {
     idx: &'i Index<'i>,
+    file: &'i SourceFile,
     cx: TyCx,
     id: String,
     module_path: String,
@@ -82,6 +94,7 @@ struct Walker<'i> {
     count: u32,
     flow: Vec<Flow>,
     uses: Vec<Use>,
+    sites: Vec<Occurrence>,
     unread_macros: u32,
     seen: HashSet<(EdgeKind, String, bool)>,
     nested: Vec<syn::ItemFn>,
@@ -140,8 +153,9 @@ impl<'ast> Visit<'ast> for Walker<'_> {
             && !tp.path.is_ident("Self")
             && let Hit::Item(sym) = self.hit(&tp.path, Ns::Type)
             && matches!(sym.kind, SymbolKind::Type | SymbolKind::Interface)
+            && let Some(at) = last_ident(&tp.path)
         {
-            self.add(EdgeKind::References, sym.id.clone());
+            self.add(EdgeKind::References, sym.id.clone(), at);
         }
         visit::visit_type_path(self, tp);
     }
@@ -241,8 +255,9 @@ impl<'i> Walker<'i> {
         let hit = self.hit(path, ns);
         if let Hit::Item(sym) = &hit
             && sym.kind != SymbolKind::Function
+            && let Some(at) = last_ident(path)
         {
-            self.add(EdgeKind::References, sym.id.clone());
+            self.add(EdgeKind::References, sym.id.clone(), at);
         }
     }
 
@@ -317,18 +332,22 @@ impl<'i> Walker<'i> {
         }
     }
 
-    fn add(&mut self, kind: EdgeKind, to: String) {
-        self.record(kind, to, Resolution::Syntactic);
+    fn add(&mut self, kind: EdgeKind, to: String, at: &syn::Ident) {
+        self.record(kind, to, Resolution::Syntactic, at);
     }
 
-    fn record(&mut self, kind: EdgeKind, to: String, resolution: Resolution) {
+    /// Records a use: once among the distinct uses, and every time with the
+    /// identifier that names the target.
+    fn record(&mut self, kind: EdgeKind, to: String, resolution: Resolution, at: &syn::Ident) {
         let guess = resolution == Resolution::Heuristic;
+        self.sites.push(Occurrence {
+            kind,
+            to: to.clone(),
+            resolution,
+            site: ident_span(self.file, at),
+        });
         if self.seen.insert((kind, to.clone(), guess)) {
-            self.uses.push(Use {
-                kind,
-                to,
-                resolution,
-            });
+            self.uses.push(Use { to, resolution });
         }
     }
 
@@ -468,10 +487,11 @@ impl<'i> Walker<'i> {
         }
     }
 
-    fn new(idx: &'i Index<'i>, home: &Home, sig: &syn::Signature) -> Self {
+    fn new(idx: &'i Index<'i>, file: &'i SourceFile, home: &Home, sig: &syn::Signature) -> Self {
         let parts: Vec<&str> = home.parts.iter().map(String::as_str).collect();
         Self {
             idx,
+            file,
             cx: home.cx.clone(),
             id: symbol_id(&home.module_path, &parts, home.kind),
             module_path: home.module_path.clone(),
@@ -484,6 +504,7 @@ impl<'i> Walker<'i> {
             count: 0,
             flow: Vec::new(),
             uses: Vec::new(),
+            sites: Vec::new(),
             unread_macros: 0,
             seen: HashSet::new(),
             nested: Vec::new(),
@@ -641,7 +662,9 @@ impl<'i> Walker<'i> {
             let hit = self.hit(&p.path, Ns::Value);
             if let Some((kind, id)) = self.call_target(&hit) {
                 let recursive = kind == EdgeKind::Calls && id == self.id;
-                self.add(kind, id);
+                if let Some(at) = last_ident(&p.path) {
+                    self.add(kind, id, at);
+                }
                 if recursive {
                     self.event(FlowKind::Recursion);
                 }
@@ -689,13 +712,13 @@ impl<'i> Walker<'i> {
             Some(recv) => {
                 if let Some(id) = self.idx.method(&recv, &name) {
                     let recursive = id == self.id;
-                    self.add(EdgeKind::Calls, id);
+                    self.add(EdgeKind::Calls, id, &m.method);
                     if recursive {
                         self.event(FlowKind::Recursion);
                     }
                 }
             }
-            None => self.may_reference(&name),
+            None => self.may_reference(&m.method),
         }
         self.visit_expr(&m.receiver);
         if let Some(turbofish) = &m.turbofish {
@@ -712,7 +735,9 @@ impl<'i> Walker<'i> {
     /// a method with an unseen caller for an unused one. A name shared by more
     /// than a few methods says nothing and is skipped; a `pub` method is
     /// guessed at a wider limit, since only tests that exercise it matter.
-    fn may_reference(&mut self, name: &str) {
+    fn may_reference(&mut self, at: &syn::Ident) {
+        let name = at.to_string();
+        let name = name.as_str();
         let crates = &self.idx.tree.crates;
         let krate = self.idx.tree.mods[self.cx.module].krate;
         let mut private = Vec::new();
@@ -736,7 +761,7 @@ impl<'i> Walker<'i> {
                 continue;
             }
             for id in ids {
-                self.record(EdgeKind::References, id, Resolution::Heuristic);
+                self.record(EdgeKind::References, id, Resolution::Heuristic, at);
             }
         }
     }
@@ -744,8 +769,10 @@ impl<'i> Walker<'i> {
     fn path_value(&mut self, p: &ExprPath) {
         if p.qself.is_none() {
             let hit = self.hit(&p.path, Ns::Value);
-            if let Some((kind, id)) = self.value_target(&hit) {
-                self.add(kind, id);
+            if let Some((kind, id)) = self.value_target(&hit)
+                && let Some(at) = last_ident(&p.path)
+            {
+                self.add(kind, id, at);
             }
         }
         visit::visit_expr_path(self, p);
@@ -765,19 +792,23 @@ impl<'i> Walker<'i> {
     fn struct_literal(&mut self, s: &ExprStruct) {
         match self.hit(&s.path, Ns::Type) {
             Hit::Item(sym) if sym.kind == SymbolKind::Type => {
-                self.add(EdgeKind::References, sym.id.clone());
+                if let Some(at) = last_ident(&s.path) {
+                    self.add(EdgeKind::References, sym.id.clone(), at);
+                }
                 for field in &s.fields {
                     let Member::Named(name) = &field.member else {
                         continue;
                     };
                     if let Some(found) = self.idx.field(&sym, &name.to_string()) {
                         let id = found.id.clone();
-                        self.add(EdgeKind::References, id);
+                        self.add(EdgeKind::References, id, name);
                     }
                 }
             }
             Hit::Item(sym) if sym.kind == SymbolKind::Field => {
-                self.add(EdgeKind::References, sym.id.clone());
+                if let Some(at) = last_ident(&s.path) {
+                    self.add(EdgeKind::References, sym.id.clone(), at);
+                }
             }
             _ => {}
         }
@@ -789,7 +820,7 @@ impl<'i> Walker<'i> {
             && let Some(found) = self.idx.field(&owner, &name.to_string())
         {
             let id = found.id.clone();
-            self.add(EdgeKind::References, id);
+            self.add(EdgeKind::References, id, name);
         }
         visit::visit_expr_field(self, f);
     }
@@ -837,14 +868,21 @@ impl<'i> Walker<'i> {
 }
 
 /// Walks `block` and summarizes the calls, flow and counts of the body.
-pub fn analyze(idx: &Index, home: &Home, sig: &syn::Signature, block: &Block) -> Facts {
-    let mut walker = Walker::new(idx, home, sig);
+pub fn analyze(
+    idx: &Index,
+    file: &SourceFile,
+    home: &Home,
+    sig: &syn::Signature,
+    block: &Block,
+) -> Facts {
+    let mut walker = Walker::new(idx, file, home, sig);
     walker.mark_tail(block);
     walker.bind_params(sig);
     walker.visit_block(block);
     let forwards_to = walker.forwards(sig, block);
     Facts {
         uses: walker.uses,
+        sites: walker.sites,
         unread_macros: walker.unread_macros,
         flow: walker.flow,
         max_nesting: walker.deepest,
@@ -852,6 +890,11 @@ pub fn analyze(idx: &Index, home: &Home, sig: &syn::Signature, block: &Block) ->
         nested: walker.nested,
         forwards_to,
     }
+}
+
+/// The identifier a path ends with, the one that names its target.
+fn last_ident(path: &syn::Path) -> Option<&syn::Ident> {
+    path.segments.last().map(|s| &s.ident)
 }
 
 fn has_receiver(sig: &syn::Signature) -> bool {

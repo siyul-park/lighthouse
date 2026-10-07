@@ -70,6 +70,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 57,
+              "line": 13
+            },
+            "start": {
+              "col": 52,
+              "line": 13
+            }
+          },
           "to": "internal/text::Count"
         },
         {
@@ -86,6 +96,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 35,
+              "line": 15
+            },
+            "start": {
+              "col": 27,
+              "line": 15
+            }
+          },
           "to": "cmd/app::Greeting"
         }
       ],
@@ -123,6 +143,16 @@
       "symbols": [
         {
           "doc": "Version is exported but nothing can import a main package.",
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
           "file": "cmd/app/main.go",
           "id": "cmd/app::Version#var",
           "kind": "var",
@@ -141,6 +171,16 @@
         },
         {
           "doc": "Greeting is built at start.",
+          "extent": {
+            "end": {
+              "col": 69,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
           "file": "cmd/app/main.go",
           "id": "cmd/app::Greeting#function",
           "kind": "function",
@@ -158,6 +198,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 40,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
           "file": "cmd/app/main.go",
           "id": "cmd/app::main#function",
           "kind": "function",
@@ -259,6 +309,16 @@
       "symbols": [
         {
           "doc": "Count counts words.",
+          "extent": {
+            "end": {
+              "col": 43,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
           "file": "internal/text/words.go",
           "id": "internal/text::Count#function",
           "kind": "function",
@@ -276,6 +336,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
           "file": "internal/text/words.go",
           "id": "internal/text::hidden#function",
           "kind": "function",

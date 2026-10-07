@@ -46,6 +46,10 @@ pub enum Error {
     UnknownRule(String),
     #[error("rule `{0}` is not enabled by the configuration")]
     RuleNotEnabled(String),
+    /// A fix run that cannot start or finish safely: incomplete analysis, a
+    /// file changed under it, a formatter that cannot run, an unknown fixer.
+    #[error("{0}")]
+    Fix(String),
 }
 
 /// The result of a run: findings, notices and the parts that were not analyzed.
@@ -83,6 +87,8 @@ pub struct Outcome {
     /// Findings that source annotations allow, within the report scope. They
     /// are not in `diagnostics` and never fail the run.
     pub allowed: Vec<Allowed>,
+    /// The analysis the findings came from; fixes read it.
+    pub project: Project,
 }
 
 impl Outcome {
@@ -98,6 +104,9 @@ impl Outcome {
         u8::from(self.diagnostics.iter().any(|d| fails(d.severity)))
     }
 }
+
+/// Replacement texts by project-relative path; see [`Engine::check_overlaid`].
+pub type Overlays = BTreeMap<PathBuf, String>;
 
 /// What a run reports: everything under some paths, or exactly some files.
 enum Reported<'a> {
@@ -119,9 +128,9 @@ pub(crate) struct Input {
 /// A configured set of plugins that analyzes one project root. Running it does
 /// not modify the project or the engine.
 pub struct Engine {
-    registry: Registry,
-    config: Config,
-    ws: Workspace,
+    pub(crate) registry: Registry,
+    pub(crate) config: Config,
+    pub(crate) ws: Workspace,
     /// Providers from listed plugins; indexes into `languages`.
     providers: Vec<usize>,
     languages: Vec<Language>,
@@ -139,6 +148,7 @@ impl Engine {
         let ws = Workspace {
             root: root.canonicalize().map_err(io_error(root))?,
             languages: config.languages().clone(),
+            overlays: BTreeMap::new(),
         };
         let mut engine = Self {
             registry,
@@ -162,7 +172,19 @@ impl Engine {
     /// Checks the whole project, then reports diagnostics under `paths`.
     /// `only` restricts which rules run; empty means all enabled rules.
     pub fn check(&self, paths: &[PathBuf], only: &[String]) -> Result<Outcome, Error> {
-        self.run(Reported::Paths(paths), only)
+        self.run(Reported::Paths(paths), only, &Overlays::new())
+    }
+
+    /// Like `check`, but the project is read with `overlays` standing in for
+    /// the files of the same path: nothing is read from or written to those
+    /// files on disk. This is how a fix verifies an edit before writing it.
+    pub fn check_overlaid(
+        &self,
+        paths: &[PathBuf],
+        only: &[String],
+        overlays: &Overlays,
+    ) -> Result<Outcome, Error> {
+        self.run(Reported::Paths(paths), only, overlays)
     }
 
     /// Checks the whole project, then reports only the diagnostics in `files`,
@@ -170,10 +192,15 @@ impl Engine {
     /// nothing is reported, not everything: analysis scope is unchanged, only
     /// the report is narrowed.
     pub fn check_files(&self, files: &[PathBuf], only: &[String]) -> Result<Outcome, Error> {
-        self.run(Reported::Files(files), only)
+        self.run(Reported::Files(files), only, &Overlays::new())
     }
 
-    fn run(&self, reported: Reported, only: &[String]) -> Result<Outcome, Error> {
+    fn run(
+        &self,
+        reported: Reported,
+        only: &[String],
+        overlays: &Overlays,
+    ) -> Result<Outcome, Error> {
         for id in only {
             if self.registry.rule(id).is_none() {
                 return Err(Error::UnknownRule(id.clone()));
@@ -195,12 +222,13 @@ impl Engine {
             Reported::Paths(paths) => self.scopes(paths, &mut incomplete)?,
             Reported::Files(files) => files.to_vec(),
         };
-        let inputs = self.read(&mut outcome.notices, &mut incomplete);
-        let (inputs, project) = self.build_project(inputs, &mut outcome.notices, &mut incomplete);
+        let inputs = self.read(overlays, &mut outcome.notices, &mut incomplete);
+        let (inputs, project) =
+            self.build_project(inputs, overlays, &mut outcome.notices, &mut incomplete);
         let facts = self.analyze(&selected, &inputs, &project)?;
         let found = self.apply(&selected, &inputs, &project, &facts, &mut outcome.notices)?;
 
-        let ran: BTreeSet<String> = selected.iter().map(|r| r.meta().id.clone()).collect();
+        let ran: BTreeSet<String> = selected.iter().map(|r| r.manifest().id.clone()).collect();
         let level = |rule: &str, file: &Path, lang: &str| self.level_at(rule, file, lang);
         let gate = annotations::Gate {
             level: &level,
@@ -231,6 +259,7 @@ impl Engine {
         outcome.options = self.options_of(&found, &project)?;
         outcome.diagnostics = found;
         outcome.reported = scopes;
+        outcome.project = project;
         outcome.rules = ran.into_iter().collect();
         outcome.configured = self.active.iter().cloned().collect();
         incomplete.sort();
@@ -261,7 +290,7 @@ impl Engine {
             let project_scope = self
                 .registry
                 .rule(&d.rule_id)
-                .is_some_and(|r| r.meta().scope == Scope::Project);
+                .is_some_and(|r| r.manifest().scope == Scope::Project);
             let (path, lang) = match project.file(&d.file) {
                 Some(file) if !project_scope => (file.path.clone(), file.lang.clone()),
                 _ => (PathBuf::new(), String::new()),
@@ -283,7 +312,7 @@ impl Engine {
     }
 
     /// Report paths relative to the root; those outside it are incomplete.
-    fn scopes(
+    pub(crate) fn scopes(
         &self,
         paths: &[PathBuf],
         incomplete: &mut Vec<Incomplete>,
@@ -306,7 +335,12 @@ impl Engine {
     }
 
     /// Reads every file under the root that a listed language claims.
-    fn read(&self, notices: &mut BTreeSet<String>, incomplete: &mut Vec<Incomplete>) -> Vec<Input> {
+    fn read(
+        &self,
+        overlays: &Overlays,
+        notices: &mut BTreeSet<String>,
+        incomplete: &mut Vec<Incomplete>,
+    ) -> Vec<Input> {
         let mut inputs = Vec::new();
         let walk = WalkBuilder::new(&self.ws.root)
             .require_git(false)
@@ -333,7 +367,11 @@ impl Engine {
                 });
                 continue;
             };
-            if let Some(input) = self.read_input(entry.path(), rel, notices, incomplete) {
+            if let Some(mut input) = self.read_input(entry.path(), rel, notices, incomplete) {
+                if let Some(text) = overlays.get(rel) {
+                    input.file.hash = hash_of(text);
+                    input.text.clone_from(text);
+                }
                 inputs.push(input);
             }
         }
@@ -357,7 +395,7 @@ impl Engine {
         let text = match fs::read_to_string(path) {
             Ok(text) => text,
             Err(e) if e.kind() == io::ErrorKind::InvalidData => {
-                if self.provider(language).fallback() {
+                if self.provider(language).manifest().fallback {
                     notices.insert(format!("{}: skipped, not valid UTF-8", rel.display()));
                 } else {
                     incomplete.push(Incomplete {
@@ -377,11 +415,8 @@ impl Engine {
         };
         let file = File {
             path: rel.to_owned(),
-            lang: self.provider(language).id().to_owned(),
-            hash: Sha256::digest(text.as_bytes())
-                .iter()
-                .map(|b| format!("{b:02x}"))
-                .collect(),
+            lang: self.provider(language).manifest().id.clone(),
+            hash: hash_of(&text),
             generated: false,
             test: self.languages[language].tests.is_match(rel),
         };
@@ -405,9 +440,14 @@ impl Engine {
     fn build_project(
         &self,
         inputs: Vec<Input>,
+        overlays: &Overlays,
         notices: &mut BTreeSet<String>,
         incomplete: &mut Vec<Incomplete>,
     ) -> (Vec<Input>, Project) {
+        let ws = Workspace {
+            overlays: overlays.clone(),
+            ..self.ws.clone()
+        };
         let mut batches: BTreeMap<usize, Vec<&Input>> = BTreeMap::new();
         for input in &inputs {
             batches.entry(input.language).or_default().push(input);
@@ -422,7 +462,7 @@ impl Engine {
                     text: &i.text,
                 })
                 .collect();
-            match provider.index(&self.ws, &sources) {
+            match provider.index(&ws, &sources) {
                 Ok(indexed) => {
                     parts.extend(indexed.fragments);
                     notices.extend(indexed.notices);
@@ -432,7 +472,7 @@ impl Engine {
                     path: None,
                     reason: format!(
                         "language `{}` failed, {} file(s) not analyzed: {e}",
-                        provider.id(),
+                        provider.manifest().id,
                         batch.len()
                     ),
                 }),
@@ -455,10 +495,10 @@ impl Engine {
     ) -> Result<Facts, Error> {
         let wanted = rules
             .iter()
-            .flat_map(|r| r.meta().analyzers.iter().map(String::as_str));
+            .flat_map(|r| r.manifest().analyzers.iter().map(String::as_str));
         let mut facts = Facts::new();
         for analyzer in self.registry.order(wanted)? {
-            let runs: Vec<(Option<&Input>, String)> = match analyzer.scope() {
+            let runs: Vec<(Option<&Input>, String)> = match analyzer.manifest().scope {
                 Scope::Project => vec![(None, String::new())],
                 Scope::File => inputs
                     .iter()
@@ -473,7 +513,7 @@ impl Engine {
                     facts: &facts,
                 };
                 let fact = analyzer.run(&ctx)?;
-                facts.insert((analyzer.id().to_owned(), key), fact);
+                facts.insert((analyzer.manifest().id.clone(), key), fact);
             }
         }
         Ok(facts)
@@ -508,8 +548,8 @@ impl Engine {
                     self.preset_rules(id)
                 })?;
             let provider = self.provider(input.language);
-            for rule in rules.iter().filter(|r| r.meta().scope == Scope::File) {
-                let meta = rule.meta();
+            for rule in rules.iter().filter(|r| r.manifest().scope == Scope::File) {
+                let meta = rule.manifest();
                 let Some(config) = resolved.get(&meta.id) else {
                     continue;
                 };
@@ -517,7 +557,7 @@ impl Engine {
                 if let Some(missing) = meta
                     .capabilities
                     .iter()
-                    .find(|c| !provider.capabilities().contains(c))
+                    .find(|c| !provider.manifest().capabilities.contains(c))
                 {
                     notices.insert(format!(
                         "{}: skipped for language `{}`, missing capability {missing}",
@@ -553,8 +593,11 @@ impl Engine {
             .config
             .resolve(Path::new(""), "", &|id| self.preset_rules(id))?;
         let mut found = Vec::new();
-        for rule in rules.iter().filter(|r| r.meta().scope == Scope::Project) {
-            let meta = rule.meta();
+        for rule in rules
+            .iter()
+            .filter(|r| r.manifest().scope == Scope::Project)
+        {
+            let meta = rule.manifest();
             let Some(config) = resolved.get(&meta.id) else {
                 continue;
             };
@@ -562,7 +605,7 @@ impl Engine {
             let missing = meta.capabilities.iter().find(|c| {
                 languages
                     .iter()
-                    .any(|&l| !self.provider(l).capabilities().contains(c))
+                    .any(|&l| !self.provider(l).manifest().capabilities.contains(c))
             });
             if let Some(missing) = missing {
                 notices.insert(format!(
@@ -588,6 +631,14 @@ impl Engine {
     fn preset_rules(&self, id: &str) -> Option<Rules> {
         self.registry.preset(id).map(|p| p.rules.clone())
     }
+}
+
+/// The content hash the model records for a file's text.
+pub fn hash_of(text: &str) -> String {
+    Sha256::digest(text.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 /// The rules the configuration enables for at least one file: the presets it
@@ -657,8 +708,8 @@ fn load_languages(
             providers.push(languages.len());
         }
         languages.push(Language {
-            files: glob_set(provider.globs())?,
-            tests: glob_set(provider.conventions().test_globs)?,
+            files: glob_set(&provider.manifest().globs)?,
+            tests: glob_set(&provider.manifest().conventions.test_globs)?,
         });
     }
     Ok((providers, languages))

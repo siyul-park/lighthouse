@@ -25,6 +25,11 @@ pub fn parse(comment: &str) -> Option<Allow> {
     comment.lines().find_map(parse_line)
 }
 
+/// The index of the line of a comment's text that holds the annotation.
+pub fn line_of(comment: &str) -> Option<usize> {
+    comment.lines().position(|line| parse_line(line).is_some())
+}
+
 fn parse_line(line: &str) -> Option<Allow> {
     let line = line.trim_start_matches(|c: char| c.is_whitespace() || "/*#!".contains(c));
     let rest = line.strip_prefix(MARKER)?;

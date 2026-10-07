@@ -1,0 +1,665 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "span": {
+            "end": {
+              "col": 61,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "text": "// A plain comment above the attributes belongs to the item."
+        },
+        {
+          "attached_to": "extents::Limit#type",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
+          "text": "/// Holds the limit."
+        },
+        {
+          "attached_to": "extents::Limit::count#field",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 5
+            },
+            "start": {
+              "col": 5,
+              "line": 5
+            }
+          },
+          "text": "/// How many."
+        },
+        {
+          "attached_to": "extents::Kind#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "text": "/// Kinds of work."
+        },
+        {
+          "attached_to": "extents::Kind::Fast#field",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 13
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "text": "/// The quick one."
+        },
+        {
+          "attached_to": "extents::extra#function",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "text": "/// Only with the feature."
+        },
+        {
+          "attached_to": "extents::Limit::new#method",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 25
+            },
+            "start": {
+              "col": 5,
+              "line": 25
+            }
+          },
+          "text": "/// Makes one."
+        },
+        {
+          "span": {
+            "end": {
+              "col": 40,
+              "line": 36
+            },
+            "start": {
+              "col": 24,
+              "line": 36
+            }
+          },
+          "text": "// trailing note"
+        },
+        {
+          "attached_to": "extents/tests::new_starts_at_zero#test",
+          "span": {
+            "end": {
+              "col": 28,
+              "line": 42
+            },
+            "start": {
+              "col": 5,
+              "line": 42
+            }
+          },
+          "text": "/// Checks the default."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "extents"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "extents::Limit#type"
+        },
+        {
+          "from": {
+            "symbol": "extents::Limit#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "extents::Limit::count#field"
+        },
+        {
+          "from": {
+            "module": "extents"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "extents::Kind#type"
+        },
+        {
+          "from": {
+            "symbol": "extents::Kind#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "extents::Kind::Fast#field"
+        },
+        {
+          "from": {
+            "symbol": "extents::Kind#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "extents::Kind::Slow#field"
+        },
+        {
+          "from": {
+            "module": "extents"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "extents::extra#function"
+        },
+        {
+          "from": {
+            "symbol": "extents::Limit#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "extents::Limit::new#method"
+        },
+        {
+          "from": {
+            "symbol": "extents::Limit::new#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 13,
+              "line": 28
+            },
+            "start": {
+              "col": 9,
+              "line": 28
+            }
+          },
+          "to": "extents::Limit#type"
+        },
+        {
+          "from": {
+            "symbol": "extents::Limit::new#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 28
+            },
+            "start": {
+              "col": 16,
+              "line": 28
+            }
+          },
+          "to": "extents::Limit::count#field"
+        },
+        {
+          "from": {
+            "symbol": "extents::Limit#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "extents::Limit::count#method"
+        },
+        {
+          "from": {
+            "symbol": "extents::Limit::count#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 32
+            },
+            "start": {
+              "col": 14,
+              "line": 32
+            }
+          },
+          "to": "extents::Limit::count#field"
+        },
+        {
+          "from": {
+            "module": "extents"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "extents::MAX#const"
+        },
+        {
+          "from": {
+            "module": "extents/tests"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "extents"
+        },
+        {
+          "from": {
+            "module": "extents/tests"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "extents/tests::new_starts_at_zero#test"
+        },
+        {
+          "from": {
+            "symbol": "extents/tests::new_starts_at_zero#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 38,
+              "line": 45
+            },
+            "start": {
+              "col": 33,
+              "line": 45
+            }
+          },
+          "to": "extents::Limit::count#method"
+        },
+        {
+          "from": {
+            "symbol": "extents/tests::new_starts_at_zero#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 30,
+              "line": 45
+            },
+            "start": {
+              "col": 27,
+              "line": 45
+            }
+          },
+          "to": "extents::Limit::new#method"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "extents::extra#function",
+          "tokens": 3,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "extents::Limit::new#method",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "extents::Limit::count#method",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "extents/tests::new_starts_at_zero#test",
+          "tokens": 18,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "extents",
+          "path": "extents"
+        },
+        {
+          "name": "tests",
+          "path": "extents/tests",
+          "test_of": "extents"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Holds the limit.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "extents::Limit#type",
+          "kind": "type",
+          "name": "Limit",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "How many.",
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 7
+            },
+            "start": {
+              "col": 5,
+              "line": 5
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "extents::Limit::count#field",
+          "kind": "field",
+          "name": "count",
+          "owner": "extents::Limit#type",
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 7
+            },
+            "start": {
+              "col": 5,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Kinds of work.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "extents::Kind#type",
+          "kind": "type",
+          "name": "Kind",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "The quick one.",
+          "extent": {
+            "end": {
+              "col": 9,
+              "line": 14
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "extents::Kind::Fast#field",
+          "kind": "field",
+          "name": "Fast",
+          "owner": "extents::Kind#type",
+          "span": {
+            "end": {
+              "col": 9,
+              "line": 14
+            },
+            "start": {
+              "col": 5,
+              "line": 14
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 9,
+              "line": 15
+            },
+            "start": {
+              "col": 5,
+              "line": 15
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "extents::Kind::Slow#field",
+          "kind": "field",
+          "name": "Slow",
+          "owner": "extents::Kind#type",
+          "span": {
+            "end": {
+              "col": 9,
+              "line": 15
+            },
+            "start": {
+              "col": 5,
+              "line": 15
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Only with the feature.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "extents::extra#function",
+          "kind": "function",
+          "name": "extra",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Makes one.",
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 29
+            },
+            "start": {
+              "col": 5,
+              "line": 25
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "extents::Limit::new#method",
+          "kind": "method",
+          "name": "new",
+          "owner": "extents::Limit#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 29
+            },
+            "start": {
+              "col": 5,
+              "line": 27
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 33
+            },
+            "start": {
+              "col": 5,
+              "line": 31
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "extents::Limit::count#method",
+          "kind": "method",
+          "name": "count",
+          "owner": "extents::Limit#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 33
+            },
+            "start": {
+              "col": 5,
+              "line": 31
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 23,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 36
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "extents::MAX#const",
+          "kind": "const",
+          "name": "MAX",
+          "span": {
+            "end": {
+              "col": 23,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 36
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Checks the default.",
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 46
+            },
+            "start": {
+              "col": 5,
+              "line": 42
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "extents/tests::new_starts_at_zero#test",
+          "kind": "test",
+          "name": "new_starts_at_zero",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 46
+            },
+            "start": {
+              "col": 5,
+              "line": 44
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "extents/tests::new_starts_at_zero#test",
+          "targets": [
+            "extents::Limit::count#method",
+            "extents::Limit::new#method"
+          ]
+        }
+      ]
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

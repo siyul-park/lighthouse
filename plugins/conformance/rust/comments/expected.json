@@ -99,6 +99,16 @@
       "symbols": [
         {
           "doc": "Runs the thing.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "src/lib.rs",
           "id": "comments::run#function",
           "kind": "function",
@@ -116,6 +126,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
           "file": "src/lib.rs",
           "id": "comments::BLOCK#const",
           "kind": "const",

@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use lighthouse_model::{
     Diagnostic, EdgeKind, Node, Project, Symbol, SymbolId, SymbolKind, Target, Visibility,
 };
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
@@ -24,7 +24,7 @@ pub(crate) fn rule() -> Box<dyn Rule> {
     Box::new(PatternRule::new(ID, &[], check))
 }
 
-fn check(meta: &RuleMeta, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
+fn check(meta: &RuleManifest, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
     let Some((file, _)) = ctx.file.filter(|_| !skipped(ctx)) else {
         return Ok(Vec::new());
     };

@@ -1,5 +1,5 @@
 use lighthouse_model::{Diagnostic, Project, Symbol, SymbolId, SymbolKind, Visibility};
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
@@ -24,7 +24,7 @@ pub(crate) fn rule() -> Box<dyn Rule> {
 
 /// A private free function whose every production caller is a method of one
 /// owner type: its behavior belongs to that owner.
-fn check(meta: &RuleMeta, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
+fn check(meta: &RuleManifest, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
     if skipped(ctx) {
         return Ok(Vec::new());
     }

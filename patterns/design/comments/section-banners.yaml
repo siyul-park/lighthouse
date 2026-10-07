@@ -32,10 +32,22 @@ tuning:
     `//` or block comment made only of banner lines is reported.
 implementation:
   builtin: design/section-banners
+fix:
+  safety: suggested
+  ops:
+    - op: delete
+      file: finding.file
+      span: finding.span
 examples:
   - name: invalid
     language: go
     kind: invalid
+    fixed:
+      - path: example.go
+        body: |-
+          package sample
+
+          func helper() int { return 1 }
     files:
       - path: example.go
         body: |-
@@ -49,6 +61,12 @@ examples:
   - name: marker
     language: go
     kind: invalid
+    fixed:
+      - path: example.go
+        body: |-
+          package sample
+
+          func helper() int { return 1 }
     files:
       - path: example.go
         body: |-
@@ -81,6 +99,10 @@ examples:
   - name: rust-invalid
     language: rust
     kind: invalid
+    fixed:
+      - path: src/lib.rs
+        body: |-
+          pub struct Store;
     files:
       - path: src/lib.rs
         body: |-

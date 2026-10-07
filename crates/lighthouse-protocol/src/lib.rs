@@ -7,8 +7,8 @@ pub use serve::{Handler, ServeError, serve};
 pub use wire::{
     Call, ClientInfo, Comment, Context, Conventions, Edge, EdgeKind, FileInfo, FileRef, Flow,
     FlowKind, Fragment, FunctionSummary, Incomplete, IndexParams, IndexResult, InitializeParams,
-    InitializeResult, Language, Methods, Module, Node, Overlay, Position, ProjectRef, Resolution,
-    Span, Symbol, SymbolKind, SymbolRole, TestCase, TestStyle, Visibility,
+    InitializeResult, Methods, Module, Node, Overlay, Position, ProjectRef, ProviderManifest,
+    Resolution, Span, Symbol, SymbolKind, SymbolRole, TestCase, TestStyle, Visibility,
 };
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.
@@ -23,8 +23,20 @@ pub const SHUTDOWN: &str = "shutdown";
 /// Notification: end the process; valid only after [`SHUTDOWN`] was answered.
 pub const EXIT: &str = "exit";
 
-/// The only capability defined by version 0.1.
+/// Capability: `calls`, `references`, `implements` and `accesses-private`
+/// edges come from the language's own semantic analysis.
 pub const SEMANTIC_EDGES: &str = "semantic-edges";
+/// Capability: every symbol carries its `extent`, the full declaration range.
+pub const EXTENT: &str = "extent";
+/// Capability: the provider analyzes the `overlays` of an index request instead
+/// of the files on disk. A host declines fixes in files of a provider without it.
+pub const OVERLAYS: &str = "overlays";
+/// Capability: every reference to a symbol is reported as an edge with a
+/// `site`, signatures, fields and receivers included. No bundled provider
+/// declares it yet.
+pub const COMPLETE_REFERENCES: &str = "complete-references";
+/// Capability: edges carry the `site` where the reference occurs.
+pub const REFERENCE_SITES: &str = "reference-sites";
 
 /// JSON Schema of every method's params and result, with the wire types under
 /// `$defs`.

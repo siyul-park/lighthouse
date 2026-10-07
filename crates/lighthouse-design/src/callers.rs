@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use lighthouse_model::{Diagnostic, Project, Symbol, SymbolId, SymbolKind, Visibility};
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
@@ -24,13 +24,13 @@ pub(crate) fn rule() -> Box<dyn Rule> {
 /// callee whose declaration group the file order places before its caller's is
 /// not judged: that order, not the reading order, fixes its position. Neither
 /// is a method of an inherent impl called from a trait impl, which follows it.
-fn check(meta: &RuleMeta, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
+fn check(meta: &RuleManifest, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
     if skipped(ctx) {
         return Ok(Vec::new());
     }
     let project = ctx.project;
     let language = ctx.file.map(|(file, _)| file.lang.as_str());
-    let group = group_index(language)?;
+    let group = group_index(language, &serde_json::Map::new())?;
     let mut found = Vec::new();
     for callee in functions(ctx) {
         let Some(callers) = file_local_callers(project, callee) else {

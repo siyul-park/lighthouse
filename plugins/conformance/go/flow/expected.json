@@ -73,6 +73,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 49
+            },
+            "start": {
+              "col": 13,
+              "line": 49
+            }
+          },
           "to": ".::fact"
         },
         {
@@ -89,6 +99,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 56
+            },
+            "start": {
+              "col": 11,
+              "line": 56
+            }
+          },
           "to": ".::Tree::value"
         },
         {
@@ -97,6 +117,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 29,
+              "line": 56
+            },
+            "start": {
+              "col": 26,
+              "line": 56
+            }
+          },
           "to": ".::Tree::Sum"
         },
         {
@@ -105,7 +135,35 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 56
+            },
+            "start": {
+              "col": 21,
+              "line": 56
+            }
+          },
           "to": ".::Tree::left"
+        },
+        {
+          "from": {
+            "symbol": ".::Tree::Sum#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 45,
+              "line": 56
+            },
+            "start": {
+              "col": 42,
+              "line": 56
+            }
+          },
+          "to": ".::Tree::Sum"
         },
         {
           "from": {
@@ -113,6 +171,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 56
+            },
+            "start": {
+              "col": 36,
+              "line": 56
+            }
+          },
           "to": ".::Tree::right"
         },
         {
@@ -177,6 +245,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 49,
+              "line": 118
+            },
+            "start": {
+              "col": 44,
+              "line": 118
+            }
+          },
           "to": ".::inner"
         },
         {
@@ -193,6 +271,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 42,
+              "line": 120
+            },
+            "start": {
+              "col": 37,
+              "line": 120
+            }
+          },
           "to": ".::inner"
         },
         {
@@ -217,6 +305,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 46,
+              "line": 124
+            },
+            "start": {
+              "col": 41,
+              "line": 124
+            }
+          },
           "to": ".::Tree::child"
         },
         {
@@ -233,6 +331,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 45,
+              "line": 126
+            },
+            "start": {
+              "col": 41,
+              "line": 126
+            }
+          },
           "to": ".::Tree::left"
         }
       ],
@@ -532,6 +640,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "flow.go",
           "id": ".::Tree#type",
           "kind": "type",
@@ -585,6 +703,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 5
+            },
+            "start": {
+              "col": 2,
+              "line": 5
+            }
+          },
           "file": "flow.go",
           "id": ".::Tree::value#field",
           "kind": "field",
@@ -603,6 +731,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
           "file": "flow.go",
           "id": ".::chain#function",
           "kind": "function",
@@ -620,6 +758,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 30
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
           "file": "flow.go",
           "id": ".::labeled#function",
           "kind": "function",
@@ -637,6 +785,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 43
+            },
+            "start": {
+              "col": 1,
+              "line": 32
+            }
+          },
           "file": "flow.go",
           "id": ".::selects#function",
           "kind": "function",
@@ -654,6 +812,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 50
+            },
+            "start": {
+              "col": 1,
+              "line": 45
+            }
+          },
           "file": "flow.go",
           "id": ".::fact#function",
           "kind": "function",
@@ -671,6 +839,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 57
+            },
+            "start": {
+              "col": 1,
+              "line": 52
+            }
+          },
           "file": "flow.go",
           "id": ".::Tree::Sum#method",
           "kind": "method",
@@ -689,6 +867,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 68
+            },
+            "start": {
+              "col": 1,
+              "line": 59
+            }
+          },
           "file": "flow.go",
           "id": ".::name#function",
           "kind": "function",
@@ -706,6 +894,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 78
+            },
+            "start": {
+              "col": 1,
+              "line": 70
+            }
+          },
           "file": "flow.go",
           "id": ".::mixed#function",
           "kind": "function",
@@ -723,6 +921,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 85
+            },
+            "start": {
+              "col": 1,
+              "line": 80
+            }
+          },
           "file": "flow.go",
           "id": ".::logic#function",
           "kind": "function",
@@ -740,6 +948,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 97
+            },
+            "start": {
+              "col": 1,
+              "line": 87
+            }
+          },
           "file": "flow.go",
           "id": ".::closures#function",
           "kind": "function",
@@ -757,6 +975,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 106
+            },
+            "start": {
+              "col": 1,
+              "line": 99
+            }
+          },
           "file": "flow.go",
           "id": ".::jump#function",
           "kind": "function",
@@ -774,6 +1002,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 116
+            },
+            "start": {
+              "col": 1,
+              "line": 108
+            }
+          },
           "file": "flow.go",
           "id": ".::typed#function",
           "kind": "function",
@@ -791,6 +1029,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 63,
+              "line": 118
+            },
+            "start": {
+              "col": 1,
+              "line": 118
+            }
+          },
           "file": "flow.go",
           "id": ".::wrap#function",
           "kind": "function",
@@ -808,6 +1056,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 50,
+              "line": 120
+            },
+            "start": {
+              "col": 1,
+              "line": 120
+            }
+          },
           "file": "flow.go",
           "id": ".::reorder#function",
           "kind": "function",
@@ -825,6 +1083,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 60,
+              "line": 122
+            },
+            "start": {
+              "col": 1,
+              "line": 122
+            }
+          },
           "file": "flow.go",
           "id": ".::inner#function",
           "kind": "function",
@@ -842,6 +1110,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 50,
+              "line": 124
+            },
+            "start": {
+              "col": 1,
+              "line": 124
+            }
+          },
           "file": "flow.go",
           "id": ".::Tree::left0#method",
           "kind": "method",
@@ -860,6 +1138,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 47,
+              "line": 126
+            },
+            "start": {
+              "col": 1,
+              "line": 126
+            }
+          },
           "file": "flow.go",
           "id": ".::Tree::child#method",
           "kind": "method",

@@ -1,16 +1,21 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{Analyzer, Error, LanguageProvider, Manifest, Plugin, Preset, Rule};
+use crate::{
+    Analyzer, Error, Fixer, LanguageProvider, OrderKey, OrderKeys, Plugin, PluginManifest,
+    PresetManifest, Rule,
+};
 
 /// The registered plugins and everything they contribute. `register` is atomic,
 /// so a registry never holds a half-registered plugin.
 #[derive(Default)]
 pub struct Registry {
-    plugins: Vec<Manifest>,
+    plugins: Vec<PluginManifest>,
     languages: Vec<(String, Box<dyn LanguageProvider>)>,
     analyzers: BTreeMap<String, Box<dyn Analyzer>>,
     rules: BTreeMap<String, Box<dyn Rule>>,
-    presets: BTreeMap<String, Preset>,
+    presets: BTreeMap<String, PresetManifest>,
+    fixers: BTreeMap<String, Box<dyn Fixer>>,
+    keys: BTreeMap<String, Box<dyn OrderKey>>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -22,7 +27,7 @@ enum Mark {
 impl Registry {
     /// Registers atomically: on error nothing from `plugin` is kept.
     pub fn register(&mut self, plugin: &dyn Plugin) -> Result<(), Error> {
-        let manifest = plugin.manifest();
+        let manifest = plugin.manifest().clone();
         if self.has_plugin(&manifest.id) {
             return Err(Error::Duplicate(manifest.id));
         }
@@ -30,27 +35,89 @@ impl Registry {
         let analyzers = plugin.analyzers();
         let rules = plugin.rules();
         let presets = plugin.presets();
+        let fixers = plugin.fixers();
+        let keys = plugin.order_keys();
         self.check_languages(&languages)?;
         check_prefixes(&manifest.id, &analyzers, &rules, &presets)?;
         self.check_unique(&analyzers, &rules, &presets)?;
+        self.check_fixers(&manifest.id, &fixers, &keys)?;
 
         let id = manifest.id.clone();
         self.plugins.push(manifest);
         self.languages
             .extend(languages.into_iter().map(|l| (id.clone(), l)));
         self.analyzers
-            .extend(analyzers.into_iter().map(|a| (a.id().to_owned(), a)));
+            .extend(analyzers.into_iter().map(|a| (a.manifest().id.clone(), a)));
         self.rules
-            .extend(rules.into_iter().map(|r| (r.meta().id.clone(), r)));
+            .extend(rules.into_iter().map(|r| (r.manifest().id.clone(), r)));
         self.presets
             .extend(presets.into_iter().map(|p| (p.id.clone(), p)));
+        self.fixers
+            .extend(fixers.into_iter().map(|f| (f.manifest().id.clone(), f)));
+        self.keys
+            .extend(keys.into_iter().map(|k| (k.manifest().id.clone(), k)));
         Ok(())
+    }
+
+    /// Fixer and order key ids are qualified with the plugin and unique.
+    fn check_fixers(
+        &self,
+        plugin: &str,
+        fixers: &[Box<dyn Fixer>],
+        keys: &[Box<dyn OrderKey>],
+    ) -> Result<(), Error> {
+        let mut seen = BTreeSet::new();
+        for f in fixers {
+            let id = f.manifest().id.as_str();
+            if plugin_of(id) != plugin || !id.contains('/') {
+                return Err(Error::Prefix {
+                    plugin: plugin.to_owned(),
+                    id: id.to_owned(),
+                });
+            }
+            if self.fixers.contains_key(id) || !seen.insert(id) {
+                return Err(Error::Duplicate(id.to_owned()));
+            }
+        }
+        let mut seen = BTreeSet::new();
+        for k in keys {
+            let id = k.manifest().id.as_str();
+            if plugin_of(id) != plugin || !id.contains('/') {
+                return Err(Error::Prefix {
+                    plugin: plugin.to_owned(),
+                    id: id.to_owned(),
+                });
+            }
+            if self.keys.contains_key(id) || !seen.insert(id) {
+                return Err(Error::Duplicate(id.to_owned()));
+            }
+        }
+        Ok(())
+    }
+
+    /// The fixer with this qualified id.
+    pub fn fixer(&self, id: &str) -> Option<&dyn Fixer> {
+        self.fixers.get(id).map(Box::as_ref)
+    }
+
+    /// Sorted by id.
+    pub fn fixers(&self) -> impl Iterator<Item = &dyn Fixer> {
+        self.fixers.values().map(Box::as_ref)
+    }
+
+    /// The order keys, sorted by id.
+    pub fn order_keys(&self) -> impl Iterator<Item = &dyn OrderKey> {
+        self.keys.values().map(Box::as_ref)
     }
 
     fn check_languages(&self, languages: &[Box<dyn LanguageProvider>]) -> Result<(), Error> {
         for l in languages {
-            if self.languages.iter().any(|(_, x)| x.id() == l.id()) {
-                return Err(Error::Duplicate(l.id().to_owned()));
+            if self
+                .languages
+                .iter()
+                .any(|(_, x)| x.manifest().id == l.manifest().id)
+            {
+                return Err(Error::Duplicate(l.manifest().id.clone()));
             }
         }
         Ok(())
@@ -61,16 +128,17 @@ impl Registry {
         &self,
         analyzers: &[Box<dyn Analyzer>],
         rules: &[Box<dyn Rule>],
-        presets: &[Preset],
+        presets: &[PresetManifest],
     ) -> Result<(), Error> {
         let mut seen = BTreeSet::new();
         for a in analyzers {
-            if self.analyzers.contains_key(a.id()) || !seen.insert(a.id()) {
-                return Err(Error::Duplicate(a.id().to_owned()));
+            let id = a.manifest().id.as_str();
+            if self.analyzers.contains_key(id) || !seen.insert(id) {
+                return Err(Error::Duplicate(id.to_owned()));
             }
         }
         for r in rules {
-            let rule = r.meta().id.as_str();
+            let rule = r.manifest().id.as_str();
             if self.rules.contains_key(rule) || !seen.insert(rule) {
                 return Err(Error::Duplicate(rule.to_owned()));
             }
@@ -101,8 +169,8 @@ impl Registry {
             .languages
             .iter()
             .map(|(p, l)| (p.as_str(), l.as_ref()))
-            .partition(|(_, l)| !l.fallback());
-        regular.sort_by_key(|(_, l)| std::cmp::Reverse(l.priority()));
+            .partition(|(_, l)| !l.manifest().fallback);
+        regular.sort_by_key(|(_, l)| std::cmp::Reverse(l.manifest().priority));
         regular.into_iter().chain(fallback)
     }
 
@@ -117,7 +185,7 @@ impl Registry {
     }
 
     /// The preset with this qualified id.
-    pub fn preset(&self, id: &str) -> Option<&Preset> {
+    pub fn preset(&self, id: &str) -> Option<&PresetManifest> {
         self.presets.get(id)
     }
 
@@ -168,13 +236,20 @@ impl Registry {
         }
         marks.insert(id.to_owned(), Mark::Visiting);
         stack.push(id.to_owned());
-        for dep in analyzer.requires() {
+        for dep in &analyzer.manifest().requires {
             self.visit(dep, id, stack, marks, out)?;
         }
         stack.pop();
         marks.insert(id.to_owned(), Mark::Done);
         out.push(analyzer.as_ref());
         Ok(())
+    }
+}
+
+impl OrderKeys for Registry {
+    /// The order key with this qualified id.
+    fn key(&self, id: &str) -> Option<&dyn OrderKey> {
+        self.keys.get(id).map(Box::as_ref)
     }
 }
 
@@ -188,12 +263,12 @@ fn check_prefixes(
     plugin: &str,
     analyzers: &[Box<dyn Analyzer>],
     rules: &[Box<dyn Rule>],
-    presets: &[Preset],
+    presets: &[PresetManifest],
 ) -> Result<(), Error> {
     let ids = analyzers
         .iter()
-        .map(|a| a.id())
-        .chain(rules.iter().map(|r| r.meta().id.as_str()))
+        .map(|a| a.manifest().id.as_str())
+        .chain(rules.iter().map(|r| r.manifest().id.as_str()))
         .chain(presets.iter().map(|p| p.id.as_str()));
     for item in ids {
         if plugin_of(item) != plugin || !item.contains('/') {

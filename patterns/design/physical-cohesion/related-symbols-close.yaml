@@ -30,10 +30,31 @@ tuning:
     by side are fine.
 implementation:
   builtin: design/related-symbols-close
+fix:
+  safety: suggested
+  requires: [extent]
+  ops:
+    - op: move
+      node: finding.evidence.symbols[2]
+      after: finding.evidence.symbols[0]
 examples:
   - name: invalid
     language: go
     kind: invalid
+    fixed:
+      - path: example.go
+        body: |-
+          package sample
+
+          type A struct{}
+
+          type B struct{}
+
+          func (a A) One() int { return 1 }
+
+          func (a A) Two() int { return 2 }
+
+          func (b B) One() int { return 1 }
     files:
       - path: example.go
         body: |-
@@ -53,6 +74,18 @@ examples:
   - name: free-function-between
     language: go
     kind: invalid
+    fixed:
+      - path: example.go
+        body: |-
+          package sample
+
+          type A struct{}
+
+          func (a A) One() int { return 1 }
+
+          func (a A) Two() int { return 2 }
+
+          func Other() int { return 0 }
     files:
       - path: example.go
         body: |-

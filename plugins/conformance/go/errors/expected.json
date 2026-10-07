@@ -51,6 +51,16 @@
       "symbols": [
         {
           "doc": "Fine compiles.",
+          "extent": {
+            "end": {
+              "col": 29,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "ok.go",
           "id": ".::Fine#function",
           "kind": "function",
@@ -94,6 +104,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 11,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "syntax/bad.go",
           "id": "syntax::f#function",
           "kind": "function",
@@ -148,6 +168,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 37,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "typed.go",
           "id": ".::broken#function",
           "kind": "function",

@@ -1,7 +1,7 @@
 use std::{collections::BTreeSet, path::Path};
 
 use lighthouse_model::{
-    Comment, Diagnostic, Fingerprint, Project, Severity,
+    Comment, Diagnostic, Fingerprint, Position, Project, Severity, Span,
     annotation::{self, ANNOTATION_REASON, Allow, UNUSED_ALLOW},
 };
 use serde_json::json;
@@ -135,6 +135,39 @@ fn finding(
         comment.span,
         Fingerprint::of(rule, &comment.file.to_string_lossy(), &text),
     );
-    d.evidence = json!({ "rules": allow.rules, "reason": allow.reason });
+    d.evidence = json!({
+        "rules": allow.rules,
+        "reason": allow.reason,
+        "annotation": annotation_span(comment),
+    });
     Some(d)
+}
+
+/// The span of the comment's line that holds the annotation: from the
+/// comment's own start on its first line, the whole line (newline included)
+/// on a later one. A fix that removes it leaves the rest of the comment.
+fn annotation_span(comment: &Comment) -> Span {
+    let at = annotation::line_of(&comment.text).unwrap_or(0);
+    let number = comment.span.start.line + u32::try_from(at).unwrap_or(0);
+    if at > 0 {
+        return Span {
+            start: Position {
+                line: number,
+                col: 1,
+            },
+            end: Position {
+                line: number + 1,
+                col: 1,
+            },
+        };
+    }
+    let first = comment.text.lines().next().unwrap_or_default();
+    let width = u32::try_from(first.trim_end_matches('\r').len()).unwrap_or(0);
+    Span {
+        start: comment.span.start,
+        end: Position {
+            line: number,
+            col: comment.span.start.col + width,
+        },
+    }
 }

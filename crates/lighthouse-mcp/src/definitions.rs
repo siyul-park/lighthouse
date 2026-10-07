@@ -1,6 +1,6 @@
 //! The tools the server offers: name, description and the JSON Schema of the
-//! arguments. `pattern_similar`, `rule_proposals` and `fix` are reserved for
-//! later phases and deliberately absent.
+//! arguments. `pattern_similar` and `rule_proposals` are reserved for later
+//! phases and deliberately absent.
 
 use rmcp::model::{JsonObject, Tool};
 use serde_json::{Value, json};
@@ -18,6 +18,18 @@ pub fn all() -> Vec<Tool> {
                 "diff": { "type": "string", "description": "Report only files changed since the merge base with this git ref." },
                 "rules": { "type": "array", "items": { "type": "string" }, "description": format!("Run only these rules; {FORMATS}.") },
                 "limit": { "type": "integer", "minimum": 1, "description": "Most findings to return, errors first (default 25)." }
+            }),
+            &[],
+        ),
+        tool(
+            "fix",
+            "Fix findings with the fixers the rules' patterns name (`fixable: safe|suggested` in `rule_list` and `explain`). Select what to fix with `fingerprints` (findings from `check`, prefixes allowed), `paths` or `rules`; at least one is required. A fix is proposed as edits over the code model, applied, formatted, re-checked and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only safe fixes of mechanical rules are applied unless `unsafe_fixes` is set. Use `dry_run` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a verdict suppresses are never fixed.",
+            json!({
+                "fingerprints": { "type": "array", "items": { "type": "string" }, "description": "Fix these findings; a fingerprint or an unambiguous prefix each." },
+                "paths": { "type": "array", "items": { "type": "string" }, "description": "Fix findings under these paths (relative to the server's working directory)." },
+                "rules": { "type": "array", "items": { "type": "string" }, "description": format!("Fix findings of these rules; {FORMATS}.") },
+                "dry_run": { "type": "boolean", "description": "Return the diff and leave every file as it was." },
+                "unsafe_fixes": { "type": "boolean", "description": "Also apply suggested fixes, which are judgment calls: review the diff." }
             }),
             &[],
         ),

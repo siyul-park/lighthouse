@@ -1,6 +1,6 @@
 use lighthouse_metrics::{FAN, Fan, SIZE, Size, is_dispatcher, read};
 use lighthouse_model::Diagnostic;
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
@@ -23,7 +23,7 @@ pub(crate) fn rule() -> Box<dyn Rule> {
     Box::new(PatternRule::new(ID, &[FAN, SIZE], check))
 }
 
-fn check(meta: &RuleMeta, ctx: &Ctx, t: Thresholds) -> Result<Vec<Diagnostic>, Error> {
+fn check(meta: &RuleManifest, ctx: &Ctx, t: Thresholds) -> Result<Vec<Diagnostic>, Error> {
     if skipped(ctx) {
         return Ok(Vec::new());
     }

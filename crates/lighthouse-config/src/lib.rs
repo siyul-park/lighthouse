@@ -35,6 +35,93 @@ pub enum Error {
     },
     #[error("unknown preset `{0}`")]
     UnknownPreset(String),
+    #[error(
+        "invalid {FILE_NAME}: `[languages.{language}] formatter` must be a non-empty list of strings, or a table with `argv` and optional `stdin` (none|file), `output` (inPlace|text) and `env`"
+    )]
+    Formatter { language: String },
+}
+
+/// What a formatter is given on stdin.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FormatterStdin {
+    #[default]
+    None,
+    /// The text of the file.
+    File,
+}
+
+/// Where a formatter leaves the formatted text.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FormatterOutput {
+    /// In the scratch copy of the file, which is appended to `argv` (or fills
+    /// an `{file}` argument).
+    #[default]
+    InPlace,
+    /// On stdout, which carries only the text.
+    Text,
+}
+
+/// The command that formats a file of a language, by the command contract of
+/// fixes: exit `0` succeeds, stdout carries only the result, stderr is for
+/// people. `["gofmt", "-w"]` is the short form: scratch copy, path appended.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Formatter {
+    pub argv: Vec<String>,
+    pub stdin: FormatterStdin,
+    pub output: FormatterOutput,
+    /// Extra environment variables; the rest is cleared to an allowlist.
+    pub env: BTreeMap<String, String>,
+}
+
+impl Formatter {
+    fn parse(value: &serde_json::Value) -> Option<Self> {
+        let words = |v: &serde_json::Value| -> Option<Vec<String>> {
+            v.as_array()?
+                .iter()
+                .map(|w| w.as_str().map(str::to_owned))
+                .collect::<Option<Vec<_>>>()
+                .filter(|w| !w.is_empty())
+        };
+        if let Some(argv) = words(value) {
+            return Some(Self {
+                argv,
+                stdin: FormatterStdin::None,
+                output: FormatterOutput::InPlace,
+                env: BTreeMap::new(),
+            });
+        }
+        let table = value.as_object()?;
+        if table
+            .keys()
+            .any(|k| !["argv", "stdin", "output", "env"].contains(&k.as_str()))
+        {
+            return None;
+        }
+        let stdin = match table.get("stdin").map(|v| v.as_str()) {
+            None | Some(Some("none")) => FormatterStdin::None,
+            Some(Some("file")) => FormatterStdin::File,
+            _ => return None,
+        };
+        let output = match table.get("output").map(|v| v.as_str()) {
+            None | Some(Some("inPlace")) => FormatterOutput::InPlace,
+            Some(Some("text")) => FormatterOutput::Text,
+            _ => return None,
+        };
+        let env = match table.get("env") {
+            None => BTreeMap::new(),
+            Some(v) => v
+                .as_object()?
+                .iter()
+                .map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned())))
+                .collect::<Option<_>>()?,
+        };
+        Some(Self {
+            argv: words(table.get("argv")?)?,
+            stdin,
+            output,
+            env,
+        })
+    }
 }
 
 /// A plugin listed in `plugins`: a bare id, or `{ id, path, timeout }`.
@@ -119,6 +206,7 @@ impl Override {
 pub struct Config {
     plugins: Vec<PluginRef>,
     languages: BTreeMap<String, Options>,
+    formatters: BTreeMap<String, Formatter>,
     extends: Vec<String>,
     rules: Rules,
     overrides: Vec<Override>,
@@ -127,7 +215,8 @@ pub struct Config {
 impl Config {
     /// Parses `text` as a `lighthouse.toml`; unknown fields and invalid globs are errors.
     pub fn parse(text: &str) -> Result<Self, Error> {
-        let raw: Raw = toml::from_str(text)?;
+        let mut raw: Raw = toml::from_str(text)?;
+        let formatters = take_formatters(&mut raw.languages)?;
         let overrides = raw
             .overrides
             .into_iter()
@@ -149,6 +238,7 @@ impl Config {
                 })
                 .collect(),
             languages: raw.languages,
+            formatters,
             extends: raw.extends,
             rules: raw.rules,
             overrides,
@@ -185,7 +275,20 @@ impl Config {
         self.plugins.iter().any(|p| p.id == id)
     }
 
-    /// `[languages.<id>]` options handed to the language's provider.
+    /// The command that formats a file of the language, `[languages.<id>]
+    /// formatter`.
+    /// Every language's formatter, by language id.
+    pub fn formatters(&self) -> impl Iterator<Item = (&str, &Formatter)> {
+        self.formatters.iter().map(|(id, f)| (id.as_str(), f))
+    }
+
+    /// The formatter of a language, if its configuration names one.
+    pub fn formatter(&self, language: &str) -> Option<&Formatter> {
+        self.formatters.get(language)
+    }
+
+    /// `[languages.<id>]` options handed to the language's provider; the
+    /// `formatter` key is the host's and is not among them.
     pub fn languages(&self) -> &BTreeMap<String, Options> {
         &self.languages
     }
@@ -249,6 +352,24 @@ where
         pattern: all.join(", "),
         source,
     })
+}
+
+/// Removes the host's `formatter` key from each language's options.
+fn take_formatters(
+    languages: &mut BTreeMap<String, Options>,
+) -> Result<BTreeMap<String, Formatter>, Error> {
+    let mut formatters = BTreeMap::new();
+    for (language, options) in languages.iter_mut() {
+        let Some(value) = options.remove("formatter") else {
+            continue;
+        };
+        let bad = || Error::Formatter {
+            language: language.clone(),
+        };
+        let formatter = Formatter::parse(&value).ok_or_else(bad)?;
+        formatters.insert(language.clone(), formatter);
+    }
+    Ok(formatters)
 }
 
 fn globs(patterns: &[String]) -> Result<Option<GlobSet>, Error> {

@@ -30,11 +30,11 @@ func (p *Provider) Initialize(params sdk.InitializeParams) (sdk.InitializeResult
 		ID:              p.id,
 		Version:         p.version,
 		ProtocolVersion: sdk.ProtocolVersion,
-		Languages: []sdk.Language{{
+		Languages: []sdk.ProviderManifest{{
 			ID:           language,
 			Globs:        []string{"**/*.go"},
 			Conventions:  sdk.Conventions{TestGlobs: []string{"**/*_test.go"}},
-			Capabilities: []string{sdk.SemanticEdges},
+			Capabilities: []string{sdk.SemanticEdges, sdk.Extent, sdk.ReferenceSites, sdk.Overlays},
 		}},
 	}, nil
 }

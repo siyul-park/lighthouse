@@ -1,5 +1,5 @@
 use lighthouse_model::{Diagnostic, Symbol, SymbolKind, Visibility};
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
@@ -19,7 +19,7 @@ pub(crate) fn rule() -> Box<dyn Rule> {
 }
 
 /// A public symbol that two or more top-level tests are named after.
-fn check(meta: &RuleMeta, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
+fn check(meta: &RuleManifest, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
     let Some((file, _)) = ctx.file else {
         return Ok(Vec::new());
     };

@@ -12,10 +12,8 @@ toml.workspace = true
 lighthouse-config.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
+lighthouse-process.workspace = true
 lighthouse-protocol.workspace = true
-
-[target.'cfg(unix)'.dependencies]
-libc.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -811,6 +811,10 @@ A test file reads top-down: what the tests use, then the specification, then how
 
 A test file MUST declare its fixtures (test types, constants, variables and the functions that build them without the test framework's handle) above its tests, and its test helpers (functions that take the test framework's handle and are called from tests) below the tests that use them. Fixtures keep the declaration-group order among themselves and sit next to the fixtures they compose.
 
+**Fix**
+
+Fixable: `safe` · operations move, move. See [fix operations](fix-operations.md).
+
 **Invalid example: fixture-after-test (go)**
 
 `go.mod`
@@ -849,6 +853,26 @@ func TestGet(t *testing.T) {
 const want = 1
 ```
 
+Fixed `store_test.go`:
+
+```go
+package store_test
+
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+const want = 1
+
+func TestGet(t *testing.T) {
+	if store.Get() != want {
+		t.Fatal("get")
+	}
+}
+```
+
 **Invalid example: helper-above-its-test (go)**
 
 `go.mod`
@@ -884,6 +908,25 @@ func checkGet(t *testing.T) {
 }
 
 func TestGet(t *testing.T) { checkGet(t) }
+```
+
+Fixed `store_test.go`:
+
+```go
+package store_test
+
+import (
+	"testing"
+
+	"example.com/store"
+)
+
+func TestGet(t *testing.T) { checkGet(t) }
+
+func checkGet(t *testing.T) {
+	t.Helper()
+	_ = store.Get()
+}
 ```
 
 **Valid example: fixtures-tests-helpers (go)**

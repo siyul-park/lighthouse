@@ -25,6 +25,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
           "to": "pkg::helper"
         }
       ],
@@ -57,6 +67,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
           "file": "pkg/inside_test.go",
           "id": "pkg::TestHelper#test",
           "kind": "test",
@@ -117,6 +137,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 31,
+              "line": 4
+            },
+            "start": {
+              "col": 25,
+              "line": 4
+            }
+          },
           "to": "pkg::helper"
         },
         {
@@ -163,6 +193,16 @@
       "symbols": [
         {
           "doc": "Run does the work.",
+          "extent": {
+            "end": {
+              "col": 35,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "pkg/pkg.go",
           "id": "pkg::Run#function",
           "kind": "function",
@@ -180,6 +220,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 31,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
           "file": "pkg/pkg.go",
           "id": "pkg::helper#function",
           "kind": "function",
@@ -232,6 +282,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 12,
+              "line": 10
+            },
+            "start": {
+              "col": 9,
+              "line": 10
+            }
+          },
           "to": "pkg::Run"
         }
       ],
@@ -265,6 +325,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
           "file": "pkg/pkg_test.go",
           "id": "pkg[test]::TestRun#test",
           "kind": "test",

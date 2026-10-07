@@ -33,6 +33,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 7
+            },
+            "start": {
+              "col": 14,
+              "line": 7
+            }
+          },
           "to": "closed::Handle::id#field"
         }
       ],
@@ -59,6 +69,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "file": "closed/src/lib.rs",
           "id": "closed::Handle#type",
           "kind": "type",
@@ -76,6 +96,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
           "file": "closed/src/lib.rs",
           "id": "closed::Handle::id#field",
           "kind": "field",
@@ -94,6 +124,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
           "file": "closed/src/lib.rs",
           "id": "closed::Handle::id#method",
           "kind": "method",
@@ -139,6 +179,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 4
+            },
+            "start": {
+              "col": 12,
+              "line": 4
+            }
+          },
           "to": "shared::Handle::id#method"
         }
       ],
@@ -165,6 +215,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "consumer/src/lib.rs",
           "id": "consumer::identify#function",
           "kind": "function",
@@ -217,6 +277,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 7
+            },
+            "start": {
+              "col": 14,
+              "line": 7
+            }
+          },
           "to": "open::Handle::id#field"
         }
       ],
@@ -243,6 +313,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "file": "open/src/lib.rs",
           "id": "open::Handle#type",
           "kind": "type",
@@ -260,6 +340,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
           "file": "open/src/lib.rs",
           "id": "open::Handle::id#field",
           "kind": "field",
@@ -278,6 +368,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
           "file": "open/src/lib.rs",
           "id": "open::Handle::id#method",
           "kind": "method",
@@ -331,6 +431,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 7
+            },
+            "start": {
+              "col": 14,
+              "line": 7
+            }
+          },
           "to": "shared::Handle::id#field"
         }
       ],
@@ -357,6 +467,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "file": "shared/src/lib.rs",
           "id": "shared::Handle#type",
           "kind": "type",
@@ -374,6 +494,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
           "file": "shared/src/lib.rs",
           "id": "shared::Handle::id#field",
           "kind": "field",
@@ -392,6 +522,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
           "file": "shared/src/lib.rs",
           "id": "shared::Handle::id#method",
           "kind": "method",

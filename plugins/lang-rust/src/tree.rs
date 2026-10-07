@@ -91,6 +91,8 @@ pub struct Tree {
     /// `(parent, name)` of a `mod name;` whose file another crate target
     /// already claimed, to the module that analyzes it.
     pub aliases: HashMap<(usize, String), usize>,
+    /// Text that stands in for the file at an absolute path.
+    pub overlays: HashMap<PathBuf, String>,
     by_abs: HashMap<PathBuf, usize>,
     root: PathBuf,
 }
@@ -164,7 +166,11 @@ impl Tree {
             .unwrap_or(&abs)
             .to_string_lossy()
             .replace('\\', "/");
-        let text = match fs::read_to_string(&abs) {
+        let read = match self.overlays.get(&abs) {
+            Some(text) => Ok(text.clone()),
+            None => fs::read_to_string(&abs),
+        };
+        let text = match read {
             Ok(text) => text,
             Err(e) => {
                 self.problems.push((rel, format!("cannot read: {e}")));

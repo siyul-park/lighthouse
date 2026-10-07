@@ -9,7 +9,7 @@ use lighthouse_session::{CheckRequest, Session, explain, rule_rows};
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
-use crate::{review, rules};
+use crate::{fix, review, rules};
 
 /// Findings returned by `check` when the caller sets no limit.
 const DEFAULT_LIMIT: usize = 25;
@@ -60,7 +60,8 @@ pub fn call(name: &str, args: Value, caller: &Caller) -> Outcome {
         "rule_create" => rules::create(parse(args)?),
         "rule_update" => rules::update(parse(args)?),
         "rule_test" => rules::test(parse(args)?),
-        "pattern_similar" | "rule_proposals" | "fix" => Err(format!(
+        "fix" => fix::fix(parse(args)?),
+        "pattern_similar" | "rule_proposals" => Err(format!(
             "`{name}` is reserved for a later version and not available yet"
         )),
         _ => Err(format!("unknown tool `{name}`")),
@@ -86,6 +87,29 @@ pub fn document(value: Value, what: &str) -> Result<Value, String> {
 
 pub fn fail<E: ToString>(e: E) -> String {
     e.to_string()
+}
+
+/// The paths, canonical, each required to lie under the project root: an
+/// agent cannot ask for a report outside the project.
+pub(crate) fn inside(root: &Path, paths: Vec<PathBuf>) -> Result<Vec<PathBuf>, String> {
+    let root = root.canonicalize().map_err(fail)?;
+    paths
+        .into_iter()
+        .map(|path| {
+            let absolute = path
+                .canonicalize()
+                .map_err(|e| format!("`{}`: {e}", path.display()))?;
+            if absolute.starts_with(&root) {
+                Ok(absolute)
+            } else {
+                Err(format!(
+                    "`{}` is outside the project root {}",
+                    path.display(),
+                    root.display()
+                ))
+            }
+        })
+        .collect()
 }
 
 fn check(args: CheckArgs) -> Outcome {
@@ -118,29 +142,6 @@ fn check(args: CheckArgs) -> Outcome {
         "reasons": report.reasons,
         "messages": checked.messages,
     }))
-}
-
-/// The paths, canonical, each required to lie under the project root: an
-/// agent cannot ask for a report outside the project.
-fn inside(root: &Path, paths: Vec<PathBuf>) -> Result<Vec<PathBuf>, String> {
-    let root = root.canonicalize().map_err(fail)?;
-    paths
-        .into_iter()
-        .map(|path| {
-            let absolute = path
-                .canonicalize()
-                .map_err(|e| format!("`{}`: {e}", path.display()))?;
-            if absolute.starts_with(&root) {
-                Ok(absolute)
-            } else {
-                Err(format!(
-                    "`{}` is outside the project root {}",
-                    path.display(),
-                    root.display()
-                ))
-            }
-        })
-        .collect()
 }
 
 fn explain_tool(args: ExplainArgs) -> Outcome {

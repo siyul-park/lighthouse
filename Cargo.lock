@@ -710,6 +710,7 @@ name = "lighthouse-builtin"
 version = "0.1.0"
 dependencies = [
  "lighthouse-config",
+ "lighthouse-declarative",
  "lighthouse-design",
  "lighthouse-engine",
  "lighthouse-metrics",
@@ -769,6 +770,7 @@ dependencies = [
  "lighthouse-metrics",
  "lighthouse-model",
  "lighthouse-plugin",
+ "lighthouse-process",
  "lighthouse-spec",
  "serde",
  "serde_json",
@@ -803,9 +805,11 @@ dependencies = [
  "lighthouse-config",
  "lighthouse-model",
  "lighthouse-plugin",
+ "lighthouse-process",
  "lighthouse-spec",
  "serde_json",
  "sha2",
+ "similar",
  "tempfile",
  "thiserror",
  "toml",
@@ -861,6 +865,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lighthouse-process"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "lighthouse-protocol"
 version = "0.1.0"
 dependencies = [
@@ -886,11 +897,11 @@ dependencies = [
 name = "lighthouse-rpc"
 version = "0.1.0"
 dependencies = [
- "libc",
  "lighthouse-config",
  "lighthouse-engine",
  "lighthouse-model",
  "lighthouse-plugin",
+ "lighthouse-process",
  "lighthouse-protocol",
  "lighthouse-testkit",
  "serde",
@@ -917,13 +928,16 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_norway",
+ "sha2",
  "tempfile",
+ "toml",
 ]
 
 [[package]]
 name = "lighthouse-spec"
 version = "0.1.0"
 dependencies = [
+ "cel",
  "include_dir",
  "insta",
  "lighthouse-model",
@@ -954,6 +968,7 @@ name = "lighthouse-testing"
 version = "0.1.0"
 dependencies = [
  "lighthouse-config",
+ "lighthouse-declarative",
  "lighthouse-design",
  "lighthouse-engine",
  "lighthouse-metrics",

@@ -136,6 +136,16 @@
           },
           "kind": "references",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 46,
+              "line": 16
+            },
+            "start": {
+              "col": 42,
+              "line": 16
+            }
+          },
           "to": ".::Store::data"
         },
         {
@@ -160,6 +170,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 39,
+              "line": 20
+            },
+            "start": {
+              "col": 35,
+              "line": 20
+            }
+          },
           "to": ".::Store::Read"
         }
       ],
@@ -210,6 +230,16 @@
       "symbols": [
         {
           "doc": "Store keeps values.",
+          "extent": {
+            "end": {
+              "col": 41,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "aliases.go",
           "id": ".::Store#type",
           "kind": "type",
@@ -227,6 +257,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 39,
+              "line": 4
+            },
+            "start": {
+              "col": 20,
+              "line": 4
+            }
+          },
           "file": "aliases.go",
           "id": ".::Store::data#field",
           "kind": "field",
@@ -246,6 +286,16 @@
         },
         {
           "doc": "Repo is another name for Store.",
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
           "file": "aliases.go",
           "id": ".::Repo#type",
           "kind": "type",
@@ -264,6 +314,16 @@
         },
         {
           "doc": "Handler is a callback shape.",
+          "extent": {
+            "end": {
+              "col": 34,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
           "file": "aliases.go",
           "id": ".::Handler#type",
           "kind": "type",
@@ -282,6 +342,16 @@
         },
         {
           "doc": "Reader reads values.",
+          "extent": {
+            "end": {
+              "col": 38,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
           "file": "aliases.go",
           "id": ".::Reader#interface",
           "kind": "interface",
@@ -299,6 +369,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 36,
+              "line": 13
+            },
+            "start": {
+              "col": 26,
+              "line": 13
+            }
+          },
           "file": "aliases.go",
           "id": ".::Reader::Read#method",
           "kind": "method",
@@ -318,6 +398,16 @@
         },
         {
           "doc": "Read returns the value count; its receiver is spelled through the alias.",
+          "extent": {
+            "end": {
+              "col": 49,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
           "file": "aliases.go",
           "id": ".::Store::Read#method",
           "kind": "method",
@@ -336,6 +426,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 44,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
           "file": "aliases.go",
           "id": ".::use#function",
           "kind": "function",
@@ -353,6 +453,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 43,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
           "file": "aliases.go",
           "id": ".::count#function",
           "kind": "function",

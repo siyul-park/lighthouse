@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use lighthouse_model::{Diagnostic, Symbol, SymbolId, Visibility};
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
@@ -22,7 +22,7 @@ pub(crate) fn rule() -> Box<dyn Rule> {
 /// tests another module from outside (`test_of`) cannot reach private symbols
 /// and is fine; so is an internal test file that only uses public symbols,
 /// which the language lets live outside as well but which breaks no boundary.
-fn check(meta: &RuleMeta, ctx: &Ctx, _: NoOptions) -> Result<Vec<Diagnostic>, Error> {
+fn check(meta: &RuleManifest, ctx: &Ctx, _: NoOptions) -> Result<Vec<Diagnostic>, Error> {
     let Some((file, _)) = ctx.file else {
         return Ok(Vec::new());
     };

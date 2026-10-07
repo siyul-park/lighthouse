@@ -2,7 +2,7 @@ use lighthouse_metrics::{
     COGNITIVE, CYCLOMATIC, NESTING, SIZE, Size, is_dispatcher, is_flat_dispatch, read,
 };
 use lighthouse_model::FunctionSummary;
-use lighthouse_plugin::{Ctx, Error, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use lighthouse_spec::PatternRule;
 use serde::Deserialize;
 use serde_json::json;
@@ -31,7 +31,7 @@ pub(crate) fn rule() -> Box<dyn Rule> {
 }
 
 fn check(
-    meta: &RuleMeta,
+    meta: &RuleManifest,
     ctx: &Ctx,
     t: Thresholds,
 ) -> Result<Vec<lighthouse_model::Diagnostic>, Error> {

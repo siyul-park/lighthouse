@@ -44,7 +44,10 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
             file: Some((&file, text)),
             facts: &facts,
         })?;
-        facts.insert((analyzer.id().to_owned(), "dir/a.txt".to_owned()), value);
+        facts.insert(
+            (analyzer.manifest().id.clone(), "dir/a.txt".to_owned()),
+            value,
+        );
     }
     ctx(&facts)
 }
@@ -54,7 +57,7 @@ fn registry_is_valid_and_exposes_core() {
     let registry = lighthouse_builtin::registry();
     registry.validate().unwrap();
     assert!(registry.has_plugin("core"));
-    let meta = registry.rule("core/max-file-lines").unwrap().meta();
+    let meta = registry.rule("core/max-file-lines").unwrap().manifest();
     assert_eq!(meta.scope, Scope::File);
     assert_eq!(meta.analyzers, ["core/line-count"]);
 }
@@ -65,8 +68,8 @@ fn recommended_preset_derives_levels_from_rule_meta() {
     let preset = registry.preset("core/recommended").unwrap();
     let want: BTreeMap<_, _> = registry
         .rules()
-        .filter(|r| lighthouse_plugin::plugin_of(&r.meta().id) == "core")
-        .map(|r| (r.meta().id.clone(), Some(r.meta().severity)))
+        .filter(|r| lighthouse_plugin::plugin_of(&r.manifest().id) == "core")
+        .map(|r| (r.manifest().id.clone(), Some(r.manifest().severity)))
         .collect();
     let got: BTreeMap<_, _> = preset
         .rules
@@ -121,7 +124,7 @@ fn registered_rules_are_exactly_the_implemented_catalog_patterns() {
     let registry = lighthouse_builtin::registry();
     let catalog = lighthouse_spec::Catalog::bundled();
     let registered: std::collections::BTreeSet<_> =
-        registry.rules().map(|r| r.meta().id.clone()).collect();
+        registry.rules().map(|r| r.manifest().id.clone()).collect();
     for id in &registered {
         let pattern = catalog
             .pattern(id)
@@ -154,6 +157,79 @@ fn registered_rules_are_exactly_the_implemented_catalog_patterns() {
 }
 
 #[test]
+fn every_fix_names_a_registered_fixer_and_the_registry_holds_no_other() {
+    use lighthouse_model::Capability;
+    use lighthouse_spec::{FixKind, OpSpec};
+
+    let registry = lighthouse_builtin::registry();
+    let catalog = lighthouse_spec::Catalog::bundled();
+    let mut fixable = std::collections::BTreeSet::new();
+    for pattern in catalog.patterns() {
+        let Some(fix) = &pattern.fix else { continue };
+        let id = &pattern.id;
+        fixable.insert(id.clone());
+        assert!(registry.rule(id).is_some(), "{id} has a fix but no rule");
+        let fixer = registry
+            .fixer(id)
+            .unwrap_or_else(|| panic!("{id} has a fix but no registered fixer"));
+        assert_eq!(&fixer.manifest().id, id);
+        assert_eq!(fixer.manifest().requires, fix.requires, "{id}");
+        let FixKind::Ops(ops) = &fix.kind else {
+            continue;
+        };
+        for op in ops {
+            match op {
+                OpSpec::Reorder { by, .. } => {
+                    for key in by {
+                        assert!(
+                            registry.order_keys().any(|k| k.manifest().id == *key),
+                            "{id} orders by unregistered key {key}"
+                        );
+                    }
+                    assert!(fix.requires.contains(&Capability::Extent), "{id}");
+                }
+                OpSpec::Move { .. } => {
+                    assert!(fix.requires.contains(&Capability::Extent), "{id}");
+                }
+                OpSpec::Rename { .. } => {
+                    assert!(fix.requires.contains(&Capability::ReferenceSites), "{id}");
+                }
+                OpSpec::Delete { node: Some(_), .. } => {
+                    assert!(fix.requires.contains(&Capability::Extent), "{id}");
+                }
+                OpSpec::Delete { .. } | OpSpec::Replace { .. } => {}
+            }
+        }
+    }
+    let registered: std::collections::BTreeSet<_> =
+        registry.fixers().map(|f| f.manifest().id.clone()).collect();
+    assert_eq!(registered, fixable);
+    assert!(!fixable.is_empty());
+}
+
+#[test]
+fn the_bundled_fixes_say_what_each_rule_needs_to_be_fixed() {
+    let catalog = lighthouse_spec::Catalog::bundled();
+    let safety = |id: &str| {
+        catalog
+            .pattern(id)
+            .and_then(|p| p.fix.as_ref())
+            .map(|f| f.safety.to_string())
+    };
+    for id in ["design/declaration-groups", "testing/test-file-layout"] {
+        assert_eq!(safety(id).as_deref(), Some("safe"), "{id}");
+    }
+    for id in [
+        "design/related-symbols-close",
+        "design/callers-before-callees",
+        "design/section-banners",
+        "core/unused-allow",
+    ] {
+        assert_eq!(safety(id).as_deref(), Some("suggested"), "{id}");
+    }
+}
+
+#[test]
 fn default_limit_comes_from_the_catalog() {
     let text = "x\n".repeat(1001);
     assert_eq!(run_rule(&text, &Options::new()).unwrap().len(), 1);
@@ -171,13 +247,13 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
     assert_eq!(plugins, ["core", "metrics", "design", "testing"]);
     let languages: Vec<_> = registry
         .languages()
-        .map(|(_, l)| l.id().to_owned())
+        .map(|(_, l)| l.manifest().id.clone())
         .collect();
     assert_eq!(languages, ["text"]);
     let design: Vec<_> = registry
         .rules()
-        .filter(|r| lighthouse_plugin::plugin_of(&r.meta().id) == "design")
-        .map(|r| r.meta().id.clone())
+        .filter(|r| lighthouse_plugin::plugin_of(&r.manifest().id) == "design")
+        .map(|r| r.manifest().id.clone())
         .collect();
     assert_eq!(
         design,

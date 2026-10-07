@@ -8,34 +8,21 @@ use lighthouse_config::Config;
 use lighthouse_engine::Engine;
 use lighthouse_metrics::Metrics;
 use lighthouse_model::{
-    Capability, Comment, Edge, EdgeKind, File, Flow, Fragment, FunctionSummary, Module, Node,
-    Position, Resolution, Span, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle,
-    Visibility,
+    Comment, Edge, EdgeKind, File, Flow, Fragment, FunctionSummary, Module, Node, Position,
+    Resolution, Span, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle, Visibility,
 };
 use lighthouse_plugin::{
-    Conventions, Error, Indexed, LanguageProvider, Manifest, Plugin, Registry, Source, Workspace,
+    Conventions, Error, Indexed, LanguageProvider, Plugin, PluginManifest, ProviderManifest,
+    Registry, Source, Workspace,
 };
 use serde_json::Value;
 
 /// Reads a UCM fragment as JSON, the way an out-of-process provider would send it.
-struct Wire {
-    globs: Vec<String>,
-}
+struct Wire(ProviderManifest);
 
 impl LanguageProvider for Wire {
-    fn id(&self) -> &str {
-        "wire"
-    }
-    fn globs(&self) -> &[String] {
-        &self.globs
-    }
-    fn conventions(&self) -> Conventions {
-        Conventions {
-            test_globs: vec!["**/*_test.ucm".to_owned()],
-        }
-    }
-    fn capabilities(&self) -> &[Capability] {
-        &[]
+    fn manifest(&self) -> &ProviderManifest {
+        &self.0
     }
     fn index(&self, _: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
         let fragments = files
@@ -51,19 +38,28 @@ impl LanguageProvider for Wire {
     }
 }
 
-struct Fixture;
+struct Fixture(PluginManifest);
 
-impl Plugin for Fixture {
-    fn manifest(&self) -> Manifest {
-        Manifest {
+impl Fixture {
+    fn new() -> Self {
+        Self(PluginManifest {
             id: "fixture".to_owned(),
             version: "0".to_owned(),
-        }
+        })
+    }
+}
+
+impl Plugin for Fixture {
+    fn manifest(&self) -> &PluginManifest {
+        &self.0
     }
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
-        vec![Box::new(Wire {
-            globs: vec!["**/*.ucm".to_owned()],
-        })]
+        vec![Box::new(Wire(ProviderManifest {
+            conventions: Conventions {
+                test_globs: vec!["**/*_test.ucm".to_owned()],
+            },
+            ..ProviderManifest::new("wire", vec!["**/*.ucm".to_owned()])
+        }))]
     }
 }
 
@@ -100,6 +96,7 @@ impl World {
             owner: None,
             file: file.into(),
             span: at(line),
+            extent: None,
             doc: None,
             name: name.to_owned(),
             role: None,
@@ -158,6 +155,7 @@ impl World {
             from: Node::Symbol(from.id.clone()),
             to: Target::Path(to.id.as_str().to_owned()),
             resolution: Resolution::Syntactic,
+            site: None,
         });
     }
 
@@ -279,7 +277,7 @@ impl World {
         root.insert("rules".to_owned(), rules.into());
         let config = Config::parse(&root.to_string()).unwrap();
         let mut registry = Registry::default();
-        registry.register(&Fixture).unwrap();
+        registry.register(&Fixture::new()).unwrap();
         registry.register(&Metrics).unwrap();
         registry.register(subject.plugin).unwrap();
         let outcome = Engine::new(registry, config, dir.path())

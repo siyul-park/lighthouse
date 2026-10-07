@@ -1,7 +1,9 @@
 use std::path::Path;
 use std::time::Duration;
 
-use lighthouse_config::{Config, Error, PluginRef, RuleConfig, Rules, glob_set};
+use lighthouse_config::{
+    Config, Error, FormatterOutput, FormatterStdin, PluginRef, RuleConfig, Rules, glob_set,
+};
 use lighthouse_model::Severity;
 
 fn rule(level: Option<Severity>, options: &[(&str, i64)]) -> RuleConfig {
@@ -203,4 +205,69 @@ fn config_languages() {
 fn config_extends() {
     let config = Config::parse("extends = [\"a/x\", \"b/y\"]").unwrap();
     assert_eq!(config.extends(), ["a/x", "b/y"]);
+}
+
+#[test]
+fn a_language_formatter_is_the_hosts_and_never_reaches_the_provider() {
+    let config = Config::parse(
+        "[languages.go]\nformatter = [\"gofmt\", \"-w\"]\ntags = [\"x\"]\n[languages.rust]\ntags = []\n",
+    )
+    .unwrap();
+
+    let go = config.formatter("go").unwrap();
+    assert_eq!(go.argv, ["gofmt", "-w"]);
+    assert_eq!(go.stdin, FormatterStdin::None);
+    assert_eq!(go.output, FormatterOutput::InPlace);
+    assert_eq!(config.formatter("rust"), None);
+    assert!(!config.languages()["go"].contains_key("formatter"));
+    assert!(config.languages()["go"].contains_key("tags"));
+}
+
+#[test]
+fn a_formatter_must_be_a_non_empty_list_of_strings() {
+    for bad in [
+        "\"gofmt\"",
+        "[]",
+        "[1]",
+        "[\"gofmt\", 2]",
+        "{ stdin = \"file\" }",
+        "{ argv = [\"x\"], stdin = \"pipe\" }",
+        "{ argv = [\"x\"], output = \"json\" }",
+        "{ argv = [\"x\"], colour = \"red\" }",
+    ] {
+        let error = Config::parse(&format!("[languages.go]\nformatter = {bad}\n")).unwrap_err();
+        assert!(matches!(error, Error::Formatter { .. }), "{bad}: {error}");
+    }
+}
+
+#[test]
+fn a_fix_table_in_the_repository_is_refused_because_trust_is_the_users() {
+    assert!(Config::parse("[fix]\ncommands = \"allow\"\n").is_err());
+}
+
+#[test]
+fn formatter() {
+    let config = Config::parse(
+        "[languages.rust]\nformatter = { argv = [\"rustfmt\", \"--emit\", \"stdout\"], stdin = \"file\", output = \"text\", env = { A = \"b\" } }\n",
+    )
+    .unwrap();
+
+    let rust = config.formatter("rust").unwrap();
+
+    assert_eq!(rust.argv, ["rustfmt", "--emit", "stdout"]);
+    assert_eq!(rust.stdin, FormatterStdin::File);
+    assert_eq!(rust.output, FormatterOutput::Text);
+    assert_eq!(rust.env["A"], "b");
+}
+
+#[test]
+fn config_formatters() {
+    let config = Config::parse(
+        "[languages.go]\nformatter = [\"gofmt\"]\n[languages.rust]\nformatter = { argv = [\"rustfmt\"], stdin = \"file\", output = \"text\" }\n",
+    )
+    .unwrap();
+
+    let ids: Vec<&str> = config.formatters().map(|(id, _)| id).collect();
+
+    assert_eq!(ids, ["go", "rust"]);
 }

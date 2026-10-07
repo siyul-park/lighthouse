@@ -165,6 +165,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
           "file": "src/lib.rs",
           "id": "reexports/inner::A#type",
           "kind": "type",
@@ -182,6 +192,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 4
+            },
+            "start": {
+              "col": 5,
+              "line": 4
+            }
+          },
           "file": "src/lib.rs",
           "id": "reexports/inner::f#function",
           "kind": "function",
@@ -199,6 +219,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
           "file": "src/lib.rs",
           "id": "reexports/inner::hidden#function",
           "kind": "function",
@@ -216,6 +246,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 9
+            },
+            "start": {
+              "col": 9,
+              "line": 9
+            }
+          },
           "file": "src/lib.rs",
           "id": "reexports/inner/deeper::g#function",
           "kind": "function",
@@ -233,6 +273,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 13
+            },
+            "start": {
+              "col": 9,
+              "line": 13
+            }
+          },
           "file": "src/lib.rs",
           "id": "reexports/inner/open::h#function",
           "kind": "function",
@@ -250,6 +300,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 18
+            },
+            "start": {
+              "col": 5,
+              "line": 18
+            }
+          },
           "file": "src/lib.rs",
           "id": "reexports/named::n#function",
           "kind": "function",
@@ -267,6 +327,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 19
+            },
+            "start": {
+              "col": 5,
+              "line": 19
+            }
+          },
           "file": "src/lib.rs",
           "id": "reexports/named::unexported#function",
           "kind": "function",

@@ -35,6 +35,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 12,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "other/b.go",
           "id": "other::B#function",
           "kind": "function",
@@ -105,6 +115,16 @@
       "symbols": [
         {
           "doc": "A is exported.",
+          "extent": {
+            "end": {
+              "col": 12,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "pkg/a.go",
           "id": "pkg::A#function",
           "kind": "function",

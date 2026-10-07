@@ -67,11 +67,11 @@ pub struct Registered {
 
 /// A listed plugin whose handshake failed: registered without languages so the
 /// configuration stays valid, while its gap is reported as incomplete.
-struct Unavailable(lighthouse_plugin::Manifest);
+struct Unavailable(lighthouse_plugin::PluginManifest);
 
 impl Plugin for Unavailable {
-    fn manifest(&self) -> lighthouse_plugin::Manifest {
-        self.0.clone()
+    fn manifest(&self) -> &lighthouse_plugin::PluginManifest {
+        &self.0
     }
 }
 
@@ -129,7 +129,7 @@ pub fn register(
                         "plugin `{id}` is unavailable, its files fall back to plain text: {reason}"
                     ),
                 });
-                registry.register(&Unavailable(lighthouse_plugin::Manifest {
+                registry.register(&Unavailable(lighthouse_plugin::PluginManifest {
                     id: one.manifest.id.clone(),
                     version: one.manifest.version.clone(),
                 }))

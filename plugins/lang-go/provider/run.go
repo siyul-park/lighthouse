@@ -21,6 +21,8 @@ type run struct {
 	root string
 	opts options
 
+	// overlays hold the text that stands in for a file, by absolute path.
+	overlays  map[string][]byte
 	requested map[string]sdk.FileRef
 	fragments map[string]*sdk.Fragment
 	claimed   map[string]bool
@@ -55,6 +57,7 @@ func newRun(params sdk.IndexParams, opts options) *run {
 	r := &run{
 		root:          params.Project.Root,
 		opts:          opts,
+		overlays:      map[string][]byte{},
 		requested:     map[string]sdk.FileRef{},
 		fragments:     map[string]*sdk.Fragment{},
 		claimed:       map[string]bool{},
@@ -64,6 +67,9 @@ func newRun(params sdk.IndexParams, opts options) *run {
 	}
 	for _, f := range params.Files {
 		r.requested[f.Path] = f
+	}
+	for _, o := range params.Context.Overlays {
+		r.overlays[filepath.Join(r.root, filepath.FromSlash(o.Path))] = []byte(o.Text)
 	}
 	return r
 }
@@ -160,10 +166,12 @@ func (r *run) load(b *batch) ([]*packages.Package, bool) {
 		Tests:      true,
 		Fset:       token.NewFileSet(),
 	}
+	cfg.Overlay = map[string][]byte{}
+	for path, text := range r.overlays {
+		cfg.Overlay[path] = text
+	}
 	if b.synthetic {
-		cfg.Overlay = map[string][]byte{
-			filepath.Join(b.dir, "go.mod"): []byte("module " + syntheticModule + "\n\ngo 1.21\n"),
-		}
+		cfg.Overlay[filepath.Join(b.dir, "go.mod")] = []byte("module " + syntheticModule + "\n\ngo 1.21\n")
 	}
 	var pkgs []*packages.Package
 	var err error
@@ -221,9 +229,13 @@ func (r *run) claim(pkgs []*packages.Package, res *resolver) []*unit {
 			if !ok || r.claimed[rel] || !r.isRequested(rel) {
 				continue
 			}
-			src, err := os.ReadFile(filepath.Join(r.root, filepath.FromSlash(rel)))
-			if err != nil {
-				continue
+			src, ok := r.overlays[filepath.Join(r.root, filepath.FromSlash(rel))]
+			if !ok {
+				var err error
+				src, err = os.ReadFile(filepath.Join(r.root, filepath.FromSlash(rel)))
+				if err != nil {
+					continue
+				}
 			}
 			r.claimed[rel] = true
 			u := newUnit(rel, file, pkg, src, res)

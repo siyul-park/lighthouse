@@ -29,12 +29,26 @@ pub struct Span {
 #[serde(rename_all = "kebab-case")]
 pub enum Capability {
     SemanticEdges,
+    /// Symbols carry an [`Symbol::extent`]: the full declaration range.
+    Extent,
+    /// Edges carry the [`Edge::site`] where the reference occurs.
+    ReferenceSites,
+    /// Every reference to a symbol is an edge with a site: signatures, fields
+    /// and receivers included, so a rename cannot miss one.
+    CompleteReferences,
+    /// The provider analyzes the `overlays` of an index request instead of the
+    /// files on disk; a fix needs it to verify an edit before writing it.
+    Overlays,
 }
 
 impl fmt::Display for Capability {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::SemanticEdges => f.write_str("semantic-edges"),
+            Self::Extent => f.write_str("extent"),
+            Self::ReferenceSites => f.write_str("reference-sites"),
+            Self::CompleteReferences => f.write_str("complete-references"),
+            Self::Overlays => f.write_str("overlays"),
         }
     }
 }
@@ -174,6 +188,12 @@ pub struct Symbol {
     pub owner: Option<SymbolId>,
     pub file: PathBuf,
     pub span: Span,
+    /// The whole declaration, from its first leading doc comment, attribute or
+    /// annotation to its last token, `None` when the provider does not report
+    /// it (capability `extent`). It is what moving or deleting the declaration
+    /// takes along.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extent: Option<Span>,
     pub doc: Option<String>,
     pub name: String,
     pub role: Option<SymbolRole>,
@@ -236,6 +256,11 @@ pub struct Edge {
     pub from: Node,
     pub to: Target,
     pub resolution: Resolution,
+    /// Where the reference occurs, when the provider reports it (capability
+    /// `reference-sites`). The same relation used at several places is one
+    /// edge per place.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub site: Option<Span>,
 }
 
 /// Normalized control-flow construct, shared by every language. Providers map
@@ -403,6 +428,17 @@ struct Index {
     references: BTreeMap<SymbolId, Vec<SymbolId>>,
     uses: BTreeMap<SymbolId, Vec<SymbolId>>,
     members: BTreeMap<SymbolId, Vec<SymbolId>>,
+    sites: BTreeMap<SymbolId, Vec<Site>>,
+}
+
+/// One place that refers to a symbol, from an edge with a `site`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Site {
+    pub file: PathBuf,
+    pub from: Node,
+    pub kind: EdgeKind,
+    pub resolution: Resolution,
+    pub span: Span,
 }
 
 impl Deref for Project {
@@ -417,14 +453,15 @@ impl Project {
     /// Sorts, deduplicates and indexes `parts`, then resolves edge targets;
     /// never fails: what it drops or leaves ambiguous is reported by [`Project::notices`].
     pub fn merge(parts: impl IntoIterator<Item = Fragment>) -> Self {
-        let (mut all, mut notices) = sorted_union(parts);
-        let ambiguous = resolve_all(&mut all);
+        let (mut all, mut notices, files) = sorted_union(parts);
+        let (ambiguous, sited) = resolve_all(&mut all, &files);
         if ambiguous > 0 {
             notices.push(format!(
                 "{ambiguous} edge target(s) matched several symbols and stayed unresolved"
             ));
         }
-        let index = Index::new(&all);
+        let mut index = Index::new(&all);
+        index.sites = sites_of(&all, sited);
         Self {
             all,
             index,
@@ -525,6 +562,13 @@ impl Project {
         let start = tests.partition_point(|t| t.symbol.as_str() < prefix.as_str());
         let len = tests[start..].partition_point(|t| t.symbol.as_str().starts_with(&prefix));
         &tests[start..start + len]
+    }
+
+    /// Every place that refers to `id` through an edge that has a site: calls,
+    /// references and the other relations alike, in file order. Empty when the
+    /// provider reports no reference sites.
+    pub fn sites(&self, id: &SymbolId) -> &[Site] {
+        self.index.sites.get(id).map_or(&[], Vec::as_slice)
     }
 
     /// Comments of `path`, in source order.
@@ -665,9 +709,14 @@ impl<'a> Resolver<'a> {
     }
 }
 
-/// Resolves edge, test and forwarding targets in place, drops duplicate edges,
-/// and returns how many targets stayed ambiguous.
-fn resolve_all(all: &mut Fragment) -> usize {
+/// Resolves edge, test and forwarding targets in place, drops duplicate edges
+/// (the same relation at several sites is one edge, which keeps its first
+/// site), and returns how many targets stayed ambiguous with every edge that
+/// has a site and the file of the fragment it came from.
+fn resolve_all(
+    all: &mut Fragment,
+    files: &[Option<PathBuf>],
+) -> (usize, Vec<(Edge, Option<PathBuf>)>) {
     let resolver = Resolver::new(all);
     let resolved: Vec<Target> = all
         .edges
@@ -693,22 +742,77 @@ fn resolve_all(all: &mut Fragment) -> usize {
     for (edge, to) in all.edges.iter_mut().zip(resolved) {
         edge.to = to;
     }
+    let sited: Vec<(Edge, Option<PathBuf>)> = all
+        .edges
+        .iter()
+        .zip(files)
+        .filter(|(e, _)| e.site.is_some())
+        .map(|(e, f)| (e.clone(), f.clone()))
+        .collect();
     let mut seen = HashSet::new();
-    all.edges.retain(|e| seen.insert(e.clone()));
+    all.edges.retain(|e| {
+        let key = Edge {
+            site: None,
+            ..e.clone()
+        };
+        seen.insert(key)
+    });
     for (test, targets) in all.tests.iter_mut().zip(targets) {
         test.targets = targets;
     }
     for (function, to) in all.functions.iter_mut().zip(forwards) {
         function.forwards_to = to;
     }
-    ambiguous
+    (ambiguous, sited)
+}
+
+/// The sited edges that end at a symbol, grouped by target, ordered by file
+/// and position.
+fn sites_of(all: &Fragment, sited: Vec<(Edge, Option<PathBuf>)>) -> BTreeMap<SymbolId, Vec<Site>> {
+    let file_of = |from: &Node| match from {
+        Node::Symbol(id) => all
+            .symbols
+            .binary_search_by(|s| s.id.cmp(id))
+            .ok()
+            .map(|at| all.symbols[at].file.clone()),
+        Node::Module(_) => None,
+    };
+    let mut sites: BTreeMap<SymbolId, Vec<Site>> = BTreeMap::new();
+    for (edge, file) in sited {
+        let (Target::Resolved(Node::Symbol(to)), Some(span)) = (&edge.to, edge.site) else {
+            continue;
+        };
+        let Some(file) = file.or_else(|| file_of(&edge.from)) else {
+            continue;
+        };
+        sites.entry(to.clone()).or_default().push(Site {
+            file,
+            from: edge.from.clone(),
+            kind: edge.kind,
+            resolution: edge.resolution,
+            span,
+        });
+    }
+    for list in sites.values_mut() {
+        list.sort_by(|a, b| (&a.file, a.span.start).cmp(&(&b.file, b.span.start)));
+        list.dedup();
+    }
+    sites
 }
 
 /// The fragments concatenated, sorted and deduplicated by identity, with a
 /// notice when a symbol id is declared in several files.
-fn sorted_union(parts: impl IntoIterator<Item = Fragment>) -> (Fragment, Vec<String>) {
+fn sorted_union(
+    parts: impl IntoIterator<Item = Fragment>,
+) -> (Fragment, Vec<String>, Vec<Option<PathBuf>>) {
     let mut all = Fragment::default();
+    let mut edge_files = Vec::new();
     for part in parts {
+        let file = match part.files.as_slice() {
+            [only] => Some(only.path.clone()),
+            _ => None,
+        };
+        edge_files.extend(part.edges.iter().map(|_| file.clone()));
         all.files.extend(part.files);
         all.modules.extend(part.modules);
         all.symbols.extend(part.symbols);
@@ -731,7 +835,7 @@ fn sorted_union(parts: impl IntoIterator<Item = Fragment>) -> (Fragment, Vec<Str
     all.comments
         .sort_by(|a, b| (&a.file, a.span.start).cmp(&(&b.file, b.span.start)));
     all.comments.dedup();
-    (all, notices)
+    (all, notices, edge_files)
 }
 
 fn duplicate_notice(sorted: &[Symbol]) -> Option<String> {

@@ -221,6 +221,29 @@ fn stop_blocks_on_remaining_errors_once() {
 }
 
 #[test]
+fn hooks_report_fixable_findings_but_never_fix_them() {
+    let source = "pub fn run() -> u8 {\n    1\n}\n\npub struct Store;\n";
+    let dir = rust_project("", source);
+
+    let (code, reply) = hook(
+        dir.path(),
+        &["post-tool-use"],
+        &edit(dir.path(), "src/lib.rs"),
+    );
+    assert_eq!(code, 0);
+    let reply = reply.expect("the error is fed back");
+    assert!(reply.to_string().contains("declaration-groups"), "{reply}");
+    let (_, forced) = hook(dir.path(), &["stop"], &stop(dir.path(), false));
+    assert!(forced.is_some());
+
+    assert_eq!(
+        fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),
+        source,
+        "a hook never changes a file"
+    );
+}
+
+#[test]
 fn init_for_claude_code_merges_without_overwriting_and_is_idempotent() {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
@@ -255,6 +278,11 @@ fn init_for_claude_code_merges_without_overwriting_and_is_idempotent() {
     assert_eq!(mcp["mcpServers"]["lighthouse"]["args"], json!(["mcp"]));
     let settings = read(".claude/settings.json");
     assert_eq!(settings["permissions"]["allow"][0], "Bash(ls)");
+    assert_eq!(
+        settings["permissions"]["deny"],
+        json!(["Bash(lighthouse trust:*)"]),
+        "an agent may not trust a project for the user"
+    );
     let post = settings["hooks"]["PostToolUse"].as_array().unwrap();
     assert_eq!(post.len(), 2);
     assert_eq!(post[0]["hooks"][0]["command"], "mine");

@@ -5,8 +5,10 @@ mod naming;
 mod owner;
 mod single_owner;
 
+use std::sync::LazyLock;
+
 use lighthouse_model::{Diagnostic, Fingerprint, Symbol};
-use lighthouse_plugin::{Ctx, Manifest, Plugin, Preset, Rule, RuleMeta};
+use lighthouse_plugin::{Ctx, Fixer, Plugin, PluginManifest, PresetManifest, Rule, RuleManifest};
 use serde_json::Value;
 
 /// Id of the plugin and prefix of every rule it provides.
@@ -17,11 +19,12 @@ pub struct Testing;
 
 impl Plugin for Testing {
     /// The plugin id with this crate's version.
-    fn manifest(&self) -> Manifest {
-        Manifest {
+    fn manifest(&self) -> &PluginManifest {
+        static MANIFEST: LazyLock<PluginManifest> = LazyLock::new(|| PluginManifest {
             id: ID.to_owned(),
             version: env!("CARGO_PKG_VERSION").to_owned(),
-        }
+        });
+        &MANIFEST
     }
 
     /// Every rule of the `testing` pack.
@@ -35,10 +38,15 @@ impl Plugin for Testing {
         ]
     }
 
+    /// The fixes of the pack's patterns, compiled from the catalog.
+    fn fixers(&self) -> Vec<Box<dyn Fixer>> {
+        lighthouse_declarative::Declarative::bundled_fixers(ID)
+    }
+
     /// The standard presets over the pack's rules.
-    fn presets(&self) -> Vec<Preset> {
+    fn presets(&self) -> Vec<PresetManifest> {
         let rules = self.rules();
-        Preset::standard("testing", rules.iter().map(|rule| rule.meta()))
+        PresetManifest::standard("testing", rules.iter().map(|rule| rule.manifest()))
     }
 }
 
@@ -49,7 +57,7 @@ fn generated(ctx: &Ctx) -> bool {
         .is_none_or(|(file, _)| ctx.project.file(&file.path).is_none_or(|f| f.generated))
 }
 
-fn finding(meta: &RuleMeta, symbol: &Symbol, message: String, evidence: Value) -> Diagnostic {
+fn finding(meta: &RuleManifest, symbol: &Symbol, message: String, evidence: Value) -> Diagnostic {
     let fingerprint = Fingerprint::of(&meta.id, symbol.id.as_str(), "");
     let mut diagnostic = Diagnostic::new(
         &meta.id,

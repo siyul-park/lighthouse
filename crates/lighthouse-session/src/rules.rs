@@ -48,7 +48,7 @@ pub fn rule_rows(catalog: &Catalog, registry: &Registry, all: bool) -> Vec<RuleR
         }
     }
     for rule in registry.rules() {
-        let meta = rule.meta();
+        let meta = rule.manifest();
         if all && catalog.pattern(&meta.id).is_some() {
             continue;
         }
@@ -74,7 +74,7 @@ pub fn explain(catalog: &Catalog, registry: &Registry, id: &str) -> Result<Strin
             let _ = writeln!(out, "Status: {}", status(pattern, registry));
         }
         (None, Some(rule)) => {
-            let meta = rule.meta();
+            let meta = rule.manifest();
             let _ = writeln!(
                 out,
                 "{}  (default: {})\n\n{}\n\n{}",
@@ -88,7 +88,7 @@ pub fn explain(catalog: &Catalog, registry: &Registry, id: &str) -> Result<Strin
         (None, None) => return Err(format!("unknown pattern or rule `{id}`").into()),
     }
     if let Some(rule) = rule {
-        let meta = rule.meta();
+        let meta = rule.manifest();
         if !meta.analyzers.is_empty() {
             let _ = writeln!(out, "Analyzers: {}", meta.analyzers.join(", "));
         }
@@ -113,7 +113,7 @@ pub fn test_rules(session: &Session, ids: &[String], language: Option<&str>) -> 
         Some(language) => BTreeSet::from([language.to_owned()]),
         None => probe
             .languages()
-            .map(|(_, l)| l.id().to_owned())
+            .map(|(_, l)| l.manifest().id.clone())
             .filter(|l| l != NEUTRAL)
             .collect(),
     };
@@ -139,7 +139,9 @@ pub fn test_rules(session: &Session, ids: &[String], language: Option<&str>) -> 
                     lighthouse_builtin::registry()
                 })
         };
-        let tester = RuleTester::new(fresh, &catalog).language(language);
+        let tester = RuleTester::new(fresh, &catalog)
+            .language(language)
+            .trusted(session.trusted());
         for pattern in &patterns {
             runs += 1;
             failures.extend(

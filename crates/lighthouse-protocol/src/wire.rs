@@ -46,12 +46,14 @@ pub struct InitializeResult {
     pub version: String,
     /// Must equal the host's protocol version.
     pub protocol_version: String,
-    pub languages: Vec<Language>,
+    pub languages: Vec<ProviderManifest>,
 }
 
-/// A language a plugin indexes and how the host routes files to it.
+/// What a language provider declares: the language it indexes, how the host
+/// routes files to it and what it guarantees. A plugin's `initialize` result
+/// lists one per language.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Language {
+pub struct ProviderManifest {
     pub id: String,
     /// Project-relative path globs; `*` and `?` never cross `/`, a `**`
     /// component matches any number of directories.
@@ -64,7 +66,9 @@ pub struct Language {
     pub fallback: bool,
     #[serde(default)]
     pub conventions: Conventions,
-    /// Known value: `semantic-edges`. Hosts ignore unknown values.
+    /// Known values: `semantic-edges`, `extent`, `reference-sites`,
+    /// `complete-references`. Hosts
+    /// ignore unknown values.
     #[serde(default)]
     pub capabilities: Vec<String>,
 }
@@ -93,8 +97,9 @@ pub struct FileRef {
     pub hash: String,
 }
 
-/// Reserved: the content of an unsaved file. Hosts do not send overlays in
-/// 0.1; providers read files from disk.
+/// The text that stands in for a file: a provider reads it instead of the
+/// file on disk, and must not read the disk for that path. Hosts send overlays
+/// for requested files only, as a fix run verifies edits before writing them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Overlay {
     pub path: String,
@@ -107,7 +112,8 @@ pub struct Context {
     /// Per-language options from `[languages.<id>]`, keyed by language id.
     #[serde(default)]
     pub options: BTreeMap<String, Value>,
-    /// Reserved, see [`Overlay`].
+    /// Texts that replace requested files, see [`Overlay`]; absent when there
+    /// are none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overlays: Option<Vec<Overlay>>,
 }
@@ -254,6 +260,12 @@ pub struct Symbol {
     /// Project-relative path of the declaring file.
     pub file: String,
     pub span: Span,
+    /// The whole declaration, from its first leading doc comment, attribute
+    /// or annotation to its last token (capability `extent`). A spec of a
+    /// grouped declaration, such as one constant of a Go `const (...)` block,
+    /// has the spec's own lines. Added in 0.1 before 1.0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extent: Option<Span>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc: Option<String>,
     pub name: String,
@@ -306,6 +318,11 @@ pub struct Edge {
     /// (`module::owner::name`) that names exactly one symbol.
     pub to: String,
     pub resolution: Resolution,
+    /// Where the reference occurs: the span of the identifier that names the
+    /// target (capability `reference-sites`). The same relation used at
+    /// several places is one edge per place. Added in 0.1 before 1.0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub site: Option<Span>,
 }
 
 /// Normalized control-flow construct, the same for every language.

@@ -1,24 +1,15 @@
-use lighthouse_model::{Capability, Severity};
+use lighthouse_model::Severity;
 use lighthouse_plugin::{
-    Analyzer, Conventions, Ctx, Error, Indexed, LanguageProvider, Manifest, Plugin, Preset,
-    Registry, RuleMeta, Scope, Source, Workspace, options,
+    Analyzer, AnalyzerManifest, Ctx, Error, Indexed, LanguageProvider, Plugin, PluginManifest,
+    PresetManifest, ProviderManifest, Registry, RuleManifest, Scope, Source, Workspace, options,
 };
 use serde_json::Value;
 
-struct Node {
-    id: &'static str,
-    requires: Vec<String>,
-}
+struct Node(AnalyzerManifest);
 
 impl Analyzer for Node {
-    fn id(&self) -> &str {
-        self.id
-    }
-    fn requires(&self) -> &[String] {
-        &self.requires
-    }
-    fn scope(&self) -> Scope {
-        Scope::Project
+    fn manifest(&self) -> &AnalyzerManifest {
+        &self.0
     }
     fn run(&self, _: &Ctx) -> Result<Value, Error> {
         Ok(Value::Null)
@@ -26,39 +17,49 @@ impl Analyzer for Node {
 }
 
 struct Graph {
-    plugin: &'static str,
+    manifest: PluginManifest,
     nodes: &'static [(&'static str, &'static [&'static str])],
 }
 
-impl Plugin for Graph {
-    fn manifest(&self) -> Manifest {
-        Manifest {
-            id: self.plugin.to_owned(),
-            version: "0".to_owned(),
+impl Graph {
+    fn new(plugin: &str, nodes: &'static [(&'static str, &'static [&'static str])]) -> Self {
+        Self {
+            manifest: PluginManifest {
+                id: plugin.to_owned(),
+                version: "0".to_owned(),
+            },
+            nodes,
         }
+    }
+}
+
+impl Plugin for Graph {
+    fn manifest(&self) -> &PluginManifest {
+        &self.manifest
     }
     fn analyzers(&self) -> Vec<Box<dyn Analyzer>> {
         self.nodes
             .iter()
             .map(|&(id, requires)| {
-                Box::new(Node {
-                    id,
+                Box::new(Node(AnalyzerManifest {
+                    id: id.to_owned(),
                     requires: requires.iter().map(|r| (*r).to_owned()).collect(),
-                }) as Box<dyn Analyzer>
+                    scope: Scope::Project,
+                })) as Box<dyn Analyzer>
             })
             .collect()
     }
 }
 
 fn graph(nodes: &'static [(&'static str, &'static [&'static str])]) -> Graph {
-    Graph { plugin: "t", nodes }
+    Graph::new("t", nodes)
 }
 
 fn ids(registry: &Registry, want: &[&str]) -> Result<Vec<String>, Error> {
     Ok(registry
         .order(want.iter().copied())?
         .iter()
-        .map(|a| a.id().to_owned())
+        .map(|a| a.manifest().id.clone())
         .collect())
 }
 
@@ -127,69 +128,47 @@ fn registry_register() {
 #[test]
 fn plugins_are_listed_in_registration_order() {
     let mut registry = Registry::default();
-    registry
-        .register(&Graph {
-            plugin: "b",
-            nodes: &[],
-        })
-        .unwrap();
-    registry
-        .register(&Graph {
-            plugin: "a",
-            nodes: &[],
-        })
-        .unwrap();
+    registry.register(&Graph::new("b", &[])).unwrap();
+    registry.register(&Graph::new("a", &[])).unwrap();
     assert_eq!(registry.plugins().collect::<Vec<_>>(), ["b", "a"]);
 }
 
-struct Lang {
-    id: &'static str,
-    fallback: bool,
-    priority: i32,
-}
+struct Lang(ProviderManifest);
 
 impl LanguageProvider for Lang {
-    fn id(&self) -> &str {
-        self.id
-    }
-    fn globs(&self) -> &[String] {
-        &[]
-    }
-    fn conventions(&self) -> Conventions {
-        Conventions::default()
-    }
-    fn capabilities(&self) -> &[Capability] {
-        &[]
-    }
-    fn fallback(&self) -> bool {
-        self.fallback
-    }
-    fn priority(&self) -> i32 {
-        self.priority
+    fn manifest(&self) -> &ProviderManifest {
+        &self.0
     }
     fn index(&self, _: &Workspace, _: &[Source]) -> Result<Indexed, Error> {
         Ok(Indexed::default())
     }
 }
 
-struct Langs(&'static str, &'static [(&'static str, bool, i32)]);
+struct Langs(PluginManifest, &'static [(&'static str, bool, i32)]);
+
+impl Langs {
+    fn new(plugin: &str, languages: &'static [(&'static str, bool, i32)]) -> Self {
+        let manifest = PluginManifest {
+            id: plugin.to_owned(),
+            version: "0".to_owned(),
+        };
+        Self(manifest, languages)
+    }
+}
 
 impl Plugin for Langs {
-    fn manifest(&self) -> Manifest {
-        Manifest {
-            id: self.0.to_owned(),
-            version: "0".to_owned(),
-        }
+    fn manifest(&self) -> &PluginManifest {
+        &self.0
     }
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
         self.1
             .iter()
             .map(|&(id, fallback, priority)| {
-                Box::new(Lang {
-                    id,
+                Box::new(Lang(ProviderManifest {
                     fallback,
                     priority,
-                }) as Box<dyn LanguageProvider>
+                    ..ProviderManifest::new(id, Vec::new())
+                })) as Box<dyn LanguageProvider>
             })
             .collect()
     }
@@ -199,14 +178,14 @@ impl Plugin for Langs {
 fn fallback_providers_come_after_regular_ones_whatever_the_registration_order() {
     let mut registry = Registry::default();
     registry
-        .register(&Langs("a", &[("text", true, 0)]))
+        .register(&Langs::new("a", &[("text", true, 0)]))
         .unwrap();
     registry
-        .register(&Langs("b", &[("go", false, 0), ("py", false, 0)]))
+        .register(&Langs::new("b", &[("go", false, 0), ("py", false, 0)]))
         .unwrap();
     let ids: Vec<_> = registry
         .languages()
-        .map(|(_, l)| l.id().to_owned())
+        .map(|(_, l)| l.manifest().id.clone())
         .collect();
     assert_eq!(ids, ["go", "py", "text"]);
 }
@@ -215,20 +194,20 @@ fn fallback_providers_come_after_regular_ones_whatever_the_registration_order() 
 fn higher_priority_providers_come_first_and_ties_keep_registration_order() {
     let mut registry = Registry::default();
     registry
-        .register(&Langs("a", &[("low", false, 0), ("tie", false, 5)]))
+        .register(&Langs::new("a", &[("low", false, 0), ("tie", false, 5)]))
         .unwrap();
     registry
-        .register(&Langs("b", &[("high", false, 9), ("tie2", false, 5)]))
+        .register(&Langs::new("b", &[("high", false, 9), ("tie2", false, 5)]))
         .unwrap();
     let ids: Vec<_> = registry
         .languages()
-        .map(|(_, l)| l.id().to_owned())
+        .map(|(_, l)| l.manifest().id.clone())
         .collect();
     assert_eq!(ids, ["high", "tie", "tie2", "low"]);
 }
 
-fn meta(id: &str, severity: Severity, strict: bool) -> RuleMeta {
-    RuleMeta {
+fn meta(id: &str, severity: Severity, strict: bool) -> RuleManifest {
+    RuleManifest {
         id: id.to_owned(),
         severity,
         scope: Scope::File,
@@ -248,14 +227,14 @@ fn preset_standard_puts_strict_rules_only_in_the_strict_preset() {
         meta("p/b", Severity::Error, true),
     ];
 
-    let presets = Preset::standard("p", &metas);
+    let presets = PresetManifest::standard("p", &metas);
 
     let ids: Vec<&str> = presets.iter().map(|p| p.id.as_str()).collect();
     assert_eq!(ids, ["p/recommended", "p/strict"]);
     assert_eq!(presets[0].rules.len(), 1);
     assert_eq!(presets[0].rules["p/a"].level, Some(Severity::Warn));
     assert_eq!(presets[1].rules.len(), 2);
-    assert_eq!(Preset::standard("p", &metas[..1]).len(), 1);
+    assert_eq!(PresetManifest::standard("p", &metas[..1]).len(), 1);
 }
 
 #[test]

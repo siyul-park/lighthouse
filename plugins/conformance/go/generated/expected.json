@@ -50,6 +50,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
           "file": "gen.go",
           "id": ".::Generated#function",
           "kind": "function",
@@ -101,6 +111,16 @@
           },
           "kind": "calls",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 4
+            },
+            "start": {
+              "col": 16,
+              "line": 4
+            }
+          },
           "to": ".::Generated"
         }
       ],
@@ -129,6 +149,16 @@
       "symbols": [
         {
           "doc": "Plain is written by hand.",
+          "extent": {
+            "end": {
+              "col": 29,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "file": "plain.go",
           "id": ".::Plain#function",
           "kind": "function",

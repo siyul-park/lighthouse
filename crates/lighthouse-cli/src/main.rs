@@ -7,7 +7,7 @@ use std::{
 use clap::{Parser, Subcommand, ValueEnum};
 use lighthouse_config::FILE_NAME;
 use lighthouse_report::{Format, render_with};
-use lighthouse_session::{CheckRequest, DEFAULT_CONFIG, Session};
+use lighthouse_session::{CheckRequest, DEFAULT_CONFIG, FixRequest, Session};
 use review::ReviewCommand;
 
 mod docs;
@@ -90,6 +90,23 @@ enum Command {
         /// Run only these fully qualified rule ids.
         #[arg(long, value_delimiter = ',')]
         rules: Vec<String>,
+        /// Fix what the catalog's fixers can fix, then report what is left.
+        /// Only safe fixes of mechanical rules are applied; each is verified
+        /// (formatted, re-checked) and a file that gets worse is rolled back.
+        /// PATHS and --rules select which findings are fixed.
+        #[arg(long)]
+        fix: bool,
+        /// With --fix: print the unified diff and leave every file as it was.
+        #[arg(long, requires = "fix")]
+        dry_run: bool,
+        /// With --fix: also apply suggested fixes.
+        #[arg(long, requires = "fix")]
+        unsafe_fixes: bool,
+        /// With --fix: use this registered fixer for the selected findings
+        /// instead of the one their rule's pattern names. Its fixes count as
+        /// suggested.
+        #[arg(long, requires = "fix", value_name = "ID")]
+        fixer: Option<String>,
         /// Use this config file; the project root is then the current directory.
         #[arg(long)]
         config: Option<PathBuf>,
@@ -125,6 +142,25 @@ enum Command {
         /// Set up this coding agent as well.
         #[arg(long, value_enum)]
         agent: Option<Agent>,
+    },
+    /// Trust this project to run the commands it names: command fixers and the
+    /// formatters of `lighthouse.toml`. Trust is yours, kept in
+    /// `~/.lighthouse/trust.toml` for this root and the exact `lighthouse.toml`
+    /// and `.lighthouse/rules` you have read; a change to either withdraws it.
+    /// `LIGHTHOUSE_TRUST=1` trusts every project, for CI. Without trust a
+    /// command fix is declined and formatting is skipped; checks and the
+    /// verification of fixes still run.
+    ///
+    /// It lists the formatters and fixer commands it would trust and asks for
+    /// confirmation on the terminal; without a terminal it refuses unless
+    /// `--yes` says you have read the list.
+    Trust {
+        /// Withdraw the trust instead.
+        #[arg(long)]
+        revoke: bool,
+        /// Trust without asking; for scripts, after reading what is listed.
+        #[arg(long, conflicts_with = "revoke")]
+        yes: bool,
     },
     /// Serve the Model Context Protocol on stdio, for coding agents: tools to
     /// check, explain, review and author rules, and resources for the
@@ -208,6 +244,13 @@ struct Options {
     allow_incomplete: bool,
 }
 
+/// What `check --fix` is asked to do.
+struct FixOptions {
+    dry_run: bool,
+    unsafe_fixes: bool,
+    fixer: Option<String>,
+}
+
 /// A report filter taken from git instead of paths.
 struct Reported<'a> {
     changed: bool,
@@ -236,6 +279,10 @@ fn run(cli: Cli) -> Result<u8> {
             strict,
             allow_incomplete,
             rules,
+            fix,
+            dry_run,
+            unsafe_fixes,
+            fixer,
             config,
         } => check(
             &paths,
@@ -252,6 +299,11 @@ fn run(cli: Cli) -> Result<u8> {
             },
             &rules,
             config.as_deref(),
+            fix.then_some(FixOptions {
+                dry_run,
+                unsafe_fixes,
+                fixer,
+            }),
         ),
         Command::Review { command } => review::run(command),
         Command::Rule {
@@ -271,6 +323,7 @@ fn run(cli: Cli) -> Result<u8> {
             DocsCommand::Check { out, skill } => docs::check(&out, &skill),
         },
         Command::Init { agent } => init(agent),
+        Command::Trust { revoke, yes } => trust(revoke, yes),
         Command::Mcp => {
             lighthouse_mcp::serve()?;
             Ok(0)
@@ -291,9 +344,17 @@ fn check(
     options: Options,
     only: &[String],
     config: Option<&Path>,
+    fix: Option<FixOptions>,
 ) -> Result<u8> {
     if options.limit.is_some() && !briefed(options.format) {
         return Err("--limit applies to the agent formats only".into());
+    }
+    if let Some(fix) = fix {
+        let dry_run = fix.dry_run;
+        fixing(paths, only, config, options.store, fix)?;
+        if dry_run {
+            return Ok(0);
+        }
     }
     let request = CheckRequest {
         paths: paths.to_vec(),
@@ -322,6 +383,57 @@ fn check(
 /// Whether the format draws on the catalog.
 fn briefed(format: Format) -> bool {
     matches!(format, Format::Agent | Format::AgentJson)
+}
+
+fn trust(revoke: bool, yes: bool) -> Result<u8> {
+    if revoke {
+        let root = lighthouse_session::project_root()?;
+        let had = lighthouse_session::revoke(&root)?;
+        println!(
+            "{} {}",
+            if had {
+                "no longer trusting"
+            } else {
+                "was not trusted:"
+            },
+            root.display()
+        );
+        return Ok(0);
+    }
+    let session = Session::load(None)?;
+    println!("{} runs:", session.root.display());
+    for command in &session.basis.commands {
+        println!("  {command}");
+    }
+    if session.basis.commands.is_empty() {
+        println!("  no formatter or fixer command");
+    }
+    if !yes && !confirmed()? {
+        return Err(
+            "not trusted: no confirmation (use a terminal, or `--yes` after reading the list)"
+                .into(),
+        );
+    }
+    let file = lighthouse_session::trust(&session.root, &session.basis)?;
+    println!(
+        "trusting {} as listed (recorded in {}); programs outside the project are trusted by command line only",
+        session.root.display(),
+        file.display()
+    );
+    Ok(0)
+}
+
+/// Asks on the terminal whether to trust; false without one.
+fn confirmed() -> Result<bool> {
+    use std::io::{IsTerminal, Write};
+    if !std::io::stdin().is_terminal() {
+        return Ok(false);
+    }
+    print!("Trust this project to run them? [y/N] ");
+    std::io::stdout().flush()?;
+    let mut answer = String::new();
+    std::io::stdin().read_line(&mut answer)?;
+    Ok(matches!(answer.trim(), "y" | "Y" | "yes"))
 }
 
 fn init(agent: Option<Agent>) -> Result<u8> {
@@ -361,4 +473,55 @@ fn ensure_line(path: &Path, line: &str) -> Result<bool> {
     text.push('\n');
     fs::write(path, text)?;
     Ok(true)
+}
+
+/// Fixes the selected findings and says what happened: the diff of a dry run
+/// on stdout, everything else on stderr.
+fn fixing(
+    paths: &[PathBuf],
+    only: &[String],
+    config: Option<&Path>,
+    store: bool,
+    fix: FixOptions,
+) -> Result<()> {
+    let request = FixRequest {
+        paths: paths.to_vec(),
+        rules: only.to_vec(),
+        dry_run: fix.dry_run,
+        unsafe_fixes: fix.unsafe_fixes,
+        fixer: fix.fixer,
+        store,
+        ..FixRequest::default()
+    };
+    let fixed = lighthouse_session::fix(Session::load(config)?, &request)?;
+    for message in &fixed.messages {
+        eprintln!("lighthouse: {message}");
+    }
+    if fixed.dry_run {
+        print!("{}", fixed.diff);
+    }
+    let verb = if fixed.dry_run { "would fix" } else { "fixed" };
+    for fix in fixed.applied() {
+        eprintln!(
+            "{verb} {} [{}] {} ({}): {}",
+            fix.rule,
+            fix.safety,
+            fix.files.join(", "),
+            fix.fixer,
+            fix.description
+        );
+    }
+    for fix in fixed.declined() {
+        eprintln!(
+            "not fixed {}:{} {}: {}",
+            fix.path, fix.line, fix.rule, fix.reason
+        );
+    }
+    eprintln!(
+        "lighthouse: {} fix(es) {}, {} left alone",
+        fixed.applied().len(),
+        if fixed.dry_run { "proposed" } else { "applied" },
+        fixed.declined().len()
+    );
+    Ok(())
 }

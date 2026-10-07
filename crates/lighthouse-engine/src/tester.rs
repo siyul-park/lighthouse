@@ -1,11 +1,11 @@
-use std::{fmt::Write as _, fs};
+use std::{fmt::Write as _, fs, path::Path};
 
 use lighthouse_config::Config;
 use lighthouse_plugin::Registry;
 use lighthouse_spec::{Catalog, Example, Kind, Pattern};
 use serde_json::Value;
 
-use crate::Engine;
+use crate::{Engine, FixPlan, FixRun, unified_diff};
 
 /// Language of examples that need no language provider.
 const NEUTRAL: &str = "text";
@@ -17,6 +17,7 @@ pub struct RuleTester<'a> {
     registry: Box<dyn Fn() -> Registry + 'a>,
     catalog: &'a Catalog,
     language: Option<String>,
+    trusted: bool,
 }
 
 impl<'a> RuleTester<'a> {
@@ -27,7 +28,14 @@ impl<'a> RuleTester<'a> {
             registry: Box::new(registry),
             catalog,
             language: None,
+            trusted: false,
         }
+    }
+
+    /// Lets fix examples run commands, as a trusted project does.
+    pub fn trusted(mut self, trusted: bool) -> Self {
+        self.trusted = trusted;
+        self
     }
 
     /// Runs only the examples written for `language`; a registry usually
@@ -89,8 +97,9 @@ impl<'a> RuleTester<'a> {
         }
         let registry = (self.registry)();
         let config = config(&registry, pattern, example)?;
-        let outcome = Engine::new(registry, config, dir.path())
-            .and_then(|engine| engine.check(&[], std::slice::from_ref(&pattern.id)))
+        let engine = Engine::new(registry, config, dir.path()).map_err(|e| e.to_string())?;
+        let outcome = engine
+            .check(&[], std::slice::from_ref(&pattern.id))
             .map_err(|e| e.to_string())?;
         let found: Vec<(u32, &str)> = outcome
             .diagnostics
@@ -100,8 +109,77 @@ impl<'a> RuleTester<'a> {
         match example.kind {
             Kind::Valid if found.is_empty() => Ok(()),
             Kind::Valid => Err(format!("expected no diagnostics, got {}", describe(&found))),
-            Kind::Invalid => compare(example, &found),
+            Kind::Invalid => {
+                compare(example, &found)?;
+                if pattern.fix.is_some() && !example.fixed.is_empty() {
+                    self.check_fix(&engine, pattern, example, dir.path())?;
+                }
+                Ok(())
+            }
         }
+    }
+
+    /// Applies the pattern's fix to the written example and holds it to the
+    /// example's `fixed` files: the text is exactly that, the rule no longer
+    /// fires, and a second application changes nothing.
+    fn check_fix(
+        &self,
+        engine: &Engine,
+        pattern: &Pattern,
+        example: &Example,
+        dir: &Path,
+    ) -> Result<(), String> {
+        let plan = FixPlan::from_catalog(self.catalog);
+        let run = FixRun {
+            rules: vec![pattern.id.clone()],
+            unsafe_fixes: true,
+            trusted: self.trusted,
+            ..FixRun::default()
+        };
+        let report = engine.fix(&plan, &run).map_err(|e| format!("fix: {e}"))?;
+        if report.applied.is_empty() {
+            let why: Vec<String> = report.declined.iter().map(|d| d.reason.clone()).collect();
+            return Err(format!("fix applied nothing ({})", why.join("; ")));
+        }
+        for file in &example.files {
+            let want = example
+                .fixed
+                .iter()
+                .find(|f| f.path == file.path)
+                .map_or_else(|| file.text(), |f| f.text());
+            let got = fs::read_to_string(dir.join(&file.path)).map_err(|e| e.to_string())?;
+            // A final newline is the formatter's business, not the fix's.
+            if got.trim_end_matches('\n') != want.trim_end_matches('\n') {
+                return Err(format!(
+                    "fix of `{}` is not what `fixed` says:\n{}",
+                    file.path,
+                    unified_diff(Path::new(&file.path), want, &got)
+                ));
+            }
+        }
+        let again = engine
+            .check(&[], std::slice::from_ref(&pattern.id))
+            .map_err(|e| e.to_string())?;
+        if !again.diagnostics.is_empty() {
+            let found: Vec<(u32, &str)> = again
+                .diagnostics
+                .iter()
+                .map(|d| (d.span.start.line, d.message.as_str()))
+                .collect();
+            return Err(format!(
+                "the rule still fires after the fix: {}",
+                describe(&found)
+            ));
+        }
+        let second = engine
+            .fix(&plan, &run)
+            .map_err(|e| format!("fix again: {e}"))?;
+        if !second.applied.is_empty() || !second.changes.is_empty() {
+            return Err(
+                "the fix is not idempotent: applying it again changed the files".to_owned(),
+            );
+        }
+        Ok(())
     }
 }
 

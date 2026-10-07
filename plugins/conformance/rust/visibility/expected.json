@@ -161,6 +161,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 45
+            },
+            "start": {
+              "col": 14,
+              "line": 45
+            }
+          },
           "to": "visibility::Open::a#field"
         },
         {
@@ -177,6 +187,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 48
+            },
+            "start": {
+              "col": 14,
+              "line": 48
+            }
+          },
           "to": "visibility::Open::b#field"
         },
         {
@@ -193,6 +213,16 @@
           },
           "kind": "references",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 51
+            },
+            "start": {
+              "col": 14,
+              "line": 51
+            }
+          },
           "to": "visibility::Open::c#field"
         },
         {
@@ -289,6 +319,16 @@
           },
           "kind": "calls",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 65
+            },
+            "start": {
+              "col": 9,
+              "line": 65
+            }
+          },
           "to": "visibility/tests::helper#function"
         }
       ],
@@ -479,6 +519,16 @@
       ],
       "symbols": [
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Open#type",
           "kind": "type",
@@ -496,6 +546,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Open::a#field",
           "kind": "field",
@@ -514,6 +574,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 3
+            },
+            "start": {
+              "col": 5,
+              "line": 3
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Open::b#field",
           "kind": "field",
@@ -532,6 +602,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 10,
+              "line": 4
+            },
+            "start": {
+              "col": 5,
+              "line": 4
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Open::c#field",
           "kind": "field",
@@ -550,6 +630,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Shared#type",
           "kind": "type",
@@ -567,6 +657,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Hidden#type",
           "kind": "type",
@@ -584,6 +684,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Kind#type",
           "kind": "type",
@@ -601,6 +711,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 12
+            },
+            "start": {
+              "col": 5,
+              "line": 12
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Kind::A#field",
           "kind": "field",
@@ -619,6 +739,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 13
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Kind::B#field",
           "kind": "field",
@@ -637,6 +767,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Tr#interface",
           "kind": "interface",
@@ -654,6 +794,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 17
+            },
+            "start": {
+              "col": 5,
+              "line": 17
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Tr::m#method",
           "kind": "method",
@@ -672,6 +822,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::LIMIT#const",
           "kind": "const",
@@ -689,6 +849,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 32,
+              "line": 21
+            },
+            "start": {
+              "col": 1,
+              "line": 21
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::SOFT#const",
           "kind": "const",
@@ -706,6 +876,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 23,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 22
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::COUNT#var",
           "kind": "var",
@@ -723,6 +903,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 24
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::open#function",
           "kind": "function",
@@ -740,6 +930,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 25
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::crate_wide#function",
           "kind": "function",
@@ -757,6 +957,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 26
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::private#function",
           "kind": "function",
@@ -774,6 +984,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 46
+            },
+            "start": {
+              "col": 5,
+              "line": 44
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Open::get#method",
           "kind": "method",
@@ -792,6 +1012,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 49
+            },
+            "start": {
+              "col": 5,
+              "line": 47
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Open::soft#method",
           "kind": "method",
@@ -810,6 +1040,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 52
+            },
+            "start": {
+              "col": 5,
+              "line": 50
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Open::hide#method",
           "kind": "method",
@@ -828,6 +1068,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 56
+            },
+            "start": {
+              "col": 5,
+              "line": 56
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility::Open::Tr::m#method",
           "kind": "method",
@@ -846,6 +1096,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 33,
+              "line": 29
+            },
+            "start": {
+              "col": 5,
+              "line": 29
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility/inner::exposed_internal#function",
           "kind": "function",
@@ -863,6 +1123,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 40,
+              "line": 30
+            },
+            "start": {
+              "col": 5,
+              "line": 30
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility/inner::scoped#function",
           "kind": "function",
@@ -880,6 +1150,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 31
+            },
+            "start": {
+              "col": 5,
+              "line": 31
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility/inner::reexported#function",
           "kind": "function",
@@ -897,6 +1177,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 32
+            },
+            "start": {
+              "col": 5,
+              "line": 32
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility/inner::up#function",
           "kind": "function",
@@ -914,6 +1204,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 38
+            },
+            "start": {
+              "col": 5,
+              "line": 38
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility/outer::deep#function",
           "kind": "function",
@@ -931,6 +1231,16 @@
           "visibility": "public"
         },
         {
+          "extent": {
+            "end": {
+              "col": 30,
+              "line": 39
+            },
+            "start": {
+              "col": 5,
+              "line": 39
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility/outer::parent#function",
           "kind": "function",
@@ -948,6 +1258,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 40
+            },
+            "start": {
+              "col": 5,
+              "line": 40
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility/outer::own#function",
           "kind": "function",
@@ -965,6 +1285,16 @@
           "visibility": "private"
         },
         {
+          "extent": {
+            "end": {
+              "col": 23,
+              "line": 61
+            },
+            "start": {
+              "col": 5,
+              "line": 61
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility/tests::helper#function",
           "kind": "function",
@@ -982,6 +1312,16 @@
           "visibility": "internal"
         },
         {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 66
+            },
+            "start": {
+              "col": 5,
+              "line": 63
+            }
+          },
           "file": "src/lib.rs",
           "id": "visibility/tests::t#test",
           "kind": "test",

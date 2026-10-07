@@ -1,10 +1,10 @@
 mod cognitive;
 mod fan;
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::LazyLock};
 
 use lighthouse_model::{FlowKind, FunctionSummary, Project, Symbol, SymbolId};
-use lighthouse_plugin::{Analyzer, Ctx, Error, Manifest, Plugin, Scope};
+use lighthouse_plugin::{Analyzer, AnalyzerManifest, Ctx, Error, Plugin, PluginManifest, Scope};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
@@ -45,11 +45,12 @@ pub struct Metrics;
 
 impl Plugin for Metrics {
     /// Identifies the plugin as `metrics` at this crate's version.
-    fn manifest(&self) -> Manifest {
-        Manifest {
+    fn manifest(&self) -> &PluginManifest {
+        static MANIFEST: LazyLock<PluginManifest> = LazyLock::new(|| PluginManifest {
             id: ID.to_owned(),
             version: env!("CARGO_PKG_VERSION").to_owned(),
-        }
+        });
+        &MANIFEST
     }
 
     /// One per-function analyzer per metric constant, each file-scoped.
@@ -70,33 +71,32 @@ type Measure<T> = fn(&Project, &Symbol, &FunctionSummary) -> T;
 
 /// Measures every function declared in the focused file.
 struct PerFunction<T> {
-    id: &'static str,
+    manifest: AnalyzerManifest,
     measure: Measure<T>,
 }
 
 impl<T> PerFunction<T> {
     fn new(id: &'static str, measure: Measure<T>) -> Self {
-        Self { id, measure }
+        Self {
+            manifest: AnalyzerManifest {
+                id: id.to_owned(),
+                requires: Vec::new(),
+                scope: Scope::File,
+            },
+            measure,
+        }
     }
 }
 
 impl<T: Serialize + Send + Sync> Analyzer for PerFunction<T> {
-    fn id(&self) -> &str {
-        self.id
-    }
-
-    fn requires(&self) -> &[String] {
-        &[]
-    }
-
-    fn scope(&self) -> Scope {
-        Scope::File
+    fn manifest(&self) -> &AnalyzerManifest {
+        &self.manifest
     }
 
     fn run(&self, ctx: &Ctx) -> Result<Value, Error> {
         let (file, _) = ctx
             .file
-            .ok_or_else(|| Error::Failed(format!("{} needs a file", self.id)))?;
+            .ok_or_else(|| Error::Failed(format!("{} needs a file", self.manifest.id)))?;
         let values: Vec<Measured<T>> = ctx
             .project
             .symbols_in(&file.path)
