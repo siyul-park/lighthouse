@@ -50,10 +50,15 @@ languages and editors are added.
   - Every bundled decision is re-expressed this way, and the gate is identical findings
     before and after.
 - `enforcement` is removed. A decision declares `severity: error|warn|info`:
-  - `error` is a deterministic contract that only an annotation can waive.
+  - `error` is definitive: it needs no verdict, and only an annotation can waive it.
   - `warn` and `info` are review tasks.
   - A decision without `check:` is documentation only.
 - ADR lifecycle fields: `status`, `supersedes`, `rationale`, `consequences`, `provenance`.
+- The decision version is split in two:
+  - The *meaning version* (requirement, scope, severity, options) decides whether a
+    verdict still holds.
+  - The *check revision* only records which implementation produced a finding.
+  - Promoting a decision to a better check therefore keeps its verdicts.
 - `command` checks follow the process contract:
   - exit code `0` clean, `1` findings, `≥2` error;
   - findings are stdout lines, with an optional `path:line:col:` prefix.
@@ -66,12 +71,20 @@ languages and editors are added.
 ### 3: decision graph and evaluation
 - Queries over the decision graph: decision, finding, verdict with reason and actor,
   evidence, and revision.
-- Per-decision precision.
+- Judgments on subjects, not only on findings:
+  - A `judged` check selects candidate subjects, and an agent or judge records
+    `violates` or `conforms` for each.
+  - Unflagged subjects are sampled for audit.
+  - Together these give labels for recall, not just precision.
+- Per-decision precision and estimated recall.
 - An evaluation harness that replays a candidate check against recorded verdicts and all
-  examples. This is the promotion gate used by people and agents alike, via CLI and MCP.
+  examples, and measures agreement with the previous tier. This is the promotion gate
+  used by people and agents alike, via CLI and MCP.
 - Structural similarity (normalized AST and token shingles, MinHash) and an optional
   `Embedder` plugin kind as retrieval aids, never as deciders.
 - Baseline and ratchet; cycle, clone and stability analyzers.
+- `lighthouse log compact` folds expired and superseded events in `decisions.jsonl`;
+  the full history stays in git.
 
 ### 4: decision evolution
 - Signals are captured from verdicts, annotations, fix outcomes and decision edits.
@@ -79,6 +92,11 @@ languages and editors are added.
 - Proposals narrow, widen or demote a decision, with generated examples.
 - Promotion `judged → learned → deterministic` through the evaluation gate. Nothing is
   enabled automatically.
+
+### 5: adoption
+- Prebuilt release binaries that bundle the Go and Rust providers, and a one-command
+  install.
+- `lighthouse init` detects languages and proposes a starter set of decisions.
 
 ### Later
 | Step | Scope |
