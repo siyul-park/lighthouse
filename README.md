@@ -183,6 +183,7 @@ documents and design files can follow.
 - [Decision catalog, rendered](docs/decisions): every decision Lighthouse knows
 - [Architecture](docs/architecture.md): code model, scopes, incomplete analysis, memory and shared decisions
 - [Plugin protocol](docs/plugin-protocol.md): writing a language plugin in any language
+- [Roadmap](docs/roadmap.md): what is done, what comes next, and why
 
 Development: `make test` builds the plugins and runs the test suites, `make lint` runs
 formatters, clippy, `go vet` and Lighthouse on its own sources, and `make ci` runs both.
