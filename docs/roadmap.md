@@ -14,9 +14,11 @@ adds is:
 2. **A semantic code model.** Native language providers build one language-neutral model
    (symbols, extents, edges, metrics). Rules are written once against that model instead
    of grep scripts per rule.
-3. **An evolution ladder.** A decision can start as plain text and is enforced from day
-   one by judgment. It is promoted to a learned detector, then to a deterministic rule.
-   Each step passes an evaluation against recorded verdicts and needs explicit approval.
+3. **Checks that evolve without losing history.** A decision can start as plain text and
+   is enforced from day one by a judge. Later check revisions add a learned model and,
+   when the boundary can be expressed faithfully, a deterministic rule. Each revision
+   passes an evaluation against recorded judgments and needs explicit approval. Judgments
+   survive, because they are tied to the decision's meaning, not to its check.
 4. **Measured trust.** Each decision's precision is computed from its verdicts. Noisy
    decisions get narrowing or demotion proposals.
 
@@ -42,8 +44,9 @@ languages and editors are added.
 ## Next
 
 ### 2d-2: one provider model for checks
-- `check:` takes one provider, like `fix:` does: `builtin`, `cel`, `command`, `rpc`, and a
-  reserved `judged` slot (served for now by agent review tasks).
+- `check:` takes one deterministic provider, like `fix:` does: `builtin`, `cel`, `command`
+  or `rpc`. A separate `judge:` block (candidate `select` and a prompt) is reserved;
+  agent review tasks serve it for now.
 - Builtins become standard, decision-agnostic operations:
   - Per-element predicates are written in `cel`, with a standard function library
     (`metrics`, `callers`, `edges`, `tests`, `annotations`, …).
@@ -74,7 +77,7 @@ languages and editors are added.
 - Queries over the decision graph: decision, finding, verdict with reason and actor,
   evidence, and revision.
 - Judgments on subjects, not only on findings:
-  - A `judged` check selects candidate subjects, and an agent or judge records
+  - A decision's `judge` selects candidate subjects, and an agent or judge records
     `violates` or `conforms` for each.
   - Unflagged subjects are sampled for audit.
   - Together these give labels for recall, not just precision.
@@ -96,8 +99,9 @@ languages and editors are added.
   dominant shape counts as conforming. Changes are grouped by their structural change
   first and refined with a local embedding model.
 - Proposals narrow, widen or demote a decision, with generated examples.
-- Promotion `judged → learned → deterministic` through the evaluation gate. Nothing is
-  enabled automatically.
+- Check revisions (attach a learned model, add a deterministic part, demote) go through
+  the evaluation gate. They are routing by cost and confidence, not a maturity state, and
+  nothing is enabled automatically.
 
 ### 5: adoption
 - Prebuilt release binaries that bundle the Go and Rust providers, and a one-command
