@@ -44,9 +44,10 @@ languages and editors are added.
 ## Next
 
 ### 2d-2: one provider model for checks
-- `check:` takes one deterministic provider, like `fix:` does: `builtin`, `cel`, `command`
-  or `rpc`. A separate `judge:` block (candidate `select` and a prompt) is reserved;
-  agent review tasks serve it for now.
+- `check:` takes one provider, like `fix:` does. Its `type` is the runtime: `builtin`,
+  `cel`, `command` or `rpc`. Whether a check is deterministic is a capability the
+  provider declares, not a type. A builtin op `judge` (candidate `select` and a prompt)
+  is reserved, and agent review tasks serve it for now.
 - Builtins become standard, decision-agnostic operations:
   - Per-element predicates are written in `cel`, with a standard function library
     (`metrics`, `callers`, `edges`, `tests`, `annotations`, …).
@@ -83,7 +84,7 @@ languages and editors are added.
 - Queries over the decision graph: decision, finding, verdict with reason and actor,
   evidence, and revision.
 - Judgments on subjects, not only on findings:
-  - A decision's `judge` selects candidate subjects, and an agent or judge records
+  - A decision's `judge` check selects candidate subjects, and an agent or judge records
     `pass` or `fail` for each.
   - Unflagged subjects are sampled for audit.
   - Together these give labels for recall, not just precision.

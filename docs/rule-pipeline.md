@@ -1,160 +1,157 @@
 # Rule pipeline
 
 Lighthouse is not a fixed rule pipeline. It is a decision evolution system: a **decision** is
-the source of truth, and Lighthouse repeats **evidence → check → judgment → evaluation →
-revision** on it. This page defines that model. The methods behind learned checks and
-repository mining are in [learning.md](learning.md). The [roadmap](roadmap.md) says what
-exists today (see [Status](#status)).
+the source of truth, and Lighthouse repeats **evidence → check → judgment → revision** on it.
+This page defines that model with as few concepts as possible. The methods behind learned
+checks and repository mining are in [learning.md](learning.md). The [roadmap](roadmap.md)
+says what exists today (see [Status](#status)).
 
-## Primitives
+## Concepts
 
 ```text
- Decision ─┬─ Meaning     requirement, scope, severity, options      → meaning version
-           ├─ Check       deterministic check, judge, learned stage  → check revision
-           ├─ Evidence    what was observed: signals and snapshots, with origin and author
-           ├─ Judgment*   labels on subjects drawn from evidence; verdicts on findings
-           └─ Revision*   proposed and approved changes, each with its evaluation
+ Decision ─┬─ meaning       what it demands             → meaning version
+           └─ check         how it is evaluated now     → check revision
+ Evidence                   what was observed
+ Judgment                   pass | fail | notApplicable on one subject
+ Suppression                why a fail is not acted on
+ Revision                   an approved change to a decision, with its evaluation
 ```
 
-| Primitive | Is | Is not |
+| Concept | Is | Absorbs |
 | --- | --- | --- |
-| Decision | the identity: what was decided and why (`Decision` resource) | a state machine; a decision has no `stage` field |
-| Meaning | what the decision demands; its hash is the **meaning version** | how it is checked |
-| Check | how the meaning is enforced now; its hash is the **check revision** | part of the meaning |
-| Evidence | what was observed: examples, signals, snapshots, incidents, mined edits, each with provenance | a result; it carries no `pass`/`fail` |
-| Judgment | a recorded result (`fail`/`pass`) on one subject, drawn from evidence by an author | ground truth; a judgment can be wrong and is superseded by a stronger one |
-| Revision | a change to a decision, classified by what it changed, with its evaluation and approval | a mutation in place |
+| Decision | what was decided and why, and how it is evaluated (`Decision` resource) | rule, pattern, proposal (a decision with `status: proposed`) |
+| Evidence | what was observed, with provenance; carries no result | signal, snapshot, incident, mined edit |
+| Judgment | a recorded result on one subject for one meaning version, drawn from evidence | verdict, label, example (an authored judgment on an example subject), audit and exploration samples |
+| Suppression | a recorded reason not to act on a `fail` (SARIF suppression) | annotation (`inSource`), intentional exception and won't-fix (`external`) |
+| Revision | a change to a decision, with its evaluation and approval | promotion, demotion, narrowing, widening, model attachment |
 
 **Meaning version and check revision are the central axis.**
 - A judgment belongs to the meaning version it was made under. It holds while that version and its evidence are unchanged.
-- A new check revision (a better predicate, a retrained model, a narrower selector) never expires judgments. This is what lets a check improve without losing its history.
+- A new check revision (a better predicate, a retrained model, a narrower selector) never expires judgments, so a check improves without losing its history.
 - A new meaning version never silently inherits judgments.
   - Older judgments may be reused only as evidence.
   - They become judgments for the new version only after revalidation: by a judge, a person or an agent, or in bulk as one explicit, recorded approval that names the actor.
-  - Until then, the new version starts with no judgments.
 
 ## Decision
 
 A decision is a `Decision` resource committed with the catalog (see
-[architecture](architecture.md)). Besides its meaning, it carries ADR fields:
-- `title`, `intent`, `rationale`, `consequences`;
-- `status`, as in MADR: `proposed`, `accepted`, `rejected`, `deprecated`, `superseded`;
-- `supersedes`, a list. One decision superseding several is a merge; several superseding one is a split;
-- `provenance`, the evidence that produced it.
+[architecture](architecture.md)):
+- **Meaning:** `requirement` (RFC 2119 wording), `scope`, `severity`, `options`.
+- **Record:** `title`, `intent`, `rationale`, `consequences`, `provenance`.
+- **Status**, as in MADR: `proposed`, `accepted`, `rejected`, `deprecated`, `superseded`.
+- **`supersedes`**, a list. One decision superseding several is a merge; several superseding one is a split.
+- **`check`**, optional. A decision without one is documentation: it appears in docs and agent guidance and produces no results.
+
+Severity belongs to the meaning. An authored `error` is *definitive*: it needs no judgment,
+and only a suppression waives it.
 
 ## Check
 
-A decision's check has up to three parts, and which parts are present decides how a subject
-is routed. No `type` says which one is primary.
+A check answers one question: *how is this decision evaluated on a subject now?* It is one
+provider, configured like every other provider in Lighthouse (fix, embedder, formatter).
+Three layers keep the vocabulary small and standard:
+
+| Layer | Says | Values |
+| --- | --- | --- |
+| Interface (plugin kind) | what is asked | `Check`; it may delegate to the `Judge` and `Classifier` kinds |
+| Runtime (`type`) | where the code runs | `builtin` (in process), `cel` (expression), `command` (process), `rpc` (plugin process) |
+| Capabilities (manifest) | how it behaves | `deterministic`, `abstains`, `cost` |
+
+"Deterministic", "learned" and "judge" are therefore not types. They are capability
+profiles of providers:
+
+| Profile | Capabilities | Examples | On failure |
+| --- | --- | --- | --- |
+| deterministic | `deterministic: true`, never abstains, cheap | builtin `order`/`proximity`/`cycle`, `cel`, `command`, `rpc` checks | analysis incomplete (exit 3) |
+| learned | `deterministic: false`, `abstains: true`, cheap | a `Classifier` provider attached by a revision | skipped with a notice |
+| judge | `deterministic: false`, expensive | builtin op `judge`, delegating to the project's bound `Judge` provider, else an agent review task | skipped with a notice |
+
+The engine keys behaviour (incomplete or skipped, definitive or reviewable, routing) off the
+capabilities, never off type or op names. A new provider fits by declaring its capabilities.
 
 ```yaml
-check:            # deterministic part: builtin | cel | command | rpc
-  type: cel
-  select: function
-  where: metrics(node).cognitive > options.cognitive
-judge:            # judge part: candidates and a prompt
+check:
+  type: builtin
+  op: judge
   select: 'node.kind == "function" && node.changed'
   prompt: Does the name state the result rather than the mechanism?
-  shots: examples # the decision's examples are the few-shot set
-# learned part: not authored; an approved revision attaches a trained model
+  shots: examples   # the decision's examples are the few-shot set
 ```
 
-| Parts present | Behaviour |
-| --- | --- |
-| none | documentation: appears in docs and agent guidance, produces no findings |
-| `check` | deterministic enforcement |
-| `judge` | each candidate is judged |
-| `judge` + learned | the model decides where it is confident; the judge decides the rest |
-| `check` + `judge` (+ learned) | the deterministic part decides what it covers; the remaining candidates are routed as above |
+Which `Judge` serves `op: judge` is a project binding, like a provider configuration in
+other tools. A decision says what to ask; the project chooses who answers.
 
-### Routing, not maturity
+A judge check can be **accelerated by a learned model**. The model is not authored: an
+approved revision attaches it, trained on the decision's judgments (see
+[learning.md](learning.md)). Routing follows capabilities, cheapest confident provider first:
 
 ```text
- candidates
-   ├─ deterministic   cheap, certain        ── decides what it covers
-   ├─ learned         cheap, probabilistic  ── fail ≥ upper · pass ≤ lower · else abstains
-   └─ judge           expensive, semantic   ── decides the rest (Judge plugin, else an agent review task)
+ candidate ─► learned (abstains): P(fail) ≥ upper → fail · ≤ lower → pass · else ─► judge
 ```
 
 - The order is about **cost and confidence**, not quality. A learned model approximates a boundary that has no faithful predicate; it is not a weaker deterministic rule.
-- Deterministic enforcement is the **preferred** endpoint when the boundary can be expressed faithfully. It is not a required one: some decisions ("names state the result, not the mechanism") stay judged for good, and that is a normal state.
-- A failing deterministic part leaves the analysis incomplete (exit 3), never clean. A failing learned part or judge skips with a notice.
-- Severity is part of the meaning, not of the routing. An authored `error` is *definitive*: it needs no verdict, and only an annotation waives it.
+- A deterministic check decides every subject it selects. Partial deterministic coverage of a judged decision is expressed by narrowing the judge's `select`, not by stacking providers.
+- Deterministic evaluation is the **preferred** endpoint when the boundary can be expressed faithfully. It is not a required one: some decisions stay judged for good.
 
 ## Evidence
 
-Evidence is what was observed. It carries no label of its own.
+Evidence is what was observed. It carries no result.
 - **Origin:** what brought it up.
-- **Author:** who recorded it.
+- **Provenance:** who recorded it and what it came from, in W3C PROV-O terms.
 
-These are properties of evidence, not kinds of decision; any origin combines with any author.
-A **producer** draws judgments from evidence: a person, an agent, a judge, or a mining rule.
-The last column shows what a producer typically draws.
+A **producer** draws judgments from evidence: a person, an agent, a judge, a learned model,
+or a mining rule.
 
 | Origin | Examples | Judgments a producer may draw |
 | --- | --- | --- |
-| Intent | a person or agent decides up front | authored examples |
-| Existing artifact | a convention, an ADR, a style guide, an external standard; an agent writes the decision (no importer) | authored examples |
-| Existing tool rule | a golangci-lint, clippy, ruff or semgrep rule, or a script, wrapped by `command`/`rpc` | the tool's findings, then verdicts |
-| Recorded history | verdicts, annotations, repeated fixes of one shape, review comments, agent-session corrections | signals with polarity |
+| Intent | a person or agent decides up front | example judgments |
+| Existing artifact | a convention, an ADR, a style guide, an external standard; an agent writes the decision (no importer) | example judgments |
+| Existing tool rule | a golangci-lint, clippy, ruff or semgrep rule, or a script, wrapped by `command`/`rpc` | the tool's `fail` results, then judgments on them |
+| Recorded history | judgments, suppressions, repeated fixes of one shape, review comments, agent-session corrections | judgments with the same polarity |
 | Incident | a bug fix, postmortem, CI break or revert | the incident site `fail`, the fixed code `pass` |
 | Repository mining | change direction in refactor-like commits; prevalence in the tree ([learning.md](learning.md)) | weak `fail` (before, outlier) and `pass` (after, dominant) |
 | Snapshot | current metrics frozen as a budget | the baseline; the decision is a ratchet |
-| Another project | an organisation catalog, a third-party pack | that project's examples (its labels never travel) |
+| Another project | an organisation catalog, a third-party pack | its examples (its other judgments never travel) |
 
-- **Decision author:** a person, an agent, or Lighthouse. Lighthouse only *proposes* (`status: proposed`); a person or agent ratifies.
-- **Judgment strength** follows the producer, from strongest to weakest:
-  1. human;
-  2. agent;
-  3. annotation;
-  4. incident site;
-  5. model judge;
-  6. mined.
+- **Decision author:** a person, an agent, or Lighthouse. Lighthouse only *proposes* (`status: proposed`); a person or agent accepts.
+- **Judgment strength** follows the producer: human > agent > incident > judge > learned model > mining rule. A stronger judgment on the same subject and meaning version supersedes a weaker one. A check whose judgments are mostly weak is capped at `warn`/`info`.
 
-  A stronger judgment on the same subject and meaning version supersedes a weaker one. A check whose judgments are mostly weak is capped at `warn`/`info` until stronger ones confirm it.
+Mining, grouping and similarity are evidence producers. The model holds without them:
+intent → decision is a complete loop.
 
-Mining, grouping and similarity are **evidence producers**. The model above holds without
-them: intent → decision is a complete loop.
+## Judgment and suppression
 
-## Judgment
+A **judgment** is a result on one subject: `pass`, `fail` or `notApplicable` (the decision
+does not apply to this subject). It is a recorded label, not ground truth.
 
-Two records with different meanings:
+What used to be a verdict on a finding is now one judgment, plus a suppression when the
+finding is right but will not be acted on:
 
-| Record | About | Values | Means |
-| --- | --- | --- | --- |
-| **Judgment** | a subject (a symbol, file, edge…) | `pass`, `fail` | a recorded label for one meaning version, with its producer, strength and the evidence it was drawn from |
-| **Verdict** | a finding produced by a check | `confirmed`, `rejected` (with a reason), `deferred` | a reviewer's response to the check's output |
+| Reviewer says | Judgment | Suppression |
+| --- | --- | --- |
+| the finding is right (`fixed`, `accepted-debt`) | `fail` | — |
+| false positive | `pass` | — |
+| the decision should not apply here (scope too broad) | `notApplicable` | — |
+| intentional exception, project allows it | `fail` | `external`, with a justification |
+| won't fix | `fail` | `external`, justification `wont-fix` |
+| `lighthouse:allow <decision> -- <reason>` in code | — | `inSource`, with the reason |
+| not sure yet | — (stays `review`) | — |
 
-- A verdict implies a judgment only for some reasons:
-  - `confirmed` implies `fail`;
-  - `rejected: false-positive` implies `pass`;
-  - `rejected: not-worth-fixing`, `intentional-exception` or `scope-too-broad` imply nothing about the subject. They are evidence about the check's scope or the decision's value.
-- A judgment is a label, and SARIF results are what a run reports. They are kept apart:
-  - a `fail` judgment, or a deterministic or learned `fail`, is reported as a `fail` result (a finding);
-  - a case nobody could decide yet is reported as `review`;
-  - a subject outside the selector is `notApplicable`. It is not a `pass`, and no judgment is recorded for it.
-- Judgments also exist where no finding does:
-  - **audit samples**, which the deterministic or learned parts left unflagged;
-  - **exploration samples**, a fixed fraction of confident learned calls re-judged;
-  - judge results on candidates.
+What a run **reports** uses SARIF results with their standard meaning:
+- `fail` is a finding. A suppressed `fail` stays in SARIF with its suppression.
+- `review` is a case nobody has decided yet.
+- `notApplicable` is a subject outside the selector, or judged so.
 
-  These give recall and drift, not only precision.
-- Everything is appended to `.lighthouse/decisions.jsonl` (shared through git) and cached in SQLite. `lighthouse log compact` folds expired and superseded records; the raw history stays in git.
+Judgments also exist where no finding does:
+- **audit samples**, which a deterministic or learned evaluator left unflagged;
+- **exploration samples**, a fixed fraction of confident learned calls re-judged;
+- judge results on candidates.
 
-## Evaluation
+These give recall and drift, not only precision.
 
-A candidate check revision is replayed against the decision's judgments and examples, through
-the CLI or MCP:
-
-| Metric | Measured on |
-| --- | --- |
-| Precision, false-positive rate | `fail` judgments and confirmed verdicts |
-| Recall, false-negative rate | `pass`/`fail` judgments, audit samples |
-| Coverage, abstention rate | the learned part |
-| Agreement | the current revision, on the same subjects |
-| Examples | every `valid`/`invalid`/`fixed` example passes |
-
-Each decision has an evaluation policy: its precision target and which error it tolerates.
+Judgments and suppressions are appended to `.lighthouse/decisions.jsonl` (shared through git)
+and cached in SQLite. `lighthouse log compact` folds expired and superseded records; the raw
+history stays in git.
 
 ## Revision
 
@@ -165,66 +162,73 @@ change, evaluation, approval}`.
 - Lighthouse proposes revisions; it never applies one without approval.
 
 **`change` is derived, never declared.** The classification is inspired by Semantic
-Versioning but is not SemVer: it says which version of the decision moved, not whether a
-public API stayed compatible.
+Versioning but is not SemVer: it says which version of the decision moved.
 
 | `change` | When | Examples | Evaluation | Judgments |
 | --- | --- | --- | --- | --- |
-| `major` | the meaning version changed (requirement, scope, severity, options) | a stricter requirement, a new option default | required | reused only as evidence, revalidated (see [Primitives](#primitives)) |
-| `minor` | only the check revision changed | add or replace a deterministic part, attach or retrain a learned part, drop a part, narrow or widen a selector | required, against the current revision | kept |
-| `patch` | neither changed | wording, rationale, examples used only for docs | none | kept |
+| `major` | the meaning version changed | a stricter requirement, a new option default | required | reused only as evidence, revalidated |
+| `minor` | only the check revision changed | replace `op: judge` with a `cel` check, attach or retrain a learned model, narrow or widen a selector | required, against the current revision | kept |
+| `patch` | neither changed | wording, rationale | none | kept |
 
-Status and distribution are not change classes:
-- **Status** follows the ADR lifecycle: `proposed → accepted | rejected`, `accepted → deprecated | superseded`. A status change needs approval only.
-  - **Split and merge** are supersession: new decisions supersede old ones and their judgments are reused only as evidence.
+**Evaluation** replays the candidate against the decision's judgments, examples included:
+
+| Metric | Measured on |
+| --- | --- |
+| Precision, false-positive rate | `fail` judgments |
+| Recall, false-negative rate | `pass`/`fail` judgments, audit samples |
+| Coverage, abstention rate | the learned model |
+| Agreement | the current revision, on the same subjects |
+
+Each decision has an evaluation policy: its precision target and which error it tolerates.
+
+Beyond change classes:
+- **Status** follows the ADR lifecycle: `proposed → accepted | rejected`, `accepted → deprecated | superseded`. Split and merge are supersession, and the old judgments are reused only as evidence.
 - **Distribution** uses package-manager terms:
   - `publish` moves a decision into an organisation pack;
   - `add` enables a pack in a project.
 
-  Labels never travel. Models are retrained and thresholds recalibrated on local judgments.
-
-"Promotion" (judged → learned → deterministic) is not a state. It is a sequence of `minor`
-revisions, each of which must pass evaluation against the current one.
+  Judgments never travel. Models are retrained and thresholds recalibrated locally.
+- **Promotion** (judge → learned → deterministic) is not a state. It is a sequence of `minor` revisions, each passing evaluation against the current one.
 
 ## Vocabulary
 
-Names follow an existing standard wherever one fits:
+Names follow an existing standard wherever one fits, with the standard's meaning:
 
 | Concept | Name | Standard |
 | --- | --- | --- |
 | Resource envelope | `apiVersion`, `kind`, `metadata`, `spec` | Kubernetes Resource Model |
-| Decision fields and status | `title`, `status` (`proposed`/`accepted`/`rejected`/`deprecated`/`superseded`), `supersedes`, `consequences` | ADR (Nygard), MADR |
+| Decision record and status | `title`, `status` (`proposed`/`accepted`/`rejected`/`deprecated`/`superseded`), `supersedes`, `consequences` | ADR (Nygard), MADR |
 | Requirement wording | MUST, SHOULD, MAY | RFC 2119 |
 | Severity | `error`, `warn`, `info` | ESLint levels; mapped to SARIF `error`/`warning`/`note` and LSP Error/Warning/Information |
-| Judgment | `pass`, `fail` | — (a label, not a tool result) |
-| Reported result | `fail` (a finding), `review` (needs a person or agent: an abstained or judged case without a Judge), `notApplicable` (outside the selector) | SARIF `result.kind`, with its meaning |
-| Learned stage outcome | decide or abstain | selective classification (reject option) |
-| Finding identity, suppressions | `partialFingerprints`, in-source and external suppressions | SARIF 2.1.0 |
-| Provenance | `wasAttributedTo` (a `Person` or `SoftwareAgent`), `wasDerivedFrom`, `generatedAtTime` | W3C PROV-O, names as defined |
-| Revision change class | `major`, `minor`, `patch` | inspired by Semantic Versioning; Lighthouse's own definition |
+| Results | `pass`, `fail`, `notApplicable`, `review` | SARIF `result.kind` |
+| Suppression | `inSource`, `external`, `justification` | SARIF suppression |
+| Finding identity | `partialFingerprints` | SARIF 2.1.0 |
+| Provenance | `wasAttributedTo` (a `Person` or `SoftwareAgent`), `wasDerivedFrom`, `generatedAtTime` | W3C PROV-O |
+| Learned outcome | decide or abstain | selective classification (reject option) |
+| Revision change class | `major`, `minor`, `patch` | inspired by Semantic Versioning |
 | Distribution | `publish`, `add` | package managers (cargo, npm) |
-| Evaluation | precision, recall, false-positive rate, coverage, abstention | selective classification |
-| Editor and provider protocol | `initialize`, `textDocument/*`, `window/logMessage` | Language Server Protocol |
+| Evaluation | precision, recall, false-positive rate, coverage, abstention | classification metrics |
+| Editor and provider protocol | `initialize`, `textDocument/*`, `window/logMessage`, capabilities in the manifest | Language Server Protocol |
 | Options | JSON Schema 2020-12 | JSON Schema |
 
-Lighthouse-specific terms are kept only where no standard fits: decision, check, judge,
-verdict, evidence, meaning version and check revision.
+Lighthouse-specific terms remain only where no standard fits: decision, check, judge,
+evidence, meaning version and check revision.
 
 ## Open questions
 
 - **Incident linking.** How a bug fix is recognised as design-relevant without an agent: commit message, linked issue, or test added with the fix?
 - **Split detection.** What disagreement between clusters inside one decision justifies a split proposal?
 - **Deprecation.** Is silence evidence that a decision is obsolete, or that it works?
-- **Cross-project labels.** Should labels ever travel with an upstreamed decision? Default: no.
+- **Cross-project judgments.** Should any travel with a published decision? Default: no.
 - **Session domain.** Decisions about agent actions reuse this model, but their subjects are tool calls. Their labels and latency budget are still open.
 
 ## Status
 
 | Part | State |
 | --- | --- |
-| Decisions, packs, verdicts, annotations, `decisions.jsonl`, SQLite memory | done |
-| `check` providers, reserved `judge` block, meaning version and check revision | in progress (2d-2) |
+| Decisions, packs, verdicts, annotations, `decisions.jsonl`, SQLite memory | done (verdicts in today's form) |
+| `check` providers by runtime, builtin op `judge` (served by agent review tasks), provider capabilities, meaning version and check revision | in progress (2d-2) |
+| Verdicts become judgments and suppressions; naming alignment (`intent` → `context`, provenance fields) | after 2d-2 |
 | Judgments on subjects, audit sampling, evaluation, `Revision` records, log compaction, snapshot budgets | Phase 3 |
-| Naming alignment of existing code (verdict reasons, `intent` → `context`, provenance fields) | after 2d-2 |
-| Evidence producers (signals, grouping, mining) and `minor`/supersession proposals | Phase 4 (mining at `init` in Phase 5) |
-| Judge providers, learned part, Embedder | Phase 7 (Embedder starts in Phase 3) |
+| Evidence producers (grouping, mining) and revision proposals | Phase 4 (mining at `init` in Phase 5) |
+| Judge providers, learned models, Embedder | Phase 7 (Embedder starts in Phase 3) |
