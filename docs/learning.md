@@ -2,7 +2,8 @@
 
 This page holds the methods behind the learned part of a check and behind repository mining.
 The model they serve is defined in [rule-pipeline.md](rule-pipeline.md). Everything here is a
-policy for plugins (Embedder, Classifier, Judge), not part of the core. Methods can change
+policy for `Model` plugins (tasks `feature-extraction`, `text-classification`,
+`zero-shot-classification`), not part of the core. Methods can change
 without changing the decision model.
 
 ## Contract
@@ -10,7 +11,7 @@ without changing the decision model.
 A learned part must:
 - be trained only from recorded evidence of its decision, by an explicit `lighthouse learn train <decision>`;
 - beat the baselines on held-out data;
-- output calibrated probabilities and abstain between two thresholds; an abstained case goes to the judge, or is reported as SARIF `review` when there is no judge;
+- output calibrated probabilities and abstain between two thresholds; an abstained case goes to the zero-shot model or an agent, and is reported as SARIF `review` until one answers;
 - be reproducible from a recorded tuple:
   - meaning version and check revision;
   - feature version;
@@ -28,20 +29,20 @@ Attaching one is a `minor` revision with an evaluation report.
 | Semantic (compact) | similarity to the nearest `fail`/`pass`, prototype similarity, cluster distance |
 | Historical | the decision's precision, judgment counts of similar subjects |
 
-- **No leakage.** Inputs are only what is known before judging. A judge's reason is never an input.
+- **No leakage.** Inputs are only what is known before judging. The reason a model or person gave is never an input.
 - **Out-of-fold similarity.** Neighbour features exclude the subject and its near-duplicates. Splits are by project, cluster and time.
 - **Raw embeddings** are an ablation, not the default input.
 
 ## Models and calibration
 
 - **Baselines.** A smoothed rate per cluster (Beta prior from the decision's precision) and a kNN model. A gradient-boosted tree model (LightGBM-class) is used only when it beats both.
-- **Label weights** follow judgment strength (see [rule-pipeline.md](rule-pipeline.md#evidence)). A model trained mostly on judge or mined labels is capped at `warn`/`info`, and its agreement with human judgments is reported separately.
+- **Label weights** follow judgment strength (see [rule-pipeline.md](rule-pipeline.md#evidence)). A model trained mostly on zero-shot or mined labels is capped at `warn`/`info`, and its agreement with human judgments is reported separately.
 - **Calibration.** Isotonic or Platt calibration on a holdout set. Thresholds are recomputed on every retrain to meet the decision's precision target.
 - **Exploration.** A fixed fraction of confident calls on both sides is re-judged.
 
 ## Embeddings
 
-- Provided by the `Embedder` plugin kind: `embed(texts) → vectors`, with model-specific prompts in its manifest.
+- Provided by a `Model` with task `feature-extraction`: `embed(texts) → vectors`, with model-specific prompts in its manifest.
 - Local by default; a remote provider is opt-in per project.
 - Vectors are cached by content hash and are never written to `decisions.jsonl`.
 - Without an embedder, similarity falls back to structural signals.
@@ -62,7 +63,7 @@ Mining produces weak evidence and `proposed` decisions.
 3. **Propose.** A `proposed` decision with:
    - a requirement drafted from the delta signature;
    - examples from members (before → `invalid`, after → `valid`/`fixed`);
-   - a judge prompt;
+   - a `classify` prompt;
    - a learned part when one beats the baselines;
    - a deterministic draft when the model's trees allow it.
 
