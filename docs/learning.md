@@ -35,7 +35,7 @@ Attaching one is a refinement revision with an evaluation report.
 ## Models and calibration
 
 - **Baselines.** A smoothed rate per cluster (Beta prior from the decision's precision) and a kNN model. A gradient-boosted tree model (LightGBM-class) is used only when it beats both.
-- **Label weights** follow evidence strength. A model trained mostly on judge or mined labels is capped at `warn`/`info`, and its agreement with human judgments is reported separately.
+- **Label weights** follow judgment strength (see [rule-pipeline.md](rule-pipeline.md#evidence)). A model trained mostly on judge or mined labels is capped at `warn`/`info`, and its agreement with human judgments is reported separately.
 - **Calibration.** Isotonic or Platt calibration on a holdout set. Thresholds are recomputed on every retrain to meet the decision's precision target.
 - **Exploration.** A fixed fraction of confident calls on both sides is re-judged.
 
