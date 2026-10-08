@@ -1,11 +1,11 @@
 # Rule pipeline
 
 This page covers how a decision gets a rule, and how that rule is judged, learned and refined.
-Every path ends in the same place: a `Decision` resource whose `check:` sits on one stage of
+Every rule ends in the same place: a `Decision` resource whose `check:` sits on one stage of
 a ladder, plus a decision memory that moves it up or down. The [roadmap](roadmap.md) says
 which parts exist today (see [Status](#status)).
 
-Invariants that hold on every path:
+Invariants that hold for every rule:
 - **A decision is the source of truth.** Prompts, models, thresholds and examples derive from it and can be rebuilt.
 - **Nothing enables itself.** Proposals, new models and promotions all need explicit approval.
 - **Each decision is its own learning unit.** No single model judges every decision.
@@ -14,63 +14,47 @@ Invariants that hold on every path:
 - **The goal is deterministic enforcement.** Judges and models are intermediate forms, not the product.
 - **The core has no LLM API.** Judges, embedders and detectors are plugins, local first and opt-in when remote.
 
-## Creation paths
+## How a rule comes to exist
 
-```text
- 1 authored ───────────────────────────────┐
- 2 authored from history ──(subcase of 1)──┤
- 3 prompted judge ─────────────────────────┤
- 4 mined from change history ──────────────┼──► Decision ──► ladder: judged ⇄ learned ⇄ deterministic
- 5 wrapped tool ───────────────────────────┤        ▲                         │
- 6 adopted pack ───────────────────────────┘        └──── evolution (7) ◄─────┘
-```
+Rules are not made through a fixed list of paths. Each rule sits at a point on four axes:
+- where the decision came from;
+- who stated it;
+- how it is enforced;
+- what evidence measures it.
 
-| # | Path | Who writes the rule | Starts at | Can reach |
-| --- | --- | --- | --- | --- |
-| 1 | Authored | a person or agent | deterministic (`builtin`/`cel`), or documentation only | — |
-| 2 | Authored from history | a person or agent, prompted by grouped history | deterministic or judged | deterministic |
-| 3 | Prompted judge | a person or agent writes the judge prompt | judged (zero- or few-shot classifier) | learned, then deterministic |
-| 4 | Mined | proposed by Lighthouse, ratified by a person or agent | learned (a model on mined labels) | deterministic |
-| 5 | Wrapped tool | a person or agent binds an existing linter rule | deterministic (`command`/`rpc`) | — |
-| 6 | Adopted pack | a pack author; the project enables it | whatever the pack ships | — |
-| 7 | Evolution | proposed from memory, approved by a person or agent | an existing decision | narrower, wider, superseded, demoted |
+It moves through a fixed set of **transitions**. A new situation is a new value on an axis,
+never a new pipeline: the shared machinery below stays the same.
 
-### 1. Authored
+### Axis 1: origin, or what brings the decision up
 
-A person, or an agent via MCP `decision_create`, writes the decision with a deterministic
-check:
-- a `cel` predicate over the code model;
-- a standard op (`order`, `proximity`, `cycle`).
+| Origin | Examples | Evidence it yields |
+| --- | --- | --- |
+| Intent | a person or agent decides up front ("domain never imports infra") | authored examples |
+| Existing artifact | a written convention, an ADR, a style guide, a review checklist, an external standard (OWASP, a language guide) | authored examples; an agent writes the decision, and there is no importer |
+| Existing tool rule | a golangci-lint, clippy, ruff or semgrep rule, or a script | the tool's findings, then verdicts on them |
+| Recorded history | verdicts, annotations, repeated fixes of the same shape, review comments, agent-session corrections ("use X, not Y") | signals with polarity and actor |
+| Incident | a bug fix, postmortem, CI break or revert: "this must not happen again" | the incident site is `violates`, the fix is `conforms` |
+| Repository mining | change direction in refactor-like commits; prevalence in the current tree | weak labels: before/outlier is `violates`, after/dominant is `conforms` |
+| Snapshot | current metrics frozen as a budget ("complexity of this module must not grow") | the baseline itself; the decision is a ratchet |
+| Another project | an organisation catalog, a third-party pack, a decision proven elsewhere | the other project's examples; its labels are not imported, only the decision |
 
-The decision is accepted once its `valid`/`invalid`/`fixed` examples pass. A decision
-without `check:` is documentation only: it shows in docs and agent guidance, and the next
-step for it is path 3.
+### Axis 2: author, or who states the decision
 
-Existing written conventions (a CONTRIBUTING file, ADR markdown, review guidelines) enter
-here: an agent reads them and authors decisions. There is no markdown importer.
+- **A person** or **an agent** writes it (MCP `decision_create`); its status is `accepted` once its examples pass.
+- **Lighthouse** proposes it (`status: proposed`) from grouped signals or mining, with provenance and generated examples. Lighthouse never accepts; a person or agent ratifies, edits or rejects. A rejection suppresses the same cluster until its evidence changes.
 
-### 2. Authored from history
+### Axis 3: form, or how it is enforced
 
-Like path 1, but the trigger is accumulated history instead of foresight.
+| Form | Needs | Provider |
+| --- | --- | --- |
+| documentation | a statement | none; shown in docs and agent guidance |
+| judged | a statement, `select`, and a judge prompt (examples as shots) | Judge plugin (e.g. a jev-class zero/few-shot classifier), else an agent review task |
+| learned | enough weighted labels, and passing the [evaluation](#evaluation) gate | Detector plugin (embedding + structural features, GBDT when it beats the baselines) |
+| deterministic | a predicate and passing examples | `builtin` standard ops, `cel`, `command`, `rpc` |
 
-1. Similar events are recorded as **signals**:
-   - verdicts;
-   - annotations;
-   - repeated fixes of the same shape;
-   - agent-session corrections ("use X, not Y").
-2. Signals are grouped, in one of two ways:
-   - automatically, by similarity (structural delta first, embeddings second; see [Grouping](#grouping));
-   - by an agent that reviews the history (`decision_signals` lists them) and decides they are one decision.
-3. A group that reaches support *k* is surfaced as a candidate.
-4. A person or agent writes the decision. Group members become its examples and its `provenance`.
-
-If the boundary is clear, the result is deterministic. Otherwise it starts as a judged check
-(path 3) seeded with the group's labels.
-
-### 3. Prompted judge
-
-When the decision is real but no predicate captures it yet ("a function name states what it
-returns, not how"), a person or agent writes a **judge prompt**:
+A judged decision may hold all three stages at once. The deterministic part decides what it
+can, the learned stage decides where it is confident, and the judge decides the rest (see the
+[cascade](#enforcement-cascade)).
 
 ```yaml
 check:
@@ -82,62 +66,74 @@ check:
     output: {verdict: [violates, conforms], confidence: number}
 ```
 
-- The judge is a zero- or few-shot System 1 classifier behind the `Judge` plugin kind, for example jev-class models. Without a Judge provider, the same prompt is served as an agent review task.
-- Calibrated confidence decides what happens. A confident result is recorded as a judgment; an unsure one goes to an agent or person.
-- Every judgment is a label. With enough weighted labels, a model (embedding + structural features + GBDT) is trained and takes over the confident region. This is the learned stage, gated by [Evaluation](#evaluation).
-- When the learned boundary is expressible, the decision is promoted to a deterministic check.
+### Axis 4: labels, or what trains and measures it
 
-### 4. Mined from change history
+From strongest to weakest:
+1. human verdicts and judgments;
+2. agent verdicts and judgments;
+3. annotations, which are intentional exceptions;
+4. incident sites;
+5. model-judge judgments;
+6. mined labels.
 
-No one names the decision in advance. Lighthouse collects decision history from every change and proposes decisions.
+Audit and exploration samples are drawn to cover recall and drift. A decision whose labels
+are mostly weak is capped at `warn`/`info` until stronger labels confirm it.
 
-1. **Collect** from commits (on `init` over a bounded window, then after each commit):
-   - **Change direction.** In refactor-like commits (symbols moved or renamed, edges removed, tests unchanged), code before the change is a weak `violates` and code after is a weak `conforms`. A later revert flips the label.
-   - **Prevalence.** In the current tree, the dominant shape within a cluster of similar code is a weak `conforms`; outliers are candidates. This works on a fresh clone with no history.
-2. **Cluster.** See [Grouping](#grouping).
-3. **Train.** One model per cluster on embedding + structural features (GBDT). It must beat the baselines.
-4. **Propose.** A `proposed` decision with:
-   - a requirement drafted from the delta signature;
-   - examples generated from members (before → `invalid`, after → `valid`/`fixed`);
-   - the model as its learned stage;
-   - a judge prompt for the cases the model abstains on;
-   - when the trees allow it, a deterministic draft.
-5. **Ratify.** A person or agent accepts, edits or rejects it. A rejection suppresses the cluster until its evidence changes.
+Two more properties are fixed per decision. They don't change how it is made:
+- **Domain:** code today; later documents and agent sessions.
+- **Reach:** project, organisation pack, or bundled.
 
-Mined labels are the weakest, so a mined model is capped at `warn`/`info` until human or
-agent verdicts confirm it.
+### Transitions
 
-### 5. Wrapped tool
+| Transition | Trigger | Gate |
+| --- | --- | --- |
+| create | any origin | examples pass; accepted or ratified |
+| promote: judged → learned → deterministic | enough weighted labels; a draft predicate from tree paths or an agent | evaluation: precision, recall, agreement with the previous stage, examples |
+| demote | precision drifts; exploration samples disagree | automatic proposal, explicit approval |
+| narrow / widen | rejections concentrated in a cluster; confirmed but unflagged subjects | replay on recorded labels |
+| split / merge | one decision with two disagreeing clusters; two decisions flagging the same subjects | replay on both; verdicts are remapped by subject |
+| supersede | a new decision replaces an old one (`supersedes`) | the old one stops enforcing; history is kept |
+| deprecate | no findings or judgments for a long time; its scope no longer exists | explicit |
+| upstream / adopt | a project decision is moved into an organisation pack, or a pack decision is enabled elsewhere | in the new project the decision restarts at its authored form; models are retrained and thresholds recalibrated on local labels |
 
-An existing linter rule (golangci-lint, clippy, ruff, semgrep, a script) becomes the
-enforcement of a decision:
-- through `check: {type: command}`, which uses exit codes and `path:line:col:` lines;
-- or through `check: {type: rpc}`.
+Every transition except creation by a person or agent is a **proposal** with an evaluation
+report. Meaning-preserving transitions (promote, demote, narrow within the same requirement)
+keep verdicts, because only the check revision changes. Transitions that change the meaning
+version start a new verdict history.
 
-The decision adds what the tool lacks: intent, rationale, memory and verdicts. The rule stays
-deterministic. Its precision is still measured from verdicts, so a noisy wrapped rule gets
-narrowing proposals like any other.
+### Common recipes
 
-### 6. Adopted pack
+| Recipe | Origin | Author | Starts as | Typically becomes |
+| --- | --- | --- | --- | --- |
+| Write a rule | intent, existing artifact | person or agent | deterministic or documentation | — |
+| Rule from accumulated history | recorded history | person or agent (grouping automatic, or the agent reviews `decision_signals`) | deterministic or judged | deterministic |
+| Prompted judge | intent, existing artifact | person or agent writes the prompt | judged | learned, then deterministic |
+| Never again | incident | person or agent | deterministic if expressible, else judged | deterministic |
+| Mined proposal | repository mining | Lighthouse, then ratified | learned, plus a judge prompt for abstentions | deterministic |
+| Wrapped tool | existing tool rule | person or agent | deterministic (`command`/`rpc`) | narrowed by verdicts |
+| Budget | snapshot | person or agent | deterministic ratchet | tightened over time |
+| Adopted decision | another project | pack author; the project enables it | the pack's form | narrowed locally through overrides |
 
-Bundled packs (`design`, `testing`) and third-party packs (catalogs shipped by plugins) are
-decisions written elsewhere through paths 1–5. A project enables them through a preset and
-tunes options per language. From then on they collect the project's own memory. Project
-verdicts can narrow a pack decision locally through an override, without forking it.
+**Mined proposals in detail.**
+1. **Collect.** On `init` over a bounded window, then after each commit. Only refactor-like commits are labelled (symbols moved or renamed, edges removed, tests unchanged); a later revert flips the label. Prevalence needs no history.
+2. **[Group](#grouping).**
+3. **Train** one model per cluster; it must beat the baselines.
+4. **Propose.** A requirement drafted from the delta signature; examples from members (before → `invalid`, after → `valid`/`fixed`); the model as the learned stage; a judge prompt for abstentions; and a deterministic draft when the trees allow it.
 
-### 7. Evolution of an existing decision
+### Open questions
 
-This does not create a rule; it changes one. Memory produces proposals:
-- **Narrow:** rejected verdicts concentrate in one cluster, so `select` or the scope shrinks.
-- **Widen:** confirmed but unflagged subjects come from audits or path 2 groups.
-- **Demote:** precision drifts, so the check moves back one stage.
-- **Supersede:** a new decision replaces the old one (`supersedes`). The old one stops enforcing, and its history is kept.
+- **Incident linking.** How a bug fix is recognised as design-relevant without an agent: commit message, linked issue, or test added with the fix?
+- **Split detection.** What disagreement between clusters inside one decision is enough to propose a split?
+- **Deprecation.** Is silence evidence that a decision is obsolete, or that it works?
+- **Cross-project labels.** Should labels ever travel with an upstreamed decision, given privacy and differing codebases? Default: no.
+- **Session domain.** Decisions about agent actions reuse these axes, but their subjects are tool calls, not code. Their labels and latency budget are still open.
+
 
 ## Shared machinery
 
 ### Grouping
 
-Used by paths 2 and 4.
+Used for recorded history and repository mining.
 
 1. **Structure first.** The key is the code-model delta signature, with identifiers abstracted:
    - edge kind added or removed;
@@ -154,7 +150,7 @@ Used by paths 2 and 4.
    - no reverse edits.
 
    Contradictions produce a conflict report, never a merge.
-4. **Match before create.** A cluster matching an existing decision feeds path 7 instead of proposing a new decision.
+4. **Match before create.** A cluster matching an existing decision becomes a narrow or widen proposal instead of a new decision.
 
 ### Enforcement cascade
 
@@ -183,7 +179,7 @@ There is one model per decision, trained by an explicit `lighthouse learn train 
 | Semantic (compact) | similarity to the nearest `violates`/`conforms`, prototype similarity, cluster distance |
 | Historical | the decision's precision, verdict counts of similar subjects |
 
-- **No leakage.** Inputs are only what is known before judging. A judge's *reason* is never an input; it feeds grouping and path 7.
+- **No leakage.** Inputs are only what is known before judging. A judge's *reason* is never an input; it feeds grouping, narrowing and widening.
 - **Out-of-fold similarity.** Neighbour features exclude the subject and its near-duplicates. Splits are by project, cluster and time.
 - **Baselines first.** A model must beat the smoothed statistical baseline (Beta prior × cluster) and a kNN model; GBDT is used only when it wins. Raw embedding vectors are an ablation, not the default.
 - **Label weight.** Human > agent > model judge > mined. A model trained mostly on judge or mined labels is capped at `warn`/`info`, and its agreement with human verdicts is reported separately.
@@ -234,15 +230,15 @@ A candidate that fails keeps the previous stage.
 
 - **judged → learned:** enough weighted labels, and the model passes the gate and beats the baselines.
 - **learned → deterministic:** the boundary can be expressed. A CEL or standard-op draft, from the model's tree paths or from an agent, must match the learned stage on the labelled set and pass all examples.
-- Paths 3 and 4 climb this ladder; paths 1, 5 and 6 start at the top. Every move is a proposal with its evaluation report, approved explicitly.
+- Every move is a proposal with its evaluation report, approved explicitly.
 
 ## Status
 
 | Part | State |
 | --- | --- |
-| Path 1, path 6, verdicts, annotations, `decisions.jsonl`, SQLite memory | done |
-| Check providers (`command`/`rpc` for path 5, `judged` slot), meaning/check versions | in progress (2d-2) |
-| Judgments on subjects, audit sampling, evaluation harness, log compaction | Phase 3 |
-| Path 2 (signals, grouping, `decision_signals`), path 7 proposals | Phase 4 |
-| Path 4 collection at `init` and on commit | Phase 4–5 |
-| Judge providers (path 3 without an agent), learned stage, Embedder, cascade thresholds | Phase 7 (Embedder starts in Phase 3) |
+| Authored decisions, adopted packs, verdicts, annotations, `decisions.jsonl`, SQLite memory | done |
+| Check providers (`command`/`rpc` for wrapped tools, `judged` with `select` and `judge` reserved), meaning/check versions | in progress (2d-2) |
+| Judgments on subjects, audit sampling, evaluation harness, log compaction, snapshot budgets (baseline and ratchet) | Phase 3 |
+| Signals, grouping, `decision_signals`, Lighthouse proposals, narrow/widen/split/merge/demote proposals | Phase 4 |
+| Repository mining at `init` and on commit | Phase 4–5 |
+| Judge providers, learned stage, Embedder, cascade thresholds | Phase 7 (Embedder starts in Phase 3) |
