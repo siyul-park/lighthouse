@@ -72,7 +72,7 @@ judge:            # judge part: candidates and a prompt
 ```text
  candidates
    ├─ deterministic   cheap, certain        ── decides what it covers
-   ├─ learned         cheap, probabilistic  ── fail ≥ upper · pass ≤ lower · else review (abstains)
+   ├─ learned         cheap, probabilistic  ── fail ≥ upper · pass ≤ lower · else abstains
    └─ judge           expensive, semantic   ── decides the rest (Judge plugin, else an agent review task)
 ```
 
@@ -122,13 +122,17 @@ Two records with different meanings:
 
 | Record | About | Values | Means |
 | --- | --- | --- | --- |
-| **Judgment** | a subject (a symbol, file, edge…) | `pass`, `fail`, `notApplicable` (SARIF `result.kind`) | a recorded label for one meaning version, with its producer, strength and the evidence it was drawn from |
+| **Judgment** | a subject (a symbol, file, edge…) | `pass`, `fail` | a recorded label for one meaning version, with its producer, strength and the evidence it was drawn from |
 | **Verdict** | a finding produced by a check | `confirmed`, `rejected` (with a reason), `deferred` | a reviewer's response to the check's output |
 
 - A verdict implies a judgment only for some reasons:
   - `confirmed` implies `fail`;
   - `rejected: false-positive` implies `pass`;
   - `rejected: not-worth-fixing`, `intentional-exception` or `scope-too-broad` imply nothing about the subject. They are evidence about the check's scope or the decision's value.
+- A judgment is a label, and SARIF results are what a run reports. They are kept apart:
+  - a `fail` judgment, or a deterministic or learned `fail`, is reported as a `fail` result (a finding);
+  - a case nobody could decide yet is reported as `review`;
+  - a subject outside the selector is `notApplicable`. It is not a `pass`, and no judgment is recorded for it.
 - Judgments also exist where no finding does:
   - **audit samples**, which the deterministic or learned parts left unflagged;
   - **exploration samples**, a fixed fraction of confident learned calls re-judged;
@@ -160,8 +164,9 @@ change, evaluation, approval}`.
 - Derived parts (a trained model, thresholds) and approvals are `Revision` records in `decisions.jsonl`.
 - Lighthouse proposes revisions; it never applies one without approval.
 
-**`change` is derived, never declared.** Following Semantic Versioning, it is classified by
-which version moved:
+**`change` is derived, never declared.** The classification is inspired by Semantic
+Versioning but is not SemVer: it says which version of the decision moved, not whether a
+public API stayed compatible.
 
 | `change` | When | Examples | Evaluation | Judgments |
 | --- | --- | --- | --- | --- |
@@ -191,10 +196,12 @@ Names follow an existing standard wherever one fits:
 | Decision fields and status | `title`, `status` (`proposed`/`accepted`/`rejected`/`deprecated`/`superseded`), `supersedes`, `consequences` | ADR (Nygard), MADR |
 | Requirement wording | MUST, SHOULD, MAY | RFC 2119 |
 | Severity | `error`, `warn`, `info` | ESLint levels; mapped to SARIF `error`/`warning`/`note` and LSP Error/Warning/Information |
-| Judgment result | `pass`, `fail`, `notApplicable`, `review` (abstained) | SARIF `result.kind` |
+| Judgment | `pass`, `fail` | — (a label, not a tool result) |
+| Reported result | `fail` (a finding), `review` (needs a person or agent: an abstained or judged case without a Judge), `notApplicable` (outside the selector) | SARIF `result.kind`, with its meaning |
+| Learned stage outcome | decide or abstain | selective classification (reject option) |
 | Finding identity, suppressions | `partialFingerprints`, in-source and external suppressions | SARIF 2.1.0 |
-| Provenance | `attributedTo` (person or software agent), `derivedFrom`, `generatedAt` | W3C PROV |
-| Revision change class | `major`, `minor`, `patch` | Semantic Versioning |
+| Provenance | `wasAttributedTo` (a `Person` or `SoftwareAgent`), `wasDerivedFrom`, `generatedAtTime` | W3C PROV-O, names as defined |
+| Revision change class | `major`, `minor`, `patch` | inspired by Semantic Versioning; Lighthouse's own definition |
 | Distribution | `publish`, `add` | package managers (cargo, npm) |
 | Evaluation | precision, recall, false-positive rate, coverage, abstention | selective classification |
 | Editor and provider protocol | `initialize`, `textDocument/*`, `window/logMessage` | Language Server Protocol |

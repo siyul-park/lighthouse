@@ -10,7 +10,7 @@ without changing the decision model.
 A learned part must:
 - be trained only from recorded evidence of its decision, by an explicit `lighthouse learn train <decision>`;
 - beat the baselines on held-out data;
-- output calibrated probabilities and abstain (`review`) between two thresholds;
+- output calibrated probabilities and abstain between two thresholds; an abstained case goes to the judge, or is reported as SARIF `review` when there is no judge;
 - be reproducible from a recorded tuple:
   - meaning version and check revision;
   - feature version;
