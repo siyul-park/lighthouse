@@ -62,7 +62,7 @@ Mining produces weak evidence and `proposed` decisions.
 3. **Propose.** A `proposed` decision with:
    - a requirement drafted from the delta signature;
    - examples from members (before → `invalid`, after → `valid`/`fixed`);
-   - a `classify` prompt;
+   - `check: {type: model}`, so the requirement is enforced from day one;
    - a learned part when one beats the baselines;
    - a deterministic draft when the model's trees allow it.
 

@@ -57,7 +57,7 @@ parts, and each answers a different question:
 
 A check is one provider, configured like every other provider in Lighthouse (fix,
 formatter):
-- **`type`** names where the code runs: `builtin` (in process), `cel` (expression), `command` (process) or `rpc` (plugin process).
+- **`type`** names where evaluation happens: `builtin` (a standard op in process), `cel` (an expression), `command` (a process), `rpc` (a plugin process) or `model` (the bound classification model).
 - **Capabilities** in the manifest say how it behaves: `deterministic`, `abstains`, `cost`.
 
 The engine keys every behaviour off capabilities, never off type, op or model names. There
@@ -75,19 +75,21 @@ Execution errors are reported as SARIF tool execution notifications.
 
 ```yaml
 check:
-  type: builtin
-  op: classify
-  select: 'node.kind == "function" && node.changed'
-  prompt: Does the name state the result rather than the mechanism?
-  shots: examples   # the decision's examples are the few-shot set
+  type: model
 ```
 
-`op: classify` asks a model. Models are one plugin kind, `Model`, with one of two tasks,
+That is the whole check for a decision the model should evaluate:
+- **Question:** the decision's `requirement`. An optional `prompt` replaces it when the requirement reads badly as a question.
+- **Shots:** the decision's examples.
+- **Candidates:** the subjects in the decision's `scope`. An optional `select` (CEL) narrows them.
+- **Output:** fixed by the task, so there is nothing to configure.
+
+Models are one plugin kind, `Model`, with one of two tasks,
 because each task has its own call shape:
 
 | Task | Call |
 | --- | --- |
-| `classification` | subject + decision (prompt, shots) → `pass`/`fail` with a confidence, or abstain |
+| `classification` | subject + decision (requirement or prompt, examples) → `pass`/`fail` with a confidence, or abstain |
 | `embedding` | texts → vectors |
 
 How a model answers is its own business. An LLM, a jev-class System 1 model, or a gradient-
@@ -104,10 +106,10 @@ embedding = "embeddinggemma"
 ```
 
 - A decision-level binding overrides the project binding.
-- **An abstention falls through** to the next binding: decision, then project, then an agent through a review task. Putting a cheap model that abstains in front of an expensive one is just a decision-level binding, not a separate mechanism.
+- **An abstention falls through** to the next binding: decision, then project, then an agent through a review task, which is how `type: model` is served today. Putting a cheap model that abstains in front of an expensive one is just a decision-level binding, not a separate mechanism.
 - The order is about **cost and confidence**, not quality. A trained classifier approximates a boundary that has no faithful predicate; it is not a weaker deterministic rule.
-- A deterministic check decides every subject it selects. Partial deterministic coverage of a classified decision is expressed by narrowing the `classify` selector, not by stacking providers.
-- Deterministic evaluation is the **preferred** endpoint when the boundary can be expressed faithfully. It is not a required one: some decisions stay classified for good.
+- A deterministic check decides every subject it selects. Partial deterministic coverage of a model-evaluated decision is expressed by narrowing its `select`, not by stacking providers.
+- Deterministic evaluation is the **preferred** endpoint when the boundary can be expressed faithfully. It is not a required one: some decisions stay model-evaluated for good.
 
 ## Evidence
 
@@ -186,7 +188,7 @@ Versioning but is not SemVer: it says which version of the decision moved.
 | `change` | When | Examples | Evaluation | Judgments |
 | --- | --- | --- | --- | --- |
 | `major` | the meaning version changed | a stricter requirement, a new option default | required | reused only as evidence, revalidated |
-| `minor` | only the check revision changed | replace `op: classify` with a `cel` check, bind or retrain a decision-level model, narrow or widen a selector | required, against the current revision | kept |
+| `minor` | only the check revision changed | replace `type: model` with a `cel` check, bind or retrain a decision-level model, narrow or widen a selector | required, against the current revision | kept |
 | `patch` | neither changed | wording, rationale | none | kept |
 
 **Evaluation** replays the candidate against the decision's judgments, examples included:
@@ -244,7 +246,7 @@ judgment, meaning version and check revision.
 | Part | State |
 | --- | --- |
 | Decisions, packs, verdicts, annotations, `decisions.jsonl`, SQLite memory | done (verdicts in today's form) |
-| `check` providers by runtime, builtin op `classify` (served by agent review tasks), provider capabilities, meaning version and check revision | in progress (2d-2) |
+| `check` providers (`builtin`, `cel`, `command`, `rpc`, and `model` served by agent review tasks), capabilities, meaning version and check revision | in progress (2d-2) |
 | Verdicts become judgments and suppressions; naming alignment (`intent` → `context`, provenance fields) | after 2d-2 |
 | Judgments on subjects, sampling, evaluation, `Revision` records, log compaction, snapshot budgets | Phase 3 |
 | Evidence sources (grouping, mining) and revision proposals | Phase 4 (mining at `init` in Phase 5) |
