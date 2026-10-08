@@ -64,8 +64,12 @@ spec:
   requirement: >-
     A simple single-use wrapper SHOULD be inlined unless its name expresses a
     real policy or mechanic.
-  enforcement: heuristic     # mechanical → error · heuristic → warn · judgment → info
-  check: { type: builtin, id: design/single-use-wrapper }
+  severity: warn             # error: definitive · warn, info: a reviewer's verdict may hide it
+  check:                     # builtin | cel | command | rpc | model
+    type: cel
+    select: function
+    where: func.forwards_only
+    message: 'private helper {{ func.name }} is a single-use forwarding wrapper'
   examples: [...]            # executable valid/invalid fixtures, per language
 ```
 

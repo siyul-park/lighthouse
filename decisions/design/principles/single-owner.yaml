@@ -15,5 +15,7 @@ spec:
   requirement: >-
     Each behavior MUST have one implementation and each semantic rule MUST have
     one owner.
-  enforcement: judgment
+  severity: info
   evidence: [owner, duplicates]
+  check:
+    type: model

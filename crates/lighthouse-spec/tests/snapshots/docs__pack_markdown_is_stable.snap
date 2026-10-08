@@ -12,14 +12,14 @@ Intro of the pack.
 
 Intro of the section.
 
-| id | title | enforcement | fix | requirement |
+| id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`demo/alpha`](#alpha-holds) | Alpha holds | mechanical→error |  |  |
+| [`demo/alpha`](#alpha-holds) | Alpha holds | error · builtin |  |  |
 | `demo/beta` | Beta is advice | doc |  | Beta SHOULD be considered. |
 
 ### Alpha holds
 
-`demo/alpha` · symbol · mechanical→error
+`demo/alpha` · symbol · error · builtin
 
 *Keeps alpha true.*
 

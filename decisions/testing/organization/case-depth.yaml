@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization
+  annotations:
+    lighthouse/was-enforcement: mechanical
 spec:
   title: Cases are at most two levels deep
   intent: Deep nesting hides which behavior a case specifies.
@@ -15,7 +17,7 @@ spec:
   requirement: >-
     Test structure MUST have at most two levels: the test function and its
     direct cases.
-  enforcement: mechanical
+  severity: warn
   evidence: [test, depth]
   languages:
     go:
@@ -24,3 +26,5 @@ spec:
       tuning: Counts class and function nesting.
     typescript:
       tuning: "Counts `describe` and `it` nesting."
+  check:
+    type: model

@@ -112,5 +112,17 @@ impl OrderKeyManifest {
 
 /// The order keys a run can use, by id.
 pub trait OrderKeys: Send + Sync {
+    /// The key registered under `id`.
     fn key(&self, id: &str) -> Option<&dyn OrderKey>;
+}
+
+/// No order keys: for checks and tests that never ask for one.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoKeys;
+
+impl OrderKeys for NoKeys {
+    /// There is none.
+    fn key(&self, _: &str) -> Option<&dyn OrderKey> {
+        None
+    }
 }

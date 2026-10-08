@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization
+  annotations:
+    lighthouse/was-builtin: testing/owner-test
 spec:
   title: Every public symbol has an owner test
   intent: >-
@@ -17,7 +19,7 @@ spec:
   requirement: >-
     Each public symbol SHOULD have one top-level test function, and exported
     contracts MUST have an owning test.
-  enforcement: heuristic
+  severity: warn
   evidence: [symbol]
   options:
     type: object
@@ -113,8 +115,28 @@ spec:
         the public methods of that name. Methods of trait impls and types
         without methods are not required to have one.
   check:
-    type: builtin
-    id: testing/owner-test
+    type: cel
+    select: symbol
+    with:
+      - name: owner
+        expr: owner(symbol)
+    where: >-
+      !symbol.file_test && !symbol.generated && !symbol.test
+      && (symbol.kind == 'method'
+          ? (owner.kind == 'type' && exposed(owner, options.include_internal))
+          : owner.kind == '')
+      && !symbol.implements_trait
+      && (options.include_data_types || !symbol.data_only)
+      && exposed(symbol, options.include_internal)
+      && options.kinds.exists(k, k == symbol.kind)
+      && !(symbol.kind == 'method' && options.exempt_methods.exists(m, m == symbol.name))
+      && symbol.module_tested
+      && size(tests(symbol)) == 0 && !symbol.touched_by_tests
+    message: "public {{ symbol.kind }} {{ symbol.name }} has no owner test; add one top-level test for it"
+    evidence:
+      symbol: symbol.id
+    identity:
+      subject: symbol.id
   examples:
     - name: invalid
       language: go

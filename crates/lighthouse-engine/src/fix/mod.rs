@@ -15,9 +15,10 @@ use std::{
     path::PathBuf,
 };
 
+use lighthouse_model::Severity;
 use lighthouse_model::{Fingerprint, Safety};
 use lighthouse_plugin::FixDecision;
-use lighthouse_spec::{Catalog, Enforcement, FixKind};
+use lighthouse_spec::{Catalog, FixKind};
 
 pub use diff::unified_diff;
 
@@ -61,7 +62,7 @@ impl FixPlan {
                 FixBinding {
                     fixer: decision.id().to_owned(),
                     cap: fix.safety,
-                    mechanical: decision.enforcement == Enforcement::Mechanical,
+                    mechanical: decision.severity() == Some(Severity::Error),
                     decision: FixDecision {
                         id: decision.id().to_owned(),
                         requirement: decision.requirement.clone(),

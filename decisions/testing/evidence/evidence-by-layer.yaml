@@ -20,4 +20,3 @@ spec:
     publication, shutdown, and race behavior; fuzz tests prove bounded
     trust-boundary or differential properties; integration tests prove public
     end-to-end behavior.
-  enforcement: doc

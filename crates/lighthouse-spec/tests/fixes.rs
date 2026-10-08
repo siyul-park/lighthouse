@@ -158,13 +158,13 @@ fn expressions_must_compile() {
 }
 
 #[test]
-fn safe_is_reserved_for_mechanical_decisions() {
+fn safe_is_reserved_for_error_decisions() {
     let heuristic =
         fixable("  fix:\n    safety: safe\n    type: ops\n    ops: [{ op: delete, node: x }]\n")
             .into_iter()
-            .map(|(k, v)| (k, v.replace("mechanical", "heuristic")))
+            .map(|(k, v)| (k, v.replace("severity: error", "severity: warn")))
             .collect();
-    rejected(heuristic, "reserved for mechanical decisions");
+    rejected(heuristic, "reserved for decisions that author `error`");
 }
 
 #[test]
@@ -234,7 +234,7 @@ fn a_command_needs_a_program_and_a_usable_timeout() {
 }
 
 #[test]
-fn a_fix_is_part_of_the_decision_version_but_not_of_what_it_demands() {
+fn a_fix_is_part_of_the_decision_version_but_not_of_what_it_means() {
     let unfixed = EXAMPLES.replace("      fixed: [{ path: a.go, body: y }]\n", "");
     let plain = Catalog::from_files(decision_with(&format!("{CHECKED}{unfixed}"))).unwrap();
     let with_fix = Catalog::from_files(fixable(MOVE)).unwrap();
@@ -244,7 +244,8 @@ fn a_fix_is_part_of_the_decision_version_but_not_of_what_it_demands() {
     );
 
     assert_ne!(a.version(), b.version());
-    assert_eq!(a.semantic_version(), b.semantic_version());
+    assert_eq!(a.meaning_version(), b.meaning_version());
+    assert_eq!(a.check_revision(), b.check_revision());
 }
 
 #[test]

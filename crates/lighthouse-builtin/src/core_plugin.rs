@@ -1,19 +1,15 @@
 use std::sync::LazyLock;
 
 use lighthouse_model::{
-    Capability, Diagnostic, Fingerprint, Fragment, Position, Span,
+    Capability, Fragment,
     annotation::{ANNOTATION_REASON, UNUSED_ALLOW},
 };
 use lighthouse_plugin::{
-    Analyzer, AnalyzerManifest, Ctx, Error, Fixer, Indexed, LanguageProvider, Plugin,
-    PluginManifest, PresetManifest, ProviderManifest, Rule, RuleManifest, Scope, Source, Workspace,
+    Analyzer, Ctx, Error, Fixer, Indexed, LanguageProvider, Plugin, PluginManifest, PresetManifest,
+    ProviderManifest, Rule, RuleManifest, Source, Workspace,
 };
 use lighthouse_spec::DecisionRule;
 use serde::Deserialize;
-use serde_json::{Value, json};
-
-const LINE_COUNT: &str = "core/line-count";
-const MAX_FILE_LINES: &str = "core/max-file-lines";
 
 pub struct Core;
 
@@ -31,15 +27,14 @@ impl Plugin for Core {
     }
 
     fn analyzers(&self) -> Vec<Box<dyn Analyzer>> {
-        vec![Box::new(LineCount)]
+        Vec::new()
     }
 
     fn rules(&self) -> Vec<Box<dyn Rule>> {
-        vec![
-            max_file_lines(),
-            annotation_rule(ANNOTATION_REASON),
-            annotation_rule(UNUSED_ALLOW),
-        ]
+        let mut rules = lighthouse_declarative::Declarative::bundled_rules("core");
+        rules.push(annotation_rule(ANNOTATION_REASON));
+        rules.push(annotation_rule(UNUSED_ALLOW));
+        rules
     }
 
     fn fixers(&self) -> Vec<Box<dyn Fixer>> {
@@ -89,31 +84,6 @@ impl LanguageProvider for Text {
     }
 }
 
-struct LineCount;
-
-impl Analyzer for LineCount {
-    fn manifest(&self) -> &AnalyzerManifest {
-        static MANIFEST: LazyLock<AnalyzerManifest> = LazyLock::new(|| AnalyzerManifest {
-            id: LINE_COUNT.to_owned(),
-            requires: Vec::new(),
-            scope: Scope::File,
-        });
-        &MANIFEST
-    }
-
-    fn run(&self, ctx: &Ctx) -> Result<Value, Error> {
-        let (_, text) = ctx
-            .file
-            .ok_or_else(|| Error::Failed("no file".to_owned()))?;
-        Ok(json!(text.lines().count()))
-    }
-}
-
-#[derive(Deserialize)]
-struct Limit {
-    max: usize,
-}
-
 #[derive(Deserialize)]
 struct Unconfigured {}
 
@@ -126,38 +96,5 @@ fn annotation_rule(id: &'static str) -> Box<dyn Rule> {
         id,
         &[],
         |_: &RuleManifest, _: &Ctx, _: Unconfigured| Ok(Vec::new()),
-    ))
-}
-
-fn max_file_lines() -> Box<dyn Rule> {
-    Box::new(DecisionRule::new(
-        MAX_FILE_LINES,
-        &[LINE_COUNT],
-        |meta: &RuleManifest, ctx: &Ctx, Limit { max }| {
-            let (file, _) = ctx
-                .file
-                .ok_or_else(|| Error::Failed("no file".to_owned()))?;
-            let lines: usize = ctx.fact(LINE_COUNT)?;
-            if lines <= max {
-                return Ok(Vec::new());
-            }
-            let at = |line: usize| Position {
-                line: u32::try_from(line).unwrap_or(u32::MAX),
-                col: 1,
-            };
-            let mut diagnostic = Diagnostic::new(
-                MAX_FILE_LINES,
-                meta.severity,
-                format!("file has {lines} lines, limit is {max}"),
-                &file.path,
-                Span {
-                    start: at(max + 1),
-                    end: at(lines),
-                },
-                Fingerprint::of(MAX_FILE_LINES, &file.path.to_string_lossy(), ""),
-            );
-            diagnostic.evidence = json!({ "lines": lines, "max": max });
-            Ok(vec![diagnostic])
-        },
     ))
 }

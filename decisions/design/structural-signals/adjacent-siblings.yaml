@@ -15,5 +15,7 @@ spec:
   requirement: >-
     Similar or symmetric siblings SHOULD be adjacent when they share an owner
     and implementation shape.
-  enforcement: heuristic
+  severity: warn
   evidence: [peer, distance]
+  check:
+    type: model

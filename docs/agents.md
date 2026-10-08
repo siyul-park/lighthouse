@@ -44,10 +44,10 @@ value starting with `-` is refused).
 
 | Tool | Arguments | Result |
 |------|-----------|--------|
-| `check` | `paths?`, `changed?`, `diff?`, `rules?`, `limit?` (default 25) | `status` (`clean`, `findings`, `incomplete`), `findings` (the agent-json records: rule, severity, tier, location, requirement, evidence, expected structure, fingerprint, resolve hint), `incomplete`, `omitted`, `summary` (counts, suppressed, allowed, reasons table), `messages` |
+| `check` | `paths?`, `changed?`, `diff?`, `rules?`, `limit?` (default 25) | `status` (`clean`, `findings`, `incomplete`), `findings` (the agent-json records: rule, severity, authored severity, location, requirement, evidence, expected structure, fingerprint, resolve hint), `incomplete`, `omitted`, `summary` (counts, suppressed, allowed, reasons table), `messages` |
 | `explain` | `id` | Markdown of the decision or rule |
 | `decision_list` | `all?` | decisions with severity, title, status, `enabled` in this config |
-| `review_tasks` | `status?` (default `open`), `rule?`, `tier?` (`review` default, or `all`), `limit?` (default 50) | findings that ask for a verdict (those of heuristic and judgment decisions, whatever their severity; or all) with `fingerprint`, `lastSeen`, evidence, latest verdict |
+| `review_tasks` | `status?` (default `open`), `rule?`, `tier?` (`review` default, or `all`), `limit?` (default 50) | findings that ask for a verdict (those of decisions that authored `warn` or `info`, whatever level they are reported at; or all) with `fingerprint`, `lastSeen`, evidence, latest verdict |
 | `review_resolve` | `fingerprint`, `verdict`, `reason?`, `note?`, `seen?` | the recorded verdict, its `standing`, warnings |
 | `review_history` | `fingerprint` | every verdict on the finding, oldest first |
 | `decision_create` | `id` (`local/<name>`), `spec` (object or YAML/JSON text), `examples` | `id`, written `path`, test runs, whether the `local` plugin is listed |
@@ -97,7 +97,7 @@ are resolved by the run that ends the fixing. Recheck with `check` afterwards.
 
 - `lighthouse://decisions/{id}`: one decision rendered as Markdown (the id keeps its
   slash: `lighthouse://decisions/design/exported-doc`).
-- `lighthouse://catalog`: `id`, tier and title of every decision, tab separated.
+- `lighthouse://catalog`: `id`, authored severity and title of every decision, tab separated.
 - `lighthouse://config`: root, plugins, `extends`, the active rule ids and the
   `lighthouse.toml` text.
 
@@ -112,7 +112,7 @@ Every verdict recorded through the server is a review of kind `agent`. The id is
 
 `decision_create` takes an `id` (`local/<name>`), the `spec` of a `Decision`
 (title, intent, `scope: {subject}`, requirement with MUST or SHOULD,
-enforcement, evidence, and a `check` of `type: cel` with `select`, `where` as a
+severity, evidence, and a `check` of `type: cel` with `select`, `where` as a
 CEL expression that is true for a violation, `message` and `evidence`) and
 examples (at least one valid and one invalid per language the project runs).
 The candidate is validated, compiled and tested through the whole engine before
@@ -132,7 +132,7 @@ Example:
 ```json
 { "name": "decision_create", "arguments": {
   "id": "local/short-notes",
-  "spec": "title: Notes stay short\nintent: Notes are read at a glance.\nscope: { subject: file }\nrequirement: A note file MUST NOT exceed three lines.\nenforcement: mechanical\nevidence: [path]\ncheck:\n  type: cel\n  select: file\n  where: 'file.lines > 3'\n  message: '{{ file.path }} is too long'\n  evidence:\n    path: file.path",
+  "spec": "title: Notes stay short\nintent: Notes are read at a glance.\nscope: { subject: file }\nrequirement: A note file MUST NOT exceed three lines.\nseverity: error\nevidence: [path]\ncheck:\n  type: cel\n  select: file\n  where: 'file.lines > 3'\n  message: '{{ file.path }} is too long'\n  evidence:\n    path: file.path",
   "examples": [
     { "name": "long", "language": "text", "kind": "invalid",
       "files": [{ "path": "a.txt", "body": "a\nb\nc\nd\n" }], "expect": [{ "line": 1 }] },
@@ -190,7 +190,7 @@ The skill is generated, never hand-written: purpose (decision memory), the loop
 (check, understand, fix, recheck, judge with reasons), rules of conduct (never
 suppress a mechanical finding except through an annotated exception with a
 reason), how to look rules up (resources and `explain`, not the rule text), and
-a digest of the active decisions (id, tier, title). `lighthouse docs generate`
+a digest of the active decisions (id, authored severity, title). `lighthouse docs generate`
 writes `skills/lighthouse/SKILL.md` for this repository and `docs check` fails
 when it is stale; `init --agent claude-code` writes the project's copy from its
 own catalog and config.

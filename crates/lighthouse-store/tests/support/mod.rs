@@ -11,7 +11,7 @@ pub fn observed(fingerprint: &str, rule: &str, path: &str) -> Observed {
         fingerprint: fingerprint.to_owned(),
         rule_id: rule.to_owned(),
         severity: Severity::Info,
-        tier: "judgment".to_owned(),
+        authored_severity: "info".to_owned(),
         path: path.to_owned(),
         locator: json!({ "span": { "start": { "line": 1 } } }),
         symbol: Some(format!("m::{fingerprint}#function")),
@@ -21,6 +21,7 @@ pub fn observed(fingerprint: &str, rule: &str, path: &str) -> Observed {
         options: json!({ "max": 3 }),
         rule_version: Some("sem1".to_owned()),
         legacy_rule_version: None,
+        check_revision: None,
         decision_hash: Some("full1".to_owned()),
     }
 }
@@ -56,6 +57,7 @@ pub fn review(fingerprint: &str, verdict: Verdict, reason: Reason) -> NewReview 
 pub fn stamp(version: &str) -> impl Fn(&lighthouse_store::FindingRecord) -> Stamp + '_ {
     move |_| Stamp {
         rule_version: Some(version.to_owned()),
+        check_revision: Some("chk1".to_owned()),
         decision_hash: Some("full1".to_owned()),
         catalog_version: Some("cat1".to_owned()),
         scope: Some("symbol".to_owned()),

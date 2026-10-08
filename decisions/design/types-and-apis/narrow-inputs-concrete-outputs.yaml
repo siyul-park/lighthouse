@@ -16,4 +16,6 @@ spec:
     Public inputs SHOULD use the narrowest reusable abstraction that fully
     expresses the contract; public outputs SHOULD use the most concrete public
     type unless polymorphism is itself the contract.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

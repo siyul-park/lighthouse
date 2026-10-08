@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Table data and generation code MUST remain simple enough to read as
     specification.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

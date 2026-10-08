@@ -13,4 +13,3 @@ spec:
     domain: code
     subject: project
   requirement: The smallest falsifying check MUST be run first.
-  enforcement: doc

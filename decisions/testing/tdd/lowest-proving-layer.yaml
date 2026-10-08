@@ -13,4 +13,6 @@ spec:
     domain: code
     subject: test
   requirement: The lowest test layer that proves the contract MUST be used.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: functions
+  annotations:
+    lighthouse/was-builtin: design/receiver-owned-behavior
 spec:
   title: Behavior lives with its owner
   intent: Where a function lives tells readers who owns the behavior.
@@ -15,7 +17,7 @@ spec:
   requirement: >-
     Methods SHOULD express receiver-owned behavior; free functions SHOULD
     express construction or behavior with no natural receiver.
-  enforcement: heuristic
+  severity: warn
   evidence: [owner, callers, takes_owner_param, uses_owner]
   options:
     type: object
@@ -51,8 +53,28 @@ spec:
         target type. Parameter types are not resolved for Rust, so
         `takes_owner_param` is always false there.
   check:
-    type: builtin
-    id: design/receiver-owned-behavior
+    type: cel
+    select: function
+    with:
+      - name: affinity
+        expr: func.receiver_affinity
+    where: >-
+      !func.file_test && !func.generated && !func.test && (func.kind == 'function' || func.kind == 'method')
+      && func.kind == 'function' && func.visibility == 'private'
+      && func.name != 'main' && func.name != 'init' && !func.constructor_named
+      && func.references == 0 && size(affinity) > 0
+      && (affinity.takes_owner_param || affinity.uses_owner)
+      && !(options.require_owner_param && !affinity.takes_owner_param)
+    message: >-
+      private function {{ func.name }} is called only by methods of
+      {{ affinity.owner_name }}; consider making it a method of {{ affinity.owner_name }}
+    evidence:
+      owner: affinity.owner
+      callers: affinity.callers
+      takes_owner_param: affinity.takes_owner_param
+      uses_owner: affinity.uses_owner
+    identity:
+      subject: func.id
   examples:
     - name: only-one-owner-calls
       language: go

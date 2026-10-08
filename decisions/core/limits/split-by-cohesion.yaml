@@ -13,4 +13,3 @@ spec:
     domain: code
     subject: file
   requirement: "A file MUST be split along cohesion boundaries, not by size alone."
-  enforcement: doc

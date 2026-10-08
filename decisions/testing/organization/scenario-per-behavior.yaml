@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Different scenarios MUST use one case per scenario, named for the behavior
     it states.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

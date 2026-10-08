@@ -144,6 +144,7 @@ impl Plugin for Fake {
                 capabilities: Vec::new(),
                 citation: None,
                 strict: false,
+                enforced: true,
             },
         })]
     }
@@ -183,7 +184,7 @@ spec:
   intent: Words are flagged.
   scope: {{ subject: file }}
   requirement: A file MUST NOT contain the marker word.
-  enforcement: heuristic
+  severity: warn
   evidence: [word]
   options:
     type: object

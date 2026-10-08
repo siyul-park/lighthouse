@@ -13,4 +13,6 @@ spec:
     domain: code
     subject: symbol
   requirement: Borrowed values MUST NOT cross or outlive their ownership boundary.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

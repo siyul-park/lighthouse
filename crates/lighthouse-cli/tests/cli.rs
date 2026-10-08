@@ -173,13 +173,13 @@ fn decision_list_and_explain() {
         );
     }
     let out = lighthouse(dir.path())
-        .args(["explain", "core/max-file-lines"])
+        .args(["explain", "design/coupling-signal"])
         .output()
         .unwrap();
     assert!(
         String::from_utf8(out.stdout)
             .unwrap()
-            .contains("Analyzers: core/line-count")
+            .contains("Analyzers: metrics/size")
     );
     lighthouse(dir.path())
         .args(["explain", "core/nope"])
@@ -197,7 +197,7 @@ fn decision_list_all_shows_status_of_every_decision() {
     let text = String::from_utf8(out.stdout).unwrap();
     for line in [
         "core/max-file-lines\timplemented\twarn\tFiles stay below a line limit",
-        "design/error-identity\tunimplemented\twarn\tPreserve error identity",
+        "design/error-identity\tjudged\twarn\tPreserve error identity",
         "design/signals-are-advisory\tdoc\t-\tSignals stay advisory",
     ] {
         assert!(text.lines().any(|l| l == line), "{line}");
@@ -205,7 +205,7 @@ fn decision_list_all_shows_status_of_every_decision() {
 }
 
 #[test]
-fn explain_describes_unimplemented_decisions() {
+fn explain_describes_judged_decisions() {
     let dir = tempfile::tempdir().unwrap();
     let out = lighthouse(dir.path())
         .args(["explain", "design/error-identity"])
@@ -214,7 +214,7 @@ fn explain_describes_unimplemented_decisions() {
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(text.contains("**Requirement**\n\nDependency identity MUST be preserved"));
     assert!(text.contains("%w"));
-    assert!(text.contains("Status: unimplemented"));
+    assert!(text.contains("Status: judged"));
 }
 
 #[test]
@@ -503,7 +503,7 @@ spec:
   intent: Long files are hard to read.
   scope: { subject: file }
   requirement: A file MUST have at most three lines.
-  enforcement: mechanical
+  severity: error
   evidence: [path]
   check:
     type: cel

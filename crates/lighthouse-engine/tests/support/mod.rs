@@ -100,6 +100,7 @@ impl Word {
                 capabilities: Vec::new(),
                 citation: None,
                 strict: false,
+                enforced: true,
             },
             word,
         }

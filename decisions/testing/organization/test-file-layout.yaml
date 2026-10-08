@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization
+  annotations:
+    lighthouse/was-builtin: testing/test-file-layout
 spec:
   title: "A test file reads fixtures, tests, helpers"
   intent: >-
@@ -21,7 +23,7 @@ spec:
     and are called from tests) below the tests that use them. Fixtures keep the
     declaration-group order among themselves and sit next to the fixtures they
     compose.
-  enforcement: mechanical
+  severity: error
   evidence: [symbol, role, before, after]
   languages:
     go:
@@ -40,8 +42,30 @@ spec:
         then the helpers that check. It is not enforced for Rust, whose provider
         does not tell fixtures from helpers.
   check:
-    type: builtin
-    id: testing/test-file-layout
+    type: cel
+    select: symbol
+    with:
+      - name: first
+        expr: symbol.file_first_test
+      - name: user
+        expr: symbol.helper_user
+      - name: misplaced_fixture
+        expr: symbol.role == 'fixture' && size(first) > 0 && first.pos < symbol.pos
+      - name: misplaced_helper
+        expr: symbol.role == 'test-helper' && size(user) > 0
+    where: >-
+      symbol.file_test && !symbol.generated && (misplaced_fixture || misplaced_helper)
+    message: >-
+      {{ misplaced_fixture
+         ? 'fixture ' + symbol.name + ' must be declared above the tests, before ' + first.name
+         : 'test helper ' + symbol.name + ' must be declared below ' + user.name + ', which uses it' }}
+    evidence:
+      symbol: symbol.id
+      role: symbol.role
+      before: "misplaced_fixture ? first.id : ''"
+      after: "misplaced_helper ? user.id : ''"
+    identity:
+      subject: symbol.id
   fix:
     safety: safe
     requires: [extent]

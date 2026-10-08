@@ -15,5 +15,7 @@ spec:
   requirement: >-
     One-letter names MUST be limited to conventional receivers, indexes, and
     tiny scopes.
-  enforcement: heuristic
+  severity: warn
   evidence: [name, scope_lines]
+  check:
+    type: model

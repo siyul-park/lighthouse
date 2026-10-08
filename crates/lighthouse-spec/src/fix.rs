@@ -21,7 +21,7 @@ use crate::Error;
 #[schemars(transform = refuse_strays)]
 pub struct Fix {
     /// Caps what the fixer may claim: a `safe` proposal under a `suggested`
-    /// decision is downgraded. `safe` is reserved for mechanical decisions.
+    /// decision is downgraded. `safe` is reserved for decisions that author `error`.
     pub safety: Safety,
     /// Provider capabilities the fix needs; without them it is declined.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -253,7 +253,7 @@ pub(crate) fn validate(id: &str, fix: &Fix, mechanical: bool, checked: bool) -> 
     }
     if fix.safety == Safety::Safe && !mechanical {
         return Err(fail(
-            "`safe` is reserved for mechanical decisions; use `suggested`".to_owned(),
+            "`safe` is reserved for decisions that author `error`; use `suggested`".to_owned(),
         ));
     }
     match &fix.kind {
@@ -394,14 +394,10 @@ fn cel(what: &str, source: &str) -> Result<(), String> {
 
 /// Every `{{ cel }}` hole of a template compiles and is closed.
 fn template(what: &str, text: &str) -> Result<(), String> {
-    let mut rest = text;
-    while let Some(open) = rest.find("{{") {
-        let after = &rest[open..];
-        let close = after
-            .find("}}")
-            .ok_or_else(|| format!("{what}: `{{{{` is never closed"))?;
-        cel(what, after[2..close].trim())?;
-        rest = &after[close + 2..];
+    for part in crate::check::parse_template(text).map_err(|e| format!("{what}: {e}"))? {
+        if let crate::check::TemplatePart::Hole(source) = part {
+            cel(what, &source)?;
+        }
     }
     Ok(())
 }

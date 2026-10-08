@@ -40,18 +40,35 @@ pub fn decision_markdown(decision: &Decision, level: usize) -> String {
     let severity = decision
         .severity()
         .map_or_else(|| "none".to_owned(), |s| s.to_string());
+    let provider = decision
+        .check
+        .as_ref()
+        .map_or("none", |check| check.kind.label());
     let preset = if decision.strict {
         " · preset `strict`"
     } else {
         ""
     };
+    let mut lifecycle = String::new();
+    if !decision.status.is_default() {
+        let _ = write!(lifecycle, " · status `{}`", decision.status);
+    }
+    if !decision.supersedes.is_empty() {
+        let _ = write!(
+            lifecycle,
+            " · supersedes {}",
+            decision.supersedes.join(", ")
+        );
+    }
     let _ = writeln!(
         out,
-        "`{}` · scope `{}` · enforcement `{}` · severity `{severity}`{preset}\n",
+        "`{}` · scope `{}` · severity `{severity}` · check `{provider}`{lifecycle}{preset}\n",
         decision.id(),
         decision.scope.subject,
-        decision.enforcement
     );
+    if let Some(consequences) = &decision.consequences {
+        block(&mut out, "Consequences", consequences);
+    }
     block(&mut out, "Intent", &decision.intent);
     block(&mut out, "Requirement", &decision.requirement);
     if let Some(exceptions) = &decision.exceptions {

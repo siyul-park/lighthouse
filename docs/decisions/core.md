@@ -8,14 +8,14 @@ Language-independent checks that need nothing beyond file contents.
 
 Size limits that keep files reviewable.
 
-| id | title | enforcement | fix | requirement |
+| id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`core/max-file-lines`](#files-stay-below-a-line-limit) | Files stay below a line limit | heuristic→warn |  |  |
+| [`core/max-file-lines`](#files-stay-below-a-line-limit) | Files stay below a line limit | warn · cel |  |  |
 | `core/split-by-cohesion` | Split files by cohesion | doc |  | A file MUST be split along cohesion boundaries, not by size alone. |
 
 ### Files stay below a line limit
 
-`core/max-file-lines` · file · heuristic→warn
+`core/max-file-lines` · file · warn · cel
 
 *Large files tend to mix responsibilities.*
 
@@ -40,11 +40,11 @@ b
 
 A finding that is right to leave in place can be allowed where it happens, in a comment that a reviewer sees in the diff.
 
-| id | title | enforcement | fix | requirement |
+| id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | [`core/allow-annotation`](#allow-a-finding-in-source) | Allow a finding in source | doc |  |  |
-| [`core/annotation-reason`](#an-allow-annotation-states-its-reason) | An allow annotation states its reason | mechanical→error |  |  |
-| [`core/unused-allow`](#allow-annotations-suppress-something) | Allow annotations suppress something | heuristic→warn | suggested |  |
+| [`core/annotation-reason`](#an-allow-annotation-states-its-reason) | An allow annotation states its reason | error · builtin |  |  |
+| [`core/unused-allow`](#allow-annotations-suppress-something) | Allow annotations suppress something | warn · builtin | suggested |  |
 
 ### Allow a finding in source
 
@@ -56,7 +56,7 @@ A finding that is right to leave in place MAY be allowed by a comment on the sym
 
 ### An allow annotation states its reason
 
-`core/annotation-reason` · file · mechanical→error
+`core/annotation-reason` · file · error · builtin
 
 *An exception without a reason cannot be reviewed or revisited.*
 
@@ -80,7 +80,7 @@ Also: rust
 
 ### Allow annotations suppress something
 
-`core/unused-allow` · file · heuristic→warn · fix: suggested
+`core/unused-allow` · file · warn · builtin · fix: suggested
 
 *An exception that no longer applies is noise that hides the next real one.*
 

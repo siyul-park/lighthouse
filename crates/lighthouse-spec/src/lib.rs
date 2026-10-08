@@ -20,9 +20,14 @@ mod validate;
 use lighthouse_resource::Descriptor;
 
 pub use catalog::{Catalog, write_atomic, write_atomic_guarded};
-pub use check::{BuiltinCheck, CelCheck, Check, Select};
+pub use check::{
+    At, Batch, Binding, BuiltinCheck, BuiltinOp, CelCheck, Check, CheckKind, CheckStdin,
+    CommandCheck, CycleLevel, DEFAULT_TIMEOUT, ExitCodes, Identity, ModelCheck, NamedRule,
+    OrderClause, OrderReport, OrderScope, RpcCheck, Select, TemplatePart, parse_template,
+};
 pub use decision::{
-    Decision, DecisionSpec, LanguageSpec, MIGRATED_FROM, PACK_LABEL, SECTION_LABEL,
+    Decision, DecisionSpec, LanguageSpec, MIGRATED_FROM, PACK_LABEL, SECTION_LABEL, WAS_BUILTIN,
+    WAS_ENFORCEMENT,
 };
 pub use error::Error;
 pub use fix::{
@@ -30,11 +35,12 @@ pub use fix::{
 };
 pub use fix_docs::{OPERATIONS, Operation, Param, fix_operations_markdown};
 pub use migrate::{
-    is_override, is_resource, migrate_decision, migrate_override, migrate_pack, migrate_sources,
+    convert_enforcement, has_enforcement, is_override, is_resource, migrate_decision,
+    migrate_override, migrate_pack, migrate_sources,
 };
 pub use model::{
-    Content, Domain, Enforcement, Example, ExampleFile, ExampleKind, Expect, Scope, Subject,
-    needs_verdict, tier,
+    Content, Domain, Example, ExampleFile, ExampleKind, Expect, Scope, Status, Subject,
+    authored_severity, needs_verdict,
 };
 pub use options::{ObjectType, OptionSchema, OptionType, OptionsSchema};
 pub use overrides::DecisionOverrideSpec;

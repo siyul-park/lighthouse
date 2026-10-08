@@ -15,10 +15,12 @@ spec:
   requirement: >-
     Semantic errors MUST use stable, named error values or types, and semantic
     categories MUST NOT be created from ad hoc formatted messages alone.
-  enforcement: heuristic
+  severity: warn
   evidence: [error, site]
   languages:
     go:
       tuning: >-
         Semantic errors are `ErrXxx` sentinels; `fmt.Errorf` alone does not
         create a category.
+  check:
+    type: model

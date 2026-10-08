@@ -8,10 +8,10 @@ use serde_json::Value;
 use crate::{Catalog, Decision};
 
 impl Decision {
-    /// Rule metadata of a checked decision; `None` while it has no check.
+    /// Rule metadata of a checked decision; `None` while no program checks it.
     /// Analyzers and capabilities belong to the check.
     pub fn rule_manifest(&self) -> Option<RuleManifest> {
-        self.check.as_ref()?;
+        self.check.as_ref().filter(|c| c.is_automated())?;
         Some(RuleManifest {
             id: self.id().to_owned(),
             severity: self.severity()?,
@@ -22,6 +22,7 @@ impl Decision {
             capabilities: Vec::new(),
             citation: self.citation.clone(),
             strict: self.strict,
+            enforced: self.enforced(),
         })
     }
 }

@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Retain/release and resource transitions MUST have one owner, and each
     resource MUST be released exactly once.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

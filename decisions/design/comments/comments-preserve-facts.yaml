@@ -18,4 +18,6 @@ spec:
     with evidence, or external contracts or specifications. A necessary comment
     MUST state the smallest sufficient fact, constraint, invariant, or
     consequence.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

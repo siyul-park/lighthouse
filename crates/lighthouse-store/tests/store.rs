@@ -38,10 +38,10 @@ fn store_opens_a_migrated_cache_and_refuses_a_newer_one() {
     assert!(Store::open_existing(dir.path()).unwrap().is_none());
 
     let first = Store::open(dir.path()).unwrap();
-    assert_eq!(first.schema_version().unwrap(), 5);
+    assert_eq!(first.schema_version().unwrap(), 6);
     drop(first);
     let again = Store::open_existing(dir.path()).unwrap().unwrap();
-    assert_eq!(again.schema_version().unwrap(), 5);
+    assert_eq!(again.schema_version().unwrap(), 6);
     drop(again);
 
     Connection::open(Store::path_in(dir.path()))
@@ -53,7 +53,7 @@ fn store_opens_a_migrated_cache_and_refuses_a_newer_one() {
         error,
         Error::NewerSchema {
             found: 99,
-            supported: 5
+            supported: 6
         }
     ));
 }
@@ -87,7 +87,7 @@ fn processes_opening_a_fresh_cache_together_all_succeed() {
         })
         .collect();
     for handle in handles {
-        assert_eq!(handle.join().unwrap(), 5);
+        assert_eq!(handle.join().unwrap(), 6);
     }
 }
 
@@ -148,7 +148,7 @@ fn record_inserts_refreshes_and_reopens_findings() {
     assert_eq!(first.commit.as_deref(), Some("abc123"));
     assert_eq!(first.dirty, Some(true));
     assert_eq!(first.options["max"], 3);
-    assert_eq!(first.tier.as_deref(), Some("judgment"));
+    assert_eq!(first.authored_severity.as_deref(), Some("info"));
     assert_eq!(first.lighthouse_version.as_deref(), Some("0.1.0"));
     assert_eq!(first.catalog_version.as_deref(), Some("cat1"));
     assert_eq!(first.state(), State::Open);
@@ -310,7 +310,7 @@ fn resolve_freezes_the_finding_as_it_was_last_seen() {
     assert_eq!(snapshot["facts"]["callers"], 2);
     assert_eq!(snapshot["options"]["max"], 3);
     assert_eq!(snapshot["severity"], "info");
-    assert_eq!(snapshot["tier"], "judgment");
+    assert_eq!(snapshot["authored"], "info");
     assert_eq!(snapshot["seenAt"], resolved.finding.last_seen);
     assert_eq!(snapshot["commit"], "abc123");
     assert_eq!(snapshot["dirty"], true);
@@ -487,10 +487,10 @@ fn evidence_that_only_reflows_does_not_expire_a_verdict() {
 }
 
 #[test]
-fn a_verdict_suppresses_by_the_tier_of_the_finding_not_by_its_severity() {
+fn a_verdict_suppresses_by_the_authored_severity_of_the_finding_not_by_its_reported_one() {
     let mut error = observed("f1", "design/a", "a.go");
     error.severity = Severity::Error;
-    error.tier = "heuristic".to_owned();
+    error.authored_severity = "warn".to_owned();
     let mut store = memory_with(&[error]);
     judge(&mut store, "f1", Verdict::Rejected, Reason::FalsePositive);
     assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
@@ -498,10 +498,10 @@ fn a_verdict_suppresses_by_the_tier_of_the_finding_not_by_its_severity() {
 }
 
 #[test]
-fn mechanical_findings_are_never_suppressed_by_a_verdict() {
+fn definitive_findings_are_never_suppressed_by_a_verdict() {
     let mut error = observed("f1", "design/a", "a.go");
     error.severity = Severity::Warn;
-    error.tier = "mechanical".to_owned();
+    error.authored_severity = "error".to_owned();
     let mut store = memory_with(&[error]);
     judge(
         &mut store,
@@ -696,7 +696,7 @@ fn migration_rewrites_the_append_only_table_and_exports_old_verdicts_to_the_log(
     }
 
     let mut store = Store::open(dir.path()).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 5);
+    assert_eq!(store.schema_version().unwrap(), 6);
     let history = store.history("f1").unwrap();
     assert_eq!(history.len(), 1);
     assert!(history[0].id.starts_with("legacy-"));
@@ -779,19 +779,85 @@ fn a_verdict_recorded_under_the_semantic_version_of_before_still_applies_while_t
 }
 
 #[test]
-fn a_finding_asks_for_a_verdict_when_its_decision_is_not_mechanical() {
+fn a_finding_asks_for_a_verdict_when_its_decision_did_not_author_an_error() {
     let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
-    let tier = |store: &Store| store.finding("f1").unwrap();
-    assert!(tier(&store).needs_verdict(), "tier judgment");
+    let finding = |store: &Store| store.finding("f1").unwrap();
+    assert!(finding(&store).needs_verdict(), "authored info");
 
-    let mut mechanical = observed("f1", "design/a", "a.go");
-    mechanical.tier = "mechanical".to_owned();
-    store.record(&run(vec![mechanical])).unwrap();
-    assert!(!tier(&store).needs_verdict());
+    let mut definitive = observed("f1", "design/a", "a.go");
+    definitive.authored_severity = "error".to_owned();
+    store.record(&run(vec![definitive])).unwrap();
+    assert!(!finding(&store).needs_verdict());
 
-    let mut heuristic = observed("f1", "design/a", "a.go");
-    heuristic.tier = "heuristic".to_owned();
-    heuristic.severity = Severity::Error;
-    store.record(&run(vec![heuristic])).unwrap();
-    assert!(tier(&store).needs_verdict(), "whatever the severity");
+    let mut review = observed("f1", "design/a", "a.go");
+    review.authored_severity = "warn".to_owned();
+    review.severity = Severity::Error;
+    store.record(&run(vec![review])).unwrap();
+    assert!(
+        finding(&store).needs_verdict(),
+        "whatever the reported level"
+    );
+}
+
+#[test]
+fn changing_only_how_a_decision_is_checked_keeps_its_verdicts_and_changing_what_it_means_expires_them()
+ {
+    let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
+    judge(&mut store, "f1", Verdict::Rejected, Reason::FalsePositive);
+
+    // Same meaning, another check: the verdict stands.
+    let mut rechecked = observed("f1", "design/a", "a.go");
+    rechecked.check_revision = Some("chk2".to_owned());
+    store.record(&run(vec![rechecked])).unwrap();
+    assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
+
+    // Another meaning: the verdict is asked again.
+    let mut reworded = observed("f1", "design/a", "a.go");
+    reworded.rule_version = Some("sem2".to_owned());
+    store.record(&run(vec![reworded])).unwrap();
+    assert_eq!(standing_of(&store, "f1"), Some(Standing::RuleChanged));
+}
+
+#[test]
+fn every_earlier_version_a_decision_lists_honors_the_verdicts_recorded_under_it() {
+    let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
+    judge(&mut store, "f1", Verdict::Rejected, Reason::FalsePositive);
+    let mut moved = observed("f1", "design/a", "a.go");
+    moved.rule_version = Some("meaning".to_owned());
+    moved.legacy_rule_version = Some("previous,sem1,oldest".to_owned());
+    store.record(&run(vec![moved])).unwrap();
+    assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
+}
+
+#[test]
+fn the_migration_turns_recorded_tiers_into_authored_severities() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = Store::path_in(dir.path());
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    {
+        let mut store = Store::open(dir.path()).unwrap();
+        store
+            .record(&run(vec![
+                observed("m", "design/a", "a.go"),
+                observed("h", "design/a", "b.go"),
+                observed("j", "design/a", "c.go"),
+            ]))
+            .unwrap();
+    }
+    let raw = Connection::open(&path).unwrap();
+    // Put the database back where V5 left it, with tiers.
+    raw.execute_batch(
+        "ALTER TABLE findings DROP COLUMN check_revision;
+         ALTER TABLE review_events DROP COLUMN check_revision;
+         ALTER TABLE findings RENAME COLUMN authored_severity TO tier;
+         UPDATE findings SET tier = CASE fingerprint WHEN 'm' THEN 'mechanical' WHEN 'h' THEN 'heuristic' ELSE 'judgment' END;
+         PRAGMA user_version = 5;",
+    )
+    .unwrap();
+    drop(raw);
+    let store = Store::open(dir.path()).unwrap();
+    let authored = |fingerprint: &str| store.finding(fingerprint).unwrap().authored_severity;
+    assert_eq!(authored("m").as_deref(), Some("error"));
+    assert_eq!(authored("h").as_deref(), Some("warn"));
+    assert_eq!(authored("j").as_deref(), Some("info"));
 }

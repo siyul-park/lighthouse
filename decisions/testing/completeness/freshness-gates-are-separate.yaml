@@ -15,4 +15,3 @@ spec:
   requirement: >-
     Generated output and documentation freshness MUST be enforced as repository
     gates, not as test-completeness rules.
-  enforcement: doc

@@ -1,15 +1,12 @@
-use lighthouse_model::{Diagnostic, Symbol, SymbolKind, SymbolRole};
+use lighthouse_model::{Symbol, SymbolKind, SymbolRole};
 use std::sync::LazyLock;
 
-use lighthouse_plugin::{Ctx, Error, KeyCtx, OrderKey, OrderKeyManifest, Rule, RuleManifest};
-use lighthouse_spec::{Catalog, DecisionRule};
+use lighthouse_plugin::{Error, KeyCtx, OrderKey, OrderKeyManifest};
+use lighthouse_spec::Catalog;
 use serde::Deserialize;
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
 
-use crate::{
-    finding, generated,
-    layout::{declarations, exposed, has_word_prefix, is_declaration, owner_key},
-};
+use lighthouse_declarative::layout::{exposed, has_word_prefix, is_declaration, owner_key};
 
 const ID: &str = "design/declaration-groups";
 
@@ -18,7 +15,6 @@ struct Options {
     groups: Vec<String>,
     constructor_prefixes: Vec<String>,
     hook_names: Vec<String>,
-    constructors_first: bool,
 }
 
 /// Orders declarations the way the `declaration-groups` rule does: by the
@@ -60,8 +56,39 @@ impl OrderKey for GroupKey {
     }
 }
 
-pub(crate) fn rule() -> Box<dyn Rule> {
-    Box::new(DecisionRule::new(ID, &[], check))
+/// Orders the methods of a type constructors first: a constructor (a public
+/// method named like one) ranks before the other methods. It orders nothing
+/// else, and nothing at all unless `constructors_first` is on.
+pub(crate) struct ConstructorKey;
+
+impl OrderKey for ConstructorKey {
+    fn manifest(&self) -> &OrderKeyManifest {
+        static MANIFEST: LazyLock<OrderKeyManifest> = LazyLock::new(|| OrderKeyManifest {
+            id: "design/constructor-first".to_owned(),
+            description: "constructors before the other methods of their type".to_owned(),
+        });
+        &MANIFEST
+    }
+
+    fn rank(&self, ctx: &KeyCtx, symbol: &Symbol) -> Result<Option<u64>, Error> {
+        let generated = ctx.project.file(&symbol.file).is_none_or(|f| f.generated);
+        if symbol.kind != SymbolKind::Method
+            || owner_key(symbol).is_none()
+            || generated
+            || ctx.project.in_test(&symbol.id)
+        {
+            return Ok(None);
+        }
+        let configured = if ctx.rule == ID {
+            ctx.options.clone()
+        } else {
+            Map::new()
+        };
+        let options = resolved(Some(ctx.language), &configured)?;
+        let constructor =
+            exposed(symbol) && is_constructor(&symbol.name, &options.constructor_prefixes);
+        Ok(Some(u64::from(!constructor)))
+    }
 }
 
 /// The group index of a symbol under the default order of `language`, for the
@@ -70,6 +97,12 @@ pub(crate) fn group_index(
     language: Option<&str>,
     configured: &Map<String, Value>,
 ) -> Result<impl Fn(&Symbol) -> Option<usize> + use<>, Error> {
+    let options = resolved(language, configured)?;
+    Ok(move |symbol: &Symbol| group_of(symbol, &options))
+}
+
+/// The options of `design/declaration-groups` for `language` over `configured`.
+fn resolved(language: Option<&str>, configured: &Map<String, Value>) -> Result<Options, Error> {
     let fail = |message: String| Error::Options {
         rule: ID.to_owned(),
         message,
@@ -80,27 +113,7 @@ pub(crate) fn group_index(
     let resolved = decision
         .resolve_options(configured, language)
         .map_err(|e| fail(e.to_string()))?;
-    let options: Options =
-        serde_json::from_value(Value::Object(resolved)).map_err(|e| fail(e.to_string()))?;
-    Ok(move |symbol: &Symbol| group_of(symbol, &options))
-}
-
-fn check(meta: &RuleManifest, ctx: &Ctx, options: Options) -> Result<Vec<Diagnostic>, Error> {
-    if generated(ctx) {
-        return Ok(Vec::new());
-    }
-    let mut found = Vec::new();
-    for module in declarations(ctx) {
-        let grouped: Vec<(&Symbol, usize)> = module
-            .iter()
-            .filter_map(|s| Some((*s, group_of(s, &options)?)))
-            .collect();
-        found.extend(out_of_place(meta, &grouped, &options));
-        if options.constructors_first {
-            found.extend(late_constructors(meta, &module, &options));
-        }
-    }
-    Ok(found)
+    serde_json::from_value(Value::Object(resolved)).map_err(|e| fail(e.to_string()))
 }
 
 /// Index into the configured group list of the first group that fits the
@@ -143,115 +156,4 @@ fn group_of(symbol: &Symbol, options: &Options) -> Option<usize> {
 
 fn is_constructor(name: &str, prefixes: &[String]) -> bool {
     prefixes.iter().any(|p| has_word_prefix(name, p))
-}
-
-/// Declarations whose group breaks the longest in-order run: the fewest
-/// declarations that, moved, would put the file in order.
-fn out_of_place(
-    meta: &lighthouse_plugin::RuleManifest,
-    grouped: &[(&Symbol, usize)],
-    options: &Options,
-) -> Vec<Diagnostic> {
-    let keep = longest_in_order(&grouped.iter().map(|(_, g)| *g).collect::<Vec<_>>());
-    let mut found = Vec::new();
-    for (at, (symbol, group)) in grouped.iter().enumerate() {
-        if keep[at] {
-            continue;
-        }
-        let after = grouped[..at]
-            .iter()
-            .enumerate()
-            .rev()
-            .find(|(i, (_, g))| keep[*i] && g <= group)
-            .map(|(_, (s, _))| s.name.as_str());
-        let name = &options.groups[*group];
-        found.push(finding(
-            meta,
-            symbol,
-            format!(
-                "{} {} belongs to the `{name}` group and must {}",
-                symbol.kind.as_str(),
-                symbol.name,
-                after.map_or_else(
-                    || "come before the declarations above it".to_owned(),
-                    |a| format!("follow {a}")
-                )
-            ),
-            json!({
-                "declaration": symbol.id.as_str(),
-                "group": name,
-                "expected_after": after,
-                "before": "",
-            }),
-        ));
-    }
-    found
-}
-
-/// Marks a longest non-decreasing subsequence of `groups`; the first of equally
-/// long ones, so the verdict does not change between runs.
-fn longest_in_order(groups: &[usize]) -> Vec<bool> {
-    let n = groups.len();
-    let mut best = vec![1usize; n];
-    let mut from = vec![usize::MAX; n];
-    for i in 0..n {
-        for j in 0..i {
-            if groups[j] <= groups[i] && best[j] + 1 > best[i] {
-                best[i] = best[j] + 1;
-                from[i] = j;
-            }
-        }
-    }
-    let mut keep = vec![false; n];
-    let Some(mut at) = (0..n).max_by_key(|&i| (best[i], std::cmp::Reverse(i))) else {
-        return keep;
-    };
-    loop {
-        keep[at] = true;
-        match from[at] {
-            usize::MAX => break,
-            previous => at = previous,
-        }
-    }
-    keep
-}
-
-/// A constructor-named method that follows another method of its owner.
-fn late_constructors(
-    meta: &RuleManifest,
-    module: &[&Symbol],
-    options: &Options,
-) -> Vec<Diagnostic> {
-    let methods: Vec<(&Symbol, String)> = module
-        .iter()
-        .filter(|s| s.kind == SymbolKind::Method)
-        .filter_map(|s| Some((*s, owner_key(s)?)))
-        .collect();
-    let mut found = Vec::new();
-    for (at, (symbol, owner)) in methods.iter().enumerate() {
-        let constructor =
-            exposed(symbol) && is_constructor(&symbol.name, &options.constructor_prefixes);
-        let earlier = methods[..at].iter().find(|(other, key)| {
-            key == owner
-                && !(exposed(other) && is_constructor(&other.name, &options.constructor_prefixes))
-        });
-        let (true, Some((first, _))) = (constructor, earlier) else {
-            continue;
-        };
-        found.push(finding(
-            meta,
-            symbol,
-            format!(
-                "constructor {} must precede the other methods of its type, such as {}",
-                symbol.name, first.name
-            ),
-            json!({
-                "declaration": symbol.id.as_str(),
-                "group": "constructor",
-                "expected_after": Option::<&str>::None,
-                "before": first.id.as_str(),
-            }),
-        ));
-    }
-    found
 }

@@ -237,6 +237,38 @@ pub enum EdgeKind {
     AccessesPrivate,
 }
 
+impl EdgeKind {
+    /// The spelling used in files and expressions.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Calls => "calls",
+            Self::References => "references",
+            Self::Imports => "imports",
+            Self::Contains => "contains",
+            Self::Implements => "implements",
+            Self::AccessesPrivate => "accesses-private",
+        }
+    }
+}
+
+impl std::str::FromStr for EdgeKind {
+    type Err = ();
+
+    fn from_str(text: &str) -> Result<Self, ()> {
+        [
+            Self::Calls,
+            Self::References,
+            Self::Imports,
+            Self::Contains,
+            Self::Implements,
+            Self::AccessesPrivate,
+        ]
+        .into_iter()
+        .find(|kind| kind.as_str() == text)
+        .ok_or(())
+    }
+}
+
 /// How reliable an [`Edge`]'s target is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -432,6 +464,12 @@ struct Index {
     uses: BTreeMap<SymbolId, Vec<SymbolId>>,
     members: BTreeMap<SymbolId, Vec<SymbolId>>,
     sites: BTreeMap<SymbolId, Vec<Site>>,
+    /// Positions in `edges` of the edges that start at a symbol.
+    edges_from: BTreeMap<SymbolId, Vec<usize>>,
+    /// The interfaces a type implements, by resolved `implements` edges.
+    implements: BTreeMap<SymbolId, Vec<SymbolId>>,
+    /// `(module, name)` of every method an interface declares.
+    interface_methods: BTreeSet<(String, String)>,
 }
 
 /// One place that refers to a symbol, from an edge with a `site`.
@@ -582,6 +620,28 @@ impl Project {
         &comments[start..end]
     }
 
+    /// The edges that start at symbol `id`, in the project's edge order.
+    pub fn edges_from(&self, id: &SymbolId) -> impl Iterator<Item = &Edge> + use<'_> {
+        self.index
+            .edges_from
+            .get(id)
+            .into_iter()
+            .flatten()
+            .map(|at| &self.all.edges[*at])
+    }
+
+    /// The interfaces the type `id` implements.
+    pub fn implements(&self, id: &SymbolId) -> &[SymbolId] {
+        self.index.implements.get(id).map_or(&[], Vec::as_slice)
+    }
+
+    /// Whether some interface of `module` declares a method called `name`.
+    pub fn declared_by_interface(&self, module: &str, name: &str) -> bool {
+        self.index
+            .interface_methods
+            .contains(&(module.to_owned(), name.to_owned()))
+    }
+
     /// Distinct symbols `id` has a resolved, non-heuristic `calls` edge to,
     /// excluding itself.
     pub fn callees(&self, id: &SymbolId) -> &[SymbolId] {
@@ -607,9 +667,18 @@ impl Index {
                 .or_default()
                 .push(at);
         }
+        index.interface_methods = interface_methods(all, &index.symbols);
+        index.edges_from = edges_from(all);
+        index.implements = implements(all);
         for (at, function) in all.functions.iter().enumerate() {
             index.functions.insert(function.symbol.clone(), at);
         }
+        index.link_calls(all);
+        index
+    }
+
+    /// Indexes the calls, uses and references between resolved symbols.
+    fn link_calls(&mut self, all: &Fragment) {
         let mut calls = BTreeSet::new();
         let mut references = BTreeSet::new();
         let mut uses = BTreeSet::new();
@@ -630,28 +699,24 @@ impl Index {
             };
         }
         for (from, to) in calls {
-            index
-                .callees
+            self.callees
                 .entry(from.clone())
                 .or_default()
                 .push(to.clone());
-            index
-                .callers
+            self.callers
                 .entry(to.clone())
                 .or_default()
                 .push(from.clone());
         }
         for (from, to) in uses {
-            index.uses.entry(from.clone()).or_default().push(to.clone());
+            self.uses.entry(from.clone()).or_default().push(to.clone());
         }
         for (from, to) in references {
-            index
-                .references
+            self.references
                 .entry(to.clone())
                 .or_default()
                 .push(from.clone());
         }
-        index
     }
 }
 
@@ -869,4 +934,48 @@ fn duplicate_notice(sorted: &[Symbol]) -> Option<String> {
         groups.len(),
         examples.join("; ")
     ))
+}
+
+/// `(module, name)` of every method an interface declares.
+fn interface_methods(
+    all: &Fragment,
+    positions: &BTreeMap<SymbolId, usize>,
+) -> BTreeSet<(String, String)> {
+    let declared_by_interface = |symbol: &Symbol| {
+        symbol.kind == SymbolKind::Method
+            && symbol
+                .owner
+                .as_ref()
+                .and_then(|o| positions.get(o))
+                .is_some_and(|at| all.symbols[*at].kind == SymbolKind::Interface)
+    };
+    all.symbols
+        .iter()
+        .filter(|s| declared_by_interface(s))
+        .map(|s| (s.id.module().to_owned(), s.name.clone()))
+        .collect()
+}
+
+/// Positions in `all.edges` of the edges that start at each symbol.
+fn edges_from(all: &Fragment) -> BTreeMap<SymbolId, Vec<usize>> {
+    let mut by_source: BTreeMap<SymbolId, Vec<usize>> = BTreeMap::new();
+    for (at, edge) in all.edges.iter().enumerate() {
+        if let Node::Symbol(from) = &edge.from {
+            by_source.entry(from.clone()).or_default().push(at);
+        }
+    }
+    by_source
+}
+
+/// The interfaces each type implements, by resolved `implements` edges.
+fn implements(all: &Fragment) -> BTreeMap<SymbolId, Vec<SymbolId>> {
+    let mut found: BTreeMap<SymbolId, Vec<SymbolId>> = BTreeMap::new();
+    for edge in all.edges.iter().filter(|e| e.kind == EdgeKind::Implements) {
+        if let (Node::Symbol(ty), Target::Resolved(Node::Symbol(interface))) =
+            (&edge.from, &edge.to)
+        {
+            found.entry(ty.clone()).or_default().push(interface.clone());
+        }
+    }
+    found
 }

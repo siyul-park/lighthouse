@@ -9,8 +9,11 @@ const ALPHA: &str = "  title: Alpha holds
   intent: Keeps alpha true.
   scope: { subject: symbol }
   requirement: Alpha MUST hold.
-  enforcement: mechanical
+  severity: error
   evidence: [name]
+  check:
+    type: builtin
+    id: demo/alpha
   options:
     type: object
     properties:
@@ -44,7 +47,6 @@ const BETA: &str = "  title: Beta is advice
   intent: Advises beta.
   scope: { subject: project }
   requirement: Beta SHOULD be considered.
-  enforcement: doc
 ";
 
 fn fixture() -> Catalog {
@@ -114,7 +116,7 @@ fn fixed_fixture() -> Catalog {
   intent: Orders gamma.
   scope: { subject: file }
   requirement: Gamma MUST come first.
-  enforcement: mechanical
+  severity: error
   evidence: [name]
   check:
     type: builtin
@@ -158,7 +160,7 @@ fn fixed_fixture() -> Catalog {
 fn a_fixable_decision_shows_a_diff_and_links_other_languages() {
     let text = docs(&fixed_fixture())["decisions/demo.md"].clone();
     assert!(
-        text.contains("`demo/gamma` · file · mechanical→error · fix: safe"),
+        text.contains("`demo/gamma` · file · error · builtin · fix: safe"),
         "{text}"
     );
     assert!(text.contains("```diff\n--- a/a.go\n+++ b/a.go\n"), "{text}");

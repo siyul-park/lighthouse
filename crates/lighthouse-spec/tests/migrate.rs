@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use lighthouse_resource::{header, to_yaml, yaml_values};
 use lighthouse_spec::{
-    Catalog, Check, FixKind, migrate_decision, migrate_override, migrate_pack, migrate_sources,
+    Catalog, CheckKind, FixKind, migrate_decision, migrate_override, migrate_pack, migrate_sources,
 };
 use serde_json::json;
 use serde_norway::Value;
@@ -107,7 +107,10 @@ fn a_pattern_becomes_a_decision_that_loads() {
         decision.languages["go"].tuning.as_deref(),
         Some("Go wording.")
     );
-    assert!(matches!(&decision.check, Some(Check::Builtin(b)) if b.id == "p/a"));
+    assert!(matches!(
+        decision.check.as_ref().map(|c| &c.kind),
+        Some(CheckKind::Builtin(b)) if b.named() == Some("p/a")
+    ));
     let FixKind::Command(command) = &decision.fix.as_ref().unwrap().kind else {
         panic!("command expected");
     };
@@ -129,7 +132,7 @@ fn a_migrated_decision_keeps_the_semantic_version_of_before() {
         the_old_semantic_version()
     );
     assert_ne!(
-        decision.semantic_version(),
+        decision.meaning_version(),
         the_old_semantic_version(),
         "the hash of the new content is a different number: that is why the old one is kept"
     );
@@ -153,7 +156,7 @@ fn a_declarative_rule_file_is_inlined_and_remembered() {
     let migrated = migrate_decision(&value(&old), "s", Some(("p/s/rules/a.yaml", &rule))).unwrap();
 
     let decision = catalog_of(&migrated).decision("p/a").unwrap().clone();
-    let Some(Check::Cel(cel)) = &decision.check else {
+    let Some(CheckKind::Cel(cel)) = decision.check.as_ref().map(|c| &c.kind) else {
         panic!("cel expected");
     };
     assert_eq!(cel.select.name(), "file");
@@ -249,4 +252,53 @@ fn is_override_needs_extends_and_a_key_of_an_override() {
     assert!(!lighthouse_spec::is_override(&value(
         "extends: [x]\nrules: {}\n"
     )));
+}
+
+#[test]
+fn has_enforcement_recognizes_only_a_decision_that_still_has_it() {
+    let old = value(
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata: {name: p/a}\nspec: {enforcement: heuristic}\n",
+    );
+    let new = value(
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata: {name: p/a}\nspec: {severity: warn}\n",
+    );
+    let pack = value(
+        "apiVersion: lighthouse/v1alpha1\nkind: Pack\nmetadata: {name: p}\nspec: {enforcement: x}\n",
+    );
+    assert!(lighthouse_spec::has_enforcement(&old));
+    assert!(!lighthouse_spec::has_enforcement(&new));
+    assert!(!lighthouse_spec::has_enforcement(&pack));
+}
+
+#[test]
+fn convert_enforcement_maps_tiers_to_severities_and_keeps_what_it_cannot_read_back() {
+    let convert = |enforcement: &str, extra: &str, check: bool| {
+        let check = if check {
+            "  check: {type: cel, select: file, where: 'true', message: m}\n"
+        } else {
+            ""
+        };
+        let text = format!(
+            "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata: {{name: p/a}}\nspec:\n  enforcement: {enforcement}\n{extra}{check}"
+        );
+        let mut doc = value(&text);
+        lighthouse_spec::convert_enforcement(&mut doc).unwrap();
+        doc
+    };
+    let mechanical = convert("mechanical", "", true);
+    assert_eq!(mechanical["spec"]["severity"], "error");
+    assert!(mechanical["metadata"].get("annotations").is_none());
+    assert_eq!(convert("heuristic", "", true)["spec"]["severity"], "warn");
+    let overridden = convert("heuristic", "  severity: info\n", true);
+    assert_eq!(overridden["spec"]["severity"], "info");
+    assert_eq!(
+        overridden["metadata"]["annotations"]["lighthouse/was-enforcement"],
+        "heuristic"
+    );
+    let reviewed = convert("mechanical", "", false);
+    assert_eq!(reviewed["spec"]["severity"], "warn");
+    assert_eq!(reviewed["spec"]["check"]["type"], "model");
+    let doc = convert("doc", "", false);
+    assert!(doc["spec"].get("severity").is_none());
+    assert!(doc["spec"].get("check").is_none());
 }

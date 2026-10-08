@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: functions
+  annotations:
+    lighthouse/was-builtin: design/single-use-wrapper
 spec:
   title: Inline single-use wrappers
   intent: A forwarding wrapper adds a name without adding meaning.
@@ -16,7 +18,7 @@ spec:
     A simple single-use wrapper SHOULD be inlined unless its name expresses a
     real policy or mechanic; complex one-use mechanics require review rather
     than mechanical removal.
-  enforcement: heuristic
+  severity: warn
   evidence: [callee, callers]
   languages:
     rust:
@@ -28,8 +30,17 @@ spec:
         method of that name in the crate, and keeps such a method from being
         reported.
   check:
-    type: builtin
-    id: design/single-use-wrapper
+    type: cel
+    select: function
+    where: >-
+      !func.file_test && !func.generated && !func.test && (func.kind == 'function' || func.kind == 'method')
+      && func.forwards_only
+    message: "private helper {{ func.name }} is a single-use forwarding wrapper; inline it"
+    evidence:
+      callee: func.forward_target
+      callers: func.callers
+    identity:
+      subject: func.id
   examples:
     - name: invalid
       language: go

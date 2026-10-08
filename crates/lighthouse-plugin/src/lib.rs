@@ -12,7 +12,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 pub use fix::{
-    FixDecision, FixRequest, Fixer, FixerManifest, KeyCtx, OrderKey, OrderKeyManifest,
+    FixDecision, FixRequest, Fixer, FixerManifest, KeyCtx, NoKeys, OrderKey, OrderKeyManifest,
     OrderKeySpec, OrderKeys,
 };
 pub use registry::{Registry, plugin_of};
@@ -37,6 +37,11 @@ pub enum Error {
     BadFact { analyzer: String, message: String },
     #[error("{0}")]
     Failed(String),
+    /// The check could not run to the end (a program crashed, timed out or
+    /// exited with an error): what it covers was not checked, which is never
+    /// the same as passing. The run reports the gap and goes on.
+    #[error("{0}")]
+    Incomplete(String),
 }
 
 /// What an analyzer or rule looks at in one run.
@@ -90,6 +95,11 @@ pub struct Ctx<'a> {
     /// The focused file and its text; `None` for project scope.
     pub file: Option<(&'a File, &'a str)>,
     pub facts: &'a Facts,
+    /// The order keys of the run's plugins, for checks that judge an order.
+    pub keys: &'a dyn OrderKeys,
+    /// The user trusts the project to run the commands it names. The user
+    /// decides that, never the repository.
+    pub trusted: bool,
 }
 
 /// Layout conventions a language declares; the engine applies them to every file of that language.
@@ -207,6 +217,10 @@ pub struct RuleManifest {
     pub citation: Option<String>,
     /// Left out of the plugin's `recommended` preset; only `strict` enables it.
     pub strict: bool,
+    /// In force. A rule that is not (a proposed, rejected, deprecated or
+    /// superseded decision) runs only when a run selects it by id, such as
+    /// `decision test`; configuration and presets never enable it.
+    pub enforced: bool,
 }
 
 /// A check that turns facts into diagnostics. `validate` rejects bad options

@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Assertions outside cases SHOULD describe setup, preconditions, or test-wide
     invariants, not case behavior.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

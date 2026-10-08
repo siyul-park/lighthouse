@@ -16,4 +16,6 @@ spec:
     Generic parameter-group types, speculative options, extension points,
     aliases, and pass-through wrappers MUST NOT be exposed without a distinct
     contract.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

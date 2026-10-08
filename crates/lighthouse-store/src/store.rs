@@ -35,7 +35,7 @@ const NOW: &str = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 /// Format version of the feature snapshot of a review: 2 has camelCase keys.
 const SNAPSHOT_VERSION: u32 = 2;
 
-const EVENT_COLUMNS: &str = "event_id, fingerprint, rule_id, rule_version, decision_hash, \
+const EVENT_COLUMNS: &str = "event_id, fingerprint, rule_id, rule_version, check_revision, decision_hash, \
      catalog_version, lighthouse_version, pattern_fingerprint, verdict, reason_code, reason_text, \
      reviewer_kind, reviewer_id, language, scope, evidence_digest, feature_snapshot, git_commit, \
      timestamp";
@@ -140,7 +140,7 @@ impl Store {
 
     /// What the latest rejection does to each finding it applies to: keeps it
     /// out of reports, has expired because the rule or the evidence moved, or
-    /// cannot apply because the finding is mechanical (its tier, not its
+    /// cannot apply because the finding is mechanical (its authored severity, not its
     /// severity, decides).
     pub fn standings(&self) -> Result<BTreeMap<String, Judgment>, Error> {
         let mut stmt = self
@@ -425,16 +425,16 @@ fn upsert(
         Some(false) => {}
     }
     tx.execute(
-        "INSERT INTO findings (fingerprint, rule_id, last_severity, tier, path, locator, symbol, \
+        "INSERT INTO findings (fingerprint, rule_id, last_severity, authored_severity, path, locator, symbol, \
              first_seen, last_seen, last_message, last_evidence, last_facts, last_options, \
              last_commit, last_dirty, lighthouse_version, catalog_version, rule_version, \
-             legacy_rule_version, decision_hash, evidence_digest) \
-         VALUES (:fingerprint, :rule_id, :severity, :tier, :path, :locator, :symbol, :now, :now, \
+             legacy_rule_version, check_revision, decision_hash, evidence_digest) \
+         VALUES (:fingerprint, :rule_id, :severity, :authored, :path, :locator, :symbol, :now, :now, \
              :message, :evidence, :facts, :options, :commit, :dirty, :version, :catalog, \
-             :rule_version, :legacy_rule_version, :decision_hash, :digest) \
+             :rule_version, :legacy_rule_version, :check_revision, :decision_hash, :digest) \
          ON CONFLICT (fingerprint) DO UPDATE SET \
              rule_id = excluded.rule_id, last_severity = excluded.last_severity, \
-             tier = excluded.tier, path = excluded.path, locator = excluded.locator, \
+             authored_severity = excluded.authored_severity, path = excluded.path, locator = excluded.locator, \
              symbol = excluded.symbol, last_seen = excluded.last_seen, \
              reopened = reopened + (resolved_at IS NOT NULL), resolved_at = NULL, \
              inactive_at = NULL, last_message = excluded.last_message, \
@@ -443,12 +443,13 @@ fn upsert(
              last_dirty = excluded.last_dirty, lighthouse_version = excluded.lighthouse_version, \
              catalog_version = excluded.catalog_version, rule_version = excluded.rule_version, \
              legacy_rule_version = excluded.legacy_rule_version, \
+             check_revision = excluded.check_revision, \
              decision_hash = excluded.decision_hash, evidence_digest = excluded.evidence_digest",
         named_params! {
             ":fingerprint": observed.fingerprint,
             ":rule_id": observed.rule_id,
             ":severity": observed.severity.to_string(),
-            ":tier": observed.tier,
+            ":authored": observed.authored_severity,
             ":path": observed.path,
             ":locator": observed.locator.to_string(),
             ":symbol": observed.symbol,
@@ -463,6 +464,7 @@ fn upsert(
             ":catalog": run.catalog_version,
             ":rule_version": observed.rule_version,
             ":legacy_rule_version": observed.legacy_rule_version,
+            ":check_revision": observed.check_revision,
             ":decision_hash": observed.decision_hash,
             ":digest": observed.evidence_digest(),
         },
@@ -599,7 +601,7 @@ fn event_of(
         "facts": finding.facts,
         "options": finding.options,
         "severity": finding.severity,
-        "tier": finding.tier,
+        "authored": finding.authored_severity,
         "seenAt": finding.last_seen,
         "commit": finding.commit,
         "dirty": finding.dirty,
@@ -611,6 +613,7 @@ fn event_of(
         fingerprint: finding.fingerprint.clone(),
         rule_id: finding.rule_id.clone(),
         rule_version: stamp.rule_version,
+        check_revision: stamp.check_revision,
         decision_hash: stamp.decision_hash,
         catalog_version: stamp.catalog_version,
         lighthouse_version: Some(review.lighthouse_version.clone()),
@@ -637,11 +640,11 @@ fn event_of(
 
 fn insert_event(tx: &Transaction, event: &ReviewEvent) -> Result<(), Error> {
     tx.execute(
-        "INSERT OR IGNORE INTO review_events (event_id, fingerprint, rule_id, rule_version, \
+        "INSERT OR IGNORE INTO review_events (event_id, fingerprint, rule_id, rule_version, check_revision, \
              decision_hash, catalog_version, lighthouse_version, pattern_fingerprint, verdict, \
              reason_code, reason_text, reviewer_kind, reviewer_id, language, scope, \
              evidence_digest, feature_snapshot, git_commit, timestamp) \
-         VALUES (:id, :fingerprint, :rule_id, :rule_version, :decision_hash, :catalog, :version, \
+         VALUES (:id, :fingerprint, :rule_id, :rule_version, :check_revision, :decision_hash, :catalog, :version, \
              :pattern_fingerprint, :verdict, :reason, :reason_text, :kind, :reviewer, :language, \
              :scope, :digest, :snapshot, :commit, :timestamp)",
         named_params! {
@@ -649,6 +652,7 @@ fn insert_event(tx: &Transaction, event: &ReviewEvent) -> Result<(), Error> {
             ":fingerprint": event.fingerprint,
             ":rule_id": event.rule_id,
             ":rule_version": event.rule_version,
+            ":check_revision": event.check_revision,
             ":decision_hash": event.decision_hash,
             ":catalog": event.catalog_version,
             ":version": event.lighthouse_version,
@@ -684,7 +688,7 @@ fn finding_record(row: &Row) -> rusqlite::Result<FindingRecord> {
         fingerprint: row.get("fingerprint")?,
         rule_id: row.get("rule_id")?,
         severity: row.get("last_severity")?,
-        tier: row.get("tier")?,
+        authored_severity: row.get("authored_severity")?,
         path: row.get("path")?,
         locator: json_column(row, "locator")?,
         symbol: row.get("symbol")?,
@@ -714,6 +718,7 @@ fn review_event(row: &Row) -> rusqlite::Result<ReviewEvent> {
         fingerprint: row.get("fingerprint")?,
         rule_id: row.get("rule_id")?,
         rule_version: row.get("rule_version")?,
+        check_revision: row.get("check_revision")?,
         decision_hash: row.get("decision_hash")?,
         catalog_version: row.get("catalog_version")?,
         lighthouse_version: row.get("lighthouse_version")?,

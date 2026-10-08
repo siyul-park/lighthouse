@@ -41,6 +41,8 @@ pub struct VerdictSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rule_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decision_hash: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub catalog_version: Option<String>,
@@ -62,7 +64,7 @@ pub struct VerdictSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evidence_digest: Option<String>,
     /// The finding frozen at review time: evidence, facts, options, severity,
-    /// tier, when and where it was seen. Its severity is the string recorded
+    /// authored severity, when and where it was seen. Its severity is the string recorded
     /// then, so history may say `review`.
     pub snapshot: Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -81,6 +83,7 @@ impl From<VerdictSpec> for ReviewEvent {
             fingerprint: spec.fingerprint,
             rule_id: spec.rule_id,
             rule_version: spec.rule_version,
+            check_revision: spec.check_revision,
             decision_hash: spec.decision_hash,
             catalog_version: spec.catalog_version,
             lighthouse_version: spec.lighthouse_version,
@@ -118,6 +121,7 @@ impl From<&ReviewEvent> for VerdictSpec {
             fingerprint: event.fingerprint.clone(),
             rule_id: event.rule_id.clone(),
             rule_version: event.rule_version.clone(),
+            check_revision: event.check_revision.clone(),
             decision_hash: event.decision_hash.clone(),
             catalog_version: event.catalog_version.clone(),
             lighthouse_version: event.lighthouse_version.clone(),

@@ -136,7 +136,7 @@ title: Notes stay short
 intent: Notes are read in one glance.
 scope: { subject: file }
 requirement: A note file MUST NOT exceed three lines.
-enforcement: mechanical
+severity: error
 evidence: [path]
 check:
   type: cel

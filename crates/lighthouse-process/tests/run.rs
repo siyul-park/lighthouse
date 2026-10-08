@@ -31,6 +31,27 @@ fn output_and_exit_code_are_returned_and_capped() {
     assert_eq!(out.code, Some(3));
     assert_eq!(out.stdout.len(), 1024);
     assert_eq!(out.stderr, b"oops\n");
+    assert!(out.truncated, "what was dropped is said");
+}
+
+#[test]
+fn output_within_the_cap_is_not_truncated() {
+    let line = argv(&["sh", "-c", "echo fine"]);
+
+    let out = run(&spec(&line, Duration::from_secs(5))).unwrap();
+
+    assert!(!out.truncated);
+}
+
+#[test]
+fn a_daemon_the_program_leaves_behind_does_not_hold_the_run_up() {
+    let line = argv(&["sh", "-c", "sleep 30 & echo started"]);
+    let started = Instant::now();
+
+    let out = run(&spec(&line, Duration::from_secs(10))).unwrap();
+
+    assert_eq!(out.stdout, b"started\n");
+    assert!(started.elapsed() < Duration::from_secs(5));
 }
 
 #[test]

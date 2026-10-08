@@ -76,7 +76,7 @@ pub fn all() -> Vec<Tool> {
         ),
         tool(
             "decision_create",
-            "Add a project-local decision under .lighthouse/decisions. `id` is `local/<name>`; `spec` is the spec of a Decision (title, intent, scope {subject}, requirement with MUST/SHOULD, enforcement, evidence, and a `check` of `type: cel` with select, where as a CEL expression that is true for a violation, message and evidence); it may be an object or a YAML/JSON string. Nothing is written unless the candidate validates, compiles and every example passes the whole engine; a rejection leaves the project untouched. The decision also needs the `local` plugin in lighthouse.toml to run in `check`.",
+            "Add a project-local decision under .lighthouse/decisions. `id` is `local/<name>`; `spec` is the spec of a Decision (title, intent, scope {subject}, requirement with MUST/SHOULD, severity, evidence, and a `check` of `type: cel` with select, where as a CEL expression that is true for a violation, message and evidence); it may be an object or a YAML/JSON string. Nothing is written unless the candidate validates, compiles and every example passes the whole engine; a rejection leaves the project untouched. The decision also needs the `local` plugin in lighthouse.toml to run in `check`.",
             json!({
                 "id": { "type": "string", "description": "`local/<name>`." },
                 "spec": { "type": ["object", "string"], "description": "The Decision spec (YAML or JSON text, or an object)." },

@@ -1,5 +1,182 @@
 {
   "$defs": {
+    "At": {
+      "additionalProperties": false,
+      "description": "Where a finding is reported. Every field is a CEL expression.",
+      "properties": {
+        "endLine": {
+          "description": "The last line, for a finding about a file.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "line": {
+          "description": "The first line, for a finding about a file.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "symbol": {
+          "description": "The id of a symbol: the finding is reported at that symbol and cites it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Batch": {
+      "description": "How a `command` check batches the files it is given.",
+      "oneOf": [
+        {
+          "const": "file",
+          "description": "One run per file.",
+          "type": "string"
+        },
+        {
+          "const": "all",
+          "description": "Runs over many files at once, as many per run as the argument list\nallows; `{files}` expands to several arguments.",
+          "type": "string"
+        }
+      ]
+    },
+    "Binding": {
+      "additionalProperties": false,
+      "description": "A named CEL value.",
+      "properties": {
+        "expr": {
+          "description": "CEL.",
+          "type": "string"
+        },
+        "name": {
+          "description": "A lower-case identifier that no expression variable already uses.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "expr"
+      ],
+      "type": "object"
+    },
+    "BuiltinCheck": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BuiltinOp"
+        },
+        {
+          "$ref": "#/$defs/NamedRule"
+        }
+      ],
+      "description": "A builtin check: one of the standard, decision-agnostic operations, or a\nrule registered by name that no standard operation can express."
+    },
+    "BuiltinOp": {
+      "description": "A standard operation over the code model.",
+      "oneOf": [
+        {
+          "description": "Declarations must follow the order of registered order keys, the same\nkeys a `reorder` fix sorts by. Each clause is judged on its own and the\nfindings are concatenated.",
+          "properties": {
+            "clauses": {
+              "items": {
+                "$ref": "#/$defs/OrderClause"
+              },
+              "type": "array"
+            },
+            "op": {
+              "const": "order",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "clauses"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Declarations that belong together stay together: nothing but members\nof the same `group` may separate two of them.",
+          "properties": {
+            "contiguous": {
+              "description": "The group is contiguous: no separator at all. The default when\n`maxDistance` is not given.",
+              "type": "boolean"
+            },
+            "evidence": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Evidence fields, each a CEL expression over the same variables.",
+              "type": "object"
+            },
+            "group": {
+              "description": "CEL over a declaration (`symbol`) that gives the key of the group\nit belongs to; empty when it belongs to none.",
+              "type": "string"
+            },
+            "maxDistance": {
+              "description": "How many separating declarations a group tolerates between two of\nits members.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "message": {
+              "description": "Text over `symbol` (the member separated from the group),\n`previous` (the member before it), `separators` (the declarations\nbetween, as a list), `count` and `options`.",
+              "type": "string"
+            },
+            "op": {
+              "const": "proximity",
+              "type": "string"
+            },
+            "separator": {
+              "description": "CEL over `between`, a declaration lying between two members of the\ngroup, and `member` (the later one) and `key` (the group's key):\ntrue for a declaration that splits the group. Default: any\ndeclaration that is not in the group.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "when": {
+              "description": "CEL over `file`: the check runs on the files it is true for.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "group",
+            "message"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "No dependency cycle over edges of one kind.",
+          "properties": {
+            "edge": {
+              "description": "The edge kind followed: `calls`, `references`, `imports`,\n`contains`, `implements` or `accesses-private`.",
+              "type": "string"
+            },
+            "level": {
+              "$ref": "#/$defs/CycleLevel"
+            },
+            "op": {
+              "const": "cycle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "edge",
+            "level"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "Capability": {
       "description": "Provider feature that rules may require.",
       "oneOf": [
@@ -32,15 +209,25 @@
       ]
     },
     "Check": {
-      "description": "How a decision is checked.",
+      "description": "How a decision is checked, mirroring [`crate::Fix`]: one provider selected by\n`type`, with the fields every provider shares. Which other fields a check\nmay have depends on its `type`; any other is refused.",
       "oneOf": [
         {
-          "additionalProperties": false,
-          "description": "A rule registered by a bundled plugin.",
+          "$ref": "#/$defs/BuiltinCheck",
+          "description": "A standard operation, or a rule registered by a bundled plugin.",
           "properties": {
-            "id": {
-              "description": "The id of the registered rule.",
-              "type": "string"
+            "requires": {
+              "description": "Capabilities the language provider must offer; without them the check\nis not run for that language.",
+              "items": {
+                "$ref": "#/$defs/Capability"
+              },
+              "type": "array"
+            },
+            "timeout": {
+              "description": "How long one run of the provider may take, such as `30s` or `2m`.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "type": {
               "const": "builtin",
@@ -48,15 +235,26 @@
             }
           },
           "required": [
-            "type",
-            "id"
+            "type"
           ],
-          "type": "object"
+          "type": "object",
+          "unevaluatedProperties": false
         },
         {
           "additionalProperties": false,
           "description": "A CEL expression over the code model.",
           "properties": {
+            "at": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/At"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Where the finding is reported when it is not at the selected value."
+            },
             "evidence": {
               "additionalProperties": {
                 "type": "string"
@@ -64,12 +262,37 @@
               "description": "Evidence fields, each a CEL expression.",
               "type": "object"
             },
+            "identity": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Identity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What makes a finding the same finding from one run to the next, when\nthe default (the selected value) does not."
+            },
             "message": {
               "description": "Text with `{{ cel }}` holes.",
               "type": "string"
             },
+            "requires": {
+              "description": "Capabilities the language provider must offer; without them the check\nis not run for that language.",
+              "items": {
+                "$ref": "#/$defs/Capability"
+              },
+              "type": "array"
+            },
             "select": {
               "$ref": "#/$defs/Select"
+            },
+            "timeout": {
+              "description": "How long one run of the provider may take, such as `30s` or `2m`.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "type": {
               "const": "cel",
@@ -78,6 +301,13 @@
             "where": {
               "description": "CEL; true for a violation.",
               "type": "string"
+            },
+            "with": {
+              "description": "Named intermediate values, evaluated in order before `where`; each\nexpression sees the ones before it.",
+              "items": {
+                "$ref": "#/$defs/Binding"
+              },
+              "type": "array"
             }
           },
           "required": [
@@ -87,6 +317,167 @@
             "message"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An external program under the process contract.",
+          "properties": {
+            "argv": {
+              "description": "Program and arguments; `{file}`, `{files}` and `{rule}` fill whole\narguments.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "batch": {
+              "$ref": "#/$defs/Batch",
+              "default": "file"
+            },
+            "env": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Extra environment variables.",
+              "type": "object"
+            },
+            "exitCodes": {
+              "$ref": "#/$defs/ExitCodes"
+            },
+            "requires": {
+              "description": "Capabilities the language provider must offer; without them the check\nis not run for that language.",
+              "items": {
+                "$ref": "#/$defs/Capability"
+              },
+              "type": "array"
+            },
+            "stdin": {
+              "$ref": "#/$defs/CheckStdin",
+              "default": "none"
+            },
+            "timeout": {
+              "description": "How long one run of the provider may take, such as `30s` or `2m`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "command",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "argv"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A language plugin's check method. Reserved until protocol 0.2.",
+          "properties": {
+            "params": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "requires": {
+              "description": "Capabilities the language provider must offer; without them the check\nis not run for that language.",
+              "items": {
+                "$ref": "#/$defs/Capability"
+              },
+              "type": "array"
+            },
+            "timeout": {
+              "description": "How long one run of the provider may take, such as `30s` or `2m`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "rpc",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Agent review: a model is asked about the candidates. Not\ndeterministic; today's agent review tasks serve it.",
+          "properties": {
+            "prompt": {
+              "description": "What the model is told. Default: the decision's requirement.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "requires": {
+              "description": "Capabilities the language provider must offer; without them the check\nis not run for that language.",
+              "items": {
+                "$ref": "#/$defs/Capability"
+              },
+              "type": "array"
+            },
+            "select": {
+              "description": "CEL over the code model that picks the subjects worth asking about.\nDefault: the subjects that match the decision's scope.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timeout": {
+              "description": "How long one run of the provider may take, such as `30s` or `2m`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "model",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "requires": {
+          "description": "Capabilities the language provider must offer; without them the check\nis not run for that language.",
+          "items": {
+            "$ref": "#/$defs/Capability"
+          },
+          "type": "array"
+        },
+        "timeout": {
+          "description": "How long one run of the provider may take, such as `30s` or `2m`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "CheckStdin": {
+      "description": "What a `command` check gives the program on stdin.",
+      "oneOf": [
+        {
+          "enum": [
+            "none"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "file",
+          "description": "The content of the file (only with `batch: file`).",
+          "type": "string"
         }
       ]
     },
@@ -131,9 +522,17 @@
         }
       ]
     },
+    "CycleLevel": {
+      "description": "At what level a `cycle` check looks for strongly connected components.",
+      "enum": [
+        "module",
+        "symbol"
+      ],
+      "type": "string"
+    },
     "DecisionSpec": {
       "additionalProperties": false,
-      "description": "A design decision with its enforcement: what was decided and why, and how\nthe decision is checked and fixed. The engine compiles `check` into the\nrule that enforces it.",
+      "description": "A design decision, the way an architecture decision record states one:\nwhat was decided and why, its status, and how it is enforced. The engine\ncompiles `check` into the rule that enforces it. A decision without a\n`check` is documentation only.",
       "properties": {
         "check": {
           "anyOf": [
@@ -151,8 +550,12 @@
             "null"
           ]
         },
-        "enforcement": {
-          "$ref": "#/$defs/Enforcement"
+        "consequences": {
+          "description": "What follows from the decision, good and bad.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "evidence": {
           "description": "Fields a checker emits as diagnostic evidence.",
@@ -221,11 +624,22 @@
               "type": "null"
             }
           ],
-          "description": "Replaces the default severity of the enforcement."
+          "description": "The severity of the decision's findings, as authored. `error` is\ndefinitive: it needs no verdict and only an annotation in the code\nwaives it, and its fix may be safe. `warn` and `info` are review\ntasks: a reviewer's verdict may hide them and a fix is at most\nsuggested. A decision without a `check` has none. A configuration\n`level` changes what is reported and the exit code, never this."
+        },
+        "status": {
+          "$ref": "#/$defs/Status",
+          "description": "Where the decision stands: only an accepted one is enforced."
         },
         "strict": {
           "description": "Review-level advice that is too noisy for the `recommended` preset;\nthe `strict` preset enables it.",
           "type": "boolean"
+        },
+        "supersedes": {
+          "description": "The decisions this one replaces, by id. Each becomes `superseded`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "title": {
           "type": "string"
@@ -235,8 +649,7 @@
         "title",
         "intent",
         "scope",
-        "requirement",
-        "enforcement"
+        "requirement"
       ],
       "type": "object"
     },
@@ -244,16 +657,6 @@
       "description": "What kind of thing a decision is about. Only code exists today.",
       "enum": [
         "code"
-      ],
-      "type": "string"
-    },
-    "Enforcement": {
-      "description": "How a decision can be verified; it fixes the default severity and whether\nits findings are review tasks.",
-      "enum": [
-        "mechanical",
-        "heuristic",
-        "judgment",
-        "doc"
       ],
       "type": "string"
     },
@@ -341,6 +744,33 @@
       ],
       "type": "string"
     },
+    "ExitCodes": {
+      "additionalProperties": false,
+      "description": "Which exit codes mean what; every other code, a signal or a timeout is an\nerror and leaves the analysis incomplete.",
+      "properties": {
+        "clean": {
+          "default": [
+            0
+          ],
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "findings": {
+          "default": [
+            1
+          ],
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "Expect": {
       "additionalProperties": false,
       "description": "An expected diagnostic of an invalid example.",
@@ -384,7 +814,7 @@
             },
             "safety": {
               "$ref": "#/$defs/Safety",
-              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for mechanical decisions."
+              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
             },
             "type": {
               "const": "ops",
@@ -429,7 +859,7 @@
             },
             "safety": {
               "$ref": "#/$defs/Safety",
-              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for mechanical decisions."
+              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
             },
             "scope": {
               "$ref": "#/$defs/CommandScope",
@@ -473,7 +903,7 @@
             },
             "safety": {
               "$ref": "#/$defs/Safety",
-              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for mechanical decisions."
+              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
             },
             "type": {
               "const": "rpc",
@@ -497,11 +927,30 @@
         },
         "safety": {
           "$ref": "#/$defs/Safety",
-          "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for mechanical decisions."
+          "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
         }
       },
       "required": [
         "safety"
+      ],
+      "type": "object"
+    },
+    "Identity": {
+      "additionalProperties": false,
+      "description": "The identity of a finding: its fingerprint is a hash of the decision, the\n`subject` and the whitespace-normalized `snippet`. Both are CEL expressions\nthat give text.",
+      "properties": {
+        "snippet": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "subject"
       ],
       "type": "object"
     },
@@ -549,6 +998,19 @@
       },
       "required": [
         "name"
+      ],
+      "type": "object"
+    },
+    "NamedRule": {
+      "description": "A rule implemented in Rust and registered by a bundled plugin. Strays are\nrefused by [`Check`], which knows the fields every provider shares.",
+      "properties": {
+        "id": {
+          "description": "The id of the registered rule.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
       ],
       "type": "object"
     },
@@ -776,6 +1238,81 @@
       },
       "type": "object"
     },
+    "OrderClause": {
+      "additionalProperties": false,
+      "description": "One ordering a container of declarations must follow.",
+      "properties": {
+        "by": {
+          "description": "Qualified `plugin/name` order keys, most significant first.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "evidence": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Evidence fields, each a CEL expression over the same variables.",
+          "type": "object"
+        },
+        "message": {
+          "description": "Text with `{{ cel }}` holes over `symbol` (the declaration reported),\n`rank` and `ranks` (its rank by the first key and by every key),\n`after` (with `displaced`: the declaration it must follow, else an\nempty node), `earlier` (with `late`: the first declaration before it\nthat ranks higher) and `options`.",
+          "type": "string"
+        },
+        "report": {
+          "$ref": "#/$defs/OrderReport",
+          "default": "displaced"
+        },
+        "when": {
+          "description": "CEL over `file` and `options`: the clause runs on the files it is\ntrue for. Default: every file.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "within": {
+          "$ref": "#/$defs/OrderScope",
+          "description": "What is ordered: each module of a file, or each owner's members."
+        }
+      },
+      "required": [
+        "within",
+        "by",
+        "message"
+      ],
+      "type": "object"
+    },
+    "OrderReport": {
+      "description": "How an `order` clause picks the declarations to report.",
+      "oneOf": [
+        {
+          "const": "displaced",
+          "description": "The fewest declarations that, moved, would put the container in order:\nthose outside its longest in-order run.",
+          "type": "string"
+        },
+        {
+          "const": "late",
+          "description": "Every declaration that has an earlier one of a higher rank.",
+          "type": "string"
+        }
+      ]
+    },
+    "OrderScope": {
+      "description": "What an `order` check judges.",
+      "oneOf": [
+        {
+          "const": "file",
+          "description": "Every declaration of a file, each module on its own.",
+          "type": "string"
+        },
+        {
+          "const": "owner",
+          "description": "Only the members of one owner.",
+          "type": "string"
+        }
+      ]
+    },
     "ReorderScope": {
       "description": "The declarations a `reorder` permutes.",
       "oneOf": [
@@ -825,15 +1362,24 @@
     },
     "Select": {
       "description": "What a CEL check looks at; each choice binds one variable of the same name.",
-      "enum": [
-        "symbol",
-        "function",
-        "edge",
-        "module",
-        "file",
-        "test"
-      ],
-      "type": "string"
+      "oneOf": [
+        {
+          "enum": [
+            "symbol",
+            "function",
+            "edge",
+            "module",
+            "file",
+            "test"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "comment",
+          "description": "A comment of a file, with its text and position.",
+          "type": "string"
+        }
+      ]
     },
     "Severity": {
       "description": "How hard a finding fails a run; serialized and parsed as the lowercase\nvariant name. Whether a finding also asks for a verdict is not a level: it\nfollows from how its decision is enforced.",
@@ -851,6 +1397,37 @@
         {
           "const": "info",
           "description": "Reported, never fails the run.",
+          "type": "string"
+        }
+      ]
+    },
+    "Status": {
+      "description": "Where a decision stands in its life, as an architecture decision record\ndoes. Only an accepted decision is enforced.",
+      "oneOf": [
+        {
+          "enum": [
+            "accepted"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "proposed",
+          "description": "Under discussion: written down, not yet enforced.",
+          "type": "string"
+        },
+        {
+          "const": "rejected",
+          "description": "Considered and turned down; kept so the question is not asked again.",
+          "type": "string"
+        },
+        {
+          "const": "superseded",
+          "description": "Replaced by another decision (named in that decision's `supersedes`).",
+          "type": "string"
+        },
+        {
+          "const": "deprecated",
+          "description": "No longer wanted, and nothing replaces it.",
           "type": "string"
         }
       ]

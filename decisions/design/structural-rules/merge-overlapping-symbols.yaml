@@ -16,4 +16,6 @@ spec:
     Symbols with substantially the same responsibility at the same abstraction
     level MUST be consolidated; one general symbol SHOULD be preferred over
     parallel variants, wrappers, aliases, or coordinators.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

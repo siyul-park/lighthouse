@@ -110,6 +110,12 @@
             "null"
           ]
         },
+        "checkRevision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "commit": {
           "type": [
             "string",
@@ -183,7 +189,7 @@
           ]
         },
         "snapshot": {
-          "description": "The finding frozen at review time: evidence, facts, options, severity,\ntier, when and where it was seen. Its severity is the string recorded\nthen, so history may say `review`."
+          "description": "The finding frozen at review time: evidence, facts, options, severity,\nauthored severity, when and where it was seen. Its severity is the string recorded\nthen, so history may say `review`."
         },
         "timestamp": {
           "type": "string"

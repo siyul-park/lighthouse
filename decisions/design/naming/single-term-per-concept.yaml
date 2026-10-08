@@ -13,5 +13,7 @@ spec:
     domain: code
     subject: project
   requirement: One term MUST represent one concept across packages.
-  enforcement: judgment
+  severity: info
   evidence: [term, locations]
+  check:
+    type: model

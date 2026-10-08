@@ -11,7 +11,7 @@ use lighthouse_config::{Config, FILE_NAME, Format};
 use lighthouse_declarative::{Declarative, load_local, local_files};
 use lighthouse_plugin::Registry;
 use lighthouse_rpc::Registered;
-use lighthouse_spec::{Catalog, FixKind};
+use lighthouse_spec::{Catalog, CheckKind, FixKind};
 
 use crate::{
     Result,
@@ -172,7 +172,7 @@ pub fn catalog_at(root: &Path) -> Result<Catalog> {
 }
 
 /// Every command the project would run: the formatters of its configuration
-/// and the command fixers of its catalog.
+/// and the command fixers and command checks of its catalog.
 fn commands(config: &Config, catalog: &Catalog) -> Vec<Command> {
     let mut found: Vec<Command> = config
         .formatters()
@@ -182,6 +182,14 @@ fn commands(config: &Config, catalog: &Catalog) -> Vec<Command> {
         })
         .collect();
     for decision in catalog.decisions() {
+        if let Some(check) = &decision.check
+            && let CheckKind::Command(command) = &check.kind
+        {
+            found.push(Command {
+                what: format!("check of {}: {}", decision.id(), command.argv.join(" ")),
+                argv: command.argv.clone(),
+            });
+        }
         if let Some(fix) = &decision.fix
             && let FixKind::Command(command) = &fix.kind
         {

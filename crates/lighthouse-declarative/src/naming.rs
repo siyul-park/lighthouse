@@ -27,7 +27,26 @@ pub(crate) enum Match {
     Variant,
 }
 
+impl Match {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Exact => "exact",
+            Self::Variant => "variant",
+        }
+    }
+}
+
 impl Naming {
+    /// The naming convention a decision's options declare (`test_prefix`,
+    /// `snake_case`, `variant_tests`, `ancestor_tests`); `None` for a decision
+    /// that declares none.
+    pub(crate) fn from_options(
+        options: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<Self> {
+        options.get("test_prefix")?;
+        serde_json::from_value(serde_json::Value::Object(options.clone())).ok()
+    }
+
     /// The tests of the modules that test `symbol`'s module from inside or
     /// outside, whose names map to `symbol`. Names resolve within the one
     /// module the symbol belongs to, so a name never maps to two symbols of
@@ -128,18 +147,6 @@ impl Naming {
             })
         })
     }
-}
-
-/// Whether some test module tests `module` or an ancestor of it, with tests.
-pub(crate) fn has_tests(project: &Project, module: &str) -> bool {
-    project.modules.iter().any(|m| {
-        let tested = m.test_of.as_deref().unwrap_or(&m.path);
-        let covers = tested == module
-            || module
-                .strip_prefix(tested)
-                .is_some_and(|rest| rest.starts_with('/'));
-        covers && !project.tests_in(&m.path).is_empty()
-    })
 }
 
 pub(crate) fn snake(name: &str) -> String {

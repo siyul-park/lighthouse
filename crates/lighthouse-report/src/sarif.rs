@@ -96,7 +96,7 @@ struct Configuration {
 
 #[derive(Serialize)]
 struct RuleProperties<'a> {
-    enforcement: String,
+    status: String,
     tags: Vec<&'a str>,
 }
 
@@ -239,7 +239,7 @@ fn rule_ref<'a>(id: &'a str, decision: Option<&'a Decision>) -> RuleRef<'a> {
             .severity()
             .map(|s| Configuration { level: level(s) }),
         properties: Some(RuleProperties {
-            enforcement: decision.enforcement.to_string(),
+            status: decision.status.to_string(),
             tags: vec![decision.pack()],
         }),
     }

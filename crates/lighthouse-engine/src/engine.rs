@@ -167,6 +167,7 @@ pub struct Engine {
     active: BTreeSet<String>,
     /// Gaps known before the run, such as a plugin that failed to start.
     startup: Vec<Incomplete>,
+    trusted: bool,
 }
 
 impl Engine {
@@ -187,9 +188,16 @@ impl Engine {
             languages,
             active: BTreeSet::new(),
             startup: Vec::new(),
+            trusted: false,
         };
         engine.active = active_rules(&engine.registry, &engine.config)?;
         Ok(engine)
+    }
+
+    /// Says whether the user trusts the project to run the commands its checks name.
+    pub fn with_trust(mut self, trusted: bool) -> Self {
+        self.trusted = trusted;
+        self
     }
 
     /// Adds gaps found while assembling the plugins; every run reports them.
@@ -243,6 +251,7 @@ impl Engine {
             .iter()
             .filter(|id| only.is_empty() || only.contains(id))
             .filter_map(|id| self.registry.rule(id))
+            .filter(|rule| rule.manifest().enforced || only.contains(&rule.manifest().id))
             .collect();
 
         let mut outcome = Outcome::default();
@@ -255,7 +264,13 @@ impl Engine {
         let (inputs, project) =
             self.build_project(inputs, overlays, &mut outcome.notices, &mut incomplete);
         let facts = self.analyze(&selected, &inputs, &project)?;
-        let found = self.apply(&selected, &inputs, &project, &facts, &mut outcome.notices)?;
+        let found = self.apply(
+            &selected,
+            &inputs,
+            &project,
+            &facts,
+            (&mut outcome.notices, &mut incomplete),
+        )?;
 
         let ran: BTreeSet<String> = selected.iter().map(|r| r.manifest().id.clone()).collect();
         let level = |rule: &str, file: &Path, lang: &str| self.level_at(rule, file, lang);
@@ -500,7 +515,7 @@ impl Engine {
                 Err(e) => incomplete.push(Incomplete {
                     path: None,
                     reason: format!(
-                        "language `{}` failed, {} file(s) not analyzed: {e}",
+                        "language `{}` had an execution error, {} file(s) not analyzed: {e}",
                         provider.manifest().id,
                         batch.len()
                     ),
@@ -540,6 +555,8 @@ impl Engine {
                     project,
                     file: input.map(|i| (&i.file, i.text.as_str())),
                     facts: &facts,
+                    keys: &self.registry,
+                    trusted: self.trusted,
                 };
                 let fact = analyzer.run(&ctx)?;
                 facts.insert((analyzer.manifest().id.clone(), key), fact);
@@ -554,10 +571,11 @@ impl Engine {
         inputs: &[Input],
         project: &Project,
         facts: &Facts,
-        notices: &mut BTreeSet<String>,
+        (notices, incomplete): (&mut BTreeSet<String>, &mut Vec<Incomplete>),
     ) -> Result<Vec<Diagnostic>, Error> {
-        let mut found = self.apply_file_rules(rules, inputs, project, facts, notices)?;
-        found.extend(self.apply_project_rules(rules, inputs, project, facts, notices)?);
+        let mut found =
+            self.apply_file_rules(rules, inputs, project, facts, notices, incomplete)?;
+        found.extend(self.apply_project_rules(rules, inputs, project, facts, notices, incomplete)?);
         Ok(found)
     }
 
@@ -568,6 +586,7 @@ impl Engine {
         project: &Project,
         facts: &Facts,
         notices: &mut BTreeSet<String>,
+        incomplete: &mut Vec<Incomplete>,
     ) -> Result<Vec<Diagnostic>, Error> {
         let mut found = Vec::new();
         for input in inputs {
@@ -599,8 +618,11 @@ impl Engine {
                     project,
                     file: Some((&input.file, input.text.as_str())),
                     facts,
+                    keys: &self.registry,
+                    trusted: self.trusted,
                 };
-                for mut d in rule.check(&ctx, &config.options)? {
+                let checked = rule.check(&ctx, &config.options);
+                for mut d in unfinished(checked, &meta.id, Some(&input.file.path), incomplete)? {
                     d.severity = level;
                     found.push(d);
                 }
@@ -616,6 +638,7 @@ impl Engine {
         project: &Project,
         facts: &Facts,
         notices: &mut BTreeSet<String>,
+        incomplete: &mut Vec<Incomplete>,
     ) -> Result<Vec<Diagnostic>, Error> {
         let languages: BTreeSet<usize> = inputs.iter().map(|i| i.language).collect();
         let resolved = self
@@ -648,8 +671,11 @@ impl Engine {
                 project,
                 file: None,
                 facts,
+                keys: &self.registry,
+                trusted: self.trusted,
             };
-            for mut d in rule.check(&ctx, &config.options)? {
+            let checked = rule.check(&ctx, &config.options);
+            for mut d in unfinished(checked, &meta.id, None, incomplete)? {
                 d.severity = level;
                 found.push(d);
             }
@@ -681,6 +707,27 @@ pub fn active_rules(registry: &Registry, config: &Config) -> Result<BTreeSet<Str
     let overridden = config.configured().filter(|(_, c)| c.level.is_some());
     active.extend(overridden.map(|(id, _)| id.to_owned()));
     Ok(active)
+}
+
+/// What a rule found, or nothing and a gap when it could not finish: the gap
+/// is recorded for the file (or the project), so the run is incomplete rather
+/// than clean. Any other failure ends the run.
+fn unfinished(
+    checked: Result<Vec<Diagnostic>, lighthouse_plugin::Error>,
+    rule: &str,
+    file: Option<&Path>,
+    incomplete: &mut Vec<Incomplete>,
+) -> Result<Vec<Diagnostic>, Error> {
+    match checked {
+        Err(lighthouse_plugin::Error::Incomplete(reason)) => {
+            incomplete.push(Incomplete {
+                path: file.map(Path::to_owned),
+                reason: format!("{rule}: {reason}"),
+            });
+            Ok(Vec::new())
+        }
+        other => Ok(other?),
+    }
 }
 
 /// Rejects a configuration that names plugins, presets or rules the registry

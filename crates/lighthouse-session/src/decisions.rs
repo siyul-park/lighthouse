@@ -4,7 +4,7 @@ use std::{cell::RefCell, collections::BTreeSet, fmt::Write};
 
 use lighthouse_engine::RuleTester;
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Catalog, Decision, Enforcement};
+use lighthouse_spec::{Catalog, Decision};
 use serde::Serialize;
 
 use crate::{Result, Session};
@@ -16,7 +16,7 @@ const NEUTRAL: &str = "text";
 #[derive(Debug, Clone, Serialize)]
 pub struct DecisionRow {
     pub id: String,
-    /// `implemented`, `unimplemented` or `doc`.
+    /// `not-enforced` (its status is not accepted), `implemented` (a program checks it), `judged` (agent review checks it), `unimplemented` (a check is named but nothing registers it) or `doc`.
     pub status: &'static str,
     pub severity: String,
     pub title: String,
@@ -178,10 +178,15 @@ pub(crate) fn test_catalog(
 }
 
 fn status(decision: &Decision, registry: &Registry) -> &'static str {
-    if registry.rule(decision.id()).is_some() {
+    if decision.check.is_some() && !decision.status.enforced() {
+        // Written down, tested, not enforced.
+        "not-enforced"
+    } else if registry.rule(decision.id()).is_some() {
         "implemented"
-    } else if decision.enforcement == Enforcement::Doc {
+    } else if decision.check.is_none() {
         "doc"
+    } else if !decision.automated() {
+        "judged"
     } else {
         "unimplemented"
     }
@@ -189,15 +194,15 @@ fn status(decision: &Decision, registry: &Registry) -> &'static str {
 
 fn selected<'c>(catalog: &'c Catalog, ids: &[String]) -> Result<Vec<&'c Decision>> {
     if ids.is_empty() {
-        return Ok(catalog.decisions().filter(|d| d.check.is_some()).collect());
+        return Ok(catalog.decisions().filter(|d| d.automated()).collect());
     }
     ids.iter()
         .map(|id| {
             let decision = catalog
                 .decision(id)
                 .ok_or_else(|| format!("unknown decision `{id}`"))?;
-            if decision.check.is_none() {
-                return Err(format!("`{id}` has no check to test").into());
+            if !decision.automated() {
+                return Err(format!("`{id}` has no automated check to test").into());
             }
             Ok(decision)
         })

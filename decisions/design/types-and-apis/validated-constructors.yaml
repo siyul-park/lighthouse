@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Constructors MUST require inputs with no safe default and MUST validate
     required dependencies and shape; `Build` MUST validate a complete builder.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

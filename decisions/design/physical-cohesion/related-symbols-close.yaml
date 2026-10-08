@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: physical-cohesion
+  annotations:
+    lighthouse/was-builtin: design/related-symbols-close
 spec:
   title: Collaborators stay close
   intent: Distance between collaborators hides their relationship.
@@ -15,7 +17,7 @@ spec:
   requirement: >-
     Strongly related symbols MUST be physically close; direct collaborators
     SHOULD be adjacent.
-  enforcement: heuristic
+  severity: warn
   evidence: [symbols, distance]
   options:
     type: object
@@ -45,7 +47,21 @@ spec:
         side by side are fine.
   check:
     type: builtin
-    id: design/related-symbols-close
+    op: proximity
+    when: "!file.test && !file.generated"
+    group: "symbol.kind == 'method' ? symbol.owner_key : ''"
+    separator: >-
+      between.kind != 'method'
+      || (between.owner_key != key
+          && (!options.visibility_groups
+              || (between.visibility != 'private') == (member.visibility != 'private')))
+    message: >-
+      method {{ symbol.name }} is separated from the other methods of its type by
+      {{ count }} other declaration{{ count == 1 ? '' : 's' }} ({{ separators[0].name }});
+      keep an owner's methods together
+    evidence:
+      symbols: "[previous.id, separators[0].id, symbol.id]"
+      distance: count
   fix:
     safety: suggested
     requires: [extent]

@@ -338,7 +338,7 @@ fn agent_format_briefs_the_agent_and_agent_json_carries_the_same_records() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     let text = stdout(lighthouse(dir.path()).args(["check", "--format", "agent"]));
     for expected in [
-        "design/private-helper-callers  info (heuristic)  src/lib.rs:5:1",
+        "design/private-helper-callers  info  src/lib.rs:5:1",
         "  owner:       demo::clamp#function",
         "  requirement: A private helper SHOULD have at least two callers.",
         "  evidence:    caller=demo::run#function callers=1 statements=3",

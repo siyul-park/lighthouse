@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: types-and-apis
+  annotations:
+    lighthouse/was-enforcement: mechanical
 spec:
   title: Public APIs do not expose private types
   intent: Callers must be able to use an API without naming private types.
@@ -13,8 +15,10 @@ spec:
     domain: code
     subject: symbol
   requirement: Public APIs MUST be usable without callers naming private types.
-  enforcement: mechanical
+  severity: warn
   evidence: [api, private_type]
+  check:
+    type: model
   examples:
     - name: invalid
       language: go

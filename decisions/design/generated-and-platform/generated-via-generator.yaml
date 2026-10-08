@@ -13,5 +13,7 @@ spec:
     domain: code
     subject: file
   requirement: Generated files MUST change only through their generator.
-  enforcement: heuristic
+  severity: warn
   evidence: [file, generator]
+  check:
+    type: model

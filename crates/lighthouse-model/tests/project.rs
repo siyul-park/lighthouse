@@ -419,3 +419,78 @@ fn indexes_answer_uses_members_and_tests_by_module() {
     assert_eq!(project.tests_in("m[test]").len(), 1);
     assert!(project.tests_in("m").is_empty(), "a prefix is not a module");
 }
+
+fn typed(module: &str, name: &str, kind: SymbolKind, owner: Option<&Symbol>) -> Symbol {
+    let owners: Vec<&str> = owner.iter().map(|o| o.name.as_str()).collect();
+    Symbol {
+        id: SymbolId::new(module, &owners, name, kind),
+        kind,
+        owner: owner.map(|o| o.id.clone()),
+        ..symbol(module, name)
+    }
+}
+
+fn implements(ty: &Symbol, interface: &Symbol) -> Edge {
+    Edge {
+        kind: EdgeKind::Implements,
+        from: Node::Symbol(ty.id.clone()),
+        to: Target::Resolved(Node::Symbol(interface.id.clone())),
+        resolution: Resolution::Semantic,
+        site: None,
+    }
+}
+
+#[test]
+fn project_edges_from_lists_the_edges_that_start_at_a_symbol() {
+    let a = symbol("m", "a");
+    let b = symbol("m", "b");
+    let project = Project::merge([Fragment {
+        files: vec![file_of(&a), file_of(&b)],
+        symbols: vec![a.clone(), b.clone()],
+        edges: vec![call(&a, "m::b#function"), call(&b, "m::a#function")],
+        ..Fragment::default()
+    }]);
+
+    let from_a: Vec<_> = project.edges_from(&a.id).collect();
+
+    assert_eq!(from_a.len(), 1);
+    assert_eq!(from_a[0].from, Node::Symbol(a.id.clone()));
+    assert_eq!(
+        project
+            .edges_from(&SymbolId::new("m", &[], "none", SymbolKind::Function))
+            .count(),
+        0
+    );
+}
+
+#[test]
+fn project_implements_and_declared_by_interface_follow_the_interfaces_of_a_type() {
+    let store = typed("m", "Store", SymbolKind::Type, None);
+    let reader = typed("m", "Reader", SymbolKind::Interface, None);
+    let read = typed("m", "Read", SymbolKind::Method, Some(&reader));
+    let project = Project::merge([Fragment {
+        files: vec![file_of(&store)],
+        symbols: vec![store.clone(), reader.clone(), read],
+        edges: vec![implements(&store, &reader)],
+        ..Fragment::default()
+    }]);
+
+    assert_eq!(
+        project.implements(&store.id),
+        std::slice::from_ref(&reader.id)
+    );
+    assert!(project.implements(&reader.id).is_empty());
+    assert!(project.declared_by_interface("m", "Read"));
+    assert!(!project.declared_by_interface("m", "Write"));
+    assert!(!project.declared_by_interface("other", "Read"));
+}
+
+fn file_of(symbol: &Symbol) -> File {
+    File {
+        path: symbol.file.clone(),
+        lang: "go".to_owned(),
+        hash: String::new(),
+        generated: false,
+        test: false,
+    }
+}

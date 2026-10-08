@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt::Write, path::Path};
 
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Severity, Verdict};
-use lighthouse_spec::{Catalog, Decision, Example, ExampleKind, tier};
+use lighthouse_spec::{Catalog, Decision, Example, ExampleKind, authored_severity};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 
@@ -21,7 +21,7 @@ const PREFIX_MIN: usize = 12;
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Briefing<'a> {
     /// The decisions findings cite. Whether a finding asks for a verdict is
-    /// the tier of its decision; without the catalog a finding is judged by
+    /// the authored severity of its decision; without the catalog a finding is judged by
     /// its severity alone, so every frontend that counts reviews passes it.
     pub catalog: Option<&'a Catalog>,
     /// Subject facts by fingerprint; the `language`, `kind` and `visibility`
@@ -39,14 +39,15 @@ pub struct Briefing<'a> {
 }
 
 impl Briefing<'_> {
-    /// Whether the finding is a review task: its decision is enforced by a
-    /// heuristic or a judgment, whatever the severity. A rule without a
-    /// decision is judged by its severity.
+    /// Whether the finding is a review task: its decision authored `warn` or
+    /// `info`, whatever severity the configuration reports it at. An authored
+    /// `error` is definitive and needs no verdict. A rule without a decision
+    /// is judged by its severity.
     pub fn needs_verdict(&self, diagnostic: &Diagnostic) -> bool {
         let decision = self
             .catalog
             .and_then(|catalog| catalog.decision(&diagnostic.rule_id));
-        lighthouse_spec::needs_verdict(tier(diagnostic.severity, decision))
+        lighthouse_spec::needs_verdict(authored_severity(diagnostic.severity, decision))
     }
 }
 
@@ -93,7 +94,7 @@ struct Finding<'a> {
     kind: &'static str,
     rule: &'a str,
     severity: Severity,
-    tier: &'static str,
+    authored: Severity,
     location: Location,
     #[serde(skip_serializing_if = "Option::is_none")]
     symbol: Option<&'a str>,
@@ -267,7 +268,7 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
         kind: "finding",
         rule: &diagnostic.rule_id,
         severity: diagnostic.severity,
-        tier: tier(diagnostic.severity, decision),
+        authored: authored_severity(diagnostic.severity, decision),
         location: Location {
             path: diagnostic.file.display().to_string(),
             line: diagnostic.span.start.line,
@@ -465,9 +466,14 @@ fn reasons_line() -> String {
 
 fn block(finding: &Finding, width: usize) -> String {
     let location = &finding.location;
+    let authored = if finding.authored == finding.severity {
+        String::new()
+    } else {
+        format!(" (authored {})", finding.authored)
+    };
     let mut out = format!(
-        "{}  {} ({})  {}:{}:{}\n",
-        finding.rule, finding.severity, finding.tier, location.path, location.line, location.column
+        "{}  {}{authored}  {}:{}:{}\n",
+        finding.rule, finding.severity, location.path, location.line, location.column
     );
     for (label, value) in fields(finding, width) {
         let mut lines = value.lines();

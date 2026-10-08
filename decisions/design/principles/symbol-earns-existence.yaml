@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Every symbol MUST earn its existence through a distinct responsibility,
     invariant, ownership boundary, or reusable abstraction.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

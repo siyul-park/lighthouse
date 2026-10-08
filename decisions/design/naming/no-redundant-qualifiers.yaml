@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: naming
+  annotations:
+    lighthouse/was-builtin: design/no-redundant-qualifiers
 spec:
   title: No redundant qualifiers
   intent: "Context already names the package, receiver, phase, or representation."
@@ -15,7 +17,7 @@ spec:
   requirement: >-
     Package, receiver, phase, or representation MUST NOT be repeated in a name
     without meaning.
-  enforcement: heuristic
+  severity: warn
   evidence: [name, repeated]
   exceptions: >-
     A name equal to its package or module name (`provider.Provider`,
@@ -50,8 +52,27 @@ spec:
         name; the root module of a crate is matched by the crate name as a
         whole.
   check:
-    type: builtin
-    id: design/no-redundant-qualifiers
+    type: cel
+    select: symbol
+    with:
+      - name: repeated
+        expr: >-
+          symbol.module_forms.filter(f, f.key != ''
+            && (symbol.name_key.startsWith(f.key + '_') || symbol.name_key.endsWith('_' + f.key)))
+    where: >-
+      !symbol.file_test && !symbol.generated && !symbol.test
+      && symbol.owner == '' && symbol.visibility != 'private'
+      && options.kinds.exists(k, k == symbol.kind)
+      && !(symbol.kind == 'function' && symbol.name == 'main')
+      && size(repeated) > 0
+    message: >-
+      {{ symbol.kind }} {{ symbol.name }} repeats its module name
+      `{{ repeated[0].name }}`; callers already write it
+    evidence:
+      name: symbol.name
+      repeated: repeated[0].name
+    identity:
+      subject: symbol.id
   examples:
     - name: invalid
       language: go

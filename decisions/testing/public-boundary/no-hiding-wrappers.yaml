@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: public-boundary
+  annotations:
+    lighthouse/was-enforcement: mechanical
 spec:
   title: Helpers do not hide the target call
   intent: A helper that wraps the call hides the very thing being specified.
@@ -16,5 +18,7 @@ spec:
     Wrappers, builders, or helpers MUST NOT hide the target call or result being
     specified, and MUST NOT be added merely for reuse. Setup helpers MAY exist
     only when the specified behavior remains visible.
-  enforcement: mechanical
+  severity: warn
   evidence: [helper, target_call]
+  check:
+    type: model

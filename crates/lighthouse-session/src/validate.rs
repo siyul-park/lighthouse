@@ -16,7 +16,7 @@ use lighthouse_config::{Config, PresetSpec, ProjectSpec};
 use lighthouse_plugin::{Registry, plugin_of};
 use lighthouse_resource::{Format, Resource, documents, kind_of, resource};
 use lighthouse_rpc::PluginSpec;
-use lighthouse_spec::{Catalog, Check, Decision, FixKind, OpSpec};
+use lighthouse_spec::{BuiltinCheck, BuiltinOp, Catalog, CheckKind, Decision, FixKind, OpSpec};
 use serde_json::Value;
 
 use crate::{Result, Session, decisions::test_catalog};
@@ -129,7 +129,7 @@ impl Sets {
                     references(&catalog, registry, &place, problems);
                     let own = catalog
                         .decisions()
-                        .filter(|d| d.check.is_some() && bundled.decision(d.id()).is_none())
+                        .filter(|d| d.automated() && bundled.decision(d.id()).is_none())
                         .map(|d| d.id().to_owned())
                         .collect();
                     layered.push((catalog, own));
@@ -296,19 +296,50 @@ fn references(catalog: &Catalog, registry: &Registry, path: &str, problems: &mut
         .collect();
     for decision in catalog.decisions() {
         order_keys(decision, &keys, path, problems);
-        if let Some(Check::Builtin(builtin)) = &decision.check
-            && registry.has_plugin(plugin_of(&builtin.id))
-            && registry.rule(&builtin.id).is_none()
-        {
-            problems.push(problem(
-                path,
-                format!(
-                    "{}: builtin check `{}` is not registered by its plugin",
-                    decision.id(),
-                    builtin.id
-                ),
-            ));
+        if let Some(CheckKind::Builtin(builtin)) = decision.check.as_ref().map(|c| &c.kind) {
+            named_rule(decision, builtin, registry, path, problems);
+            if let BuiltinCheck::Op(BuiltinOp::Order { clauses }) = builtin {
+                for clause in clauses {
+                    unknown_keys(decision, &clause.by, &keys, path, problems);
+                }
+            }
         }
+    }
+}
+
+fn named_rule(
+    decision: &Decision,
+    builtin: &BuiltinCheck,
+    registry: &Registry,
+    path: &str,
+    problems: &mut Vec<Problem>,
+) {
+    let Some(id) = builtin.named() else {
+        return;
+    };
+    if registry.has_plugin(plugin_of(id)) && registry.rule(id).is_none() {
+        problems.push(problem(
+            path,
+            format!(
+                "{}: builtin check `{id}` is not registered by its plugin",
+                decision.id()
+            ),
+        ));
+    }
+}
+
+fn unknown_keys(
+    decision: &Decision,
+    by: &[String],
+    keys: &BTreeSet<&str>,
+    path: &str,
+    problems: &mut Vec<Problem>,
+) {
+    for key in by.iter().filter(|key| !keys.contains(key.as_str())) {
+        problems.push(problem(
+            path,
+            format!("{}: `order` names unknown order key `{key}`", decision.id()),
+        ));
     }
 }
 

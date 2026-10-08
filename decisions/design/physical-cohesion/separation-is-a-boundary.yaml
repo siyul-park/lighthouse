@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Physical separation MUST represent a real responsibility, ownership, or
     abstraction boundary.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

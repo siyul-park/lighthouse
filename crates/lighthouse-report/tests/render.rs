@@ -158,7 +158,7 @@ fn sarif_describes_a_rule_by_the_decision_it_cites_and_links_its_docs() {
         "Files stay below a line limit"
     );
     assert_eq!(rules[0]["defaultConfiguration"]["level"], "warning");
-    assert_eq!(rules[0]["properties"]["enforcement"], "heuristic");
+    assert_eq!(rules[0]["properties"]["status"], "accepted");
     assert_eq!(
         rules[0]["helpUri"],
         "https://github.com/siyul-park/lighthouse/blob/main/docs/decisions/core.md#files-stay-below-a-line-limit"

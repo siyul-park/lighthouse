@@ -8,26 +8,26 @@ Tests are the executable specification of a feature. They define the contracts, 
 
 Tests are the executable specification of a feature: they should show what the public contract promises, not how the implementation happens to work.
 
-| id | title | enforcement | fix | requirement |
+| id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `testing/shows-public-contract` | Tests show the public contract | judgment→info |  | A test MUST show public usage and promised behavior. |
-| `testing/structure-serves-contract` | Structure serves the contract | judgment→info |  | Test structure MUST serve the contract rather than implementation shape or coverage. |
-| `testing/case-exposes-target` | A case exposes its target | judgment→info |  | A test MUST expose the target, input, operation, and expected result in the case; the target and its behavior MUST remain visible. |
-| `testing/case-is-behavior` | A case is a behavior | judgment→info |  | A case MUST represent behavior, not a branch or implementation path, and MUST contain the behavior it claims to specify. |
+| `testing/shows-public-contract` | Tests show the public contract | info · model |  | A test MUST show public usage and promised behavior. |
+| `testing/structure-serves-contract` | Structure serves the contract | info · model |  | Test structure MUST serve the contract rather than implementation shape or coverage. |
+| `testing/case-exposes-target` | A case exposes its target | info · model |  | A test MUST expose the target, input, operation, and expected result in the case; the target and its behavior MUST remain visible. |
+| `testing/case-is-behavior` | A case is a behavior | info · model |  | A case MUST represent behavior, not a branch or implementation path, and MUST contain the behavior it claims to specify. |
 
 ## Public Boundary
 
 Contract tests should prove behavior through the same public boundary available to callers.
 
-| id | title | enforcement | fix | requirement |
+| id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`testing/external-test-package`](#contract-tests-live-outside-the-target) | Contract tests live outside the target | mechanical→error |  |  |
-| [`testing/no-private-symbol-access`](#tests-do-not-reach-private-symbols) | Tests do not reach private symbols | mechanical→error |  |  |
-| [`testing/no-hiding-wrappers`](#helpers-do-not-hide-the-target-call) | Helpers do not hide the target call | mechanical→error |  |  |
+| [`testing/external-test-package`](#contract-tests-live-outside-the-target) | Contract tests live outside the target | error · cel |  |  |
+| `testing/no-private-symbol-access` | Tests do not reach private symbols | warn · model |  | Tests MUST NOT reference private symbols of the target; private-symbol testing MUST be resolved at the public boundary rather than by exposing internals solely for tests. |
+| `testing/no-hiding-wrappers` | Helpers do not hide the target call | warn · model |  | Wrappers, builders, or helpers MUST NOT hide the target call or result being specified, and MUST NOT be added merely for reuse. Setup helpers MAY exist only when the specified behavior remains visible. |
 
 ### Contract tests live outside the target
 
-`testing/external-test-package` · test · mechanical→error
+`testing/external-test-package` · test · error · cel
 
 *Living outside the target makes private access impossible rather than discouraged.*
 
@@ -67,34 +67,18 @@ func TestGet(t *testing.T) {
 
 Also: rust
 
-### Tests do not reach private symbols
-
-`testing/no-private-symbol-access` · test · mechanical→error
-
-*Private-symbol tests freeze the implementation.*
-
-Tests MUST NOT reference private symbols of the target; private-symbol testing MUST be resolved at the public boundary rather than by exposing internals solely for tests.
-
-### Helpers do not hide the target call
-
-`testing/no-hiding-wrappers` · test · mechanical→error
-
-*A helper that wraps the call hides the very thing being specified.*
-
-Wrappers, builders, or helpers MUST NOT hide the target call or result being specified, and MUST NOT be added merely for reuse. Setup helpers MAY exist only when the specified behavior remains visible.
-
 ## Readability
 
 A readable test is a small, direct specification whose behavior can be understood without following test infrastructure.
 
-| id | title | enforcement | fix | requirement |
+| id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `testing/simple-table-data` | Table data stays simple | judgment→info |  | Table data and generation code MUST remain simple enough to read as specification. |
-| [`testing/standard-assertions`](#assertions-use-the-standard-library) | Assertions use the standard library | heuristic→warn |  |  |
+| `testing/simple-table-data` | Table data stays simple | info · model |  | Table data and generation code MUST remain simple enough to read as specification. |
+| [`testing/standard-assertions`](#assertions-use-the-standard-library) | Assertions use the standard library | warn · cel |  |  |
 
 ### Assertions use the standard library
 
-`testing/standard-assertions` · test · heuristic→warn
+`testing/standard-assertions` · test · warn · cel
 
 *A hand-written compare-and-fail repeats what the project's assertion library already states, with worse failure output.*
 
@@ -144,22 +128,22 @@ Also: rust
 
 Test structure should provide one obvious owner for each public contract and keep case structure shallow.
 
-| id | title | enforcement | fix | requirement |
+| id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`testing/owner-test`](#every-public-symbol-has-an-owner-test) | Every public symbol has an owner test | heuristic→warn |  |  |
-| [`testing/single-owner-test`](#one-owner-test-per-public-symbol) | One owner test per public symbol | mechanical→error |  |  |
-| [`testing/test-file-layout`](#a-test-file-reads-fixtures-tests-helpers) | A test file reads fixtures, tests, helpers | mechanical→error | safe |  |
-| [`testing/case-depth`](#cases-are-at-most-two-levels-deep) | Cases are at most two levels deep | mechanical→error |  |  |
-| [`testing/table-for-same-behavior`](#tables-for-one-behavior-over-many-inputs) | Tables for one behavior over many inputs | judgment→info |  |  |
-| `testing/scenario-per-behavior` | One case per scenario | judgment→info |  | Different scenarios MUST use one case per scenario, named for the behavior it states. |
-| [`testing/single-case-style`](#one-case-style-and-one-writing-style) | One case style and one writing style | heuristic→warn |  |  |
-| `testing/assertions-in-cases` | Assertions belong to cases | judgment→info |  | Assertions outside cases SHOULD describe setup, preconditions, or test-wide invariants, not case behavior. |
-| [`testing/polling-outlives-teardown`](#polling-does-not-outlive-teardown) | Polling does not outlive teardown | mechanical→error |  |  |
-| `testing/polling-conditions-are-pure` | Polling conditions only observe | judgment→info |  | Polling conditions MUST return readiness and observed results or errors only; assertions belong after readiness is established. |
+| [`testing/owner-test`](#every-public-symbol-has-an-owner-test) | Every public symbol has an owner test | warn · cel |  |  |
+| [`testing/single-owner-test`](#one-owner-test-per-public-symbol) | One owner test per public symbol | error · cel |  |  |
+| [`testing/test-file-layout`](#a-test-file-reads-fixtures-tests-helpers) | A test file reads fixtures, tests, helpers | error · cel | safe |  |
+| [`testing/case-depth`](#cases-are-at-most-two-levels-deep) | Cases are at most two levels deep | warn · model |  |  |
+| [`testing/table-for-same-behavior`](#tables-for-one-behavior-over-many-inputs) | Tables for one behavior over many inputs | info · model |  |  |
+| `testing/scenario-per-behavior` | One case per scenario | info · model |  | Different scenarios MUST use one case per scenario, named for the behavior it states. |
+| `testing/single-case-style` | One case style and one writing style | warn · model |  | A test function MUST use either table cases or scenario cases, never both, and SHOULD use one case style per level. Tests MUST NOT mix different writing styles or abstraction levels at one level. |
+| `testing/assertions-in-cases` | Assertions belong to cases | info · model |  | Assertions outside cases SHOULD describe setup, preconditions, or test-wide invariants, not case behavior. |
+| `testing/polling-outlives-teardown` | Polling does not outlive teardown | warn · model |  | Readiness polling MUST NOT outlive teardown or retain resources after the case closes them. |
+| `testing/polling-conditions-are-pure` | Polling conditions only observe | info · model |  | Polling conditions MUST return readiness and observed results or errors only; assertions belong after readiness is established. |
 
 ### Every public symbol has an owner test
 
-`testing/owner-test` · test · heuristic→warn
+`testing/owner-test` · test · warn · cel
 
 *A contract without an owner test has no place to read or extend its specification.*
 
@@ -220,7 +204,7 @@ Also: rust
 
 ### One owner test per public symbol
 
-`testing/single-owner-test` · test · mechanical→error
+`testing/single-owner-test` · test · error · cel
 
 *Several semantic owners split one contract across places and let them contradict.*
 
@@ -298,7 +282,7 @@ Also: rust
 
 ### A test file reads fixtures, tests, helpers
 
-`testing/test-file-layout` · test · mechanical→error · fix: safe
+`testing/test-file-layout` · test · error · cel · fix: safe
 
 *A test file reads top-down: what the tests use, then the specification, then how it checks.*
 
@@ -329,7 +313,7 @@ Also: rust
 
 ### Cases are at most two levels deep
 
-`testing/case-depth` · test · mechanical→error
+`testing/case-depth` · test · warn · model
 
 *Deep nesting hides which behavior a case specifies.*
 
@@ -343,7 +327,7 @@ Tuning (typescript): Counts `describe` and `it` nesting.
 
 ### Tables for one behavior over many inputs
 
-`testing/table-for-same-behavior` · test · judgment→info
+`testing/table-for-same-behavior` · test · info · model
 
 *A table says the behavior is the same and only the data differs.*
 
@@ -351,34 +335,18 @@ Same behavior over many inputs MUST use one inline table of named inputs and exp
 
 Tuning (go): Use an inline anonymous struct table.
 
-### One case style and one writing style
-
-`testing/single-case-style` · test · heuristic→warn
-
-*Table and scenario cases answer different questions and mixed styles force readers to relearn the test at every step.*
-
-A test function MUST use either table cases or scenario cases, never both, and SHOULD use one case style per level. Tests MUST NOT mix different writing styles or abstraction levels at one level.
-
-### Polling does not outlive teardown
-
-`testing/polling-outlives-teardown` · test · mechanical→error
-
-*Polling that continues after teardown races with released resources.*
-
-Readiness polling MUST NOT outlive teardown or retain resources after the case closes them.
-
 ## F.I.R.S.T.
 
 F.I.R.S.T. keeps tests reliable evidence rather than intermittent diagnostics.
 
-| id | title | enforcement | fix | requirement |
+| id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`testing/first-properties`](#fast-independent-repeatable-self-validating-timely) | Fast, independent, repeatable, self-validating, timely | judgment→info |  |  |
-| [`testing/independent-tests`](#tests-do-not-depend-on-hidden-state) | Tests do not depend on hidden state | heuristic→warn |  |  |
+| [`testing/first-properties`](#fast-independent-repeatable-self-validating-timely) | Fast, independent, repeatable, self-validating, timely | info · model |  |  |
+| [`testing/independent-tests`](#tests-do-not-depend-on-hidden-state) | Tests do not depend on hidden state | warn · model |  |  |
 
 ### Fast, independent, repeatable, self-validating, timely
 
-`testing/first-properties` · test · judgment→info
+`testing/first-properties` · test · info · model
 
 *Unreliable tests train people to ignore failures.*
 
@@ -388,7 +356,7 @@ Method: Martin, Clean Code, chapter 9
 
 ### Tests do not depend on hidden state
 
-`testing/independent-tests` · test · heuristic→warn
+`testing/independent-tests` · test · warn · model
 
 *Order-dependent or manual tests fail intermittently.*
 
@@ -400,29 +368,29 @@ Method: van Deursen et al. 2001; Peruma et al., tsDetect 2020
 
 TDD separates the required behavior from its implementation by making the smallest missing contract fail before the implementation is generalized.
 
-| id | title | enforcement | fix | requirement |
+| id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | `testing/red-green-cycle` | Smallest failing contract first | doc |  | For each behavior change, the agent MUST state the contract and invariants, write the narrowest falsifying test, observe the expected failure when practical, implement the smallest owning change, and run focused checks followed by applicable structural and repository gates. |
-| `testing/cover-contract-dimensions` | Cover every contract dimension | judgment→info |  | Tests MUST cover applicable success, failure, boundaries, ownership and lifecycle, compatibility, parity, and architecture contracts. |
-| `testing/lowest-proving-layer` | Use the lowest layer that proves it | judgment→info |  | The lowest test layer that proves the contract MUST be used. |
-| `testing/no-structure-only-tests` | No structure-only tests | judgment→info |  | Structure-only tests MUST NOT be added merely to exercise implementation details. |
+| `testing/cover-contract-dimensions` | Cover every contract dimension | info · model |  | Tests MUST cover applicable success, failure, boundaries, ownership and lifecycle, compatibility, parity, and architecture contracts. |
+| `testing/lowest-proving-layer` | Use the lowest layer that proves it | info · model |  | The lowest test layer that proves the contract MUST be used. |
+| `testing/no-structure-only-tests` | No structure-only tests | info · model |  | Structure-only tests MUST NOT be added merely to exercise implementation details. |
 
 ## Evidence
 
 Different test layers prove different facts; evidence is complete only when each required fact has an appropriate proof.
 
-| id | title | enforcement | fix | requirement |
+| id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | `testing/coverage-is-reachability` | Coverage proves reachability | doc |  | Coverage proves reachability, not quality or completeness. When no red phase is available, coverage SHOULD prove execution without changing production behavior to manufacture failure. |
 | `testing/evidence-by-layer` | Each layer proves its own facts | doc |  | Each required fact MUST be proven by the layer that owns it: public tests prove exported behavior, errors, and lifecycle; parity tests prove equivalent public behavior across distinct execution paths; golden tests prove exact low-level output for a specified input shape; async tests prove publication, shutdown, and race behavior; fuzz tests prove bounded trust-boundary or differential properties; integration tests prove public end-to-end behavior. |
-| `testing/parity-across-paths` | Test parity across execution paths | judgment→info |  | Parity MUST be tested wherever multiple execution paths are required to implement the same public contract. |
-| `testing/independent-golden-output` | Golden output is independent | judgment→info |  | Golden tests MUST define expected low-level output independently of the implementation that produced it, with the required complete output and metadata checks. |
+| `testing/parity-across-paths` | Test parity across execution paths | info · model |  | Parity MUST be tested wherever multiple execution paths are required to implement the same public contract. |
+| `testing/independent-golden-output` | Golden output is independent | info · model |  | Golden tests MUST define expected low-level output independently of the implementation that produced it, with the required complete output and metadata checks. |
 
 ## Validation
 
 Validation should start with the smallest useful falsification and expand only as far as the affected contract requires.
 
-| id | title | enforcement | fix | requirement |
+| id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | `testing/smallest-check-first` | Run the smallest falsifying check first | doc |  | The smallest falsifying check MUST be run first. |
 | `testing/expand-validation-to-contract` | Expand validation to the contract | doc |  | Package, race, coverage, architecture, and repository checks MUST be applied when relevant; only genuinely inapplicable checks MAY be skipped, and the reason MUST be stated. |
@@ -431,15 +399,15 @@ Validation should start with the smallest useful falsification and expand only a
 
 A complete change has evidence for every contract that the change affects, including cross-layer and architecture-specific obligations.
 
-| id | title | enforcement | fix | requirement |
+| id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `testing/architecture-specific-evidence` | Architecture-specific contracts need specific evidence | judgment→info |  | Architecture-specific contracts MUST have architecture-specific evidence. |
+| `testing/architecture-specific-evidence` | Architecture-specific contracts need specific evidence | info · model |  | Architecture-specific contracts MUST have architecture-specific evidence. |
 | `testing/freshness-gates-are-separate` | Freshness is a repository gate | doc |  | Generated output and documentation freshness MUST be enforced as repository gates, not as test-completeness rules. |
 
 ## Ownership
 
 Test contracts and structure have one owner and should remain independent of incidental implementation details.
 
-| id | title | enforcement | fix | requirement |
+| id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | `testing/single-owner-per-concern` | One owner per concern | doc |  | Each concern, such as test contracts and structure or general test code style, MUST have exactly one owning document; other documents MUST reference it instead of restating it. |

@@ -11,7 +11,7 @@ use crate::Error;
 /// in, it drops the triggers and the views over the table, creates the new
 /// table, copies every row across, drops the old table, renames the new one,
 /// and recreates indexes, triggers and views. `V2` does exactly that.
-const MIGRATIONS: &[&str] = &[V1, V2, V3, V4, V5];
+const MIGRATIONS: &[&str] = &[V1, V2, V3, V4, V5, V6];
 
 /// Findings and the append-only review log. Locators, evidence and facts are
 /// JSON text, so nothing here assumes the artifact is code.
@@ -260,6 +260,54 @@ SELECT f.fingerprint, l.reason_code, (l.reason_code = 'scope-too-broad') AS narr
         WHEN l.rule_version IS NOT NULL AND f.rule_version IS NOT NULL
              AND l.rule_version <> f.rule_version
              AND l.rule_version IS NOT f.legacy_rule_version THEN 'rule-changed'
+        WHEN l.evidence_digest IS NOT NULL AND f.evidence_digest IS NOT NULL
+             AND l.evidence_digest <> f.evidence_digest THEN 'evidence-changed'
+        ELSE 'suppressed'
+    END AS standing
+FROM findings f
+JOIN latest_verdicts l ON l.fingerprint = f.fingerprint
+WHERE l.verdict = 'rejected';
+
+CREATE VIEW finding_states AS
+SELECT f.*, l.verdict AS review_verdict, l.reason_code AS review_reason,
+       s.standing AS standing, COALESCE(s.narrowing, 0) AS narrowing
+FROM findings f
+LEFT JOIN latest_verdicts l ON l.fingerprint = f.fingerprint
+LEFT JOIN standings s ON s.fingerprint = f.fingerprint;
+";
+
+/// Severities replace enforcement tiers. What decides whether a verdict may
+/// hide a finding is the severity its decision authored (`error` is definitive,
+/// `warn` and `info` are review tasks), so the recorded tier becomes that
+/// severity: mechanical is `error`, heuristic `warn`, judgment `info`. The
+/// verdict log is not touched. A rule version now means what the decision
+/// means, apart from how it is checked: the versions older builds recorded
+/// verdicts under are kept in `legacy_rule_version` as a comma separated list,
+/// and the revision of the check is recorded beside the finding and the
+/// verdict without ever expiring one.
+const V6: &str = "
+DROP VIEW finding_states;
+DROP VIEW standings;
+
+ALTER TABLE findings RENAME COLUMN tier TO authored_severity;
+UPDATE findings SET authored_severity = CASE authored_severity
+    WHEN 'mechanical' THEN 'error'
+    WHEN 'heuristic' THEN 'warn'
+    WHEN 'judgment' THEN 'info'
+    WHEN 'evidence' THEN 'info'
+    ELSE authored_severity END;
+ALTER TABLE findings ADD COLUMN check_revision TEXT;
+ALTER TABLE review_events ADD COLUMN check_revision TEXT;
+
+CREATE VIEW standings AS
+SELECT f.fingerprint, l.reason_code, (l.reason_code = 'scope-too-broad') AS narrowing,
+    CASE
+        WHEN COALESCE(f.authored_severity, CASE WHEN f.last_severity = 'error' THEN 'error' ELSE 'warn' END)
+             = 'error' THEN 'unsuppressible'
+        WHEN l.rule_version IS NOT NULL AND f.rule_version IS NOT NULL
+             AND l.rule_version <> f.rule_version
+             AND instr(',' || COALESCE(f.legacy_rule_version, '') || ',', ',' || l.rule_version || ',') = 0
+             THEN 'rule-changed'
         WHEN l.evidence_digest IS NOT NULL AND f.evidence_digest IS NOT NULL
              AND l.evidence_digest <> f.evidence_digest THEN 'evidence-changed'
         ELSE 'suppressed'

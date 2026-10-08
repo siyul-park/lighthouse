@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use lighthouse_engine::Outcome;
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete};
-use lighthouse_spec::{Catalog, Decision, tier};
+use lighthouse_spec::{Catalog, Decision, authored_severity};
 use lighthouse_store::{Judgment, Observed, Run, Standing, Store, Unchecked};
 use serde_json::{Value, json};
 
@@ -167,10 +167,11 @@ fn observed(d: &Diagnostic, catalog: &Catalog, outcome: &Outcome) -> Observed {
     let facts = outcome.facts.get(&d.fingerprint);
     let decision = catalog.decision(&d.rule_id);
     let mut record = Observed::from_diagnostic(d, facts.cloned().unwrap_or_else(|| json!({})));
-    record.tier = tier(d.severity, decision).to_owned();
+    record.authored_severity = authored_severity(d.severity, decision).to_string();
     record.options = options(decision, d, facts, outcome);
-    record.rule_version = decision.map(|d| d.semantic_version());
-    record.legacy_rule_version = decision.and_then(Decision::legacy_semantic_version);
+    record.rule_version = decision.map(|d| d.meaning_version());
+    record.legacy_rule_version = decision.map(|d| d.earlier_versions().join(","));
+    record.check_revision = decision.map(|d| d.check_revision());
     record.decision_hash = decision.map(Decision::version);
     record
 }

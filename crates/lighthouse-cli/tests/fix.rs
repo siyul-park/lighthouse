@@ -284,7 +284,7 @@ spec:
     domain: code
     subject: symbol
   requirement: A function MUST NOT have a name that ends in Old.
-  enforcement: mechanical
+  severity: error
   evidence: [name]
   check:
     type: cel
@@ -355,7 +355,7 @@ spec:
     domain: code
     subject: file
   requirement: A note MUST be written in upper case.
-  enforcement: mechanical
+  severity: error
   evidence: [path]
   check:
     type: cel
@@ -543,7 +543,7 @@ spec:
     domain: code
     subject: file
   requirement: A note MUST NOT be written in lower case.
-  enforcement: mechanical
+  severity: error
   evidence: [path]
   check:
     type: cel
@@ -616,7 +616,7 @@ spec:
     domain: code
     subject: symbol
   requirement: A public function MUST have a doc comment.
-  enforcement: mechanical
+  severity: error
   evidence: [name]
   check:
     type: cel

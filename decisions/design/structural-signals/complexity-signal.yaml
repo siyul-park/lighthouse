@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-signals
+  annotations:
+    lighthouse/was-builtin: design/complexity-signal
 spec:
   title: Complexity is a review signal
   intent: High complexity often marks a symbol doing too much.
@@ -19,7 +21,7 @@ spec:
     handler clause, non-default switch arm and boolean operator (`&&`, `||`);
     nesting counts the deepest level of nested constructs, a flat body being 0,
     and nested functions count as a level.
-  enforcement: heuristic
+  severity: warn
   evidence: [cyclomatic, cognitive, statements, nesting]
   exceptions: >-
     A body that is one switch whose every arm is a single return is a table in
@@ -71,8 +73,38 @@ spec:
         single values (in return position) or `return`s is a table in code form
         and is not reported.
   check:
-    type: builtin
-    id: design/complexity-signal
+    type: cel
+    select: function
+    with:
+      - name: m
+        expr: metrics(func)
+      - name: cognitive
+        expr: m.cognitive >= options.cognitive && m.statements >= options.cognitive_statements
+      - name: verdict
+        expr: >-
+          m.flat_dispatch
+          ? (cognitive ? 'high cognitive complexity' : '')
+          : (m.cyclomatic >= options.cyclomatic && m.statements >= options.statements)
+          ? 'high complexity'
+          : (m.cyclomatic >= options.structural_cyclomatic
+             && m.statements >= options.structural_statements
+             && m.nesting >= options.structural_nesting)
+          ? 'high structural complexity'
+          : cognitive ? 'high cognitive complexity' : ''
+    where: >-
+      !func.file_test && !func.generated && !func.test
+      && (func.kind == 'function' || func.kind == 'method')
+      && m.measured && !m.dispatcher && verdict != ''
+    message: >-
+      function {{ func.name }} has {{ verdict }}: cyclomatic={{ m.cyclomatic }}
+      cognitive={{ m.cognitive }} statements={{ m.statements }} nesting={{ m.nesting }}
+    evidence:
+      cyclomatic: m.cyclomatic
+      cognitive: m.cognitive
+      statements: m.statements
+      nesting: m.nesting
+    identity:
+      subject: func.id
   citation: "McCabe 1976; Campbell, Cognitive Complexity (SonarSource 2018)"
   examples:
     - name: many-branches

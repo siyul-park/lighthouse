@@ -61,32 +61,32 @@ Do not memorize decision text; ask for it when a finding names a rule.
 
 ## Active decisions (19)
 
-A decision's tier is its enforcement: mechanical (default error), heuristic (default warn), judgment (default info). Heuristic and judgment findings are review tasks and verdicts can suppress them, at any severity; mechanical findings cannot be suppressed. `fixable: safe|suggested` marks a decision with a fixer.
+A decision declares the severity of its findings: `error` is definitive, so it needs no verdict and only an annotation in the code waives it; `warn` and `info` are review tasks, and a verdict can hide them whatever level the configuration reports them at. `fixable: safe|suggested` marks a decision with a fixer.
 
 ### core
 
-- `core/max-file-lines` (heuristic) Files stay below a line limit
-- `core/annotation-reason` (mechanical) An allow annotation states its reason
-- `core/unused-allow` (heuristic, fixable: suggested) Allow annotations suppress something
+- `core/max-file-lines` (warn) Files stay below a line limit
+- `core/annotation-reason` (error) An allow annotation states its reason
+- `core/unused-allow` (warn, fixable: suggested) Allow annotations suppress something
 
 ### design
 
-- `design/related-symbols-close` (heuristic, fixable: suggested) Collaborators stay close
-- `design/complexity-signal` (heuristic) Complexity is a review signal
-- `design/coupling-signal` (heuristic) Coupling is a review signal
-- `design/single-use-wrapper` (heuristic) Inline single-use wrappers
-- `design/receiver-owned-behavior` (heuristic) Behavior lives with its owner
-- `design/callers-before-callees` (heuristic, fixable: suggested) Callers before callees
-- `design/no-redundant-qualifiers` (heuristic) No redundant qualifiers
-- `design/no-exported-mutable-global` (heuristic) No exported mutable global
-- `design/declaration-groups` (mechanical, fixable: safe) Declarations follow ownership groups
-- `design/section-banners` (heuristic, fixable: suggested) Comments do not label sections
-- `design/exported-doc` (heuristic) Exported symbols are documented
+- `design/related-symbols-close` (warn, fixable: suggested) Collaborators stay close
+- `design/complexity-signal` (warn) Complexity is a review signal
+- `design/coupling-signal` (warn) Coupling is a review signal
+- `design/single-use-wrapper` (warn) Inline single-use wrappers
+- `design/receiver-owned-behavior` (warn) Behavior lives with its owner
+- `design/callers-before-callees` (warn, fixable: suggested) Callers before callees
+- `design/no-redundant-qualifiers` (warn) No redundant qualifiers
+- `design/no-exported-mutable-global` (warn) No exported mutable global
+- `design/declaration-groups` (error, fixable: safe) Declarations follow ownership groups
+- `design/section-banners` (warn, fixable: suggested) Comments do not label sections
+- `design/exported-doc` (warn) Exported symbols are documented
 
 ### testing
 
-- `testing/external-test-package` (mechanical) Contract tests live outside the target
-- `testing/standard-assertions` (heuristic) Assertions use the standard library
-- `testing/owner-test` (heuristic) Every public symbol has an owner test
-- `testing/single-owner-test` (mechanical) One owner test per public symbol
-- `testing/test-file-layout` (mechanical, fixable: safe) A test file reads fixtures, tests, helpers
+- `testing/external-test-package` (error) Contract tests live outside the target
+- `testing/standard-assertions` (warn) Assertions use the standard library
+- `testing/owner-test` (warn) Every public symbol has an owner test
+- `testing/single-owner-test` (error) One owner test per public symbol
+- `testing/test-file-layout` (error, fixable: safe) A test file reads fixtures, tests, helpers

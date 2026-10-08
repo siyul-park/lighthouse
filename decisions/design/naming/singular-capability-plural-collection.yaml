@@ -13,4 +13,6 @@ spec:
     domain: code
     subject: symbol
   requirement: "Capability names MUST be singular; collections and stores MUST be plural."
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

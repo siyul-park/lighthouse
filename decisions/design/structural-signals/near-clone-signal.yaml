@@ -15,6 +15,8 @@ spec:
   requirement: >-
     Near-clone analysis SHOULD require meaningful body size and a semantic or
     naming relation; syntax similarity alone MUST NOT require abstraction.
-  enforcement: heuristic
+  severity: warn
   evidence: [peer, similarity, statements]
+  check:
+    type: model
   citation: "Jiang et al., Deckard 2007; Roy and Cordy 2007"

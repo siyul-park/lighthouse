@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Structure-only tests MUST NOT be added merely to exercise implementation
     details.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

@@ -13,8 +13,10 @@ spec:
     domain: code
     subject: symbol
   requirement: Standard abbreviations MUST be kept in their conventional form.
-  enforcement: heuristic
+  severity: warn
   evidence: [name, abbreviation]
   languages:
     go:
       tuning: "Initialisms keep a uniform case, for example `ID` and `IP`."
+  check:
+    type: model

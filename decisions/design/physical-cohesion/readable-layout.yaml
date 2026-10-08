@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Files and declaration order MUST make ownership, responsibility, and
     relationships easy to read.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

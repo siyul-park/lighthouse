@@ -20,7 +20,6 @@ spec:
     <rule>[, <rule>] -- <reason>`. The comment suppresses the named rules there,
     whatever their severity, and the reason is required. Allowed findings are
     counted in the report.
-  enforcement: doc
   examples:
     - name: go-allow
       language: go

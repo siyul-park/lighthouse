@@ -16,7 +16,7 @@ const MARKDOWN: &str = "text/markdown";
 pub fn list() -> Vec<Resource> {
     vec![
         Resource::new(CATALOG, "catalog")
-            .with_description("Index of the decision catalog: id, tier, title.")
+            .with_description("Index of the decision catalog: id, authored severity, status (only `accepted` decisions are enforced), title.")
             .with_mime_type("text/plain"),
         Resource::new(CONFIG, "config")
             .with_description("The effective configuration of this project.")
@@ -58,10 +58,17 @@ fn catalog(session: &Session) -> Result<String, String> {
     let catalog = session.catalog().map_err(|e| e.to_string())?;
     let mut out = String::new();
     for decision in catalog.decisions() {
-        let tier = decision
-            .severity()
-            .map_or("doc", |s| lighthouse_spec::tier(s, Some(decision)));
-        let _ = writeln!(out, "{}\t{tier}\t{}", decision.id(), decision.title);
+        let tier = decision.severity().map_or_else(
+            || "doc".to_owned(),
+            |s| lighthouse_spec::authored_severity(s, Some(decision)).to_string(),
+        );
+        let _ = writeln!(
+            out,
+            "{}\t{tier}\t{}\t{}",
+            decision.id(),
+            decision.status,
+            decision.title
+        );
     }
     Ok(out)
 }

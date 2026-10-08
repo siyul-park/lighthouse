@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 
 use lighthouse_plugin::Scope as RunScope;
 use lighthouse_spec::{
-    CelCheck, Check, Decision, DecisionOverrideSpec, OptionSchema, OptionType, OptionsSchema,
-    Select, descriptors, is_resource,
+    CelCheck, Check, CheckKind, Decision, DecisionOverrideSpec, OptionSchema, OptionType,
+    OptionsSchema, Select, descriptors, is_resource,
 };
 use serde_json::json;
 use serde_norway::Value;
@@ -50,12 +50,13 @@ fn a_cel_check_reads_its_select_where_message_and_evidence() {
     }))
     .unwrap();
 
-    let Check::Cel(CelCheck {
+    let CheckKind::Cel(CelCheck {
         select,
         condition,
         message,
         evidence,
-    }) = check
+        ..
+    }) = check.kind
     else {
         panic!("cel expected");
     };

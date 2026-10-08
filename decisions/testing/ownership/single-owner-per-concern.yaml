@@ -16,4 +16,3 @@ spec:
     Each concern, such as test contracts and structure or general test code
     style, MUST have exactly one owning document; other documents MUST reference
     it instead of restating it.
-  enforcement: doc

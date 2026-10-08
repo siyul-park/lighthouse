@@ -574,10 +574,12 @@ fn local_decision(file: &str, mut decision: Decision) -> Result<Decision, Error>
             }
         }
     }
-    if matches!(decision.check, Some(crate::Check::Builtin(_))) {
+    if let Some(crate::CheckKind::Builtin(builtin)) = decision.check.as_ref().map(|c| &c.kind)
+        && builtin.named().is_some()
+    {
         return Err(Error::layout(
             file,
-            "a local decision has a `cel` check or none; `builtin` names Rust code",
+            "a local decision may not name a bundled rule with `builtin: {id}`; use a standard operation, `cel` or `command`",
         ));
     }
     Ok(decision)

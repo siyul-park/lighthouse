@@ -76,6 +76,8 @@ enum Shape {
     Sources,
     Override,
     Pattern,
+    /// A `Decision` that still has `enforcement` instead of `severity`.
+    Enforcement,
     Foreign,
 }
 
@@ -413,7 +415,7 @@ fn read_legacy(files: &[PathBuf]) -> Result<(Vec<Legacy>, BTreeMap<PathBuf, usiz
         let docs = yaml_values(&label, &text)?;
         documents.insert(path.clone(), docs.len());
         for doc in docs {
-            if doc.get("apiVersion").is_some() {
+            if doc.get("apiVersion").is_some() && !lighthouse_spec::has_enforcement(&doc) {
                 unchanged += 1;
             } else {
                 legacy.push(Legacy {
@@ -429,7 +431,9 @@ fn read_legacy(files: &[PathBuf]) -> Result<(Vec<Legacy>, BTreeMap<PathBuf, usiz
 /// Which legacy shape a document has.
 fn shape(path: &Path, doc: &Value) -> Shape {
     let name = file_name(path);
-    if doc.get("select").is_some() && doc.get("where").is_some() && doc.get("id").is_none() {
+    if lighthouse_spec::has_enforcement(doc) {
+        Shape::Enforcement
+    } else if doc.get("select").is_some() && doc.get("where").is_some() && doc.get("id").is_none() {
         Shape::RuleFile
     } else if name == "section.yaml" && doc.is_mapping() && doc.get("id").is_some() {
         Shape::Section
@@ -488,6 +492,11 @@ fn plan_item(
             let (migrated, rule) = decision(item, rule_files)?;
             plan.consumed.extend(rule);
             move_or_write(plan, path, target, &migrated)?;
+        }
+        Shape::Enforcement => {
+            let mut migrated = doc.clone();
+            lighthouse_spec::convert_enforcement(&mut migrated)?;
+            write(plan, path, &migrated);
         }
         Shape::Foreign => {}
     }

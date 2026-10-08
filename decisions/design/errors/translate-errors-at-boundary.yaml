@@ -13,4 +13,6 @@ spec:
     domain: code
     subject: symbol
   requirement: Error categories MUST be translated only at their owning boundary.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

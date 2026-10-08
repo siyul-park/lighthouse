@@ -63,33 +63,32 @@ impl fmt::Display for Scope {
     }
 }
 
-/// How a decision can be verified; it fixes the default severity and whether
-/// its findings are review tasks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+/// Where a decision stands in its life, as an architecture decision record
+/// does. Only an accepted decision is enforced.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
-pub enum Enforcement {
-    Mechanical,
-    Heuristic,
-    Judgment,
-    Doc,
+pub enum Status {
+    /// Under discussion: written down, not yet enforced.
+    Proposed,
+    #[default]
+    Accepted,
+    /// Considered and turned down; kept so the question is not asked again.
+    Rejected,
+    /// Replaced by another decision (named in that decision's `supersedes`).
+    Superseded,
+    /// No longer wanted, and nothing replaces it.
+    Deprecated,
 }
 
-impl Enforcement {
-    /// `None` for `doc`: guidance without a verdict.
-    pub fn default_severity(self) -> Option<Severity> {
-        match self {
-            Self::Mechanical => Some(Severity::Error),
-            Self::Heuristic => Some(Severity::Warn),
-            Self::Judgment => Some(Severity::Info),
-            Self::Doc => None,
-        }
+impl Status {
+    /// Whether decisions in this state are enforced.
+    pub fn enforced(self) -> bool {
+        self == Self::Accepted
     }
 
-    /// Whether a finding of this decision asks for a verdict: it was not
-    /// decided by a mechanical check, so a reviewer confirms or rejects it,
-    /// whatever its severity.
-    pub fn needs_verdict(self) -> bool {
-        matches!(self, Self::Heuristic | Self::Judgment)
+    /// Whether this is the default, left out of written files.
+    pub fn is_default(&self) -> bool {
+        *self == Self::Accepted
     }
 }
 
@@ -229,26 +228,17 @@ pub struct Example {
     pub fixed: Vec<ExampleFile>,
 }
 
-/// How a finding is decided: the decision's enforcement, or, for a rule
-/// without a decision, what its severity implies.
-pub fn tier(severity: Severity, decision: Option<&crate::Decision>) -> &'static str {
-    match decision.map(|d| d.enforcement) {
-        Some(Enforcement::Mechanical) => "mechanical",
-        Some(Enforcement::Heuristic) => "heuristic",
-        Some(Enforcement::Judgment) => "judgment",
-        Some(Enforcement::Doc) | None => match severity {
-            Severity::Error => "mechanical",
-            Severity::Warn => "heuristic",
-            Severity::Info => "evidence",
-        },
-    }
+/// The severity a finding's decision authored, else the severity the finding
+/// has: what decides whether a verdict may hide it and a fix may be safe.
+pub fn authored_severity(severity: Severity, decision: Option<&crate::Decision>) -> Severity {
+    decision.and_then(|d| d.severity()).unwrap_or(severity)
 }
 
-/// Whether findings of this tier (see [`tier`]) ask for a verdict: they were
-/// not decided by a mechanical check, so a reviewer confirms or rejects each,
-/// whatever its severity.
-pub fn needs_verdict(tier: &str) -> bool {
-    matches!(tier, "heuristic" | "judgment")
+/// Whether findings of a decision with this authored severity ask for a
+/// verdict. An `error` is definitive: only an annotation in the code waives
+/// it. A `warn` or `info` is a review task: a reviewer confirms or rejects it.
+pub fn needs_verdict(authored: Severity) -> bool {
+    authored != Severity::Error
 }
 
 /// The first eight bytes of the SHA-256 of `text`, in hex.
@@ -269,7 +259,7 @@ macro_rules! display {
 
 display!(Subject { Symbol => "symbol", File => "file", Module => "module", Project => "project", Test => "test" });
 display!(Domain { Code => "code" });
-display!(Enforcement { Mechanical => "mechanical", Heuristic => "heuristic", Judgment => "judgment", Doc => "doc" });
+display!(Status { Proposed => "proposed", Accepted => "accepted", Rejected => "rejected", Superseded => "superseded", Deprecated => "deprecated" });
 display!(ExampleKind { Valid => "valid", Invalid => "invalid" });
 
 fn is_false(value: &bool) -> bool {

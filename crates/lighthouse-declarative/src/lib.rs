@@ -1,18 +1,27 @@
-//! Declarative rules: a CEL expression over the code model. A `cel` check
+//! Declarative rules: the checks a decision's spec describes, compiled into
+//! rules. A `cel` check
 //! names what it selects (`symbol`, `function`, `edge`, `module`, `file` or
 //! `test`), a `where` expression that is true for a violation, and a message;
 //! the decision that holds it supplies id, severity, scope, evidence fields
 //! and the examples that `lighthouse decision test` runs.
 
-mod definition;
+mod builder;
+mod cel_rule;
+mod command;
+mod eval;
 mod facts;
 mod fix;
+pub mod layout;
+mod library;
 mod local;
+mod naming;
+mod ops;
 mod rule;
+mod text;
 
 use fix::SpecFixer;
 use lighthouse_plugin::{Fixer, Plugin, PluginManifest, Rule};
-use lighthouse_spec::{Catalog, Check};
+use lighthouse_spec::Catalog;
 
 pub use local::{load_local, local_dir, local_files};
 use rule::DeclarativeRule;
@@ -47,10 +56,7 @@ impl Declarative {
             .decisions()
             .filter(|d| d.id().starts_with(&format!("{id}/")))
         {
-            let Some(Check::Cel(cel)) = &decision.check else {
-                continue;
-            };
-            definitions.push(DeclarativeRule::new(decision, cel)?);
+            definitions.extend(DeclarativeRule::new(decision)?);
         }
         let mut fixers = Vec::new();
         for decision in catalog
@@ -120,7 +126,10 @@ impl Plugin for Declarative {
     fn presets(&self) -> Vec<lighthouse_plugin::PresetManifest> {
         lighthouse_plugin::PresetManifest::standard(
             &self.manifest.id,
-            self.definitions.iter().map(|r| r.manifest()),
+            self.definitions
+                .iter()
+                .map(|r| r.manifest())
+                .filter(|m| m.enforced),
         )
     }
 }

@@ -293,7 +293,7 @@ fn detail(finding: &FindingRecord) -> String {
         let _ = writeln!(out, "{label:<13}{value}");
     };
     field("fingerprint:", finding.fingerprint.clone());
-    let tier = finding.tier.as_deref().unwrap_or("-");
+    let tier = finding.authored_severity.as_deref().unwrap_or("-");
     field(
         "rule:",
         format!("{} ({}, {tier})", finding.rule_id, finding.severity),

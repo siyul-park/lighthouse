@@ -23,33 +23,19 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
     let file = file();
     let ws = Workspace::new(".");
     let project = Project::merge([Fragment::default()]);
-    let mut facts = Facts::new();
-    let ctx = |facts: &Facts| -> Result<Vec<_>, Error> {
-        let ctx = Ctx {
-            ws: &ws,
-            project: &project,
-            file: Some((&file, text)),
-            facts,
-        };
-        registry
-            .rule("core/max-file-lines")
-            .unwrap()
-            .check(&ctx, options)
+    let facts = Facts::new();
+    let ctx = Ctx {
+        ws: &ws,
+        project: &project,
+        file: Some((&file, text)),
+        facts: &facts,
+        keys: &lighthouse_plugin::NoKeys,
+        trusted: false,
     };
-    let analyzers = registry.order(["core/line-count"])?;
-    for analyzer in analyzers {
-        let value = analyzer.run(&Ctx {
-            ws: &ws,
-            project: &project,
-            file: Some((&file, text)),
-            facts: &facts,
-        })?;
-        facts.insert(
-            (analyzer.manifest().id.clone(), "dir/a.txt".to_owned()),
-            value,
-        );
-    }
-    ctx(&facts)
+    registry
+        .rule("core/max-file-lines")
+        .unwrap()
+        .check(&ctx, options)
 }
 
 #[test]
@@ -59,7 +45,10 @@ fn registry_is_valid_and_exposes_core() {
     assert!(registry.has_plugin("core"));
     let meta = registry.rule("core/max-file-lines").unwrap().manifest();
     assert_eq!(meta.scope, Scope::File);
-    assert_eq!(meta.analyzers, ["core/line-count"]);
+    assert!(
+        meta.analyzers.is_empty(),
+        "the lines of a file are read from its text"
+    );
 }
 
 #[test]
@@ -100,27 +89,9 @@ fn rule_validates_options() {
 }
 
 #[test]
-fn missing_fact_is_a_distinct_error() {
-    let registry = lighthouse_builtin::registry();
-    let file = file();
-    let ws = Workspace::new(".");
-    let project = Project::default();
-    let facts = Facts::new();
-    let ctx = Ctx {
-        ws: &ws,
-        project: &project,
-        file: Some((&file, "")),
-        facts: &facts,
-    };
-    let err = registry
-        .rule("core/max-file-lines")
-        .unwrap()
-        .check(&ctx, &Options::new());
-    assert!(matches!(err, Err(Error::MissingFact(_))));
-}
+fn registered_rules_are_exactly_the_automated_catalog_decisions() {
+    use lighthouse_spec::CheckKind;
 
-#[test]
-fn registered_rules_are_exactly_the_checked_catalog_decisions() {
     let registry = lighthouse_builtin::registry();
     let catalog = lighthouse_spec::Catalog::bundled();
     let registered: std::collections::BTreeSet<_> =
@@ -129,20 +100,17 @@ fn registered_rules_are_exactly_the_checked_catalog_decisions() {
         let decision = catalog
             .decision(id)
             .unwrap_or_else(|| panic!("{id} has no decision"));
-        assert_ne!(
-            decision.enforcement,
-            lighthouse_spec::Enforcement::Doc,
-            "{id}"
-        );
-        match &decision.check {
-            Some(lighthouse_spec::Check::Builtin(rule)) => assert_eq!(&rule.id, id),
-            Some(lighthouse_spec::Check::Cel(_)) => {}
-            None => panic!("{id} is registered but its decision has no check"),
+        match decision.check.as_ref().map(|c| &c.kind) {
+            Some(CheckKind::Builtin(rule)) => {
+                assert!(rule.named().is_none_or(|rule| rule == id), "{id}");
+            }
+            Some(CheckKind::Cel(_)) => {}
+            other => panic!("{id} is registered but its decision's check is {other:?}"),
         }
     }
     let checked: std::collections::BTreeSet<_> = catalog
         .decisions()
-        .filter(|d| d.check.is_some())
+        .filter(|d| d.automated())
         .map(|d| d.id().to_owned())
         .collect();
     assert_eq!(registered, checked);

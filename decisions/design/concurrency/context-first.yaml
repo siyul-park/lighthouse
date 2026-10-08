@@ -15,11 +15,13 @@ spec:
   requirement: >-
     Blocking, I/O, and process-boundary operations MUST take the cancellation
     context as their first parameter.
-  enforcement: heuristic
+  severity: warn
   evidence: [function, parameter_index]
   languages:
     go:
       tuning: "`ctx context.Context` is the first parameter."
+  check:
+    type: model
   examples:
     - name: invalid
       language: go

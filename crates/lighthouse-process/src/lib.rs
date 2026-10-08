@@ -6,7 +6,10 @@ use std::{
     io::{Read, Write},
     path::Path,
     process::{Child, Command, Stdio},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -27,6 +30,9 @@ pub struct Output {
     pub code: Option<i32>,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
+    /// More was printed than `max_output` keeps: the rest was dropped, so
+    /// what is here is not everything the program said.
+    pub truncated: bool,
 }
 
 /// What to run and how: no shell, `dir` as the working directory, `stdin` on
@@ -49,6 +55,7 @@ pub struct Spec<'a> {
 /// What a reader thread has collected so far.
 struct Captured {
     bytes: Arc<Mutex<Vec<u8>>>,
+    overflowed: Arc<AtomicBool>,
     reader: thread::JoinHandle<()>,
 }
 
@@ -56,12 +63,16 @@ impl Captured {
     /// What was read, waiting a moment for the reader to reach the end of a
     /// pipe that was closed; a pipe something still holds open does not hold
     /// the run up.
-    fn finish(self) -> Vec<u8> {
+    fn finish(self) -> (Vec<u8>, bool) {
         let waited = Instant::now();
         while !self.reader.is_finished() && waited.elapsed() < DRAIN {
             thread::sleep(POLL);
         }
-        self.bytes.lock().map(|b| b.clone()).unwrap_or_default()
+        let bytes = self.bytes.lock().map(|b| b.clone()).unwrap_or_default();
+        // A reader still running after the drain has not seen the end of the
+        // output either.
+        let cut = self.overflowed.load(Ordering::Relaxed) || !self.reader.is_finished();
+        (bytes, cut)
     }
 }
 
@@ -93,8 +104,18 @@ pub fn run(spec: &Spec) -> Result<Output, String> {
     let stderr = capture(child.stderr.take(), spec.max_output);
     let started = Instant::now();
     let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
+        match exited(&mut child) {
+            Ok(Some(())) => {
+                // The leader has exited but is not yet collected, so its group
+                // id is still ours: take down whatever it left running before
+                // collecting it, so a daemon holding the pipes cannot hang the
+                // run.
+                kill_group(&child);
+                match child.wait() {
+                    Ok(status) => break status,
+                    Err(e) => return Err(e.to_string()),
+                }
+            }
             Ok(None) if started.elapsed() >= spec.limit => {
                 stop(&mut child, spec.grace);
                 return Err(format!("timed out after {}s", spec.limit.as_secs()));
@@ -106,21 +127,15 @@ pub fn run(spec: &Spec) -> Result<Output, String> {
             }
         }
     };
-    // The leader is gone; anything it left running in its group, a daemon that
-    // holds the pipes open, goes with it, so the run cannot hang on it.
-    #[cfg(unix)]
-    if let Ok(pid) = i32::try_from(child.id()) {
-        // SAFETY: killpg only signals the group made at spawn.
-        unsafe {
-            libc::killpg(pid, libc::SIGKILL);
-        }
-    }
     let _ = writer.join();
+    let (stdout, cut_out) = stdout.finish();
+    let (stderr, cut_err) = stderr.finish();
     Ok(Output {
         success: status.success(),
         code: status.code(),
-        stdout: stdout.finish(),
-        stderr: stderr.finish(),
+        stdout,
+        stderr,
+        truncated: cut_out || cut_err,
     })
 }
 
@@ -169,9 +184,55 @@ fn stop(child: &mut Child, grace: Duration) {
     reap(child);
 }
 
+/// Whether the program has exited, without collecting it: its process group
+/// stays ours until it is waited for.
+fn exited(child: &mut Child) -> std::io::Result<Option<()>> {
+    #[cfg(unix)]
+    {
+        let pid: libc::id_t = child.id();
+        // SAFETY: an all-zero siginfo_t is a valid value for waitid to fill.
+        let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+        // SAFETY: waitid reads the pid and writes only `info`; WNOWAIT leaves
+        // the child waitable.
+        let status = unsafe {
+            libc::waitid(
+                libc::P_PID,
+                pid,
+                &mut info,
+                libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
+            )
+        };
+        if status != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        // SAFETY: after a successful waitid, si_pid says whether a child changed state.
+        let changed = unsafe { info.si_pid() } != 0;
+        Ok(changed.then_some(()))
+    }
+    #[cfg(not(unix))]
+    {
+        child.try_wait().map(|s| s.map(drop))
+    }
+}
+
+/// Kills the process group the program led.
+fn kill_group(child: &Child) {
+    #[cfg(unix)]
+    if let Ok(pid) = i32::try_from(child.id()) {
+        // SAFETY: killpg only signals the group made at spawn.
+        unsafe {
+            libc::killpg(pid, libc::SIGKILL);
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = child;
+}
+
 fn capture<R: Read + Send + 'static>(pipe: Option<R>, max: usize) -> Captured {
     let bytes = Arc::new(Mutex::new(Vec::new()));
     let sink = Arc::clone(&bytes);
+    let overflowed = Arc::new(AtomicBool::new(false));
+    let overflow = Arc::clone(&overflowed);
     let reader = thread::spawn(move || {
         let Some(mut pipe) = pipe else {
             return;
@@ -183,9 +244,16 @@ fn capture<R: Read + Send + 'static>(pipe: Option<R>, max: usize) -> Captured {
             }
             if let Ok(mut kept) = sink.lock() {
                 let room = max.saturating_sub(kept.len());
+                if n > room {
+                    overflow.store(true, Ordering::Relaxed);
+                }
                 kept.extend_from_slice(&chunk[..n.min(room)]);
             }
         }
     });
-    Captured { bytes, reader }
+    Captured {
+        bytes,
+        overflowed,
+        reader,
+    }
 }

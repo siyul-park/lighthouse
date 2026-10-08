@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: comments
+  annotations:
+    lighthouse/was-builtin: design/exported-doc
 spec:
   title: Exported symbols are documented
   intent: Public API changes need facts callers cannot read from the code.
@@ -16,7 +18,7 @@ spec:
     Exported symbols SHOULD have doc comments in the language's standard form.
     Public API changes SHOULD document user-visible behavior, constraints,
     ownership, or other facts the code cannot express.
-  enforcement: heuristic
+  severity: warn
   evidence: [symbol]
   options:
     type: object
@@ -92,8 +94,25 @@ spec:
         unpublished = "auto" | "public" | "internal"`). Code in an inline
         `#[cfg(test)]` module is test code.
   check:
-    type: builtin
-    id: design/exported-doc
+    type: cel
+    select: symbol
+    with:
+      - name: owner
+        expr: owner(symbol)
+    where: >-
+      !symbol.file_test && !symbol.generated && !symbol.test
+      && options.kinds.exists(k, k == symbol.kind)
+      && exposed(symbol, options.include_internal)
+      && (owner.kind == '' || (exposed(owner, options.include_internal) && owner.kind != 'interface'))
+      && !(symbol.kind == 'method'
+           && (options.exempt_methods.exists(m, m == symbol.name)
+               || (options.exempt_interface_methods && symbol.documented_by_interface)))
+      && !symbol.documented
+    message: "exported {{ symbol.kind }} {{ symbol.name }} must have a doc comment"
+    evidence:
+      symbol: symbol.id
+    identity:
+      subject: symbol.id
   examples:
     - name: undocumented
       language: go

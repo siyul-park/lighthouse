@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: functions
+  annotations:
+    lighthouse/was-builtin: design/callers-before-callees
 spec:
   title: Callers before callees
   intent: Readers follow behavior from intent to mechanics.
@@ -17,7 +19,7 @@ spec:
     symbols adjacent, and cohesive implementations together. Callers MUST
     precede their exclusive helpers, and shared leaves MUST follow the code that
     uses them.
-  enforcement: heuristic
+  severity: warn
   evidence: [caller, callee]
   options:
     type: object
@@ -40,8 +42,30 @@ spec:
         method of an inherent impl called by a method of a trait impl: inherent
         impls come first.
   check:
-    type: builtin
-    id: design/callers-before-callees
+    type: cel
+    select: function
+    with:
+      - name: local
+        expr: func.local_callers
+      - name: anchor
+        expr: >-
+          size(local) == 0 ? func
+          : options.shared_after_last_caller ? local[size(local) - 1] : local[0]
+    where: >-
+      !func.file_test && !func.generated && !func.test && (func.kind == 'function' || func.kind == 'method')
+      && size(local) > 0 && func.pos <= anchor.pos
+      && !(rank(func, 'design/group') >= 0 && rank(anchor, 'design/group') >= 0
+           && rank(func, 'design/group') < rank(anchor, 'design/group'))
+      && !(func.kind == 'method' && !func.implements_trait
+           && anchor.kind == 'method' && anchor.implements_trait)
+    message: >-
+      private {{ func.kind }} {{ func.name }} is declared before its caller
+      {{ anchor.name }}; callers come first
+    evidence:
+      caller: anchor.id
+      callee: func.id
+    identity:
+      subject: func.id
   fix:
     safety: suggested
     requires: [extent]

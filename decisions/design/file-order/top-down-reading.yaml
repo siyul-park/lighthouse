@@ -15,4 +15,6 @@ spec:
   requirement: >-
     A cohesive implementation MUST read from higher-level behavior toward shared
     machinery.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

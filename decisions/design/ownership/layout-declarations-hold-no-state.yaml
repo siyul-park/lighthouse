@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Layout-only declarations MAY name private members but MUST NOT access
     runtime state.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

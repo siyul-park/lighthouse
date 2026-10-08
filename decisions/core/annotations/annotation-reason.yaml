@@ -15,7 +15,7 @@ spec:
   requirement: >-
     An allow annotation MUST give a reason after `--`; an annotation without one
     is ignored and reported.
-  enforcement: mechanical
+  severity: error
   evidence: [rules, reason]
   check:
     type: builtin

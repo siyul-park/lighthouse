@@ -191,7 +191,6 @@ fn facts_describe_the_subject_with_callers_split_and_file_measures() {
         .unwrap();
     let file = &lines.facts[&finding.fingerprint]["file"];
     assert_eq!(file["lines"], 6);
-    assert_eq!(file["measures"]["core/line-count"], 6);
     assert_eq!(file["path"], "src/lib.rs");
 }
 

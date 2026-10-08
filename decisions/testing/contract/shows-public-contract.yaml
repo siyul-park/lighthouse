@@ -13,4 +13,6 @@ spec:
     domain: code
     subject: test
   requirement: A test MUST show public usage and promised behavior.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

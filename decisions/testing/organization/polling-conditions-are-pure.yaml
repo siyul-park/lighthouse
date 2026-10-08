@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Polling conditions MUST return readiness and observed results or errors
     only; assertions belong after readiness is established.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

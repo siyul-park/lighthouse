@@ -66,7 +66,7 @@ in `.gitignore` syntax; unlike a report filter, that removes them from analysis.
 
 | Term | Means |
 | --- | --- |
-| **decision** | What was decided and why: the catalog entry (`Decision`), with its enforcement, options, examples and fix. The one authored concept. |
+| **decision** | What was decided and why: the catalog entry (`Decision`), with its severity, check, options, examples and fix. The one authored concept. |
 | **rule** | The executable form the engine compiles from a decision's `check`: the `Rule` trait, the rule ids that findings carry (a rule id is the id of its decision). |
 | **verdict** | A judgment about one finding (confirmed, rejected, deferred, with a reason), appended to the decision log. |
 | **annotation** | A verdict written at the code: `lighthouse:allow <rule> -- <reason>`. |
@@ -89,7 +89,7 @@ spec: { ... }
 
 | Kind | Holds | Lives in |
 | --- | --- | --- |
-| `Decision` | a decision: `title intent scope requirement enforcement severity evidence exceptions options languages check fix citation strict examples` | `decisions/<pack>/<section>/<name>.yaml`, `.lighthouse/decisions/` |
+| `Decision` | a decision: `title intent scope requirement status supersedes consequences severity evidence exceptions options languages check fix citation strict examples` | `decisions/<pack>/<section>/<name>.yaml`, `.lighthouse/decisions/` |
 | `DecisionOverride` | a project's adjustment of a decision of a lower layer (`extends`) | `.lighthouse/decisions/` |
 | `Pack` | title, intro and the ordered sections, each listing its decisions | `decisions/<pack>/pack.yaml` |
 | `SourceMap` | which decision covers each normative line of the documents a catalog came from | `decisions/sources.yaml` |
@@ -107,7 +107,7 @@ meaning. `scope` is `{domain, subject}` (`domain` is `code`). `options` is a JSO
 Schema object (`type`, `default`, `description` per property, closed with
 `additionalProperties: false`); `languages.<id>` holds the option values and the
 wording of one language. `check` and `fix` choose a provider by `type`: `check` is
-`builtin` or `cel`; `fix` is `ops`, `command` or `rpc`, with the fields of its type
+`builtin`, `cel`, `command`, `rpc` or `model`; `fix` is `ops`, `command` or `rpc`, with the fields of its type
 next to `safety` and `requires`, and no others.
 
 The JSON Schema (2020-12) of each kind is generated from the Rust types into
@@ -141,14 +141,12 @@ the catalog root, or its own directory); otherwise it stays, with a warning.
 ## Severity
 
 A finding is `error`, `warn` or `info` (and a rule may be `off` in
-configuration). The default follows the decision's enforcement: mechanical is
-`error`, heuristic is `warn`, judgment is `info`; `doc` yields no finding. The same
+configuration). A decision authors its severity (`severity: error|warn|info`); a decision without a `check` is documentation and yields no finding. A project's `level` changes what is reported and the exit code, never the authored severity. The same
 three levels map to SARIF (`error`, `warning`, `note`). Exit code: `1` if any error;
 a warning fails only with `--strict` or past `--max-warnings N`; `info` never
 fails; an incomplete analysis is `3`.
 
-Needing a verdict is not a level: findings of non-mechanical decisions
-(`enforcement: heuristic` or `judgment`) are review tasks whatever their severity.
+Needing a verdict follows the *authored* severity: `error` is definitive (no verdict, only an annotation in the code waives it, its fix may be `safe`); `warn` and `info` are review tasks whatever level the configuration reports them at.
 `review list`, the MCP `review_tasks` tool, the agent format and the hooks select by
 that property. A rule that has no decision is treated by its severity. History keeps
 the severity string it recorded, including `review` from older builds.
@@ -156,14 +154,22 @@ the severity string it recorded, including `review` from older builds.
 Suppression follows the same property, not the severity: a verdict can suppress a
 finding of a heuristic or judgment decision even when the project configured it as
 `error`, and never one of a mechanical decision even when configured as `warn`. So an
-agent is only asked for a verdict that can take effect. (A cache row from before tiers
-were recorded has no tier; its recorded severity stands in for it.)
+agent is only asked for a verdict that can take effect. (A cache row from before authored severities were recorded has none; its recorded
+severity stands in for it. Schema migration 6 turned the recorded tiers into
+authored severities: mechanical is `error`, heuristic `warn`, judgment `info`.)
 
 ## Rules
 
 Every implemented rule belongs to a catalog decision whose `check` is
-either `type: builtin` (a Rust rule of a bundled plugin: `design`, `testing`,
-`core`) or `type: cel`: an expression over the code model, written in the decision.
+one provider of the union `builtin | cel | command | rpc | model`, with the common fields `requires` and `timeout`:
+
+- `builtin` is a standard, decision-agnostic operation (`order`, `proximity`, `cycle`) or, for the two rules the engine reports itself (`core/annotation-reason`, `core/unused-allow`), a rule registered by name.
+- `cel` is an expression over the code model, written in the decision, with the standard function library `metrics callers callees edges owner tests annotations rank exposed` and the text helpers `lines trim trimPrefixes trimSuffixes trimLeft trimRight leadingRun drop`.
+- `command` runs a program under the process contract: argv without a shell, `{file}`/`{files}`/`{rule}` filling whole arguments, `batch: file|all`, exit `0` clean, `1` findings (stdout lines, an optional `path:line[:col]: ` prefix), anything else an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script. A command is not sandboxed: it runs with the user's privileges, in the project root, with an environment cleared to `PATH`, `LANG`, `TMPDIR` and the declared `env` (no `HOME`) plus `LIGHTHOUSE_*`. Trust is the only protection; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean.
+- `rpc` is reserved until plugin protocol 0.2 and refused at load.
+- `model` hands the decision to agent review (`select` and `prompt` optional); it is not deterministic and caps the severity at `warn`.
+
+A decision with no `check` is documentation. How a decision is checked is not part of what it means: the *meaning version* hashes requirement, severity, scope and options, and the `check_revision` records the check on findings and verdicts without ever expiring one.
 
 ```yaml
 check:
@@ -250,7 +256,7 @@ evidence, facts and options are JSON, so nothing in it is specific to code.
 
 ### Findings
 
-`findings` has one row per fingerprint: rule, last severity and tier, path, locator,
+`findings` has one row per fingerprint: rule, last severity and authored severity, path, locator,
 owner symbol, `first_seen`, `last_seen`, `resolved_at`, `inactive_at`, how often it came
 back (`reopened`), and the last sighting: message, evidence, facts, the options the rule
 ran with, the commit and whether the tracked files were dirty, the Lighthouse and
@@ -292,15 +298,19 @@ back to its undistinguished fingerprint.
 
 ### Semantic version
 
-`rule_version` is the hash of a decision's normalized semantic content
-(requirement with whitespace squashed, enforcement, scope, check, and the option
-types and defaults including each language's values): the envelope, the labels, the
+`rule_version` is the *meaning version*: the hash of a decision's normalized semantic content
+(requirement with whitespace squashed, severity, scope, and the option
+types and defaults including each language's values; never the `check`): the envelope, the labels, the
 file format and the prose do not change it. Hashing a different set of fields gives a
 different number than builds before the resource model recorded, so a verdict
 written then would expire for the change of format alone. Each finding therefore
-also carries the *legacy* version: what the old formula gives for the same content
-(`Decision::legacy_semantic_version`, which reads the old shape back out of the
-new). The store treats a verdict as current when its `rule_version` equals either, so
+also carries the *earlier* versions: what the build with `enforcement` and what the
+build before the resource model gave for the same content
+(`Decision::earlier_versions`, which reads the old shapes back out of the new; a
+decision that moved from a bespoke rule to a standard operation remembers its old
+id in `lighthouse/was-builtin`, one whose `enforcement` is not its severity's default
+in `lighthouse/was-enforcement`). The store treats a verdict as current when its
+`rule_version` equals the meaning version or any of them, so
 existing verdicts keep applying while the decision demands the same, and expire as
 before when it changes (one exception: `scope` was not hashed before, so changing
 it expires only verdicts recorded after the model). A test pins the legacy value of
@@ -312,15 +322,16 @@ since has no legacy version.
 ### Verdicts
 
 A verdict is a review event: the finding's fingerprint, rule id, `rule_version` (the
-*semantic* version of the decision: a hash of its requirement, enforcement, options and
-implementation, not of prose, examples or tuning notes), `decision_hash` (the whole
+*meaning* version of the decision: a hash of its requirement, severity, scope and options,
+not of its check, prose, examples or tuning notes), `check_revision` (a hash of the
+`check`, recorded for evaluation and never compared to expire a verdict), `decision_hash` (the whole
 decision definition), `catalog_version`, the Lighthouse version, a nullable
 `pattern_fingerprint` (code-shape identity, filled by the similarity index), the
 verdict, the reason, free text, the reviewer (`agent | human` and id), language, scope,
 a digest of the evidence, a **snapshot** frozen at review time, the commit and a
 timestamp. The snapshot is one JSON object, versioned (`"v": 2`, camelCase keys; `1`
 had snake_case keys): message, path, locator, symbol, evidence, facts, options, severity,
-tier (the severity string is what was recorded, so history may say `review`), when the
+`authored` (the severity the decision authored; builds before it recorded a `tier`; the severity string is what was recorded, so history may say `review`), when the
 finding was seen (`seenAt`), the commit and dirtiness at that sighting, the Lighthouse
 version and `patternFingerprint: null`. The snapshot is the single owner of the frozen evidence.
 

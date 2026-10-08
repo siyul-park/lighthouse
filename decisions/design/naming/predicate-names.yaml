@@ -17,10 +17,12 @@ spec:
     `IsX` for a state predicate, `MatchX` for comparison or validation against
     X, and a bare `X` for a direct boolean value. `At` MUST be used for position
     or time predicates.
-  enforcement: heuristic
+  severity: warn
   evidence: [name, expected_form]
   languages:
     go:
       tuning: >-
         Spelled as shown for exported names; unexported names use lower camel
         case.
+  check:
+    type: model

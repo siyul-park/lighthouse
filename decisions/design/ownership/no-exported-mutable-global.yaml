@@ -18,7 +18,7 @@ spec:
     An exported package-level variable MUST NOT hold mutable state: state
     belongs to an owner that guards it, and a global that never changes SHOULD
     be a constant or a function.
-  enforcement: heuristic
+  severity: warn
   evidence: [symbol, module]
   exceptions: >-
     Sentinel errors, by the `Err` name prefix, are exported variables by

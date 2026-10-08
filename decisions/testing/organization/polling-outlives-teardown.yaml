@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization
+  annotations:
+    lighthouse/was-enforcement: mechanical
 spec:
   title: Polling does not outlive teardown
   intent: Polling that continues after teardown races with released resources.
@@ -15,5 +17,7 @@ spec:
   requirement: >-
     Readiness polling MUST NOT outlive teardown or retain resources after the
     case closes them.
-  enforcement: mechanical
+  severity: warn
   evidence: [test, poller]
+  check:
+    type: model

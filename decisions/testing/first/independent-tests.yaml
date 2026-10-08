@@ -15,6 +15,8 @@ spec:
   requirement: >-
     Tests MUST NOT depend on other tests, uncontrolled mutable state, manual
     inspection, or unnecessary setup.
-  enforcement: heuristic
+  severity: warn
   evidence: [test, smell]
+  check:
+    type: model
   citation: "van Deursen et al. 2001; Peruma et al., tsDetect 2020"

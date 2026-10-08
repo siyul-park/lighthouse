@@ -118,9 +118,12 @@ impl Checked {
 /// records the run and drops the findings that verdicts keep out.
 pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     let (registry, plugins) = session.registry()?;
+    let trusted = session.trusted();
     let root = session.root.clone();
     let catalog = session.catalog()?;
-    let engine = Engine::new(registry, session.config, &root)?.with_incomplete(plugins.incomplete);
+    let engine = Engine::new(registry, session.config, &root)?
+        .with_incomplete(plugins.incomplete)
+        .with_trust(trusted);
     let mut messages = Vec::new();
     let mut outcome = analyze(&engine, &root, request, &mut messages)?;
     messages.extend(plugins.notices.iter().chain(&outcome.notices).cloned());

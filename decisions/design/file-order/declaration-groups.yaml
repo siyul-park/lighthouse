@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: file-order
+  annotations:
+    lighthouse/was-builtin: design/declaration-groups
 spec:
   title: Declarations follow ownership groups
   intent: A fixed group order makes every file predictable.
@@ -17,7 +19,7 @@ spec:
     order, from public contract to private mechanics. Initializers MUST stay
     together and MUST precede non-initializer functions and methods. Within one
     type, constructors MUST precede other behavior.
-  enforcement: mechanical
+  severity: error
   evidence: [declaration, group, expected_after, before]
   options:
     type: object
@@ -103,7 +105,30 @@ spec:
         it is `pub` or `pub(crate)`.
   check:
     type: builtin
-    id: design/declaration-groups
+    op: order
+    clauses:
+      - within: file
+        by: [design/group]
+        message: >-
+          {{ symbol.kind }} {{ symbol.name }} belongs to the `{{ options.groups[rank] }}` group
+          and must {{ after.id != '' ? 'follow ' + after.name : 'come before the declarations above it' }}
+        evidence:
+          declaration: symbol.id
+          group: options.groups[rank]
+          expected_after: "after.id != '' ? after.name : null"
+          before: "''"
+      - within: owner
+        by: [design/constructor-first]
+        report: late
+        when: options.constructors_first
+        message: >-
+          constructor {{ symbol.name }} must precede the other methods of its type,
+          such as {{ earlier.name }}
+        evidence:
+          declaration: symbol.id
+          group: "'constructor'"
+          expected_after: "null"
+          before: earlier.id
   fix:
     safety: safe
     requires: [extent]

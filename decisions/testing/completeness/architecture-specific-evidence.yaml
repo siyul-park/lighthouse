@@ -13,4 +13,6 @@ spec:
     domain: code
     subject: project
   requirement: Architecture-specific contracts MUST have architecture-specific evidence.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

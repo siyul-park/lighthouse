@@ -15,4 +15,6 @@ spec:
   requirement: >-
     A case MUST represent behavior, not a branch or implementation path, and
     MUST contain the behavior it claims to specify.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

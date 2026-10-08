@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-signals
+  annotations:
+    lighthouse/was-builtin: design/coupling-signal
 spec:
   title: Coupling is a review signal
   intent: A dependency hub changes for many reasons.
@@ -18,7 +20,7 @@ spec:
     called by it, against deliberately high thresholds. Calls from other
     packages and from tests do not count: a widely used public function is a
     service, not a hub.
-  enforcement: heuristic
+  severity: warn
   evidence: [fan_in, fan_out, statements]
   options:
     type: object
@@ -60,8 +62,31 @@ spec:
         receiver whose type is not written in the code are not seen, so fan
         counts are lower bounds.
   check:
-    type: builtin
-    id: design/coupling-signal
+    type: cel
+    select: function
+    with:
+      - name: m
+        expr: metrics(func)
+      - name: role
+        expr: >-
+          (m.fan_in >= options.hub_fan_in && m.fan_out >= options.hub_fan_out
+           && m.statements >= options.hub_statements)
+          ? 'a dependency hub'
+          : (m.fan_out >= options.coordinator_fan_out
+             && m.fan_in <= options.coordinator_max_fan_in
+             && m.statements >= options.coordinator_statements)
+          ? 'a high fan-out coordinator' : ''
+    where: >-
+      !func.file_test && !func.generated && !func.test
+      && (func.kind == 'function' || func.kind == 'method')
+      && m.measured && !m.dispatcher && role != ''
+    message: "function {{ func.name }} is {{ role }}: fan-in={{ m.fan_in }} fan-out={{ m.fan_out }}"
+    evidence:
+      fan_in: m.fan_in
+      fan_out: m.fan_out
+      statements: m.statements
+    identity:
+      subject: func.id
   citation: "Henry and Kafura 1981, information flow"
   examples:
     - name: hub

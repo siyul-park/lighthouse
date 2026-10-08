@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Exported types SHOULD expose contract rather than mutable implementation
     state; data-only values and ABI bridge types MAY expose their fields.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

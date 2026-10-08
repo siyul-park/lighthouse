@@ -2,7 +2,7 @@
 source: crates/lighthouse-report/tests/agent.rs
 expression: "render_with(Format::Agent, &findings, &gap(), &briefing)"
 ---
-design/coupling-signal  warn (heuristic)  internal/jit/compile.go:350:1
+design/coupling-signal  warn  internal/jit/compile.go:350:1
   owner:       jit::compile#function
   message:     function coordinates 14 collaborators in its package
   requirement: Coupling SHOULD be judged from direct intra-package fan-in and fan-out, that is the functions and methods of the same package that call a symbol or are called by it, against deliberately high thresholds. Calls from other packages and from tests do not count: a widely used public function is a service, not a hub.
@@ -24,7 +24,7 @@ design/coupling-signal  warn (heuristic)  internal/jit/compile.go:350:1
   fingerprint: f5ed6fd96750
   resolve:     lighthouse review resolve f5ed6fd96750 --verdict <verdict> --reason <reason> --reviewer-kind agent
 
-design/private-helper-callers  info (heuristic)  src/lib.rs:7:1
+design/private-helper-callers  info  src/lib.rs:7:1
   owner:       m::helper#function
   message:     private helper has one caller
   requirement: A private helper SHOULD have at least two callers.
@@ -44,7 +44,7 @@ design/private-helper-callers  info (heuristic)  src/lib.rs:7:1
   fingerprint: d3d6fba8ce7c
   resolve:     lighthouse review resolve d3d6fba8ce7c --verdict <verdict> --reason <reason> --reviewer-kind agent
 
-acme/custom  error (mechanical)  a.txt:1:1
+acme/custom  error  a.txt:1:1
   message:     custom finding
   fingerprint: c8dfae349df1
 

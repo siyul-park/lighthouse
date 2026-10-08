@@ -289,6 +289,11 @@ impl World {
             .check(&[], &[rule.to_owned()])
             .unwrap();
         assert!(outcome.notices.is_empty(), "{:?}", outcome.notices);
+        assert!(
+            outcome.incomplete.is_empty(),
+            "the check did not finish: {:?}",
+            outcome.incomplete
+        );
         outcome
             .diagnostics
             .iter()

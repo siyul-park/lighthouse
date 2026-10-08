@@ -17,4 +17,6 @@ spec:
   requirement: >-
     Each symbol MUST have one coherent responsibility, a narrow contract, and
     sufficient scope for every legitimate caller.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

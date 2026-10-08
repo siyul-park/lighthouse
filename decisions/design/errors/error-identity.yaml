@@ -15,11 +15,13 @@ spec:
   requirement: >-
     Dependency identity MUST be preserved when callers depend on it; context
     added to an error MUST keep the cause reachable.
-  enforcement: heuristic
+  severity: warn
   evidence: [call, verb]
   languages:
     go:
       tuning: "Wrap with `%w` when adding context."
+  check:
+    type: model
   examples:
     - name: invalid
       language: go

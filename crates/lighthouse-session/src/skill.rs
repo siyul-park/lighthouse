@@ -4,7 +4,7 @@
 use std::{collections::BTreeSet, fmt::Write};
 
 use lighthouse_engine::active_rules;
-use lighthouse_spec::{Catalog, tier};
+use lighthouse_spec::{Catalog, authored_severity};
 
 use crate::{Result, Session};
 
@@ -24,7 +24,7 @@ pub fn skill_for(session: &Session) -> Result<String> {
 }
 
 /// The text of `skills/lighthouse/SKILL.md`: what Lighthouse is for, the loop
-/// an agent follows, how to look decisions up, and a digest (id, title, tier)
+/// an agent follows, how to look decisions up, and a digest (id, title, authored severity)
 /// of the decisions `active` names. The decision text itself is never copied:
 /// the agent reads it from the MCP resources or `lighthouse explain`.
 pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
@@ -37,7 +37,10 @@ pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
             .flat_map(|s| &s.decisions)
             .filter(|d| active.contains(d.id()))
             .map(|d| {
-                let level = d.severity().map_or("doc", |s| tier(s, Some(d)));
+                let level = d.severity().map_or_else(
+                    || "doc".to_owned(),
+                    |s| authored_severity(s, Some(d)).to_string(),
+                );
                 let fixable = d
                     .fix
                     .as_ref()
@@ -51,7 +54,7 @@ pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
     }
     let total: usize = by_pack.iter().map(|(_, l)| l.len()).sum();
     let _ = writeln!(out, "\n## Active decisions ({total})\n");
-    out.push_str("A decision's tier is its enforcement: mechanical (default error), heuristic (default warn), judgment (default info). Heuristic and judgment findings are review tasks and verdicts can suppress them, at any severity; mechanical findings cannot be suppressed. `fixable: safe|suggested` marks a decision with a fixer.\n");
+    out.push_str("A decision declares the severity of its findings: `error` is definitive, so it needs no verdict and only an annotation in the code waives it; `warn` and `info` are review tasks, and a verdict can hide them whatever level the configuration reports them at. `fixable: safe|suggested` marks a decision with a fixer.\n");
     for (pack, lines) in by_pack {
         let _ = writeln!(out, "\n### {pack}\n");
         for line in lines {

@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Parity MUST be tested wherever multiple execution paths are required to
     implement the same public contract.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

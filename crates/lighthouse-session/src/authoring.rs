@@ -152,7 +152,7 @@ fn commit(session: Session, id: &str, name: &str, doc: Value, created: bool) -> 
     let testable = candidate
         .catalog()?
         .decision(id)
-        .is_some_and(|d| d.check.is_some());
+        .is_some_and(|d| d.automated());
     let test = if testable {
         test_decisions(&candidate, &[id.to_owned()], None)?
     } else {

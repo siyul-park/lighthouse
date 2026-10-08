@@ -81,7 +81,8 @@ fn stamp(catalog: Option<&Catalog>, finding: &FindingRecord) -> Stamp {
     };
     let decision = catalog.decision(&finding.rule_id);
     Stamp {
-        rule_version: decision.map(|d| d.semantic_version()),
+        rule_version: decision.map(|d| d.meaning_version()),
+        check_revision: decision.map(|d| d.check_revision()),
         decision_hash: decision.map(Decision::version),
         catalog_version: Some(catalog.version()),
         scope: decision.map(|d| d.scope.subject.to_string()),

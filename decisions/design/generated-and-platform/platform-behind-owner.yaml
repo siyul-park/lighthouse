@@ -15,7 +15,9 @@ spec:
   requirement: >-
     Platform mechanics MUST stay behind matching build constraints and owner
     packages.
-  enforcement: judgment
+  severity: info
   languages:
     go:
       tuning: Use matching build constraints or file-name suffixes.
+  check:
+    type: model

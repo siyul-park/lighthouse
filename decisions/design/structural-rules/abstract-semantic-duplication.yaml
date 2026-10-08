@@ -15,5 +15,7 @@ spec:
   requirement: >-
     Multiple implementations of the same behavior or rule MUST converge on one
     owner; syntax similarity alone MUST NOT trigger abstraction.
-  enforcement: judgment
+  severity: info
   evidence: [owners, locations]
+  check:
+    type: model

@@ -120,7 +120,7 @@ fn task(f: &FindingRecord) -> Value {
         "fingerprint": f.fingerprint,
         "rule": f.rule_id,
         "severity": f.severity,
-        "tier": f.tier,
+        "authored": f.authored_severity,
         "state": f.state().to_string(),
         "location": { "path": f.path, "line": f.locator["span"]["start"]["line"] },
         "symbol": f.symbol,

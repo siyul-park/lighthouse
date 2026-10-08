@@ -1,7 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use lighthouse_model::{EdgeKind, Severity};
+
 use crate::{
-    Catalog, Check, Decision, Enforcement, Error, Example, ExampleKind,
+    Catalog, CheckKind, Decision, Error, Example, ExampleKind, Status,
+    check::{BuiltinCheck, BuiltinOp},
     sources::{Source, has_keyword},
 };
 
@@ -26,7 +29,7 @@ pub(crate) fn decisions(catalog: &Catalog) -> Result<(), Error> {
         }
         self::decision(decision)?;
     }
-    Ok(())
+    lifecycle(catalog)
 }
 
 pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {
@@ -45,22 +48,35 @@ pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {
             "the requirement needs MUST, SHOULD or MAY",
         ));
     }
-    let doc = decision.enforcement == Enforcement::Doc;
-    if doc && decision.severity.is_some() {
-        return Err(Error::invalid(id, "a `doc` decision has no severity"));
+    match (&decision.check, decision.severity) {
+        (None, Some(_)) => {
+            return Err(Error::invalid(
+                id,
+                "a decision without a `check` is documentation and has no `severity`",
+            ));
+        }
+        (Some(_), None) => {
+            return Err(Error::invalid(
+                id,
+                "a decision with a `check` needs a `severity`: error, warn or info",
+            ));
+        }
+        _ => {}
     }
-    if doc && decision.check.is_some() {
-        return Err(Error::invalid(id, "a `doc` decision has no check"));
-    }
-    let checkable = matches!(
-        decision.enforcement,
-        Enforcement::Mechanical | Enforcement::Heuristic
-    );
-    if checkable && decision.evidence.is_empty() {
+    let automated = decision
+        .check
+        .as_ref()
+        .is_some_and(crate::Check::is_automated);
+    if automated && decision.evidence.is_empty() {
         return Err(Error::invalid(
             id,
-            "a checkable decision lists its evidence fields",
+            "a checked decision lists its evidence fields",
         ));
+    }
+    for reference in decision.supersedes.iter() {
+        if reference.trim().is_empty() {
+            return Err(Error::invalid(id, "`supersedes` entries are not empty"));
+        }
     }
     options(decision)?;
     decision
@@ -68,12 +84,69 @@ pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {
         .iter()
         .try_for_each(|e| example(decision, e))?;
     canonical(decision)?;
-    check(decision, checkable)?;
+    check(decision, automated)?;
     fix(decision)
 }
 
 pub(crate) fn relative(path: &str) -> bool {
     !path.is_empty() && !path.starts_with('/') && path.split('/').all(|part| part != "..")
+}
+
+/// A decision that supersedes another names one that exists, is not itself,
+/// and has been marked superseded; no two supersede each other.
+fn lifecycle(catalog: &Catalog) -> Result<(), Error> {
+    for decision in catalog.decisions() {
+        let id = decision.id();
+        for old in &decision.supersedes {
+            let fail = |reason: String| Error::invalid(id, format!("supersedes `{old}`: {reason}"));
+            let Some(target) = catalog.decision(old) else {
+                return Err(fail("no such decision".to_owned()));
+            };
+            if old == id {
+                return Err(fail("a decision cannot supersede itself".to_owned()));
+            }
+            if target.status != Status::Superseded {
+                return Err(fail(format!(
+                    "it is `{}`; set its status to `superseded`",
+                    target.status
+                )));
+            }
+        }
+        if let Some(cycle) = supersession_cycle(catalog, id) {
+            return Err(Error::invalid(
+                id,
+                format!(
+                    "supersession goes round in a circle: {}",
+                    cycle.join(" -> ")
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// The decisions on a path of `supersedes` that leads from `start` back to it.
+fn supersession_cycle<'c>(catalog: &'c Catalog, start: &'c str) -> Option<Vec<&'c str>> {
+    let mut path = vec![start];
+    let mut seen = BTreeSet::new();
+    let mut stack: Vec<(&str, usize)> = vec![(start, 0)];
+    while let Some((at, next)) = stack.pop() {
+        let successors = catalog.decision(at).map_or(&[][..], |d| &d.supersedes[..]);
+        let Some(to) = successors.get(next) else {
+            path.pop();
+            continue;
+        };
+        stack.push((at, next + 1));
+        if to == start {
+            path.push(start);
+            return Some(path);
+        }
+        if seen.insert(to.as_str()) {
+            path.push(to);
+            stack.push((to, 0));
+        }
+    }
+    None
 }
 
 fn fix(decision: &Decision) -> Result<(), Error> {
@@ -82,8 +155,11 @@ fn fix(decision: &Decision) -> Result<(), Error> {
         crate::fix::validate(
             id,
             fix,
-            decision.enforcement == Enforcement::Mechanical,
-            decision.check.is_some(),
+            decision.severity == Some(Severity::Error),
+            decision
+                .check
+                .as_ref()
+                .is_some_and(crate::Check::is_automated),
         )?;
         let fixed = decision
             .examples
@@ -207,40 +283,159 @@ fn canonical(decision: &Decision) -> Result<(), Error> {
     Ok(())
 }
 
-fn check(decision: &Decision, checkable: bool) -> Result<(), Error> {
+fn check(decision: &Decision, automated: bool) -> Result<(), Error> {
     let id = decision.id();
     let Some(check) = &decision.check else {
         return Ok(());
     };
-    match check {
-        Check::Builtin(builtin) if builtin.id.is_empty() => {
-            return Err(Error::invalid(id, "a builtin check needs a rule id"));
-        }
-        Check::Builtin(_) => {}
-        Check::Cel(cel) => {
-            if let Some(problem) = cel.problem() {
-                return Err(Error::invalid(id, problem));
-            }
-            let subject = decision.scope.subject;
-            if cel.select.scope() != subject.rule_scope() {
-                return Err(Error::invalid(
-                    id,
-                    format!(
-                        "selects `{}`, which a `{subject}` decision cannot run over",
-                        cel.select.name()
-                    ),
-                ));
-            }
-        }
+    if check.timeout_duration().is_none_or(|t| t.is_zero()) {
+        return Err(Error::invalid(
+            id,
+            format!(
+                "check `timeout` is `{}`, expected a duration such as `30s` or `2m`",
+                check.timeout.as_deref().unwrap_or_default()
+            ),
+        ));
     }
+    kind_problem(decision, &check.kind).map_or(Ok(()), |reason| Err(Error::invalid(id, reason)))?;
     let has = |kind| decision.examples.iter().any(|e| e.kind == kind);
-    if checkable && !(has(ExampleKind::Valid) && has(ExampleKind::Invalid)) {
+    if automated && !(has(ExampleKind::Valid) && has(ExampleKind::Invalid)) {
         return Err(Error::invalid(
             id,
             "a checked decision needs a valid and an invalid example",
         ));
     }
     Ok(())
+}
+
+/// What is wrong with the provider a check names, for this decision.
+fn kind_problem(decision: &Decision, kind: &CheckKind) -> Option<String> {
+    let subject = decision.scope.subject;
+    match kind {
+        CheckKind::Builtin(BuiltinCheck::Named(named)) if named.id.is_empty() => {
+            Some("a builtin check needs a rule id".to_owned())
+        }
+        CheckKind::Builtin(BuiltinCheck::Named(_)) => None,
+        CheckKind::Builtin(BuiltinCheck::Op(op)) => op_problem(op).or_else(|| scope_problem(op, subject)),
+        CheckKind::Cel(cel) => cel.problem().or_else(|| {
+            (cel.select.scope() != subject.rule_scope()).then(|| {
+                format!(
+                    "selects `{}`, which a `{subject}` decision cannot run over",
+                    cel.select.name()
+                )
+            })
+        }),
+        CheckKind::Command(command) => command.problem().or_else(|| {
+            let per_file = subject.rule_scope() == lighthouse_plugin::Scope::File;
+            (command.batch == crate::check::Batch::All && per_file).then(|| {
+                "check `batch: all` needs a module or project decision: a file-scope decision is checked one file at a time"
+                    .to_owned()
+            })
+        }),
+        CheckKind::Model(model) => model.problem().or_else(|| {
+            (decision.severity == Some(Severity::Error)).then(|| {
+                "a `model` check is capped at `warn`: only a deterministic check can be an `error`"
+                    .to_owned()
+            })
+        }),
+        CheckKind::Rpc(_) => Some("an `rpc` check is not supported until plugin protocol 0.2".to_owned()),
+    }
+}
+
+/// A standard operation judges the shape of one file or of the whole project.
+fn scope_problem(op: &BuiltinOp, subject: crate::Subject) -> Option<String> {
+    let per_file = subject.rule_scope() == lighthouse_plugin::Scope::File;
+    match (op, per_file) {
+        (BuiltinOp::Order { .. } | BuiltinOp::Proximity { .. }, false) => Some(format!(
+            "an `order` or `proximity` check judges one file at a time, which a `{subject}` decision does not"
+        )),
+        (BuiltinOp::Cycle { .. }, true) => Some(format!(
+            "a `cycle` check judges the whole project, which a `{subject}` decision does not"
+        )),
+        _ => None,
+    }
+}
+
+fn op_problem(op: &BuiltinOp) -> Option<String> {
+    match op {
+        BuiltinOp::Order { clauses } => {
+            if clauses.is_empty() {
+                return Some("check: `order` needs at least one clause".to_owned());
+            }
+            for clause in clauses {
+                let mut seen = BTreeSet::new();
+                if clause.by.is_empty() {
+                    return Some(
+                        "check: an `order` clause needs at least one key in `by`".to_owned(),
+                    );
+                }
+                let stray = clause
+                    .by
+                    .iter()
+                    .find(|key| !key.contains('/') || !seen.insert(*key));
+                if let Some(key) = stray {
+                    return Some(format!(
+                        "check: order key `{key}` must be a qualified `plugin/name` and listed once"
+                    ));
+                }
+                if let Some(problem) =
+                    expressions(clause.when.as_ref(), &clause.message, &clause.evidence)
+                {
+                    return Some(problem);
+                }
+            }
+            None
+        }
+        BuiltinOp::Proximity {
+            when,
+            group,
+            separator,
+            max_distance,
+            contiguous,
+            message,
+            evidence,
+        } => {
+            if *contiguous && max_distance.is_some_and(|d| d > 0) {
+                return Some(
+                    "check: `contiguous` and a positive `maxDistance` disagree".to_owned(),
+                );
+            }
+            [("group", Some(group)), ("separator", separator.as_ref())]
+                .into_iter()
+                .filter_map(|(what, source)| Some((what, source?)))
+                .find_map(|(what, source)| {
+                    cel::Program::compile(source)
+                        .err()
+                        .map(|e| format!("check {what}: {e}"))
+                })
+                .or_else(|| expressions(when.as_ref(), message, evidence))
+        }
+        BuiltinOp::Cycle { edge, .. } => edge
+            .parse::<EdgeKind>()
+            .is_err()
+            .then(|| format!("check: `{edge}` is not an edge kind")),
+    }
+}
+
+/// The first of a `when` guard, a message template and evidence expressions
+/// that does not compile.
+fn expressions(
+    when: Option<&String>,
+    message: &str,
+    evidence: &std::collections::BTreeMap<String, String>,
+) -> Option<String> {
+    let compile = |what: &str, source: &str| {
+        cel::Program::compile(source)
+            .err()
+            .map(|e| format!("check {what}: {e}"))
+    };
+    when.and_then(|source| compile("when", source))
+        .or_else(|| {
+            evidence
+                .iter()
+                .find_map(|(name, source)| compile(&format!("evidence `{name}`"), source))
+        })
+        .or_else(|| crate::check::template_problem(message).map(|p| format!("check message: {p}")))
 }
 
 fn kebab(name: &str) -> Result<(), Error> {

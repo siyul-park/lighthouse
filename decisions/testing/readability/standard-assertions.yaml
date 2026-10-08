@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: readability
+  annotations:
+    lighthouse/was-builtin: testing/standard-assertions
 spec:
   title: Assertions use the standard library
   intent: >-
@@ -18,7 +20,7 @@ spec:
     Tests SHOULD assert through the project's standard assertion library, and a
     test helper SHOULD NOT reimplement a comparison and failure that the library
     already provides.
-  enforcement: heuristic
+  severity: warn
   evidence: [symbol, manual_assertions]
   languages:
     go:
@@ -35,8 +37,19 @@ spec:
         helpers that compare and `panic!`. Not enforced for Rust, whose provider
         does not count hand-written checks.
   check:
-    type: builtin
-    id: testing/standard-assertions
+    type: cel
+    select: function
+    where: >-
+      func.file_test && !func.generated && func.manual_assertions > 0
+    message: >-
+      {{ func.kind == 'test' ? 'test' : func.role == 'test-helper' ? 'test helper' : 'function' }}
+      {{ func.name }} compares and fails by hand {{ func.manual_assertions }} time(s);
+      use the project's assertion library
+    evidence:
+      symbol: func.id
+      manual_assertions: func.manual_assertions
+    identity:
+      subject: func.id
   examples:
     - name: hand-written-comparison
       language: go

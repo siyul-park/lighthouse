@@ -49,7 +49,7 @@ impl<'a> RuleTester<'a> {
     pub fn check_all(&self) -> Vec<String> {
         self.catalog
             .decisions()
-            .filter(|d| d.check.is_some())
+            .filter(|d| d.automated())
             .flat_map(|p| self.check(p))
             .collect()
     }
@@ -97,7 +97,9 @@ impl<'a> RuleTester<'a> {
         }
         let registry = (self.registry)();
         let config = config(&registry, decision, example)?;
-        let engine = Engine::new(registry, config, dir.path()).map_err(|e| e.to_string())?;
+        let engine = Engine::new(registry, config, dir.path())
+            .map_err(|e| e.to_string())?
+            .with_trust(self.trusted);
         let outcome = engine
             .check(&[], &[decision.id().to_owned()])
             .map_err(|e| e.to_string())?;

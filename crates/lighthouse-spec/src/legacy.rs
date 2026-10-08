@@ -9,8 +9,8 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::{
-    Check, Decision, DecisionSpec, OptionType,
-    decision::{MIGRATED_FROM, squash},
+    CheckKind, Decision, DecisionSpec, OptionType,
+    decision::{MIGRATED_FROM, WAS_BUILTIN, squash},
     model::short_hash,
 };
 
@@ -42,12 +42,16 @@ impl Decision {
     /// format: a CEL check that was not migrated from a rule file.
     pub fn legacy_semantic_version(&self) -> Option<String> {
         let spec: &DecisionSpec = self;
-        let implementation = match &spec.check {
-            None => Value::Null,
-            Some(Check::Builtin(builtin)) => json!({ "builtin": builtin.id }),
-            Some(Check::Cel(_)) => {
+        let was_builtin = self.metadata().annotations.get(WAS_BUILTIN);
+        let implementation = match (was_builtin, spec.check.as_ref().map(|c| &c.kind)) {
+            (Some(id), _) => json!({ "builtin": id }),
+            (None, Some(CheckKind::Builtin(builtin))) => json!({ "builtin": builtin.named()? }),
+            (None, Some(CheckKind::Cel(_))) => {
                 json!({ "declarative": self.metadata().annotations.get(MIGRATED_FROM)? })
             }
+            (None, Some(CheckKind::Command(_) | CheckKind::Rpc(_))) => return None,
+            (None, Some(CheckKind::Model(_))) => Value::Null,
+            (None, None) => Value::Null,
         };
         let options: BTreeMap<&str, LegacyOption> = spec
             .options
@@ -70,7 +74,7 @@ impl Decision {
             .collect();
         let decision = json!({
             "requirement": squash(&spec.requirement),
-            "enforcement": spec.enforcement,
+            "enforcement": self.was_enforcement(),
             "options": options,
             "implementation": implementation,
         });

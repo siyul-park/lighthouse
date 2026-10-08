@@ -5,9 +5,17 @@
 use std::path::Path;
 
 use lighthouse_model::{
-    Edge, Module, Node, Project, Symbol, SymbolKind, Target, TestCase, Visibility,
+    Edge, Module, Node, Position, Project, Symbol, SymbolKind, SymbolRole, Target, TestCase,
+    Visibility,
+};
+
+use crate::{
+    layout::{is_declaration, owner_key},
+    text,
 };
 use serde_json::{Value, json};
+
+const POS_LINE: u64 = 1 << 20;
 
 pub(crate) fn visibility(v: Visibility) -> &'static str {
     match v {
@@ -17,11 +25,15 @@ pub(crate) fn visibility(v: Visibility) -> &'static str {
     }
 }
 
-pub(crate) fn symbol(project: &Project, s: &Symbol) -> Value {
+/// A position as one number that orders like (line, column).
+pub(crate) fn pos(p: Position) -> u64 {
+    u64::from(p.line) * POS_LINE + u64::from(p.col)
+}
+
+/// The fields that identify a declaration, for the nodes of a list.
+pub(crate) fn node(project: &Project, s: &Symbol) -> Value {
     let owner = s.owner.as_ref().and_then(|o| project.symbol(o));
-    let lang = project
-        .file(&s.file)
-        .map_or_else(String::new, |f| f.lang.clone());
+    let file = project.file(&s.file);
     json!({
         "id": s.id.as_str(),
         "name": s.name,
@@ -31,17 +43,61 @@ pub(crate) fn symbol(project: &Project, s: &Symbol) -> Value {
         "owner_kind": owner.map_or("", |o| o.kind.as_str()),
         "file": path(&s.file),
         "line": s.span.start.line,
+        "col": s.span.start.col,
+        "pos": pos(s.span.start),
         "end_line": s.span.end.line,
         "module": s.id.module(),
-        "lang": lang,
+        "role": s.role.map_or("", role),
         "documented": s.doc.is_some(),
         "test": project.in_test(&s.id),
-        "generated": project.file(&s.file).is_some_and(|f| f.generated),
+        "file_test": file.is_some_and(|f| f.test),
+        "generated": file.is_some_and(|f| f.generated),
+        "owner_key": owner_key(s).unwrap_or_default(),
+        "declaration": is_declaration(project, s),
+        "implements_trait": s.kind == SymbolKind::Method && s.id.as_str().matches("::").count() > 2,
+    })
+}
+
+pub(crate) fn symbol(project: &Project, s: &Symbol) -> Value {
+    let lang = project
+        .file(&s.file)
+        .map_or_else(String::new, |f| f.lang.clone());
+    let mut value = node(project, s);
+    let module = project.module(s.id.module());
+    let last = module.map_or_else(
+        || {
+            s.id.module()
+                .rsplit('/')
+                .next()
+                .unwrap_or_default()
+                .to_owned()
+        },
+        |m| m.path.rsplit('/').next().unwrap_or(&m.path).to_owned(),
+    );
+    let spelled = module
+        .and_then(|m| m.name.clone())
+        .unwrap_or_else(|| last.clone());
+    let extra = json!({
+        "lang": lang,
+        "doc": s.doc.clone().unwrap_or_default(),
+        "name_key": text::key(&s.name),
+        "module_forms": if module.is_some() {
+            json!([
+                { "name": spelled, "key": text::key(&spelled) },
+                { "name": last, "key": text::key(&last) },
+            ])
+        } else {
+            json!([])
+        },
         "callers": project.callers(&s.id).len(),
         "callees": project.callees(&s.id).len(),
         "references": project.references(&s.id).len(),
         "members": project.members(&s.id).len(),
-    })
+    });
+    if let (Some(into), Some(extra)) = (value.as_object_mut(), extra.as_object()) {
+        into.extend(extra.clone());
+    }
+    value
 }
 
 /// A symbol with its function summary; the metrics are zero for a symbol
@@ -57,6 +113,7 @@ pub(crate) fn function(project: &Project, s: &Symbol) -> Option<Value> {
         "max_nesting": summary.max_nesting,
         "tokens": summary.tokens,
         "branches": summary.flow.len(),
+        "manual_assertions": summary.manual_assertions,
     });
     value.as_object_mut()?.extend(extra.as_object()?.clone());
     Some(value)
@@ -89,13 +146,13 @@ pub(crate) fn test(project: &Project, s: &Symbol, case: &TestCase) -> Value {
 
 pub(crate) fn edge(project: &Project, e: &Edge) -> Value {
     let to = match &e.to {
-        Target::Resolved(n) => node(project, n),
+        Target::Resolved(n) => graph_node(project, n),
         Target::Path(p) => json!({ "kind": "unresolved", "id": p, "module": "", "name": p }),
     };
     json!({
         "kind": serde_json::to_value(e.kind).unwrap_or(Value::Null),
         "resolution": serde_json::to_value(e.resolution).unwrap_or(Value::Null),
-        "from": node(project, &e.from),
+        "from": graph_node(project, &e.from),
         "to": to,
     })
 }
@@ -127,11 +184,18 @@ pub(crate) fn file(project: &Project, f: &lighthouse_model::File, text: &str) ->
     })
 }
 
+fn role(role: SymbolRole) -> &'static str {
+    match role {
+        SymbolRole::TestHelper => "test-helper",
+        SymbolRole::Fixture => "fixture",
+    }
+}
+
 fn path(p: &Path) -> String {
     p.to_string_lossy().into_owned()
 }
 
-fn node(project: &Project, n: &Node) -> Value {
+fn graph_node(project: &Project, n: &Node) -> Value {
     match n {
         Node::Module(m) => json!({ "kind": "module", "id": m, "module": m, "name": m }),
         Node::Symbol(id) => {

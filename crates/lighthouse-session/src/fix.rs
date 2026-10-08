@@ -91,7 +91,9 @@ pub fn fix(session: Session, request: &FixRequest) -> Result<Fixed> {
     let root = session.root.clone();
     let catalog = session.catalog()?;
     let plan = fix_plan(&catalog);
-    let engine = Engine::new(registry, session.config, &root)?.with_incomplete(plugins.incomplete);
+    let engine = Engine::new(registry, session.config, &root)?
+        .with_incomplete(plugins.incomplete)
+        .with_trust(trusted);
     let mut messages = plugins.notices.clone();
     let skip = suppressed(&engine, &root, &catalog, request.store)?;
     let run = FixRun {

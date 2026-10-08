@@ -1,7 +1,9 @@
 mod support;
 
 use lighthouse_model::Severity;
-use lighthouse_spec::{Catalog, Decision, Enforcement, ExampleFile, Subject};
+use lighthouse_spec::{
+    Catalog, Check, CheckKind, Decision, ExampleFile, ModelCheck, Status, Subject,
+};
 use serde_json::{Map, json};
 use support::*;
 
@@ -16,8 +18,8 @@ mod write {
 
     use lighthouse_resource::Metadata;
     use lighthouse_spec::{
-        Check, DecisionSpec, Example, ExampleKind, Expect, LanguageSpec, ObjectType, OptionSchema,
-        OptionType, OptionsSchema, Scope,
+        BuiltinCheck, Check, CheckKind, DecisionSpec, Example, ExampleKind, Expect, LanguageSpec,
+        NamedRule, ObjectType, OptionSchema, OptionType, OptionsSchema, Scope,
     };
 
     use super::*;
@@ -37,7 +39,9 @@ mod write {
             intent: "To be written.".into(),
             scope: Scope::code(Subject::File),
             requirement: "A rich decision MUST round-trip.".into(),
-            enforcement: Enforcement::Mechanical,
+            status: Status::Accepted,
+            supersedes: Vec::new(),
+            consequences: Some("More tests.".into()),
             severity: Some(Severity::Warn),
             evidence: vec!["x".into()],
             exceptions: Some("Generated code.".into()),
@@ -62,9 +66,11 @@ mod write {
                 },
             )]
             .into(),
-            check: Some(Check::Builtin(lighthouse_spec::BuiltinCheck {
-                id: "p/rich".into(),
-            })),
+            check: Some(Check::of(CheckKind::Builtin(BuiltinCheck::Named(
+                NamedRule {
+                    id: "p/rich".into(),
+                },
+            )))),
             fix: None,
             citation: Some("Someone 2001".into()),
             strict: false,
@@ -177,7 +183,7 @@ fn catalog_version_changes_with_any_decision() {
 }
 
 #[test]
-fn semantic_version_ignores_wording_examples_tuning_and_option_descriptions() {
+fn meaning_version_ignores_wording_examples_tuning_option_descriptions_and_adr_prose() {
     let decision = bundled("design/coupling-signal");
     let reworded = decision.clone().map_spec(|mut spec| {
         spec.intent.push_str(" More prose.");
@@ -189,14 +195,15 @@ fn semantic_version_ignores_wording_examples_tuning_and_option_descriptions() {
             property.description.push_str(" Reworded.");
         }
         spec.requirement = format!("  {}  ", spec.requirement.replace(' ', "  "));
+        spec.consequences = Some("Then.".into());
         spec
     });
-    assert_eq!(reworded.semantic_version(), decision.semantic_version());
+    assert_eq!(reworded.meaning_version(), decision.meaning_version());
     assert_ne!(reworded.version(), decision.version());
 }
 
 #[test]
-fn semantic_version_follows_what_the_decision_demands() {
+fn meaning_version_follows_what_the_decision_demands() {
     let decision = bundled("design/coupling-signal");
     let changed = |change: fn(&mut lighthouse_spec::DecisionSpec)| {
         decision
@@ -205,13 +212,12 @@ fn semantic_version_follows_what_the_decision_demands() {
                 change(&mut spec);
                 spec
             })
-            .semantic_version()
+            .meaning_version()
     };
-    let base = decision.semantic_version();
+    let base = decision.meaning_version();
     assert_ne!(changed(|s| s.requirement.push_str(" Always.")), base);
-    assert_ne!(changed(|s| s.enforcement = Enforcement::Judgment), base);
+    assert_ne!(changed(|s| s.severity = Some(Severity::Info)), base);
     assert_ne!(changed(|s| s.scope.subject = Subject::Module), base);
-    assert_ne!(changed(|s| s.check = None), base);
     assert_ne!(
         changed(|s| {
             let property = s
@@ -236,6 +242,24 @@ fn semantic_version_follows_what_the_decision_demands() {
         }),
         base
     );
+}
+
+#[test]
+fn how_a_decision_is_checked_changes_its_check_revision_and_never_its_meaning() {
+    let decision = bundled("design/coupling-signal");
+    let unchecked = decision.clone().map_spec(|mut spec| {
+        spec.check = None;
+        spec
+    });
+    let judged = decision.clone().map_spec(|mut spec| {
+        spec.check = Some(Check::of(CheckKind::Model(ModelCheck::default())));
+        spec
+    });
+    assert_eq!(unchecked.meaning_version(), decision.meaning_version());
+    assert_eq!(judged.meaning_version(), decision.meaning_version());
+    assert_ne!(unchecked.check_revision(), decision.check_revision());
+    assert_ne!(judged.check_revision(), unchecked.check_revision());
+    assert_ne!(judged.version(), decision.version());
 }
 
 /// What `semantic_version` was in the build before the resource model, for
@@ -278,7 +302,7 @@ fn the_legacy_version_moves_with_the_decision_so_a_changed_decision_expires_old_
         decision.legacy_semantic_version(),
         "the scope was never part of what a verdict pinned"
     );
-    assert_ne!(scoped.semantic_version(), decision.semantic_version());
+    assert_ne!(scoped.meaning_version(), decision.meaning_version());
 }
 
 #[test]
@@ -288,7 +312,7 @@ fn a_cel_decision_that_was_never_a_rule_file_has_no_legacy_version() {
         decision(
             "local/probe",
             "rules",
-            "  title: P\n  intent: i\n  scope: { subject: file }\n  requirement: A MUST b.\n  enforcement: judgment\n  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n",
+            "  title: P\n  intent: i\n  scope: { subject: file }\n  requirement: A MUST b.\n  severity: info\n  evidence: [x]\n  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{ path: a.txt, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: text\n      kind: valid\n      files: [{ path: a.txt, body: x }]\n",
         ),
     )]))
     .unwrap();

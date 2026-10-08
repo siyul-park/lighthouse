@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Configured action verbs, by default `Build`, `Compile`, `Publish`,
     `Capture`, and `Use`, MUST be reserved for actions or transitions.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

@@ -217,6 +217,7 @@ fn meta(id: &str, severity: Severity, strict: bool) -> RuleManifest {
         capabilities: Vec::new(),
         citation: None,
         strict,
+        enforced: true,
     }
 }
 

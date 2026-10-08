@@ -3,7 +3,7 @@ mod support;
 use lighthouse_model::Severity;
 use lighthouse_plugin::Scope as RunScope;
 use lighthouse_spec::{
-    Catalog, Content, Decision, Enforcement, Error, ExampleFile, Subject, needs_verdict, tier,
+    Catalog, Content, Decision, Error, ExampleFile, Subject, authored_severity, needs_verdict,
 };
 use serde_json::{Map, json};
 use support::*;
@@ -21,33 +21,24 @@ fn bundled_catalog_has_core_design_and_testing_packs() {
 }
 
 #[test]
-fn enforcement_default_severity() {
-    let cases = [
-        (Enforcement::Mechanical, Some(Severity::Error)),
-        (Enforcement::Heuristic, Some(Severity::Warn)),
-        (Enforcement::Judgment, Some(Severity::Info)),
-        (Enforcement::Doc, None),
-    ];
-    for (enforcement, want) in cases {
-        assert_eq!(enforcement.default_severity(), want, "{enforcement}");
-    }
-}
-
-#[test]
-fn a_finding_asks_for_a_verdict_when_its_decision_is_not_mechanical() {
-    for (enforcement, asks) in [
-        (Enforcement::Mechanical, false),
-        (Enforcement::Heuristic, true),
-        (Enforcement::Judgment, true),
-        (Enforcement::Doc, false),
+fn a_finding_asks_for_a_verdict_unless_its_decision_authored_an_error() {
+    for (authored, asks) in [
+        (Severity::Error, false),
+        (Severity::Warn, true),
+        (Severity::Info, true),
     ] {
-        assert_eq!(enforcement.needs_verdict(), asks, "{enforcement}");
+        assert_eq!(needs_verdict(authored), asks, "{authored}");
     }
-    let heuristic = bundled("design/private-helper-callers");
-    assert!(needs_verdict(tier(Severity::Info, Some(heuristic))));
-    assert!(needs_verdict(tier(Severity::Error, Some(heuristic))));
-    let mechanical = bundled("design/declaration-groups");
-    assert!(!needs_verdict(tier(Severity::Warn, Some(mechanical))));
+    let warn = bundled("design/private-helper-callers");
+    assert!(needs_verdict(authored_severity(
+        Severity::Error,
+        Some(warn)
+    )));
+    let definitive = bundled("design/declaration-groups");
+    assert!(!needs_verdict(authored_severity(
+        Severity::Warn,
+        Some(definitive)
+    )));
 }
 
 #[test]
@@ -144,7 +135,7 @@ fn example_file_text() {
 
 #[test]
 fn checked_decisions_carry_runnable_examples() {
-    for decision in Catalog::bundled().decisions().filter(|d| d.check.is_some()) {
+    for decision in Catalog::bundled().decisions().filter(|d| d.automated()) {
         let invalid = decision.examples.iter().find(|e| !e.expect.is_empty());
         assert!(
             invalid.is_some(),
@@ -161,7 +152,7 @@ fn a_cel_check_lives_in_its_decision() {
   intent: i
   scope: { subject: symbol }
   requirement: A MUST b.
-  enforcement: mechanical
+  severity: error
   evidence: [x]
   check:
     type: cel
@@ -185,7 +176,10 @@ fn a_cel_check_lives_in_its_decision() {
     let decision = catalog.decision("local/probe").unwrap();
     assert!(matches!(
         decision.check,
-        Some(lighthouse_spec::Check::Cel(_))
+        Some(lighthouse_spec::Check {
+            kind: lighthouse_spec::CheckKind::Cel(_),
+            ..
+        })
     ));
     assert_eq!(decision.pack(), "local");
     assert_eq!(decision.section(), "rules");
@@ -220,10 +214,7 @@ mod validation {
     #[test]
     fn minimal_catalog_loads() {
         let catalog = Catalog::from_files(base()).unwrap();
-        assert_eq!(
-            catalog.decision("p/a").unwrap().severity(),
-            Some(Severity::Error)
-        );
+        assert_eq!(catalog.decision("p/a").unwrap().severity(), None);
     }
 
     #[test]
@@ -264,23 +255,25 @@ mod validation {
 
     #[test]
     fn decision_rules_are_enforced() {
-        let doc = SPEC
-            .replace("mechanical", "doc")
-            .replace("  scope", "  severity: warn\n  scope");
+        let severity_without_check = format!("{SPEC}{CHECKED_SPEC}");
         rejected(
-            with("p/s/a.yaml", &decision("p/a", "s", &doc)),
-            "no severity",
+            with("p/s/a.yaml", &decision("p/a", "s", &severity_without_check)),
+            "no `severity`",
+        );
+        let check_without_severity = format!("{SPEC}  check:\n    type: builtin\n    id: p/a\n");
+        rejected(
+            with("p/s/a.yaml", &decision("p/a", "s", &check_without_severity)),
+            "needs a `severity`",
         );
         rejected(swap("MUST", "must"), "MUST, SHOULD or MAY");
         rejected(swap("intent: i", "intent: ' '"), "intent");
-        rejected(swap("  evidence: [x]\n", ""), "evidence");
-        let doc_with_check = format!(
-            "{}  check:\n    type: builtin\n    id: p/a\n",
-            SPEC.replace("mechanical", "doc")
-        );
+        let no_evidence = "  severity: error\n  check:\n    type: builtin\n    id: p/a\n";
         rejected(
-            with("p/s/a.yaml", &decision("p/a", "s", &doc_with_check)),
-            "no check",
+            with(
+                "p/s/a.yaml",
+                &decision("p/a", "s", &format!("{SPEC}{no_evidence}")),
+            ),
+            "evidence",
         );
         rejected(
             swap("title: A\n", "title: A\n  nonsense: 1\n"),
@@ -293,10 +286,10 @@ mod validation {
         let checked = "  check:\n    type: builtin\n    id: p/a\n";
         rejected(decision_with(checked), "valid and an invalid example");
         Catalog::from_files(decision_with(&format!("{checked}{EXAMPLE_PAIR}"))).unwrap();
-        let judgment = SPEC.replace("mechanical", "judgment");
+        let judged = "  severity: info\n  check:\n    type: model\n";
         Catalog::from_files(with(
             "p/s/a.yaml",
-            &decision("p/a", "s", &format!("{judgment}{checked}")),
+            &decision("p/a", "s", &format!("{SPEC}{judged}")),
         ))
         .unwrap();
         rejected(
@@ -323,7 +316,7 @@ mod validation {
         );
         rejected(
             decision_with("  check:\n    type: python\n    code: x\n"),
-            "unknown variant",
+            "expected builtin, cel, command, rpc or model",
         );
     }
 
@@ -503,7 +496,7 @@ mod validation {
     #[test]
     fn the_same_catalog_reads_from_json_and_toml() {
         let json = r#"{"apiVersion":"lighthouse/v1alpha1","kind":"Pack","metadata":{"name":"p"},"spec":{"title":"P","intro":"x","sections":[{"name":"s","title":"S","intro":"x","decisions":["a"]}]}}"#;
-        let toml = "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Decision\"\n[metadata]\nname = \"p/a\"\n[metadata.labels]\n\"lighthouse/pack\" = \"p\"\n\"lighthouse/section\" = \"s\"\n[spec]\ntitle = \"A\"\nintent = \"i\"\nrequirement = \"A MUST b.\"\nenforcement = \"mechanical\"\nevidence = [\"x\"]\n[spec.scope]\nsubject = \"file\"\n";
+        let toml = "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Decision\"\n[metadata]\nname = \"p/a\"\n[metadata.labels]\n\"lighthouse/pack\" = \"p\"\n\"lighthouse/section\" = \"s\"\n[spec]\ntitle = \"A\"\nintent = \"i\"\nrequirement = \"A MUST b.\"\n[spec.scope]\nsubject = \"file\"\n";
         let mut files = Files::new();
         files.insert("p/pack.json".into(), json.into());
         files.insert("p/s/a.toml".into(), toml.into());
@@ -563,7 +556,8 @@ mod overlay {
     const OPTION: &str = "  options:\n    type: object\n    properties:\n      max:\n        type: integer\n        default: 1\n        description: d\n    additionalProperties: false\n";
 
     fn base_catalog() -> Catalog {
-        Catalog::from_files(decision_with(OPTION)).unwrap()
+        let judged = format!("{SPEC}  severity: info\n  check:\n    type: model\n{OPTION}");
+        Catalog::from_files(with("p/s/a.yaml", &decision("p/a", "s", &judged))).unwrap()
     }
 
     fn local(entries: &[(&str, String)]) -> Catalog {
@@ -667,10 +661,7 @@ mod overlay {
 
     #[test]
     fn doc_decisions_stay_without_severity_after_overlay() {
-        let doc = SPEC
-            .replace("mechanical", "doc")
-            .replace("  evidence: [x]\n", "");
-        let doc = Catalog::from_files(with("p/s/a.yaml", &decision("p/a", "s", &doc))).unwrap();
+        let doc = Catalog::from_files(base()).unwrap();
         assert!(Catalog::overlay(&doc, &tweak("  extends: p/a\n  severity: warn\n")).is_err());
     }
 
@@ -693,20 +684,23 @@ mod overlay {
         let builtin = decision(
             "local/x",
             "rules",
-            &format!("{SPEC}  check:\n    type: builtin\n    id: local/x\n"),
+            &format!("{SPEC}{CHECKED_SPEC}  check:\n    type: builtin\n    id: local/x\n"),
         );
         let error = Catalog::from_local(files(&[("x.yaml", builtin)])).unwrap_err();
-        assert!(error.to_string().contains("`cel` check"), "{error}");
+        assert!(error.to_string().contains("standard operation"), "{error}");
     }
 }
 
 #[test]
-fn tier_follows_enforcement_then_severity() {
-    let heuristic = bundled("design/private-helper-callers");
-    assert_eq!(tier(Severity::Info, Some(heuristic)), "heuristic");
-    assert_eq!(tier(Severity::Error, None), "mechanical");
-    assert_eq!(tier(Severity::Warn, None), "heuristic");
-    assert_eq!(tier(Severity::Info, None), "evidence");
+fn the_authored_severity_follows_the_decision_else_what_was_reported() {
+    let warn = bundled("design/private-helper-callers");
+    assert_eq!(
+        authored_severity(Severity::Error, Some(warn)),
+        Severity::Info
+    );
+    assert_eq!(authored_severity(Severity::Error, None), Severity::Error);
+    assert_eq!(authored_severity(Severity::Warn, None), Severity::Warn);
+    assert_eq!(authored_severity(Severity::Info, None), Severity::Info);
 }
 
 #[test]
@@ -716,7 +710,7 @@ fn checked_decisions_mark_one_canonical_example_per_language() {
             let valid = |e: &&lighthouse_spec::Example| {
                 e.language == language && e.kind == lighthouse_spec::ExampleKind::Valid
             };
-            if decision.check.is_none() || !decision.examples.iter().any(|e| valid(&e)) {
+            if !decision.automated() || !decision.examples.iter().any(|e| valid(&e)) {
                 continue;
             }
             let marked = decision
@@ -731,7 +725,7 @@ fn checked_decisions_mark_one_canonical_example_per_language() {
 
 #[test]
 fn decision_text_and_write_local_round_trip_through_the_local_layer() {
-    let spec = "  title: Probe\n  intent: A probe.\n  scope: { subject: file }\n  requirement: A probe MUST hold.\n  enforcement: mechanical\n  evidence: [path]\n  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{ path: a.txt, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: text\n      kind: valid\n      files: [{ path: a.txt, body: x }]\n";
+    let spec = "  title: Probe\n  intent: A probe.\n  scope: { subject: file }\n  requirement: A probe MUST hold.\n  severity: error\n  evidence: [path]\n  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{ path: a.txt, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: text\n      kind: valid\n      files: [{ path: a.txt, body: x }]\n";
     let layer = Catalog::from_local(files(&[(
         "probe.yaml",
         decision("local/probe", "rules", spec),

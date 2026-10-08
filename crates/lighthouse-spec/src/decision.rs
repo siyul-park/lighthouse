@@ -6,7 +6,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-use crate::{Check, Enforcement, Error, Example, Fix, OptionsSchema, Scope, model::short_hash};
+use crate::{Check, Error, Example, Fix, OptionsSchema, Scope, Status, model::short_hash};
 
 /// Label that says which pack a decision belongs to.
 pub const PACK_LABEL: &str = "lighthouse/pack";
@@ -14,6 +14,14 @@ pub const PACK_LABEL: &str = "lighthouse/pack";
 pub const SECTION_LABEL: &str = "lighthouse/section";
 /// Annotation a migrated decision keeps: the rule file its CEL check came from.
 pub const MIGRATED_FROM: &str = "lighthouse/migrated-from";
+/// Annotation of a decision that was a bespoke builtin rule before it became
+/// a spec over standard operations: the id that rule had. Verdicts recorded
+/// under the old rule keep applying while the decision means the same.
+pub const WAS_BUILTIN: &str = "lighthouse/was-builtin";
+/// Annotation of a decision whose `enforcement` (since replaced by `severity`)
+/// cannot be told from its severity: `mechanical`, `heuristic`, `judgment` or
+/// `doc`. It keeps the versions older verdicts were recorded under.
+pub const WAS_ENFORCEMENT: &str = "lighthouse/was-enforcement";
 
 /// What one language changes about a decision.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -27,9 +35,10 @@ pub struct LanguageSpec {
     pub tuning: Option<String>,
 }
 
-/// A design decision with its enforcement: what was decided and why, and how
-/// the decision is checked and fixed. The engine compiles `check` into the
-/// rule that enforces it.
+/// A design decision, the way an architecture decision record states one:
+/// what was decided and why, its status, and how it is enforced. The engine
+/// compiles `check` into the rule that enforces it. A decision without a
+/// `check` is documentation only.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DecisionSpec {
@@ -38,8 +47,21 @@ pub struct DecisionSpec {
     pub scope: Scope,
     /// What the decision demands, in RFC 2119 words.
     pub requirement: String,
-    pub enforcement: Enforcement,
-    /// Replaces the default severity of the enforcement.
+    /// Where the decision stands: only an accepted one is enforced.
+    #[serde(default, skip_serializing_if = "Status::is_default")]
+    pub status: Status,
+    /// The decisions this one replaces, by id. Each becomes `superseded`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub supersedes: Vec<String>,
+    /// What follows from the decision, good and bad.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub consequences: Option<String>,
+    /// The severity of the decision's findings, as authored. `error` is
+    /// definitive: it needs no verdict and only an annotation in the code
+    /// waives it, and its fix may be safe. `warn` and `info` are review
+    /// tasks: a reviewer's verdict may hide them and a fix is at most
+    /// suggested. A decision without a `check` has none. A configuration
+    /// `level` changes what is reported and the exit code, never this.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub severity: Option<Severity>,
     /// Fields a checker emits as diagnostic evidence.
@@ -183,6 +205,54 @@ impl Decision {
     }
 }
 
+impl Decision {
+    /// The `enforcement` this decision had before severities replaced it:
+    /// what its annotation recorded, else what its severity implies.
+    pub(crate) fn was_enforcement(&self) -> &str {
+        if let Some(recorded) = self.metadata().annotations.get(WAS_ENFORCEMENT) {
+            return recorded;
+        }
+        match self.severity {
+            None => "doc",
+            Some(Severity::Error) => "mechanical",
+            Some(Severity::Warn) => "heuristic",
+            Some(Severity::Info) => "judgment",
+        }
+    }
+
+    /// The semantic version a build between the resource model and severities
+    /// computed for this decision: it hashed the `check` and the enforcement.
+    /// Verdicts recorded then keep applying while the meaning is unchanged.
+    ///
+    /// That build never shipped outside development, so nothing real was
+    /// recorded under this version; it is kept so that a store written while
+    /// developing keeps working, and it is cheap.
+    pub fn previous_semantic_version(&self) -> String {
+        let check = match (self.metadata().annotations.get(WAS_BUILTIN), &self.check) {
+            (Some(id), _) => json!({ "type": "builtin", "id": id }),
+            (None, Some(check)) if check.is_automated() => json!(check),
+            (None, _) => Value::Null,
+        };
+        let content = json!({
+            "requirement": squash(&self.requirement),
+            "enforcement": self.was_enforcement(),
+            "scope": self.scope,
+            "check": check,
+            "options": self.options_content(),
+        });
+        short_hash(&content.to_string())
+    }
+
+    /// Every version older builds recorded verdicts under that still apply
+    /// to this decision while its meaning is unchanged.
+    pub fn earlier_versions(&self) -> Vec<String> {
+        let mut versions = vec![self.previous_semantic_version()];
+        versions.extend(self.legacy_semantic_version());
+        versions.dedup();
+        versions
+    }
+}
+
 impl Deref for Decision {
     type Target = DecisionSpec;
 
@@ -192,24 +262,49 @@ impl Deref for Decision {
 }
 
 impl DecisionSpec {
-    /// The override if the decision has one, else the default of its
-    /// enforcement; `None` for a `doc` decision.
+    /// The authored severity; `None` for a decision without a check.
     pub fn severity(&self) -> Option<Severity> {
         self.severity
-            .or_else(|| self.enforcement.default_severity())
     }
 
-    /// Identifies what the decision demands: the hash of its requirement,
-    /// enforcement, scope, check and options (types and defaults, with the
-    /// values each language sets). Wording, examples, tuning and option
-    /// descriptions do not change it, so a verdict stays valid across edits
-    /// that leave the decision alone. Nothing about the envelope, the labels
-    /// or the file format is part of it.
-    pub fn semantic_version(&self) -> String {
-        short_hash(&self.semantic_content().to_string())
+    /// Whether a program decides the decision's findings, as opposed to agent
+    /// review (`judged`) or nothing (documentation).
+    pub fn automated(&self) -> bool {
+        self.check.as_ref().is_some_and(Check::is_automated)
     }
 
-    fn semantic_content(&self) -> Value {
+    /// Whether the decision is enforced: accepted, and it has a check.
+    pub fn enforced(&self) -> bool {
+        self.status.enforced() && self.check.is_some()
+    }
+
+    /// Identifies what the decision means: the hash of its requirement,
+    /// severity, scope and options (types and defaults, with the values each
+    /// language sets). A verdict stays valid exactly while this does not
+    /// change. How the decision is checked is not part of it, so a decision
+    /// may move from review to a rule, or from one provider to another, and
+    /// keep its verdicts. Wording, examples, tuning, option descriptions, the
+    /// ADR fields, the envelope and the file format do not change it either.
+    pub fn meaning_version(&self) -> String {
+        short_hash(&self.meaning_content().to_string())
+    }
+
+    /// Identifies how the decision is checked: the hash of its `check`. It is
+    /// recorded with findings for evaluation and never expires a verdict.
+    pub fn check_revision(&self) -> String {
+        short_hash(&json!(self.check).to_string())
+    }
+
+    fn meaning_content(&self) -> Value {
+        json!({
+            "requirement": squash(&self.requirement),
+            "severity": self.severity,
+            "scope": self.scope,
+            "options": self.options_content(),
+        })
+    }
+
+    fn options_content(&self) -> Value {
         let empty = OptionsSchema::default();
         let schema = self.options.as_ref().unwrap_or(&empty);
         let properties: Map<String, Value> = schema
@@ -228,14 +323,7 @@ impl DecisionSpec {
             .filter(|(_, l)| !l.options.is_empty())
             .map(|(id, l)| (id.clone(), Value::Object(l.options.clone())))
             .collect();
-        let options = json!({ "properties": properties, "languages": languages });
-        json!({
-            "requirement": squash(&self.requirement),
-            "enforcement": self.enforcement,
-            "scope": self.scope,
-            "check": self.check,
-            "options": options,
-        })
+        json!({ "properties": properties, "languages": languages })
     }
 }
 

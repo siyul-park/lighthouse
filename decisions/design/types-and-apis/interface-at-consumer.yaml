@@ -15,10 +15,12 @@ spec:
   requirement: >-
     Interfaces MUST be used only when callers supply behavior and MUST be
     defined where that behavior is consumed.
-  enforcement: heuristic
+  severity: warn
   evidence: [interface, consumers]
   languages:
     go:
       tuning: >-
         Declare the interface in the consuming package, not beside its only
         implementation.
+  check:
+    type: model

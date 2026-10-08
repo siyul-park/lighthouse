@@ -16,7 +16,9 @@ spec:
     Same behavior over many inputs MUST use one inline table of named inputs and
     expected outputs, each entry one case; cases that specify the same behavior
     MUST be merged into one case or one table.
-  enforcement: judgment
+  severity: info
   languages:
     go:
       tuning: Use an inline anonymous struct table.
+  check:
+    type: model

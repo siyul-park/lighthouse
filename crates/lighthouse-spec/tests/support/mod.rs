@@ -10,7 +10,10 @@ pub const SPEC: &str = "  title: A
   intent: i
   scope: { subject: file }
   requirement: A MUST b.
-  enforcement: mechanical
+";
+
+/// What a checked decision adds to `SPEC`: an authored severity and evidence.
+pub const CHECKED_SPEC: &str = "  severity: error
   evidence: [x]
 ";
 
@@ -71,10 +74,16 @@ pub fn with(path: &str, text: &str) -> Files {
     files
 }
 
-/// `base` with decision `p/a` having `extra` after its spec lines.
+/// `base` with decision `p/a` having `extra` after its spec lines; a `check:`
+/// in `extra` brings an `error` severity and evidence with it.
 pub fn decision_with(extra: &str) -> Files {
+    let head = if extra.contains("  check:") {
+        format!("{SPEC}{CHECKED_SPEC}")
+    } else {
+        SPEC.to_owned()
+    };
     with(
         "p/s/a.yaml",
-        &decision("p/a", "s", &format!("{SPEC}{extra}")),
+        &decision("p/a", "s", &format!("{head}{extra}")),
     )
 }

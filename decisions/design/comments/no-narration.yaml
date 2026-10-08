@@ -16,8 +16,10 @@ spec:
     Comments MUST NOT narrate code, restate names, label control-flow phases, or
     explain obvious behavior; a better name, type, or structure SHOULD be
     preferred.
-  enforcement: judgment
+  severity: info
   evidence: [comment, restated_identifiers]
+  check:
+    type: model
   examples:
     - name: invalid
       language: go

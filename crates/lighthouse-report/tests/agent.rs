@@ -110,7 +110,7 @@ fn agent_json_is_one_tagged_record_per_line() {
 
     let coupling = &records[0];
     assert_eq!(coupling["rule"], "design/coupling-signal");
-    assert_eq!(coupling["tier"], "heuristic");
+    assert_eq!(coupling["authored"], "warn");
     assert_eq!(coupling["symbol"], "jit::compile#function");
     assert_eq!(coupling["location"]["line"], 350);
     assert_eq!(coupling["evidence"]["fan_out"], 14);
@@ -123,7 +123,7 @@ fn agent_json_is_one_tagged_record_per_line() {
 
     let review = &records[1];
     assert_eq!(review["severity"], "info");
-    assert_eq!(review["tier"], "heuristic");
+    assert_eq!(review["authored"], "info");
     let command = review["resolve"]["command"].as_str().unwrap();
     assert!(
         command.starts_with("lighthouse review resolve "),
@@ -133,7 +133,7 @@ fn agent_json_is_one_tagged_record_per_line() {
     assert!(review["resolve"].get("verdicts").is_none());
 
     let custom = &records[2];
-    assert_eq!(custom["tier"], "mechanical");
+    assert_eq!(custom["authored"], "error");
     assert!(
         custom.get("resolve").is_none(),
         "an error is not a review task"
@@ -305,7 +305,7 @@ fn decision_with(examples: &str, tuning: &str) -> Catalog {
     let indented: String = examples.lines().map(|l| format!("  {l}\n")).collect();
     let empty = if examples.is_empty() { " []" } else { "" };
     let decision = format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: p/a\n  labels:\n    lighthouse/pack: p\n    lighthouse/section: s\nspec:\n  title: A\n  intent: i\n  scope: {{ subject: symbol }}\n  requirement: A MUST b.\n  enforcement: judgment\n{tuning}  examples:{empty}\n{indented}"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: p/a\n  labels:\n    lighthouse/pack: p\n    lighthouse/section: s\nspec:\n  title: A\n  intent: i\n  scope: {{ subject: symbol }}\n  requirement: A MUST b.\n  severity: info\n  check:\n    type: model\n{tuning}  examples:{empty}\n{indented}"
     );
     let files = std::collections::BTreeMap::from([
         (

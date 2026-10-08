@@ -15,6 +15,8 @@ spec:
   requirement: >-
     Higher-level code MAY depend on lower-level code when that code is general
     and context-independent; lower-level code MUST NOT depend on its callers.
-  enforcement: heuristic
+  severity: warn
   evidence: [from, to, cycle]
+  check:
+    type: model
   citation: "Tarjan 1972, strongly connected components"

@@ -6,6 +6,9 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: functions
+  annotations:
+    lighthouse/was-builtin: design/private-helper-callers
+    lighthouse/was-enforcement: heuristic
 spec:
   title: Private helpers have two callers
   intent: A private helper with one caller is usually part of that caller.
@@ -13,7 +16,6 @@ spec:
     domain: code
     subject: symbol
   requirement: A private helper SHOULD have at least two callers.
-  enforcement: heuristic
   severity: info
   evidence: [caller, callers, statements]
   languages:
@@ -30,8 +32,25 @@ spec:
         test code and are never named as a value. A method that some call may
         reach through a receiver of unknown type is not judged.
   check:
-    type: builtin
-    id: design/private-helper-callers
+    type: cel
+    select: function
+    with:
+      - name: production
+        expr: callers(func).filter(c, !c.test)
+    where: >-
+      !func.file_test && !func.generated && !func.test && (func.kind == 'function' || func.kind == 'method')
+      && func.visibility == 'private' && func.name != 'main' && func.name != 'init'
+      && func.references == 0 && !func.satisfies_interface && !func.forwards_only
+      && size(production) == 1
+    message: >-
+      private {{ func.kind }} {{ func.name }} has one caller ({{ production[0].name }});
+      review whether it is part of that caller or names a real policy
+    evidence:
+      caller: production[0].id
+      callers: "1"
+      statements: func.statements
+    identity:
+      subject: func.id
   strict: true
   examples:
     - name: invalid

@@ -15,4 +15,6 @@ spec:
     domain: code
     subject: symbol
   requirement: Unrelated roles MUST NOT be combined merely to force reuse.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

@@ -99,6 +99,7 @@ Keys for `reorder.by`, registered by plugins.
 
 | key | orders by |
 | --- | --- |
+| `design/constructor-first` | constructors before the other methods of their type |
 | `design/group` | the declaration group of `design/declaration-groups`, from public contract to private mechanics |
 
 ## Commands

@@ -1,5 +1,6 @@
-//! What the ordering rules share: the declarations of a file in source order
-//! and the vocabulary that tells a declaration's owner and visibility.
+//! What the ordering checks share: the declarations of a file in source order
+//! and the vocabulary that tells a declaration's owner and visibility. Order
+//! keys registered by other plugins use the same vocabulary.
 
 use lighthouse_model::{Project, Symbol, SymbolKind, SymbolRole, Visibility};
 use lighthouse_plugin::Ctx;
@@ -10,7 +11,7 @@ use lighthouse_plugin::Ctx;
 /// of an interface and not nested in a function body. Test code is left out,
 /// except the fixtures of a test file, which are ordered like any other
 /// declarations.
-pub(crate) fn declarations<'a>(ctx: &Ctx<'a>) -> Vec<Vec<&'a Symbol>> {
+pub fn declarations<'a>(ctx: &Ctx<'a>) -> Vec<Vec<&'a Symbol>> {
     let Some((file, _)) = ctx.file else {
         return Vec::new();
     };
@@ -39,13 +40,13 @@ pub(crate) fn declarations<'a>(ctx: &Ctx<'a>) -> Vec<Vec<&'a Symbol>> {
 }
 
 /// Visible beyond its own scope: public, or public inside the project.
-pub(crate) fn exposed(symbol: &Symbol) -> bool {
+pub fn exposed(symbol: &Symbol) -> bool {
     symbol.visibility != Visibility::Private
 }
 
 /// What a member belongs to: its owner, or for a member of a type declared
 /// elsewhere, the written owner path of its id.
-pub(crate) fn owner_key(symbol: &Symbol) -> Option<String> {
+pub fn owner_key(symbol: &Symbol) -> Option<String> {
     if let Some(owner) = &symbol.owner {
         return Some(owner.as_str().to_owned());
     }
@@ -63,7 +64,7 @@ pub(crate) fn owner_key(symbol: &Symbol) -> Option<String> {
 /// Whether `name` is `prefix` or `prefix` followed by a word of its own: an
 /// upper-case letter or an underscore (`New`, `NewStore`, `new`, `new_in`; not
 /// `Newton` or `newline`).
-pub(crate) fn has_word_prefix(name: &str, prefix: &str) -> bool {
+pub fn has_word_prefix(name: &str, prefix: &str) -> bool {
     name.strip_prefix(prefix).is_some_and(|rest| {
         rest.chars()
             .next()
@@ -71,7 +72,9 @@ pub(crate) fn has_word_prefix(name: &str, prefix: &str) -> bool {
     })
 }
 
-pub(crate) fn is_declaration(project: &Project, symbol: &Symbol) -> bool {
+/// A type, interface, constant, variable, function or method that is not a
+/// member of an interface and not nested in a function body.
+pub fn is_declaration(project: &Project, symbol: &Symbol) -> bool {
     use SymbolKind::{Const, Function, Interface, Method, Type, Var};
     if !matches!(
         symbol.kind,

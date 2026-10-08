@@ -15,7 +15,9 @@ spec:
   requirement: >-
     Required constructor values MUST be passed as arguments; optional values
     MUST be injected through options.
-  enforcement: judgment
+  severity: info
   languages:
     go:
       tuning: Optional values are injected through functional options.
+  check:
+    type: model

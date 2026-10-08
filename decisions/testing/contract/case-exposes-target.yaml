@@ -15,4 +15,6 @@ spec:
   requirement: >-
     A test MUST expose the target, input, operation, and expected result in the
     case; the target and its behavior MUST remain visible.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Test structure MUST serve the contract rather than implementation shape or
     coverage.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

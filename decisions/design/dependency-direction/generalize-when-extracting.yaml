@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Shared functionality MUST be generalized when extracted; it MUST NOT be
     moved downward merely to relocate complexity.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

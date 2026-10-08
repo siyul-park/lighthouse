@@ -16,4 +16,6 @@ spec:
     Panic MUST be limited to impossible programmer errors, `Must*`-style APIs,
     or documented hot-path invariants with one recovery boundary; normal runtime
     failures MUST return errors.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

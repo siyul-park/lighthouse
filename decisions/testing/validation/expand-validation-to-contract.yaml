@@ -16,4 +16,3 @@ spec:
     Package, race, coverage, architecture, and repository checks MUST be applied
     when relevant; only genuinely inapplicable checks MAY be skipped, and the
     reason MUST be stated.
-  enforcement: doc

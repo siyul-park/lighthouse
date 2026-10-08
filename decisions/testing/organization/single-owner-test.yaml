@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization
+  annotations:
+    lighthouse/was-builtin: testing/single-owner-test
 spec:
   title: One owner test per public symbol
   intent: >-
@@ -15,7 +17,7 @@ spec:
     domain: code
     subject: test
   requirement: A public symbol MUST NOT have multiple semantic owner test functions.
-  enforcement: mechanical
+  severity: error
   evidence: [symbol, owner_tests]
   options:
     type: object
@@ -53,8 +55,25 @@ spec:
         name are not owners; two tests with exactly the name of one item (in
         different test crates, or inline and in `tests/`) are.
   check:
-    type: builtin
-    id: testing/single-owner-test
+    type: cel
+    select: symbol
+    with:
+      - name: owners
+        expr: tests(symbol)
+    where: >-
+      !symbol.file_test && !symbol.generated && !symbol.test
+      && symbol.visibility == 'public'
+      && (symbol.kind == 'function' || symbol.kind == 'method'
+          || symbol.kind == 'type' || symbol.kind == 'interface')
+      && size(owners) >= 2
+    message: >-
+      public {{ symbol.kind }} {{ symbol.name }} has {{ size(owners) }} owner tests;
+      keep one top-level test and make the rest cases of it
+    evidence:
+      symbol: symbol.id
+      owner_tests: owners.map(t, t.symbol)
+    identity:
+      subject: symbol.id
   examples:
     - name: invalid
       language: go

@@ -15,4 +15,3 @@ spec:
   requirement: >-
     These ordering rules MUST NOT justify artificial file splits, wrappers, or
     duplicated helpers.
-  enforcement: doc

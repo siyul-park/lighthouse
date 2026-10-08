@@ -18,7 +18,7 @@ spec:
   intent: A scratch note holds nothing.
   scope: { subject: file }
   requirement: A scratch note MUST be empty.
-  enforcement: mechanical
+  severity: error
   evidence: [path]
   check:
     type: cel

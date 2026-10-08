@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: public-boundary
+  annotations:
+    lighthouse/was-builtin: testing/external-test-package
 spec:
   title: Contract tests live outside the target
   intent: >-
@@ -17,7 +19,7 @@ spec:
   requirement: >-
     Feature contract tests MUST use only the target's public symbols and MUST
     live outside the target's private scope.
-  enforcement: mechanical
+  severity: error
   evidence: [test_file, package, private_symbols]
   languages:
     go:
@@ -36,8 +38,23 @@ spec:
     typescript:
       tuning: "Contract tests import only the package's public exports."
   check:
-    type: builtin
-    id: testing/external-test-package
+    type: cel
+    select: file
+    where: >-
+      file.test && !file.generated && file.module != '' && file.module_known
+      && file.module_test_of == '' && size(file.private_reach.symbols) > 0
+    message: >-
+      test file {{ file.path }} lives inside the package it tests and uses its private
+      symbols ({{ size(file.private_reach.symbols) }}); test through the public boundary
+      from outside the package
+    evidence:
+      test_file: file.path
+      package: file.module
+      private_symbols: file.private_reach.symbols
+    at:
+      symbol: file.private_reach.first
+    identity:
+      subject: file.private_reach.first
   examples:
     - name: invalid
       language: go

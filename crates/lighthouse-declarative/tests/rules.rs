@@ -17,7 +17,7 @@ use support::{Subject, World};
 fn local(scope: &str, check: &str) -> Result<Declarative, String> {
     let indented: String = check.lines().map(|l| format!("    {l}\n")).collect();
     let text = format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  intent: A probe.\n  scope: {{ subject: {scope} }}\n  requirement: A probe MUST hold.\n  enforcement: mechanical\n  evidence: [x]\n  check:\n    type: cel\n{indented}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  intent: A probe.\n  scope: {{ subject: {scope} }}\n  requirement: A probe MUST hold.\n  severity: error\n  evidence: [x]\n  check:\n    type: cel\n{indented}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
     );
     let layer = Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)]))
         .map_err(|e| e.to_string())?;
@@ -164,7 +164,7 @@ fn error() {
 }
 
 #[test]
-fn an_expression_that_fails_to_evaluate_fails_the_run_loudly() {
+fn an_expression_with_an_execution_error_leaves_the_analysis_incomplete() {
     let plugin = local(
         "symbol",
         "select: symbol\nwhere: 'symbol.nothing == 1'\nmessage: x",
@@ -173,7 +173,7 @@ fn an_expression_that_fails_to_evaluate_fails_the_run_loudly() {
     let mut w = World::default();
     w.func("m", "Run", "m/a.ucm");
     let outcome = std::panic::catch_unwind(|| found(&plugin, &w));
-    assert!(outcome.is_err(), "an evaluation error is not a silent pass");
+    assert!(outcome.is_err(), "an execution error is not a silent pass");
 }
 
 #[test]
@@ -181,7 +181,7 @@ fn local_files_need_the_local_prefix_and_a_cel_check_and_inline_examples() {
     let files = |text: &str| BTreeMap::from([("x.yaml".to_owned(), text.to_owned())]);
     let header = |name: &str| {
         format!(
-            "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: {name}\nspec:\n  title: t\n  intent: i\n  scope: {{ subject: symbol }}\n  requirement: A MUST b.\n  enforcement: doc\n"
+            "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: {name}\nspec:\n  title: t\n  intent: i\n  scope: {{ subject: symbol }}\n  requirement: A MUST b.\n"
         )
     };
     assert!(
@@ -198,7 +198,7 @@ fn local_files_need_the_local_prefix_and_a_cel_check_and_inline_examples() {
         Catalog::from_local(files(&builtin))
             .unwrap_err()
             .to_string()
-            .contains("`cel` check")
+            .contains("standard operation")
     );
     let sourced = format!(
         "{}  examples:\n    - name: e\n      language: text\n      kind: valid\n      files: [{{ path: a, source: a.txt }}]\n",

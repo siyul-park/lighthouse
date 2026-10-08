@@ -6,6 +6,8 @@ metadata:
   labels:
     lighthouse/pack: core
     lighthouse/section: limits
+  annotations:
+    lighthouse/was-builtin: core/max-file-lines
 spec:
   title: Files stay below a line limit
   intent: Large files tend to mix responsibilities.
@@ -13,7 +15,7 @@ spec:
     domain: code
     subject: file
   requirement: "A file SHOULD stay at or below the configured line limit (option `max`)."
-  enforcement: heuristic
+  severity: warn
   evidence: [lines, max]
   options:
     type: object
@@ -24,8 +26,18 @@ spec:
         description: Largest number of lines a file may have.
     additionalProperties: false
   check:
-    type: builtin
-    id: core/max-file-lines
+    type: cel
+    select: file
+    where: file.lines > options.max
+    message: "file has {{ file.lines }} lines, limit is {{ options.max }}"
+    evidence:
+      lines: file.lines
+      max: options.max
+    at:
+      line: options.max + 1
+      endLine: file.lines
+    identity:
+      subject: file.path
   examples:
     - name: over-limit
       language: text

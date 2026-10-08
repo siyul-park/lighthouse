@@ -15,7 +15,7 @@ spec:
   requirement: >-
     An allow annotation SHOULD suppress a finding; one whose rule no longer
     fires there, or is not enabled, SHOULD be removed.
-  enforcement: heuristic
+  severity: warn
   evidence: [rules, reason, annotation]
   check:
     type: builtin

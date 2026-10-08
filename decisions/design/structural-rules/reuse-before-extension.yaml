@@ -15,4 +15,6 @@ spec:
   requirement: >-
     Existing symbols and composition SHOULD be preferred before adding layers,
     extension points, policy knobs, or parallel mechanisms.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

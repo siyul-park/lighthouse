@@ -15,6 +15,8 @@ spec:
   requirement: >-
     A symbol MUST NOT depend on code that is more specific, more
     context-dependent, or less stable than itself.
-  enforcement: heuristic
+  severity: warn
   evidence: [from, to, from_instability, to_instability]
+  check:
+    type: model
   citation: "Martin, Stable Dependencies Principle"

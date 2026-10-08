@@ -15,4 +15,6 @@ spec:
   requirement: >-
     One symbol MUST own each mutable state and its transitions; shared mutable
     state MUST have one owner and one synchronization strategy.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

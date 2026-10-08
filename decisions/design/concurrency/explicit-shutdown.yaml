@@ -13,8 +13,10 @@ spec:
     domain: code
     subject: symbol
   requirement: Long-lived concurrent tasks MUST have an explicit shutdown path.
-  enforcement: heuristic
+  severity: warn
   evidence: [task, spawned_at]
   languages:
     go:
       tuning: Applies to goroutines.
+  check:
+    type: model

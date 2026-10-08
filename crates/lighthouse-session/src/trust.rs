@@ -65,13 +65,24 @@ impl Basis {
         for command in commands {
             let program = command.argv.first().map_or("", String::as_str);
             field(&mut hash, "program", program.as_bytes());
-            let inside = root.as_deref().and_then(|r| inside(r, program));
-            let content = inside.and_then(|p| fs::read(p).ok());
-            field(
-                &mut hash,
-                "binary",
-                &Sha256::digest(content.unwrap_or_default()),
-            );
+            // The program and every argument that names a file inside the
+            // project (`sh script.sh`, `python3 x.py`) are trusted by content.
+            for (at, arg) in command.argv.iter().enumerate() {
+                field(&mut hash, "argument", arg.as_bytes());
+                let named = root.as_deref().and_then(|r| {
+                    if at == 0 {
+                        inside(r, arg)
+                    } else {
+                        in_project(r, arg)
+                    }
+                });
+                let content = named.and_then(|p| fs::read(p).ok());
+                field(
+                    &mut hash,
+                    "binary",
+                    &Sha256::digest(content.unwrap_or_default()),
+                );
+            }
         }
         Self {
             digest: hash.finalize().iter().map(|b| format!("{b:02x}")).collect(),
@@ -136,6 +147,18 @@ fn inside(root: &Path, program: &str) -> Option<PathBuf> {
         .into_iter()
         .filter_map(|c| c.canonicalize().ok())
         .find(|c| c.starts_with(root) && c.is_file())
+}
+
+/// The file `arg` names when it is a path inside `root`, relative to it or
+/// absolute.
+fn in_project(root: &Path, arg: &str) -> Option<PathBuf> {
+    if arg.starts_with('-') || arg.starts_with('{') {
+        return None;
+    }
+    root.join(arg)
+        .canonicalize()
+        .ok()
+        .filter(|p| p.starts_with(root) && p.is_file())
 }
 
 fn key(root: &Path) -> Option<String> {

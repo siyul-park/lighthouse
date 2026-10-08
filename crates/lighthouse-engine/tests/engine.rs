@@ -84,6 +84,7 @@ fn meta(id: &str, scope: Scope, analyzers: &[&str], capabilities: &[Capability])
         capabilities: capabilities.to_vec(),
         citation: None,
         strict: false,
+        enforced: true,
     }
 }
 
@@ -106,6 +107,7 @@ impl Rule for Fake {
             end: Position { line: 1, col: 1 },
         };
         let (file, message) = match ctx.file {
+            Some((file, _)) if ctx.trusted => (file.path.clone(), "file (trusted)".to_owned()),
             Some((file, _)) => (file.path.clone(), "file".to_owned()),
             None => {
                 let count: usize = ctx.fact("fake/count-files")?;
@@ -408,7 +410,7 @@ fn non_utf8_data_claimed_only_by_a_fallback_provider_is_a_notice() {
 }
 
 #[test]
-fn a_failed_provider_makes_its_whole_batch_incomplete_in_one_entry() {
+fn a_provider_with_an_execution_error_makes_its_whole_batch_incomplete_in_one_entry() {
     let dir = project(&[("a.txt", b"1"), ("b.txt", b"2"), ("boom.crash", b"3")]);
     let (registry, batches) = batched("!", ".crash");
     let engine = Engine::new(registry, Config::parse_inline(ALL).unwrap(), dir.path()).unwrap();
@@ -420,7 +422,7 @@ fn a_failed_provider_makes_its_whole_batch_incomplete_in_one_entry() {
     let gap = &out.incomplete[0];
     assert_eq!(gap.path, None);
     assert!(
-        gap.reason.contains("language `any` failed"),
+        gap.reason.contains("language `any` had an execution error"),
         "{}",
         gap.reason
     );
@@ -594,6 +596,29 @@ fn engine_check_files() {
             .all(|d| d.file == Path::new("b/y.txt"))
     );
     assert!(engine.check_files(&[], &[]).unwrap().diagnostics.is_empty());
+}
+
+#[test]
+fn engine_with_trust_tells_the_rules_the_user_trusts_the_project() {
+    let dir = project(&[("x.txt", b"1")]);
+    let untrusted = engine(&dir, ALL).unwrap();
+    let before = untrusted
+        .check(&root(&dir), &["fake/each".to_owned()])
+        .unwrap();
+    assert!(before.diagnostics.iter().all(|d| d.message == "file"));
+
+    let trusted = engine(&dir, ALL).unwrap().with_trust(true);
+    let after = trusted
+        .check(&root(&dir), &["fake/each".to_owned()])
+        .unwrap();
+
+    assert!(!after.diagnostics.is_empty());
+    assert!(
+        after
+            .diagnostics
+            .iter()
+            .all(|d| d.message == "file (trusted)")
+    );
 }
 
 #[test]

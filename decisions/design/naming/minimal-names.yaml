@@ -15,4 +15,6 @@ spec:
   requirement: >-
     One word SHOULD be the default; a multi-word name MUST add only the minimum
     qualifier needed to express a distinction.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model

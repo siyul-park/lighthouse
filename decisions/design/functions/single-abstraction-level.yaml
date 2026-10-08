@@ -13,4 +13,6 @@ spec:
     domain: code
     subject: symbol
   requirement: One function MUST stay at one abstraction level.
-  enforcement: judgment
+  severity: info
+  check:
+    type: model
