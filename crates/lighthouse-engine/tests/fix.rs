@@ -9,7 +9,7 @@ use lighthouse_config::Config;
 use lighthouse_engine::{Engine, Error, FixBinding, FixPlan, FixRun, unified_diff};
 use lighthouse_model::{EditOp, FixOutcome, Safety};
 use lighthouse_plugin::{
-    Error as PluginError, FixPattern, FixRequest, Fixer, FixerManifest, LanguageProvider, Plugin,
+    Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, LanguageProvider, Plugin,
     PluginManifest, Registry, Rule,
 };
 
@@ -136,10 +136,10 @@ fn a_suggested_fix_needs_unsafe_fixes() {
 }
 
 #[test]
-fn the_pattern_caps_what_a_fixer_claims() {
+fn the_decision_caps_what_a_fixer_claims() {
     let dir = project("TODO\n");
     let engine = engine(&dir, "");
-    // The fixer claims `safe`; the pattern says `suggested`.
+    // The fixer claims `safe`; the decision says `suggested`.
     let capped = plan("fake/to-done-claimed-safe", Safety::Suggested, true);
 
     let report = engine.fix(&capped, &FixRun::default()).unwrap();
@@ -339,7 +339,7 @@ fn fixes_stop_after_a_bounded_number_of_rounds() {
         ))
         .unwrap();
     let config =
-        Config::parse("plugins = [\"grow\"]\n[rules]\n\"grow/todo\" = \"warn\"\n").unwrap();
+        Config::parse_inline("plugins = [\"grow\"]\n[rules]\n\"grow/todo\" = \"warn\"\n").unwrap();
     let engine = Engine::new(registry, config, dir.path()).unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
@@ -348,7 +348,7 @@ fn fixes_stop_after_a_bounded_number_of_rounds() {
             fixer: "grow/grow".to_owned(),
             cap: Safety::Safe,
             mechanical: true,
-            pattern: FixPattern {
+            decision: FixDecision {
                 id: "grow/todo".to_owned(),
                 requirement: String::new(),
                 intent: String::new(),

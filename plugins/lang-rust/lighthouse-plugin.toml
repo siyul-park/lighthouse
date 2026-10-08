@@ -1,3 +1,11 @@
-id = "lang-rust"
+apiVersion = "lighthouse/v1alpha1"
+kind = "Plugin"
+
+[metadata]
+name = "lang-rust"
+
+[spec]
 version = "0.1.0"
+
+[spec.runtime]
 command = "./lang-rust"

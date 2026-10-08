@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/platform-behind-owner
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: generated-and-platform
+spec:
+  title: Platform mechanics stay behind their owner
+  intent: Platform differences leak when they are not fenced.
+  scope:
+    domain: code
+    subject: module
+  requirement: >-
+    Platform mechanics MUST stay behind matching build constraints and owner
+    packages.
+  enforcement: judgment
+  languages:
+    go:
+      tuning: Use matching build constraints or file-name suffixes.

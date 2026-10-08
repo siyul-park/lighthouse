@@ -14,7 +14,10 @@ use lighthouse_model::Incomplete;
 use lighthouse_plugin::{Plugin, Registry};
 use thiserror::Error;
 
-pub use manifest::{Discovered, FILE_NAME, Found, PluginManifest, discover, load};
+pub use manifest::{
+    Discovered, FILE_NAME, FILE_NAMES, Found, PluginManifest, PluginSpec, Provides, Runtime,
+    discover, file_in, is_legacy, load, migrate, parse,
+};
 pub use plugin::RpcPlugin;
 
 /// Per-request limit unless the plugin entry sets `timeout`; generous because
@@ -30,11 +33,8 @@ pub enum Error {
         path: PathBuf,
         source: std::io::Error,
     },
-    #[error("{}: {source}", path.display())]
-    Manifest {
-        path: PathBuf,
-        source: toml::de::Error,
-    },
+    #[error("{}: {message}", path.display())]
+    Manifest { path: PathBuf, message: String },
     #[error("plugin `{id}` is provided more than once: {}", places.join(", "))]
     Conflict { id: String, places: Vec<String> },
     #[error("{}: manifest declares `{found}`, config lists `{id}`", dir.display())]
@@ -73,6 +73,11 @@ impl Plugin for Unavailable {
     fn manifest(&self) -> &lighthouse_plugin::PluginManifest {
         &self.0
     }
+}
+
+/// The JSON Schema of the kinds this crate defines.
+pub fn descriptors() -> Vec<lighthouse_resource::Descriptor> {
+    vec![lighthouse_resource::Descriptor::of::<PluginSpec>()]
 }
 
 /// Where plugin manifests are searched: `<root>/.lighthouse/plugins`,

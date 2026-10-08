@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/adjacent-siblings
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: structural-signals
+spec:
+  title: Similar siblings are adjacent
+  intent: Symmetric siblings read best side by side.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Similar or symmetric siblings SHOULD be adjacent when they share an owner
+    and implementation shape.
+  enforcement: heuristic
+  evidence: [peer, distance]

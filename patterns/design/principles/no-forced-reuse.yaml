@@ -1,8 +1,0 @@
-id: design/no-forced-reuse
-title: No reuse by merging unrelated roles
-intent: >-
-  Reuse bought by merging unrelated roles couples things that change for
-  different reasons.
-scope: symbol
-requirement: Unrelated roles MUST NOT be combined merely to force reuse.
-enforcement: judgment

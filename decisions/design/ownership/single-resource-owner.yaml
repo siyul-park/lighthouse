@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/single-resource-owner
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: ownership
+spec:
+  title: One owner per resource transition
+  intent: "Resources leak when nobody, or two parties, ends them."
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Retain/release and resource transitions MUST have one owner, and each
+    resource MUST be released exactly once.
+  enforcement: judgment

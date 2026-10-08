@@ -4,7 +4,7 @@ use include_dir::{Dir, DirEntry, include_dir};
 
 use crate::Error;
 
-static BUNDLED: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../patterns");
+static BUNDLED: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../decisions");
 
 /// Catalog files keyed by `/`-separated path relative to the catalog root.
 pub type Files = BTreeMap<String, String>;

@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/translate-errors-at-boundary
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: errors
+spec:
+  title: Translate errors at their boundary
+  intent: "Early translation loses information; late translation leaks layers."
+  scope:
+    domain: code
+    subject: symbol
+  requirement: Error categories MUST be translated only at their owning boundary.
+  enforcement: judgment

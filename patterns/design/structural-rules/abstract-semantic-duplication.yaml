@@ -1,9 +1,0 @@
-id: design/abstract-semantic-duplication
-title: Abstract semantic duplication
-intent: Two implementations of one rule will diverge.
-scope: project
-requirement: >-
-  Multiple implementations of the same behavior or rule MUST converge on one
-  owner; syntax similarity alone MUST NOT trigger abstraction.
-enforcement: judgment
-evidence: [owners, locations]

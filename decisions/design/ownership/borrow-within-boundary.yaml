@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/borrow-within-boundary
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: ownership
+spec:
+  title: Borrowed values stay within their boundary
+  intent: A borrowed value that escapes its owner dangles or aliases.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: Borrowed values MUST NOT cross or outlive their ownership boundary.
+  enforcement: judgment

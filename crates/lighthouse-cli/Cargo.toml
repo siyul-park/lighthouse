@@ -7,6 +7,8 @@ publish.workspace = true
 [dependencies]
 clap.workspace = true
 lighthouse-config.workspace = true
+lighthouse-engine.workspace = true
+lighthouse-resource.workspace = true
 lighthouse-mcp.workspace = true
 lighthouse-model.workspace = true
 lighthouse-builtin.workspace = true
@@ -21,7 +23,8 @@ name = "lighthouse"
 path = "src/main.rs"
 
 [dev-dependencies]
-lighthouse-engine.workspace = true
+lighthouse-resource.workspace = true
+lighthouse-session.workspace = true
 assert_cmd.workspace = true
 predicates = "3"
 tempfile.workspace = true

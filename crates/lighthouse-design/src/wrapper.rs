@@ -4,7 +4,7 @@ use lighthouse_model::{
     Diagnostic, Node, Project, Symbol, SymbolId, SymbolKind, Target, Visibility,
 };
 use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
-use lighthouse_spec::PatternRule;
+use lighthouse_spec::DecisionRule;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -16,7 +16,7 @@ const ID: &str = "design/single-use-wrapper";
 struct NoOptions {}
 
 pub(crate) fn rule() -> Box<dyn Rule> {
-    Box::new(PatternRule::new(ID, &[], check))
+    Box::new(DecisionRule::new(ID, &[], check))
 }
 
 /// The private target a private undocumented wrapper only forwards to. The

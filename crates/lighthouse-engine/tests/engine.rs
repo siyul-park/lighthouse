@@ -173,6 +173,7 @@ impl Plugin for FakePlugin {
             options: Options::new(),
         };
         vec![PresetManifest {
+            extends: Vec::new(),
             id: "fake/p".to_owned(),
             rules: Rules::from([("fake/each".to_owned(), each)]),
         }]
@@ -256,7 +257,11 @@ fn project(files: &[(&str, &[u8])]) -> TempDir {
 }
 
 fn engine(dir: &TempDir, toml: &str) -> Result<Engine, Error> {
-    Engine::new(registry("!"), Config::parse(toml).unwrap(), dir.path())
+    Engine::new(
+        registry("!"),
+        Config::parse_inline(toml).unwrap(),
+        dir.path(),
+    )
 }
 
 const ALL: &str = r#"plugins = ["fake"]
@@ -350,7 +355,12 @@ fn unreadable_and_unindexed_files_are_incomplete_not_notices() {
         ("bin.dat", &[0xff, 0xfe]),
         ("bad.skip", b"x"),
     ]);
-    let engine = Engine::new(registry(".skip"), Config::parse(ALL).unwrap(), dir.path()).unwrap();
+    let engine = Engine::new(
+        registry(".skip"),
+        Config::parse_inline(ALL).unwrap(),
+        dir.path(),
+    )
+    .unwrap();
     let out = engine
         .check(&root(&dir), &["fake/each".to_owned()])
         .unwrap();
@@ -388,7 +398,7 @@ fn non_utf8_data_claimed_only_by_a_fallback_provider_is_a_notice() {
         .unwrap();
     let engine = Engine::new(
         registry,
-        Config::parse("plugins = [\"bin\"]").unwrap(),
+        Config::parse_inline("plugins = [\"bin\"]").unwrap(),
         dir.path(),
     )
     .unwrap();
@@ -401,7 +411,7 @@ fn non_utf8_data_claimed_only_by_a_fallback_provider_is_a_notice() {
 fn a_failed_provider_makes_its_whole_batch_incomplete_in_one_entry() {
     let dir = project(&[("a.txt", b"1"), ("b.txt", b"2"), ("boom.crash", b"3")]);
     let (registry, batches) = batched("!", ".crash");
-    let engine = Engine::new(registry, Config::parse(ALL).unwrap(), dir.path()).unwrap();
+    let engine = Engine::new(registry, Config::parse_inline(ALL).unwrap(), dir.path()).unwrap();
     let out = engine
         .check(&root(&dir), &["fake/each".to_owned()])
         .unwrap();
@@ -422,7 +432,7 @@ fn a_failed_provider_makes_its_whole_batch_incomplete_in_one_entry() {
 fn each_provider_is_called_once_with_all_its_files() {
     let dir = project(&[("a/x.txt", b"1"), ("b/y.txt", b"2"), ("z.txt", b"3")]);
     let (registry, batches) = batched("!", "!");
-    let engine = Engine::new(registry, Config::parse(ALL).unwrap(), dir.path()).unwrap();
+    let engine = Engine::new(registry, Config::parse_inline(ALL).unwrap(), dir.path()).unwrap();
     engine.check(&root(&dir), &[]).unwrap();
     engine.check(&[dir.path().join("a")], &[]).unwrap();
     assert_eq!(*batches.lock().unwrap(), [3, 3]);
@@ -464,22 +474,47 @@ fn only_must_name_an_enabled_rule() {
 #[test]
 fn outcome_exit_code() {
     let dir = project(&[("x.txt", b"1"), ("bad.skip", b"x")]);
-    let code = |level: &str, strict| {
+    let code = |level: &str, fail_on: lighthouse_engine::FailOn| {
         let toml = format!("plugins = [\"fake\"]\n[rules]\n\"fake/each\" = \"{level}\"\n");
         engine(&dir, &toml)
             .unwrap()
             .check(&root(&dir), &[])
             .unwrap()
-            .exit_code(strict, false)
+            .exit_code(fail_on, false)
     };
-    assert_eq!(code("error", false), 1);
-    assert_eq!(code("warn", false), 0);
-    assert_eq!(code("warn", true), 1);
-    assert_eq!(code("review", true), 0);
-    assert_eq!(code("info", true), 0);
-    assert_eq!(code("off", true), 0);
+    let lenient = lighthouse_engine::FailOn::default();
+    let strict = lighthouse_engine::FailOn::from(true);
+    let at_most = |n| lighthouse_engine::FailOn {
+        strict: false,
+        max_warnings: Some(n),
+    };
+    assert_eq!(code("error", lenient), 1);
+    assert_eq!(code("warn", lenient), 0);
+    assert_eq!(code("warn", strict), 1);
+    assert_eq!(code("info", strict), 0);
+    assert_eq!(code("off", strict), 0);
+    // Warnings are tolerated up to the number given, and fail past it.
+    let warnings = engine(
+        &dir,
+        "plugins = [\"fake\"]\n[rules]\n\"fake/each\" = \"warn\"\n",
+    )
+    .unwrap()
+    .check(&root(&dir), &[])
+    .unwrap()
+    .diagnostics
+    .len();
+    assert!(warnings > 0);
+    assert_eq!(code("warn", at_most(warnings)), 0);
+    assert_eq!(code("warn", at_most(warnings - 1)), 1);
+    assert_eq!(code("info", at_most(0)), 0, "info never fails a run");
+    assert_eq!(code("error", at_most(5)), 1, "errors always do");
 
-    let engine = Engine::new(registry(".skip"), Config::parse(ALL).unwrap(), dir.path()).unwrap();
+    let engine = Engine::new(
+        registry(".skip"),
+        Config::parse_inline(ALL).unwrap(),
+        dir.path(),
+    )
+    .unwrap();
     let out = engine
         .check(&root(&dir), &["fake/each".to_owned()])
         .unwrap();
@@ -517,12 +552,14 @@ fn construction_validates_plugins_presets_rules_and_options() {
         Error::PluginNotListed(_)
     ));
     assert!(matches!(
-        err("plugins = [\"fake\"]\n[rules]\n\"fake/each\" = { level = \"warn\", bad = 1 }"),
+        err(
+            "plugins = [\"fake\"]\n[rules]\n\"fake/each\" = { level = \"warn\", options = { bad = 1 } }"
+        ),
         Error::Plugin(PluginError::Options { .. })
     ));
     assert!(matches!(
         err(
-            "plugins = [\"fake\"]\n[[overrides]]\nrules = { \"fake/each\" = { level = \"warn\", bad = 1 } }"
+            "plugins = [\"fake\"]\n[[overrides]]\nrules = { \"fake/each\" = { level = \"warn\", options = { bad = 1 } } }"
         ),
         Error::Plugin(PluginError::Options { .. })
     ));
@@ -600,7 +637,7 @@ fn outcome_states_report_scope_rules_that_ran_and_subject_facts() {
 #[test]
 fn active_rules() {
     let registry = registry("!");
-    let config = |toml: &str| Config::parse(toml).unwrap();
+    let config = |toml: &str| Config::parse_inline(toml).unwrap();
     let from_preset = lighthouse_engine::active_rules(
         &registry,
         &config("plugins = [\"fake\"]\nextends = [\"fake/p\"]\n"),

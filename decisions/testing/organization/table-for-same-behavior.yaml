@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/table-for-same-behavior
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: organization
+spec:
+  title: Tables for one behavior over many inputs
+  intent: A table says the behavior is the same and only the data differs.
+  scope:
+    domain: code
+    subject: test
+  requirement: >-
+    Same behavior over many inputs MUST use one inline table of named inputs and
+    expected outputs, each entry one case; cases that specify the same behavior
+    MUST be merged into one case or one table.
+  enforcement: judgment
+  languages:
+    go:
+      tuning: Use an inline anonymous struct table.

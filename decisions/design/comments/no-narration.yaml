@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-narration
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: comments
+spec:
+  title: Comments do not narrate
+  intent: Narration repeats the code and goes stale.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Comments MUST NOT narrate code, restate names, label control-flow phases, or
+    explain obvious behavior; a better name, type, or structure SHOULD be
+    preferred.
+  enforcement: judgment
+  evidence: [comment, restated_identifiers]
+  examples:
+    - name: invalid
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            // increment the counter
+            count++
+    - name: valid
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            // The wire format counts from zero; callers expect one-based totals.
+            count++

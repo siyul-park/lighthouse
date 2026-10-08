@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/polling-outlives-teardown
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: organization
+spec:
+  title: Polling does not outlive teardown
+  intent: Polling that continues after teardown races with released resources.
+  scope:
+    domain: code
+    subject: test
+  requirement: >-
+    Readiness polling MUST NOT outlive teardown or retain resources after the
+    case closes them.
+  enforcement: mechanical
+  evidence: [test, poller]

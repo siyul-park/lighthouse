@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/justified-helper
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: functions
+spec:
+  title: Helpers are justified
+  intent: A helper that earns nothing is indirection.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    A helper MUST be extracted only to remove semantic duplication, name
+    reusable behavior or policy, isolate an abstraction level, or serve as a
+    function value.
+  enforcement: judgment

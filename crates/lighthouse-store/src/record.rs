@@ -29,10 +29,14 @@ pub struct Observed {
     pub facts: Value,
     /// The options the rule ran with, defaults included.
     pub options: Value,
-    /// Hash of what the rule's pattern demands; verdicts expire when it moves.
+    /// Hash of what the rule's decision demands; verdicts expire when it moves.
     pub rule_version: Option<String>,
-    /// Hash of the whole pattern definition, wording and examples included.
-    pub pattern_hash: Option<String>,
+    /// What `rule_version` was in builds from before the resource model, for
+    /// as long as the decision still demands the same: a verdict recorded then
+    /// does not expire for the change of format alone.
+    pub legacy_rule_version: Option<String>,
+    /// Hash of the whole decision definition, wording and examples included.
+    pub decision_hash: Option<String>,
 }
 
 impl Observed {
@@ -52,7 +56,8 @@ impl Observed {
             facts,
             options: json!({}),
             rule_version: None,
-            pattern_hash: None,
+            legacy_rule_version: None,
+            decision_hash: None,
         }
     }
 
@@ -146,7 +151,8 @@ pub enum Standing {
     RuleChanged,
     /// The finding's evidence changed since the verdict: ask again.
     EvidenceChanged,
-    /// Mechanical findings are fixed, never suppressed by a verdict.
+    /// Mechanical findings are fixed, never suppressed by a verdict, whatever
+    /// severity they are configured at.
     Unsuppressible,
 }
 
@@ -202,6 +208,7 @@ impl fmt::Display for State {
 
 /// A finding as stored: its latest sighting, its history and its standing.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FindingRecord {
     pub fingerprint: String,
     pub rule_id: String,
@@ -237,6 +244,13 @@ pub struct FindingRecord {
 }
 
 impl FindingRecord {
+    /// Whether the finding asks for a verdict: its decision is enforced by a
+    /// heuristic or a judgment, whatever its severity. A finding recorded when
+    /// `review` was a severity of its own is one too.
+    pub fn needs_verdict(&self) -> bool {
+        matches!(self.tier.as_deref(), Some("heuristic" | "judgment")) || self.severity == "review"
+    }
+
     /// Where the finding is in its life; a suppression wins over the rest.
     pub fn state(&self) -> State {
         if self.standing == Some(Standing::Suppressed) {
@@ -268,15 +282,15 @@ pub struct NewReview {
 }
 
 /// What a review records about the rule beyond the finding: the versions of
-/// the pattern it judged and its scope.
+/// the decision it judged and its scope.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Stamp {
-    /// Semantic version of the pattern, which decides when the verdict expires.
+    /// Semantic version of the decision, which decides when the verdict expires.
     pub rule_version: Option<String>,
-    /// Hash of the whole pattern definition.
-    pub pattern_hash: Option<String>,
+    /// Hash of the whole decision definition.
+    pub decision_hash: Option<String>,
     pub catalog_version: Option<String>,
-    /// The pattern's scope (`symbol`, `file`, ...).
+    /// The decision's scope (`symbol`, `file`, ...).
     pub scope: Option<String>,
 }
 
@@ -290,6 +304,8 @@ pub struct Resolved {
 /// One entry of the decision log and of the review table: a verdict on a
 /// finding with everything needed to learn from it later. `id` is the hash of
 /// the rest, so the same entry read from two copies of the log is one entry.
+/// This is the shape of the entries written before the resource model; the
+/// log now writes them as `Verdict` records.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReviewEvent {
     pub id: String,
@@ -297,8 +313,14 @@ pub struct ReviewEvent {
     pub rule_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rule_version: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pattern_hash: Option<String>,
+    /// Read as `pattern_hash` in entries written before the rename.
+    #[serde(
+        default,
+        rename = "pattern_hash",
+        alias = "decision_hash",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub decision_hash: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub catalog_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -355,6 +377,7 @@ pub struct NewFix {
 
 /// A recorded fix; `fixed by` the fixer named, when.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FixEvent {
     pub id: String,
     pub fingerprint: String,

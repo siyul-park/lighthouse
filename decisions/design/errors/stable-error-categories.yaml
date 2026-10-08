@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/stable-error-categories
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: errors
+spec:
+  title: Stable error categories
+  intent: "Callers classify failures by identity, not by message text."
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Semantic errors MUST use stable, named error values or types, and semantic
+    categories MUST NOT be created from ad hoc formatted messages alone.
+  enforcement: heuristic
+  evidence: [error, site]
+  languages:
+    go:
+      tuning: >-
+        Semantic errors are `ErrXxx` sentinels; `fmt.Errorf` alone does not
+        create a category.

@@ -19,7 +19,7 @@ fn go_plugin() -> Option<PathBuf> {
 
 fn registry(plugin: &Path) -> Registry {
     let mut registry = lighthouse_builtin::registry();
-    let config = Config::parse(&format!(
+    let config = Config::parse_inline(&format!(
         "plugins = [{{ id = \"lang-go\", path = {:?} }}]",
         plugin.to_str().unwrap()
     ))
@@ -263,7 +263,7 @@ fn config(plugin: &Path) -> String {
 const CONFIG: &str = r#"extends = ["design/recommended"]
 
 [rules]
-"design/coupling-signal" = { level = "warn", hub_fan_in = 2, hub_fan_out = 2, hub_statements = 1 }
+"design/coupling-signal" = { level = "warn", options = { hub_fan_in = 2, hub_fan_out = 2, hub_statements = 1 } }
 "#;
 
 fn line_of(source: &str, needle: &str) -> u32 {
@@ -281,7 +281,7 @@ fn write(root: &Path, path: &str, text: &str) {
 }
 
 fn engine(plugin: &Path, root: &Path, extra: &str) -> Engine {
-    let config = Config::parse(&format!("{}{extra}", config(plugin))).unwrap();
+    let config = Config::parse_inline(&format!("{}{extra}", config(plugin))).unwrap();
     Engine::new(registry(plugin), config, root).unwrap()
 }
 
@@ -440,7 +440,7 @@ fn engine_analyzes_the_build_context_and_notes_excluded_variants() {
 }
 
 #[test]
-fn every_implemented_pattern_passes_its_catalog_examples() {
+fn every_checked_decision_passes_its_catalog_examples() {
     if go_plugin().is_none() {
         return;
     }

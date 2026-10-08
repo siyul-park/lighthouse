@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/no-structure-only-tests
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: tdd
+spec:
+  title: No structure-only tests
+  intent: Tests of implementation details fail on refactors and prove nothing.
+  scope:
+    domain: code
+    subject: test
+  requirement: >-
+    Structure-only tests MUST NOT be added merely to exercise implementation
+    details.
+  enforcement: judgment

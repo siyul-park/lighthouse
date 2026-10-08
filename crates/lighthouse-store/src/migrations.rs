@@ -11,7 +11,7 @@ use crate::Error;
 /// in, it drops the triggers and the views over the table, creates the new
 /// table, copies every row across, drops the old table, renames the new one,
 /// and recreates indexes, triggers and views. `V2` does exactly that.
-const MIGRATIONS: &[&str] = &[V1, V2, V3];
+const MIGRATIONS: &[&str] = &[V1, V2, V3, V4, V5];
 
 /// Findings and the append-only review log. Locators, evidence and facts are
 /// JSON text, so nothing here assumes the artifact is code.
@@ -205,6 +205,75 @@ CREATE TABLE fix_events (
     timestamp          TEXT NOT NULL
 );
 CREATE INDEX fix_events_fingerprint ON fix_events (fingerprint, timestamp);
+";
+
+/// The resource model renames a pattern to a decision, so `pattern_hash`
+/// becomes `decision_hash` in both tables, and gives a finding the semantic
+/// version its rule had before the model (`legacy_rule_version`): a verdict
+/// recorded then keeps applying while the decision demands the same. The
+/// views that compare versions are recreated to honor it. No row is touched.
+const V4: &str = "
+ALTER TABLE findings RENAME COLUMN pattern_hash TO decision_hash;
+ALTER TABLE review_events RENAME COLUMN pattern_hash TO decision_hash;
+ALTER TABLE findings ADD COLUMN legacy_rule_version TEXT;
+
+DROP VIEW finding_states;
+DROP VIEW standings;
+
+CREATE VIEW standings AS
+SELECT f.fingerprint, l.reason_code, (l.reason_code = 'scope-too-broad') AS narrowing,
+    CASE
+        WHEN f.last_severity = 'error' THEN 'unsuppressible'
+        WHEN l.rule_version IS NOT NULL AND f.rule_version IS NOT NULL
+             AND l.rule_version <> f.rule_version
+             AND l.rule_version IS NOT f.legacy_rule_version THEN 'rule-changed'
+        WHEN l.evidence_digest IS NOT NULL AND f.evidence_digest IS NOT NULL
+             AND l.evidence_digest <> f.evidence_digest THEN 'evidence-changed'
+        ELSE 'suppressed'
+    END AS standing
+FROM findings f
+JOIN latest_verdicts l ON l.fingerprint = f.fingerprint
+WHERE l.verdict = 'rejected';
+
+CREATE VIEW finding_states AS
+SELECT f.*, l.verdict AS review_verdict, l.reason_code AS review_reason,
+       s.standing AS standing, COALESCE(s.narrowing, 0) AS narrowing
+FROM findings f
+LEFT JOIN latest_verdicts l ON l.fingerprint = f.fingerprint
+LEFT JOIN standings s ON s.fingerprint = f.fingerprint;
+";
+
+/// A verdict can suppress a finding of a heuristic or judgment decision,
+/// whatever severity the project gave it, and never one of a mechanical
+/// decision: the tier decides, not the severity. A finding recorded before
+/// tiers existed has none, and then the severity it had stands in for it, as
+/// it did. The views are recreated; no row is touched.
+const V5: &str = "
+DROP VIEW finding_states;
+DROP VIEW standings;
+
+CREATE VIEW standings AS
+SELECT f.fingerprint, l.reason_code, (l.reason_code = 'scope-too-broad') AS narrowing,
+    CASE
+        WHEN COALESCE(f.tier, CASE WHEN f.last_severity = 'error' THEN 'mechanical' ELSE 'heuristic' END)
+             NOT IN ('heuristic', 'judgment') THEN 'unsuppressible'
+        WHEN l.rule_version IS NOT NULL AND f.rule_version IS NOT NULL
+             AND l.rule_version <> f.rule_version
+             AND l.rule_version IS NOT f.legacy_rule_version THEN 'rule-changed'
+        WHEN l.evidence_digest IS NOT NULL AND f.evidence_digest IS NOT NULL
+             AND l.evidence_digest <> f.evidence_digest THEN 'evidence-changed'
+        ELSE 'suppressed'
+    END AS standing
+FROM findings f
+JOIN latest_verdicts l ON l.fingerprint = f.fingerprint
+WHERE l.verdict = 'rejected';
+
+CREATE VIEW finding_states AS
+SELECT f.*, l.verdict AS review_verdict, l.reason_code AS review_reason,
+       s.standing AS standing, COALESCE(s.narrowing, 0) AS narrowing
+FROM findings f
+LEFT JOIN latest_verdicts l ON l.fingerprint = f.fingerprint
+LEFT JOIN standings s ON s.fingerprint = f.fingerprint;
 ";
 
 /// The schema version this build writes.

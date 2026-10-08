@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 /// Why a catalog could not be read, built, validated or written; every
-/// variant names the offending file or pattern.
+/// variant names the offending file or decision.
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("cannot read {path}: {source}")]
@@ -11,10 +11,13 @@ pub enum Error {
     },
     #[error("{path}: {message}")]
     Parse { path: String, message: String },
+    /// A document that is not a valid resource of the kind it declares.
+    #[error(transparent)]
+    Document(#[from] lighthouse_resource::Error),
     /// Files that do not form a catalog: ordering, naming, missing files.
     #[error("{path}: {message}")]
     Layout { path: String, message: String },
-    /// A pattern, option, source or overlay that breaks a catalog rule.
+    /// A decision, option, source or overlay that breaks a catalog rule.
     #[error("`{id}`: {reason}")]
     Invalid { id: String, reason: String },
 }

@@ -1,0 +1,193 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/coupling-signal
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: structural-signals
+spec:
+  title: Coupling is a review signal
+  intent: A dependency hub changes for many reasons.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Coupling SHOULD be judged from direct intra-package fan-in and fan-out, that
+    is the functions and methods of the same package that call a symbol or are
+    called by it, against deliberately high thresholds. Calls from other
+    packages and from tests do not count: a widely used public function is a
+    service, not a hub.
+  enforcement: heuristic
+  evidence: [fan_in, fan_out, statements]
+  options:
+    type: object
+    properties:
+      hub_fan_in:
+        type: integer
+        default: 8
+        description: >-
+          Callers that, with `hub_fan_out` and `hub_statements`, mark a
+          dependency hub.
+      hub_fan_out:
+        type: integer
+        default: 6
+        description: Callees of a dependency hub.
+      hub_statements:
+        type: integer
+        default: 20
+        description: Statement count of a dependency hub.
+      coordinator_fan_out:
+        type: integer
+        default: 12
+        description: >-
+          Callees that, with the other `coordinator_*` options, mark a
+          coordinator.
+      coordinator_max_fan_in:
+        type: integer
+        default: 1
+        description: Most callers a coordinator may have.
+      coordinator_statements:
+        type: integer
+        default: 15
+        description: Statement count of a coordinator.
+    additionalProperties: false
+  languages:
+    rust:
+      tuning: >-
+        The unit is the Rust module (a `mod` and every inline module are
+        distinct units). Methods count with their impl's type; calls through a
+        receiver whose type is not written in the code are not seen, so fan
+        counts are lower bounds.
+  check:
+    type: builtin
+    id: design/coupling-signal
+  citation: "Henry and Kafura 1981, information flow"
+  examples:
+    - name: hub
+      language: go
+      kind: invalid
+      options:
+        hub_fan_in: 2
+        hub_fan_out: 2
+        hub_statements: 1
+      files:
+        - path: sample.go
+          body: "package sample\n\nfunc hub() {\n\tleft()\n\tright()\n}\n\nfunc left()  {}\nfunc right() {}\n\nfunc a() { hub() }\nfunc b() { hub() }"
+      expect:
+        - line: 3
+    - name: coordinator
+      language: go
+      kind: invalid
+      options:
+        hub_fan_in: 100
+        coordinator_fan_out: 3
+        coordinator_max_fan_in: 0
+        coordinator_statements: 3
+      files:
+        - path: sample.go
+          body: "package sample\n\nfunc run() {\n\tone()\n\ttwo()\n\tthree()\n}\n\nfunc one()   {}\nfunc two()   {}\nfunc three() {}"
+      expect:
+        - line: 3
+    - name: ordinary-fan
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: sample.go
+          body: "package sample\n\nfunc hub() {\n\tleft()\n\tright()\n}\n\nfunc left()  {}\nfunc right() {}\n\nfunc a() { hub() }\nfunc b() { hub() }"
+    - name: rust-hub
+      language: rust
+      kind: invalid
+      options:
+        hub_fan_in: 2
+        hub_fan_out: 2
+        hub_statements: 1
+      files:
+        - path: src/lib.rs
+          body: |-
+            fn hub() {
+                left();
+                right();
+            }
+
+            fn left() {}
+            fn right() {}
+
+            fn a() {
+                hub();
+            }
+            fn b() {
+                hub();
+            }
+      expect:
+        - line: 1
+    - name: rust-coordinator
+      language: rust
+      kind: invalid
+      options:
+        hub_fan_in: 100
+        coordinator_fan_out: 3
+        coordinator_max_fan_in: 0
+        coordinator_statements: 3
+      files:
+        - path: src/lib.rs
+          body: |-
+            fn run() {
+                one();
+                two();
+                three();
+            }
+
+            fn one() {}
+            fn two() {}
+            fn three() {}
+      expect:
+        - line: 1
+    - name: rust-ordinary-fan
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            fn hub() {
+                left();
+                right();
+            }
+
+            fn left() {}
+            fn right() {}
+
+            fn a() {
+                hub();
+            }
+            fn b() {
+                hub();
+            }
+    - name: rust-service-used-across-modules
+      language: rust
+      kind: valid
+      options:
+        hub_fan_in: 2
+        hub_fan_out: 2
+        hub_statements: 1
+      files:
+        - path: src/lib.rs
+          body: |-
+            mod service {
+                pub fn serve() {
+                    super::left();
+                    super::right();
+                }
+            }
+
+            fn left() {}
+            fn right() {}
+
+            pub fn a() {
+                service::serve();
+            }
+            pub fn b() {
+                service::serve();
+            }

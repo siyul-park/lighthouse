@@ -1,0 +1,116 @@
+{
+  "$defs": {
+    "Level": {
+      "description": "A level a project can set: a severity, or `off`, which only\nconfiguration has.",
+      "enum": [
+        "error",
+        "warn",
+        "info",
+        "off"
+      ],
+      "type": "string"
+    },
+    "Metadata": {
+      "additionalProperties": false,
+      "description": "Who a resource is. Identity is `name`; grouping is by label, never by\nwhere the document is stored.",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Free notes; never used to select.",
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Selectable facts, keyed `lighthouse/<name>`.",
+          "type": "object"
+        },
+        "name": {
+          "description": "Fully qualified name, such as `design/minimal-names`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "PresetSpec": {
+      "additionalProperties": false,
+      "description": "Named rule configuration, referenced from `extends`.",
+      "properties": {
+        "extends": {
+          "description": "Presets whose rules this one starts from.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rules": {
+          "additionalProperties": {
+            "$ref": "#/$defs/RuleSetting"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "RuleDetail": {
+      "additionalProperties": false,
+      "description": "A level with options.",
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/Level"
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "The decision's options, as its own schema declares them.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "type": "object"
+    },
+    "RuleSetting": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Level"
+        },
+        {
+          "$ref": "#/$defs/RuleDetail"
+        }
+      ],
+      "description": "How a rule is written in a spec: `warn`, `off`, or\n`{ level: warn, options: { max: 10 } }`."
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/preset.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "lighthouse/v1alpha1"
+    },
+    "kind": {
+      "const": "Preset"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "spec": {
+      "$ref": "#/$defs/PresetSpec"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "title": "Preset",
+  "type": "object"
+}

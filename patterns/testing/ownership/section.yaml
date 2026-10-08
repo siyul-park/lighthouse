@@ -1,6 +1,0 @@
-id: ownership
-title: Ownership
-intro: >-
-  Test contracts and structure have one owner and should remain independent of
-  incidental implementation details.
-patterns: [single-owner-per-concern]

@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/validated-constructors
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: types-and-apis
+spec:
+  title: Constructors validate
+  intent: A constructed value should be valid or not exist.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Constructors MUST require inputs with no safe default and MUST validate
+    required dependencies and shape; `Build` MUST validate a complete builder.
+  enforcement: judgment

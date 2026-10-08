@@ -1,0 +1,127 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/section-banners
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: comments
+spec:
+  title: Comments do not label sections
+  intent: A banner restates structure that names and file layout already carry.
+  scope:
+    domain: code
+    subject: file
+  requirement: >-
+    A comment MUST NOT only label a section of code: banner lines such as `//
+    ---- Helpers ----`, `// ====` rules and `// MARK:` markers are a substitute
+    for splitting, naming or ordering, and SHOULD be replaced by one of them.
+  enforcement: heuristic
+  evidence: [comment, label]
+  options:
+    type: object
+    properties:
+      min_run:
+        type: integer
+        default: 3
+        description: Rule characters in a row that make a banner line.
+      rule_chars:
+        type: string
+        default: "-=*~_+"
+        description: Characters a banner rule is drawn with.
+      labels:
+        type: array
+        default: ["MARK:", "#region", "#endregion"]
+        description: Line prefixes that label a section on their own.
+    additionalProperties: false
+  languages:
+    go:
+      tuning: >-
+        Reported when every non-blank line of a comment group is a banner line.
+        A group that mixes banner lines with prose (a table, a diagram) is
+        documentation and passes.
+    rust:
+      tuning: >-
+        Doc comments (`///`, `//!`) are Markdown and never banners; a plain `//`
+        or block comment made only of banner lines is reported.
+  check:
+    type: builtin
+    id: design/section-banners
+  fix:
+    safety: suggested
+    type: ops
+    ops:
+      - op: delete
+        file: finding.file
+        span: finding.span
+  examples:
+    - name: invalid
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            func helper() int { return 1 }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // ---- Helpers ----
+
+            func helper() int { return 1 }
+      expect:
+        - line: 3
+    - name: marker
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            func helper() int { return 1 }
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // MARK: - Helpers
+
+            func helper() int { return 1 }
+      expect:
+        - line: 3
+    - name: valid
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: "package sample\n\n// Parse reads the header.\n//\n// The layout is\n//\n//\t---\n//\tname: value\n//\t---\nfunc Parse() int { return 1 }\n\nvar x = 1 // --- not a banner: it trails code"
+    - name: rust-invalid
+      language: rust
+      kind: invalid
+      fixed:
+        - path: src/lib.rs
+          body: "pub struct Store;"
+      files:
+        - path: src/lib.rs
+          body: |-
+            // ===== Types =====
+
+            pub struct Store;
+      expect:
+        - line: 1
+    - name: rust-valid
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            /// Store of values.
+            ///
+            /// ---
+            pub struct Store;

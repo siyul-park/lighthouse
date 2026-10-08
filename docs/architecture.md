@@ -44,7 +44,7 @@ Dependency direction runs from the general to the specific:
 `model` ← `plugin` (contracts) ← `protocol` (wire types) ← `rpc` (host and the only
 wire-to-model conversion) ← `engine` ← `cli`. The wire model is separate from the
 core model: renaming a core field is not a protocol change. `store` knows only
-`model` (artifact-neutral records), and `report` knows `model` and the pattern
+`model` (artifact-neutral records), and `report` knows `model` and the decision
 catalog in `spec`.
 
 ## Analysis scope and report scope
@@ -62,17 +62,116 @@ reported even on a line the change did not touch. Files the project never wants
 analyzed (fixtures that are broken on purpose) are listed in `.lighthouseignore`,
 in `.gitignore` syntax; unlike a report filter, that removes them from analysis.
 
-## Rules
+## Terms
 
-Every implemented rule belongs to a catalog pattern whose `implementation` is
-either `builtin` (a Rust rule of a bundled plugin: `design`, `testing`, `core`) or
-`declarative`: a YAML file with a CEL expression over the code model.
+| Term | Means |
+| --- | --- |
+| **decision** | What was decided and why: the catalog entry (`Decision`), with its enforcement, options, examples and fix. The one authored concept. |
+| **rule** | The executable form the engine compiles from a decision's `check`: the `Rule` trait, the rule ids that findings carry (a rule id is the id of its decision). |
+| **verdict** | A judgment about one finding (confirmed, rejected, deferred, with a reason), appended to the decision log. |
+| **annotation** | A verdict written at the code: `lighthouse:allow <rule> -- <reason>`. |
+
+## Resource model
+
+Every spec document has one envelope, in the style of the Kubernetes resource
+model, and is read from YAML, TOML or JSON alike (a YAML file may hold several
+documents):
 
 ```yaml
-select: symbol            # symbol | function | edge | module | file | test
-where: 'symbol.kind == "var" && symbol.visibility != "private"'
-message: 'exported variable {{ symbol.name }} is mutable package state'
-evidence: { symbol: symbol.id }
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: core/max-file-lines        # identity, `<namespace>/<kebab-name>`
+  labels: { lighthouse/pack: core, lighthouse/section: limits }
+  annotations: {}
+spec: { ... }
+```
+
+| Kind | Holds | Lives in |
+| --- | --- | --- |
+| `Decision` | a decision: `title intent scope requirement enforcement severity evidence exceptions options languages check fix citation strict examples` | `decisions/<pack>/<section>/<name>.yaml`, `.lighthouse/decisions/` |
+| `DecisionOverride` | a project's adjustment of a decision of a lower layer (`extends`) | `.lighthouse/decisions/` |
+| `Pack` | title, intro and the ordered sections, each listing its decisions | `decisions/<pack>/pack.yaml` |
+| `SourceMap` | which decision covers each normative line of the documents a catalog came from | `decisions/sources.yaml` |
+| `Project` | `lighthouse.toml`: `plugins extends languages rules overrides` | project root |
+| `Preset` | named rule configuration (`extends`, `rules`); the `recommended` and `strict` presets of a plugin are derived from its decisions | in code |
+| `Plugin` | `lighthouse-plugin.toml`: `runtime {command, args}` and `provides` | plugin directory |
+| `OrderKey` | a way to order declarations for a `reorder` fix | in code |
+| `Verdict` | a record of the decision log | `.lighthouse/decisions.jsonl` |
+
+Conventions: keys are lowerCamelCase (option names inside a decision stay as the
+decision authors them), durations are strings (`30s`), enums are lowercase kebab,
+paths are relative with `/`. A decision belongs to a pack and section by its
+labels; the `Pack` document only orders them, so where the file lies carries no
+meaning. `scope` is `{domain, subject}` (`domain` is `code`). `options` is a JSON
+Schema object (`type`, `default`, `description` per property, closed with
+`additionalProperties: false`); `languages.<id>` holds the option values and the
+wording of one language. `check` and `fix` choose a provider by `type`: `check` is
+`builtin` or `cel`; `fix` is `ops`, `command` or `rpc`, with the fields of its type
+next to `safety` and `requires`, and no others.
+
+The JSON Schema (2020-12) of each kind is generated from the Rust types into
+`schema/` and checked in (`lighthouse schema [kind]` prints one, `--write DIR`
+writes all; a test fails when the files are stale). Documents carry a
+`# yaml-language-server: $schema=...` comment so editors validate them.
+`lighthouse spec validate [paths]` checks each document against its schema and
+against the others (presets and rules name things that exist, fix operations name
+registered order keys, CEL compiles, examples are well formed; `--examples` also
+runs them). `lighthouse spec migrate [paths]` rewrites the formats from before the
+model (decision files of the earlier format, `pack.yaml` with `section.yaml`, rule files, `sources.yaml`,
+`lighthouse.toml`, `lighthouse-plugin.toml`, `.lighthouse/rules`) and leaves a
+document that already has an `apiVersion` alone, so it is idempotent. Readers
+accept the new format only, and say so: a project that still has `.lighthouse/rules`,
+a catalog of the earlier format or a configuration without an envelope fails to load
+with a pointer to `lighthouse spec migrate`. TOML comments are not preserved by the
+migration.
+
+The migration touches only shapes it recognizes: a decision has an `id` and a
+`requirement`, an override an `extends` and an override key, a configuration one of the
+keys of the old one; a key it does not know is an error rather than dropped. A directory
+scan covers the catalogs it finds (a directory with a `pack.yaml`), `.lighthouse/` and
+the configuration files; other YAML or JSON (an `.eslintrc.yml`) is not read. A file
+of several documents with one in the old format is refused, to be split first. Changes
+are applied together: every target is written next to its destination and renamed into
+place, and only then are files removed, so a failure never leaves a rule removed
+before the decision that inlines it exists. A rule file or `section.yaml` is removed
+only when a migrated document consumed it (a decision names a rule file relative to
+the catalog root, or its own directory); otherwise it stays, with a warning.
+
+## Severity
+
+A finding is `error`, `warn` or `info` (and a rule may be `off` in
+configuration). The default follows the decision's enforcement: mechanical is
+`error`, heuristic is `warn`, judgment is `info`; `doc` yields no finding. The same
+three levels map to SARIF (`error`, `warning`, `note`). Exit code: `1` if any error;
+a warning fails only with `--strict` or past `--max-warnings N`; `info` never
+fails; an incomplete analysis is `3`.
+
+Needing a verdict is not a level: findings of non-mechanical decisions
+(`enforcement: heuristic` or `judgment`) are review tasks whatever their severity.
+`review list`, the MCP `review_tasks` tool, the agent format and the hooks select by
+that property. A rule that has no decision is treated by its severity. History keeps
+the severity string it recorded, including `review` from older builds.
+
+Suppression follows the same property, not the severity: a verdict can suppress a
+finding of a heuristic or judgment decision even when the project configured it as
+`error`, and never one of a mechanical decision even when configured as `warn`. So an
+agent is only asked for a verdict that can take effect. (A cache row from before tiers
+were recorded has no tier; its recorded severity stands in for it.)
+
+## Rules
+
+Every implemented rule belongs to a catalog decision whose `check` is
+either `type: builtin` (a Rust rule of a bundled plugin: `design`, `testing`,
+`core`) or `type: cel`: an expression over the code model, written in the decision.
+
+```yaml
+check:
+  type: cel
+  select: symbol            # symbol | function | edge | module | file | test
+  where: 'symbol.kind == "var" && symbol.visibility != "private"'
+  message: 'exported variable {{ symbol.name }} is mutable package state'
+  evidence: { symbol: symbol.id }
 ```
 
 `select` binds one variable of the same name (`func` for `function`, which CEL
@@ -84,15 +183,15 @@ max_nesting tokens branches`; edges have `kind resolution from to` (each end wit
 lang test generated lines symbols functions`; tests add `nesting style targets
 target_count`. Absent values are empty strings, never null. `edge` and `module`
 rules run once over the project, the others once per file. Projects add their
-own rules as `.lighthouse/rules/*.yaml` (a pattern with id `local/<name>` and
-the rule file under `rule:`), enabled through the `local` plugin of
-`lighthouse.toml`. `lighthouse rule test [ids]` runs every example of the
-bundled and local patterns through the whole engine, in each language whose
+own decisions as `.lighthouse/decisions/*.yaml` (a `Decision` with id `local/<name>`
+and a `cel` check), enabled through the `local` plugin of
+`lighthouse.toml`. `lighthouse decision test [ids]` runs every example of the
+bundled and local decisions through the whole engine, in each language whose
 plugin the configuration lists.
 
 Language specifics stay out of the rules: provider facts (symbols, owners,
 visibility, spans, comments) are the same everywhere, and per-language option
-defaults and tuning prose in the pattern realize a rule per language.
+defaults and tuning prose in the decision realize a rule per language.
 
 ## Incomplete analysis
 
@@ -191,19 +290,39 @@ are marked in the facts (`ordinal`), and `review resolve` warns about them: the 
 moves when an identical finding appears before it. A finding that stops colliding goes
 back to its undistinguished fingerprint.
 
+### Semantic version
+
+`rule_version` is the hash of a decision's normalized semantic content
+(requirement with whitespace squashed, enforcement, scope, check, and the option
+types and defaults including each language's values): the envelope, the labels, the
+file format and the prose do not change it. Hashing a different set of fields gives a
+different number than builds before the resource model recorded, so a verdict
+written then would expire for the change of format alone. Each finding therefore
+also carries the *legacy* version: what the old formula gives for the same content
+(`Decision::legacy_semantic_version`, which reads the old shape back out of the
+new). The store treats a verdict as current when its `rule_version` equals either, so
+existing verdicts keep applying while the decision demands the same, and expire as
+before when it changes (one exception: `scope` was not hashed before, so changing
+it expires only verdicts recorded after the model). A test pins the legacy value of
+every bundled decision to the number the previous build computed. A CEL check
+migrated from a rule file remembers the file name in the annotation
+`lighthouse/migrated-from`, which the old formula hashed; a CEL decision authored
+since has no legacy version.
+
 ### Verdicts
 
 A verdict is a review event: the finding's fingerprint, rule id, `rule_version` (the
-*semantic* version of the pattern: a hash of its requirement, enforcement, options and
-implementation, not of prose, examples or tuning notes), `pattern_hash` (the whole
-pattern definition), `catalog_version`, the Lighthouse version, a nullable
-`pattern_fingerprint` (code-pattern identity, filled by the similarity index), the
+*semantic* version of the decision: a hash of its requirement, enforcement, options and
+implementation, not of prose, examples or tuning notes), `decision_hash` (the whole
+decision definition), `catalog_version`, the Lighthouse version, a nullable
+`pattern_fingerprint` (code-shape identity, filled by the similarity index), the
 verdict, the reason, free text, the reviewer (`agent | human` and id), language, scope,
 a digest of the evidence, a **snapshot** frozen at review time, the commit and a
-timestamp. The snapshot is one JSON object, versioned (`"v": 1`): message, path,
-locator, symbol, evidence, facts, options, severity, tier, when the finding was seen
-(`seen_at`), the commit and dirtiness at that sighting, the Lighthouse version and
-`pattern_fingerprint: null`. The snapshot is the single owner of the frozen evidence.
+timestamp. The snapshot is one JSON object, versioned (`"v": 2`, camelCase keys; `1`
+had snake_case keys): message, path, locator, symbol, evidence, facts, options, severity,
+tier (the severity string is what was recorded, so history may say `review`), when the
+finding was seen (`seenAt`), the commit and dirtiness at that sighting, the Lighthouse
+version and `patternFingerprint: null`. The snapshot is the single owner of the frozen evidence.
 
 | Verdict | Reasons | Effect |
 | --- | --- | --- |
@@ -222,8 +341,9 @@ catalog: it warns, and the versions are left out.
 **Suppression is derived**, never stored, from the latest verdict per finding (ordered by
 time, then event id). A rejected verdict suppresses only while it is valid:
 
-- the finding is not mechanical: findings of severity `error` are decided by the rule, so a
-  verdict on one is recorded but never suppresses it, and `check` says so (`rejected as
+- the finding is not mechanical: findings of mechanical decisions are decided by the rule,
+  whatever severity they are configured at, so a verdict on one is recorded but never
+  suppresses it, and `check` says so (`rejected as
   <reason> - mechanical findings are not suppressible; fix the rule`);
 - the semantic version of the rule is the one the verdict judged (otherwise `verdict
   expired: rule changed`);
@@ -252,9 +372,13 @@ Three things decide that a finding is not reported, with different lifetimes:
 | Sighting history | `.lighthouse/lighthouse.db` (ignored) | nobody | it is a local cache |
 
 **The decision log** is the source of truth for verdicts. `review resolve` appends one
-JSON object per verdict (canonical, compact, keys sorted, so diffs are one line) with a
-single write and `fsync`, then updates the cache. Every entry's `id` is a hash of the
-entry without it. Opening the store imports the entries the cache does not have and
+line per verdict, a `Verdict` record of the resource model (`apiVersion`, `kind`,
+`metadata.name` = the record's id, `spec` with camelCase keys; canonical, compact, keys
+sorted, so diffs are one line) with a single write and `fsync`, then updates the cache.
+The `id` is a hash of the spec. The reader accepts both this and the flat snake_case
+line that earlier builds wrote (the log is append-only, history is never rewritten),
+and skips records of a kind or `apiVersion` it does not know, so new kinds never
+break an older reader. Opening the store imports the entries the cache does not have and
 ignores the ones it has, so the cache can always be deleted and rebuilt, a teammate's
 verdicts apply as soon as the log is pulled, and CI suppresses what developers
 suppressed. Two branches that both appended merge by keeping both lines
@@ -285,7 +409,7 @@ another lookup, `--format agent-json` the same records as JSON lines (`finding`,
 `incomplete`, `truncated` and `summary` records tagged by `type`):
 
 ```text
-design/private-helper-callers  review (heuristic)  src/lib.rs:5:1
+design/private-helper-callers  info (heuristic)  src/lib.rs:5:1
   owner:       demo::clamp#function
   message:     private function clamp has one caller (run); review whether ...
   requirement: A private helper SHOULD have at least two callers.
@@ -298,14 +422,14 @@ design/private-helper-callers  review (heuristic)  src/lib.rs:5:1
 ```
 
 The requirement and intent come from the catalog. The expected structure is a valid
-example of the pattern for the file's language, at most 12 lines and 600 characters,
+example of the decision for the file's language, at most 12 lines and 600 characters,
 chosen in this order, and the block says why: the example marked `canonical` (at most
 one per language and kind, enforced by the catalog validation); a valid example whose name
 or whose invalid counterpart's name mentions the kind or visibility of the finding's
-symbol; the shortest valid example; the pattern's tuning note for the language. Evidence
+symbol; the shortest valid example; the decision's tuning note for the language. Evidence
 that repeats the owner symbol is left out and long values are cut. Fingerprints are
 shown as 12-character prefixes, longer when two shown findings would collide, and the
-store accepts any unambiguous prefix. Only findings at the `review` severity carry a
+store accepts any unambiguous prefix. Only findings that ask for a verdict carry a
 resolve command; the choices to make are the verdict and the reason, listed once after the
 blocks (`reasons:`) and in the summary record of the JSON. A finding reported although a
 verdict exists says why in a `note`. `--limit N` prints the N most severe findings (errors
@@ -320,11 +444,11 @@ never apply, the orchestrator never judges. `check` stays pure: a fix is compute
 demand, when `check --fix` or the MCP `fix` tool asks.
 
 **One canonical fix per rule.** The catalog is the single source that says how a rule is
-fixed: the optional `fix:` block of its pattern (see [Fixer spec](#fixer-spec)). The
-resolution is deterministic, `finding.rule` to `pattern.fix` to the fixer registered
-under the pattern's id; there is no list of competing fixers and no fallback chain.
+fixed: the optional `fix:` block of its decision (see [Fixer spec](#fixer-spec)). The
+resolution is deterministic, `finding.rule` to `decision.fix` to the fixer registered
+under the decision's id; there is no list of competing fixers and no fallback chain.
 `--fixer <id>` is an explicit override that must name a registered fixer; it replaces the
-pattern's fixer for the selected findings, whose proposals count as `suggested`, and it
+decision's fixer for the selected findings, whose proposals count as `suggested`, and it
 is the way to use a fixer for a rule that has no `fix:`. Documentation, `explain` and the
 skill show `fixable: safe|suggested`.
 
@@ -371,11 +495,11 @@ catalog that uses `rename` must list `complete-references` in `requires`.
 normalized (no `..`, not absolute), a non-generated file of the analyzed project, and
 reached through no symlink; anything else is declined before any text is read.
 
-**Safety.** A proposal is `safe` or `suggested`. The pattern's `safety` caps what its
-fixer may claim: a fixer that returns `safe` for a `suggested` pattern is downgraded.
-`safe` is reserved for mechanical patterns (the catalog validation refuses it elsewhere).
+**Safety.** A proposal is `safe` or `suggested`. The decision's `safety` caps what its
+fixer may claim: a fixer that returns `safe` for a `suggested` decision is downgraded.
+`safe` is reserved for mechanical decisions (the catalog validation refuses it elsewhere).
 By default only safe fixes of mechanical rules are applied; `--unsafe-fixes` (MCP
-`unsafe_fixes`) also applies suggested ones. Eligibility is decided from the pattern before
+`unsafeFixes`) also applies suggested ones. Eligibility is decided from the decision before
 a fixer is asked, so a suggested fix, a command included, never even runs without
 `--unsafe-fixes`; the finding is reported as left alone, with the reason. `--fixer <id>`
 (CLI only, not offered by MCP) names a registered fixer for the selected findings and
@@ -443,10 +567,10 @@ reordering a Rust file cannot move one: such findings are declined and fixed by 
 
 ## Fixer spec
 
-The `fix:` block of a pattern is declarative and selects one fixer *kind*; every kind
+The `fix:` block of a decision is declarative and selects one fixer *kind*; every kind
 compiles into a provider of the single `Fixer` interface, the way declarative rules
 compile into `Rule`, and bundled fixers are such specs registered by their plugin through
-`Plugin::fixers()` under the pattern's id. Local rules in `.lighthouse/rules/*.yaml` carry
+`Plugin::fixers()` under the decision's id. Local rules in `.lighthouse/decisions/*.yaml` carry
 a `fix:` too.
 
 ```yaml
@@ -474,7 +598,7 @@ fix:
   `facts`), `symbol` (the finding's symbol, as in declarative rules) and `options`, and an
   optional `when` skips an operation. `text` and `name` are templates with `{{ cel }}`
   holes. The operations, their parameters and the registered order keys of `reorder` are
-  generated into [patterns/fix-operations.md](patterns/fix-operations.md). Semantics that
+  generated into [decisions/fix-operations.md](decisions/fix-operations.md). Semantics that
   need Rust (`reorder` sorting by a key such as `design/group`, registered by a plugin
   through `Plugin::order_keys()`) live in the operation, not in per-rule code.
 - **`command`** is the simple text contract; structured data goes through `rpc`. It runs a
@@ -504,25 +628,25 @@ fix:
   project's own, run from the project root) in `~/.lighthouse/trust.toml`. Programs outside
   the project (`gofmt`, `rustfmt`) are trusted by command line only. Every field of the digest
   is tagged and length-prefixed, and it is computed from the very bytes the configuration
-  and rules were loaded from. Authoring candidates (`rule_create`) are never trusted (`$LIGHTHOUSE_HOME` replaces `~/.lighthouse`); any change to
+  and rules were loaded from. Authoring candidates (`decision_create`) are never trusted (`$LIGHTHOUSE_HOME` replaces `~/.lighthouse`); any change to
   either withdraws it, and `lighthouse trust --revoke` removes it. `LIGHTHOUSE_TRUST=1`
   trusts every project, for CI. The repository cannot grant trust itself: a `[fix]` table
   in `lighthouse.toml` is not accepted. Without trust a command fix is declined with a
   message naming the command, and formatting is skipped with a note.
-- **Validation** (every catalog load, local layers included): exactly one kind; a pattern
-  with an implementation; `safe` only on mechanical patterns; every CEL expression and
+- **Validation** (every catalog load, local layers included): exactly one kind; a decision
+  with an implementation; `safe` only on mechanical decisions; every CEL expression and
   template compiles; operation parameters are well-typed (one of `before`/`after`, `node`
   or `file` and `span`, qualified order keys); a command has a program and a timeout;
   `rename` lists `complete-references`; placeholders fill whole arguments; an `rpc` fix is
   kept but only that rule's findings are declined as not yet supported (it does not fail
-  the pack); and the pattern has an invalid example with
+  the pack); and the decision has an invalid example with
   `fixed`. The workspace tests also check that every bundled `fix` has its rule and a
   registered fixer, that every `reorder` key is registered and that the `requires` list
   covers what the operations need.
 - **Testing:** an invalid example may carry `fixed:`, the new text of each file that
   changes. `lighthouse rule test` applies the fix to the example (suggested ones too),
   asserts the files equal `fixed` (a final newline aside), checks that the rule no longer
-  fires and that applying the fix again changes nothing. `rule_create` and `rule_update`
+  fires and that applying the fix again changes nothing. `decision_create` and `decision_update`
   run the same examples in their gate.
 
 ## Frontends
@@ -537,27 +661,26 @@ hook is the same event in the same log. Fixing is the same: `check --fix [--dry-
 Hooks never fix.
 
 ```
- lighthouse-cli ── check [--fix], review, rule, docs, init --agent, hook claude-code
+ lighthouse-cli ── check [--fix], review, decision, spec, schema, docs, init --agent, hook claude-code
  lighthouse-mcp ── `lighthouse mcp`: tools and resources over stdio (rmcp)
         └── lighthouse-session ── engine, store, spec, declarative, rpc, report
 ```
 
-Rule authoring is gated: `rule_create` and `rule_update` build the candidate
+Rule authoring is gated: `decision_create` and `decision_update` build the candidate
 local layer in memory, compile its rules and run every example through the whole
-engine; the file under `.lighthouse/rules` is written (through a temporary name)
+engine; the file under `.lighthouse/decisions` is written (through a temporary name)
 only when all of that passes, so a rejection leaves the project untouched.
 
 The agent skill is generated from the catalog and the configuration
 (`lighthouse docs generate` writes `skills/lighthouse/SKILL.md`, `docs check`
 covers it; `init --agent claude-code` writes the project's own copy): the loop,
-rules of conduct, how to query rules, and a digest of the active patterns.
+rules of conduct, how to query rules, and a digest of the active decisions.
 See [agents.md](agents.md).
 
 ## Dogfooding
 
 Lighthouse checks its own sources. The repository's `lighthouse.toml` enables the
-bundled `core`, `design` and `testing` plugins with their recommended presets (`<plugin>/strict` adds the review-level
-advice that is too noisy to recommend, such as `design/private-helper-callers`) and
+bundled `core`, `design` and `testing` plugins with their recommended presets (`<plugin>/strict` adds the advice that is too noisy to recommend, such as `design/private-helper-callers`) and
 the Go and Rust plugins built by `make plugins`, and `make lint` (part of `make ci`)
 ends with `lighthouse check .`, which must exit 0: a finding is either fixed in the code, or it exposes a rule or
 provider that is imprecise, and that is fixed instead of silenced. The only

@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/singular-capability-plural-collection
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: naming
+spec:
+  title: "Singular capabilities, plural collections"
+  intent: Number in a name tells what the value is.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: "Capability names MUST be singular; collections and stores MUST be plural."
+  enforcement: judgment

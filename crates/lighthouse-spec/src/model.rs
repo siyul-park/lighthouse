@@ -1,17 +1,24 @@
-use std::{collections::BTreeMap, fmt};
+use std::fmt;
 
 use lighthouse_model::Severity;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
-use crate::{Error, Fix};
+/// What kind of thing a decision is about. Only code exists today.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Domain {
+    #[default]
+    Code,
+}
 
-/// What a pattern talks about. Mapping to the run scope of a rule is
-/// `Scope::rule_scope`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Scope {
+/// What a decision talks about inside its domain. Mapping to the run scope
+/// of a rule is `Subject::rule_scope`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Subject {
     Symbol,
     File,
     Module,
@@ -19,9 +26,47 @@ pub enum Scope {
     Test,
 }
 
-/// How a pattern can be verified; it fixes the default severity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+impl Subject {
+    /// Symbol, file and test decisions are checked once per file; module and
+    /// project decisions once over the merged project.
+    pub fn rule_scope(self) -> lighthouse_plugin::Scope {
+        use lighthouse_plugin::Scope as RunScope;
+        match self {
+            Self::Symbol | Self::File | Self::Test => RunScope::File,
+            Self::Module | Self::Project => RunScope::Project,
+        }
+    }
+}
+
+/// Where a decision applies: its domain and what it is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Scope {
+    #[serde(default)]
+    pub domain: Domain,
+    pub subject: Subject,
+}
+
+impl Scope {
+    /// A scope in the code domain.
+    pub fn code(subject: Subject) -> Self {
+        Self {
+            domain: Domain::Code,
+            subject,
+        }
+    }
+}
+
+impl fmt::Display for Scope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.subject.fmt(f)
+    }
+}
+
+/// How a decision can be verified; it fixes the default severity and whether
+/// its findings are review tasks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub enum Enforcement {
     Mechanical,
     Heuristic,
@@ -35,103 +80,37 @@ impl Enforcement {
         match self {
             Self::Mechanical => Some(Severity::Error),
             Self::Heuristic => Some(Severity::Warn),
-            Self::Judgment => Some(Severity::Review),
+            Self::Judgment => Some(Severity::Info),
             Self::Doc => None,
         }
+    }
+
+    /// Whether a finding of this decision asks for a verdict: it was not
+    /// decided by a mechanical check, so a reviewer confirms or rejects it,
+    /// whatever its severity.
+    pub fn needs_verdict(self) -> bool {
+        matches!(self, Self::Heuristic | Self::Judgment)
     }
 }
 
 /// Whether an example must produce no diagnostics (`valid`) or exactly those
 /// listed in `expect` (`invalid`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Kind {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExampleKind {
     Valid,
     Invalid,
-}
-
-/// The JSON type the values of an option must have; `Float` accepts any number.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum OptionType {
-    Int,
-    Float,
-    Bool,
-    String,
-    List,
-}
-
-/// A tunable value of a pattern. Rules read defaults from here, not from code.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct OptionSpec {
-    #[serde(rename = "type")]
-    pub kind: OptionType,
-    pub default: Value,
-    pub description: String,
-    /// Replaces `default` for one language.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub per_language: BTreeMap<String, Value>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawImplementation {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    builtin: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    declarative: Option<String>,
-}
-
-/// How a pattern is checked. Declarative rules arrive with the declarative
-/// engine; only the schema exists today.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(try_from = "RawImplementation", into = "RawImplementation")]
-pub enum Implementation {
-    /// Id of a rule registered by a bundled plugin.
-    Builtin(String),
-    /// Path of a rule definition, relative to the catalog root.
-    Declarative(String),
-}
-
-impl TryFrom<RawImplementation> for Implementation {
-    type Error = String;
-
-    fn try_from(raw: RawImplementation) -> Result<Self, String> {
-        match (raw.builtin, raw.declarative) {
-            (Some(rule), None) => Ok(Self::Builtin(rule)),
-            (None, Some(path)) => Ok(Self::Declarative(path)),
-            _ => {
-                Err("an implementation needs exactly one of `builtin` or `declarative`".to_owned())
-            }
-        }
-    }
-}
-
-impl From<Implementation> for RawImplementation {
-    fn from(implementation: Implementation) -> Self {
-        match implementation {
-            Implementation::Builtin(rule) => Self {
-                builtin: Some(rule),
-                declarative: None,
-            },
-            Implementation::Declarative(path) => Self {
-                builtin: None,
-                declarative: Some(path),
-            },
-        }
-    }
 }
 
 /// Where a fixture file's text comes from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Content {
     Inline(String),
-    /// Path relative to the pattern's section directory.
+    /// Path relative to the directory of the decision's file.
     File(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct RawFile {
     path: String,
@@ -142,8 +121,11 @@ struct RawFile {
 }
 
 /// One file of an example project, addressed by `path` inside the example.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Its text is a `body` written in the decision file, or a `source` file next
+/// to it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "RawFile", into = "RawFile")]
+#[schemars(with = "RawFile")]
 pub struct ExampleFile {
     pub path: String,
     pub content: Content,
@@ -151,7 +133,7 @@ pub struct ExampleFile {
 }
 
 impl ExampleFile {
-    /// A file whose text is `body`, written in the pattern file itself.
+    /// A file whose text is `body`, written in the decision file itself.
     pub fn inline(path: &str, body: &str) -> Self {
         Self {
             path: path.to_owned(),
@@ -213,7 +195,7 @@ impl From<ExampleFile> for RawFile {
 }
 
 /// An expected diagnostic of an invalid example.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Expect {
     pub line: u32,
@@ -223,14 +205,14 @@ pub struct Expect {
 
 /// A fixture project for one language and what a rule must report on it:
 /// nothing for `valid`, the diagnostics of `expect` for `invalid`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Example {
     pub name: String,
     pub language: String,
-    pub kind: Kind,
+    pub kind: ExampleKind,
     pub files: Vec<ExampleFile>,
-    /// The example that best shows the pattern in its language; at most one
+    /// The example that best shows the decision in its language; at most one
     /// per language and kind. Agent output prefers it.
     #[serde(default, skip_serializing_if = "is_false")]
     pub canonical: bool,
@@ -240,157 +222,33 @@ pub struct Example {
     /// Rule options the example runs with.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub options: Map<String, Value>,
-    /// What an invalid example's files become when the pattern's fix is
+    /// What an invalid example's files become when the decision's fix is
     /// applied: the files that change, each with its whole new text. Applying
     /// the fix again must change nothing, and the rule must no longer fire.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fixed: Vec<ExampleFile>,
 }
 
-/// One catalog entry: a requirement with its enforcement, options and
-/// examples. Rules take their metadata and option defaults from it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Pattern {
-    /// `<pack>/<name>`.
-    pub id: String,
-    pub title: String,
-    pub intent: String,
-    pub scope: Scope,
-    pub requirement: String,
-    pub enforcement: Enforcement,
-    #[serde(default, rename = "severity", skip_serializing_if = "Option::is_none")]
-    pub severity_override: Option<Severity>,
-    /// Fields a checker emits as diagnostic evidence.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub evidence: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub examples: Vec<Example>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub exceptions: Option<String>,
-    /// Per-language wording.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub tuning: BTreeMap<String, String>,
-    /// Tunable values, keyed by option name.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub options: BTreeMap<String, OptionSpec>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub implementation: Option<Implementation>,
-    /// How the findings of the rule are fixed; the catalog is the one place
-    /// that says.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fix: Option<Fix>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub citation: Option<String>,
-    /// Review-level advice that is too noisy for the `recommended` preset;
-    /// the `strict` preset enables it.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub strict: bool,
-}
-
-impl Pattern {
-    /// The override if the pattern has one, else the default of its enforcement;
-    /// `None` for a `doc` pattern.
-    pub fn severity(&self) -> Option<Severity> {
-        self.severity_override
-            .or_else(|| self.enforcement.default_severity())
-    }
-
-    /// Identifies this wording of the pattern: the hash of its definition, so
-    /// a verdict can say which version of the rule it judged.
-    pub fn version(&self) -> String {
-        short_hash(&serde_json::to_string(self).expect("a pattern serializes"))
-    }
-
-    /// Identifies what the pattern demands: the hash of its requirement,
-    /// enforcement, options and implementation. Wording, examples and tuning
-    /// notes do not change it, so a verdict stays valid across edits that
-    /// leave the decision alone.
-    pub fn semantic_version(&self) -> String {
-        let decision = serde_json::json!({
-            "requirement": self.requirement.split_whitespace().collect::<Vec<_>>().join(" "),
-            "enforcement": self.enforcement,
-            "options": self.options,
-            "implementation": self.implementation,
-        });
-        short_hash(&decision.to_string())
-    }
-
-    /// Defaults filled in and configured keys checked against the declared
-    /// options; `language` selects per-language defaults.
-    pub fn resolve_options(
-        &self,
-        configured: &Map<String, Value>,
-        language: Option<&str>,
-    ) -> Result<Map<String, Value>, Error> {
-        for (key, value) in configured {
-            let spec = self
-                .options
-                .get(key)
-                .ok_or_else(|| Error::invalid(&self.id, format!("unknown option `{key}`")))?;
-            if !spec.kind.accepts(value) {
-                return Err(Error::invalid(
-                    &self.id,
-                    format!("option `{key}` must be {}", spec.kind),
-                ));
-            }
-        }
-        let mut resolved = Map::new();
-        for (key, spec) in &self.options {
-            let value = configured
-                .get(key)
-                .or_else(|| language.and_then(|l| spec.per_language.get(l)))
-                .unwrap_or(&spec.default);
-            resolved.insert(key.clone(), value.clone());
-        }
-        Ok(resolved)
-    }
-}
-
-impl OptionType {
-    pub(crate) fn accepts(self, value: &Value) -> bool {
-        match self {
-            Self::Int => value.is_i64() || value.is_u64(),
-            Self::Float => value.is_number(),
-            Self::Bool => value.is_boolean(),
-            Self::String => value.is_string(),
-            Self::List => value.is_array(),
-        }
-    }
-}
-
-/// An ordered group of patterns within a pack.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct Section {
-    pub id: String,
-    pub title: String,
-    pub intro: String,
-    pub patterns: Vec<Pattern>,
-}
-
-/// An ordered set of sections; the pack id is the prefix of its pattern ids.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct Pack {
-    pub id: String,
-    pub title: String,
-    pub intro: String,
-    pub sections: Vec<Section>,
-}
-
-/// How a finding is decided: the pattern's enforcement, or, for a rule
-/// without a pattern, what its severity implies.
-pub fn tier(severity: Severity, pattern: Option<&Pattern>) -> &'static str {
-    match pattern.map(|p| p.enforcement) {
+/// How a finding is decided: the decision's enforcement, or, for a rule
+/// without a decision, what its severity implies.
+pub fn tier(severity: Severity, decision: Option<&crate::Decision>) -> &'static str {
+    match decision.map(|d| d.enforcement) {
         Some(Enforcement::Mechanical) => "mechanical",
         Some(Enforcement::Heuristic) => "heuristic",
         Some(Enforcement::Judgment) => "judgment",
         Some(Enforcement::Doc) | None => match severity {
             Severity::Error => "mechanical",
             Severity::Warn => "heuristic",
-            Severity::Review => "judgment",
             Severity::Info => "evidence",
         },
     }
+}
+
+/// Whether findings of this tier (see [`tier`]) ask for a verdict: they were
+/// not decided by a mechanical check, so a reviewer confirms or rejects each,
+/// whatever its severity.
+pub fn needs_verdict(tier: &str) -> bool {
+    matches!(tier, "heuristic" | "judgment")
 }
 
 /// The first eight bytes of the SHA-256 of `text`, in hex.
@@ -409,10 +267,10 @@ macro_rules! display {
     };
 }
 
-display!(Scope { Symbol => "symbol", File => "file", Module => "module", Project => "project", Test => "test" });
+display!(Subject { Symbol => "symbol", File => "file", Module => "module", Project => "project", Test => "test" });
+display!(Domain { Code => "code" });
 display!(Enforcement { Mechanical => "mechanical", Heuristic => "heuristic", Judgment => "judgment", Doc => "doc" });
-display!(Kind { Valid => "valid", Invalid => "invalid" });
-display!(OptionType { Int => "int", Float => "float", Bool => "bool", String => "string", List => "list" });
+display!(ExampleKind { Valid => "valid", Invalid => "invalid" });
 
 fn is_false(value: &bool) -> bool {
     !value

@@ -8,7 +8,7 @@ use lighthouse_plugin::{
     Analyzer, AnalyzerManifest, Ctx, Error, Fixer, Indexed, LanguageProvider, Plugin,
     PluginManifest, PresetManifest, ProviderManifest, Rule, RuleManifest, Scope, Source, Workspace,
 };
-use lighthouse_spec::PatternRule;
+use lighthouse_spec::DecisionRule;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -122,7 +122,7 @@ struct Unconfigured {}
 /// annotation is used depends on every other rule's findings; the rule exists
 /// so that configuration, presets and the catalog treat it like any other.
 fn annotation_rule(id: &'static str) -> Box<dyn Rule> {
-    Box::new(PatternRule::new(
+    Box::new(DecisionRule::new(
         id,
         &[],
         |_: &RuleManifest, _: &Ctx, _: Unconfigured| Ok(Vec::new()),
@@ -130,7 +130,7 @@ fn annotation_rule(id: &'static str) -> Box<dyn Rule> {
 }
 
 fn max_file_lines() -> Box<dyn Rule> {
-    Box::new(PatternRule::new(
+    Box::new(DecisionRule::new(
         MAX_FILE_LINES,
         &[LINE_COUNT],
         |meta: &RuleManifest, ctx: &Ctx, Limit { max }| {

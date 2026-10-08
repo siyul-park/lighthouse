@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use lighthouse_config::Rules;
+
 use crate::{
     Analyzer, Error, Fixer, LanguageProvider, OrderKey, OrderKeys, Plugin, PluginManifest,
     PresetManifest, Rule,
@@ -187,6 +189,30 @@ impl Registry {
     /// The preset with this qualified id.
     pub fn preset(&self, id: &str) -> Option<&PresetManifest> {
         self.presets.get(id)
+    }
+
+    /// The rules of the preset with this id, those of the presets it extends
+    /// underneath; `None` when it or one it extends is unknown, or when the
+    /// presets extend each other in a circle.
+    pub fn preset_rules(&self, id: &str) -> Option<Rules> {
+        self.flatten(id, &mut Vec::new())
+    }
+
+    fn flatten(&self, id: &str, stack: &mut Vec<String>) -> Option<Rules> {
+        if stack.iter().any(|seen| seen == id) {
+            return None;
+        }
+        let preset = self.presets.get(id)?;
+        stack.push(id.to_owned());
+        let mut rules = Rules::new();
+        for base in &preset.extends {
+            for (rule, config) in self.flatten(base, stack)? {
+                rules.insert(rule, config);
+            }
+        }
+        stack.pop();
+        rules.extend(preset.rules.clone());
+        Some(rules)
     }
 
     /// `ids` and their transitive requirements, dependencies first.

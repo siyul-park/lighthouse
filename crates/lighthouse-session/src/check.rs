@@ -41,6 +41,9 @@ pub struct Summary {
     pub status: Status,
     pub errors: usize,
     pub warnings: usize,
+    pub infos: usize,
+    /// Findings of heuristic and judgment decisions, whatever their severity:
+    /// the ones that ask for a verdict.
     pub reviews: usize,
     pub incomplete: usize,
     /// Findings that verdicts kept out of the report.
@@ -81,18 +84,27 @@ impl Checked {
             status,
             errors: count(Severity::Error),
             warnings: count(Severity::Warn),
-            reviews: count(Severity::Review),
+            infos: count(Severity::Info),
+            reviews: {
+                let briefing = self.briefing(None);
+                outcome
+                    .diagnostics
+                    .iter()
+                    .filter(|d| briefing.needs_verdict(d))
+                    .count()
+            },
             incomplete,
             suppressed: self.remembered.suppressed,
             allowed: outcome.allowed.len(),
         }
     }
 
-    /// The briefing the agent formats draw on; the catalog is left out for
-    /// formats that do not use it.
-    pub fn briefing(&self, with_catalog: bool, limit: Option<usize>) -> Briefing<'_> {
+    /// The briefing the agent formats draw on. It always carries the
+    /// catalog, so that the summary and every format agree on which findings
+    /// ask for a verdict.
+    pub fn briefing(&self, limit: Option<usize>) -> Briefing<'_> {
         Briefing {
-            catalog: with_catalog.then_some(&self.catalog),
+            catalog: Some(&self.catalog),
             facts: Some(&self.outcome.facts),
             notes: Some(&self.remembered.notes),
             suppressed: self.remembered.suppressed,

@@ -12,10 +12,10 @@ fn skill_for_lists_every_rule_the_engines_registry_enables() {
     let plugin = lighthouse_testkit::lang_rust();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        format!(
+        lighthouse_testkit::project(&format!(
             "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"design\", \"testing\"]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"]\n",
             plugin.to_str().unwrap()
-        ),
+        )),
     )
     .unwrap();
     let session = Session::find_in(dir.path()).unwrap().unwrap();
@@ -30,7 +30,7 @@ fn skill_for_lists_every_rule_the_engines_registry_enables() {
     let skill = skill_for(&session).unwrap();
     let catalog = session.catalog().unwrap();
     for id in &enabled {
-        assert!(catalog.pattern(id).is_some(), "{id} has no pattern spec");
+        assert!(catalog.decision(id).is_some(), "{id} has no decision");
         assert!(
             skill.contains(&format!("`{id}`")),
             "{id} missing from the skill"

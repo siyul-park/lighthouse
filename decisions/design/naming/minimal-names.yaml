@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/minimal-names
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: naming
+spec:
+  title: Minimal names
+  intent: "Longer names add words, not meaning."
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    One word SHOULD be the default; a multi-word name MUST add only the minimum
+    qualifier needed to express a distinction.
+  enforcement: judgment

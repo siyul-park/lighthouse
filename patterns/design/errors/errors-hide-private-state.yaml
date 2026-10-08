@@ -1,6 +1,0 @@
-id: design/errors-hide-private-state
-title: Errors do not leak state
-intent: Error text and values are part of the public contract.
-scope: symbol
-requirement: Errors MUST NOT expose private or sensitive process state.
-enforcement: judgment

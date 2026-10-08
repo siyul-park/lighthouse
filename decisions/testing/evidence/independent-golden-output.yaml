@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/independent-golden-output
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: evidence
+spec:
+  title: Golden output is independent
+  intent: Golden output produced by the implementation only proves it is stable.
+  scope:
+    domain: code
+    subject: test
+  requirement: >-
+    Golden tests MUST define expected low-level output independently of the
+    implementation that produced it, with the required complete output and
+    metadata checks.
+  enforcement: judgment

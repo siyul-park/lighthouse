@@ -1,7 +1,7 @@
-//! Authoring project-local rules. A change is written to
-//! `.lighthouse/rules` only after the candidate layer loads, its rules
-//! compile and every example passes the whole engine; a rejected change
-//! leaves the project exactly as it was.
+//! Authoring project-local decisions. A change is written to
+//! `.lighthouse/decisions` only after the candidate layer loads, its checks
+//! compile and every example passes the whole engine; a rejected change leaves
+//! the project exactly as it was.
 
 use std::{
     collections::BTreeMap,
@@ -11,76 +11,77 @@ use std::{
 };
 
 use lighthouse_declarative::{local_dir, local_files};
-use lighthouse_spec::Catalog;
-use serde_json::{Map, Value};
+use lighthouse_resource::{API_VERSION, SCHEMA_URL_BASE, resource, to_document};
+use lighthouse_spec::{Catalog, DecisionOverrideSpec};
+use serde_json::{Map, Value, json};
 
-use crate::{Result, RuleTest, Session, test_rules};
+use crate::{DecisionTest, Result, Session, test_decisions};
 
 const LOCAL_PACK: &str = "local";
-/// Held while a rule is authored. Its name matches the `.lighthouse/*.db*`
+/// Held while a decision is authored. Its name matches the `.lighthouse/*.db*`
 /// ignore that `init` writes, so it stays out of version control.
 const LOCK_FILE: &str = ".lighthouse/authoring.db-lock";
 
-/// A rule change that passed its gate and was written.
+/// A decision change that passed its gate and was written.
 pub struct Authored {
     pub id: String,
     pub path: PathBuf,
     pub created: bool,
-    pub test: RuleTest,
+    pub test: DecisionTest,
     /// Whether `lighthouse.toml` lists the `local` plugin, without which the
-    /// project's own rules do not run in `check`.
+    /// project's own decisions do not run in `check`.
     pub plugin_listed: bool,
 }
 
-/// Adds the local rule described by `pattern` (all pattern fields but
-/// `implementation`, id `local/<name>`), its declarative `rule` and
-/// `examples` (appended to the pattern's own).
-pub fn create_rule(
+/// Adds the local decision `id` (`local/<name>`) with `spec`, the spec of a
+/// `Decision` (its check is `type: cel` or absent), and `examples`, appended
+/// to the spec's own.
+pub fn create_decision(
     session: Session,
-    mut pattern: Value,
-    rule: Option<Value>,
+    id: &str,
+    mut spec: Value,
     examples: Vec<Value>,
 ) -> Result<Authored> {
-    let doc = pattern
+    let map = spec
         .as_object_mut()
-        .ok_or("`pattern` must be an object with the fields of a pattern")?;
-    doc.remove("implementation");
-    if let Some(rule) = rule {
-        doc.insert("rule".to_owned(), rule);
-    }
+        .ok_or("`spec` must be an object with the fields of a Decision spec")?;
     if !examples.is_empty() {
-        let mut all = match doc.remove("examples") {
+        let mut all = match map.remove("examples") {
             Some(Value::Array(own)) => own,
             Some(_) => return Err("`examples` must be a list".into()),
             None => Vec::new(),
         };
         all.extend(examples);
-        doc.insert("examples".to_owned(), Value::Array(all));
+        map.insert("examples".to_owned(), Value::Array(all));
     }
-    let id = doc
-        .get("id")
-        .and_then(Value::as_str)
-        .ok_or("the pattern needs an `id`")?
-        .to_owned();
     let name = id
         .strip_prefix("local/")
-        .ok_or_else(|| format!("id is `{id}`, a local rule is `local/<name>`"))?
+        .ok_or_else(|| format!("id is `{id}`, a local decision is `local/<name>`"))?
         .to_owned();
     checked_name(&name)?;
     let _lock = lock(&session.root)?;
     if local_files(&session.root)?.is_some_and(|f| f.contains_key(&file_name(&name))) {
-        return Err(format!("`{id}` already exists; change it with rule_update").into());
+        return Err(format!("`{id}` already exists; change it with decision_update").into());
     }
-    commit(session, &id, &name, pattern, true)
+    let doc = json!({
+        "apiVersion": API_VERSION,
+        "kind": "Decision",
+        "metadata": { "name": id },
+        "spec": spec,
+    });
+    commit(session, id, &name, doc, true)
 }
 
-/// Applies `patch`, a JSON merge patch (null removes a key), to the local
-/// rule `id`; for any other pattern of the catalog it writes or changes the
-/// project's overlay file, whose fields are `severity`, `exceptions`,
-/// `options`, `tuning` and `examples`.
-pub fn update_rule(session: Session, id: &str, patch: &Value) -> Result<Authored> {
+/// Applies `patch`, a JSON merge patch (null removes a key), to the spec of
+/// the local decision `id`; for any other decision of the catalog it writes or
+/// changes the project's override file, whose spec fields are `severity`,
+/// `exceptions`, `options`, `languages` and `examples`.
+pub fn update_decision(session: Session, id: &str, patch: &Value) -> Result<Authored> {
     if !patch.is_object() {
         return Err("`patch` must be an object".into());
+    }
+    if patch.get("extends").is_some() {
+        return Err("`extends` cannot be changed".into());
     }
     let _lock = lock(&session.root)?;
     let files = local_files(&session.root)?.unwrap_or_default();
@@ -88,35 +89,41 @@ pub fn update_rule(session: Session, id: &str, patch: &Value) -> Result<Authored
         checked_name(name)?;
         let text = files
             .get(&file_name(name))
-            .ok_or_else(|| format!("`{id}` is not a local rule of this project"))?;
+            .ok_or_else(|| format!("`{id}` is not a local decision of this project"))?;
         (name.to_owned(), parse(text)?, false)
     } else {
-        if session.catalog()?.pattern(id).is_none() {
-            return Err(format!("unknown pattern `{id}`").into());
+        if session.catalog()?.decision(id).is_none() {
+            return Err(format!("unknown decision `{id}`").into());
         }
         let name = format!("override-{}", id.replace('/', "-"));
         checked_name(&name)?;
         match files.get(&file_name(&name)) {
             Some(text) => (name, parse(text)?, false),
-            None => (name, serde_json::json!({ "extends": id }), true),
+            None => {
+                let doc = json!({
+                    "apiVersion": API_VERSION,
+                    "kind": "DecisionOverride",
+                    "metadata": { "name": name },
+                    "spec": { "extends": id },
+                });
+                (name, doc, true)
+            }
         }
     };
-    for key in ["id", "extends"] {
-        if patch.get(key).is_some() {
-            return Err(format!("`{key}` cannot be changed").into());
-        }
-    }
-    merge(&mut doc, patch);
+    let spec = doc
+        .get_mut("spec")
+        .ok_or_else(|| format!("the file of `{id}` has no `spec`"))?;
+    merge(spec, patch);
     commit(session, id, &name, doc, created)
 }
 
-/// Refuses a rule name that could name a file outside `.lighthouse/rules`.
+/// Refuses a decision name that could name a file outside `.lighthouse/decisions`.
 fn checked_name(name: &str) -> Result<()> {
     if Catalog::local_name_ok(name) {
         return Ok(());
     }
     Err(format!(
-        "`{name}` is not a valid rule name: lowercase letters, digits, `.`, `_` and `-`, starting with a letter or digit, without `..`"
+        "`{name}` is not a valid decision name: lowercase letters, digits, `.`, `_` and `-`, starting with a letter or digit, without `..`"
     )
     .into())
 }
@@ -137,21 +144,20 @@ fn commit(session: Session, id: &str, name: &str, doc: Value, created: bool) -> 
     let root = session.root.clone();
     let plugin_listed = session.config.lists(LOCAL_PACK);
     let mut files: BTreeMap<String, String> = local_files(&root)?.unwrap_or_default();
-    let text = serde_norway::to_string(&doc)?;
-    files.insert(file_name(name), text.clone());
+    files.insert(file_name(name), serde_norway::to_string(&doc)?);
     let local = Catalog::from_local(files)?;
-    let text = canonical(&local, id, &doc, text)?;
+    let text = canonical(&local, id, &doc)?;
     let candidate = session.with_local(Some(local));
     candidate.catalog()?;
     let testable = candidate
         .catalog()?
-        .pattern(id)
-        .is_some_and(|p| p.implementation.is_some());
+        .decision(id)
+        .is_some_and(|d| d.check.is_some());
     let test = if testable {
-        test_rules(&candidate, &[id.to_owned()], None)?
+        test_decisions(&candidate, &[id.to_owned()], None)?
     } else {
-        RuleTest {
-            patterns: 0,
+        DecisionTest {
+            decisions: 0,
             languages: 0,
             runs: 0,
             failures: Vec::new(),
@@ -175,16 +181,17 @@ fn commit(session: Session, id: &str, name: &str, doc: Value, created: bool) -> 
     })
 }
 
-/// A new local rule is written in the loader's own layout; an overlay file
-/// as given.
-fn canonical(local: &Catalog, id: &str, doc: &Value, text: String) -> Result<String> {
-    let Some(pattern) = local.pattern(id).filter(|_| doc.get("extends").is_none()) else {
-        return Ok(text);
-    };
-    let rule = doc
-        .get("rule")
-        .ok_or("a local rule needs a `rule:` section")?;
-    Ok(Catalog::local_rule_text(pattern, rule)?)
+/// The text written to disk: the typed document, so that keys come in the
+/// schema's order and the file starts with the schema comment.
+fn canonical(local: &Catalog, id: &str, doc: &Value) -> Result<String> {
+    if doc.get("kind").and_then(Value::as_str) == Some("DecisionOverride") {
+        let override_doc = resource::<DecisionOverrideSpec>(id, doc)?;
+        return Ok(to_document(&override_doc, SCHEMA_URL_BASE));
+    }
+    let decision = local
+        .decision(id)
+        .ok_or_else(|| format!("`{id}` is not in the candidate layer"))?;
+    Ok(Catalog::decision_text(decision)?)
 }
 
 fn file_name(name: &str) -> String {

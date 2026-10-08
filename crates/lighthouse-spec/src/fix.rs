@@ -1,93 +1,105 @@
-//! The `fix:` block of a pattern: how the finding of its rule is fixed. A
-//! fix is data, never code of the rule: its kind names how the proposal is
+//! The `fix:` block of a decision: how the finding of its rule is fixed. A
+//! fix is data, never code of the rule: its `type` names how the proposal is
 //! made (generic operations over the code model, an external command) and
-//! every kind compiles into a provider of the one `Fixer` interface.
+//! every type compiles into a provider of the one `Fixer` interface.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::time::Duration;
 
 use cel::Program;
 use lighthouse_model::{Capability, Safety};
+use lighthouse_resource::parse_duration;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::Error;
 
-/// How a pattern's findings are fixed and how far the fix may be trusted.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(try_from = "RawFix", into = "RawFix")]
+/// How a decision's findings are fixed and how far the fix may be trusted.
+/// Which fields a fix may have depends on its `type`; any other is refused.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[schemars(transform = refuse_strays)]
 pub struct Fix {
     /// Caps what the fixer may claim: a `safe` proposal under a `suggested`
-    /// pattern is downgraded. `safe` is reserved for mechanical patterns.
+    /// decision is downgraded. `safe` is reserved for mechanical decisions.
     pub safety: Safety,
     /// Provider capabilities the fix needs; without them it is declined.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub requires: Vec<Capability>,
+    #[serde(flatten)]
     pub kind: FixKind,
 }
 
-/// The kind of a fix; a `fix:` block holds exactly one.
-#[derive(Debug, Clone, PartialEq)]
-pub enum FixKind {
-    /// Generic operations over the code model, evaluated with CEL.
-    Ops(Vec<OpSpec>),
-    /// An external program on a scratch copy of the files.
-    Command(CommandSpec),
-    /// A language plugin's fix method. Reserved: not yet supported.
-    Rpc(Value),
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawFix {
+/// The fields of a fix as it is read, before its `type` has had its say about
+/// which of them may be there.
+#[derive(Deserialize)]
+struct Shape {
     safety: Safety,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     requires: Vec<Capability>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    ops: Option<Vec<OpSpec>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    command: Option<CommandSpec>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    rpc: Option<Value>,
+    #[serde(flatten)]
+    kind: FixKind,
 }
 
-impl TryFrom<RawFix> for Fix {
-    type Error = String;
-
-    fn try_from(raw: RawFix) -> Result<Self, String> {
-        let kind = match (raw.ops, raw.command, raw.rpc) {
-            (Some(ops), None, None) => FixKind::Ops(ops),
-            (None, Some(command), None) => FixKind::Command(command),
-            (None, None, Some(rpc)) => FixKind::Rpc(rpc),
-            _ => return Err("a fix needs exactly one of `ops`, `command` or `rpc`".to_owned()),
+impl<'de> Deserialize<'de> for Fix {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error as _;
+        const COMMON: [&str; 3] = ["safety", "requires", "type"];
+        let value = Value::deserialize(deserializer)?;
+        let table = value
+            .as_object()
+            .ok_or_else(|| D::Error::custom("a fix is a table"))?;
+        let own: &[&str] = match table.get("type").and_then(Value::as_str) {
+            Some("ops") => &["ops"],
+            Some("command") => &["argv", "output", "stdin", "env", "timeout", "scope"],
+            Some("rpc") => &["params"],
+            other => {
+                return Err(D::Error::custom(match other {
+                    None => "a fix needs a `type`: ops, command or rpc".to_owned(),
+                    Some(found) => format!("fix `type` is `{found}`, expected ops, command or rpc"),
+                }));
+            }
         };
+        if let Some(stray) = table
+            .keys()
+            .find(|key| !COMMON.contains(&key.as_str()) && !own.contains(&key.as_str()))
+        {
+            return Err(D::Error::custom(format!(
+                "unknown field `{stray}` for a fix of type `{}`",
+                table["type"].as_str().unwrap_or_default()
+            )));
+        }
+        let Shape {
+            safety,
+            requires,
+            kind,
+        } = serde_json::from_value(value).map_err(D::Error::custom)?;
         Ok(Self {
-            safety: raw.safety,
-            requires: raw.requires,
+            safety,
+            requires,
             kind,
         })
     }
 }
 
-impl From<Fix> for RawFix {
-    fn from(fix: Fix) -> Self {
-        let (mut ops, mut command, mut rpc) = (None, None, None);
-        match fix.kind {
-            FixKind::Ops(o) => ops = Some(o),
-            FixKind::Command(c) => command = Some(c),
-            FixKind::Rpc(r) => rpc = Some(r),
-        }
-        Self {
-            safety: fix.safety,
-            requires: fix.requires,
-            ops,
-            command,
-            rpc,
-        }
-    }
+/// The type of a fix; a `fix:` block holds exactly one.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "type", rename_all = "kebab-case")]
+pub enum FixKind {
+    /// Generic operations over the code model, evaluated with CEL.
+    Ops { ops: Vec<OpSpec> },
+    /// An external program on a scratch copy of the files.
+    Command(CommandSpec),
+    /// A language plugin's fix method. Reserved: not yet supported.
+    Rpc {
+        #[serde(default, skip_serializing_if = "Map::is_empty")]
+        params: Map<String, Value>,
+    },
 }
 
 /// The declarations a `reorder` permutes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub enum ReorderScope {
     /// Every declaration of the finding's file, each container sorted on its own.
     File,
@@ -99,8 +111,8 @@ pub enum ReorderScope {
 /// CEL expression over the finding (`finding`, `symbol`, `options`) or, for
 /// `text` and `name`, a template with `{{ cel }}` holes. A `when` expression
 /// that is false skips the operation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "op", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum OpSpec {
     Move {
         node: String,
@@ -167,8 +179,8 @@ impl OpSpec {
 }
 
 /// What the orchestrator takes from a command that succeeded.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub enum CommandOutput {
     /// The command edits the scratch copy of the file.
     #[default]
@@ -178,8 +190,8 @@ pub enum CommandOutput {
 }
 
 /// What the command is given on stdin.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub enum CommandStdin {
     #[default]
     None,
@@ -188,8 +200,8 @@ pub enum CommandStdin {
 }
 
 /// Where a command's edits may land.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub enum CommandScope {
     /// Only the finding's file.
     #[default]
@@ -203,7 +215,7 @@ pub enum CommandScope {
 /// stderr is for people. It runs without a shell, in a scratch directory, with
 /// an environment cleared to `PATH`, `HOME`, `LANG`, `TMPDIR`, the declared
 /// `env` and `LIGHTHOUSE_DECISION`, `LIGHTHOUSE_OPTIONS`, `LIGHTHOUSE_API_VERSION`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CommandSpec {
     /// Program and arguments; `{file}`, `{line}`, `{symbol}` and `{rule}` fill
@@ -223,40 +235,29 @@ pub struct CommandSpec {
     pub scope: CommandScope,
 }
 
-/// Seconds in a timeout written as `30s`, `2m` or a bare number of seconds.
-pub fn timeout_seconds(text: &str) -> Option<u64> {
-    let text = text.trim();
-    let split = text
-        .find(|c: char| !c.is_ascii_digit())
-        .unwrap_or(text.len());
-    let n: u64 = text[..split].parse().ok()?;
-    match &text[split..] {
-        "" | "s" => Some(n),
-        "m" => n.checked_mul(60),
-        _ => None,
+impl CommandSpec {
+    /// How long the command may run; `None` for a text that is not a
+    /// duration such as `30s`.
+    pub fn timeout_duration(&self) -> Option<Duration> {
+        parse_duration(&self.timeout)
     }
 }
 
-/// The checks of a catalog on a pattern's `fix:`.
-pub(crate) fn validate(
-    id: &str,
-    fix: &Fix,
-    mechanical: bool,
-    implemented: bool,
-) -> Result<(), Error> {
+/// The checks of a catalog on a decision's `fix:`.
+pub(crate) fn validate(id: &str, fix: &Fix, mechanical: bool, checked: bool) -> Result<(), Error> {
     let fail = |reason: String| Error::invalid(id, format!("fix: {reason}"));
-    if !implemented {
+    if !checked {
         return Err(fail(
-            "a pattern without an implementation has no findings to fix".to_owned(),
+            "a decision without a check has no findings to fix".to_owned(),
         ));
     }
     if fix.safety == Safety::Safe && !mechanical {
         return Err(fail(
-            "`safe` is reserved for mechanical patterns; use `suggested`".to_owned(),
+            "`safe` is reserved for mechanical decisions; use `suggested`".to_owned(),
         ));
     }
     match &fix.kind {
-        FixKind::Ops(ops) => {
+        FixKind::Ops { ops } => {
             if ops.is_empty() {
                 return Err(fail("`ops` is empty".to_owned()));
             }
@@ -266,11 +267,11 @@ pub(crate) fn validate(
                     "`rename` needs `complete-references` in `requires`".to_owned(),
                 ));
             }
-            ops.iter().try_for_each(|op| op_valid(op).map_err(&fail))
+            ops.iter().try_for_each(|op| op_valid(op).map_err(fail))
         }
         FixKind::Command(command) => command_valid(command).map_err(fail),
         // Kept, and declined when a fix is asked for; see `FixPlan`.
-        FixKind::Rpc(_) => Ok(()),
+        FixKind::Rpc { .. } => Ok(()),
     }
 }
 
@@ -289,11 +290,11 @@ fn command_valid(command: &CommandSpec) -> Result<(), String> {
         .first()
         .is_none_or(|program| program.trim().is_empty())
     {
-        return Err("`command.argv` needs a program".to_owned());
+        return Err("`argv` needs a program".to_owned());
     }
-    if timeout_seconds(&command.timeout).is_none_or(|s| s == 0) {
+    if command.timeout_duration().is_none_or(|t| t.is_zero()) {
         return Err(format!(
-            "`command.timeout` is `{}`, expected a number of seconds or minutes such as `30s`",
+            "`timeout` is `{}`, expected a duration such as `30s` or `2m`",
             command.timeout
         ));
     }
@@ -403,4 +404,37 @@ fn template(what: &str, text: &str) -> Result<(), String> {
         rest = &after[close + 2..];
     }
     Ok(())
+}
+
+/// The loader refuses a field its `type` does not have; so does the schema:
+/// each branch carries the common fields too and allows no other.
+fn refuse_strays(schema: &mut schemars::Schema) {
+    let Some(root) = schema.as_object_mut() else {
+        return;
+    };
+    let common = match root.get("properties") {
+        Some(Value::Object(properties)) => properties.clone(),
+        _ => Map::new(),
+    };
+    let required = root
+        .get("required")
+        .cloned()
+        .unwrap_or(Value::Array(Vec::new()));
+    let Some(Value::Array(branches)) = root.get_mut("oneOf") else {
+        return;
+    };
+    for branch in branches.iter_mut().filter_map(Value::as_object_mut) {
+        if let Value::Object(properties) = branch
+            .entry("properties")
+            .or_insert_with(|| Value::Object(Map::new()))
+        {
+            properties.extend(common.clone());
+        }
+        if let (Some(Value::Array(own)), Value::Array(shared)) =
+            (branch.get_mut("required"), &required)
+        {
+            own.extend(shared.iter().cloned());
+        }
+        branch.insert("additionalProperties".to_owned(), Value::Bool(false));
+    }
 }

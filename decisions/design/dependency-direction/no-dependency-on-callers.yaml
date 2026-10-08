@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-dependency-on-callers
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: dependency-direction
+spec:
+  title: Lower-level code does not depend on its callers
+  intent: A dependency cycle makes both sides unusable alone.
+  scope:
+    domain: code
+    subject: module
+  requirement: >-
+    Higher-level code MAY depend on lower-level code when that code is general
+    and context-independent; lower-level code MUST NOT depend on its callers.
+  enforcement: heuristic
+  evidence: [from, to, cycle]
+  citation: "Tarjan 1972, strongly connected components"

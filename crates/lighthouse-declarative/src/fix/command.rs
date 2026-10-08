@@ -12,7 +12,7 @@ use std::{
 use lighthouse_model::{EditOp, LineIndex, Span};
 use lighthouse_plugin::{Error as PluginError, FixRequest};
 use lighthouse_process::Spec;
-use lighthouse_spec::{CommandOutput, CommandSpec, CommandStdin, timeout_seconds};
+use lighthouse_spec::{CommandOutput, CommandSpec, CommandStdin};
 use serde_json::json;
 
 use super::ops::Evaluated;
@@ -62,7 +62,7 @@ pub(crate) fn run(
         dir: scratch.path(),
         stdin: &stdin,
         env: Some(&environment),
-        limit: Duration::from_secs(timeout_seconds(&spec.timeout).unwrap_or(30)),
+        limit: spec.timeout_duration().unwrap_or(Duration::from_secs(30)),
         grace: GRACE,
         max_output: lighthouse_process::MAX_OUTPUT,
     })

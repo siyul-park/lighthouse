@@ -1,6 +1,0 @@
-id: design/single-abstraction-level
-title: One abstraction level per function
-intent: Mixed levels force readers to switch between intent and mechanics.
-scope: symbol
-requirement: One function MUST stay at one abstraction level.
-enforcement: judgment

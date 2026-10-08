@@ -6,7 +6,7 @@ use std::{
 };
 
 use lighthouse_model::{Capability, Diagnostic, EditOp, Fingerprint, FixOutcome, Safety, Severity};
-use lighthouse_plugin::{FixPattern, FixRequest};
+use lighthouse_plugin::{FixDecision, FixRequest};
 use lighthouse_spec::write_atomic;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -383,7 +383,7 @@ impl Orchestrator<'_> {
                 }
                 Ok(proposal) => {
                     let reason = format!(
-                        "the fixer proposes a {} fix ({}); it is applied only with unsafe fixes (`--unsafe-fixes`, MCP `unsafe_fixes`)",
+                        "the fixer proposes a {} fix ({}); it is applied only with unsafe fixes (`--unsafe-fixes`, MCP `unsafeFixes`)",
                         proposal.safety, proposal.description
                     );
                     self.decline(finding, reason);
@@ -408,7 +408,7 @@ impl Orchestrator<'_> {
             return None;
         };
         Some(format!(
-            "{why}, so it is applied only with unsafe fixes (`--unsafe-fixes`, MCP `unsafe_fixes`)"
+            "{why}, so it is applied only with unsafe fixes (`--unsafe-fixes`, MCP `unsafeFixes`)"
         ))
     }
 
@@ -456,7 +456,7 @@ impl Orchestrator<'_> {
                 cap: Safety::Suggested,
                 mechanical: false,
                 unsupported: None,
-                pattern: FixPattern {
+                decision: FixDecision {
                     id: rule.to_owned(),
                     requirement: String::new(),
                     intent: String::new(),
@@ -514,7 +514,7 @@ impl Orchestrator<'_> {
         let request = FixRequest {
             finding,
             facts,
-            pattern: &binding.pattern,
+            decision: &binding.decision,
             options: &options,
             project: &outcome.project,
             ws: &engine.ws,

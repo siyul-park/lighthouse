@@ -2,7 +2,7 @@ use lighthouse_model::{Diagnostic, Symbol, SymbolKind, SymbolRole};
 use std::sync::LazyLock;
 
 use lighthouse_plugin::{Ctx, Error, KeyCtx, OrderKey, OrderKeyManifest, Rule, RuleManifest};
-use lighthouse_spec::{Catalog, PatternRule};
+use lighthouse_spec::{Catalog, DecisionRule};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
@@ -61,7 +61,7 @@ impl OrderKey for GroupKey {
 }
 
 pub(crate) fn rule() -> Box<dyn Rule> {
-    Box::new(PatternRule::new(ID, &[], check))
+    Box::new(DecisionRule::new(ID, &[], check))
 }
 
 /// The group index of a symbol under the default order of `language`, for the
@@ -74,10 +74,10 @@ pub(crate) fn group_index(
         rule: ID.to_owned(),
         message,
     };
-    let pattern = Catalog::bundled()
-        .pattern(ID)
-        .ok_or_else(|| fail("pattern missing from the bundled catalog".to_owned()))?;
-    let resolved = pattern
+    let decision = Catalog::bundled()
+        .decision(ID)
+        .ok_or_else(|| fail("decision missing from the bundled catalog".to_owned()))?;
+    let resolved = decision
         .resolve_options(configured, language)
         .map_err(|e| fail(e.to_string()))?;
     let options: Options =

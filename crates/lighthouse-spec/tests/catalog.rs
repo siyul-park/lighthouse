@@ -1,11 +1,16 @@
+mod support;
+
 use lighthouse_model::Severity;
 use lighthouse_plugin::Scope as RunScope;
-use lighthouse_spec::{Catalog, Content, Enforcement, Error, ExampleFile, Pattern, Scope};
+use lighthouse_spec::{
+    Catalog, Content, Decision, Enforcement, Error, ExampleFile, Subject, needs_verdict, tier,
+};
 use serde_json::{Map, json};
+use support::*;
 
-fn bundled(id: &str) -> &'static Pattern {
+fn bundled(id: &str) -> &'static Decision {
     Catalog::bundled()
-        .pattern(id)
+        .decision(id)
         .unwrap_or_else(|| panic!("missing {id}"))
 }
 
@@ -20,7 +25,7 @@ fn enforcement_default_severity() {
     let cases = [
         (Enforcement::Mechanical, Some(Severity::Error)),
         (Enforcement::Heuristic, Some(Severity::Warn)),
-        (Enforcement::Judgment, Some(Severity::Review)),
+        (Enforcement::Judgment, Some(Severity::Info)),
         (Enforcement::Doc, None),
     ];
     for (enforcement, want) in cases {
@@ -29,29 +34,49 @@ fn enforcement_default_severity() {
 }
 
 #[test]
-fn pattern_severity() {
-    let mut pattern = bundled("design/error-identity").clone();
-    assert_eq!(pattern.severity(), Some(Severity::Warn));
-    pattern.severity_override = Some(Severity::Error);
-    assert_eq!(pattern.severity(), Some(Severity::Error));
+fn a_finding_asks_for_a_verdict_when_its_decision_is_not_mechanical() {
+    for (enforcement, asks) in [
+        (Enforcement::Mechanical, false),
+        (Enforcement::Heuristic, true),
+        (Enforcement::Judgment, true),
+        (Enforcement::Doc, false),
+    ] {
+        assert_eq!(enforcement.needs_verdict(), asks, "{enforcement}");
+    }
+    let heuristic = bundled("design/private-helper-callers");
+    assert!(needs_verdict(tier(Severity::Info, Some(heuristic))));
+    assert!(needs_verdict(tier(Severity::Error, Some(heuristic))));
+    let mechanical = bundled("design/declaration-groups");
+    assert!(!needs_verdict(tier(Severity::Warn, Some(mechanical))));
 }
 
 #[test]
-fn scope_rule_scope() {
+fn decision_severity() {
+    let mut decision = bundled("design/error-identity").clone();
+    assert_eq!(decision.severity(), Some(Severity::Warn));
+    decision = decision.map_spec(|spec| lighthouse_spec::DecisionSpec {
+        severity: Some(Severity::Error),
+        ..spec
+    });
+    assert_eq!(decision.severity(), Some(Severity::Error));
+}
+
+#[test]
+fn subject_rule_scope() {
     let cases = [
-        (Scope::Symbol, RunScope::File),
-        (Scope::File, RunScope::File),
-        (Scope::Test, RunScope::File),
-        (Scope::Module, RunScope::Project),
-        (Scope::Project, RunScope::Project),
+        (Subject::Symbol, RunScope::File),
+        (Subject::File, RunScope::File),
+        (Subject::Test, RunScope::File),
+        (Subject::Module, RunScope::Project),
+        (Subject::Project, RunScope::Project),
     ];
-    for (scope, want) in cases {
-        assert_eq!(scope.rule_scope(), want, "{scope}");
+    for (subject, want) in cases {
+        assert_eq!(subject.rule_scope(), want, "{subject}");
     }
 }
 
 #[test]
-fn pattern_rule_meta() {
+fn decision_rule_meta() {
     let meta = bundled("core/max-file-lines").rule_manifest().unwrap();
     assert_eq!(meta.id, "core/max-file-lines");
     assert_eq!(meta.severity, Severity::Warn);
@@ -69,39 +94,42 @@ fn pattern_rule_meta() {
 }
 
 #[test]
-fn pattern_resolve_options() {
-    let mut pattern = bundled("core/max-file-lines").clone();
-    pattern
-        .options
-        .get_mut("max")
-        .unwrap()
-        .per_language
-        .insert("go".into(), json!(500));
+fn decision_resolve_options() {
+    let decision = bundled("core/max-file-lines").clone().map_spec(|mut spec| {
+        spec.languages
+            .entry("go".to_owned())
+            .or_default()
+            .options
+            .insert("max".to_owned(), json!(500));
+        spec
+    });
     let none = Map::new();
-    assert_eq!(pattern.resolve_options(&none, None).unwrap()["max"], 1000);
+    assert_eq!(decision.resolve_options(&none, None).unwrap()["max"], 1000);
     assert_eq!(
-        pattern.resolve_options(&none, Some("go")).unwrap()["max"],
+        decision.resolve_options(&none, Some("go")).unwrap()["max"],
         500
     );
     assert_eq!(
-        pattern.resolve_options(&none, Some("rust")).unwrap()["max"],
+        decision.resolve_options(&none, Some("rust")).unwrap()["max"],
         1000
     );
 
     let set = |v| Map::from_iter([("max".to_owned(), v)]);
     assert_eq!(
-        pattern.resolve_options(&set(json!(7)), Some("go")).unwrap()["max"],
+        decision
+            .resolve_options(&set(json!(7)), Some("go"))
+            .unwrap()["max"],
         7
     );
     let unknown = Map::from_iter([("mx".to_owned(), json!(1))]);
     assert!(
-        pattern
+        decision
             .resolve_options(&unknown, None)
             .unwrap_err()
             .to_string()
             .contains("unknown option")
     );
-    assert!(pattern.resolve_options(&set(json!("big")), None).is_err());
+    assert!(decision.resolve_options(&set(json!("big")), None).is_err());
 }
 
 #[test]
@@ -115,170 +143,187 @@ fn example_file_text() {
 }
 
 #[test]
-fn implemented_patterns_carry_runnable_examples() {
-    for pattern in Catalog::bundled()
-        .patterns()
-        .filter(|p| p.implementation.is_some())
-    {
-        let invalid = pattern.examples.iter().find(|e| !e.expect.is_empty());
+fn checked_decisions_carry_runnable_examples() {
+    for decision in Catalog::bundled().decisions().filter(|d| d.check.is_some()) {
+        let invalid = decision.examples.iter().find(|e| !e.expect.is_empty());
         assert!(
             invalid.is_some(),
             "{} has no invalid example with expectations",
-            pattern.id
+            decision.id()
         );
     }
 }
 
 #[test]
-fn catalog_declarative() {
-    let rule = "id: local/probe\ntitle: P\nintent: i\nscope: symbol\nrequirement: A MUST b.\nenforcement: mechanical\nevidence: [x]\nexamples:\n  - name: bad\n    language: text\n    kind: invalid\n    files: [{ path: a.txt, body: x }]\n    expect: [{ line: 1 }]\n  - name: good\n    language: text\n    kind: valid\n    files: [{ path: a.txt, body: x }]\nrule:\n  select: symbol\n  where: 'true'\n  message: x\n";
-    let files = std::collections::BTreeMap::from([("probe.yaml".to_owned(), rule.to_owned())]);
+fn a_cel_check_lives_in_its_decision() {
+    let rule = decision_with("");
+    let probe = "  title: P
+  intent: i
+  scope: { subject: symbol }
+  requirement: A MUST b.
+  enforcement: mechanical
+  evidence: [x]
+  check:
+    type: cel
+    select: symbol
+    where: 'true'
+    message: x
+  examples:
+    - name: bad
+      language: text
+      kind: invalid
+      files: [{ path: a.txt, body: x }]
+      expect: [{ line: 1 }]
+    - name: good
+      language: text
+      kind: valid
+      files: [{ path: a.txt, body: x }]
+";
+    drop(rule);
+    let files = files(&[("probe.yaml", decision("local/probe", "rules", probe))]);
     let catalog = Catalog::from_local(files).unwrap();
-    assert!(
-        catalog
-            .declarative("probe.yaml")
-            .unwrap()
-            .contains("select: symbol")
-    );
-    assert_eq!(catalog.declarative("absent.yaml"), None);
-    assert_eq!(Catalog::bundled().declarative("absent.yaml"), None);
-}
-
-mod fixture {
-    use std::collections::BTreeMap;
-
-    pub const PATTERN: &str = "id: p/a\ntitle: A\nintent: i\nscope: file\nrequirement: A MUST b.\nenforcement: mechanical\nevidence: [x]\n";
-
-    pub fn base() -> BTreeMap<String, String> {
-        [
-            ("p/pack.yaml", "id: p\ntitle: P\nintro: x\nsections: [s]\n"),
-            (
-                "p/s/section.yaml",
-                "id: s\ntitle: S\nintro: x\npatterns: [a]\n",
-            ),
-            ("p/s/a.yaml", PATTERN),
-        ]
-        .into_iter()
-        .map(|(k, v)| (k.to_owned(), v.to_owned()))
-        .collect()
-    }
-
-    pub fn with(path: &str, text: &str) -> BTreeMap<String, String> {
-        let mut files = base();
-        files.insert(path.to_owned(), text.to_owned());
-        files
-    }
-
-    pub fn pattern_with(extra: &str) -> BTreeMap<String, String> {
-        with("p/s/a.yaml", &format!("{}{extra}", PATTERN))
-    }
-}
-
-fn rejected(files: std::collections::BTreeMap<String, String>, needle: &str) {
-    let err = Catalog::from_files(files).unwrap_err();
-    assert!(
-        err.to_string().contains(needle),
-        "{err} should mention {needle}"
-    );
+    let decision = catalog.decision("local/probe").unwrap();
+    assert!(matches!(
+        decision.check,
+        Some(lighthouse_spec::Check::Cel(_))
+    ));
+    assert_eq!(decision.pack(), "local");
+    assert_eq!(decision.section(), "rules");
 }
 
 mod validation {
-    use super::{fixture::*, *};
+    use super::*;
 
-    const EXAMPLE_PAIR: &str = "examples:
-  - name: bad
-    language: go
-    kind: invalid
-    files: [{ path: a.go, body: x }]
-  - name: good
-    language: go
-    kind: valid
-    files: [{ path: a.go, body: y }]
+    const EXAMPLE_PAIR: &str = "  examples:
+    - name: bad
+      language: go
+      kind: invalid
+      files: [{ path: a.go, body: x }]
+    - name: good
+      language: go
+      kind: valid
+      files: [{ path: a.go, body: y }]
 ";
+
+    fn rejected(files: Files, needle: &str) {
+        let err = Catalog::from_files(files).unwrap_err();
+        assert!(
+            err.to_string().contains(needle),
+            "{err} should mention {needle}"
+        );
+    }
+
+    fn swap(from: &str, to: &str) -> Files {
+        with("p/s/a.yaml", &decision("p/a", "s", &SPEC.replace(from, to)))
+    }
 
     #[test]
     fn minimal_catalog_loads() {
         let catalog = Catalog::from_files(base()).unwrap();
         assert_eq!(
-            catalog.pattern("p/a").unwrap().severity(),
+            catalog.decision("p/a").unwrap().severity(),
             Some(Severity::Error)
         );
     }
 
     #[test]
-    fn id_must_match_pack_and_file_name() {
-        let files = with("p/s/a.yaml", &PATTERN.replace("p/a", "q/a"));
-        assert!(matches!(
-            Catalog::from_files(files),
-            Err(Error::Layout { .. })
-        ));
-        let files = with("p/s/a.yaml", &PATTERN.replace("p/a", "p/b"));
-        assert!(matches!(
-            Catalog::from_files(files),
-            Err(Error::Layout { .. })
-        ));
+    fn a_decision_belongs_where_its_labels_and_its_pack_say() {
+        let wrong_pack =
+            decision("p/a", "s", SPEC).replace("lighthouse/pack: p", "lighthouse/pack: q");
+        rejected(
+            with("p/s/a.yaml", &wrong_pack),
+            "label `lighthouse/pack` is `q`",
+        );
+        let wrong_section = decision("p/a", "t", SPEC);
+        rejected(
+            with("p/s/a.yaml", &wrong_section),
+            "label `lighthouse/section` is `t`",
+        );
+        let unlabeled = decision("p/a", "s", SPEC).replace(
+            "  labels:\n    lighthouse/pack: p\n    lighthouse/section: s\n",
+            "",
+        );
+        rejected(with("p/s/a.yaml", &unlabeled), "needs the label");
     }
 
     #[test]
-    fn ids_must_be_unique_across_sections() {
+    fn identity_comes_from_metadata_not_from_where_the_file_lies() {
         let mut files = base();
-        files.insert(
-            "p/pack.yaml".into(),
-            "id: p\ntitle: P\nintro: x\nsections: [s, t]\n".into(),
-        );
-        files.insert(
-            "p/t/section.yaml".into(),
-            "id: t\ntitle: T\nintro: x\npatterns: [a]\n".into(),
-        );
-        files.insert("p/t/a.yaml".into(), PATTERN.into());
+        let text = files.remove("p/s/a.yaml").unwrap();
+        files.insert("anywhere/at/all/renamed.yaml".to_owned(), text);
+        let catalog = Catalog::from_files(files).unwrap();
+        assert_eq!(catalog.decision("p/a").unwrap().id(), "p/a");
+    }
+
+    #[test]
+    fn ids_must_be_unique() {
+        let mut files = base();
+        files.insert("p/s/copy.yaml".to_owned(), decision("p/a", "s", SPEC));
         rejected(files, "defined twice");
     }
 
     #[test]
-    fn pattern_rules_are_enforced() {
+    fn decision_rules_are_enforced() {
+        let doc = SPEC
+            .replace("mechanical", "doc")
+            .replace("  scope", "  severity: warn\n  scope");
         rejected(
-            with(
-                "p/s/a.yaml",
-                &PATTERN
-                    .replace("mechanical", "doc")
-                    .replace("scope", "severity: warn\nscope"),
-            ),
+            with("p/s/a.yaml", &decision("p/a", "s", &doc)),
             "no severity",
         );
-        rejected(
-            with("p/s/a.yaml", &PATTERN.replace("MUST", "must")),
-            "MUST, SHOULD or MAY",
+        rejected(swap("MUST", "must"), "MUST, SHOULD or MAY");
+        rejected(swap("intent: i", "intent: ' '"), "intent");
+        rejected(swap("  evidence: [x]\n", ""), "evidence");
+        let doc_with_check = format!(
+            "{}  check:\n    type: builtin\n    id: p/a\n",
+            SPEC.replace("mechanical", "doc")
         );
         rejected(
-            with("p/s/a.yaml", &PATTERN.replace("intent: i", "intent: ' '")),
-            "intent",
+            with("p/s/a.yaml", &decision("p/a", "s", &doc_with_check)),
+            "no check",
         );
         rejected(
-            with("p/s/a.yaml", &PATTERN.replace("evidence: [x]\n", "")),
-            "evidence",
-        );
-        rejected(
-            with(
-                "p/s/a.yaml",
-                &format!(
-                    "{}implementation:\n  builtin: p/a\n",
-                    PATTERN.replace("mechanical", "doc")
-                ),
-            ),
-            "no implementation",
+            swap("title: A\n", "title: A\n  nonsense: 1\n"),
+            "unknown field",
         );
     }
 
     #[test]
-    fn implemented_checkers_need_a_valid_and_an_invalid_example() {
-        let implemented = "implementation:\n  builtin: p/a\n";
-        rejected(pattern_with(implemented), "valid and an invalid example");
-        Catalog::from_files(pattern_with(&format!("{implemented}{EXAMPLE_PAIR}"))).unwrap();
-        let judgment = PATTERN.replace("mechanical", "judgment");
-        Catalog::from_files(with("p/s/a.yaml", &format!("{judgment}{implemented}"))).unwrap();
+    fn checked_decisions_need_a_valid_and_an_invalid_example() {
+        let checked = "  check:\n    type: builtin\n    id: p/a\n";
+        rejected(decision_with(checked), "valid and an invalid example");
+        Catalog::from_files(decision_with(&format!("{checked}{EXAMPLE_PAIR}"))).unwrap();
+        let judgment = SPEC.replace("mechanical", "judgment");
+        Catalog::from_files(with(
+            "p/s/a.yaml",
+            &decision("p/a", "s", &format!("{judgment}{checked}")),
+        ))
+        .unwrap();
         rejected(
-            pattern_with("implementation:\n  declarative: /abs.yaml\n"),
-            "relative .yaml path",
+            decision_with("  check:\n    type: builtin\n    id: ''\n"),
+            "needs a rule id",
+        );
+    }
+
+    #[test]
+    fn a_cel_check_must_compile_and_select_what_the_scope_runs_over() {
+        let cel = |select: &str, condition: &str| {
+            format!(
+                "  check:\n    type: cel\n    select: {select}\n    where: \"{condition}\"\n    message: m\n{EXAMPLE_PAIR}"
+            )
+        };
+        Catalog::from_files(decision_with(&cel("file", "true"))).unwrap();
+        rejected(decision_with(&cel("file", "1 +")), "check where");
+        rejected(decision_with(&cel("module", "true")), "cannot run over");
+        rejected(
+            decision_with(&format!(
+                "  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: '{{{{ 1 + }}}}'\n{EXAMPLE_PAIR}"
+            )),
+            "check message",
+        );
+        rejected(
+            decision_with("  check:\n    type: python\n    code: x\n"),
+            "unknown variant",
         );
     }
 
@@ -286,206 +331,262 @@ mod validation {
     fn at_most_one_canonical_example_per_language_and_kind() {
         let example = |name: &str, language: &str, canonical: bool| {
             format!(
-                "  - name: {name}\n    language: {language}\n    kind: valid\n    canonical: {canonical}\n    files: [{{ path: a, body: x }}]\n"
+                "    - name: {name}\n      language: {language}\n      kind: valid\n      canonical: {canonical}\n      files: [{{ path: a, body: x }}]\n"
             )
         };
         let one = format!(
-            "examples:\n{}{}",
+            "  examples:\n{}{}",
             example("a", "go", true),
             example("b", "rust", true)
         );
-        Catalog::from_files(pattern_with(&one)).unwrap();
+        Catalog::from_files(decision_with(&one)).unwrap();
         let two = format!(
-            "examples:\n{}{}",
+            "  examples:\n{}{}",
             example("a", "go", true),
             example("b", "go", true)
         );
-        rejected(pattern_with(&two), "more than one canonical");
+        rejected(decision_with(&two), "more than one canonical");
         let marked_once = format!(
-            "examples:\n{}{}",
+            "  examples:\n{}{}",
             example("a", "go", true),
             example("b", "go", false)
         );
-        Catalog::from_files(pattern_with(&marked_once)).unwrap();
+        Catalog::from_files(decision_with(&marked_once)).unwrap();
     }
 
     #[test]
     fn example_rules_are_enforced() {
         let file = |extra: &str| {
-            format!("examples:\n  - name: e\n    language: go\n    kind: valid\n{extra}")
+            format!("  examples:\n    - name: e\n      language: go\n      kind: valid\n{extra}")
         };
-        rejected(pattern_with(&file("    files: []\n")), "no files");
+        rejected(decision_with(&file("      files: []\n")), "no files");
         rejected(
-            pattern_with(&file(
-                "    files: [{ path: a, body: x }]\n    expect: [{ line: 1 }]\n",
+            decision_with(&file(
+                "      files: [{ path: a, body: x }]\n      expect: [{ line: 1 }]\n",
             )),
             "expects no diagnostics",
         );
         rejected(
-            pattern_with(&file(
-                "    files: [{ path: a, body: x }, { path: a, body: y }]\n",
+            decision_with(&file(
+                "      files: [{ path: a, body: x }, { path: a, body: y }]\n",
             )),
             "repeated",
         );
         rejected(
-            pattern_with(&file(
-                "    files: [{ path: a, body: x }]\n    options: { nope: 1 }\n",
+            decision_with(&file(
+                "      files: [{ path: a, body: x }]\n      options: { nope: 1 }\n",
             )),
             "unknown option",
         );
         rejected(
-            pattern_with(&file("    files: [{ path: a }]\n")),
+            decision_with(&file("      files: [{ path: a }]\n")),
             "exactly one of",
         );
         rejected(
-            pattern_with(&file("    files: [{ path: a, body: x, source: y }]\n")),
+            decision_with(&file("      files: [{ path: a, body: x, source: y }]\n")),
             "exactly one of",
         );
     }
 
     #[test]
-    fn example_sources_resolve_inside_the_section_directory() {
-        let example = "examples:\n  - name: e\n    language: go\n    kind: valid\n    files: [{ path: a.go, source: examples/a.go }]\n";
-        rejected(pattern_with(example), "does not exist");
-        let mut files = pattern_with(example);
+    fn example_sources_resolve_next_to_the_decision_file() {
+        let example = "  examples:\n    - name: e\n      language: go\n      kind: valid\n      files: [{ path: a.go, source: examples/a.go }]\n";
+        rejected(decision_with(example), "does not exist");
+        let mut files = decision_with(example);
         files.insert("p/s/examples/a.go".into(), "package a\n".into());
         let catalog = Catalog::from_files(files).unwrap();
         assert_eq!(
-            catalog.pattern("p/a").unwrap().examples[0].files[0].text(),
+            catalog.decision("p/a").unwrap().examples[0].files[0].text(),
             "package a\n"
         );
         rejected(
-            pattern_with(&example.replace("examples/a.go", "../a.go")),
+            decision_with(&example.replace("examples/a.go", "../a.go")),
             "escapes",
         );
     }
 
+    fn options(kind: &str, default: &str, per_language: &str) -> String {
+        format!(
+            "  options:\n    type: object\n    properties:\n      max:\n        type: {kind}\n        default: {default}\n        description: d\n    additionalProperties: false\n{per_language}"
+        )
+    }
+
     #[test]
     fn option_values_match_their_type() {
-        let option = |ty: &str, default: &str| {
-            format!(
-                "options:\n  max:\n    type: {ty}\n    default: {default}\n    description: d\n"
-            )
-        };
-        Catalog::from_files(pattern_with(&option("int", "1"))).unwrap();
-        Catalog::from_files(pattern_with(&option("list", "[a]"))).unwrap();
-        rejected(pattern_with(&option("int", "one")), "not int");
+        Catalog::from_files(decision_with(&options("integer", "1", ""))).unwrap();
+        Catalog::from_files(decision_with(&options("array", "[a]", ""))).unwrap();
         rejected(
-            pattern_with(&format!(
-                "{}    per_language: {{ go: true }}\n",
-                option("int", "1")
+            decision_with(&options("integer", "one", "")),
+            "not an integer",
+        );
+        rejected(
+            decision_with(&options(
+                "integer",
+                "1",
+                "  languages:\n    go:\n      options: { max: true }\n",
             )),
-            "not int",
+            "not an integer",
+        );
+        rejected(
+            decision_with(&options(
+                "integer",
+                "1",
+                "  languages:\n    go:\n      options: { mx: 2 }\n",
+            )),
+            "unknown option `mx`",
+        );
+        rejected(
+            decision_with(&options("integer", "1", "").replace("false", "true")),
+            "additionalProperties",
+        );
+        rejected(
+            decision_with(
+                &options("integer", "1", "").replace("description: d", "description: ''"),
+            ),
+            "needs a description",
         );
     }
 
     #[test]
-    fn every_pattern_and_section_is_listed_once() {
+    fn every_decision_is_listed_once_in_the_pack_its_labels_name() {
         let mut files = base();
-        files.insert("p/s/b.yaml".into(), PATTERN.replace("p/a", "p/b"));
-        rejected(files, "`b` exists but is not listed");
+        files.insert("p/s/b.yaml".into(), decision("p/b", "s", SPEC));
         rejected(
-            with(
-                "p/s/section.yaml",
-                "id: s\ntitle: S\nintro: x\npatterns: [a, a]\n",
-            ),
+            files,
+            "`p/b` names section `s` of pack `p` but its pack does not list it",
+        );
+        rejected(
+            with("p/pack.yaml", &pack("p", &[("s", &["a", "a"])])),
             "listed twice",
         );
         rejected(
-            with(
-                "p/s/section.yaml",
-                "id: s\ntitle: S\nintro: x\npatterns: [a, z]\n",
-            ),
-            "`z` is listed but has no file",
+            with("p/pack.yaml", &pack("p", &[("s", &["a", "z"])])),
+            "`z` is listed in section `s` but is not defined",
         );
-        let mut sections = base();
-        sections.insert(
-            "p/t/section.yaml".into(),
-            "id: t\ntitle: T\nintro: x\npatterns: []\n".into(),
+        rejected(
+            with("p/pack.yaml", &pack("p", &[("s", &["a"]), ("s", &[])])),
+            "section `s` is listed twice",
         );
-        rejected(sections, "`t` exists but is not listed");
+        let mut orphan = base();
+        orphan.insert("q/s/x.yaml".into(), decision("q/x", "s", SPEC));
+        rejected(orphan, "does not list it");
     }
 
     #[test]
-    fn nested_example_directories_are_not_patterns() {
+    fn files_that_are_not_documents_are_ignored() {
         let mut files = base();
-        files.insert("p/s/examples/other.yaml".into(), "not: a pattern\n".into());
+        files.insert(
+            "p/s/testdata/Cargo.toml".into(),
+            "[package]\nname = \"x\"\n".into(),
+        );
+        files.insert("p/s/notes.md".into(), "# notes\n".into());
         Catalog::from_files(files).unwrap();
     }
 
     #[test]
-    fn sources_map_to_patterns_or_carry_a_reason() {
+    fn a_document_from_before_the_resource_model_says_how_to_migrate() {
+        let legacy = "id: p/a\ntitle: A\nintent: i\nscope: file\nrequirement: A MUST b.\nenforcement: mechanical\nevidence: [x]\n";
+        let error = Catalog::from_files(with("p/s/a.yaml", legacy)).unwrap_err();
+        assert!(
+            error.to_string().contains("lighthouse spec migrate"),
+            "{error}"
+        );
+        rejected(
+            with(
+                "p/s/a.yaml",
+                "apiVersion: lighthouse/v1alpha1\nkind: Surprise\nmetadata:\n  name: x\nspec: {}\n",
+            ),
+            "unsupported kind `Surprise`",
+        );
+    }
+
+    #[test]
+    fn the_same_catalog_reads_from_json_and_toml() {
+        let json = r#"{"apiVersion":"lighthouse/v1alpha1","kind":"Pack","metadata":{"name":"p"},"spec":{"title":"P","intro":"x","sections":[{"name":"s","title":"S","intro":"x","decisions":["a"]}]}}"#;
+        let toml = "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Decision\"\n[metadata]\nname = \"p/a\"\n[metadata.labels]\n\"lighthouse/pack\" = \"p\"\n\"lighthouse/section\" = \"s\"\n[spec]\ntitle = \"A\"\nintent = \"i\"\nrequirement = \"A MUST b.\"\nenforcement = \"mechanical\"\nevidence = [\"x\"]\n[spec.scope]\nsubject = \"file\"\n";
+        let mut files = Files::new();
+        files.insert("p/pack.json".into(), json.into());
+        files.insert("p/s/a.toml".into(), toml.into());
+        let catalog = Catalog::from_files(files).unwrap();
+        assert_eq!(catalog.decision("p/a").unwrap().title, "A");
+    }
+
+    #[test]
+    fn several_documents_may_share_one_yaml_file() {
+        let mut files = Files::new();
+        files.insert(
+            "all.yaml".into(),
+            format!(
+                "{}---\n{}",
+                pack("p", &[("s", &["a"])]),
+                decision("p/a", "s", SPEC)
+            ),
+        );
+        assert_eq!(Catalog::from_files(files).unwrap().decisions().count(), 1);
+    }
+
+    #[test]
+    fn sources_map_to_decisions_or_carry_a_reason() {
         let cases = [
-            ("- ref: d#a-1\n  text: t\n", false),
-            ("- ref: d#a-1\n  text: t\n  patterns: [p/zzz]\n", false),
+            ("- ref: d#a-1\n      text: t\n", false),
             (
-                "- ref: d#a-1\n  text: t\n  patterns: [p/a]\n  omitted: x\n",
+                "- ref: d#a-1\n      text: t\n      decisions: [p/zzz]\n",
                 false,
             ),
-            ("- ref: d#a-1\n  text: t\n  omitted: ' '\n", false),
-            ("- ref: d#a-1\n  text: t\n  patterns: [p/a]\n", true),
             (
-                "- ref: d#a-1\n  text: t\n  omitted: project-specific\n",
+                "- ref: d#a-1\n      text: t\n      decisions: [p/a]\n      omitted: x\n",
+                false,
+            ),
+            ("- ref: d#a-1\n      text: t\n      omitted: ' '\n", false),
+            (
+                "- ref: d#a-1\n      text: t\n      decisions: [p/a]\n",
+                true,
+            ),
+            (
+                "- ref: d#a-1\n      text: t\n      omitted: project-specific\n",
                 true,
             ),
         ];
         for (sources, ok) in cases {
-            let files = with("sources.yaml", sources);
+            let text = format!(
+                "apiVersion: lighthouse/v1alpha1\nkind: SourceMap\nmetadata:\n  name: sources\nspec:\n  sources:\n    {sources}"
+            );
+            let files = with("sources.yaml", &text);
             assert_eq!(Catalog::from_files(files).is_ok(), ok, "{sources}");
         }
     }
 }
 
 mod overlay {
-    use super::{fixture::*, *};
+    use super::*;
 
-    const OPTION: &str = "options:\n  max:\n    type: int\n    default: 1\n    description: d\n";
-
-    fn local(files: &[(&str, &str)]) -> Catalog {
-        let map = files
-            .iter()
-            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-            .collect();
-        Catalog::from_files(map).unwrap()
-    }
+    const OPTION: &str = "  options:\n    type: object\n    properties:\n      max:\n        type: integer\n        default: 1\n        description: d\n    additionalProperties: false\n";
 
     fn base_catalog() -> Catalog {
-        Catalog::from_files(pattern_with(OPTION)).unwrap()
+        Catalog::from_files(decision_with(OPTION)).unwrap()
     }
 
-    const OVERRIDE_LAYOUT: [(&str, &str); 2] = [
-        ("l/pack.yaml", "id: l\ntitle: L\nintro: x\nsections: [s]\n"),
-        (
-            "l/s/section.yaml",
-            "id: s\ntitle: S\nintro: x\npatterns: [tweak]\n",
-        ),
-    ];
+    fn local(entries: &[(&str, String)]) -> Catalog {
+        Catalog::from_files(files(entries)).unwrap()
+    }
 
-    fn tweak(text: &str) -> Catalog {
-        let [a, b] = OVERRIDE_LAYOUT;
-        local(&[a, b, ("l/s/tweak.yaml", text)])
+    fn tweak(spec: &str) -> Catalog {
+        let layer = files(&[("tweak.yaml", override_of("tweak", spec))]);
+        Catalog::from_local(layer).unwrap()
     }
 
     #[test]
-    fn local_layer_adds_packs_sections_and_patterns() {
+    fn local_layer_adds_packs_sections_and_decisions() {
         let extra = local(&[
             (
                 "p/pack.yaml",
-                "id: p\ntitle: Ignored\nintro: x\nsections: [s, t]\n",
+                pack("p", &[("s", &["b"]), ("t", &[])]).replace("title: P", "title: Ignored"),
             ),
-            (
-                "p/s/section.yaml",
-                "id: s\ntitle: Ignored\nintro: x\npatterns: [b]\n",
-            ),
-            ("p/s/b.yaml", &PATTERN.replace("p/a", "p/b")),
-            (
-                "p/t/section.yaml",
-                "id: t\ntitle: T\nintro: x\npatterns: []\n",
-            ),
-            ("q/pack.yaml", "id: q\ntitle: Q\nintro: x\nsections: []\n"),
+            ("p/s/b.yaml", decision("p/b", "s", SPEC)),
+            ("q/pack.yaml", pack("q", &[])),
         ]);
         let merged = Catalog::overlay(&base_catalog(), &extra).unwrap();
-        let ids: Vec<_> = merged.patterns().map(|p| &*p.id).collect();
+        let ids: Vec<_> = merged.decisions().map(|d| d.id()).collect();
         assert_eq!(ids, ["p/a", "p/b"]);
         assert_eq!(merged.packs[0].title, "P");
         assert_eq!(merged.packs[0].sections.len(), 2);
@@ -495,292 +596,161 @@ mod overlay {
     #[test]
     fn colliding_ids_are_rejected() {
         let clash = local(&[
-            ("p/pack.yaml", "id: p\ntitle: P\nintro: x\nsections: [s]\n"),
-            (
-                "p/s/section.yaml",
-                "id: s\ntitle: S\nintro: x\npatterns: [a]\n",
-            ),
-            ("p/s/a.yaml", PATTERN),
+            ("p/pack.yaml", pack("p", &[("s", &["a"])])),
+            ("p/s/a.yaml", decision("p/a", "s", SPEC)),
         ]);
         let err = Catalog::overlay(&base_catalog(), &clash).unwrap_err();
         assert!(err.to_string().contains("defined twice"));
     }
 
     #[test]
-    fn extends_adjusts_only_the_overridable_fields() {
+    fn an_override_adjusts_only_the_overridable_fields() {
         let patch = tweak(
-            "extends: p/a
-severity: warn
-exceptions: Vendored code.
-tuning:
-  go: Local wording.
-options:
-  max:
-    default: 9
-    per_language: { go: 5 }
-examples:
-  - name: local
-    language: go
-    kind: valid
-    files: [{ path: a.go, body: z }]
+            "  extends: p/a
+  severity: warn
+  exceptions: Vendored code.
+  options: { max: 9 }
+  languages:
+    go:
+      options: { max: 5 }
+      tuning: Local wording.
+  examples:
+    - name: local
+      language: go
+      kind: valid
+      files: [{ path: a.go, body: z }]
 ",
         );
         let merged = Catalog::overlay(&base_catalog(), &patch).unwrap();
-        let pattern = merged.pattern("p/a").unwrap();
-        assert_eq!(pattern.severity(), Some(Severity::Warn));
-        assert_eq!(pattern.exceptions.as_deref(), Some("Vendored code."));
-        assert_eq!(pattern.tuning["go"], "Local wording.");
-        assert_eq!(pattern.options["max"].default, 9);
-        assert_eq!(pattern.options["max"].per_language["go"], 5);
-        assert_eq!(pattern.examples.len(), 1);
-        assert_eq!(pattern.title, "A");
-        assert_eq!(merged.patterns().count(), 1);
+        let decision = merged.decision("p/a").unwrap();
+        assert_eq!(decision.severity(), Some(Severity::Warn));
+        assert_eq!(decision.exceptions.as_deref(), Some("Vendored code."));
+        assert_eq!(
+            decision.languages["go"].tuning.as_deref(),
+            Some("Local wording.")
+        );
+        assert_eq!(
+            decision.options.as_ref().unwrap().properties["max"].default,
+            9
+        );
+        assert_eq!(decision.languages["go"].options["max"], 5);
+        assert_eq!(decision.examples.len(), 1);
+        assert_eq!(decision.title, "A");
+        assert_eq!(merged.decisions().count(), 1);
     }
 
     #[test]
-    fn extends_cannot_change_other_fields_or_missing_targets() {
-        let [a, b] = OVERRIDE_LAYOUT;
-        let bad = |text: &str| {
-            let map = [a, b, ("l/s/tweak.yaml", text)]
-                .iter()
-                .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-                .collect();
-            Catalog::from_files(map)
-        };
-        assert!(matches!(
-            bad("extends: p/a\nrequirement: A MUST c.\n"),
-            Err(Error::Parse { .. })
-        ));
-        let unknown = tweak("extends: p/none\nseverity: warn\n");
+    fn an_override_cannot_change_other_fields_or_missing_targets() {
+        let bad = Catalog::from_local(files(&[(
+            "tweak.yaml",
+            override_of("tweak", "  extends: p/a\n  requirement: A MUST c.\n"),
+        )]));
+        assert!(matches!(bad, Err(Error::Document(_))));
+        let unknown = tweak("  extends: p/none\n  severity: warn\n");
         assert!(
             Catalog::overlay(&base_catalog(), &unknown)
                 .unwrap_err()
                 .to_string()
-                .contains("unknown pattern")
+                .contains("unknown decision")
         );
-        let wrong_type = tweak("extends: p/a\noptions:\n  max:\n    default: text\n");
-        assert!(Catalog::overlay(&base_catalog(), &wrong_type).is_err());
+        let wrong_type = tweak("  extends: p/a\n  options: { max: text }\n");
+        let applied = Catalog::overlay(&base_catalog(), &wrong_type);
+        assert!(applied.is_err(), "the default must still be an integer");
     }
 
     #[test]
-    fn extends_rejects_unknown_option_names() {
-        let typo = tweak("extends: p/a\noptions:\n  mx:\n    default: 9\n");
+    fn an_override_rejects_unknown_option_names() {
+        let typo = tweak("  extends: p/a\n  options: { mx: 9 }\n");
         let err = Catalog::overlay(&base_catalog(), &typo).unwrap_err();
         assert!(err.to_string().contains("unknown option `mx`"), "{err}");
     }
 
     #[test]
-    fn doc_patterns_stay_without_severity_after_overlay() {
-        let doc = Catalog::from_files(with(
-            "p/s/a.yaml",
-            &PATTERN
-                .replace("mechanical", "doc")
-                .replace("evidence: [x]\n", ""),
-        ))
-        .unwrap();
-        assert!(Catalog::overlay(&doc, &tweak("extends: p/a\nseverity: warn\n")).is_err());
+    fn doc_decisions_stay_without_severity_after_overlay() {
+        let doc = SPEC
+            .replace("mechanical", "doc")
+            .replace("  evidence: [x]\n", "");
+        let doc = Catalog::from_files(with("p/s/a.yaml", &decision("p/a", "s", &doc))).unwrap();
+        assert!(Catalog::overlay(&doc, &tweak("  extends: p/a\n  severity: warn\n")).is_err());
     }
 
     #[test]
     fn layers_validate_their_own_sources_only() {
-        let sources = local(&[
-            ("l/pack.yaml", "id: l\ntitle: L\nintro: x\nsections: []\n"),
-            (
-                "sources.yaml",
-                "- ref: d#x-1\n  text: t\n  omitted: project-specific\n",
-            ),
+        let sources = "apiVersion: lighthouse/v1alpha1\nkind: SourceMap\nmetadata:\n  name: sources\nspec:\n  sources:\n    - ref: d#x-1\n      text: t\n      omitted: project-specific\n";
+        let layer = local(&[
+            ("l/pack.yaml", pack("l", &[])),
+            ("sources.yaml", sources.to_owned()),
         ]);
-        let merged = Catalog::overlay(&base_catalog(), &sources).unwrap();
-        assert!(merged.patterns().count() == 1);
+        let merged = Catalog::overlay(&base_catalog(), &layer).unwrap();
+        assert!(merged.decisions().count() == 1);
     }
-}
 
-mod write {
-    use std::fs;
-
-    use lighthouse_spec::{
-        Example, ExampleFile, Expect, Implementation, Kind, OptionSpec, OptionType,
-    };
-
-    use super::{fixture::*, *};
-
-    fn rich() -> Pattern {
-        let mut pattern = Catalog::from_files(base())
-            .unwrap()
-            .pattern("p/a")
-            .unwrap()
-            .clone();
-        pattern.id = "p/rich".to_owned();
-        pattern.severity_override = Some(Severity::Warn);
-        pattern.exceptions = Some("Generated code.".to_owned());
-        pattern.citation = Some("Someone 2001".to_owned());
-        pattern.tuning.insert("go".into(), "Go wording.".into());
-        pattern.options.insert(
-            "max".into(),
-            OptionSpec {
-                kind: OptionType::Int,
-                default: json!(3),
-                description: "Limit.".into(),
-                per_language: [("go".to_owned(), json!(4))].into(),
-            },
+    #[test]
+    fn a_local_decision_needs_the_local_prefix_and_a_cel_check() {
+        let probe = decision("p/x", "rules", SPEC);
+        let error = Catalog::from_local(files(&[("x.yaml", probe)])).unwrap_err();
+        assert!(error.to_string().contains("local/<name>"), "{error}");
+        let builtin = decision(
+            "local/x",
+            "rules",
+            &format!("{SPEC}  check:\n    type: builtin\n    id: local/x\n"),
         );
-        pattern.implementation = Some(Implementation::Builtin("p/rich".into()));
-        pattern.examples = vec![
-            Example {
-                name: "bad".into(),
-                language: "go".into(),
-                kind: Kind::Invalid,
-                files: vec![ExampleFile::inline("a.go", "package a\n\nfunc F() {}")],
-                canonical: false,
-                expect: vec![Expect {
-                    line: 3,
-                    message: Some("F".into()),
-                }],
-                options: Map::from_iter([("max".to_owned(), json!(1))]),
-                fixed: Vec::new(),
-            },
-            Example {
-                name: "good".into(),
-                language: "go".into(),
-                kind: Kind::Valid,
-                files: vec![ExampleFile::inline("a.go", "package a")],
-                canonical: false,
-                expect: Vec::new(),
-                options: Map::new(),
-                fixed: Vec::new(),
-            },
-        ];
-        pattern
+        let error = Catalog::from_local(files(&[("x.yaml", builtin)])).unwrap_err();
+        assert!(error.to_string().contains("`cel` check"), "{error}");
     }
-
-    fn write_base(root: &std::path::Path) {
-        for (path, text) in base() {
-            let target = root.join(path);
-            fs::create_dir_all(target.parent().unwrap()).unwrap();
-            fs::write(target, text).unwrap();
-        }
-    }
-
-    #[test]
-    fn written_patterns_load_back_unchanged_and_join_the_section_order() {
-        let dir = tempfile::tempdir().unwrap();
-        write_base(dir.path());
-        let pattern = rich();
-        Catalog::write_pattern(dir.path(), "s", &pattern).unwrap();
-        Catalog::write_pattern(dir.path(), "s", &pattern).unwrap();
-
-        let catalog = Catalog::load(dir.path()).unwrap();
-        assert_eq!(catalog.pattern("p/rich"), Some(&pattern));
-        let ids: Vec<_> = catalog.patterns().map(|p| &*p.id).collect();
-        assert_eq!(ids, ["p/a", "p/rich"]);
-        let leftovers: Vec<_> = fs::read_dir(dir.path().join("p/s"))
-            .unwrap()
-            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
-            .filter(|n| n.ends_with(".tmp"))
-            .collect();
-        assert!(leftovers.is_empty());
-    }
-
-    #[test]
-    fn invalid_patterns_and_unknown_sections_write_nothing() {
-        let dir = tempfile::tempdir().unwrap();
-        write_base(dir.path());
-        let mut bad = rich();
-        bad.intent = String::new();
-        assert!(Catalog::write_pattern(dir.path(), "s", &bad).is_err());
-        assert!(Catalog::write_pattern(dir.path(), "nope", &rich()).is_err());
-        assert!(!dir.path().join("p/s/rich.yaml").exists());
-        assert_eq!(Catalog::load(dir.path()).unwrap().patterns().count(), 1);
-    }
-}
-
-#[test]
-fn pattern_version_changes_with_its_definition() {
-    let pattern = bundled("core/max-file-lines");
-    assert_eq!(pattern.version().len(), 16);
-    assert_eq!(pattern.version(), pattern.clone().version());
-    let mut edited = pattern.clone();
-    edited.requirement.push('!');
-    assert_ne!(edited.version(), pattern.version());
-}
-
-#[test]
-fn catalog_version_changes_with_any_pattern() {
-    let catalog = Catalog::bundled();
-    assert_eq!(catalog.version(), Catalog::bundled().version());
-    assert_ne!(catalog.version(), Catalog::default().version());
-}
-
-#[test]
-fn semantic_version_ignores_wording_examples_and_tuning() {
-    let pattern = bundled("design/coupling-signal");
-    let mut reworded = pattern.clone();
-    reworded.intent.push_str(" More prose.");
-    reworded.examples.clear();
-    reworded.tuning.clear();
-    reworded.requirement = format!("  {}  ", reworded.requirement.replace(' ', "  "));
-    assert_eq!(reworded.semantic_version(), pattern.semantic_version());
-    assert_ne!(reworded.version(), pattern.version());
-
-    let mut stricter = pattern.clone();
-    stricter.requirement.push_str(" Always.");
-    assert_ne!(stricter.semantic_version(), pattern.semantic_version());
-    let mut tuned = pattern.clone();
-    tuned.enforcement = Enforcement::Judgment;
-    assert_ne!(tuned.semantic_version(), pattern.semantic_version());
 }
 
 #[test]
 fn tier_follows_enforcement_then_severity() {
     let heuristic = bundled("design/private-helper-callers");
-    assert_eq!(
-        lighthouse_spec::tier(Severity::Review, Some(heuristic)),
-        "heuristic"
-    );
-    assert_eq!(lighthouse_spec::tier(Severity::Error, None), "mechanical");
-    assert_eq!(lighthouse_spec::tier(Severity::Info, None), "evidence");
+    assert_eq!(tier(Severity::Info, Some(heuristic)), "heuristic");
+    assert_eq!(tier(Severity::Error, None), "mechanical");
+    assert_eq!(tier(Severity::Warn, None), "heuristic");
+    assert_eq!(tier(Severity::Info, None), "evidence");
 }
 
 #[test]
-fn implemented_patterns_mark_one_canonical_example_per_language() {
-    for pattern in Catalog::bundled().patterns() {
+fn checked_decisions_mark_one_canonical_example_per_language() {
+    for decision in Catalog::bundled().decisions() {
         for language in ["go", "rust"] {
             let valid = |e: &&lighthouse_spec::Example| {
-                e.language == language && e.kind == lighthouse_spec::Kind::Valid
+                e.language == language && e.kind == lighthouse_spec::ExampleKind::Valid
             };
-            if pattern.implementation.is_none() || !pattern.examples.iter().any(|e| valid(&e)) {
+            if decision.check.is_none() || !decision.examples.iter().any(|e| valid(&e)) {
                 continue;
             }
-            let marked = pattern
+            let marked = decision
                 .examples
                 .iter()
                 .filter(valid)
                 .filter(|e| e.canonical);
-            assert_eq!(marked.count(), 1, "{} {language}", pattern.id);
+            assert_eq!(marked.count(), 1, "{} {language}", decision.id());
         }
     }
 }
 
 #[test]
-fn local_rule_text_and_write_local_round_trip_through_the_local_layer() {
-    let pattern: Pattern = serde_norway::from_str(
-        "id: local/probe\ntitle: Probe\nintent: A probe.\nscope: file\nrequirement: A probe MUST hold.\nenforcement: mechanical\nevidence: [path]\nexamples:\n  - name: bad\n    language: text\n    kind: invalid\n    files: [{ path: a.txt, body: x }]\n    expect: [{ line: 1 }]\n  - name: good\n    language: text\n    kind: valid\n    files: [{ path: a.txt, body: x }]\nimplementation: { declarative: \"probe.yaml\" }\n",
-    )
+fn decision_text_and_write_local_round_trip_through_the_local_layer() {
+    let spec = "  title: Probe\n  intent: A probe.\n  scope: { subject: file }\n  requirement: A probe MUST hold.\n  enforcement: mechanical\n  evidence: [path]\n  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{ path: a.txt, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: text\n      kind: valid\n      files: [{ path: a.txt, body: x }]\n";
+    let layer = Catalog::from_local(files(&[(
+        "probe.yaml",
+        decision("local/probe", "rules", spec),
+    )]))
     .unwrap();
-    let rule = json!({ "select": "file", "where": "true", "message": "m" });
-    let text = Catalog::local_rule_text(&pattern, &rule).unwrap();
-    assert!(!text.contains("implementation"), "{text}");
-    assert!(text.contains("rule:"), "{text}");
+    let probe = layer.decision("local/probe").unwrap();
+    let text = Catalog::decision_text(probe).unwrap();
+    assert!(text.contains("kind: Decision"), "{text}");
+    assert!(text.contains("type: cel"), "{text}");
 
     let dir = tempfile::tempdir().unwrap();
-    let rules = dir.path().join("nested/rules");
+    let rules = dir.path().join("nested/decisions");
     Catalog::write_local(&rules, "probe", &text).unwrap();
     let written = std::fs::read_to_string(rules.join("probe.yaml")).unwrap();
     assert_eq!(written, text);
     assert!(!rules.join("probe.yaml.tmp").exists());
 
     let layer = Catalog::from_local([("probe.yaml".to_owned(), written)].into()).unwrap();
-    assert_eq!(layer.pattern("local/probe").unwrap().title, "Probe");
+    assert_eq!(layer.decision("local/probe"), Some(probe));
     assert!(Catalog::write_local(&rules.join("probe.yaml/x"), "y", "z").is_err());
 }
 
@@ -796,7 +766,7 @@ fn write_local_refuses_names_and_targets_that_leave_the_directory() {
     }
 
     let dir = tempfile::tempdir().unwrap();
-    let rules = dir.path().join("rules");
+    let rules = dir.path().join("decisions");
     for name in ["../evil", "a/b", ""] {
         assert!(Catalog::write_local(&rules, name, "x").is_err(), "{name:?}");
     }

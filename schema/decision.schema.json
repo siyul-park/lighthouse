@@ -1,0 +1,895 @@
+{
+  "$defs": {
+    "Capability": {
+      "description": "Provider feature that rules may require.",
+      "oneOf": [
+        {
+          "enum": [
+            "semantic-edges"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "extent",
+          "description": "Symbols carry an [`Symbol::extent`]: the full declaration range.",
+          "type": "string"
+        },
+        {
+          "const": "reference-sites",
+          "description": "Edges carry the [`Edge::site`] where the reference occurs.",
+          "type": "string"
+        },
+        {
+          "const": "complete-references",
+          "description": "Every reference to a symbol is an edge with a site: signatures, fields\nand receivers included, so a rename cannot miss one.",
+          "type": "string"
+        },
+        {
+          "const": "overlays",
+          "description": "The provider analyzes the `overlays` of an index request instead of the\nfiles on disk; a fix needs it to verify an edit before writing it.",
+          "type": "string"
+        }
+      ]
+    },
+    "Check": {
+      "description": "How a decision is checked.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A rule registered by a bundled plugin.",
+          "properties": {
+            "id": {
+              "description": "The id of the registered rule.",
+              "type": "string"
+            },
+            "type": {
+              "const": "builtin",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A CEL expression over the code model.",
+          "properties": {
+            "evidence": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Evidence fields, each a CEL expression.",
+              "type": "object"
+            },
+            "message": {
+              "description": "Text with `{{ cel }}` holes.",
+              "type": "string"
+            },
+            "select": {
+              "$ref": "#/$defs/Select"
+            },
+            "type": {
+              "const": "cel",
+              "type": "string"
+            },
+            "where": {
+              "description": "CEL; true for a violation.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "select",
+            "where",
+            "message"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "CommandOutput": {
+      "description": "What the orchestrator takes from a command that succeeded.",
+      "oneOf": [
+        {
+          "const": "in-place",
+          "description": "The command edits the scratch copy of the file.",
+          "type": "string"
+        },
+        {
+          "const": "text",
+          "description": "The command prints the new text of the file on stdout, and nothing else.",
+          "type": "string"
+        }
+      ]
+    },
+    "CommandScope": {
+      "description": "Where a command's edits may land.",
+      "oneOf": [
+        {
+          "const": "file",
+          "description": "Only the finding's file.",
+          "type": "string"
+        }
+      ]
+    },
+    "CommandStdin": {
+      "description": "What the command is given on stdin.",
+      "oneOf": [
+        {
+          "enum": [
+            "none"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "file",
+          "description": "The content of the target file.",
+          "type": "string"
+        }
+      ]
+    },
+    "DecisionSpec": {
+      "additionalProperties": false,
+      "description": "A design decision with its enforcement: what was decided and why, and how\nthe decision is checked and fixed. The engine compiles `check` into the\nrule that enforces it.",
+      "properties": {
+        "check": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Check"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "citation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enforcement": {
+          "$ref": "#/$defs/Enforcement"
+        },
+        "evidence": {
+          "description": "Fields a checker emits as diagnostic evidence.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "examples": {
+          "items": {
+            "$ref": "#/$defs/Example"
+          },
+          "type": "array"
+        },
+        "exceptions": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fix": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fix"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How the findings of the rule are fixed; the catalog is the one place\nthat says."
+        },
+        "intent": {
+          "type": "string"
+        },
+        "languages": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LanguageSpec"
+          },
+          "description": "What each language changes: option values and wording, by language id.",
+          "type": "object"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OptionsSchema"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Tunable values, as a JSON Schema object."
+        },
+        "requirement": {
+          "description": "What the decision demands, in RFC 2119 words.",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "severity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Severity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Replaces the default severity of the enforcement."
+        },
+        "strict": {
+          "description": "Review-level advice that is too noisy for the `recommended` preset;\nthe `strict` preset enables it.",
+          "type": "boolean"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "intent",
+        "scope",
+        "requirement",
+        "enforcement"
+      ],
+      "type": "object"
+    },
+    "Domain": {
+      "description": "What kind of thing a decision is about. Only code exists today.",
+      "enum": [
+        "code"
+      ],
+      "type": "string"
+    },
+    "Enforcement": {
+      "description": "How a decision can be verified; it fixes the default severity and whether\nits findings are review tasks.",
+      "enum": [
+        "mechanical",
+        "heuristic",
+        "judgment",
+        "doc"
+      ],
+      "type": "string"
+    },
+    "Example": {
+      "additionalProperties": false,
+      "description": "A fixture project for one language and what a rule must report on it:\nnothing for `valid`, the diagnostics of `expect` for `invalid`.",
+      "properties": {
+        "canonical": {
+          "description": "The example that best shows the decision in its language; at most one\nper language and kind. Agent output prefers it.",
+          "type": "boolean"
+        },
+        "expect": {
+          "description": "Diagnostics an invalid example must produce.",
+          "items": {
+            "$ref": "#/$defs/Expect"
+          },
+          "type": "array"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/ExampleFile"
+          },
+          "type": "array"
+        },
+        "fixed": {
+          "description": "What an invalid example's files become when the decision's fix is\napplied: the files that change, each with its whole new text. Applying\nthe fix again must change nothing, and the rule must no longer fire.",
+          "items": {
+            "$ref": "#/$defs/ExampleFile"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/ExampleKind"
+        },
+        "language": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "Rule options the example runs with.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "language",
+        "kind",
+        "files"
+      ],
+      "type": "object"
+    },
+    "ExampleFile": {
+      "additionalProperties": false,
+      "description": "One file of an example project, addressed by `path` inside the example.\nIts text is a `body` written in the decision file, or a `source` file next\nto it.",
+      "properties": {
+        "body": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "ExampleKind": {
+      "description": "Whether an example must produce no diagnostics (`valid`) or exactly those\nlisted in `expect` (`invalid`).",
+      "enum": [
+        "valid",
+        "invalid"
+      ],
+      "type": "string"
+    },
+    "Expect": {
+      "additionalProperties": false,
+      "description": "An expected diagnostic of an invalid example.",
+      "properties": {
+        "line": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "line"
+      ],
+      "type": "object"
+    },
+    "Fix": {
+      "description": "How a decision's findings are fixed and how far the fix may be trusted.\nWhich fields a fix may have depends on its `type`; any other is refused.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Generic operations over the code model, evaluated with CEL.",
+          "properties": {
+            "ops": {
+              "items": {
+                "$ref": "#/$defs/OpSpec"
+              },
+              "type": "array"
+            },
+            "requires": {
+              "description": "Provider capabilities the fix needs; without them it is declined.",
+              "items": {
+                "$ref": "#/$defs/Capability"
+              },
+              "type": "array"
+            },
+            "safety": {
+              "$ref": "#/$defs/Safety",
+              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for mechanical decisions."
+            },
+            "type": {
+              "const": "ops",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "ops",
+            "safety"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An external program on a scratch copy of the files.",
+          "properties": {
+            "argv": {
+              "description": "Program and arguments; `{file}`, `{line}`, `{symbol}` and `{rule}` fill\nwhole arguments.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "env": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Extra environment variables.",
+              "type": "object"
+            },
+            "output": {
+              "$ref": "#/$defs/CommandOutput",
+              "default": "in-place"
+            },
+            "requires": {
+              "description": "Provider capabilities the fix needs; without them it is declined.",
+              "items": {
+                "$ref": "#/$defs/Capability"
+              },
+              "type": "array"
+            },
+            "safety": {
+              "$ref": "#/$defs/Safety",
+              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for mechanical decisions."
+            },
+            "scope": {
+              "$ref": "#/$defs/CommandScope",
+              "default": "file"
+            },
+            "stdin": {
+              "$ref": "#/$defs/CommandStdin",
+              "default": "none"
+            },
+            "timeout": {
+              "default": "30s",
+              "description": "How long it may run, such as `30s` or `2m`.",
+              "type": "string"
+            },
+            "type": {
+              "const": "command",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "argv",
+            "safety"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A language plugin's fix method. Reserved: not yet supported.",
+          "properties": {
+            "params": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "requires": {
+              "description": "Provider capabilities the fix needs; without them it is declined.",
+              "items": {
+                "$ref": "#/$defs/Capability"
+              },
+              "type": "array"
+            },
+            "safety": {
+              "$ref": "#/$defs/Safety",
+              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for mechanical decisions."
+            },
+            "type": {
+              "const": "rpc",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "safety"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "requires": {
+          "description": "Provider capabilities the fix needs; without them it is declined.",
+          "items": {
+            "$ref": "#/$defs/Capability"
+          },
+          "type": "array"
+        },
+        "safety": {
+          "$ref": "#/$defs/Safety",
+          "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for mechanical decisions."
+        }
+      },
+      "required": [
+        "safety"
+      ],
+      "type": "object"
+    },
+    "LanguageSpec": {
+      "additionalProperties": false,
+      "description": "What one language changes about a decision.",
+      "properties": {
+        "options": {
+          "additionalProperties": true,
+          "description": "Values of the decision's options that replace their defaults here.",
+          "type": "object"
+        },
+        "tuning": {
+          "description": "Wording of the decision for this language.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Metadata": {
+      "additionalProperties": false,
+      "description": "Who a resource is. Identity is `name`; grouping is by label, never by\nwhere the document is stored.",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Free notes; never used to select.",
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Selectable facts, keyed `lighthouse/<name>`.",
+          "type": "object"
+        },
+        "name": {
+          "description": "Fully qualified name, such as `design/minimal-names`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "ObjectType": {
+      "description": "The only `type` of the options object.",
+      "enum": [
+        "object"
+      ],
+      "type": "string"
+    },
+    "OpSpec": {
+      "description": "One operation of an `ops` fix. Every parameter but `scope` and `by` is a\nCEL expression over the finding (`finding`, `symbol`, `options`) or, for\n`text` and `name`, a template with `{{ cel }}` holes. A `when` expression\nthat is false skips the operation.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "after": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "before": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "node": {
+              "type": "string"
+            },
+            "op": {
+              "const": "move",
+              "type": "string"
+            },
+            "when": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "node"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "by": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "op": {
+              "const": "reorder",
+              "type": "string"
+            },
+            "scope": {
+              "$ref": "#/$defs/ReorderScope"
+            },
+            "when": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "scope",
+            "by"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "file": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "node": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "op": {
+              "const": "delete",
+              "type": "string"
+            },
+            "span": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "when": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "op": {
+              "const": "rename",
+              "type": "string"
+            },
+            "symbol": {
+              "type": "string"
+            },
+            "when": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "symbol",
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "file": {
+              "type": "string"
+            },
+            "op": {
+              "const": "replace",
+              "type": "string"
+            },
+            "span": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "when": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "file",
+            "span",
+            "text"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "OptionSchema": {
+      "additionalProperties": false,
+      "description": "One tunable value.",
+      "properties": {
+        "default": true,
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/OptionType"
+        }
+      },
+      "required": [
+        "type",
+        "default",
+        "description"
+      ],
+      "type": "object"
+    },
+    "OptionType": {
+      "description": "The JSON type the values of an option must have; `number` accepts any\nnumber.",
+      "enum": [
+        "integer",
+        "number",
+        "boolean",
+        "string",
+        "array"
+      ],
+      "type": "string"
+    },
+    "OptionsSchema": {
+      "additionalProperties": false,
+      "description": "A JSON Schema object that declares the options of a decision. Keys not\ndeclared are refused: `additionalProperties` is `false`.",
+      "properties": {
+        "additionalProperties": {
+          "default": false,
+          "type": "boolean"
+        },
+        "properties": {
+          "additionalProperties": {
+            "$ref": "#/$defs/OptionSchema"
+          },
+          "default": {},
+          "type": "object"
+        },
+        "type": {
+          "$ref": "#/$defs/ObjectType",
+          "default": "object"
+        }
+      },
+      "type": "object"
+    },
+    "ReorderScope": {
+      "description": "The declarations a `reorder` permutes.",
+      "oneOf": [
+        {
+          "const": "file",
+          "description": "Every declaration of the finding's file, each container sorted on its own.",
+          "type": "string"
+        },
+        {
+          "const": "owner",
+          "description": "Only the members of the finding symbol's owner.",
+          "type": "string"
+        }
+      ]
+    },
+    "Safety": {
+      "description": "How much a proposed fix may be trusted to keep the program's meaning.",
+      "oneOf": [
+        {
+          "const": "safe",
+          "description": "Mechanical and meaning-preserving: applied by default.",
+          "type": "string"
+        },
+        {
+          "const": "suggested",
+          "description": "Probably right but a judgment call: applied only when asked for.",
+          "type": "string"
+        }
+      ]
+    },
+    "Scope": {
+      "additionalProperties": false,
+      "description": "Where a decision applies: its domain and what it is about.",
+      "properties": {
+        "domain": {
+          "$ref": "#/$defs/Domain",
+          "default": "code"
+        },
+        "subject": {
+          "$ref": "#/$defs/Subject"
+        }
+      },
+      "required": [
+        "subject"
+      ],
+      "type": "object"
+    },
+    "Select": {
+      "description": "What a CEL check looks at; each choice binds one variable of the same name.",
+      "enum": [
+        "symbol",
+        "function",
+        "edge",
+        "module",
+        "file",
+        "test"
+      ],
+      "type": "string"
+    },
+    "Severity": {
+      "description": "How hard a finding fails a run; serialized and parsed as the lowercase\nvariant name. Whether a finding also asks for a verdict is not a level: it\nfollows from how its decision is enforced.",
+      "oneOf": [
+        {
+          "const": "error",
+          "description": "Fails the run.",
+          "type": "string"
+        },
+        {
+          "const": "warn",
+          "description": "Fails the run only under `--strict` or past `--max-warnings`.",
+          "type": "string"
+        },
+        {
+          "const": "info",
+          "description": "Reported, never fails the run.",
+          "type": "string"
+        }
+      ]
+    },
+    "Subject": {
+      "description": "What a decision talks about inside its domain. Mapping to the run scope\nof a rule is `Subject::rule_scope`.",
+      "enum": [
+        "symbol",
+        "file",
+        "module",
+        "project",
+        "test"
+      ],
+      "type": "string"
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/decision.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "lighthouse/v1alpha1"
+    },
+    "kind": {
+      "const": "Decision"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "spec": {
+      "$ref": "#/$defs/DecisionSpec"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "title": "Decision",
+  "type": "object"
+}

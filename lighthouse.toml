@@ -1,3 +1,10 @@
+apiVersion = "lighthouse/v1alpha1"
+kind = "Project"
+
+[metadata]
+name = "lighthouse"
+
+[spec]
 plugins = [
   "core",
   "design",
@@ -8,25 +15,25 @@ plugins = [
 extends = ["core/recommended", "design/recommended", "testing/recommended"]
 
 # What `lighthouse check --fix` runs on a file it changed.
-[languages.go]
+[spec.languages.go]
 formatter = { argv = ["gofmt"], stdin = "file", output = "text" }
 
-[languages.rust]
+[spec.languages.rust]
 formatter = { argv = ["rustfmt", "--edition", "2024", "--emit", "stdout"], stdin = "file", output = "text" }
 
-[rules]
-"core/max-file-lines" = { level = "warn", max = 1000 }
+[spec.rules]
+"core/max-file-lines" = { level = "warn", options = { max = 1000 } }
 
 # Fixtures and their goldens describe code on purpose; they are not the
 # project's own design.
-[[overrides]]
+[[spec.overrides]]
 files = ["plugins/conformance/**"]
 rules = { "core/max-file-lines" = "off", "design/complexity-signal" = "off", "design/coupling-signal" = "off", "design/exported-doc" = "off", "design/single-use-wrapper" = "off", "design/declaration-groups" = "off", "design/related-symbols-close" = "off", "design/callers-before-callees" = "off", "design/private-helper-callers" = "off", "design/section-banners" = "off", "design/no-redundant-qualifiers" = "off", "design/no-exported-mutable-global" = "off", "testing/external-test-package" = "off", "testing/owner-test" = "off", "testing/single-owner-test" = "off" }
 
-[[overrides]]
-files = ["docs/patterns/**"]
+[[spec.overrides]]
+files = ["docs/decisions/**"]
 rules = { "core/max-file-lines" = "off" }
 
-[[overrides]]
+[[spec.overrides]]
 files = ["**/*.lock"]
 rules = { "core/max-file-lines" = "off" }

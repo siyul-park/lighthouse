@@ -1,5 +1,5 @@
-//! Fixes as data: a pattern's `fix:` block compiled into a provider of the
-//! single `Fixer` interface, the way a declarative rule file compiles into a
+//! Fixes as data: a decision's `fix:` block compiled into a provider of the
+//! single `Fixer` interface, the way a declarative check compiles into a
 //! `Rule`. `ops` evaluates generic operations with CEL; `command` runs an
 //! external program on a scratch copy.
 
@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use lighthouse_model::{FixOutcome, Safety};
 use lighthouse_plugin::{Error as PluginError, FixRequest, Fixer, FixerManifest};
-use lighthouse_spec::{CommandSpec, FixKind, Pattern};
+use lighthouse_spec::{CommandSpec, Decision, FixKind};
 
 use crate::Error;
 
@@ -19,7 +19,7 @@ enum Compiled {
     Command(CommandSpec),
 }
 
-/// A fixer built from a pattern's `fix:` block.
+/// A fixer built from a decision's `fix:` block.
 pub(crate) struct SpecFixer {
     meta: FixerManifest,
     description: String,
@@ -28,26 +28,26 @@ pub(crate) struct SpecFixer {
 }
 
 impl SpecFixer {
-    /// `None` when the pattern has no fix, or one of a kind that is not yet
+    /// `None` when the decision has no fix, or one of a kind that is not yet
     /// supported; an error when it cannot compile.
-    pub(crate) fn new(pattern: &Pattern) -> Result<Option<Self>, Error> {
-        let Some(fix) = &pattern.fix else {
+    pub(crate) fn new(decision: &Decision) -> Result<Option<Self>, Error> {
+        let Some(fix) = &decision.fix else {
             return Ok(None);
         };
         let compiled = match &fix.kind {
-            FixKind::Ops(list) => Compiled::Ops(ops::Steps::compile(&pattern.id, list)?),
+            FixKind::Ops { ops: list } => Compiled::Ops(ops::Steps::compile(decision.id(), list)?),
             FixKind::Command(command) => Compiled::Command(command.clone()),
-            // Not supported yet: the pattern keeps its fix, no fixer is built, and
+            // Not supported yet: the decision keeps its fix, no fixer is built, and
             // the plan declines its findings with that reason. The rest of the
             // pack is unaffected.
-            FixKind::Rpc(_) => return Ok(None),
+            FixKind::Rpc { .. } => return Ok(None),
         };
         Ok(Some(Self {
             meta: FixerManifest {
-                id: pattern.id.clone(),
+                id: decision.id().to_owned(),
                 requires: fix.requires.clone(),
             },
-            description: pattern.title.clone(),
+            description: decision.title.clone(),
             safety: fix.safety,
             compiled: Arc::new(compiled),
         }))

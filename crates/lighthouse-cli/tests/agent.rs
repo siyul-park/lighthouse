@@ -21,7 +21,7 @@ fn text_project() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        "plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"error\", max = 3 }\n",
+        lighthouse_testkit::project("plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"error\", options = { max = 3 } }\n"),
     )
     .unwrap();
     fs::write(dir.path().join("big.txt"), BIG).unwrap();
@@ -35,10 +35,10 @@ fn rust_project(extra: &str, source: &str) -> TempDir {
     let plugin = lighthouse_testkit::lang_rust();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        format!(
+        lighthouse_testkit::project(&format!(
             "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n{extra}",
             plugin.to_str().unwrap()
-        ),
+        )),
     )
     .unwrap();
     fs::write(
@@ -369,7 +369,7 @@ fn docs_generate_writes_the_skill_and_check_covers_it() {
         .success();
     let skill = dir.path().join("skills/lighthouse/SKILL.md");
     let text = fs::read_to_string(&skill).unwrap();
-    assert!(text.contains("## Active patterns"));
+    assert!(text.contains("## Active decisions"));
     lighthouse(dir.path())
         .args(["docs", "check"])
         .assert()

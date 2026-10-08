@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     io::Write,
     path::{Path, PathBuf},
@@ -9,77 +9,43 @@ use std::{
     },
 };
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use serde_json::Value;
+use lighthouse_resource::{
+    Format, Resource, SCHEMA_URL_BASE, Spec, documents, kind_of, resource, to_document,
+};
+use serde::Serialize;
 
 use crate::{
-    Content, Error, Example, ExampleFile, Implementation, Pack, Pattern, Section,
+    Content, Decision, DecisionOverrideSpec, DecisionSpec, Error, Example, ExampleFile, Pack,
+    PackSpec, Section, SectionSpec,
+    decision::{PACK_LABEL, SECTION_LABEL},
     load::{self, Files},
     model::short_hash,
-    sources::{Source, extract},
+    sources::{Source, SourceMapSpec, extract},
     validate,
 };
 
 const PACK_FILE: &str = "pack.yaml";
-const SECTION_FILE: &str = "section.yaml";
 const SOURCES_FILE: &str = "sources.yaml";
+/// The pack and section the decisions of a project's own layer belong to.
+const LOCAL_PACK: &str = "local";
+const LOCAL_SECTION: &str = "rules";
 
-/// A set of packs with the sources and declarative rule files they came from.
-/// A catalog is a layer: `overlay` stacks the project-local layer on the bundled one.
+/// A set of packs with the sources they came from. A catalog is a layer:
+/// `overlay` stacks the project-local layer on the bundled one.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Catalog {
     pub packs: Vec<Pack>,
     pub(crate) sources: Vec<Source>,
-    overrides: Vec<Override>,
-    /// Text of the declarative rule files that patterns name, by their path
-    /// in the catalog layer.
-    rules: BTreeMap<String, String>,
+    overrides: Vec<Resource<DecisionOverrideSpec>>,
 }
 
-/// A local pattern file with `extends`: adjusts a pattern of a lower layer.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Override {
-    extends: String,
-    severity: Option<lighthouse_model::Severity>,
-    exceptions: Option<String>,
-    #[serde(default)]
-    options: BTreeMap<String, OptionOverride>,
-    #[serde(default)]
-    tuning: BTreeMap<String, String>,
-    #[serde(default)]
-    examples: Vec<Example>,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct OptionOverride {
-    default: Option<Value>,
-    #[serde(default)]
-    per_language: BTreeMap<String, Value>,
-}
-
-enum Loaded {
-    Pattern(Box<Pattern>),
-    Override(Override),
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PackFile {
-    id: String,
-    title: String,
-    intro: String,
-    sections: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct SectionFile {
-    id: String,
-    title: String,
-    intro: String,
-    patterns: Vec<String>,
+/// What a catalog file holds, with the directory it lies in.
+struct Loaded {
+    dir: String,
+    packs: Vec<Resource<PackSpec>>,
+    decisions: Vec<Decision>,
+    overrides: Vec<(String, Resource<DecisionOverrideSpec>)>,
+    sources: Vec<Source>,
 }
 
 impl Catalog {
@@ -96,56 +62,72 @@ impl Catalog {
     }
 
     /// Builds a validated layer from files keyed by `/`-separated paths
-    /// relative to the catalog root. `sources.yaml` is optional. Pattern files
-    /// holding `extends` become overrides, applied by `overlay`.
+    /// relative to the catalog root. Every YAML, TOML or JSON file outside a
+    /// `testdata` directory holds documents of the kinds `Pack`, `Decision`,
+    /// `DecisionOverride` and `SourceMap`; a decision belongs to the pack and
+    /// section its labels name, and the pack lists it. `Decision`s that are
+    /// overrides become overrides, applied by `overlay`.
     pub fn from_files(files: Files) -> Result<Self, Error> {
         let mut catalog = Self::default();
-        for path in files.keys() {
-            if let Some(id) = path.strip_suffix(&format!("/{PACK_FILE}"))
-                && !id.contains('/')
-            {
-                catalog.load_pack(&files, id)?;
+        let mut packs = Vec::new();
+        let mut decisions: Vec<(String, Decision)> = Vec::new();
+        for (path, text) in &files {
+            let loaded = read_documents(path, text)?;
+            packs.extend(loaded.packs.into_iter().map(|p| (path.clone(), p)));
+            decisions.extend(
+                loaded
+                    .decisions
+                    .into_iter()
+                    .map(|d| (loaded.dir.clone(), d)),
+            );
+            for (dir, o) in loaded.overrides {
+                catalog.overrides.push(resolve_override(&files, &dir, o)?);
             }
+            catalog.sources.extend(loaded.sources);
         }
-        if let Some(text) = files.get(SOURCES_FILE) {
-            catalog.sources = parse(SOURCES_FILE, text)?;
-        }
+        packs.sort_by(|a, b| a.1.metadata.name.cmp(&b.1.metadata.name));
+        catalog.packs = assemble(&files, packs, decisions)?;
         validate::layer(&catalog)?;
-        catalog.attach_rules(&files)?;
         Ok(catalog)
     }
 
-    /// Builds the project-local layer from the files of `.lighthouse/rules`,
-    /// keyed by file name. A file is a pattern (id `local/<name>`, the fields
-    /// of any pattern but `implementation`) with its declarative rule under
-    /// `rule:`; the pattern is added to the `local` pack. A file with
-    /// `extends` adjusts a pattern of a lower layer as `overlay` describes.
-    /// Examples must be inline.
+    /// Builds the project-local layer from the files of
+    /// `.lighthouse/decisions`, keyed by file name. A `Decision` there has an
+    /// id `local/<name>` and a CEL check (or none); the loader adds the
+    /// `local` pack and `rules` section labels it leaves out. A
+    /// `DecisionOverride` adjusts a decision of a lower layer as `overlay`
+    /// describes. Examples must be inline.
     pub fn from_local(files: Files) -> Result<Self, Error> {
         let mut catalog = Self::default();
-        let mut patterns = Vec::new();
+        let mut decisions = Vec::new();
         for (name, text) in &files {
-            let doc: serde_norway::Mapping = parse(name, text)?;
-            if doc.contains_key("extends") {
-                let mut o: Override = parse(name, text)?;
-                o.examples = resolve_all(&files, "", &o.extends, o.examples)?;
-                catalog.overrides.push(o);
-                continue;
+            let loaded = read_documents(name, text)?;
+            if let Some(pack) = loaded.packs.first() {
+                return Err(Error::layout(
+                    name,
+                    format!("a local layer has no packs, found `{}`", pack.metadata.name),
+                ));
             }
-            let (pattern, rule) = local_rule(name, doc)?;
-            catalog.rules.insert(name.clone(), rule);
-            patterns.push(pattern);
+            for (_, o) in loaded.overrides {
+                catalog.overrides.push(resolve_override(&files, "", o)?);
+            }
+            for decision in loaded.decisions {
+                decisions.push(local_decision(name, decision)?);
+            }
         }
-        if !patterns.is_empty() {
+        if !decisions.is_empty() {
             catalog.packs.push(Pack {
-                id: "local".to_owned(),
-                title: "Local rules".to_owned(),
-                intro: "Rules of this project, from `.lighthouse/rules`.".to_owned(),
+                id: LOCAL_PACK.to_owned(),
+                title: "Local decisions".to_owned(),
+                intro: "Decisions of this project, from `.lighthouse/decisions`.".to_owned(),
                 sections: vec![Section {
-                    id: "rules".to_owned(),
-                    title: "Rules".to_owned(),
-                    intro: "Project-local declarative rules.".to_owned(),
-                    patterns,
+                    id: LOCAL_SECTION.to_owned(),
+                    title: "Decisions".to_owned(),
+                    intro: "Project-local decisions with CEL checks.".to_owned(),
+                    decisions: decisions
+                        .into_iter()
+                        .map(|d| resolve_examples(&files, "", d))
+                        .collect::<Result<_, _>>()?,
                 }],
             });
         }
@@ -153,35 +135,11 @@ impl Catalog {
         Ok(catalog)
     }
 
-    /// The declarative rule file `path`, as written in the layer that defines
-    /// the pattern naming it.
-    pub fn declarative(&self, path: &str) -> Option<&str> {
-        self.rules.get(path).map(String::as_str)
-    }
-
-    fn attach_rules(&mut self, files: &Files) -> Result<(), Error> {
-        let wanted: Vec<(String, String)> = self
-            .patterns()
-            .filter_map(|p| match &p.implementation {
-                Some(Implementation::Declarative(path)) => Some((p.id.clone(), path.clone())),
-                _ => None,
-            })
-            .collect();
-        for (id, path) in wanted {
-            let text = files.get(&path).ok_or_else(|| {
-                Error::invalid(&id, format!("declarative rule `{path}` does not exist"))
-            })?;
-            self.rules.insert(path, text.clone());
-        }
-        Ok(())
-    }
-
-    /// `base` with `local` on top. Local packs, sections and patterns are
-    /// added; into an existing pack or section only new sections or patterns
-    /// are merged, and the base title and intro win. A local pattern with
-    /// `extends` adjusts the named pattern: `severity` and `exceptions`
-    /// replace, `tuning` and `options` replace per key, `examples` are
-    /// appended. Sources are validated per layer, not across layers.
+    /// `base` with `local` on top. Local packs, sections and decisions are
+    /// added; into an existing pack or section only new sections or decisions
+    /// are merged, and the base title and intro win. A local override adjusts
+    /// the decision it extends. Sources are validated per layer, not across
+    /// layers.
     pub fn overlay(base: &Self, local: &Self) -> Result<Self, Error> {
         let mut merged = base.clone();
         for pack in &local.packs {
@@ -191,47 +149,68 @@ impl Catalog {
             }
         }
         merged.sources.extend(local.sources.iter().cloned());
-        merged.rules.extend(local.rules.clone());
         for o in &local.overrides {
-            let pattern = merged
+            let decision = merged
                 .packs
                 .iter_mut()
                 .flat_map(|p| &mut p.sections)
-                .flat_map(|s| &mut s.patterns)
-                .find(|p| p.id == o.extends)
-                .ok_or_else(|| Error::invalid(&o.extends, "extends an unknown pattern"))?;
-            apply(pattern, o)?;
+                .flat_map(|s| &mut s.decisions)
+                .find(|d| d.id() == o.spec.extends)
+                .ok_or_else(|| Error::invalid(&o.spec.extends, "extends an unknown decision"))?;
+            o.spec.apply(decision)?;
         }
-        validate::patterns(&merged)?;
+        validate::decisions(&merged)?;
         Ok(merged)
     }
 
-    /// Writes `pattern` into `<root>/<pack>/<section>/` and lists it in that
-    /// section's order. Both files are written to temporary names first, so a
-    /// failure leaves no half-written file; the pattern is renamed before the
-    /// section list. `source` example files must already exist.
-    pub fn write_pattern(root: &Path, section: &str, pattern: &Pattern) -> Result<(), Error> {
-        validate::pattern(pattern)?;
-        let (pack, name) = pattern
-            .id
+    /// Writes `decision` into `<root>/<pack>/<section>/` and lists it in that
+    /// section of the pack file. Both files are written to temporary names
+    /// first, so a failure leaves no half-written file; the decision is
+    /// renamed before the pack. `source` example files must already exist.
+    pub fn write_decision(root: &Path, decision: &Decision) -> Result<(), Error> {
+        validate::decision(decision)?;
+        let id = decision.id();
+        let (pack, name) = id
             .split_once('/')
-            .ok_or_else(|| Error::invalid(&pattern.id, "an id is `<pack>/<name>`"))?;
-        let dir = root.join(pack).join(section);
-        let section_path = dir.join(SECTION_FILE);
-        let text = read(&section_path)?;
-        let mut file: SectionFile = parse(&section_path.display().to_string(), &text)?;
-        if !file.patterns.iter().any(|p| p == name) {
-            file.patterns.push(name.to_owned());
+            .ok_or_else(|| Error::invalid(id, "an id is `<pack>/<name>`"))?;
+        let section = decision.section();
+        if section.is_empty() {
+            return Err(Error::invalid(
+                id,
+                format!("needs a `{SECTION_LABEL}` label"),
+            ));
         }
-        let pattern_path = dir.join(format!("{name}.yaml"));
+        let dir = root.join(pack).join(section);
+        let pack_path = root.join(pack).join(PACK_FILE);
+        let text = read(&pack_path)?;
+        let label = pack_path.display().to_string();
+        let mut docs = documents(Format::Yaml, &label, &text).map_err(Error::from)?;
+        let doc = docs
+            .pop()
+            .ok_or_else(|| Error::layout(&label, "is empty"))?;
+        let mut file = resource::<PackSpec>(&label, &doc).map_err(Error::from)?;
+        let listed = file
+            .spec
+            .sections
+            .iter_mut()
+            .find(|s| s.name == section)
+            .ok_or_else(|| Error::layout(&label, format!("has no section `{section}`")))?;
+        if !listed.decisions.iter().any(|d| d == name) {
+            listed.decisions.push(name.to_owned());
+        }
+        let decision_path = dir.join(format!("{name}.yaml"));
         let staged = [
-            (pattern_path.clone(), dump(pattern)?),
-            (section_path, dump(&file)?),
+            (decision_path.clone(), decision_document(decision)?),
+            (pack_path, document(&file)?),
         ];
         let temps: Vec<(PathBuf, PathBuf)> = staged
             .iter()
             .map(|(path, _)| (path.with_extension("yaml.tmp"), path.clone()))
             .collect();
+        fs::create_dir_all(&dir).map_err(|source| Error::Io {
+            path: dir.display().to_string(),
+            source,
+        })?;
         for ((tmp, _), (_, text)) in temps.iter().zip(&staged) {
             write(tmp, text)?;
         }
@@ -244,22 +223,10 @@ impl Catalog {
         Ok(())
     }
 
-    /// The text of a project-local rule file: `pattern` without an
-    /// implementation (the loader adds it) and `rule`, the declarative rule
-    /// definition, under `rule:`.
-    pub fn local_rule_text(pattern: &Pattern, rule: &Value) -> Result<String, Error> {
-        let mut doc = serde_norway::to_value(Pattern {
-            implementation: None,
-            ..pattern.clone()
-        })
-        .map_err(|e| Error::invalid(&pattern.id, e.to_string()))?;
-        let rule =
-            serde_norway::to_value(rule).map_err(|e| Error::invalid(&pattern.id, e.to_string()))?;
-        let map = doc
-            .as_mapping_mut()
-            .ok_or_else(|| Error::invalid(&pattern.id, "a pattern is a mapping"))?;
-        map.insert("rule".into(), rule);
-        dump(&doc)
+    /// The text of a decision file: a `Decision` document in YAML that starts
+    /// with the schema comment editors use.
+    pub fn decision_text(decision: &Decision) -> Result<String, Error> {
+        decision_document(decision)
     }
 
     /// Whether `name` can be the file name of a local layer file: it starts
@@ -284,7 +251,7 @@ impl Catalog {
         if !Self::local_name_ok(name) {
             return Err(Error::invalid(
                 name,
-                "a local rule file name is lowercase letters, digits, `.`, `_` and `-`, without `..`",
+                "a local decision file name is lowercase letters, digits, `.`, `_` and `-`, without `..`",
             ));
         }
         let io = |path: &Path, source| Error::Io {
@@ -300,7 +267,10 @@ impl Catalog {
             .map_err(|e| io(dir, e))?
             == Some(dir.canonicalize().map_err(|e| io(dir, e))?);
         if !inside {
-            return Err(Error::invalid(name, "resolves outside the rules directory"));
+            return Err(Error::invalid(
+                name,
+                "resolves outside the decisions directory",
+            ));
         }
         write_atomic(&path, text)
     }
@@ -343,65 +313,27 @@ impl Catalog {
         ))
     }
 
-    /// Every pattern in pack, section and file order.
-    pub fn patterns(&self) -> impl Iterator<Item = &Pattern> {
+    /// Every decision in pack, section and file order.
+    pub fn decisions(&self) -> impl Iterator<Item = &Decision> {
         self.packs
             .iter()
             .flat_map(|p| &p.sections)
-            .flat_map(|s| &s.patterns)
+            .flat_map(|s| &s.decisions)
     }
 
-    /// The pattern with this `<pack>/<name>` id.
-    pub fn pattern(&self, id: &str) -> Option<&Pattern> {
-        self.patterns().find(|p| p.id == id)
+    /// The decision with this `<pack>/<name>` id.
+    pub fn decision(&self, id: &str) -> Option<&Decision> {
+        self.decisions().find(|d| d.id() == id)
     }
 
-    /// Identifies this set of patterns: the hash of every pattern's id and
+    /// Identifies this set of decisions: the hash of every decision's id and
     /// version, in catalog order.
     pub fn version(&self) -> String {
         let listing: String = self
-            .patterns()
-            .map(|p| format!("{}:{}\n", p.id, p.version()))
+            .decisions()
+            .map(|d| format!("{}:{}\n", d.id(), d.version()))
             .collect();
         short_hash(&listing)
-    }
-
-    fn load_pack(&mut self, files: &Files, id: &str) -> Result<(), Error> {
-        let path = format!("{id}/{PACK_FILE}");
-        let file: PackFile = parse(&path, &files[&path])?;
-        expect(&path, id, &file.id)?;
-        check_order(&path, &file.sections, &sections_in(files, id))?;
-        let mut sections = Vec::new();
-        for name in &file.sections {
-            sections.push(self.load_section(files, id, name)?);
-        }
-        self.packs.push(Pack {
-            id: file.id,
-            title: file.title,
-            intro: file.intro,
-            sections,
-        });
-        Ok(())
-    }
-
-    fn load_section(&mut self, files: &Files, pack: &str, name: &str) -> Result<Section, Error> {
-        let path = format!("{pack}/{name}/{SECTION_FILE}");
-        let file: SectionFile = parse(&path, &files[&path])?;
-        expect(&path, name, &file.id)?;
-        check_order(&path, &file.patterns, &patterns_in(files, pack, name))?;
-        let mut patterns = Vec::new();
-        for pattern in &file.patterns {
-            match load_pattern(files, pack, name, pattern)? {
-                Loaded::Pattern(p) => patterns.push(*p),
-                Loaded::Override(o) => self.overrides.push(o),
-            }
-        }
-        Ok(Section {
-            id: file.id,
-            title: file.title,
-            intro: file.intro,
-            patterns,
-        })
     }
 }
 
@@ -459,111 +391,228 @@ pub fn write_atomic_guarded(
     Ok(())
 }
 
-/// The pattern of a local rule file and the text of its `rule:` section.
-fn local_rule(name: &str, mut doc: serde_norway::Mapping) -> Result<(Pattern, String), Error> {
-    let rule = doc
-        .remove("rule")
-        .ok_or_else(|| Error::layout(name, "a local rule file needs a `rule:` section"))?;
-    doc.insert(
-        "implementation".into(),
-        serde_norway::from_str(&format!("declarative: {name:?}"))
-            .map_err(|e| Error::layout(name, e.to_string()))?,
-    );
-    let pattern: Pattern =
-        serde_norway::from_value(doc.into()).map_err(|e| Error::layout(name, e.to_string()))?;
-    if !pattern.id.starts_with("local/") {
-        return Err(Error::layout(
+/// The documents of one catalog file; files that are not documents (example
+/// sources, anything under `testdata`) hold none.
+fn read_documents(path: &str, text: &str) -> Result<Loaded, Error> {
+    let dir = path.rsplit_once('/').map_or("", |(dir, _)| dir).to_owned();
+    let mut loaded = Loaded {
+        dir,
+        packs: Vec::new(),
+        decisions: Vec::new(),
+        overrides: Vec::new(),
+        sources: Vec::new(),
+    };
+    let in_testdata = path.split('/').any(|part| part == "testdata");
+    let Some(format) = Format::of_path(Path::new(path)).filter(|_| !in_testdata) else {
+        return Ok(loaded);
+    };
+    for doc in documents(format, path, text).map_err(Error::from)? {
+        match kind_of(&doc) {
+            Some(PackSpec::KIND) => loaded
+                .packs
+                .push(resource::<PackSpec>(path, &doc).map_err(Error::from)?),
+            Some(DecisionSpec::KIND) => {
+                let Resource { metadata, spec } =
+                    resource::<DecisionSpec>(path, &doc).map_err(Error::from)?;
+                loaded.decisions.push(Decision::new(metadata, spec));
+            }
+            Some(DecisionOverrideSpec::KIND) => loaded.overrides.push((
+                loaded.dir.clone(),
+                resource::<DecisionOverrideSpec>(path, &doc).map_err(Error::from)?,
+            )),
+            Some(SourceMapSpec::KIND) => loaded.sources.extend(
+                resource::<SourceMapSpec>(path, &doc)
+                    .map_err(Error::from)?
+                    .spec
+                    .sources,
+            ),
+            // A document without `kind` is a legacy one: `resource` says so.
+            None => {
+                resource::<DecisionSpec>(path, &doc).map_err(Error::from)?;
+            }
+            Some(other) => {
+                return Err(Error::layout(path, format!("unsupported kind `{other}`")));
+            }
+        }
+    }
+    Ok(loaded)
+}
+
+/// Packs with their decisions, in the order the packs list them. Every
+/// decision is listed once, in the pack and section its labels name.
+fn assemble(
+    files: &Files,
+    packs: Vec<(String, Resource<PackSpec>)>,
+    decisions: Vec<(String, Decision)>,
+) -> Result<Vec<Pack>, Error> {
+    let mut waiting: BTreeMap<String, (String, Decision)> = BTreeMap::new();
+    for (dir, decision) in decisions {
+        let id = decision.id().to_owned();
+        if waiting.insert(id.clone(), (dir, decision)).is_some() {
+            return Err(Error::invalid(&id, "defined twice"));
+        }
+    }
+    let mut built = Vec::new();
+    let mut seen_packs = BTreeSet::new();
+    for (path, pack) in packs {
+        let id = pack.metadata.name;
+        if !seen_packs.insert(id.clone()) {
+            return Err(Error::layout(
+                &path,
+                format!("pack `{id}` is defined twice"),
+            ));
+        }
+        let mut sections = Vec::new();
+        let mut names = BTreeSet::new();
+        for SectionSpec {
             name,
-            format!("id is `{}`, a local rule is `local/<name>`", pattern.id),
+            title,
+            intro,
+            decisions: listed,
+        } in pack.spec.sections
+        {
+            if !names.insert(name.clone()) {
+                return Err(Error::layout(
+                    &path,
+                    format!("section `{name}` is listed twice"),
+                ));
+            }
+            let mut members = Vec::new();
+            for short in &listed {
+                let full = format!("{id}/{short}");
+                let (dir, decision) = waiting.remove(&full).ok_or_else(|| {
+                    Error::layout(
+                        &path,
+                        format!("`{short}` is listed in section `{name}` but is not defined, or is listed twice"),
+                    )
+                })?;
+                labels_match(&decision, &id, &name)?;
+                members.push(resolve_examples(files, &dir, decision)?);
+            }
+            sections.push(Section {
+                id: name,
+                title,
+                intro,
+                decisions: members,
+            });
+        }
+        built.push(Pack {
+            id,
+            title: pack.spec.title,
+            intro: pack.spec.intro,
+            sections,
+        });
+    }
+    if let Some((id, (dir, decision))) = waiting.into_iter().next() {
+        let place = if decision.section().is_empty() {
+            "no section".to_owned()
+        } else {
+            format!(
+                "section `{}` of pack `{}`",
+                decision.section(),
+                decision.pack()
+            )
+        };
+        return Err(Error::layout(
+            &dir,
+            format!("`{id}` names {place} but its pack does not list it"),
         ));
     }
-    Ok((pattern, dump(&rule)?))
+    Ok(built)
+}
+
+/// A decision's labels name the pack and section that list it.
+fn labels_match(decision: &Decision, pack: &str, section: &str) -> Result<(), Error> {
+    let id = decision.id();
+    let labels = &decision.metadata().labels;
+    for (key, want) in [(PACK_LABEL, pack), (SECTION_LABEL, section)] {
+        match labels.get(key) {
+            Some(found) if found == want => {}
+            Some(found) => {
+                return Err(Error::invalid(
+                    id,
+                    format!(
+                        "label `{key}` is `{found}` but the {} lists it",
+                        if key == PACK_LABEL { "pack" } else { "section" }
+                    ),
+                ));
+            }
+            None => {
+                return Err(Error::invalid(
+                    id,
+                    format!("needs the label `{key}: {want}`"),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A decision of the local layer, with the pack and section labels a project
+/// does not have to write.
+fn local_decision(file: &str, mut decision: Decision) -> Result<Decision, Error> {
+    if !decision.id().starts_with("local/") {
+        return Err(Error::layout(
+            file,
+            format!(
+                "id is `{}`, a local decision is `local/<name>`",
+                decision.id()
+            ),
+        ));
+    }
+    for (key, value) in [(PACK_LABEL, LOCAL_PACK), (SECTION_LABEL, LOCAL_SECTION)] {
+        let labels = &mut decision.metadata_mut().labels;
+        match labels.get(key) {
+            Some(found) if found != value => {
+                return Err(Error::layout(
+                    file,
+                    format!("label `{key}` is `{found}`, a local decision's is `{value}`"),
+                ));
+            }
+            _ => {
+                labels.insert(key.to_owned(), value.to_owned());
+            }
+        }
+    }
+    if matches!(decision.check, Some(crate::Check::Builtin(_))) {
+        return Err(Error::layout(
+            file,
+            "a local decision has a `cel` check or none; `builtin` names Rust code",
+        ));
+    }
+    Ok(decision)
 }
 
 fn merge_sections(into: &mut Pack, from: &Pack) {
     for section in &from.sections {
         match into.sections.iter_mut().find(|s| s.id == section.id) {
             None => into.sections.push(section.clone()),
-            Some(existing) => existing.patterns.extend(section.patterns.iter().cloned()),
+            Some(existing) => existing.decisions.extend(section.decisions.iter().cloned()),
         }
     }
 }
 
-fn apply(pattern: &mut Pattern, o: &Override) -> Result<(), Error> {
-    if o.severity.is_some() {
-        pattern.severity_override = o.severity;
-    }
-    if o.exceptions.is_some() {
-        pattern.exceptions.clone_from(&o.exceptions);
-    }
-    for (language, text) in &o.tuning {
-        pattern.tuning.insert(language.clone(), text.clone());
-    }
-    for (name, change) in &o.options {
-        let Some(spec) = pattern.options.get_mut(name) else {
-            return Err(Error::invalid(
-                &o.extends,
-                format!("extends an unknown option `{name}`"),
-            ));
-        };
-        if let Some(default) = &change.default {
-            spec.default = default.clone();
+fn resolve_override(
+    files: &Files,
+    dir: &str,
+    mut o: Resource<DecisionOverrideSpec>,
+) -> Result<Resource<DecisionOverrideSpec>, Error> {
+    let id = o.spec.extends.clone();
+    o.spec.examples = resolve_all(files, dir, &id, std::mem::take(&mut o.spec.examples))?;
+    Ok(o)
+}
+
+fn resolve_examples(files: &Files, dir: &str, decision: Decision) -> Result<Decision, Error> {
+    let id = decision.id().to_owned();
+    let mut resolved = Ok(());
+    let decision = decision.map_spec(|mut spec| {
+        match resolve_all(files, dir, &id, std::mem::take(&mut spec.examples)) {
+            Ok(examples) => spec.examples = examples,
+            Err(e) => resolved = Err(e),
         }
-        for (language, value) in &change.per_language {
-            spec.per_language.insert(language.clone(), value.clone());
-        }
-    }
-    pattern.examples.extend(o.examples.iter().cloned());
-    Ok(())
-}
-
-fn read(path: &Path) -> Result<String, Error> {
-    fs::read_to_string(path).map_err(|source| Error::Io {
-        path: path.display().to_string(),
-        source,
-    })
-}
-
-fn write(path: &Path, text: &str) -> Result<(), Error> {
-    fs::write(path, text).map_err(|source| Error::Io {
-        path: path.display().to_string(),
-        source,
-    })
-}
-
-fn dump<T: Serialize>(value: &T) -> Result<String, Error> {
-    serde_norway::to_string(value).map_err(|e| Error::Parse {
-        path: "<serialize>".to_owned(),
-        message: e.to_string(),
-    })
-}
-
-fn parse<T: DeserializeOwned>(path: &str, text: &str) -> Result<T, Error> {
-    serde_norway::from_str(text).map_err(|e| Error::Parse {
-        path: path.to_owned(),
-        message: e.to_string(),
-    })
-}
-
-fn load_pattern(files: &Files, pack: &str, section: &str, name: &str) -> Result<Loaded, Error> {
-    let path = format!("{pack}/{section}/{name}.yaml");
-    let dir = format!("{pack}/{section}");
-    let text = &files[&path];
-    let probe: serde_norway::Value = parse(&path, text)?;
-    if probe.get("extends").is_some() {
-        let mut o: Override = parse(&path, text)?;
-        o.examples = resolve_all(files, &dir, &o.extends, o.examples)?;
-        return Ok(Loaded::Override(o));
-    }
-    let mut pattern: Pattern = parse(&path, text)?;
-    expect(&path, &format!("{pack}/{name}"), &pattern.id)?;
-    pattern.examples = resolve_all(
-        files,
-        &dir,
-        &pattern.id,
-        std::mem::take(&mut pattern.examples),
-    )?;
-    Ok(Loaded::Pattern(Box::new(pattern)))
+        spec
+    });
+    resolved.map(|()| decision)
 }
 
 fn resolve_all(
@@ -598,11 +647,16 @@ fn resolve_files(
         if !validate::relative(source) {
             return Err(Error::invalid(
                 id,
-                format!("example source `{source}` escapes its section"),
+                format!("example source `{source}` escapes its directory"),
             ));
         }
+        let key = if dir.is_empty() {
+            source.clone()
+        } else {
+            format!("{dir}/{source}")
+        };
         let text = files
-            .get(&format!("{dir}/{source}"))
+            .get(&key)
             .ok_or_else(|| Error::invalid(id, format!("example source `{source}` does not exist")))?
             .clone();
         resolved.push(file.with_loaded(text));
@@ -610,58 +664,25 @@ fn resolve_files(
     Ok(resolved)
 }
 
-fn expect(path: &str, expected: &str, found: &str) -> Result<(), Error> {
-    if expected == found {
-        return Ok(());
-    }
-    Err(Error::layout(
-        path,
-        format!("id is `{found}`, expected `{expected}`"),
-    ))
+fn decision_document(decision: &Decision) -> Result<String, Error> {
+    let resource = decision.clone().into_resource();
+    document(&resource)
 }
 
-fn sections_in<'a>(files: &'a Files, pack: &str) -> Vec<&'a str> {
-    let prefix = format!("{pack}/");
-    files
-        .keys()
-        .filter_map(|p| p.strip_prefix(&prefix))
-        .filter_map(|rest| rest.strip_suffix(&format!("/{SECTION_FILE}")))
-        .filter(|name| !name.contains('/'))
-        .collect()
+fn document<S: Spec + Serialize>(resource: &Resource<S>) -> Result<String, Error> {
+    Ok(to_document(resource, SCHEMA_URL_BASE))
 }
 
-/// Direct `.yaml` children of the section directory; subdirectories such as
-/// `testdata/` are never patterns.
-fn patterns_in<'a>(files: &'a Files, pack: &str, section: &str) -> Vec<&'a str> {
-    let prefix = format!("{pack}/{section}/");
-    files
-        .keys()
-        .filter_map(|p| p.strip_prefix(&prefix))
-        .filter_map(|rest| rest.strip_suffix(".yaml"))
-        .filter(|name| !name.contains('/') && *name != "section")
-        .collect()
+fn read(path: &Path) -> Result<String, Error> {
+    fs::read_to_string(path).map_err(|source| Error::Io {
+        path: path.display().to_string(),
+        source,
+    })
 }
 
-fn check_order(path: &str, listed: &[String], present: &[&str]) -> Result<(), Error> {
-    let mut seen: Vec<&str> = Vec::new();
-    for name in listed {
-        let name = name.as_str();
-        if seen.contains(&name) {
-            return Err(Error::layout(path, format!("`{name}` is listed twice")));
-        }
-        if !present.contains(&name) {
-            return Err(Error::layout(
-                path,
-                format!("`{name}` is listed but has no file"),
-            ));
-        }
-        seen.push(name);
-    }
-    match present.iter().find(|n| !seen.contains(n)) {
-        Some(name) => Err(Error::layout(
-            path,
-            format!("`{name}` exists but is not listed"),
-        )),
-        None => Ok(()),
-    }
+fn write(path: &Path, text: &str) -> Result<(), Error> {
+    fs::write(path, text).map_err(|source| Error::Io {
+        path: path.display().to_string(),
+        source,
+    })
 }

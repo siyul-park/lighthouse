@@ -7,25 +7,28 @@ description: Use when writing or changing code in a project with a lighthouse.to
 
 # Lighthouse
 
-Lighthouse is the project's decision memory. Design decisions become rules;
-every change is checked against them; a finding someone judged intentional is
-remembered with its reason and is not raised again.
+Lighthouse is the project's decision memory. A **decision** is what was
+decided and why; **rules** are the checks the engine compiles from decisions;
+every change is checked against them. A **verdict** is a judgment about one
+finding; an **annotation** is a verdict written at the code. A finding someone
+judged intentional is remembered with its reason and is not raised again.
 
 ## The loop
 
 1. **Check** the files you changed: MCP tool `check` (with `changed: true`), or
    `lighthouse check --changed --format agent`.
 2. **Understand** each finding: it carries the requirement, the evidence and an
-   expected structure. For more, read the pattern: MCP resource
-   `lighthouse://patterns/<id>`, tool `explain`, or `lighthouse explain <id>`.
+   expected structure. For more, read the decision: MCP resource
+   `lighthouse://decisions/<id>`, tool `explain`, or `lighthouse explain <id>`.
 3. **Fix** the code, then **recheck**. Findings of a rule marked `fixable` in
    the digest below can be fixed for you: MCP tool `fix` (by `fingerprints` or
-   `paths`, `dry_run` first to see the diff), or `lighthouse check --fix`.
-   Only safe fixes of mechanical rules apply by default; `unsafe_fixes` also
+   `paths`, `dryRun` first to see the diff), or `lighthouse check --fix`.
+   Only safe fixes of mechanical rules apply by default; `unsafeFixes` also
    applies suggested ones. Every fix is verified and rolled back if it makes
    the file worse. Review the diff like any other change. A run that reports `incomplete` did not
    check everything: it is not a pass.
-4. **Judge** review-tier findings (`review_tasks`): fix them, or record a
+4. **Judge** the findings that ask for a verdict (`review_tasks`: those of
+   heuristic and judgment decisions, whatever their severity): fix them, or record a
    verdict with `review_resolve`. `confirmed` means the finding is right
    (reason `fixed` or `accepted-debt`); `rejected` means it is wrong or
    intentional and needs a reason (`false-positive`, `intentional-exception`,
@@ -35,23 +38,23 @@ remembered with its reason and is not raised again.
 
 ## Rules of conduct
 
-- Never suppress a mechanical (error) finding to make it go away. Fix the code.
+- Never suppress a mechanical finding to make it go away. Fix the code.
   The only exception is an inline annotation `lighthouse:allow <rule> -- <reason>`
   with a real reason; it is reviewed in the diff.
 - A rejected verdict never hides a mechanical finding; if the rule is wrong,
-  narrow it with `rule_update` (it is tested before it is written).
-- When the same decision comes up twice, make it a rule: `rule_create` writes a
-  project-local rule under `.lighthouse/rules` and rejects it unless its
-  examples pass.
+  narrow it with `decision_update` (it is tested before it is written).
+- When the same decision comes up twice, write it down: `decision_create` writes
+  a project-local decision under `.lighthouse/decisions` and rejects it unless
+  its examples pass.
 - Analysis always covers the whole project; paths and `changed` only narrow
   what is reported.
 
 ## Looking things up
 
-Do not memorize rule text; ask for it when a finding names a rule.
+Do not memorize decision text; ask for it when a finding names a rule.
 
-- `rule_list` lists rules; `lighthouse://catalog` is the index of patterns.
-- `lighthouse://patterns/<id>` renders one pattern (intent, requirement,
+- `decision_list` lists decisions; `lighthouse://catalog` is the index.
+- `lighthouse://decisions/<id>` renders one decision (intent, requirement,
   examples, exceptions).
 - `lighthouse://config` is the effective configuration.
 - `review_history` shows every verdict recorded on a finding.

@@ -1,23 +1,40 @@
 use std::collections::BTreeMap;
 
-use serde::Deserialize;
+use lighthouse_resource::Spec;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 const KEYWORDS: [&str; 3] = ["MUST", "SHOULD", "MAY"];
 
-/// One normative line of a source document and where it went.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+/// The spec of the `SourceMap` kind: the normative lines of the documents a
+/// catalog was written from, and which decision covers each.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Source {
+pub struct SourceMapSpec {
+    pub sources: Vec<Source>,
+}
+
+impl Spec for SourceMapSpec {
+    const KIND: &'static str = "SourceMap";
+}
+
+/// One normative line of a source document and where it went.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Source {
     /// `<doc>#<heading-slug>-<content hash>`; moving or reordering a bullet
     /// keeps its ref, rewording it changes the ref.
     #[serde(rename = "ref")]
     pub reference: String,
     pub text: String,
-    #[serde(default)]
-    pub patterns: Vec<String>,
-    /// Why no pattern covers this line.
+    /// Ids of the decisions that cover the line.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub decisions: Vec<String>,
+    /// Why no decision covers this line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub omitted: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
 }
 

@@ -24,7 +24,7 @@ expression: "render(Format::Sarif, &fixture(), &[])"
       "originalUriBaseIds": {
         "%SRCROOT%": {
           "description": {
-            "text": "directory containing lighthouse.toml"
+            "text": "the project root, where Lighthouse was run"
           }
         }
       },
@@ -37,6 +37,7 @@ expression: "render(Format::Sarif, &fixture(), &[])"
       "results": [
         {
           "ruleId": "core/max-file-lines",
+          "ruleIndex": 0,
           "level": "warning",
           "message": {
             "text": "file has 12 lines, limit is 10"
@@ -63,6 +64,7 @@ expression: "render(Format::Sarif, &fixture(), &[])"
         },
         {
           "ruleId": "demo/boom",
+          "ruleIndex": 1,
           "level": "error",
           "message": {
             "text": "boom"

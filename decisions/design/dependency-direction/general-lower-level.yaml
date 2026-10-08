@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/general-lower-level
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: dependency-direction
+spec:
+  title: Lower-level code is general
+  intent: Reusable code that knows its callers is not reusable.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Lower-level or reusable symbols MUST express their responsibility in the
+    most general form that fully fits it and MUST NOT depend on caller-specific
+    policy, types, lifecycle, or semantics.
+  enforcement: judgment

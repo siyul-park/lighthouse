@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/error-identity
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: errors
+spec:
+  title: Preserve error identity
+  intent: Adding context must not hide the cause callers depend on.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Dependency identity MUST be preserved when callers depend on it; context
+    added to an error MUST keep the cause reachable.
+  enforcement: heuristic
+  evidence: [call, verb]
+  languages:
+    go:
+      tuning: "Wrap with `%w` when adding context."
+  examples:
+    - name: invalid
+      language: go
+      kind: invalid
+      files:
+        - path: error-identity-invalid.go
+          source: testdata/error-identity-invalid.go
+    - name: valid
+      language: go
+      kind: valid
+      files:
+        - path: error-identity-valid.go
+          source: testdata/error-identity-valid.go

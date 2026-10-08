@@ -1,0 +1,295 @@
+{
+  "$defs": {
+    "Formatter": {
+      "additionalProperties": false,
+      "description": "The command that formats a file of a language, by the command contract of\nfixes: exit `0` succeeds, stdout carries only the result, stderr is for\npeople.",
+      "properties": {
+        "argv": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra environment variables; the rest is cleared to an allowlist.",
+          "type": "object"
+        },
+        "output": {
+          "$ref": "#/$defs/FormatterOutput",
+          "default": "in-place"
+        },
+        "stdin": {
+          "$ref": "#/$defs/FormatterStdin",
+          "default": "none"
+        }
+      },
+      "required": [
+        "argv"
+      ],
+      "type": "object"
+    },
+    "FormatterOutput": {
+      "description": "Where a formatter leaves the formatted text.",
+      "oneOf": [
+        {
+          "const": "in-place",
+          "description": "In the scratch copy of the file, which is appended to `argv` (or fills\nan `{file}` argument).",
+          "type": "string"
+        },
+        {
+          "const": "text",
+          "description": "On stdout, which carries only the text.",
+          "type": "string"
+        }
+      ]
+    },
+    "FormatterSpec": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "$ref": "#/$defs/Formatter"
+        }
+      ],
+      "description": "How a formatter is written: `[gofmt, -w]` is the short form (scratch copy,\npath appended)."
+    },
+    "FormatterStdin": {
+      "description": "What a formatter is given on stdin.",
+      "oneOf": [
+        {
+          "enum": [
+            "none"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "file",
+          "description": "The text of the file.",
+          "type": "string"
+        }
+      ]
+    },
+    "LanguageSpec": {
+      "additionalProperties": true,
+      "description": "The options of one language.",
+      "properties": {
+        "formatter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FormatterSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The command that formats a file of the language after a fix."
+        }
+      },
+      "type": "object"
+    },
+    "Level": {
+      "description": "A level a project can set: a severity, or `off`, which only\nconfiguration has.",
+      "enum": [
+        "error",
+        "warn",
+        "info",
+        "off"
+      ],
+      "type": "string"
+    },
+    "Metadata": {
+      "additionalProperties": false,
+      "description": "Who a resource is. Identity is `name`; grouping is by label, never by\nwhere the document is stored.",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Free notes; never used to select.",
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Selectable facts, keyed `lighthouse/<name>`.",
+          "type": "object"
+        },
+        "name": {
+          "description": "Fully qualified name, such as `design/minimal-names`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "OverrideSpec": {
+      "additionalProperties": false,
+      "description": "Rules for the files and languages that match.",
+      "properties": {
+        "files": {
+          "description": "Globs of project-relative paths; empty matches every path.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "languages": {
+          "description": "Language ids; empty matches every language.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rules": {
+          "additionalProperties": {
+            "$ref": "#/$defs/RuleSetting"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "PluginEntry": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/PluginRefSpec"
+        }
+      ],
+      "description": "A plugin in `plugins`: a bare id, or an id with where to find it."
+    },
+    "PluginRefSpec": {
+      "additionalProperties": false,
+      "description": "A listed plugin. `path` (relative to the config directory) names the\nplugin directory instead of searching the plugin locations; `timeout` is\nthe per-request limit for process plugins, such as `30s`.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timeout": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "ProjectSpec": {
+      "additionalProperties": false,
+      "description": "A project's configuration.",
+      "properties": {
+        "extends": {
+          "description": "Presets whose rules apply first, in order.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "languages": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LanguageSpec"
+          },
+          "description": "Options per language id; `formatter` is the host's, the rest goes to\nthe language's provider.",
+          "type": "object"
+        },
+        "overrides": {
+          "description": "Rules that apply to some files or languages only, after `rules`.",
+          "items": {
+            "$ref": "#/$defs/OverrideSpec"
+          },
+          "type": "array"
+        },
+        "plugins": {
+          "description": "Plugins that provide rules, languages and presets; a bare id searches\nthe plugin locations.",
+          "items": {
+            "$ref": "#/$defs/PluginEntry"
+          },
+          "type": "array"
+        },
+        "rules": {
+          "additionalProperties": {
+            "$ref": "#/$defs/RuleSetting"
+          },
+          "description": "Level and options per decision id.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "RuleDetail": {
+      "additionalProperties": false,
+      "description": "A level with options.",
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/Level"
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "The decision's options, as its own schema declares them.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "type": "object"
+    },
+    "RuleSetting": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Level"
+        },
+        {
+          "$ref": "#/$defs/RuleDetail"
+        }
+      ],
+      "description": "How a rule is written in a spec: `warn`, `off`, or\n`{ level: warn, options: { max: 10 } }`."
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/project.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "lighthouse/v1alpha1"
+    },
+    "kind": {
+      "const": "Project"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "spec": {
+      "$ref": "#/$defs/ProjectSpec"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "title": "Project",
+  "type": "object"
+}

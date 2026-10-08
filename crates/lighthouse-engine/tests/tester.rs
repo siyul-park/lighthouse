@@ -164,36 +164,48 @@ fn catalog(examples: &str) -> Catalog {
     catalog_with("", examples)
 }
 
+/// `text` one level deeper, as it sits under `spec:`.
+fn under_spec(text: &str) -> String {
+    text.lines().map(|l| format!("  {l}\n")).collect()
+}
+
 fn catalog_with(fix: &str, examples: &str) -> Catalog {
-    let pattern = format!(
-        "id: fake/marker
-title: Marker
-intent: Words are flagged.
-scope: file
-requirement: A file MUST NOT contain the marker word.
-enforcement: heuristic
-evidence: [word]
-options:
-  word:
-    type: string
-    default: TODO
-    description: Word to flag.
-implementation:
-  builtin: fake/marker
-{fix}examples:
-{examples}"
+    let decision = format!(
+        "apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: fake/marker
+  labels:
+    lighthouse/pack: fake
+    lighthouse/section: s
+spec:
+  title: Marker
+  intent: Words are flagged.
+  scope: {{ subject: file }}
+  requirement: A file MUST NOT contain the marker word.
+  enforcement: heuristic
+  evidence: [word]
+  options:
+    type: object
+    properties:
+      word:
+        type: string
+        default: TODO
+        description: Word to flag.
+    additionalProperties: false
+  check:
+    type: builtin
+    id: fake/marker
+{}  examples:
+{}",
+        under_spec(fix),
+        under_spec(examples)
     );
+    let pack = "apiVersion: lighthouse/v1alpha1\nkind: Pack\nmetadata:\n  name: fake\nspec:\n  title: Fake\n  intro: x\n  sections:\n    - name: s\n      title: S\n      intro: x\n      decisions: [marker]\n";
     Catalog::from_files(
         [
-            (
-                "fake/pack.yaml",
-                "id: fake\ntitle: Fake\nintro: x\nsections: [s]\n",
-            ),
-            (
-                "fake/s/section.yaml",
-                "id: s\ntitle: S\nintro: x\npatterns: [marker]\n",
-            ),
-            ("fake/s/marker.yaml", pattern.as_str()),
+            ("fake/pack.yaml", pack),
+            ("fake/s/marker.yaml", decision.as_str()),
         ]
         .into_iter()
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
@@ -244,7 +256,7 @@ fn holding_examples_pass_through_the_engine() {
 }
 
 #[test]
-fn broken_examples_report_the_pattern_example_and_reason() {
+fn broken_examples_report_the_decision_example_and_reason() {
     let catalog = catalog(
         "  - name: wrong-line
     language: notes
@@ -308,20 +320,21 @@ fn engine_errors_in_an_example_are_failures_not_panics() {
 #[test]
 fn rule_tester_check() {
     let catalog = catalog(HOLDING);
-    let pattern = catalog.pattern("fake/marker").unwrap();
+    let decision = catalog.decision("fake/marker").unwrap();
     assert!(
         RuleTester::new(registry, &catalog)
-            .check(pattern)
+            .check(decision)
             .is_empty()
     );
     let failures = RuleTester::new(registry, &catalog)
         .language("go")
-        .check(pattern);
+        .check(decision);
     assert_eq!(failures, ["fake/marker: no example for language `go`"]);
 }
 
 const FIX: &str = "fix:
   safety: suggested
+  type: ops
   ops:
     - op: delete
       file: finding.file

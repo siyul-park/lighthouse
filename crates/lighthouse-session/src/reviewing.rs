@@ -3,7 +3,7 @@
 use std::{env, path::Path};
 
 use lighthouse_model::ReviewerKind;
-use lighthouse_spec::{Catalog, Pattern};
+use lighthouse_spec::{Catalog, Decision};
 use lighthouse_store::{FindingRecord, NewReview, ReviewEvent, Stamp, Standing, State, Store};
 use serde_json::Value;
 
@@ -79,12 +79,12 @@ fn stamp(catalog: Option<&Catalog>, finding: &FindingRecord) -> Stamp {
     let Some(catalog) = catalog else {
         return Stamp::default();
     };
-    let pattern = catalog.pattern(&finding.rule_id);
+    let decision = catalog.decision(&finding.rule_id);
     Stamp {
-        rule_version: pattern.map(Pattern::semantic_version),
-        pattern_hash: pattern.map(Pattern::version),
+        rule_version: decision.map(|d| d.semantic_version()),
+        decision_hash: decision.map(Decision::version),
         catalog_version: Some(catalog.version()),
-        scope: pattern.map(|p| p.scope.to_string()),
+        scope: decision.map(|d| d.scope.subject.to_string()),
     }
 }
 

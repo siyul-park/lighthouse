@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt::Write, path::Path};
 
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Severity, Verdict};
-use lighthouse_spec::{Catalog, Example, Kind, Pattern, tier};
+use lighthouse_spec::{Catalog, Decision, Example, ExampleKind, tier};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 
@@ -20,6 +20,9 @@ const PREFIX_MIN: usize = 12;
 /// print.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Briefing<'a> {
+    /// The decisions findings cite. Whether a finding asks for a verdict is
+    /// the tier of its decision; without the catalog a finding is judged by
+    /// its severity alone, so every frontend that counts reviews passes it.
     pub catalog: Option<&'a Catalog>,
     /// Subject facts by fingerprint; the `language`, `kind` and `visibility`
     /// entries pick the expected structure.
@@ -35,9 +38,21 @@ pub struct Briefing<'a> {
     pub limit: Option<usize>,
 }
 
+impl Briefing<'_> {
+    /// Whether the finding is a review task: its decision is enforced by a
+    /// heuristic or a judgment, whatever the severity. A rule without a
+    /// decision is judged by its severity.
+    pub fn needs_verdict(&self, diagnostic: &Diagnostic) -> bool {
+        let decision = self
+            .catalog
+            .and_then(|catalog| catalog.decision(&diagnostic.rule_id));
+        lighthouse_spec::needs_verdict(tier(diagnostic.severity, decision))
+    }
+}
+
 /// The agent records as typed data: the findings that fit `briefing.limit`,
 /// the gaps, how many findings were left out, and the reasons table when a
-/// shown finding asks for review.
+/// shown finding asks for a verdict.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentReport {
     pub findings: Vec<Value>,
@@ -47,6 +62,7 @@ pub struct AgentReport {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Location {
     path: String,
     line: u32,
@@ -57,7 +73,7 @@ struct Location {
 /// A short picture of what the code should look like.
 #[derive(Serialize)]
 struct Expected {
-    /// `example` (a valid example of the pattern) or `tuning` (its note for
+    /// `example` (a valid example of the decision) or `tuning` (its note for
     /// the language).
     source: &'static str,
     language: String,
@@ -139,7 +155,7 @@ pub(crate) fn text(
     for item in incomplete {
         let _ = writeln!(out, "{}", incomplete_line(item));
     }
-    if shown.iter().any(|d| d.severity == Severity::Review) {
+    if shown.iter().any(|d| briefing.needs_verdict(d)) {
         let _ = writeln!(out, "reasons: {}", reasons_line());
     }
     let _ = writeln!(out, "{}", summary_line(diagnostics, incomplete, briefing));
@@ -168,7 +184,7 @@ pub fn agent_report(
         omitted,
         reasons: shown
             .iter()
-            .any(|d| d.severity == Severity::Review)
+            .any(|d| briefing.needs_verdict(d))
             .then(reasons),
     }
 }
@@ -197,7 +213,8 @@ pub(crate) fn json_lines(
         "type": "summary",
         "errors": count(Severity::Error),
         "warnings": count(Severity::Warn),
-        "reviews": count(Severity::Review),
+        "infos": count(Severity::Info),
+        "reviews": diagnostics.iter().filter(|d| briefing.needs_verdict(d)).count(),
         "incomplete": incomplete.len(),
         "suppressed": briefing.suppressed,
         "allowed": briefing.allowed,
@@ -239,9 +256,9 @@ fn prefix(fingerprint: &str, len: usize) -> &str {
 }
 
 fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) -> Finding<'a> {
-    let pattern = briefing
+    let decision = briefing
         .catalog
-        .and_then(|catalog| catalog.pattern(&diagnostic.rule_id));
+        .and_then(|catalog| catalog.decision(&diagnostic.rule_id));
     let facts = briefing
         .facts
         .and_then(|facts| facts.get(&diagnostic.fingerprint));
@@ -250,7 +267,7 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
         kind: "finding",
         rule: &diagnostic.rule_id,
         severity: diagnostic.severity,
-        tier: tier(diagnostic.severity, pattern),
+        tier: tier(diagnostic.severity, decision),
         location: Location {
             path: diagnostic.file.display().to_string(),
             line: diagnostic.span.start.line,
@@ -259,35 +276,37 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
         },
         symbol: diagnostic.symbol.as_deref(),
         message: &diagnostic.message,
-        requirement: pattern.map(|p| one_line(&p.requirement)),
-        intent: pattern.map(|p| one_line(&p.intent)),
+        requirement: decision.map(|d| one_line(&d.requirement)),
+        intent: decision.map(|d| one_line(&d.intent)),
         evidence: evidence(&diagnostic.evidence, diagnostic.symbol.as_deref()),
-        expected: pattern.and_then(|p| expected(p, &subject, &diagnostic.file)),
+        expected: decision.and_then(|d| expected(d, &subject, &diagnostic.file)),
         note: briefing
             .notes
             .and_then(|notes| notes.get(&diagnostic.fingerprint))
             .cloned(),
         fingerprint: diagnostic.fingerprint.as_str(),
-        resolve: (diagnostic.severity == Severity::Review).then(|| resolve(diagnostic, width)),
+        resolve: briefing
+            .needs_verdict(diagnostic)
+            .then(|| resolve(diagnostic, width)),
     }
 }
 
 /// The canonical valid example for the file's language; else the valid
 /// example whose name (or whose invalid counterpart's) mentions the kind or
 /// visibility of the finding's symbol; else the shortest valid example; else
-/// the pattern's tuning note for the language. Each kept short.
-fn expected(pattern: &Pattern, subject: &Subject, file: &Path) -> Option<Expected> {
-    let valid: Vec<&Example> = pattern
+/// the decision's tuning note for the language. Each kept short.
+fn expected(decision: &Decision, subject: &Subject, file: &Path) -> Option<Expected> {
+    let valid: Vec<&Example> = decision
         .examples
         .iter()
-        .filter(|e| e.kind == Kind::Valid)
+        .filter(|e| e.kind == ExampleKind::Valid)
         .filter(|e| subject.language.is_none_or(|l| e.language == l))
         .collect();
     let chosen = valid
         .iter()
         .find(|e| e.canonical)
         .map(|e| (*e, "canonical".to_owned()))
-        .or_else(|| matching(pattern, &valid, subject))
+        .or_else(|| matching(decision, &valid, subject))
         .or_else(|| {
             let shortest = valid.iter().min_by_key(|e| size(e))?;
             Some((*shortest, "shortest valid example".to_owned()))
@@ -296,7 +315,7 @@ fn expected(pattern: &Pattern, subject: &Subject, file: &Path) -> Option<Expecte
         return Some(from_example(example, basis, file));
     }
     let language = subject.language?;
-    let text = pattern.tuning.get(language)?;
+    let text = decision.languages.get(language)?.tuning.as_ref()?;
     Some(Expected {
         source: "tuning",
         language: language.to_owned(),
@@ -311,15 +330,15 @@ fn expected(pattern: &Pattern, subject: &Subject, file: &Path) -> Option<Expecte
 /// visibility, in its own name or in its invalid counterpart's; none when no
 /// example mentions either.
 fn matching<'a>(
-    pattern: &'a Pattern,
+    decision: &'a Decision,
     valid: &[&'a Example],
     subject: &Subject,
 ) -> Option<(&'a Example, String)> {
     let score = |example: &Example| {
-        let counterpart = pattern
+        let counterpart = decision
             .examples
             .iter()
-            .filter(|e| e.kind == Kind::Invalid && e.language == example.language)
+            .filter(|e| e.kind == ExampleKind::Invalid && e.language == example.language)
             .find(|e| pair_key(&e.name) == pair_key(&example.name))
             .map_or("", |e| e.name.as_str());
         let names = format!("{} {counterpart}", example.name).to_lowercase();
@@ -540,11 +559,16 @@ fn summary_line(
     briefing: &Briefing,
 ) -> String {
     let count = |s: Severity| diagnostics.iter().filter(|d| d.severity == s).count();
+    let reviews = diagnostics
+        .iter()
+        .filter(|d| briefing.needs_verdict(d))
+        .count();
     format!(
-        "summary: {} error, {} warn, {} review, {} incomplete, {} suppressed, {} allowed",
+        "summary: {} error, {} warn, {} info, {} review, {} incomplete, {} suppressed, {} allowed",
         count(Severity::Error),
         count(Severity::Warn),
-        count(Severity::Review),
+        count(Severity::Info),
+        reviews,
         incomplete.len(),
         briefing.suppressed,
         briefing.allowed

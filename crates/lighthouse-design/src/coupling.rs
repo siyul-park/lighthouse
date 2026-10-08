@@ -1,7 +1,7 @@
 use lighthouse_metrics::{FAN, Fan, SIZE, Size, is_dispatcher, read};
 use lighthouse_model::Diagnostic;
 use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
-use lighthouse_spec::PatternRule;
+use lighthouse_spec::DecisionRule;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -20,7 +20,7 @@ struct Thresholds {
 }
 
 pub(crate) fn rule() -> Box<dyn Rule> {
-    Box::new(PatternRule::new(ID, &[FAN, SIZE], check))
+    Box::new(DecisionRule::new(ID, &[FAN, SIZE], check))
 }
 
 fn check(meta: &RuleManifest, ctx: &Ctx, t: Thresholds) -> Result<Vec<Diagnostic>, Error> {

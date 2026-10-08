@@ -3,16 +3,16 @@ use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 use cel::{Context, Program};
 use lighthouse_model::{Diagnostic, Fingerprint, Options, Project, Span, Symbol};
 use lighthouse_plugin::{Ctx, Error as PluginError, Rule, RuleManifest, Scope};
-use lighthouse_spec::Pattern;
+use lighthouse_spec::{CelCheck, Decision, Select};
 use serde_json::{Map, Value};
 
 use crate::{
     Error,
-    definition::{Compiled, Definition, Piece, Select},
+    definition::{Compiled, Piece, compile},
     facts,
 };
 
-/// A rule built from a pattern and its rule file.
+/// A rule built from a decision and its CEL check.
 #[derive(Clone)]
 pub(crate) struct DeclarativeRule {
     meta: RuleManifest,
@@ -20,28 +20,27 @@ pub(crate) struct DeclarativeRule {
 }
 
 impl DeclarativeRule {
-    /// Compiles the rule file `text` for `pattern`. The pattern's scope must
-    /// agree with what the rule selects, and it declares no options: a
-    /// declarative rule is tuned by editing its expression.
-    pub(crate) fn new(pattern: &Pattern, text: &str) -> Result<Self, Error> {
-        let definition: Definition =
-            serde_norway::from_str(text).map_err(|e| Error::invalid(&pattern.id, e.to_string()))?;
-        let mut meta = pattern.rule_manifest().ok_or_else(|| {
-            Error::invalid(&pattern.id, "the pattern has no severity or implementation")
-        })?;
-        if meta.scope != definition.select.scope() {
+    /// Compiles `check` for `decision`. The decision's scope has been checked
+    /// against what the check selects when the catalog was validated; a
+    /// declarative rule declares no options: it is tuned by editing its
+    /// expression.
+    pub(crate) fn new(decision: &Decision, check: &CelCheck) -> Result<Self, Error> {
+        let id = decision.id();
+        let meta = decision
+            .rule_manifest()
+            .ok_or_else(|| Error::invalid(id, "the decision has no severity or check"))?;
+        if meta.scope != check.select.scope() {
             return Err(Error::invalid(
-                &pattern.id,
+                id,
                 format!(
-                    "selects `{}`, which a `{}` pattern cannot run over",
-                    definition.select.name(),
-                    pattern.scope
+                    "selects `{}`, which a `{}` decision cannot run over",
+                    check.select.name(),
+                    decision.scope.subject
                 ),
             ));
         }
-        meta.docs.clone_from(&pattern.requirement);
         Ok(Self {
-            compiled: Arc::new(definition.compile(&pattern.id)?),
+            compiled: Arc::new(compile(check, id)?),
             meta,
         })
     }
@@ -197,7 +196,7 @@ impl DeclarativeRule {
 }
 
 impl Rule for DeclarativeRule {
-    /// The metadata of the pattern the rule was built from.
+    /// The metadata of the decision the rule was built from.
     fn manifest(&self) -> &RuleManifest {
         &self.meta
     }
@@ -213,7 +212,7 @@ impl Rule for DeclarativeRule {
         }
     }
 
-    /// Runs once per file or once over the project, following the pattern's scope.
+    /// Runs once per file or once over the project, following the decision's scope.
     fn check(&self, ctx: &Ctx, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
         match self.meta.scope {
             Scope::File => self.check_file(ctx),

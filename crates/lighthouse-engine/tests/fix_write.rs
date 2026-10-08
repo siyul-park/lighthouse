@@ -6,7 +6,7 @@ use lighthouse_config::Config;
 use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun};
 use lighthouse_model::{EditOp, FixOutcome, Safety};
 use lighthouse_plugin::{
-    Error as PluginError, FixPattern, FixRequest, Fixer, FixerManifest, LanguageProvider, Plugin,
+    Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, LanguageProvider, Plugin,
     PluginManifest, Registry, Rule,
 };
 
@@ -79,7 +79,7 @@ fn pair(dir: &tempfile::TempDir, formatter: &str) -> (Engine, FixPlan) {
             version: "0".to_owned(),
         }))
         .unwrap();
-    let config = Config::parse(&format!(
+    let config = Config::parse_inline(&format!(
         "plugins = [\"pair\"]\n[rules]\n\"pair/todo\" = \"error\"\n{formatter}"
     ))
     .unwrap();
@@ -90,7 +90,7 @@ fn pair(dir: &tempfile::TempDir, formatter: &str) -> (Engine, FixPlan) {
             fixer: "pair/both".to_owned(),
             cap: Safety::Safe,
             mechanical: true,
-            pattern: FixPattern {
+            decision: FixDecision {
                 id: "pair/todo".to_owned(),
                 requirement: String::new(),
                 intent: String::new(),
@@ -228,7 +228,8 @@ fn a_write_that_fails_midway_puts_the_written_files_back() {
         }))
         .unwrap();
     let config =
-        Config::parse("plugins = [\"nested\"]\n[rules]\n\"nested/todo\" = \"error\"\n").unwrap();
+        Config::parse_inline("plugins = [\"nested\"]\n[rules]\n\"nested/todo\" = \"error\"\n")
+            .unwrap();
     let engine = Engine::new(registry, config, dir.path()).unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
@@ -237,7 +238,7 @@ fn a_write_that_fails_midway_puts_the_written_files_back() {
             fixer: "nested/todo".to_owned(),
             cap: Safety::Safe,
             mechanical: true,
-            pattern: FixPattern {
+            decision: FixDecision {
                 id: "nested/todo".to_owned(),
                 requirement: String::new(),
                 intent: String::new(),
@@ -298,7 +299,8 @@ fn a_file_whose_provider_does_not_analyze_overlays_is_not_fixed() {
         }))
         .unwrap();
     let config =
-        Config::parse("plugins = [\"plain\"]\n[rules]\n\"plain/todo\" = \"error\"\n").unwrap();
+        Config::parse_inline("plugins = [\"plain\"]\n[rules]\n\"plain/todo\" = \"error\"\n")
+            .unwrap();
     let engine = Engine::new(registry, config, dir.path()).unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
@@ -307,7 +309,7 @@ fn a_file_whose_provider_does_not_analyze_overlays_is_not_fixed() {
             fixer: "plain/todo".to_owned(),
             cap: Safety::Safe,
             mechanical: true,
-            pattern: FixPattern {
+            decision: FixDecision {
                 id: "plain/todo".to_owned(),
                 requirement: String::new(),
                 intent: String::new(),

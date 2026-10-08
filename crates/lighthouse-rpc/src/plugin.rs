@@ -54,6 +54,18 @@ impl RpcPlugin {
                 result.id
             )));
         }
+        let declared = &found.manifest.provides.languages;
+        let mut reported: Vec<&str> = result.languages.iter().map(|l| l.id.as_str()).collect();
+        reported.sort_unstable();
+        let mut promised: Vec<&str> = declared.iter().map(String::as_str).collect();
+        promised.sort_unstable();
+        if !promised.is_empty() && promised != reported {
+            return Err(failed(format!(
+                "its manifest provides languages [{}], the process reports [{}]",
+                promised.join(", "),
+                reported.join(", ")
+            )));
+        }
         Ok(Self {
             manifest: PluginManifest {
                 id: result.id,

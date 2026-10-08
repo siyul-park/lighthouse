@@ -1,6 +1,6 @@
 use lighthouse_model::{Diagnostic, SymbolKind, SymbolRole};
 use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
-use lighthouse_spec::PatternRule;
+use lighthouse_spec::DecisionRule;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -12,7 +12,7 @@ const ID: &str = "testing/standard-assertions";
 struct NoOptions {}
 
 pub(crate) fn rule() -> Box<dyn Rule> {
-    Box::new(PatternRule::new(ID, &[], check))
+    Box::new(DecisionRule::new(ID, &[], check))
 }
 
 /// Functions of a test file that fail the test by hand after a comparison:

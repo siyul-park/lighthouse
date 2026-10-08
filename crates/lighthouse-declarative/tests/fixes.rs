@@ -1,4 +1,4 @@
-//! Fixes compiled from patterns: the generic operations evaluated over a
+//! Fixes compiled from decisions: the generic operations evaluated over a
 //! finding, and commands run on a scratch copy.
 
 use std::{collections::BTreeMap, path::PathBuf};
@@ -9,7 +9,7 @@ use lighthouse_model::{
     Position, Project, Severity, Span, Symbol, SymbolId, SymbolKind, Visibility,
 };
 use lighthouse_plugin::{
-    Error, FixPattern, FixRequest, Fixer, KeyCtx, OrderKey, OrderKeyManifest, OrderKeys, Plugin,
+    Error, FixDecision, FixRequest, Fixer, KeyCtx, OrderKey, OrderKeyManifest, OrderKeys, Plugin,
     Workspace,
 };
 use lighthouse_spec::Catalog;
@@ -71,13 +71,37 @@ fn project(names: &[&str]) -> Project {
     }])
 }
 
-/// A pattern `local/probe` whose fix is `fix`.
+const EXAMPLES: &str = "  examples:
+    - name: bad
+      language: text
+      kind: invalid
+      files: [{ path: a.txt, body: x }]
+      expect: [{ line: 1 }]
+      fixed: [{ path: a.txt, body: y }]
+    - name: good
+      language: text
+      kind: valid
+      files: [{ path: a.txt, body: x }]
+";
+
+/// A decision `id` (labels for `pack`) with `fix` and `check`, as a document.
+fn document(id: &str, pack: &str, section: &str, fix: &str, check: &str) -> String {
+    let indented: String = fix.lines().map(|l| format!("    {l}\n")).collect();
+    format!(
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: {id}\n  labels:\n    lighthouse/pack: {pack}\n    lighthouse/section: {section}\nspec:\n  title: Probe\n  intent: A probe.\n  scope: {{ subject: file }}\n  requirement: A probe MUST hold.\n  enforcement: mechanical\n  evidence: [x]\n{check}  fix:\n{indented}{EXAMPLES}"
+    )
+}
+
+const CEL: &str = "  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n";
+
+/// A decision `local/probe` whose fix is `fix`.
+fn local_layer(fix: &str) -> Result<Catalog, lighthouse_spec::Error> {
+    let text = document("local/probe", "local", "rules", fix, CEL);
+    Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)]))
+}
+
 fn fixer(fix: &str, pack: &str) -> Box<dyn Fixer> {
-    let indented: String = fix.lines().map(|l| format!("  {l}\n")).collect();
-    let text = format!(
-        "id: local/probe\ntitle: Probe\nintent: A probe.\nscope: file\nrequirement: A probe MUST hold.\nenforcement: mechanical\nevidence: [x]\nfix:\n{indented}examples:\n  - name: bad\n    language: text\n    kind: invalid\n    files: [{{ path: a.txt, body: x }}]\n    expect: [{{ line: 1 }}]\n    fixed: [{{ path: a.txt, body: y }}]\n  - name: good\n    language: text\n    kind: valid\n    files: [{{ path: a.txt, body: x }}]\nrule:\n  select: file\n  where: 'true'\n  message: m\n"
-    );
-    let layer = Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)])).unwrap();
+    let layer = local_layer(fix).unwrap();
     let plugin = Declarative::from_catalog(pack, &layer).unwrap();
     plugin.fixers().remove(0)
 }
@@ -86,22 +110,14 @@ fn local(fix: &str) -> Box<dyn Fixer> {
     fixer(fix, "local")
 }
 
-/// The same fix as the pattern of a bundled-style pack `demo`.
+/// The same fix as the decision of a bundled-style pack `demo`.
 fn bundled(fix: &str) -> Box<dyn Fixer> {
-    let indented: String = fix.lines().map(|l| format!("  {l}\n")).collect();
-    let pattern = format!(
-        "id: demo/probe\ntitle: Probe\nintent: A probe.\nscope: file\nrequirement: A probe MUST hold.\nenforcement: mechanical\nevidence: [x]\nimplementation:\n  builtin: demo/probe\nfix:\n{indented}examples:\n  - name: bad\n    language: text\n    kind: invalid\n    files: [{{ path: a.txt, body: x }}]\n    expect: [{{ line: 1 }}]\n    fixed: [{{ path: a.txt, body: y }}]\n  - name: good\n    language: text\n    kind: valid\n    files: [{{ path: a.txt, body: x }}]\n"
-    );
+    let builtin = "  check:\n    type: builtin\n    id: demo/probe\n";
+    let decision = document("demo/probe", "demo", "s", fix, builtin);
+    let pack = "apiVersion: lighthouse/v1alpha1\nkind: Pack\nmetadata:\n  name: demo\nspec:\n  title: Demo\n  intro: x\n  sections:\n    - name: s\n      title: S\n      intro: x\n      decisions: [probe]\n";
     let files = [
-        (
-            "demo/pack.yaml",
-            "id: demo\ntitle: Demo\nintro: x\nsections: [s]\n",
-        ),
-        (
-            "demo/s/section.yaml",
-            "id: s\ntitle: S\nintro: x\npatterns: [probe]\n",
-        ),
-        ("demo/s/probe.yaml", pattern.as_str()),
+        ("demo/pack.yaml", pack),
+        ("demo/s/probe.yaml", decision.as_str()),
     ]
     .into_iter()
     .map(|(k, v)| (k.to_owned(), v.to_owned()))
@@ -169,7 +185,7 @@ fn run(
     keys: &Keys,
     trusted: bool,
 ) -> Result<FixOutcome, Error> {
-    let pattern = FixPattern {
+    let decision = FixDecision {
         id: "local/probe".to_owned(),
         requirement: String::new(),
         intent: String::new(),
@@ -181,7 +197,7 @@ fn run(
     fixer.fix(&FixRequest {
         finding,
         facts: &facts,
-        pattern: &pattern,
+        decision: &decision,
         options: &options,
         project,
         ws: &ws,
@@ -222,7 +238,7 @@ fn evaluate(fix: &str, finding: &Diagnostic) -> Result<FixOutcome, Error> {
 
 #[test]
 fn a_move_takes_its_node_and_anchor_from_the_finding() {
-    let fix = "safety: suggested\nops:\n  - op: move\n    node: finding.evidence.callee\n    after: finding.evidence.caller";
+    let fix = "safety: suggested\ntype: ops\nops:\n  - op: move\n    node: finding.evidence.callee\n    after: finding.evidence.caller";
     let evidence = json!({ "callee": id("a").as_str(), "caller": id("c").as_str() });
 
     let outcome = evaluate(fix, &finding(Some("a"), evidence)).unwrap();
@@ -248,7 +264,7 @@ fn a_move_takes_its_node_and_anchor_from_the_finding() {
 
 #[test]
 fn a_move_before_is_a_before_anchor() {
-    let fix = "safety: safe\nops:\n  - op: move\n    node: finding.symbol\n    before: finding.evidence.first";
+    let fix = "safety: safe\ntype: ops\nops:\n  - op: move\n    node: finding.symbol\n    before: finding.evidence.first";
     let evidence = json!({ "first": id("b").as_str() });
 
     let got = ops(evaluate(fix, &finding(Some("a"), evidence)).unwrap());
@@ -264,7 +280,7 @@ fn a_move_before_is_a_before_anchor() {
 
 #[test]
 fn guards_choose_which_operations_apply() {
-    let fix = "safety: safe\nops:\n  - op: move\n    when: finding.evidence.role == 'fixture'\n    node: finding.symbol\n    before: finding.evidence.at\n  - op: move\n    when: finding.evidence.role == 'helper'\n    node: finding.symbol\n    after: finding.evidence.at";
+    let fix = "safety: safe\ntype: ops\nops:\n  - op: move\n    when: finding.evidence.role == 'fixture'\n    node: finding.symbol\n    before: finding.evidence.at\n  - op: move\n    when: finding.evidence.role == 'helper'\n    node: finding.symbol\n    after: finding.evidence.at";
     let at = id("c").as_str().to_owned();
 
     let fixture = ops(evaluate(
@@ -302,9 +318,8 @@ fn guards_choose_which_operations_apply() {
 
 #[test]
 fn delete_names_a_node_or_a_range() {
-    let node_fix = "safety: suggested\nops: [{ op: delete, node: finding.symbol }]";
-    let range_fix =
-        "safety: suggested\nops: [{ op: delete, file: finding.file, span: finding.span }]";
+    let node_fix = "safety: suggested\ntype: ops\nops: [{ op: delete, node: finding.symbol }]";
+    let range_fix = "safety: suggested\ntype: ops\nops: [{ op: delete, file: finding.file, span: finding.span }]";
 
     let by_node = ops(evaluate(node_fix, &finding(Some("b"), json!({}))).unwrap());
     let by_range = ops(evaluate(range_fix, &finding(None, json!({}))).unwrap());
@@ -321,8 +336,8 @@ fn delete_names_a_node_or_a_range() {
 
 #[test]
 fn rename_and_replace_fill_their_templates() {
-    let rename = "safety: suggested\nrequires: [complete-references]\nops: [{ op: rename, symbol: finding.symbol, name: '{{ symbol.name }}New{{ 1 + 1 }}' }]";
-    let replace = "safety: suggested\nops: [{ op: replace, file: finding.file, span: finding.span, text: '// {{ finding.rule }}: {{ symbol.kind }}' }]";
+    let rename = "safety: suggested\nrequires: [complete-references]\ntype: ops\nops: [{ op: rename, symbol: finding.symbol, name: '{{ symbol.name }}New{{ 1 + 1 }}' }]";
+    let replace = "safety: suggested\ntype: ops\nops: [{ op: replace, file: finding.file, span: finding.span, text: '// {{ finding.rule }}: {{ symbol.kind }}' }]";
 
     let renamed = ops(evaluate(rename, &finding(Some("a"), json!({}))).unwrap());
     let replaced = ops(evaluate(replace, &finding(Some("a"), json!({}))).unwrap());
@@ -346,7 +361,7 @@ fn rename_and_replace_fill_their_templates() {
 
 #[test]
 fn an_expression_that_fails_is_an_error_naming_the_fix() {
-    let fix = "safety: suggested\nops: [{ op: delete, node: finding.evidence.missing }]";
+    let fix = "safety: suggested\ntype: ops\nops: [{ op: delete, node: finding.evidence.missing }]";
 
     let error = evaluate(fix, &finding(None, json!({}))).unwrap_err();
 
@@ -355,7 +370,7 @@ fn an_expression_that_fails_is_an_error_naming_the_fix() {
 
 #[test]
 fn a_node_that_is_not_a_symbol_id_is_an_error() {
-    let fix = "safety: suggested\nops: [{ op: delete, node: \"'nope'\" }]";
+    let fix = "safety: suggested\ntype: ops\nops: [{ op: delete, node: \"'nope'\" }]";
 
     let error = evaluate(fix, &finding(None, json!({}))).unwrap_err();
 
@@ -363,7 +378,7 @@ fn a_node_that_is_not_a_symbol_id_is_an_error() {
 }
 
 fn reorder(table: &[(&'static str, u64)], names: &[&str]) -> FixOutcome {
-    let fix = "safety: safe\nops: [{ op: reorder, scope: file, by: [t/rank] }]";
+    let fix = "safety: safe\ntype: ops\nops: [{ op: reorder, scope: file, by: [t/rank] }]";
     run(
         local(fix).as_ref(),
         &project(names),
@@ -423,7 +438,7 @@ fn reorder_declines_with_fewer_than_two_ordered_declarations() {
 
 #[test]
 fn reorder_by_an_unregistered_key_is_an_error() {
-    let fix = "safety: safe\nops: [{ op: reorder, scope: file, by: [t/missing] }]";
+    let fix = "safety: safe\ntype: ops\nops: [{ op: reorder, scope: file, by: [t/missing] }]";
 
     let error = run(
         local(fix).as_ref(),
@@ -449,7 +464,7 @@ fn try_command(
     finding: &Diagnostic,
 ) -> Result<FixOutcome, Error> {
     let fix = format!(
-        "safety: suggested\ncommand:\n  argv: {argv}\n  output: {output}\n  timeout: 5s\n  {extra}"
+        "safety: suggested\ntype: command\nargv: {argv}\noutput: {output}\ntimeout: 5s\n{extra}"
     );
     run(
         local(&fix).as_ref(),
@@ -488,7 +503,7 @@ fn a_command_that_edits_the_scratch_copy_is_diffed_against_the_original() {
     let edit = r#"["sh", "-c", "printf 'x\n' >> \"$1\"", "sh", "{file}"]"#;
     let text = "one\ntwo\n";
 
-    let got = ops(command(edit, "inPlace", text, &finding(None, json!({}))));
+    let got = ops(command(edit, "in-place", text, &finding(None, json!({}))));
 
     assert_eq!(
         got,
@@ -506,7 +521,7 @@ fn a_command_that_changes_nothing_or_prints_nothing_is_declined() {
 
     let same = reason(command(
         touch,
-        "inPlace",
+        "in-place",
         "same\n",
         &finding(None, json!({})),
     ));
@@ -572,7 +587,12 @@ fn the_context_is_in_the_environment_and_nothing_else_is() {
 fn placeholders_are_replaced_in_every_argument() {
     let argv = r#"["sh", "-c", "printf '%s|%s|%s' \"$1\" \"$2\" \"$3\" > \"$4\"", "sh", "{rule}", "{line}", "{symbol}", "{file}"]"#;
 
-    let got = ops(command(argv, "inPlace", "", &finding(Some("a"), json!({}))));
+    let got = ops(command(
+        argv,
+        "in-place",
+        "",
+        &finding(Some("a"), json!({})),
+    ));
 
     let EditOp::Replace { text, .. } = &got[0] else {
         panic!("replace expected");
@@ -607,7 +627,7 @@ fn exit_two_a_signal_and_a_timeout_are_errors_that_apply_nothing() {
     let killed = try_command("", r#"["sh", "-c", "kill -9 $$"]"#, "text", "", &at)
         .unwrap_err()
         .to_string();
-    let slow = "safety: suggested\ncommand:\n  argv: [\"sleep\", \"5\"]\n  timeout: 1s";
+    let slow = "safety: suggested\ntype: command\nargv: [\"sleep\", \"5\"]\ntimeout: 1s";
     let started = std::time::Instant::now();
     let timed_out = run(
         local(slow).as_ref(),
@@ -643,7 +663,7 @@ fn a_program_that_cannot_start_is_an_error() {
 
 #[test]
 fn a_command_runs_only_in_a_project_the_user_trusts_whoever_wrote_it() {
-    let fix = format!("safety: suggested\ncommand:\n  argv: {SHOUT}\n  output: text");
+    let fix = format!("safety: suggested\ntype: command\nargv: {SHOUT}\noutput: text");
     let project = project(&["a"]);
     let at = finding(None, json!({}));
 
@@ -666,8 +686,8 @@ fn a_placeholder_value_that_starts_with_a_dash_is_refused() {
     let mut dashed = at.clone();
     dashed.symbol = Some("-rf".to_owned());
 
-    let fine = command(argv, "inPlace", "x\n", &at);
-    let why = reason(command(argv, "inPlace", "x\n", &dashed));
+    let fine = command(argv, "in-place", "x\n", &at);
+    let why = reason(command(argv, "in-place", "x\n", &dashed));
 
     assert!(reason(fine).contains("changed nothing"));
     assert!(why.contains("starts with `-`"), "{why}");
@@ -687,7 +707,7 @@ fn a_command_prints_at_most_a_megabyte_that_is_kept() {
 
 #[test]
 fn the_fixer_carries_the_capabilities_the_fix_requires() {
-    let fix = "safety: safe\nrequires: [extent, reference-sites]\nops: [{ op: delete, node: finding.symbol }]";
+    let fix = "safety: safe\nrequires: [extent, reference-sites]\ntype: ops\nops: [{ op: delete, node: finding.symbol }]";
 
     let fixer = local(fix);
 
@@ -702,7 +722,7 @@ fn the_fixer_carries_the_capabilities_the_fix_requires() {
 }
 
 #[test]
-fn only_patterns_with_a_fix_have_fixers() {
+fn only_decisions_with_a_fix_have_fixers() {
     let plugin = Declarative::from_catalog("design", Catalog::bundled()).unwrap();
 
     let ids: Vec<String> = plugin
@@ -716,7 +736,7 @@ fn only_patterns_with_a_fix_have_fixers() {
 }
 
 #[test]
-fn the_bundled_fixers_of_a_pack_are_those_of_its_patterns_with_a_fix() {
+fn the_bundled_fixers_of_a_pack_are_those_of_its_decisions_with_a_fix() {
     let ids: Vec<String> = Declarative::bundled_fixers("testing")
         .iter()
         .map(|f| f.manifest().id.clone())
@@ -727,27 +747,18 @@ fn the_bundled_fixers_of_a_pack_are_those_of_its_patterns_with_a_fix() {
 
 #[test]
 fn a_rename_must_declare_that_it_needs_complete_references() {
-    let fix = "safety: suggested\nops: [{ op: rename, symbol: finding.symbol, name: x }]";
-    let indented: String = fix.lines().map(|l| format!("  {l}\n")).collect();
-    let text = format!(
-        "id: local/probe\ntitle: Probe\nintent: A probe.\nscope: file\nrequirement: A probe MUST hold.\nenforcement: mechanical\nevidence: [x]\nfix:\n{indented}examples:\n  - name: bad\n    language: text\n    kind: invalid\n    files: [{{ path: a.txt, body: x }}]\n    expect: [{{ line: 1 }}]\n    fixed: [{{ path: a.txt, body: y }}]\n  - name: good\n    language: text\n    kind: valid\n    files: [{{ path: a.txt, body: x }}]\nrule:\n  select: file\n  where: 'true'\n  message: m\n"
-    );
+    let fix =
+        "safety: suggested\ntype: ops\nops: [{ op: rename, symbol: finding.symbol, name: x }]";
 
-    let error = Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)])).unwrap_err();
+    let error = local_layer(fix).unwrap_err();
 
     assert!(error.to_string().contains("complete-references"), "{error}");
 }
 
 #[test]
 fn a_command_argument_may_not_embed_a_placeholder_or_use_root() {
-    let build = |argv: &str| {
-        let fix = format!("safety: suggested\ncommand:\n  argv: {argv}");
-        let indented: String = fix.lines().map(|l| format!("  {l}\n")).collect();
-        let text = format!(
-            "id: local/probe\ntitle: Probe\nintent: A probe.\nscope: file\nrequirement: A probe MUST hold.\nenforcement: mechanical\nevidence: [x]\nfix:\n{indented}examples:\n  - name: bad\n    language: text\n    kind: invalid\n    files: [{{ path: a.txt, body: x }}]\n    expect: [{{ line: 1 }}]\n    fixed: [{{ path: a.txt, body: y }}]\n  - name: good\n    language: text\n    kind: valid\n    files: [{{ path: a.txt, body: x }}]\nrule:\n  select: file\n  where: 'true'\n  message: m\n"
-        );
-        Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)]))
-    };
+    let build =
+        |argv: &str| local_layer(&format!("safety: suggested\ntype: command\nargv: {argv}"));
 
     for bad in [r#"["tool", "--out={file}"]"#, r#"["tool", "{root}"]"#] {
         let error = build(bad).unwrap_err();

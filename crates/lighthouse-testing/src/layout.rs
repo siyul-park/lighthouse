@@ -1,6 +1,6 @@
 use lighthouse_model::{Diagnostic, Symbol, SymbolKind, SymbolRole};
 use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
-use lighthouse_spec::PatternRule;
+use lighthouse_spec::DecisionRule;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -12,7 +12,7 @@ const ID: &str = "testing/test-file-layout";
 struct NoOptions {}
 
 pub(crate) fn rule() -> Box<dyn Rule> {
-    Box::new(PatternRule::new(ID, &[], check))
+    Box::new(DecisionRule::new(ID, &[], check))
 }
 
 /// Fixtures declared after the file's first test, and helpers declared before

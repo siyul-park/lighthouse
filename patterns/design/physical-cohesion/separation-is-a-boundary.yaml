@@ -1,8 +1,0 @@
-id: design/separation-is-a-boundary
-title: Separation marks a boundary
-intent: A file or module split without a real boundary only adds navigation cost.
-scope: module
-requirement: >-
-  Physical separation MUST represent a real responsibility, ownership, or
-  abstraction boundary.
-enforcement: judgment

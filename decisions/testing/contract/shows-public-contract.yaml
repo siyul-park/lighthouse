@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/shows-public-contract
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: contract
+spec:
+  title: Tests show the public contract
+  intent: A test that documents internals breaks when internals change.
+  scope:
+    domain: code
+    subject: test
+  requirement: A test MUST show public usage and promised behavior.
+  enforcement: judgment

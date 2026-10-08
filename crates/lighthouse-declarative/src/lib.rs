@@ -1,8 +1,8 @@
-//! Declarative rules: a CEL expression over the code model. A rule file names
-//! what it selects (`symbol`, `function`, `edge`, `module`, `file` or `test`),
-//! a `where` expression that is true for a violation, and a message; the
-//! pattern that names the file supplies id, severity, scope, evidence fields
-//! and the examples that `lighthouse rule test` runs.
+//! Declarative rules: a CEL expression over the code model. A `cel` check
+//! names what it selects (`symbol`, `function`, `edge`, `module`, `file` or
+//! `test`), a `where` expression that is true for a violation, and a message;
+//! the decision that holds it supplies id, severity, scope, evidence fields
+//! and the examples that `lighthouse decision test` runs.
 
 mod definition;
 mod facts;
@@ -12,7 +12,7 @@ mod rule;
 
 use fix::SpecFixer;
 use lighthouse_plugin::{Fixer, Plugin, PluginManifest, Rule};
-use lighthouse_spec::{Catalog, Implementation};
+use lighthouse_spec::{Catalog, Check};
 
 pub use local::{load_local, local_dir, local_files};
 use rule::DeclarativeRule;
@@ -35,31 +35,29 @@ pub enum Error {
     Spec(#[from] lighthouse_spec::Error),
     #[error("{path}: {message}")]
     Io { path: String, message: String },
+    #[error("{path}: a format from before the resource model; run `lighthouse spec migrate`")]
+    Legacy { path: String },
 }
 
 impl Declarative {
-    /// Builds the rules of every pattern in pack `id` whose implementation is
-    /// declarative.
+    /// Builds the rules of every decision in pack `id` whose check is `cel`.
     pub fn from_catalog(id: &str, catalog: &Catalog) -> Result<Self, Error> {
         let mut definitions = Vec::new();
-        for pattern in catalog
-            .patterns()
-            .filter(|p| p.id.starts_with(&format!("{id}/")))
+        for decision in catalog
+            .decisions()
+            .filter(|d| d.id().starts_with(&format!("{id}/")))
         {
-            let Some(Implementation::Declarative(path)) = &pattern.implementation else {
+            let Some(Check::Cel(cel)) = &decision.check else {
                 continue;
             };
-            let text = catalog
-                .declarative(path)
-                .ok_or_else(|| Error::invalid(&pattern.id, format!("`{path}` is not loaded")))?;
-            definitions.push(DeclarativeRule::new(pattern, text)?);
+            definitions.push(DeclarativeRule::new(decision, cel)?);
         }
         let mut fixers = Vec::new();
-        for pattern in catalog
-            .patterns()
-            .filter(|p| p.id.starts_with(&format!("{id}/")))
+        for decision in catalog
+            .decisions()
+            .filter(|d| d.id().starts_with(&format!("{id}/")))
         {
-            fixers.extend(SpecFixer::new(pattern)?.map(std::sync::Arc::new));
+            fixers.extend(SpecFixer::new(decision)?.map(std::sync::Arc::new));
         }
         Ok(Self {
             manifest: PluginManifest {
@@ -76,7 +74,7 @@ impl Declarative {
         self.definitions.is_empty()
     }
 
-    /// The fixers of the bundled catalog's pack `id`: one per pattern with a
+    /// The fixers of the bundled catalog's pack `id`: one per decision with a
     /// `fix`, whatever implements its rule. Panics when a bundled fix does not
     /// compile: it is tested.
     pub fn bundled_fixers(id: &str) -> Vec<Box<dyn Fixer>> {
@@ -100,7 +98,7 @@ impl Plugin for Declarative {
         &self.manifest
     }
 
-    /// One rule per declarative pattern, in catalog order.
+    /// One rule per declarative decision, in catalog order.
     fn rules(&self) -> Vec<Box<dyn Rule>> {
         self.definitions
             .iter()
@@ -109,7 +107,7 @@ impl Plugin for Declarative {
             .collect()
     }
 
-    /// One fixer per pattern of the pack that has a `fix`.
+    /// One fixer per decision of the pack that has a `fix`.
     fn fixers(&self) -> Vec<Box<dyn Fixer>> {
         self.fixers
             .iter()
@@ -127,7 +125,7 @@ impl Plugin for Declarative {
     }
 }
 
-/// A plugin whose rules are the declarative patterns of one catalog pack.
+/// A plugin whose rules are the declarative decisions of one catalog pack.
 pub struct Declarative {
     manifest: PluginManifest,
     definitions: Vec<DeclarativeRule>,

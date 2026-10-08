@@ -1,0 +1,84 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/private-helper-callers
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: functions
+spec:
+  title: Private helpers have two callers
+  intent: A private helper with one caller is usually part of that caller.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: A private helper SHOULD have at least two callers.
+  enforcement: heuristic
+  severity: info
+  evidence: [caller, callers, statements]
+  languages:
+    go:
+      tuning: >-
+        A review item, not an error: a helper with one caller may be justified
+        by naming a policy or isolating an abstraction level. Test callers do
+        not count. Forwarding wrappers are reported by
+        `design/single-use-wrapper`, and a function used as a value is not
+        judged.
+    rust:
+      tuning: >-
+        Private free functions and methods that have exactly one caller outside
+        test code and are never named as a value. A method that some call may
+        reach through a receiver of unknown type is not judged.
+  check:
+    type: builtin
+    id: design/private-helper-callers
+  strict: true
+  examples:
+    - name: invalid
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: "package sample\n\nfunc Run(x int) int { return clamp(x) + 1 }\n\nfunc clamp(x int) int {\n\tif x > 10 {\n\t\treturn 10\n\t}\n\treturn x\n}"
+      expect:
+        - line: 5
+    - name: valid
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: "package sample\n\nfunc Run(x int) int { return clamp(x) + 1 }\n\nfunc Other(x int) int { return clamp(x) + 2 }\n\nfunc clamp(x int) int {\n\tif x > 10 {\n\t\treturn 10\n\t}\n\treturn x\n}"
+    - name: rust-invalid
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn run(x: u8) -> u8 {
+                clamp(x) + 1
+            }
+
+            fn clamp(x: u8) -> u8 {
+                if x > 10 { 10 } else { x }
+            }
+      expect:
+        - line: 5
+    - name: rust-valid
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn run(x: u8) -> u8 {
+                clamp(x) + 1
+            }
+
+            pub fn other(x: u8) -> u8 {
+                clamp(x) + 2
+            }
+
+            fn clamp(x: u8) -> u8 {
+                if x > 10 { 10 } else { x }
+            }

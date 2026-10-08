@@ -1,70 +1,10 @@
-use std::collections::BTreeMap;
-
 use cel::Program;
-use lighthouse_plugin::Scope;
-use serde::Deserialize;
 
 use crate::Error;
 
-/// What a rule looks at; each choice binds one variable of the same name.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub(crate) enum Select {
-    Symbol,
-    Function,
-    Edge,
-    Module,
-    File,
-    Test,
-}
+use lighthouse_spec::{CelCheck, Select};
 
-impl Select {
-    /// Edges and modules are judged once over the project; the rest per file.
-    pub(crate) fn scope(self) -> Scope {
-        match self {
-            Self::Edge | Self::Module => Scope::Project,
-            _ => Scope::File,
-        }
-    }
-
-    /// The variable the selected value is bound to. `function` is reserved
-    /// in CEL, so functions are `func`.
-    pub(crate) fn variable(self) -> &'static str {
-        match self {
-            Self::Function => "func",
-            other => other.name(),
-        }
-    }
-
-    /// The spelling used in rule files and in messages.
-    pub(crate) fn name(self) -> &'static str {
-        match self {
-            Self::Symbol => "symbol",
-            Self::Function => "function",
-            Self::Edge => "edge",
-            Self::Module => "module",
-            Self::File => "file",
-            Self::Test => "test",
-        }
-    }
-}
-
-/// The text of a rule file.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct Definition {
-    pub select: Select,
-    /// CEL; true for a violation.
-    #[serde(rename = "where")]
-    pub condition: String,
-    /// Text with `{{ cel }}` holes.
-    pub message: String,
-    /// Evidence fields, each a CEL expression.
-    #[serde(default)]
-    pub evidence: BTreeMap<String, String>,
-}
-
-/// A rule file with every expression compiled.
+/// A CEL check with every expression compiled.
 #[derive(Debug)]
 pub(crate) struct Compiled {
     pub select: Select,
@@ -80,25 +20,24 @@ pub(crate) enum Piece {
     Hole(Program),
 }
 
-impl Definition {
-    pub(crate) fn compile(&self, rule: &str) -> Result<Compiled, Error> {
-        let program = |what: &str, source: &str| {
-            Program::compile(source).map_err(|e| Error::invalid(rule, format!("{what}: {e}")))
-        };
-        let mut evidence = Vec::new();
-        for (name, source) in &self.evidence {
-            evidence.push((
-                name.clone(),
-                program(&format!("evidence `{name}`"), source)?,
-            ));
-        }
-        Ok(Compiled {
-            select: self.select,
-            condition: program("where", &self.condition)?,
-            message: template(rule, &self.message)?,
-            evidence,
-        })
+/// Compiles every expression of `check`, naming `rule` in errors.
+pub(crate) fn compile(check: &CelCheck, rule: &str) -> Result<Compiled, Error> {
+    let program = |what: &str, source: &str| {
+        Program::compile(source).map_err(|e| Error::invalid(rule, format!("{what}: {e}")))
+    };
+    let mut evidence = Vec::new();
+    for (name, source) in &check.evidence {
+        evidence.push((
+            name.clone(),
+            program(&format!("evidence `{name}`"), source)?,
+        ));
     }
+    Ok(Compiled {
+        select: check.select,
+        condition: program("where", &check.condition)?,
+        message: template(rule, &check.message)?,
+        evidence,
+    })
 }
 
 fn template(rule: &str, text: &str) -> Result<Vec<Piece>, Error> {

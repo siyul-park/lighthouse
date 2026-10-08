@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/architecture-specific-evidence
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: completeness
+spec:
+  title: Architecture-specific contracts need specific evidence
+  intent: Generic tests cannot prove contracts that only exist on one architecture.
+  scope:
+    domain: code
+    subject: project
+  requirement: Architecture-specific contracts MUST have architecture-specific evidence.
+  enforcement: judgment

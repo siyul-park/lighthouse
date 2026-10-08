@@ -1,0 +1,717 @@
+# yaml-language-server: $schema=../schema/source-map.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: SourceMap
+metadata:
+  name: sources
+spec:
+  sources:
+    - ref: "coding-patterns#design-f6344382"
+      text: >-
+        Required behavior MUST use the fewest necessary symbols and least
+        necessary code without weakening boundaries.
+      decisions: [design/minimal-symbols]
+    - ref: "coding-patterns#design-de507f87"
+      text: >-
+        Every symbol MUST earn its existence through a distinct responsibility,
+        invariant, ownership boundary, or reusable abstraction.
+      decisions: [design/symbol-earns-existence]
+    - ref: "coding-patterns#design-dc82328b"
+      text: >-
+        Each behavior MUST have one implementation and each semantic rule MUST
+        have one owner.
+      decisions: [design/single-owner]
+    - ref: "coding-patterns#design-596525ee"
+      text: >-
+        Each symbol MUST have one coherent responsibility, a narrow contract,
+        and sufficient scope for every legitimate caller.
+      decisions: [design/coherent-responsibility]
+    - ref: "coding-patterns#design-b19af147"
+      text: Unrelated roles MUST NOT be combined merely to force reuse.
+      decisions: [design/no-forced-reuse]
+    - ref: "coding-patterns#dependency-direction-cbed7b1d"
+      text: >-
+        A symbol MUST NOT depend on code that is more specific, more
+        context-dependent, or less stable than itself.
+      decisions: [design/no-upward-dependency]
+    - ref: "coding-patterns#dependency-direction-278c4f1e"
+      text: >-
+        Lower-level or reusable symbols MUST express their responsibility in the
+        most general form that fully fits it and MUST NOT depend on
+        caller-specific policy, types, lifecycle, or semantics.
+      decisions: [design/general-lower-level]
+    - ref: "coding-patterns#dependency-direction-1f1b1fc1"
+      text: >-
+        Higher-level code MAY depend on lower-level code when that code is
+        general and context-independent; lower-level code MUST NOT depend on its
+        callers.
+      decisions: [design/no-dependency-on-callers]
+    - ref: "coding-patterns#dependency-direction-53be7fb8"
+      text: >-
+        Shared functionality MUST be generalized when extracted; it MUST NOT be
+        moved downward merely to relocate complexity.
+      decisions: [design/generalize-when-extracting]
+    - ref: "coding-patterns#physical-cohesion-547f3a8e"
+      text: Symbols with one owner and cohesive responsibility MUST share a file.
+      decisions: [design/single-file-per-owner]
+    - ref: "coding-patterns#physical-cohesion-65fb9347"
+      text: >-
+        Strongly related symbols MUST be physically close; direct collaborators
+        SHOULD be adjacent.
+      decisions: [design/related-symbols-close]
+    - ref: "coding-patterns#physical-cohesion-ca6a85dd"
+      text: >-
+        Files and declaration order MUST make ownership, responsibility, and
+        relationships easy to read.
+      decisions: [design/readable-layout]
+    - ref: "coding-patterns#physical-cohesion-9cf2f03b"
+      text: >-
+        Physical separation MUST represent a real responsibility, ownership, or
+        abstraction boundary.
+      decisions: [design/separation-is-a-boundary]
+    - ref: "coding-patterns#structural-rules-598c8922"
+      text: >-
+        **Abstract semantic duplication.** Multiple implementations of the same
+        behavior or rule MUST converge on one owner; syntax similarity alone
+        MUST NOT trigger abstraction.
+      decisions: [design/abstract-semantic-duplication]
+    - ref: "coding-patterns#structural-rules-94592840"
+      text: >-
+        **Merge overlapping symbols.** Symbols with substantially the same
+        responsibility at the same abstraction level MUST be consolidated;
+        prefer one general symbol over parallel variants, wrappers, aliases, or
+        coordinators.
+      decisions: [design/merge-overlapping-symbols]
+    - ref: "coding-patterns#structural-rules-dbd77a89"
+      text: >-
+        **Split real boundaries.** Separate symbols only when responsibility,
+        invariant, ownership, lifecycle, or abstraction level differs.
+      decisions: [design/split-real-boundaries]
+    - ref: "coding-patterns#structural-rules-8036b176"
+      text: >-
+        **Reuse before extension.** Prefer existing symbols and composition
+        before adding layers, extension points, policy knobs, or parallel
+        mechanisms.
+      decisions: [design/reuse-before-extension]
+    - ref: "coding-patterns#structural-signals-a6200267"
+      text: Consider cyclomatic complexity with statement count and nesting depth.
+      decisions: [design/complexity-signal]
+    - ref: "coding-patterns#structural-signals-01978ee3"
+      text: "Consider coupling with direct fan-in, fan-out, and dependency depth."
+      decisions: [design/coupling-signal]
+    - ref: "coding-patterns#structural-signals-e07fba6b"
+      text: >-
+        Near-clone analysis SHOULD require meaningful body size and a semantic
+        or naming relation; syntax similarity alone MUST NOT require
+        abstraction.
+      decisions: [design/near-clone-signal]
+    - ref: "coding-patterns#structural-signals-83834735"
+      text: >-
+        Similar or symmetric siblings SHOULD be adjacent when they share an
+        owner and implementation shape.
+      decisions: [design/adjacent-siblings]
+    - ref: "coding-patterns#structural-signals-6343159a"
+      text: >-
+        Metrics MUST NOT define universal declaration order, justify automatic
+        reordering, or prove single responsibility.
+      decisions: [design/signals-are-advisory]
+    - ref: "coding-patterns#structural-signals-bccfd6a4"
+      text: >-
+        Prefer mechanical checks for directly expressible rules; heuristic
+        signals SHOULD remain advisory and use deliberately high thresholds.
+      decisions: [design/signals-are-advisory]
+    - ref: "coding-patterns#functions-30019ba3"
+      text: >-
+        A helper MUST be extracted only to remove semantic duplication, name
+        reusable behavior or policy, isolate an abstraction level, or serve as a
+        function value.
+      decisions: [design/justified-helper]
+    - ref: "coding-patterns#functions-be8f45fd"
+      text: A private helper SHOULD have at least two callers.
+      decisions: [design/private-helper-callers]
+    - ref: "coding-patterns#functions-3419f6c9"
+      text: >-
+        A simple single-use wrapper SHOULD be inlined unless its name expresses
+        a real policy or mechanic; complex one-use mechanics require review
+        rather than mechanical removal.
+      decisions: [design/single-use-wrapper]
+    - ref: "coding-patterns#functions-366c92d3"
+      text: >-
+        Methods SHOULD express receiver-owned behavior; package functions SHOULD
+        express construction or behavior with no natural receiver.
+      decisions: [design/receiver-owned-behavior]
+    - ref: "coding-patterns#functions-7ff6fb85"
+      text: One function MUST stay at one abstraction level.
+      decisions: [design/single-abstraction-level]
+    - ref: "coding-patterns#functions-2623228e"
+      text: >-
+        Declarations MUST be ordered for reading: callers before callees,
+        related symbols adjacent, and cohesive implementations together.
+      decisions: [design/callers-before-callees]
+    - ref: "coding-patterns#naming-1fc2961d"
+      text: One term MUST represent one concept across packages.
+      decisions: [design/single-term-per-concept]
+    - ref: "coding-patterns#naming-7293803e"
+      text: >-
+        One word SHOULD be the default; a multi-word name MUST add only the
+        minimum qualifier needed to express a distinction.
+      decisions: [design/minimal-names]
+    - ref: "coding-patterns#naming-3fa87af5"
+      text: >-
+        Package, receiver, phase, or representation MUST NOT be repeated without
+        meaning.
+      decisions: [design/no-redundant-qualifiers]
+    - ref: "coding-patterns#naming-49da70c5"
+      text: >-
+        Standard abbreviations MUST be kept: `ID`, `IP`, `ABI`, `JIT`, `VM`,
+        `SSA`, `CFG`, `GVN`, `DCE`.
+      decisions: [design/standard-abbreviations]
+      note: >-
+        The minivm-only abbreviations ABI, JIT, VM, SSA, CFG, GVN and DCE are
+        omitted as project-specific; projects list their own.
+    - ref: "coding-patterns#naming-eb4a4ae5"
+      text: >-
+        One-letter names MUST be limited to conventional receivers, indexes, and
+        tiny scopes.
+      decisions: [design/short-names-limited]
+    - ref: "coding-patterns#naming-6cd80925"
+      text: "`HasX` | contains or registers X"
+      decisions: [design/predicate-names]
+    - ref: "coding-patterns#naming-88b5f6bb"
+      text: "`IsX` | state predicate"
+      decisions: [design/predicate-names]
+    - ref: "coding-patterns#naming-1daea9c6"
+      text: "`MatchX` | comparison or validation against X"
+      decisions: [design/predicate-names]
+    - ref: "coding-patterns#naming-a0778391"
+      text: "`X` | direct boolean value"
+      decisions: [design/predicate-names]
+    - ref: "coding-patterns#naming-a99c562e"
+      text: "`At` MUST be used for position/time predicates."
+      decisions: [design/predicate-names]
+    - ref: "coding-patterns#naming-f81fdf16"
+      text: >-
+        `Build`, `Compile`, `Publish`, `Capture`, and `Use` MUST be reserved for
+        actions or transitions.
+      decisions: [design/reserved-action-verbs]
+    - ref: "coding-patterns#naming-ab64e5fb"
+      text: >-
+        Capability names MUST be singular; collections and stores MUST be
+        plural.
+      decisions: [design/singular-capability-plural-collection]
+    - ref: "coding-patterns#types-and-apis-99a0c39c"
+      text: >-
+        Interfaces MUST be used only when callers supply behavior and MUST be
+        defined where that behavior is consumed.
+      decisions: [design/interface-at-consumer]
+    - ref: "coding-patterns#types-and-apis-f4a27ffd"
+      text: >-
+        Public inputs SHOULD use the narrowest reusable abstraction that fully
+        expresses the contract; public outputs SHOULD use the most concrete
+        public type unless polymorphism is itself the contract.
+      decisions: [design/narrow-inputs-concrete-outputs]
+    - ref: "coding-patterns#types-and-apis-aed3aa66"
+      text: Public APIs MUST be usable without callers naming private types.
+      decisions: [design/no-private-types-in-public-api]
+    - ref: "coding-patterns#types-and-apis-0e075b7e"
+      text: >-
+        Exported types SHOULD expose contract rather than mutable implementation
+        state; data-only values and ABI bridge types MAY expose their fields.
+      decisions: [design/contract-not-state]
+    - ref: "coding-patterns#types-and-apis-411f8630"
+      text: >-
+        Constructors MUST require inputs with no safe default and MUST validate
+        required dependencies and shape; `Build` MUST validate a complete
+        builder.
+      decisions: [design/validated-constructors]
+    - ref: "coding-patterns#types-and-apis-6bc1728e"
+      text: >-
+        Required constructor values MUST be passed as arguments; optional values
+        MUST be injected through functional options.
+      decisions: [design/required-args-optional-options]
+    - ref: "coding-patterns#types-and-apis-3c270f36"
+      text: >-
+        Generic parameter-group types, speculative options, extension points,
+        aliases, and pass-through wrappers MUST NOT be exposed without a
+        distinct contract.
+      decisions: [design/no-speculative-api]
+    - ref: "coding-patterns#ownership-b242fb18"
+      text: One symbol MUST own each mutable state and its transitions.
+      decisions: [design/single-state-owner]
+    - ref: "coding-patterns#ownership-79f5e61f"
+      text: Private state belongs to its owner.
+      decisions: [design/private-state-behind-owner]
+    - ref: "coding-patterns#ownership-1b398d4a"
+      text: >-
+        An unexported implementation component MAY access its exported owner's
+        private state when it implements that owner's responsibility; unrelated
+        same-package code MUST use the owner's contract.
+      decisions: [design/private-state-behind-owner]
+    - ref: "coding-patterns#ownership-c85ed7a6"
+      text: Borrowed values MUST NOT cross or outlive their ownership boundary.
+      decisions: [design/borrow-within-boundary]
+    - ref: "coding-patterns#ownership-91d95023"
+      text: >-
+        Retain/release and resource transitions MUST have one owner, and each
+        resource MUST be released exactly once.
+      decisions: [design/single-resource-owner]
+    - ref: "coding-patterns#ownership-0b016255"
+      text: >-
+        Layout-only declarations MAY name private members but MUST NOT access
+        runtime state.
+      decisions: [design/layout-declarations-hold-no-state]
+    - ref: "coding-patterns#concurrency-ac98e6a0"
+      text: >-
+        Shared mutable state MUST have one owner and one synchronization
+        strategy.
+      decisions: [design/single-state-owner]
+    - ref: "coding-patterns#concurrency-c49e7b37"
+      text: Long-lived goroutines MUST have an explicit shutdown path.
+      decisions: [design/explicit-shutdown]
+    - ref: "coding-patterns#concurrency-e88afbda"
+      text: "Blocking, I/O, and process-boundary operations MUST take context first."
+      decisions: [design/context-first]
+    - ref: "coding-patterns#concurrency-162fbcb1"
+      text: Request contexts MUST NOT be stored in long-lived objects.
+      decisions: [design/no-stored-request-context]
+    - ref: "coding-patterns#errors-c53f8cf1"
+      text: "Semantic errors MUST use stable `ErrXxx` sentinels."
+      decisions: [design/stable-error-categories]
+    - ref: "coding-patterns#errors-013589e0"
+      text: >-
+        Dependency identity MUST be preserved when callers depend on it; use
+        `%w` when adding context.
+      decisions: [design/error-identity]
+    - ref: "coding-patterns#errors-2de6c4b7"
+      text: Error categories MUST be translated only at their owning boundary.
+      decisions: [design/translate-errors-at-boundary]
+    - ref: "coding-patterns#errors-b0da56b2"
+      text: "Semantic categories MUST NOT be created with `fmt.Errorf` alone."
+      decisions: [design/stable-error-categories]
+    - ref: "coding-patterns#errors-c039c75d"
+      text: Errors MUST NOT expose private or sensitive process state.
+      decisions: [design/errors-hide-private-state]
+    - ref: "coding-patterns#errors-fc4988d9"
+      text: >-
+        Panic MUST be limited to impossible programmer errors, `Must*` APIs, or
+        documented hot-path invariants with one recovery boundary.
+      decisions: [design/errors-not-panics]
+    - ref: "coding-patterns#errors-4d6e8249"
+      text: Normal runtime failures MUST return errors.
+      decisions: [design/errors-not-panics]
+    - ref: "coding-patterns#file-order-4ab2e7c7"
+      text: "Within a Go file, package-level declarations MUST appear in this order:"
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-1aefb9e2"
+      text: public types
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-a64ea628"
+      text: private types
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-d68c8bb6"
+      text: public constants
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-1a985fed"
+      text: private constants
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-7af0b3e4"
+      text: variables
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-c3e11131"
+      text: "all `init` functions"
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-b29e522a"
+      text: public options/functions
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-81faa7b6"
+      text: public constructors
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-06a43229"
+      text: public methods
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-7edda99c"
+      text: clone/conversion and interface hooks
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-ab2964f6"
+      text: private functions/methods
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-c6b09a72"
+      text: >-
+        `init` functions MUST stay together and MUST precede non-`init`
+        functions and methods.
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-f1941732"
+      text: >-
+        A cohesive implementation MUST read from higher-level behavior toward
+        shared machinery.
+      decisions: [design/top-down-reading]
+    - ref: "coding-patterns#file-order-f4da8d4a"
+      text: >-
+        Callers MUST precede exclusive helpers; symmetric counterparts SHOULD be
+        adjacent; shared leaves MUST follow the code that uses them.
+      decisions: [design/adjacent-siblings, design/callers-before-callees]
+    - ref: "coding-patterns#file-order-3990c601"
+      text: "Within one type, constructors MUST precede other behavior."
+      decisions: [design/declaration-groups]
+    - ref: "coding-patterns#file-order-91cd3473"
+      text: >-
+        These ordering rules MUST NOT justify artificial file splits, wrappers,
+        or duplicated helpers.
+      decisions: [design/order-is-not-a-reason-to-split]
+    - ref: "coding-patterns#comments-fc101736"
+      text: "Comments MAY be added only when clearly necessary to preserve:"
+      decisions: [design/comments-preserve-facts]
+    - ref: "coding-patterns#comments-a59ae8e3"
+      text: "invariants and consequences;"
+      decisions: [design/comments-preserve-facts]
+    - ref: "coding-patterns#comments-de4382f9"
+      text: "external or cross-package constraints;"
+      decisions: [design/comments-preserve-facts]
+    - ref: "coding-patterns#comments-9c2d685b"
+      text: "rejected alternatives with evidence;"
+      decisions: [design/comments-preserve-facts]
+    - ref: "coding-patterns#comments-a385f170"
+      text: external contracts or specifications.
+      decisions: [design/comments-preserve-facts]
+    - ref: "coding-patterns#comments-d0e247e3"
+      text: >-
+        Necessary comments MUST state the smallest sufficient fact, constraint,
+        invariant, or consequence.
+      decisions: [design/comments-preserve-facts]
+    - ref: "coding-patterns#comments-1246d21a"
+      text: >-
+        Comments MUST NOT narrate code, restate names, label control-flow
+        phases, or explain obvious behavior. Prefer a better name, type, or
+        structure.
+      decisions: [design/no-narration, design/section-banners]
+    - ref: "coding-patterns#comments-f522539c"
+      text: >-
+        Exported symbols SHOULD have normal Go doc comments. Public API changes
+        SHOULD document user-visible behavior, constraints, ownership, or other
+        facts the code cannot express.
+      decisions: [design/exported-doc]
+    - ref: "coding-patterns#generated-and-platform-code-fc6a81b6"
+      text: Generated files MUST change only through their generator.
+      decisions: [design/generated-via-generator]
+    - ref: "coding-patterns#generated-and-platform-code-0669c79d"
+      text: >-
+        Platform mechanics MUST stay behind matching build constraints and owner
+        packages.
+      decisions: [design/platform-behind-owner]
+    - ref: "coding-patterns#related-ea38c98a"
+      text: "`AGENTS.md` — workflow and delegation"
+      omitted: project-specific
+      note: Cross-reference to a minivm document.
+    - ref: "coding-patterns#related-3cd01f62"
+      text: "`refactoring.md` — structural review and simplification"
+      omitted: project-specific
+      note: Cross-reference to a minivm document.
+    - ref: "coding-patterns#related-a3d25124"
+      text: "`architecture.md` — package/runtime architecture"
+      omitted: project-specific
+      note: Cross-reference to a minivm document.
+    - ref: "coding-patterns#related-0e3d5da8"
+      text: "`testing.md` — test contract, structure, methodology, and validation"
+      omitted: project-specific
+      note: Cross-reference to a minivm document.
+    - ref: "testing#contract-4985e9bf"
+      text: A test MUST show public usage and promised behavior.
+      decisions: [testing/shows-public-contract]
+    - ref: "testing#contract-364c28d1"
+      text: >-
+        Test structure MUST serve the contract rather than implementation shape
+        or coverage.
+      decisions: [testing/structure-serves-contract]
+    - ref: "testing#contract-31731df3"
+      text: >-
+        A test MUST expose the target, input, operation, and expected result in
+        the case.
+      decisions: [testing/case-exposes-target]
+    - ref: "testing#contract-3415da0f"
+      text: "A case MUST represent behavior, not a branch or implementation path."
+      decisions: [testing/case-is-behavior]
+    - ref: "testing#public-boundary-efc435b9"
+      text: >-
+        Feature contract tests MUST use only target-package public symbols and
+        MUST live in `package <target>_test`.
+      decisions: [testing/external-test-package, testing/no-private-symbol-access]
+    - ref: "testing#public-boundary-b8681587"
+      text: Wrappers that hide target API usage MUST NOT be added merely for reuse.
+      decisions: [testing/no-hiding-wrappers]
+    - ref: "testing#public-boundary-8f4b8444"
+      text: >-
+        Setup helpers MAY exist only when the specified behavior remains
+        visible.
+      decisions: [testing/no-hiding-wrappers]
+    - ref: "testing#public-boundary-182c5f9f"
+      text: >-
+        Private-symbol testing MUST be resolved at the public boundary rather
+        than by exposing internals solely for tests.
+      decisions: [testing/no-private-symbol-access]
+    - ref: "testing#readability-e0875430"
+      text: The target and its behavior MUST remain visible.
+      decisions: [testing/case-exposes-target]
+    - ref: "testing#readability-668c9a46"
+      text: >-
+        Wrappers, builders, or helpers MUST NOT hide the call or result being
+        specified.
+      decisions: [testing/no-hiding-wrappers]
+    - ref: "testing#readability-1bf75d03"
+      text: >-
+        Tests MUST NOT mix different writing styles or abstraction levels at one
+        level.
+      decisions: [testing/single-case-style]
+    - ref: "testing#readability-fa58951a"
+      text: >-
+        Table data and generation code MUST remain simple enough to read as
+        specification.
+      decisions: [testing/simple-table-data]
+    - ref: "testing#readability-71cbc25a"
+      text: A case MUST contain the behavior it claims to specify.
+      decisions: [testing/case-is-behavior]
+    - ref: "testing#organization-4b4e2627"
+      text: >-
+        Owner | Each public symbol SHOULD have one top-level test function; a
+        missing owner test is a warning, and multiple semantic owner tests are
+        an error.
+      decisions: [testing/owner-test, testing/single-owner-test]
+    - ref: "testing#organization-c3e1ee9a"
+      text: "Depth | At most two levels: the test function and its direct cases."
+      decisions: [testing/case-depth]
+    - ref: "testing#organization-dac1a854"
+      text: >-
+        Same behavior, many inputs | Use an inline anonymous struct table of
+        named inputs and expected outputs; each entry is one case.
+      decisions: [testing/table-for-same-behavior]
+    - ref: "testing#organization-bd4d8f2c"
+      text: >-
+        Different scenarios | Use one case per scenario, named for the behavior
+        it states.
+      decisions: [testing/scenario-per-behavior]
+    - ref: "testing#organization-a47f4191"
+      text: >-
+        Similar cases | Merge cases that specify the same behavior into one case
+        or one table.
+      decisions: [testing/table-for-same-behavior]
+    - ref: "testing#organization-17ab163b"
+      text: >-
+        Style | A test function uses either table cases or scenario cases, never
+        both.
+      decisions: [testing/single-case-style]
+    - ref: "testing#organization-abc40ec2"
+      text: A test SHOULD use one case style per level.
+      decisions: [testing/single-case-style]
+    - ref: "testing#organization-2aa48e36"
+      text: >-
+        Assertions outside cases SHOULD describe setup, preconditions, or
+        test-wide invariants, not case behavior.
+      decisions: [testing/assertions-in-cases]
+    - ref: "testing#organization-05384f94"
+      text: >-
+        Readiness polling MUST NOT outlive teardown or retain resources after
+        the case closes them.
+      decisions: [testing/polling-outlives-teardown]
+    - ref: "testing#organization-5dabb856"
+      text: >-
+        Polling conditions MUST return readiness and observed results/errors
+        only; assertions belong after readiness is established.
+      decisions: [testing/polling-conditions-are-pure]
+    - ref: "testing#f-i-r-s-t-05a59702"
+      text: >-
+        Tests MUST be **Fast, Independent, Repeatable, Self-validating, and
+        Timely**.
+      decisions: [testing/first-properties]
+    - ref: "testing#f-i-r-s-t-5e44df14"
+      text: >-
+        Tests MUST NOT depend on other tests, uncontrolled mutable state, manual
+        inspection, or unnecessary setup.
+      decisions: [testing/independent-tests]
+    - ref: "testing#tdd-6186f09b"
+      text: "For each behavior change, the agent MUST:"
+      decisions: [testing/red-green-cycle]
+    - ref: "testing#tdd-eebadd8a"
+      text: "state the contract and invariants;"
+      decisions: [testing/red-green-cycle]
+    - ref: "testing#tdd-7718dd5a"
+      text: "write the narrowest falsifying test;"
+      decisions: [testing/red-green-cycle]
+    - ref: "testing#tdd-0efd0280"
+      text: "observe the expected failure when practical;"
+      decisions: [testing/red-green-cycle]
+    - ref: "testing#tdd-ee9a07d4"
+      text: "implement the smallest owning change;"
+      decisions: [testing/red-green-cycle]
+    - ref: "testing#tdd-4fbb4b48"
+      text: "run focused checks, then applicable structural and repository gates."
+      decisions: [testing/red-green-cycle]
+    - ref: "testing#tdd-f5c4ca98"
+      text: >-
+        Tests MUST cover applicable success, failure, boundaries,
+        ownership/lifecycle, compatibility, parity, and architecture contracts.
+      decisions: [testing/cover-contract-dimensions]
+    - ref: "testing#tdd-9cd4d927"
+      text: The lowest test layer that proves the contract MUST be used.
+      decisions: [testing/lowest-proving-layer]
+    - ref: "testing#tdd-64ebcce6"
+      text: >-
+        Structure-only tests MUST NOT be added merely to exercise implementation
+        details.
+      decisions: [testing/no-structure-only-tests]
+    - ref: "testing#evidence-e51ffdb8"
+      text: "Coverage proves reachability, not quality or completeness."
+      decisions: [testing/coverage-is-reachability]
+    - ref: "testing#evidence-c3f3f8dc"
+      text: >-
+        When no red phase is available, coverage SHOULD prove execution without
+        changing production behavior to manufacture failure.
+      decisions: [testing/coverage-is-reachability]
+    - ref: "testing#evidence-56f5d151"
+      text: "Public | exported behavior, errors, lifecycle"
+      decisions: [testing/evidence-by-layer]
+    - ref: "testing#evidence-45222e55"
+      text: "Runtime | opcode behavior, traps, ownership"
+      omitted: project-specific
+      note: Opcode runtime layer of the minivm instruction set.
+    - ref: "testing#evidence-d038b612"
+      text: "Parity | equivalent public behavior across distinct execution paths"
+      decisions: [testing/evidence-by-layer]
+    - ref: "testing#evidence-8f8ad7ec"
+      text: "Frontend | acceptance and intermediate-representation contracts"
+      omitted: project-specific
+      note: Bytecode frontend layer of minivm.
+    - ref: "testing#evidence-b2d39020"
+      text: >-
+        Backend | machine layout, bindings, moves, metadata, and bridge/deopt
+        contracts
+      omitted: project-specific
+      note: Machine-code backend layer of minivm.
+    - ref: "testing#evidence-7bf5a1dc"
+      text: "Golden | exact low-level output for a specified input shape"
+      decisions: [testing/evidence-by-layer]
+    - ref: "testing#evidence-69d67454"
+      text: "Async | publication, shutdown, and race behavior"
+      decisions: [testing/evidence-by-layer]
+    - ref: "testing#evidence-e44a28e3"
+      text: "Fuzz | bounded trust-boundary or differential properties"
+      decisions: [testing/evidence-by-layer]
+    - ref: "testing#evidence-8b0af56d"
+      text: "Integration | public end-to-end behavior"
+      decisions: [testing/evidence-by-layer]
+    - ref: "testing#native-jit-413d8a13"
+      text: Frontend tests MUST prove frontend contracts.
+      omitted: project-specific
+      note: Frontend/backend/interpreter split is specific to a compiler with a JIT.
+    - ref: "testing#native-jit-7c5ee604"
+      text: >-
+        Backend tests MUST prove machine layout, bindings, moves, metadata, and
+        bridge/deopt contracts where applicable.
+      omitted: project-specific
+      note: Machine layout and deopt contracts of the minivm JIT.
+    - ref: "testing#native-jit-8607c87e"
+      text: >-
+        Interpreter tests MUST prove public results, errors, ownership, and
+        execution behavior.
+      omitted: project-specific
+      note: Interpreter contract of minivm.
+    - ref: "testing#native-jit-20e6de03"
+      text: >-
+        Parity MUST be tested wherever multiple execution paths are required to
+        implement the same public contract.
+      decisions: [testing/parity-across-paths]
+    - ref: "testing#native-jit-7e35f7e0"
+      text: >-
+        Golden tests MUST define expected low-level output independently of the
+        implementation that produced it, with the required complete output and
+        metadata checks.
+      decisions: [testing/independent-golden-output]
+    - ref: "testing#validation-b3f33959"
+      text: Run the smallest falsifying check first.
+      decisions: [testing/smallest-check-first]
+    - ref: "testing#validation-abad7d96"
+      text: >-
+        Apply package, race, coverage, architecture, and repository checks when
+        relevant.
+      decisions: [testing/expand-validation-to-contract]
+    - ref: "testing#validation-83fe3fb1"
+      text: "Skip only genuinely inapplicable checks, and state the reason."
+      decisions: [testing/expand-validation-to-contract]
+    - ref: "testing#completeness-b1182e1b"
+      text: >-
+        Repeated execution units MUST have the required metadata and runtime
+        coverage.
+      omitted: project-specific
+      note: Opcode metadata coverage in minivm.
+    - ref: "testing#completeness-592cec2c"
+      text: Verification policy MUST be covered at its defined boundaries.
+      omitted: project-specific
+      note: Bytecode verifier coverage in minivm.
+    - ref: "testing#completeness-ccf9ae64"
+      text: Backend support status MUST match the implemented contract.
+      omitted: project-specific
+      note: Backend support status table of minivm.
+    - ref: "testing#completeness-955a8a36"
+      text: Exported contracts MUST have an owning test.
+      decisions: [testing/owner-test]
+    - ref: "testing#completeness-f61f5237"
+      text: >-
+        Architecture-specific contracts MUST have architecture-specific
+        evidence.
+      decisions: [testing/architecture-specific-evidence]
+    - ref: "testing#completeness-7dc259e7"
+      text: >-
+        Generated output and documentation freshness are repository gates, not
+        test-completeness rules.
+      decisions: [testing/freshness-gates-are-separate]
+    - ref: "testing#ownership-63979bd0"
+      text: "Test contracts and structure | `testing.md`"
+      decisions: [testing/single-owner-per-concern]
+    - ref: "testing#ownership-f312c163"
+      text: "General test code style | `coding-patterns.md`"
+      decisions: [testing/single-owner-per-concern]
+    - ref: "testing#ownership-86984d55"
+      text: "Opcode metadata | opcode definitions and their contract tests"
+      omitted: project-specific
+      note: Owner map for minivm documents and packages.
+    - ref: "testing#ownership-17a021f6"
+      text: "Verification | verifier and verifier tests"
+      omitted: project-specific
+      note: Owner map for minivm documents and packages.
+    - ref: "testing#ownership-d0f5b9ba"
+      text: "Runtime opcode behavior | interpreter/runtime contract tests"
+      omitted: project-specific
+      note: Owner map for minivm documents and packages.
+    - ref: "testing#ownership-46b9a27b"
+      text: "Backend status | backend instruction contract"
+      omitted: project-specific
+      note: Owner map for minivm documents and packages.
+    - ref: "testing#ownership-c0d25b3f"
+      text: "JIT contracts | JIT contract documentation and tests"
+      omitted: project-specific
+      note: Owner map for minivm documents and packages.
+    - ref: "testing#ownership-bf689afd"
+      text: "Performance evidence | benchmark documentation and benchmarks"
+      omitted: project-specific
+      note: Owner map for minivm documents and packages.
+    - ref: "testing#related-679b4282"
+      text: "`coding-patterns.md` — general code design and style"
+      omitted: project-specific
+      note: Cross-reference to a minivm document.
+    - ref: "testing#related-52218c9d"
+      text: "`refactoring.md` — structural review"
+      omitted: project-specific
+      note: Cross-reference to a minivm document.
+    - ref: "testing#related-d313593c"
+      text: "`instruction-set.md` — opcode/backend contracts"
+      omitted: project-specific
+      note: Cross-reference to a minivm document.
+    - ref: "testing#related-8a0d6523"
+      text: "`verification.md` — bytecode validation"
+      omitted: project-specific
+      note: Cross-reference to a minivm document.
+    - ref: "testing#related-843c822e"
+      text: "`jit-internals.md` — JIT contracts"
+      omitted: project-specific
+      note: Cross-reference to a minivm document.
+    - ref: "testing#related-39860d76"
+      text: "`benchmarks.md` — performance evidence"
+      omitted: project-specific
+      note: Cross-reference to a minivm document.

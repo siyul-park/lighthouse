@@ -32,7 +32,7 @@ fn coupling() -> Diagnostic {
 fn helper() -> Diagnostic {
     let mut d = Diagnostic::new(
         "design/private-helper-callers",
-        Severity::Review,
+        Severity::Info,
         "private helper has one caller",
         "src/lib.rs",
         span(7),
@@ -115,11 +115,14 @@ fn agent_json_is_one_tagged_record_per_line() {
     assert_eq!(coupling["location"]["line"], 350);
     assert_eq!(coupling["evidence"]["fan_out"], 14);
     assert!(coupling["requirement"].as_str().unwrap().contains("fan"));
-    assert!(coupling.get("resolve").is_none());
+    assert!(
+        coupling["resolve"].is_object(),
+        "a heuristic finding asks for a verdict whatever its severity"
+    );
     assert_eq!(coupling["expected"]["language"], "go");
 
     let review = &records[1];
-    assert_eq!(review["severity"], "review");
+    assert_eq!(review["severity"], "info");
     assert_eq!(review["tier"], "heuristic");
     let command = review["resolve"]["command"].as_str().unwrap();
     assert!(
@@ -131,12 +134,18 @@ fn agent_json_is_one_tagged_record_per_line() {
 
     let custom = &records[2];
     assert_eq!(custom["tier"], "mechanical");
+    assert!(
+        custom.get("resolve").is_none(),
+        "an error is not a review task"
+    );
     assert!(custom.get("requirement").is_none());
     assert!(custom.get("expected").is_none());
 
     let summary = &records[4];
     assert_eq!(summary["errors"], 1);
-    assert_eq!(summary["reviews"], 1);
+    assert_eq!(summary["warnings"], 1);
+    assert_eq!(summary["infos"], 1);
+    assert_eq!(summary["reviews"], 2);
     assert_eq!(summary["suppressed"], 2);
     assert_eq!(summary["allowed"], 1);
     assert_eq!(summary["reasons"]["deferred"], json!(["none"]));
@@ -148,7 +157,7 @@ fn agent_formats_state_a_clean_run() {
     let text = render(Format::Agent, &[], &[]);
     assert_eq!(
         text,
-        "summary: 0 error, 0 warn, 0 review, 0 incomplete, 0 suppressed, 0 allowed\n"
+        "summary: 0 error, 0 warn, 0 info, 0 review, 0 incomplete, 0 suppressed, 0 allowed\n"
     );
     let json = render(Format::AgentJson, &[], &[]);
     let summary: Value = serde_json::from_str(json.trim()).unwrap();
@@ -205,16 +214,19 @@ fn limit_keeps_the_most_severe_findings_and_counts_the_rest() {
     let text = render_with(Format::Agent, &findings, &[], &briefing);
     assert!(text.contains("acme/custom  error"), "{text}");
     assert!(text.contains("design/coupling-signal  warn"), "{text}");
-    assert!(!text.contains("private-helper-callers  review"), "{text}");
+    assert!(!text.contains("private-helper-callers  info"), "{text}");
     assert!(
         text.contains("... 1 more finding(s) not shown (raise --limit)"),
         "{text}"
     );
     assert!(
-        text.contains("summary: 1 error, 1 warn, 1 review"),
+        text.contains("summary: 1 error, 1 warn, 1 info, 2 review"),
         "{text}"
     );
-    assert!(!text.contains("reasons:"), "{text}");
+    assert!(
+        text.contains("reasons:"),
+        "a shown heuristic finding asks for a verdict: {text}"
+    );
 
     let json = records_of(&render_with(Format::AgentJson, &findings, &[], &briefing));
     let kinds: Vec<_> = json.iter().map(|r| r["type"].as_str().unwrap()).collect();
@@ -224,7 +236,7 @@ fn limit_keeps_the_most_severe_findings_and_counts_the_rest() {
         json[0]["rule"], "design/coupling-signal",
         "original order is kept"
     );
-    assert!(json[3].get("reasons").is_none());
+    assert!(json[3]["reasons"].is_object());
 }
 
 #[test]
@@ -289,20 +301,18 @@ fn fingerprint_prefixes_grow_until_the_shown_findings_are_distinct() {
     );
 }
 
-fn pattern_with(examples: &str, tuning: &str) -> Catalog {
-    let pattern = format!(
-        "id: p/a\ntitle: A\nintent: i\nscope: symbol\nrequirement: A MUST b.\nenforcement: judgment\n{tuning}examples:\n{examples}"
+fn decision_with(examples: &str, tuning: &str) -> Catalog {
+    let indented: String = examples.lines().map(|l| format!("  {l}\n")).collect();
+    let empty = if examples.is_empty() { " []" } else { "" };
+    let decision = format!(
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: p/a\n  labels:\n    lighthouse/pack: p\n    lighthouse/section: s\nspec:\n  title: A\n  intent: i\n  scope: {{ subject: symbol }}\n  requirement: A MUST b.\n  enforcement: judgment\n{tuning}  examples:{empty}\n{indented}"
     );
     let files = std::collections::BTreeMap::from([
         (
             "p/pack.yaml".to_owned(),
-            "id: p\ntitle: P\nintro: x\nsections: [s]\n".to_owned(),
+            "apiVersion: lighthouse/v1alpha1\nkind: Pack\nmetadata:\n  name: p\nspec:\n  title: P\n  intro: x\n  sections:\n    - name: s\n      title: S\n      intro: x\n      decisions: [a]\n".to_owned(),
         ),
-        (
-            "p/s/section.yaml".to_owned(),
-            "id: s\ntitle: S\nintro: x\npatterns: [a]\n".to_owned(),
-        ),
-        ("p/s/a.yaml".to_owned(), pattern),
+        ("p/s/a.yaml".to_owned(), decision),
     ]);
     Catalog::from_files(files).unwrap()
 }
@@ -341,7 +351,7 @@ fn expected_basis(catalog: &Catalog, kind: &str) -> Option<(String, String)> {
 
 #[test]
 fn expected_structure_prefers_canonical_then_a_match_then_the_shortest_then_tuning() {
-    let canonical = pattern_with(
+    let canonical = decision_with(
         &format!(
             "{}{}",
             example("short-valid", "valid", false, "x"),
@@ -354,7 +364,7 @@ fn expected_structure_prefers_canonical_then_a_match_then_the_shortest_then_tuni
         Some(("canonical".to_owned(), "long-valid".to_owned()))
     );
 
-    let matched = pattern_with(
+    let matched = decision_with(
         &format!(
             "{}{}{}{}",
             example("plain-valid", "valid", false, "x"),
@@ -382,12 +392,15 @@ fn expected_structure_prefers_canonical_then_a_match_then_the_shortest_then_tuni
         ))
     );
 
-    let tuned = pattern_with("", "tuning:\n  go: Write it the Go way.\n");
+    let tuned = decision_with(
+        "",
+        "  languages:\n    go:\n      tuning: Write it the Go way.\n",
+    );
     assert_eq!(
         expected_basis(&tuned, "function"),
         Some(("tuning".to_owned(), "tuning".to_owned()))
     );
-    assert_eq!(expected_basis(&pattern_with("", ""), "function"), None);
+    assert_eq!(expected_basis(&decision_with("", ""), "function"), None);
 }
 
 #[test]
@@ -398,7 +411,7 @@ fn agent_report_has_the_records_the_json_lines_print() {
         limit: Some(1),
         ..Briefing::default()
     };
-    let findings = [coupling(), helper()];
+    let findings = [unknown_rule(), helper()];
     let gaps = [Incomplete {
         path: None,
         reason: "plugin crashed".to_owned(),
@@ -408,10 +421,40 @@ fn agent_report_has_the_records_the_json_lines_print() {
     assert_eq!(report.findings[0]["type"], "finding");
     assert_eq!(report.omitted, 1);
     assert_eq!(report.incomplete[0]["reason"], "plugin crashed");
-    assert!(report.reasons.is_none(), "the review finding was left out");
+    assert!(
+        report.reasons.is_none(),
+        "the finding that asks for a verdict was left out"
+    );
 
-    let all = lighthouse_report::agent_report(&findings, &[], &Briefing::default());
+    let all = lighthouse_report::agent_report(
+        &findings,
+        &[],
+        &Briefing {
+            catalog: Some(catalog),
+            ..Briefing::default()
+        },
+    );
     assert_eq!(all.findings.len(), 2);
     assert_eq!(all.omitted, 0);
     assert!(all.reasons.is_some());
+}
+
+#[test]
+fn needs_verdict_follows_the_tier_of_the_decision_and_not_the_severity() {
+    let briefing = Briefing {
+        catalog: Some(Catalog::bundled()),
+        ..Briefing::default()
+    };
+    let mut heuristic = coupling();
+    heuristic.severity = Severity::Error;
+    assert!(briefing.needs_verdict(&heuristic), "heuristic at error");
+    let mechanical = Diagnostic::new(
+        "core/annotation-reason",
+        Severity::Warn,
+        "needs a reason",
+        "src/lib.rs",
+        span(1),
+        Fingerprint::of("core/annotation-reason", "m", ""),
+    );
+    assert!(!briefing.needs_verdict(&mechanical), "mechanical at warn");
 }

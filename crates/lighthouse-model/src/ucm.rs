@@ -6,6 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::Fingerprint;
@@ -25,7 +26,9 @@ pub struct Span {
 }
 
 /// Provider feature that rules may require.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Capability {
     SemanticEdges,

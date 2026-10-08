@@ -1,9 +1,0 @@
-id: testing/coverage-is-reachability
-title: Coverage proves reachability
-intent: Coverage shows code ran, not that behavior is right.
-scope: project
-requirement: >-
-  Coverage proves reachability, not quality or completeness. When no red phase
-  is available, coverage SHOULD prove execution without changing production
-  behavior to manufacture failure.
-enforcement: doc

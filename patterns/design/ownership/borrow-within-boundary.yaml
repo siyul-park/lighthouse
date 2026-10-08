@@ -1,6 +1,0 @@
-id: design/borrow-within-boundary
-title: Borrowed values stay within their boundary
-intent: A borrowed value that escapes its owner dangles or aliases.
-scope: symbol
-requirement: Borrowed values MUST NOT cross or outlive their ownership boundary.
-enforcement: judgment

@@ -1,8 +1,0 @@
-id: testing/polling-conditions-are-pure
-title: Polling conditions only observe
-intent: Assertions inside a poll hide whether readiness or behavior failed.
-scope: test
-requirement: >-
-  Polling conditions MUST return readiness and observed results or errors
-  only; assertions belong after readiness is established.
-enforcement: judgment

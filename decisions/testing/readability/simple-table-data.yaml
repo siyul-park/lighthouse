@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/simple-table-data
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: readability
+spec:
+  title: Table data stays simple
+  intent: A table that needs its own logic is no longer a specification.
+  scope:
+    domain: code
+    subject: test
+  requirement: >-
+    Table data and generation code MUST remain simple enough to read as
+    specification.
+  enforcement: judgment

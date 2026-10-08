@@ -1,9 +1,0 @@
-id: testing/polling-outlives-teardown
-title: Polling does not outlive teardown
-intent: Polling that continues after teardown races with released resources.
-scope: test
-requirement: >-
-  Readiness polling MUST NOT outlive teardown or retain resources after the
-  case closes them.
-enforcement: mechanical
-evidence: [test, poller]

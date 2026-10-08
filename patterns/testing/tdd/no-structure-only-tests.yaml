@@ -1,8 +1,0 @@
-id: testing/no-structure-only-tests
-title: No structure-only tests
-intent: Tests of implementation details fail on refactors and prove nothing.
-scope: test
-requirement: >-
-  Structure-only tests MUST NOT be added merely to exercise implementation
-  details.
-enforcement: judgment

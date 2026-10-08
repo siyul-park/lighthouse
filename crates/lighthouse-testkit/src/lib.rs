@@ -1,4 +1,5 @@
-//! Test support: builds the bundled language plugins from source.
+//! Test support: builds the bundled language plugins from source, and writes
+//! the documents tests put in a project.
 
 use std::{
     env, fs,
@@ -8,7 +9,21 @@ use std::{
 };
 
 static LANG_GO: OnceLock<Option<PathBuf>> = OnceLock::new();
+
 static LANG_RUST: OnceLock<PathBuf> = OnceLock::new();
+
+/// The text of a `lighthouse.toml`: a `Project` document around `spec`, the
+/// bare TOML of its `spec` (`plugins`, `[rules]`, ...). It is four lines long,
+/// the spec on one, so that a test that sets a small line limit on its files
+/// does not trip over the configuration. Panics when `spec` is not TOML, so
+/// that a typo in a test fails at once.
+pub fn project(spec: &str) -> String {
+    let spec: toml::Table = toml::from_str(spec).expect("a project spec is TOML");
+    format!(
+        "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Project\"\nmetadata = {{ name = \"test\" }}\nspec = {}\n",
+        inline(&toml::Value::Table(spec))
+    )
+}
 
 /// Directory of the `lang-go` plugin (manifest and binary, the layout
 /// `make plugins` produces), built once per process. `None` after printing a
@@ -18,11 +33,32 @@ static LANG_RUST: OnceLock<PathBuf> = OnceLock::new();
 pub fn lang_go() -> Option<PathBuf> {
     LANG_GO.get_or_init(build_lang_go).clone()
 }
-
 /// Directory of the `lang-rust` plugin (manifest and binary), built once per
 /// process with the cargo that runs the tests; a failing build panics.
 pub fn lang_rust() -> PathBuf {
     LANG_RUST.get_or_init(build_lang_rust).clone()
+}
+
+/// `value` as TOML on one line.
+fn inline(value: &toml::Value) -> String {
+    match value {
+        toml::Value::Table(table) => {
+            let entries: Vec<String> = table
+                .iter()
+                .map(|(key, value)| format!("{} = {}", quoted(key), inline(value)))
+                .collect();
+            format!("{{ {} }}", entries.join(", "))
+        }
+        toml::Value::Array(items) => {
+            let items: Vec<String> = items.iter().map(inline).collect();
+            format!("[{}]", items.join(", "))
+        }
+        scalar => scalar.to_string(),
+    }
+}
+
+fn quoted(key: &str) -> String {
+    toml::Value::String(key.to_owned()).to_string()
 }
 
 fn build_lang_go() -> Option<PathBuf> {

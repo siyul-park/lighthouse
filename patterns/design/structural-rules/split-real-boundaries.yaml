@@ -1,8 +1,0 @@
-id: design/split-real-boundaries
-title: Split real boundaries
-intent: Differences in lifecycle or invariant deserve their own symbol.
-scope: symbol
-requirement: >-
-  Symbols MUST be separated only when responsibility, invariant, ownership,
-  lifecycle, or abstraction level differs.
-enforcement: judgment

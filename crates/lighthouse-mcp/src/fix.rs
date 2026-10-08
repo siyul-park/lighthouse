@@ -9,7 +9,7 @@ use serde_json::json;
 use crate::tools::{Outcome, fail, inside};
 
 #[derive(Deserialize, Default)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct FixArgs {
     #[serde(default)]
     fingerprints: Vec<String>,
@@ -42,7 +42,7 @@ pub fn fix(args: FixArgs) -> Outcome {
     };
     let fixed = lighthouse_session::fix(session, &request).map_err(fail)?;
     Ok(json!({
-        "dry_run": fixed.dry_run,
+        "dryRun": fixed.dry_run,
         "diff": fixed.diff,
         "applied": fixed.applied(),
         "declined": fixed.declined(),

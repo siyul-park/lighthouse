@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-upward-dependency
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: dependency-direction
+spec:
+  title: Depend toward the stable and general
+  intent: "Stable, general code must not break when specific code changes."
+  scope:
+    domain: code
+    subject: module
+  requirement: >-
+    A symbol MUST NOT depend on code that is more specific, more
+    context-dependent, or less stable than itself.
+  enforcement: heuristic
+  evidence: [from, to, from_instability, to_instability]
+  citation: "Martin, Stable Dependencies Principle"

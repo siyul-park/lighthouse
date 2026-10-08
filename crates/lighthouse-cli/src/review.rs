@@ -9,7 +9,7 @@ use lighthouse_session::{Recorded, Reviewer, existing_store, head, project_root,
 use lighthouse_store::{
     Filter, FindingRecord, NewReview, ReviewEvent, Standing, StatusFilter, Store,
 };
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::Result;
 
@@ -19,8 +19,13 @@ const SHORT: usize = 12;
 
 #[derive(Subcommand)]
 pub enum ReviewCommand {
-    /// List the findings the store remembers.
+    /// List the findings that ask for a verdict: those of heuristic and
+    /// judgment decisions, whatever their severity.
     List {
+        /// Also list findings that do not ask for a verdict (mechanical
+        /// decisions).
+        #[arg(long)]
+        all: bool,
         /// Only this fully qualified rule id.
         #[arg(long)]
         rule: Option<String>,
@@ -47,7 +52,7 @@ pub enum ReviewCommand {
     /// rejected (false-positive, intentional-exception, scope-too-broad,
     /// project-allowed, not-worth-fixing) keeps the finding out of later
     /// reports while its rule and evidence stay as they are; mechanical
-    /// findings (severity error) are recorded but never suppressed. deferred
+    /// findings (decided by their check, at any severity) are recorded but never suppressed. deferred
     /// (no reason) leaves it visible. Verdicts are appended to
     /// .lighthouse/decisions.jsonl, which is meant to be committed, and never
     /// edited: a later one replaces the standing of the finding.
@@ -110,11 +115,18 @@ pub fn run(command: ReviewCommand) -> Result<u8> {
     let root = project_root()?;
     match command {
         ReviewCommand::List {
+            all,
             rule,
             status,
             format,
         } => match Store::open_existing(&root)? {
-            Some(store) => list(&store, rule, status, format),
+            Some(store) => {
+                store
+                    .notices()
+                    .iter()
+                    .for_each(|n| eprintln!("lighthouse: {n}"));
+                list(&store, rule, status, all, format)
+            }
             None => {
                 eprintln!("lighthouse: no findings recorded yet (run `lighthouse check`)");
                 Ok(0)
@@ -155,7 +167,13 @@ pub fn run(command: ReviewCommand) -> Result<u8> {
     }
 }
 
-fn list(store: &Store, rule: Option<String>, status: Status, format: Format) -> Result<u8> {
+fn list(
+    store: &Store,
+    rule: Option<String>,
+    status: Status,
+    all: bool,
+    format: Format,
+) -> Result<u8> {
     let status = match status {
         Status::Open => StatusFilter::Open,
         Status::Suppressed => StatusFilter::Suppressed,
@@ -164,10 +182,11 @@ fn list(store: &Store, rule: Option<String>, status: Status, format: Format) -> 
         Status::Resolved => StatusFilter::Resolved,
         Status::All => StatusFilter::All,
     };
-    for finding in store.list(&Filter { rule, status })? {
+    let findings = store.list(&Filter { rule, status })?;
+    for finding in findings.iter().filter(|f| all || f.needs_verdict()) {
         match format {
-            Format::Text => println!("{}", row(&finding)),
-            Format::Json => println!("{}", serde_json::to_string(&finding)?),
+            Format::Text => println!("{}", row(finding)),
+            Format::Json => println!("{}", serde_json::to_string(finding)?),
         }
     }
     Ok(0)
@@ -190,7 +209,7 @@ fn history(store: &Store, fingerprint: &str, format: Format) -> Result<u8> {
     for event in events {
         match format {
             Format::Text => println!("{}", event_row(&event)),
-            Format::Json => println!("{}", event_json(&event)?),
+            Format::Json => println!("{}", event.to_json()),
         }
     }
     Ok(0)
@@ -321,12 +340,6 @@ fn event_row(event: &ReviewEvent) -> String {
         event.label(),
         event.reason_text.as_deref().unwrap_or("")
     )
-}
-
-fn event_json(event: &ReviewEvent) -> Result<Value> {
-    let mut value = serde_json::to_value(event)?;
-    value["label"] = json!(event.label());
-    Ok(value)
 }
 
 fn line(locator: &Value) -> u64 {

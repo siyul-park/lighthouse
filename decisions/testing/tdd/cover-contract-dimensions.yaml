@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/cover-contract-dimensions
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: tdd
+spec:
+  title: Cover every contract dimension
+  intent: Untested failure and boundary behavior is unspecified behavior.
+  scope:
+    domain: code
+    subject: test
+  requirement: >-
+    Tests MUST cover applicable success, failure, boundaries, ownership and
+    lifecycle, compatibility, parity, and architecture contracts.
+  enforcement: judgment

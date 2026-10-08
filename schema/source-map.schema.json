@@ -1,0 +1,111 @@
+{
+  "$defs": {
+    "Metadata": {
+      "additionalProperties": false,
+      "description": "Who a resource is. Identity is `name`; grouping is by label, never by\nwhere the document is stored.",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Free notes; never used to select.",
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Selectable facts, keyed `lighthouse/<name>`.",
+          "type": "object"
+        },
+        "name": {
+          "description": "Fully qualified name, such as `design/minimal-names`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "description": "One normative line of a source document and where it went.",
+      "properties": {
+        "decisions": {
+          "description": "Ids of the decisions that cover the line.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "omitted": {
+          "description": "Why no decision covers this line.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ref": {
+          "description": "`<doc>#<heading-slug>-<content hash>`; moving or reordering a bullet\nkeeps its ref, rewording it changes the ref.",
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "text"
+      ],
+      "type": "object"
+    },
+    "SourceMapSpec": {
+      "additionalProperties": false,
+      "description": "The spec of the `SourceMap` kind: the normative lines of the documents a\ncatalog was written from, and which decision covers each.",
+      "properties": {
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "sources"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/source-map.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "lighthouse/v1alpha1"
+    },
+    "kind": {
+      "const": "SourceMap"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "spec": {
+      "$ref": "#/$defs/SourceMapSpec"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "title": "SourceMap",
+  "type": "object"
+}

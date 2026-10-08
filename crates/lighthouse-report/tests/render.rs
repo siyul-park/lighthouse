@@ -1,5 +1,6 @@
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Position, Severity, Span};
-use lighthouse_report::{Format, render};
+use lighthouse_report::{Briefing, Format, render, render_with};
+use lighthouse_spec::Catalog;
 use serde_json::json;
 
 fn span(line: u32, col: u32, end_line: u32) -> Span {
@@ -107,5 +108,72 @@ fn sarif_marks_the_invocation_unsuccessful_with_notifications() {
     assert_eq!(
         complete["runs"][0]["invocations"][0]["executionSuccessful"],
         true
+    );
+}
+
+fn at(severity: Severity) -> Diagnostic {
+    Diagnostic::new(
+        "core/max-file-lines",
+        severity,
+        "m",
+        "a.txt",
+        span(1, 1, 1),
+        Fingerprint::of("core/max-file-lines", "a.txt", &format!("{severity}")),
+    )
+}
+
+#[test]
+fn sarif_maps_severities_one_to_one() {
+    let findings = [at(Severity::Error), at(Severity::Warn), at(Severity::Info)];
+
+    let sarif: serde_json::Value =
+        serde_json::from_str(&render(Format::Sarif, &findings, &[])).unwrap();
+
+    let levels: Vec<&str> = sarif["runs"][0]["results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["level"].as_str().unwrap())
+        .collect();
+    assert_eq!(levels, ["error", "warning", "note"]);
+}
+
+#[test]
+fn sarif_describes_a_rule_by_the_decision_it_cites_and_links_its_docs() {
+    let findings = fixture();
+    let briefing = Briefing {
+        catalog: Some(Catalog::bundled()),
+        ..Briefing::default()
+    };
+
+    let sarif: serde_json::Value =
+        serde_json::from_str(&render_with(Format::Sarif, &findings, &[], &briefing)).unwrap();
+
+    let rules = sarif["runs"][0]["tool"]["driver"]["rules"]
+        .as_array()
+        .unwrap();
+    assert_eq!(rules[0]["id"], "core/max-file-lines");
+    assert_eq!(
+        rules[0]["shortDescription"]["text"],
+        "Files stay below a line limit"
+    );
+    assert_eq!(rules[0]["defaultConfiguration"]["level"], "warning");
+    assert_eq!(rules[0]["properties"]["enforcement"], "heuristic");
+    assert_eq!(
+        rules[0]["helpUri"],
+        "https://github.com/siyul-park/lighthouse/blob/main/docs/decisions/core.md#files-stay-below-a-line-limit"
+    );
+    assert_eq!(rules[1]["id"], "demo/boom");
+    assert!(
+        rules[1].get("helpUri").is_none(),
+        "a rule without a decision has no page"
+    );
+    let results = sarif["runs"][0]["results"].as_array().unwrap();
+    assert_eq!(results[0]["ruleIndex"], 0);
+    assert_eq!(results[1]["ruleIndex"], 1);
+    assert!(
+        results[0]["partialFingerprints"]["lighthouse/v1"]
+            .as_str()
+            .is_some_and(|f| f.len() == 64)
     );
 }

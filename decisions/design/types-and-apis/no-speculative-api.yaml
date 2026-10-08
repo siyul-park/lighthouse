@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-speculative-api
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: types-and-apis
+spec:
+  title: No speculative API surface
+  intent: Every public knob has to be supported forever.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Generic parameter-group types, speculative options, extension points,
+    aliases, and pass-through wrappers MUST NOT be exposed without a distinct
+    contract.
+  enforcement: judgment

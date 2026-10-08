@@ -2,7 +2,7 @@
 
 use lighthouse_model::{Reason, ReviewerKind, Verdict};
 use lighthouse_session::{existing_store, head, project_root, record_verdict};
-use lighthouse_store::{Filter, FindingRecord, NewReview, StatusFilter, Store};
+use lighthouse_store::{Filter, FindingRecord, NewReview, ReviewEvent, StatusFilter, Store};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -62,7 +62,7 @@ pub fn tasks(args: TasksArgs) -> Outcome {
         .map_err(fail)?;
     let wanted: Vec<&FindingRecord> = found
         .iter()
-        .filter(|f| all_tiers || f.severity == "review")
+        .filter(|f| all_tiers || f.needs_verdict())
         .collect();
     let limit = args.limit.unwrap_or(DEFAULT_TASKS);
     let tasks: Vec<Value> = wanted.iter().take(limit).map(|f| task(f)).collect();
@@ -103,7 +103,7 @@ pub fn resolve(args: ResolveArgs, reviewer: &str) -> Outcome {
         },
         "standing": recorded.standing,
         "warnings": recorded.warnings,
-        "catalog_error": recorded.catalog_error,
+        "catalogError": recorded.catalog_error,
     }))
 }
 
@@ -111,14 +111,7 @@ pub fn history(args: HistoryArgs) -> Outcome {
     let root = project_root().map_err(fail)?;
     let store = existing_store(&root).map_err(fail)?;
     let events = store.history(&args.fingerprint).map_err(fail)?;
-    let events: Vec<Value> = events
-        .iter()
-        .map(|event| {
-            let mut value = serde_json::to_value(event).unwrap_or(Value::Null);
-            value["label"] = json!(event.label());
-            value
-        })
-        .collect();
+    let events: Vec<Value> = events.iter().map(ReviewEvent::to_json).collect();
     Ok(json!({ "fingerprint": args.fingerprint, "events": events }))
 }
 
@@ -133,7 +126,7 @@ fn task(f: &FindingRecord) -> Value {
         "symbol": f.symbol,
         "message": f.message,
         "evidence": f.evidence,
-        "last_seen": f.last_seen,
+        "lastSeen": f.last_seen,
         "review": f.review.map(|r| json!({ "verdict": r.verdict.to_string(), "reason": r.reason.to_string() })),
     })
 }

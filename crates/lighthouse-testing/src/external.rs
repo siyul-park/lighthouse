@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use lighthouse_model::{Diagnostic, Symbol, SymbolId, Visibility};
 use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
-use lighthouse_spec::PatternRule;
+use lighthouse_spec::DecisionRule;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -14,7 +14,7 @@ const ID: &str = "testing/external-test-package";
 struct NoOptions {}
 
 pub(crate) fn rule() -> Box<dyn Rule> {
-    Box::new(PatternRule::new(ID, &[], check))
+    Box::new(DecisionRule::new(ID, &[], check))
 }
 
 /// A test file that lives in the package it tests, inside its private scope,

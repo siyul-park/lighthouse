@@ -107,7 +107,7 @@ separators, sorted. The request is project-level: one call carries the whole
 batch and the provider decides which packages, modules or build units it must
 load to analyze them, reading files from disk. Analysis scope is never
 narrowed to the files a user asked to see; reporting is the host's concern.
-`context.options` holds the `[languages.<id>]` tables of `lighthouse.toml`
+`context.options` holds the `spec.languages.<id>` tables of `lighthouse.toml`
 for every language, as JSON; a provider reads its own entry and MUST reject
 unknown keys in it (as an `incomplete` entry, see below).
 
@@ -277,20 +277,38 @@ or references, in order of first use).
 
 ## Discovery
 
-A plugin directory holds `lighthouse-plugin.toml` and the executable:
+A plugin directory holds `lighthouse-plugin.toml` (or `.yaml` or `.json`: any
+format reads the same document) and the executable. The manifest is a `Plugin`
+resource, described by `schema/plugin.schema.json`:
 
 ```toml
-id = "lang-go"
+apiVersion = "lighthouse/v1alpha1"
+kind = "Plugin"
+
+[metadata]
+name = "lang-go"            # must equal the id the process reports
+
+[spec]
 version = "0.1.0"
-command = "./lang-go"   # relative path: next to the manifest; bare name: PATH
+
+[spec.runtime]
+command = "./lang-go"       # relative path: next to the manifest; bare name: PATH
 args = []
+
+[spec.provides]             # optional
+languages = ["go"]          # checked against what the process reports
 ```
+
+`provides` also lists `decisions` (catalog directories), `orderKeys`,
+`embedders` and `fixOps`, so tools can see a plugin's contributions without
+starting it; only `languages` is checked today. A manifest from before the
+resource model is rewritten by `lighthouse spec migrate`.
 
 Only plugins listed in `lighthouse.toml` are started. Manifests that do not parse are ignored (with a notice) unless the directory
 is named after a listed id. A bare id is looked up in
 `./.lighthouse/plugins/*/`, `~/.lighthouse/plugins/*/` and `<executable
 dir>/plugins/*/`; an entry `{ id = "lang-go", path = "plugins/lang-go",
-timeout = 120 }` names the directory itself (relative to the config) and is how
+timeout = "120s" }` names the directory itself (relative to the config) and is how
 a development checkout is used. The same id in more than one place, an in-process
 plugin included, is an error: there is no shadowing.
 

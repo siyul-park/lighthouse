@@ -1,6 +1,6 @@
 use lighthouse_model::{Diagnostic, Options};
 use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest, Scope};
-use lighthouse_spec::PatternRule;
+use lighthouse_spec::DecisionRule;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -18,8 +18,8 @@ fn options(value: serde_json::Value) -> Options {
 }
 
 #[test]
-fn pattern_rule() {
-    let rule = PatternRule::new(ID, &[], no_findings);
+fn decision_rule() {
+    let rule = DecisionRule::new(ID, &[], no_findings);
     assert_eq!(rule.manifest().id, ID);
     assert_eq!(rule.manifest().scope, Scope::File);
     assert!(rule.validate(&options(json!({}))).is_ok());
@@ -29,9 +29,9 @@ fn pattern_rule() {
 }
 
 #[test]
-fn pattern_rule_new() {
-    let rule = PatternRule::new(ID, &["lines", "tokens"], no_findings);
+fn decision_rule_new() {
+    let rule = DecisionRule::new(ID, &["lines", "tokens"], no_findings);
     assert_eq!(rule.manifest().analyzers, ["lines", "tokens"]);
-    let missing = std::panic::catch_unwind(|| PatternRule::new("core/absent", &[], no_findings));
+    let missing = std::panic::catch_unwind(|| DecisionRule::new("core/absent", &[], no_findings));
     assert!(missing.is_err());
 }

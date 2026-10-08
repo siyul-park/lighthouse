@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/explicit-shutdown
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: concurrency
+spec:
+  title: Long-lived tasks can be stopped
+  intent: A task nobody can stop leaks and blocks shutdown.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: Long-lived concurrent tasks MUST have an explicit shutdown path.
+  enforcement: heuristic
+  evidence: [task, spawned_at]
+  languages:
+    go:
+      tuning: Applies to goroutines.

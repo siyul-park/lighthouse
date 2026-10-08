@@ -44,6 +44,7 @@ lighthouse-plugin = { path = "crates/lighthouse-plugin" }
 lighthouse-process = { path = "crates/lighthouse-process" }
 lighthouse-protocol = { path = "crates/lighthouse-protocol" }
 lighthouse-report = { path = "crates/lighthouse-report" }
+lighthouse-resource = { path = "crates/lighthouse-resource" }
 lighthouse-rpc = { path = "crates/lighthouse-rpc" }
 lighthouse-session = { path = "crates/lighthouse-session" }
 lighthouse-spec = { path = "crates/lighthouse-spec" }

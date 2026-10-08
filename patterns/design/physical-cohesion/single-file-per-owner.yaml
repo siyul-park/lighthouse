@@ -1,9 +1,0 @@
-id: design/single-file-per-owner
-title: One owner, one file
-intent: A reader finds an owner and everything it owns in one place.
-scope: symbol
-requirement: Symbols with one owner and cohesive responsibility MUST share a file.
-enforcement: mechanical
-evidence: [owner, files]
-tuning:
-  go: All methods of a receiver type stay in one file.

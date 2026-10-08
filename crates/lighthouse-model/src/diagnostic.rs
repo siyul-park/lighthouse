@@ -1,5 +1,6 @@
 use std::{fmt, path::PathBuf, str::FromStr};
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -7,22 +8,25 @@ use thiserror::Error;
 
 use crate::Span;
 
-/// How a finding is acted on; serialized and parsed as the lowercase variant name.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+/// How hard a finding fails a run; serialized and parsed as the lowercase
+/// variant name. Whether a finding also asks for a verdict is not a level: it
+/// follows from how its decision is enforced.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
-    /// Mechanical violation.
+    /// Fails the run.
     Error,
-    /// Heuristic signal.
+    /// Fails the run only under `--strict` or past `--max-warnings`.
     Warn,
-    /// Delegated to an agent or human with evidence.
-    Review,
+    /// Reported, never fails the run.
     Info,
 }
 
 /// The text given to [`Severity::from_str`] names no severity.
 #[derive(Debug, Error)]
-#[error("unknown severity `{0}` (expected error, warn, review or info)")]
+#[error("unknown severity `{0}` (expected error, warn or info)")]
 pub struct UnknownSeverity(pub String);
 
 impl FromStr for Severity {
@@ -32,7 +36,6 @@ impl FromStr for Severity {
         match s {
             "error" => Ok(Self::Error),
             "warn" => Ok(Self::Warn),
-            "review" => Ok(Self::Review),
             "info" => Ok(Self::Info),
             _ => Err(UnknownSeverity(s.to_owned())),
         }
@@ -44,7 +47,6 @@ impl fmt::Display for Severity {
         f.write_str(match self {
             Self::Error => "error",
             Self::Warn => "warn",
-            Self::Review => "review",
             Self::Info => "info",
         })
     }
@@ -104,6 +106,7 @@ impl Fingerprint {
 /// One finding: where a rule found a violation and how to tell it apart from
 /// the same finding in another run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Diagnostic {
     pub rule_id: String,
     pub severity: Severity,

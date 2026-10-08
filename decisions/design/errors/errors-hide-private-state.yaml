@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/errors-hide-private-state
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: errors
+spec:
+  title: Errors do not leak state
+  intent: Error text and values are part of the public contract.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: Errors MUST NOT expose private or sensitive process state.
+  enforcement: judgment

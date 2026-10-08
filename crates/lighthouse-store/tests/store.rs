@@ -1,77 +1,14 @@
-use std::{fs, path::Path, thread};
+mod support;
 
-use lighthouse_model::{
-    Diagnostic, Fingerprint, Label, Position, Reason, ReviewerKind, Severity, Span, Verdict,
-};
+use std::{fs, thread};
+
+use lighthouse_model::{Diagnostic, Fingerprint, Label, Position, Reason, Severity, Span, Verdict};
 use lighthouse_store::{
-    Error, Filter, NewReview, Observed, Run, RunSummary, Stamp, Standing, State, StatusFilter,
-    Store, Unchecked,
+    Error, Filter, Observed, Run, RunSummary, Standing, State, StatusFilter, Store, Unchecked,
 };
 use rusqlite::Connection;
 use serde_json::json;
-use tempfile::TempDir;
-
-fn observed(fingerprint: &str, rule: &str, path: &str) -> Observed {
-    Observed {
-        fingerprint: fingerprint.to_owned(),
-        rule_id: rule.to_owned(),
-        severity: Severity::Review,
-        tier: "judgment".to_owned(),
-        path: path.to_owned(),
-        locator: json!({ "span": { "start": { "line": 1 } } }),
-        symbol: Some(format!("m::{fingerprint}#function")),
-        message: format!("message of {fingerprint}"),
-        evidence: json!({ "fan_out": 14 }),
-        facts: json!({ "language": "go", "callers": 2 }),
-        options: json!({ "max": 3 }),
-        rule_version: Some("sem1".to_owned()),
-        pattern_hash: Some("full1".to_owned()),
-    }
-}
-
-fn run(observed: Vec<Observed>) -> Run {
-    Run {
-        observed,
-        reported: vec![String::new()],
-        rules: vec!["design/a".to_owned(), "design/b".to_owned()],
-        configured: vec!["design/a".to_owned(), "design/b".to_owned()],
-        unchecked: Unchecked::Nothing,
-        commit: Some("abc123".to_owned()),
-        dirty: true,
-        catalog_version: Some("cat1".to_owned()),
-        lighthouse_version: "0.1.0".to_owned(),
-    }
-}
-
-fn review(fingerprint: &str, verdict: Verdict, reason: Reason) -> NewReview {
-    NewReview {
-        fingerprint: fingerprint.to_owned(),
-        verdict,
-        reason,
-        reason_text: None,
-        reviewer_kind: ReviewerKind::Agent,
-        reviewer_id: Some("claude".to_owned()),
-        commit: Some("def456".to_owned()),
-        expect_seen: None,
-        lighthouse_version: "0.1.0".to_owned(),
-    }
-}
-
-fn stamp(version: &str) -> impl Fn(&lighthouse_store::FindingRecord) -> Stamp + '_ {
-    move |_| Stamp {
-        rule_version: Some(version.to_owned()),
-        pattern_hash: Some("full1".to_owned()),
-        catalog_version: Some("cat1".to_owned()),
-        scope: Some("symbol".to_owned()),
-    }
-}
-
-/// Records a verdict stamped with the rule version `sem1`.
-fn judge(store: &mut Store, fingerprint: &str, verdict: Verdict, reason: Reason) {
-    store
-        .resolve(&review(fingerprint, verdict, reason), stamp("sem1"))
-        .unwrap();
-}
+use support::*;
 
 fn all() -> Filter {
     Filter {
@@ -84,12 +21,6 @@ fn status(status: StatusFilter) -> Filter {
     Filter { rule: None, status }
 }
 
-fn memory_with(findings: &[Observed]) -> Store {
-    let mut store = Store::open_in_memory().unwrap();
-    store.record(&run(findings.to_vec())).unwrap();
-    store
-}
-
 fn fingerprints(store: &Store, filter: &Filter) -> Vec<String> {
     store
         .list(filter)
@@ -97,14 +28,6 @@ fn fingerprints(store: &Store, filter: &Filter) -> Vec<String> {
         .into_iter()
         .map(|f| f.fingerprint)
         .collect()
-}
-
-fn standing_of(store: &Store, fingerprint: &str) -> Option<Standing> {
-    store
-        .standings()
-        .unwrap()
-        .get(fingerprint)
-        .map(|j| j.standing)
 }
 
 #[test]
@@ -115,10 +38,10 @@ fn store_opens_a_migrated_cache_and_refuses_a_newer_one() {
     assert!(Store::open_existing(dir.path()).unwrap().is_none());
 
     let first = Store::open(dir.path()).unwrap();
-    assert_eq!(first.schema_version().unwrap(), 3);
+    assert_eq!(first.schema_version().unwrap(), 5);
     drop(first);
     let again = Store::open_existing(dir.path()).unwrap().unwrap();
-    assert_eq!(again.schema_version().unwrap(), 3);
+    assert_eq!(again.schema_version().unwrap(), 5);
     drop(again);
 
     Connection::open(Store::path_in(dir.path()))
@@ -130,7 +53,7 @@ fn store_opens_a_migrated_cache_and_refuses_a_newer_one() {
         error,
         Error::NewerSchema {
             found: 99,
-            supported: 3
+            supported: 5
         }
     ));
 }
@@ -164,7 +87,7 @@ fn processes_opening_a_fresh_cache_together_all_succeed() {
         })
         .collect();
     for handle in handles {
-        assert_eq!(handle.join().unwrap(), 3);
+        assert_eq!(handle.join().unwrap(), 5);
     }
 }
 
@@ -369,7 +292,7 @@ fn resolve_freezes_the_finding_as_it_was_last_seen() {
     assert_eq!(event.fingerprint, "f1");
     assert_eq!(event.rule_id, "design/a");
     assert_eq!(event.rule_version.as_deref(), Some("sem1"));
-    assert_eq!(event.pattern_hash.as_deref(), Some("full1"));
+    assert_eq!(event.decision_hash.as_deref(), Some("full1"));
     assert_eq!(event.catalog_version.as_deref(), Some("cat1"));
     assert_eq!(event.lighthouse_version.as_deref(), Some("0.1.0"));
     assert_eq!(event.language.as_deref(), Some("go"));
@@ -381,18 +304,18 @@ fn resolve_freezes_the_finding_as_it_was_last_seen() {
     assert_eq!(resolved.finding.fingerprint, "f1");
 
     let snapshot = &event.snapshot;
-    assert_eq!(snapshot["v"], 1);
+    assert_eq!(snapshot["v"], 2);
     assert_eq!(snapshot["evidence"]["fan_out"], 14);
     assert_eq!(event.evidence()["fan_out"], 14);
     assert_eq!(snapshot["facts"]["callers"], 2);
     assert_eq!(snapshot["options"]["max"], 3);
-    assert_eq!(snapshot["severity"], "review");
+    assert_eq!(snapshot["severity"], "info");
     assert_eq!(snapshot["tier"], "judgment");
-    assert_eq!(snapshot["seen_at"], resolved.finding.last_seen);
+    assert_eq!(snapshot["seenAt"], resolved.finding.last_seen);
     assert_eq!(snapshot["commit"], "abc123");
     assert_eq!(snapshot["dirty"], true);
-    assert_eq!(snapshot["lighthouse_version"], "0.1.0");
-    assert!(snapshot["pattern_fingerprint"].is_null());
+    assert_eq!(snapshot["lighthouseVersion"], "0.1.0");
+    assert!(snapshot["patternFingerprint"].is_null());
 
     let mut changed = observed("f1", "design/a", "a.go");
     changed.facts = json!({ "language": "go", "callers": 50 });
@@ -564,9 +487,21 @@ fn evidence_that_only_reflows_does_not_expire_a_verdict() {
 }
 
 #[test]
-fn mechanical_findings_are_never_suppressed_by_a_verdict() {
+fn a_verdict_suppresses_by_the_tier_of_the_finding_not_by_its_severity() {
     let mut error = observed("f1", "design/a", "a.go");
     error.severity = Severity::Error;
+    error.tier = "heuristic".to_owned();
+    let mut store = memory_with(&[error]);
+    judge(&mut store, "f1", Verdict::Rejected, Reason::FalsePositive);
+    assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
+    assert!(store.finding("f1").unwrap().needs_verdict());
+}
+
+#[test]
+fn mechanical_findings_are_never_suppressed_by_a_verdict() {
+    let mut error = observed("f1", "design/a", "a.go");
+    error.severity = Severity::Warn;
+    error.tier = "mechanical".to_owned();
     let mut store = memory_with(&[error]);
     judge(
         &mut store,
@@ -702,173 +637,6 @@ fn observed_records_a_diagnostic_and_digests_its_evidence() {
     assert_ne!(spaced.evidence_digest(), record.evidence_digest());
 }
 
-/// A project root that has recorded `findings` and judged each one in `rejected`.
-fn clone_with(findings: &[Observed], rejected: &[(&str, Reason)]) -> TempDir {
-    let dir = tempfile::tempdir().unwrap();
-    let mut store = Store::open(dir.path()).unwrap();
-    store.record(&run(findings.to_vec())).unwrap();
-    for (fingerprint, reason) in rejected {
-        judge(&mut store, fingerprint, Verdict::Rejected, *reason);
-    }
-    dir
-}
-
-fn log_of(dir: &Path) -> String {
-    fs::read_to_string(Store::log_path_in(dir)).unwrap_or_default()
-}
-
-#[test]
-fn a_decision_log_carries_suppression_to_another_clone() {
-    let findings = [
-        observed("f1", "design/a", "a.go"),
-        observed("f2", "design/a", "b.go"),
-    ];
-    let author = clone_with(&findings, &[("f1", Reason::IntentionalException)]);
-    assert_eq!(log_of(author.path()).lines().count(), 1);
-
-    let teammate = tempfile::tempdir().unwrap();
-    fs::create_dir_all(teammate.path().join(".lighthouse")).unwrap();
-    fs::write(Store::log_path_in(teammate.path()), log_of(author.path())).unwrap();
-    let mut store = Store::open_existing(teammate.path()).unwrap().unwrap();
-    store.record(&run(findings.to_vec())).unwrap();
-    assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
-    assert_eq!(standing_of(&store, "f2"), None);
-    let history = store.history("f1").unwrap();
-    assert_eq!(history[0].reason, Reason::IntentionalException);
-    assert_eq!(history[0].reviewer_id.as_deref(), Some("claude"));
-}
-
-#[test]
-fn a_verdict_is_logged_before_the_cache_and_the_cache_is_rebuilt_from_the_log() {
-    let findings = [observed("f1", "design/a", "a.go")];
-    let dir = clone_with(&findings, &[("f1", Reason::FalsePositive)]);
-    drop(Store::open(dir.path()).unwrap());
-    fs::remove_file(Store::path_in(dir.path())).unwrap();
-    for suffix in ["-wal", "-shm"] {
-        let _ = fs::remove_file(format!("{}{suffix}", Store::path_in(dir.path()).display()));
-    }
-    let mut rebuilt = Store::open(dir.path()).unwrap();
-    assert_eq!(rebuilt.history("f1").unwrap().len(), 1);
-    rebuilt.record(&run(findings.to_vec())).unwrap();
-    assert_eq!(standing_of(&rebuilt, "f1"), Some(Standing::Suppressed));
-}
-
-#[test]
-fn concatenated_logs_apply_every_decision_once() {
-    let findings = [
-        observed("f1", "design/a", "a.go"),
-        observed("f2", "design/a", "b.go"),
-    ];
-    let one = clone_with(&findings, &[("f1", Reason::FalsePositive)]);
-    let two = clone_with(&findings, &[("f2", Reason::ProjectAllowed)]);
-    let merged = tempfile::tempdir().unwrap();
-    fs::create_dir_all(merged.path().join(".lighthouse")).unwrap();
-    let union = format!(
-        "{}{}{}",
-        log_of(one.path()),
-        log_of(two.path()),
-        log_of(one.path())
-    );
-    fs::write(Store::log_path_in(merged.path()), union).unwrap();
-
-    let mut store = Store::open(merged.path()).unwrap();
-    store.record(&run(findings.to_vec())).unwrap();
-    assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
-    assert_eq!(standing_of(&store, "f2"), Some(Standing::Suppressed));
-    assert_eq!(
-        store.history("f1").unwrap().len(),
-        1,
-        "the duplicate line is one event"
-    );
-    assert_eq!(store.history("f2").unwrap().len(), 1);
-    drop(store);
-    assert_eq!(
-        log_of(merged.path()).lines().count(),
-        3,
-        "the log is left as merged"
-    );
-}
-
-#[test]
-fn log_lines_are_canonical_and_unchanged_by_reading() {
-    let dir = clone_with(
-        &[observed("f1", "design/a", "a.go")],
-        &[("f1", Reason::FalsePositive)],
-    );
-    let log = log_of(dir.path());
-    let line = log.lines().next().unwrap();
-    let value: serde_json::Value = serde_json::from_str(line).unwrap();
-    let keys: Vec<&String> = value.as_object().unwrap().keys().collect();
-    let mut sorted = keys.clone();
-    sorted.sort();
-    assert_eq!(keys, sorted, "keys are sorted");
-    assert!(line.starts_with("{\"catalog_version\":"), "{line}");
-    assert!(
-        !line.contains(": ") && !line.contains(", "),
-        "compact: {line}"
-    );
-    drop(Store::open(dir.path()).unwrap());
-    assert_eq!(log_of(dir.path()), log);
-}
-
-#[test]
-fn an_unreadable_or_altered_log_line_is_an_error_naming_the_line() {
-    let dir = clone_with(
-        &[observed("f1", "design/a", "a.go")],
-        &[("f1", Reason::FalsePositive)],
-    );
-    let log = log_of(dir.path());
-    let path = Store::log_path_in(dir.path());
-
-    fs::write(&path, format!("{log}not json\n")).unwrap();
-    let error = Store::open(dir.path()).err().unwrap();
-    assert!(matches!(error, Error::Log { line: 2, .. }), "{error}");
-
-    fs::write(
-        &path,
-        log.replace(
-            "\"reason\":\"false-positive\"",
-            "\"reason\":\"project-allowed\"",
-        ),
-    )
-    .unwrap();
-    let error = Store::open(dir.path()).err().unwrap();
-    assert!(
-        error.to_string().contains("the id does not match"),
-        "{error}"
-    );
-
-    let bad_pair = log.replace("\"verdict\":\"rejected\"", "\"verdict\":\"confirmed\"");
-    fs::write(&path, bad_pair).unwrap();
-    assert!(Store::open(dir.path()).is_err());
-}
-
-#[test]
-fn an_append_after_a_line_without_a_newline_starts_a_new_line() {
-    let dir = clone_with(
-        &[observed("f1", "design/a", "a.go")],
-        &[("f1", Reason::FalsePositive)],
-    );
-    let path = Store::log_path_in(dir.path());
-    let log = log_of(dir.path());
-    fs::write(&path, log.trim_end()).unwrap();
-    let mut store = Store::open(dir.path()).unwrap();
-    store
-        .record(&run(vec![observed("f1", "design/a", "a.go")]))
-        .unwrap();
-    judge(&mut store, "f1", Verdict::Deferred, Reason::Unspecified);
-    assert_eq!(log_of(dir.path()).lines().count(), 2);
-    drop(store);
-    assert_eq!(
-        Store::open(dir.path())
-            .unwrap()
-            .history("f1")
-            .unwrap()
-            .len(),
-        2
-    );
-}
-
 /// The schema of version 1, as the first release wrote it.
 const V1_SCHEMA: &str = "
 CREATE TABLE findings (
@@ -928,11 +696,11 @@ fn migration_rewrites_the_append_only_table_and_exports_old_verdicts_to_the_log(
     }
 
     let mut store = Store::open(dir.path()).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 3);
+    assert_eq!(store.schema_version().unwrap(), 5);
     let history = store.history("f1").unwrap();
     assert_eq!(history.len(), 1);
     assert!(history[0].id.starts_with("legacy-"));
-    assert_eq!(history[0].pattern_hash.as_deref(), Some("pattern-hash"));
+    assert_eq!(history[0].decision_hash.as_deref(), Some("pattern-hash"));
     assert_eq!(history[0].rule_version, None);
     assert_eq!(history[0].evidence()["n"], 1);
     assert_eq!(log_of(dir.path()).lines().count(), 1, "exported once");
@@ -981,4 +749,49 @@ fn as_str_names_each_standing() {
     for (standing, name) in names {
         assert_eq!(standing.as_str(), name);
     }
+}
+
+#[test]
+fn a_verdict_recorded_under_the_semantic_version_of_before_still_applies_while_the_decision_is_unchanged()
+ {
+    let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
+    judge(
+        &mut store,
+        "f1",
+        Verdict::Rejected,
+        Reason::IntentionalException,
+    );
+    assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
+
+    // The decision is now identified by a new hash, and remembers the old one.
+    let mut migrated = observed("f1", "design/a", "a.go");
+    migrated.rule_version = Some("sem-new".to_owned());
+    migrated.legacy_rule_version = Some("sem1".to_owned());
+    store.record(&run(vec![migrated])).unwrap();
+    assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
+
+    // Once the decision changes, the old verdict goes with its old hash.
+    let mut edited = observed("f1", "design/a", "a.go");
+    edited.rule_version = Some("sem-newer".to_owned());
+    edited.legacy_rule_version = Some("sem-edited".to_owned());
+    store.record(&run(vec![edited])).unwrap();
+    assert_eq!(standing_of(&store, "f1"), Some(Standing::RuleChanged));
+}
+
+#[test]
+fn a_finding_asks_for_a_verdict_when_its_decision_is_not_mechanical() {
+    let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
+    let tier = |store: &Store| store.finding("f1").unwrap();
+    assert!(tier(&store).needs_verdict(), "tier judgment");
+
+    let mut mechanical = observed("f1", "design/a", "a.go");
+    mechanical.tier = "mechanical".to_owned();
+    store.record(&run(vec![mechanical])).unwrap();
+    assert!(!tier(&store).needs_verdict());
+
+    let mut heuristic = observed("f1", "design/a", "a.go");
+    heuristic.tier = "heuristic".to_owned();
+    heuristic.severity = Severity::Error;
+    store.record(&run(vec![heuristic])).unwrap();
+    assert!(tier(&store).needs_verdict(), "whatever the severity");
 }

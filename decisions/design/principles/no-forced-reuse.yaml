@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-forced-reuse
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: principles
+spec:
+  title: No reuse by merging unrelated roles
+  intent: >-
+    Reuse bought by merging unrelated roles couples things that change for
+    different reasons.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: Unrelated roles MUST NOT be combined merely to force reuse.
+  enforcement: judgment

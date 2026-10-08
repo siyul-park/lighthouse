@@ -31,15 +31,11 @@ fn fingerprint_is_hex_sha256() {
 
 #[test]
 fn severity_round_trips_through_text() {
-    for s in [
-        Severity::Error,
-        Severity::Warn,
-        Severity::Review,
-        Severity::Info,
-    ] {
+    for s in [Severity::Error, Severity::Warn, Severity::Info] {
         assert_eq!(s.to_string().parse::<Severity>().unwrap(), s);
     }
     assert!("fatal".parse::<Severity>().is_err());
+    assert!("review".parse::<Severity>().is_err());
 }
 
 #[test]

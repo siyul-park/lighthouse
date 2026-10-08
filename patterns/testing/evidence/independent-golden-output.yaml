@@ -1,9 +1,0 @@
-id: testing/independent-golden-output
-title: Golden output is independent
-intent: Golden output produced by the implementation only proves it is stable.
-scope: test
-requirement: >-
-  Golden tests MUST define expected low-level output independently of the
-  implementation that produced it, with the required complete output and
-  metadata checks.
-enforcement: judgment

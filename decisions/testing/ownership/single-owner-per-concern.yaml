@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/single-owner-per-concern
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: ownership
+spec:
+  title: One owner per concern
+  intent: A concern restated in two places drifts apart.
+  scope:
+    domain: code
+    subject: project
+  requirement: >-
+    Each concern, such as test contracts and structure or general test code
+    style, MUST have exactly one owning document; other documents MUST reference
+    it instead of restating it.
+  enforcement: doc

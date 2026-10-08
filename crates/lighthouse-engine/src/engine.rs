@@ -79,7 +79,7 @@ pub struct Outcome {
     /// shape, function summary, measures), by fingerprint.
     pub facts: BTreeMap<Fingerprint, Value>,
     /// The options the configuration set for each finding's rule, by
-    /// fingerprint; options left to the pattern's defaults are absent.
+    /// fingerprint; options left to the decision's defaults are absent.
     pub options: BTreeMap<Fingerprint, Options>,
     /// Every rule the configuration enables for some file, whether or not it
     /// ran: a remembered finding of any other rule is no longer configured.
@@ -93,15 +93,44 @@ pub struct Outcome {
 
 impl Outcome {
     /// Process exit code: 3 if the analysis is incomplete, unless
-    /// `allow_incomplete`; else 1 if any error diagnostic, or any warning
-    /// when `strict`; otherwise 0. `review` and `info` never fail a run. The
-    /// CLI exits 2 on usage and runtime errors.
-    pub fn exit_code(&self, strict: bool, allow_incomplete: bool) -> u8 {
+    /// `allow_incomplete`; else 1 if any error diagnostic, or when the
+    /// warnings fail the run as `fail_on` says; otherwise 0. `info` never
+    /// fails a run. The CLI exits 2 on usage and runtime errors. A `bool`
+    /// stands for `FailOn { strict, .. }`.
+    pub fn exit_code(&self, fail_on: impl Into<FailOn>, allow_incomplete: bool) -> u8 {
         if !self.incomplete.is_empty() && !allow_incomplete {
             return EXIT_INCOMPLETE;
         }
-        let fails = |s: Severity| s == Severity::Error || (strict && s == Severity::Warn);
-        u8::from(self.diagnostics.iter().any(|d| fails(d.severity)))
+        let fail_on = fail_on.into();
+        let count = |severity: Severity| {
+            self.diagnostics
+                .iter()
+                .filter(|d| d.severity == severity)
+                .count()
+        };
+        let warnings = count(Severity::Warn);
+        let fails = count(Severity::Error) > 0
+            || (fail_on.strict && warnings > 0)
+            || fail_on.max_warnings.is_some_and(|max| warnings > max);
+        u8::from(fails)
+    }
+}
+
+/// When warnings fail a run. Errors always do and `info` never does.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FailOn {
+    /// Any warning fails the run.
+    pub strict: bool,
+    /// More than this many warnings fail the run.
+    pub max_warnings: Option<usize>,
+}
+
+impl From<bool> for FailOn {
+    fn from(strict: bool) -> Self {
+        Self {
+            strict,
+            max_warnings: None,
+        }
     }
 }
 
@@ -629,7 +658,7 @@ impl Engine {
     }
 
     fn preset_rules(&self, id: &str) -> Option<Rules> {
-        self.registry.preset(id).map(|p| p.rules.clone())
+        self.registry.preset_rules(id)
     }
 }
 
@@ -645,9 +674,7 @@ pub fn hash_of(text: &str) -> String {
 /// extends and the entries it sets, resolved over the registry.
 pub fn active_rules(registry: &Registry, config: &Config) -> Result<BTreeSet<String>, Error> {
     let mut active: BTreeSet<String> = config
-        .resolve(Path::new(""), "", &|id| {
-            registry.preset(id).map(|p| p.rules.clone())
-        })?
+        .resolve(Path::new(""), "", &|id| registry.preset_rules(id))?
         .into_iter()
         .filter_map(|(id, c)| c.level.map(|_| id))
         .collect();
@@ -677,12 +704,10 @@ fn validate_config(registry: &Registry, config: &Config) -> Result<(), Error> {
         if !listed(&preset.id) {
             return Err(Error::PluginNotListed(preset.id.clone()));
         }
-        entries.extend(
-            preset
-                .rules
-                .iter()
-                .map(|(id, c)| (id.clone(), c.options.clone())),
-        );
+        let rules = registry
+            .preset_rules(&preset.id)
+            .ok_or_else(|| lighthouse_config::Error::PresetCycle(preset.id.clone()))?;
+        entries.extend(rules.into_iter().map(|(id, c)| (id, c.options)));
     }
     for (id, options) in &entries {
         let rule = registry

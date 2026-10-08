@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: core/split-by-cohesion
+  labels:
+    lighthouse/pack: core
+    lighthouse/section: limits
+spec:
+  title: Split files by cohesion
+  intent: Splitting by size alone creates arbitrary boundaries.
+  scope:
+    domain: code
+    subject: file
+  requirement: "A file MUST be split along cohesion boundaries, not by size alone."
+  enforcement: doc

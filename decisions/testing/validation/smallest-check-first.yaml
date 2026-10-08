@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/smallest-check-first
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: validation
+spec:
+  title: Run the smallest falsifying check first
+  intent: Fast feedback finds most problems.
+  scope:
+    domain: code
+    subject: project
+  requirement: The smallest falsifying check MUST be run first.
+  enforcement: doc

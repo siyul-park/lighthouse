@@ -1,6 +1,6 @@
 use lighthouse_model::{Comment, Diagnostic, Fingerprint};
 use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
-use lighthouse_spec::PatternRule;
+use lighthouse_spec::DecisionRule;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -14,7 +14,7 @@ struct Options {
 }
 
 pub(crate) fn rule() -> Box<dyn Rule> {
-    Box::new(PatternRule::new(ID, &[], check))
+    Box::new(DecisionRule::new(ID, &[], check))
 }
 
 /// Comments made only of banner lines: a run of rule characters, optionally

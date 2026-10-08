@@ -13,7 +13,7 @@
 //! agent going), `hookSpecificOutput.additionalContext` adds context without
 //! blocking, `systemMessage` shows the user a note. Exit 2 is never used: a
 //! failing hook must not block the agent. Only a payload that is not JSON
-//! exits 1 (non-blocking); a broken config, broken local rules or a plugin
+//! exits 1 (non-blocking); a broken config, broken local decisions or a plugin
 //! that cannot start are told to the agent as "nothing was checked".
 
 use std::{
@@ -83,7 +83,7 @@ fn reply(event: Event, allow_incomplete: bool, payload: &str) -> Result<Option<V
 
 /// The project is the one `cwd` of the payload belongs to; a directory with
 /// no `lighthouse.toml` is not a Lighthouse project and gets silence, but a
-/// config or local rules that are broken are an error.
+/// config or local decisions that are broken are an error.
 fn answer_event(event: Event, allow_incomplete: bool, payload: &Value) -> Result<Option<Value>> {
     let here = match payload["cwd"].as_str() {
         Some(cwd) => PathBuf::from(cwd),
@@ -171,8 +171,9 @@ fn is_text(path: &Path) -> bool {
 }
 
 /// An edit: error and warn findings go back to the agent as the reason of a
-/// block so that it fixes them; review findings and incompleteness are
-/// context. Clean and complete is silent.
+/// block so that it fixes them (or judges them, when their decision asks for a
+/// verdict); the remaining findings that ask for a verdict, and incompleteness,
+/// are context. Clean and complete is silent.
 fn after_edit(checked: &Checked, allow_incomplete: bool) -> Option<Value> {
     let summary = checked.summary();
     let incomplete = summary.status == Status::Incomplete;
@@ -188,7 +189,7 @@ fn after_edit(checked: &Checked, allow_incomplete: bool) -> Option<Value> {
     let mut notes = Vec::new();
     if summary.reviews > 0 {
         notes.push(format!(
-            "Lighthouse: {} finding(s) in the edited file need a judgment, not necessarily a fix. \
+            "Lighthouse: {} finding(s) in the edited file ask for a verdict, not necessarily a fix. \
              List them with the MCP tool `review_tasks`, then fix the code or record a verdict with \
              `review_resolve` (a reason is required to reject).",
             summary.reviews
@@ -251,7 +252,8 @@ fn at_stop(
     }
     for (n, what) in [
         (summary.warnings, "warning(s)"),
-        (summary.reviews, "finding(s) to review"),
+        (summary.infos, "info finding(s)"),
+        (summary.reviews, "finding(s) asking for a verdict"),
         (summary.incomplete, "incomplete gap(s)"),
     ] {
         if n > 0 {
@@ -276,6 +278,6 @@ fn feedback(checked: &Checked, limit: usize) -> String {
         Format::Agent,
         &outcome.diagnostics,
         &outcome.incomplete,
-        &checked.briefing(true, Some(limit)),
+        &checked.briefing(Some(limit)),
     )
 }

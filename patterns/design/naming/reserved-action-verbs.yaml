@@ -1,8 +1,0 @@
-id: design/reserved-action-verbs
-title: Action verbs are reserved
-intent: A verb that names an action must not hide a value or a query.
-scope: symbol
-requirement: >-
-  Configured action verbs, by default `Build`, `Compile`, `Publish`,
-  `Capture`, and `Use`, MUST be reserved for actions or transitions.
-enforcement: judgment

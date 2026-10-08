@@ -1,8 +1,0 @@
-id: design/reuse-before-extension
-title: Reuse before extension
-intent: Every extra layer or knob is a permanent cost.
-scope: project
-requirement: >-
-  Existing symbols and composition SHOULD be preferred before adding layers,
-  extension points, policy knobs, or parallel mechanisms.
-enforcement: judgment

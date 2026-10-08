@@ -1,5 +1,6 @@
 use std::{fmt, str::FromStr};
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -60,7 +61,7 @@ macro_rules! vocabulary {
 }
 
 /// What a reviewer decided about a finding.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Verdict {
     /// The finding is right.
@@ -108,7 +109,7 @@ impl Verdict {
 }
 
 /// Why a reviewer reached a verdict.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub enum Reason {
     /// Confirmed and the code was changed.
     #[serde(rename = "fixed")]
@@ -148,7 +149,7 @@ vocabulary!(Reason, "reason" {
 });
 
 /// Who reviewed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum ReviewerKind {
     Agent,

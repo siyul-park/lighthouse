@@ -737,6 +737,7 @@ dependencies = [
  "lighthouse-mcp",
  "lighthouse-model",
  "lighthouse-report",
+ "lighthouse-resource",
  "lighthouse-session",
  "lighthouse-spec",
  "lighthouse-store",
@@ -752,6 +753,8 @@ version = "0.1.0"
 dependencies = [
  "globset",
  "lighthouse-model",
+ "lighthouse-resource",
+ "schemars",
  "serde",
  "serde_json",
  "tempfile",
@@ -771,6 +774,7 @@ dependencies = [
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-process",
+ "lighthouse-resource",
  "lighthouse-spec",
  "serde",
  "serde_json",
@@ -847,6 +851,7 @@ dependencies = [
 name = "lighthouse-model"
 version = "0.1.0"
 dependencies = [
+ "schemars",
  "serde",
  "serde_json",
  "sha2",
@@ -859,6 +864,8 @@ version = "0.1.0"
 dependencies = [
  "lighthouse-config",
  "lighthouse-model",
+ "lighthouse-resource",
+ "schemars",
  "serde",
  "serde_json",
  "thiserror",
@@ -894,6 +901,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lighthouse-resource"
+version = "0.1.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_norway",
+ "thiserror",
+ "toml",
+]
+
+[[package]]
 name = "lighthouse-rpc"
 version = "0.1.0"
 dependencies = [
@@ -903,12 +922,13 @@ dependencies = [
  "lighthouse-plugin",
  "lighthouse-process",
  "lighthouse-protocol",
+ "lighthouse-resource",
  "lighthouse-testkit",
+ "schemars",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror",
- "toml",
 ]
 
 [[package]]
@@ -922,6 +942,7 @@ dependencies = [
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-report",
+ "lighthouse-resource",
  "lighthouse-rpc",
  "lighthouse-spec",
  "lighthouse-store",
@@ -942,6 +963,8 @@ dependencies = [
  "insta",
  "lighthouse-model",
  "lighthouse-plugin",
+ "lighthouse-resource",
+ "schemars",
  "serde",
  "serde_json",
  "serde_norway",
@@ -956,7 +979,9 @@ name = "lighthouse-store"
 version = "0.1.0"
 dependencies = [
  "lighthouse-model",
+ "lighthouse-resource",
  "rusqlite",
+ "schemars",
  "serde",
  "serde_json",
  "sha2",
@@ -985,6 +1010,9 @@ dependencies = [
 [[package]]
 name = "lighthouse-testkit"
 version = "0.1.0"
+dependencies = [
+ "toml",
+]
 
 [[package]]
 name = "linux-raw-sys"

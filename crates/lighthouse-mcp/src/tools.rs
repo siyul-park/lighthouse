@@ -5,11 +5,11 @@ use std::path::{Path, PathBuf};
 
 use lighthouse_engine::active_rules;
 use lighthouse_report::agent_report;
-use lighthouse_session::{CheckRequest, Session, explain, rule_rows};
+use lighthouse_session::{CheckRequest, Session, decision_rows, explain};
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
-use crate::{fix, review, rules};
+use crate::{decisions, fix, review};
 
 /// Findings returned by `check` when the caller sets no limit.
 const DEFAULT_LIMIT: usize = 25;
@@ -43,7 +43,7 @@ struct ExplainArgs {
 
 #[derive(Deserialize, Default)]
 #[serde(deny_unknown_fields)]
-struct RuleListArgs {
+struct DecisionListArgs {
     #[serde(default)]
     all: bool,
 }
@@ -53,16 +53,20 @@ pub fn call(name: &str, args: Value, caller: &Caller) -> Outcome {
     match name {
         "check" => check(parse(args)?),
         "explain" => explain_tool(parse(args)?),
-        "rule_list" => rule_list(parse(args)?),
+        "decision_list" => decision_list(parse(args)?),
         "review_tasks" => review::tasks(parse(args)?),
         "review_resolve" => review::resolve(parse(args)?, &caller.reviewer),
         "review_history" => review::history(parse(args)?),
-        "rule_create" => rules::create(parse(args)?),
-        "rule_update" => rules::update(parse(args)?),
-        "rule_test" => rules::test(parse(args)?),
+        "decision_create" => decisions::create(parse(args)?),
+        "decision_update" => decisions::update(parse(args)?),
+        "decision_test" => decisions::test(parse(args)?),
         "fix" => fix::fix(parse(args)?),
-        "pattern_similar" | "rule_proposals" => Err(format!(
+        "decision_similar" | "decision_proposals" => Err(format!(
             "`{name}` is reserved for a later version and not available yet"
+        )),
+        old if old.starts_with("rule_") => Err(format!(
+            "`{old}` was renamed: call `decision_{}`",
+            &old["rule_".len()..]
         )),
         _ => Err(format!("unknown tool `{name}`")),
     }
@@ -130,7 +134,7 @@ fn check(args: CheckArgs) -> Outcome {
     let report = agent_report(
         &outcome.diagnostics,
         &outcome.incomplete,
-        &checked.briefing(true, limit),
+        &checked.briefing(limit),
     );
     let summary = checked.summary();
     Ok(json!({
@@ -152,12 +156,12 @@ fn explain_tool(args: ExplainArgs) -> Outcome {
     Ok(json!({ "id": args.id, "markdown": markdown }))
 }
 
-fn rule_list(args: RuleListArgs) -> Outcome {
+fn decision_list(args: DecisionListArgs) -> Outcome {
     let session = Session::load_or_default(None).map_err(fail)?;
     let catalog = session.catalog().map_err(fail)?;
     let registry = session.in_process_registry().map_err(fail)?;
     let enabled = active_rules(&registry, &session.config).map_err(fail)?;
-    let rows: Vec<Value> = rule_rows(&catalog, &registry, args.all)
+    let rows: Vec<Value> = decision_rows(&catalog, &registry, args.all)
         .into_iter()
         .map(|row| {
             let mut value = serde_json::to_value(&row).unwrap_or(Value::Null);
@@ -165,5 +169,5 @@ fn rule_list(args: RuleListArgs) -> Outcome {
             value
         })
         .collect();
-    Ok(json!({ "rules": rows }))
+    Ok(json!({ "decisions": rows }))
 }

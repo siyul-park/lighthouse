@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/symbol-earns-existence
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: principles
+spec:
+  title: Every symbol earns its existence
+  intent: "Each symbol pays for itself; otherwise it is noise."
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Every symbol MUST earn its existence through a distinct responsibility,
+    invariant, ownership boundary, or reusable abstraction.
+  enforcement: judgment

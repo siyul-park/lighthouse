@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: core/unused-allow
+  labels:
+    lighthouse/pack: core
+    lighthouse/section: annotations
+spec:
+  title: Allow annotations suppress something
+  intent: An exception that no longer applies is noise that hides the next real one.
+  scope:
+    domain: code
+    subject: file
+  requirement: >-
+    An allow annotation SHOULD suppress a finding; one whose rule no longer
+    fires there, or is not enabled, SHOULD be removed.
+  enforcement: heuristic
+  evidence: [rules, reason, annotation]
+  check:
+    type: builtin
+    id: core/unused-allow
+  fix:
+    safety: suggested
+    type: ops
+    ops:
+      - op: delete
+        file: finding.file
+        span: finding.evidence.annotation
+  examples:
+    - name: go-stale-allow
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            func open() {}
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // lighthouse:allow design/exported-doc -- stale
+            func open() {}
+      expect:
+        - line: 3
+    - name: go-plain-comment
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // open is not exported.
+            func open() {}
+    - name: rust-stale-allow
+      language: rust
+      kind: invalid
+      fixed:
+        - path: src/lib.rs
+          body: "fn open() {}"
+      files:
+        - path: src/lib.rs
+          body: |-
+            // lighthouse:allow design/exported-doc -- stale
+            fn open() {}
+      expect:
+        - line: 1
+    - name: rust-plain-comment
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            // open is not exported.
+            fn open() {}

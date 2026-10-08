@@ -1,0 +1,96 @@
+# yaml-language-server: $schema=../../schema/pack.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Pack
+metadata:
+  name: testing
+spec:
+  title: Testing Decisions
+  intro: >-
+    Tests are the executable specification of a feature. They define the
+    contracts, structure, evidence, and validation required to establish correct
+    behavior.
+  sections:
+    - name: contract
+      title: Contract
+      intro: >-
+        Tests are the executable specification of a feature: they should show
+        what the public contract promises, not how the implementation happens to
+        work.
+      decisions:
+        - shows-public-contract
+        - structure-serves-contract
+        - case-exposes-target
+        - case-is-behavior
+    - name: public-boundary
+      title: Public Boundary
+      intro: >-
+        Contract tests should prove behavior through the same public boundary
+        available to callers.
+      decisions: [external-test-package, no-private-symbol-access, no-hiding-wrappers]
+    - name: readability
+      title: Readability
+      intro: >-
+        A readable test is a small, direct specification whose behavior can be
+        understood without following test infrastructure.
+      decisions: [simple-table-data, standard-assertions]
+    - name: organization
+      title: Organization
+      intro: >-
+        Test structure should provide one obvious owner for each public contract
+        and keep case structure shallow.
+      decisions:
+        - owner-test
+        - single-owner-test
+        - test-file-layout
+        - case-depth
+        - table-for-same-behavior
+        - scenario-per-behavior
+        - single-case-style
+        - assertions-in-cases
+        - polling-outlives-teardown
+        - polling-conditions-are-pure
+    - name: first
+      title: F.I.R.S.T.
+      intro: >-
+        F.I.R.S.T. keeps tests reliable evidence rather than intermittent
+        diagnostics.
+      decisions: [first-properties, independent-tests]
+    - name: tdd
+      title: TDD
+      intro: >-
+        TDD separates the required behavior from its implementation by making
+        the smallest missing contract fail before the implementation is
+        generalized.
+      decisions:
+        - red-green-cycle
+        - cover-contract-dimensions
+        - lowest-proving-layer
+        - no-structure-only-tests
+    - name: evidence
+      title: Evidence
+      intro: >-
+        Different test layers prove different facts; evidence is complete only
+        when each required fact has an appropriate proof.
+      decisions:
+        - coverage-is-reachability
+        - evidence-by-layer
+        - parity-across-paths
+        - independent-golden-output
+    - name: validation
+      title: Validation
+      intro: >-
+        Validation should start with the smallest useful falsification and
+        expand only as far as the affected contract requires.
+      decisions: [smallest-check-first, expand-validation-to-contract]
+    - name: completeness
+      title: Completeness
+      intro: >-
+        A complete change has evidence for every contract that the change
+        affects, including cross-layer and architecture-specific obligations.
+      decisions: [architecture-specific-evidence, freshness-gates-are-separate]
+    - name: ownership
+      title: Ownership
+      intro: >-
+        Test contracts and structure have one owner and should remain
+        independent of incidental implementation details.
+      decisions: [single-owner-per-concern]

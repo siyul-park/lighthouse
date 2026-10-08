@@ -1,6 +1,0 @@
-id: public-boundary
-title: Public Boundary
-intro: >-
-  Contract tests should prove behavior through the same public boundary
-  available to callers.
-patterns: [external-test-package, no-private-symbol-access, no-hiding-wrappers]

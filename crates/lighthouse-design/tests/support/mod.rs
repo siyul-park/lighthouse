@@ -264,8 +264,12 @@ impl World {
         }
         let mut level = toml::Table::new();
         level.insert("level".to_owned(), "warn".into());
+        let mut settings = toml::Table::new();
         for (key, value) in options.as_object().unwrap() {
-            level.insert(key.clone(), toml::Value::try_from(value).unwrap());
+            settings.insert(key.clone(), toml::Value::try_from(value).unwrap());
+        }
+        if !settings.is_empty() {
+            level.insert("options".to_owned(), settings.into());
         }
         let mut rules = toml::Table::new();
         rules.insert(rule.to_owned(), level.into());
@@ -275,7 +279,7 @@ impl World {
             vec!["fixture", "metrics", subject.id].into(),
         );
         root.insert("rules".to_owned(), rules.into());
-        let config = Config::parse(&root.to_string()).unwrap();
+        let config = Config::parse_inline(&root.to_string()).unwrap();
         let mut registry = Registry::default();
         registry.register(&Fixture::new()).unwrap();
         registry.register(&Metrics).unwrap();

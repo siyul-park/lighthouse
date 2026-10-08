@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/single-file-per-owner
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: physical-cohesion
+spec:
+  title: "One owner, one file"
+  intent: A reader finds an owner and everything it owns in one place.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: Symbols with one owner and cohesive responsibility MUST share a file.
+  enforcement: mechanical
+  evidence: [owner, files]
+  languages:
+    go:
+      tuning: All methods of a receiver type stay in one file.

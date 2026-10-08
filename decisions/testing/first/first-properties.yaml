@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/first-properties
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: first
+spec:
+  title: "Fast, independent, repeatable, self-validating, timely"
+  intent: Unreliable tests train people to ignore failures.
+  scope:
+    domain: code
+    subject: test
+  requirement: "Tests MUST be Fast, Independent, Repeatable, Self-validating, and Timely."
+  enforcement: judgment
+  citation: "Martin, Clean Code, chapter 9"

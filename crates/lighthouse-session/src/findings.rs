@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use lighthouse_engine::Outcome;
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete};
-use lighthouse_spec::{Catalog, Pattern, tier};
+use lighthouse_spec::{Catalog, Decision, tier};
 use lighthouse_store::{Judgment, Observed, Run, Standing, Store, Unchecked};
 use serde_json::{Value, json};
 
@@ -31,7 +31,10 @@ pub struct Remembered {
 pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut Outcome) -> Remembered {
     let mut remembered = Remembered::default();
     let judged = match record(root, catalog, outcome) {
-        Ok(judged) => judged,
+        Ok((judged, notices)) => {
+            remembered.messages.extend(notices);
+            judged
+        }
         Err(e) => {
             remembered
                 .messages
@@ -120,10 +123,10 @@ fn record(
     root: &Path,
     catalog: &Catalog,
     outcome: &Outcome,
-) -> Result<BTreeMap<String, Judgment>, lighthouse_store::Error> {
+) -> Result<(BTreeMap<String, Judgment>, Vec<String>), lighthouse_store::Error> {
     let mut store = Store::open(root)?;
     store.record(&run_of(root, catalog, outcome))?;
-    store.standings()
+    Ok((store.standings()?, store.notices().to_vec()))
 }
 
 /// The verdicts already recorded, when recording this run was not possible.
@@ -162,19 +165,20 @@ fn run_of(root: &Path, catalog: &Catalog, outcome: &Outcome) -> Run {
 
 fn observed(d: &Diagnostic, catalog: &Catalog, outcome: &Outcome) -> Observed {
     let facts = outcome.facts.get(&d.fingerprint);
-    let pattern = catalog.pattern(&d.rule_id);
+    let decision = catalog.decision(&d.rule_id);
     let mut record = Observed::from_diagnostic(d, facts.cloned().unwrap_or_else(|| json!({})));
-    record.tier = tier(d.severity, pattern).to_owned();
-    record.options = options(pattern, d, facts, outcome);
-    record.rule_version = pattern.map(Pattern::semantic_version);
-    record.pattern_hash = pattern.map(Pattern::version);
+    record.tier = tier(d.severity, decision).to_owned();
+    record.options = options(decision, d, facts, outcome);
+    record.rule_version = decision.map(|d| d.semantic_version());
+    record.legacy_rule_version = decision.and_then(Decision::legacy_semantic_version);
+    record.decision_hash = decision.map(Decision::version);
     record
 }
 
-/// The options the rule ran with: the configured ones over the pattern's
+/// The options the rule ran with: the configured ones over the decision's
 /// defaults for the file's language.
 fn options(
-    pattern: Option<&Pattern>,
+    decision: Option<&Decision>,
     d: &Diagnostic,
     facts: Option<&Value>,
     outcome: &Outcome,
@@ -187,7 +191,7 @@ fn options(
     let language = facts
         .and_then(|f| f.get("language"))
         .and_then(Value::as_str);
-    match pattern.map(|p| p.resolve_options(&configured, language)) {
+    match decision.map(|d| d.resolve_options(&configured, language)) {
         Some(Ok(resolved)) => Value::Object(resolved),
         _ => Value::Object(configured),
     }

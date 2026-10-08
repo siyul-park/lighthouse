@@ -2,7 +2,10 @@ use std::{collections::BTreeMap, fmt::Write};
 
 use serde_json::Value;
 
-use crate::{Catalog, Example, Fix, FixKind, OpSpec, OptionSpec, Pattern, pack_docs};
+use crate::{Catalog, Decision, Example, Fix, FixKind, OpSpec, OptionsSchema, pack_docs};
+
+/// Where the generated decision pages live, relative to the docs root.
+pub const DOCS_DIR: &str = "decisions";
 
 /// Markdown for every pack, keyed by path relative to the docs root.
 pub fn docs(catalog: &Catalog) -> BTreeMap<String, String> {
@@ -11,21 +14,33 @@ pub fn docs(catalog: &Catalog) -> BTreeMap<String, String> {
         .iter()
         .map(|pack| {
             (
-                format!("patterns/{}.md", pack.id),
+                format!("{DOCS_DIR}/{}.md", pack.id),
                 pack_docs::pack_markdown(pack),
             )
         })
         .collect()
 }
 
-/// One pattern as Markdown with its title at heading `level`.
-pub fn pattern_markdown(pattern: &Pattern, level: usize) -> String {
+/// Where a decision is explained in the generated docs: the pack page and,
+/// for a decision that has an entry of its own, the heading anchor. The path
+/// is relative to the repository root.
+pub fn help_path(decision: &Decision) -> String {
+    let page = format!("docs/{DOCS_DIR}/{}.md", decision.pack());
+    if pack_docs::is_row(decision) {
+        page
+    } else {
+        format!("{page}#{}", pack_docs::anchor(&decision.title))
+    }
+}
+
+/// One decision as Markdown with its title at heading `level`.
+pub fn decision_markdown(decision: &Decision, level: usize) -> String {
     let mut out = String::new();
-    let _ = writeln!(out, "{} {}\n", "#".repeat(level), pattern.title);
-    let severity = pattern
+    let _ = writeln!(out, "{} {}\n", "#".repeat(level), decision.title);
+    let severity = decision
         .severity()
         .map_or_else(|| "none".to_owned(), |s| s.to_string());
-    let preset = if pattern.strict {
+    let preset = if decision.strict {
         " · preset `strict`"
     } else {
         ""
@@ -33,40 +48,48 @@ pub fn pattern_markdown(pattern: &Pattern, level: usize) -> String {
     let _ = writeln!(
         out,
         "`{}` · scope `{}` · enforcement `{}` · severity `{severity}`{preset}\n",
-        pattern.id, pattern.scope, pattern.enforcement
+        decision.id(),
+        decision.scope.subject,
+        decision.enforcement
     );
-    block(&mut out, "Intent", &pattern.intent);
-    block(&mut out, "Requirement", &pattern.requirement);
-    if let Some(exceptions) = &pattern.exceptions {
+    block(&mut out, "Intent", &decision.intent);
+    block(&mut out, "Requirement", &decision.requirement);
+    if let Some(exceptions) = &decision.exceptions {
         block(&mut out, "Exceptions", exceptions);
     }
-    if !pattern.options.is_empty() {
-        options_table(&mut out, &pattern.options);
+    if let Some(options) = decision
+        .options
+        .as_ref()
+        .filter(|o| !o.properties.is_empty())
+    {
+        options_table(&mut out, decision, options);
     }
-    if let Some(fix) = &pattern.fix {
+    if let Some(fix) = &decision.fix {
         fix_markdown(&mut out, fix);
     }
-    for example in &pattern.examples {
+    for example in &decision.examples {
         example_markdown(&mut out, example);
     }
-    for (language, text) in &pattern.tuning {
-        block(&mut out, &format!("Tuning: {language}"), text);
+    for (language, spec) in &decision.languages {
+        if let Some(text) = &spec.tuning {
+            block(&mut out, &format!("Tuning: {language}"), text);
+        }
     }
-    if let Some(citation) = &pattern.citation {
+    if let Some(citation) = &decision.citation {
         block(&mut out, "Method", citation);
     }
     out
 }
 
-/// How a pattern's findings are fixed, for the pattern page.
+/// How a decision's findings are fixed, for the decision page.
 fn fix_markdown(out: &mut String, fix: &Fix) {
     let how = match &fix.kind {
-        FixKind::Ops(ops) => {
+        FixKind::Ops { ops } => {
             let names: Vec<&str> = ops.iter().map(OpSpec::name).collect();
             format!("operations {}", names.join(", "))
         }
         FixKind::Command(command) => format!("command `{}`", command.argv.join(" ")),
-        FixKind::Rpc(_) => "rpc".to_owned(),
+        FixKind::Rpc { .. } => "rpc".to_owned(),
     };
     let _ = writeln!(
         out,
@@ -79,20 +102,22 @@ fn block(out: &mut String, label: &str, text: &str) {
     let _ = writeln!(out, "**{label}**\n\n{}\n", text.trim());
 }
 
-fn options_table(out: &mut String, options: &BTreeMap<String, OptionSpec>) {
+fn options_table(out: &mut String, decision: &Decision, options: &OptionsSchema) {
     let _ = writeln!(out, "**Options**\n");
     let _ = writeln!(out, "| Option | Type | Default | Description |");
     let _ = writeln!(out, "| --- | --- | --- | --- |");
-    for (name, spec) in options {
-        let mut default = format!("`{}`", spec.default);
-        for (language, value) in &spec.per_language {
-            let _ = write!(default, "; {language}: `{value}`");
+    for (name, property) in &options.properties {
+        let mut default = format!("`{}`", property.default);
+        for (language, spec) in &decision.languages {
+            if let Some(value) = spec.options.get(name) {
+                let _ = write!(default, "; {language}: `{value}`");
+            }
         }
         let _ = writeln!(
             out,
             "| `{name}` | {} | {default} | {} |",
-            spec.kind,
-            spec.description.trim()
+            property.kind.name(),
+            property.description.trim()
         );
     }
     out.push('\n');

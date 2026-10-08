@@ -1,9 +1,0 @@
-id: design/minimal-symbols
-title: Fewest necessary symbols
-intent: Keep the conceptual surface small so readers hold less in their head.
-scope: project
-requirement: >-
-  Required behavior MUST use the fewest necessary symbols and the least
-  necessary code without weakening ownership or responsibility boundaries.
-enforcement: judgment
-evidence: [symbols, candidates]

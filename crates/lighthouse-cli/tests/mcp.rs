@@ -105,10 +105,10 @@ fn rust_project() -> TempDir {
     let plugin = lighthouse_testkit::lang_rust();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        format!(
+        lighthouse_testkit::project(&format!(
             "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n",
             plugin.to_str().unwrap()
-        ),
+        )),
     )
     .unwrap();
     fs::write(
@@ -125,22 +125,27 @@ fn text_project() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        "plugins = [\"core\"]\nextends = [\"core/recommended\"]\n",
+        lighthouse_testkit::project("plugins = [\"core\"]\nextends = [\"core/recommended\"]\n"),
     )
     .unwrap();
     dir
 }
 
-const LONG_FILE_PATTERN: &str = r#"
-id: local/short-notes
+const LONG_FILE_SPEC: &str = r#"
 title: Notes stay short
 intent: Notes are read in one glance.
-scope: file
+scope: { subject: file }
 requirement: A note file MUST NOT exceed three lines.
 enforcement: mechanical
 evidence: [path]
+check:
+  type: cel
+  select: file
+  where: 'file.lines > 3'
+  message: '{{ file.path }} is too long'
+  evidence:
+    path: file.path
 "#;
-const LONG_FILE_RULE: &str = "select: file\nwhere: 'file.lines > 3'\nmessage: '{{ file.path }} is too long'\nevidence:\n  path: file.path\n";
 
 fn examples(invalid_body: &str) -> Value {
     json!([
@@ -170,19 +175,21 @@ fn the_server_lists_its_tools_and_resources() {
         names,
         [
             "check",
+            "decision_create",
+            "decision_list",
+            "decision_test",
+            "decision_update",
             "explain",
             "fix",
             "review_history",
             "review_resolve",
-            "review_tasks",
-            "rule_create",
-            "rule_list",
-            "rule_test",
-            "rule_update"
+            "review_tasks"
         ]
     );
-    let reserved = client.tool("pattern_similar", json!({}));
+    let reserved = client.tool("decision_similar", json!({}));
     assert!(reserved.unwrap_err().contains("reserved"));
+    let renamed = client.tool("rule_list", json!({}));
+    assert!(renamed.unwrap_err().contains("decision_list"));
 
     let resources = client.request("resources/list", json!({}));
     let uris: Vec<&str> = resources["result"]["resources"]
@@ -194,7 +201,7 @@ fn the_server_lists_its_tools_and_resources() {
     assert_eq!(uris, ["lighthouse://catalog", "lighthouse://config"]);
     let pattern = client.request(
         "resources/read",
-        json!({ "uri": "lighthouse://patterns/core/max-file-lines" }),
+        json!({ "uri": "lighthouse://decisions/core/max-file-lines" }),
     );
     let text = pattern["result"]["contents"][0]["text"].as_str().unwrap();
     assert!(text.contains("max-file-lines"), "{text}");
@@ -207,7 +214,7 @@ fn the_server_lists_its_tools_and_resources() {
     );
     let missing = client.request(
         "resources/read",
-        json!({ "uri": "lighthouse://patterns/nope/nope" }),
+        json!({ "uri": "lighthouse://decisions/nope/nope" }),
     );
     assert!(missing["error"].is_object(), "{missing}");
 }
@@ -248,7 +255,7 @@ fn a_verdict_recorded_through_mcp_is_an_agent_review_that_later_checks_honor() {
     let task = &tasks["tasks"][0];
     assert_eq!(task["rule"], "design/private-helper-callers", "{tasks}");
     let fingerprint = task["fingerprint"].as_str().unwrap();
-    let seen = task["last_seen"].as_str().unwrap();
+    let seen = task["lastSeen"].as_str().unwrap();
 
     let stale = client.tool(
         "review_resolve",
@@ -276,8 +283,8 @@ fn a_verdict_recorded_through_mcp_is_an_agent_review_that_later_checks_honor() {
         .tool("review_history", json!({ "fingerprint": fingerprint }))
         .unwrap();
     let event = &history["events"][0];
-    assert_eq!(event["reviewer_kind"], "agent");
-    assert_eq!(event["reason_text"], "named policy");
+    assert_eq!(event["reviewerKind"], "agent");
+    assert_eq!(event["reasonText"], "named policy");
 
     let after = client.tool("check", json!({})).unwrap();
     let still: Vec<&str> = after["findings"]
@@ -294,47 +301,47 @@ fn a_verdict_recorded_through_mcp_is_an_agent_review_that_later_checks_honor() {
 }
 
 #[test]
-fn rule_create_writes_a_tested_rule_and_rolls_back_a_bad_one() {
+fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
     let dir = text_project();
     let mut client = Client::start(dir.path());
-    let rules_dir = dir.path().join(".lighthouse/rules");
+    let rules_dir = dir.path().join(".lighthouse/decisions");
 
     let created = client
         .tool(
-            "rule_create",
-            json!({ "pattern": LONG_FILE_PATTERN, "rule": LONG_FILE_RULE,
+            "decision_create",
+            json!({ "id": "local/short-notes", "spec": LONG_FILE_SPEC,
                     "examples": examples("a\nb\nc\nd\n") }),
         )
         .unwrap();
     assert_eq!(created["id"], "local/short-notes");
     assert!(rules_dir.join("short-notes.yaml").is_file());
-    assert_eq!(created["local_plugin_listed"], false);
+    assert_eq!(created["localPluginListed"], false);
 
     let tested = client
-        .tool("rule_test", json!({ "ids": ["local/short-notes"] }))
+        .tool("decision_test", json!({ "ids": ["local/short-notes"] }))
         .unwrap();
     assert_eq!(tested["ok"], true, "{tested}");
 
     let again = client.tool(
-        "rule_create",
-        json!({ "pattern": LONG_FILE_PATTERN, "rule": LONG_FILE_RULE, "examples": examples("a\nb\nc\nd\n") }),
+        "decision_create",
+        json!({ "id": "local/short-notes", "spec": LONG_FILE_SPEC, "examples": examples("a\nb\nc\nd\n") }),
     );
     assert!(again.unwrap_err().contains("already exists"));
 
     // The invalid example is too short for the rule to flag: rejected, and the
     // project keeps only the first rule.
-    let other = LONG_FILE_PATTERN.replace("short-notes", "tiny-notes");
     let rejected = client.tool(
-        "rule_create",
-        json!({ "pattern": other, "rule": LONG_FILE_RULE, "examples": examples("a\n") }),
+        "decision_create",
+        json!({ "id": "local/tiny-notes", "spec": LONG_FILE_SPEC, "examples": examples("a\n") }),
     );
     let message = rejected.unwrap_err();
     assert!(message.contains("not written"), "{message}");
     assert!(!rules_dir.join("tiny-notes.yaml").exists());
 
     let broken_rule = client.tool(
-        "rule_create",
-        json!({ "pattern": other, "rule": "select: file\nwhere: 'file.nope >'\nmessage: x\n",
+        "decision_create",
+        json!({ "id": "local/tiny-notes",
+                "spec": LONG_FILE_SPEC.replace("file.lines > 3", "file.nope >"),
                 "examples": examples("a\nb\nc\nd\n") }),
     );
     assert!(broken_rule.is_err());
@@ -344,15 +351,15 @@ fn rule_create_writes_a_tested_rule_and_rolls_back_a_bad_one() {
 
     // An update goes through the same gate.
     let bad_update = client.tool(
-        "rule_update",
-        json!({ "id": "local/short-notes", "patch": { "rule": { "where": "file.lines > 100" } } }),
+        "decision_update",
+        json!({ "id": "local/short-notes", "patch": { "check": { "where": "file.lines > 100" } } }),
     );
     assert!(bad_update.is_err());
     let before = fs::read_to_string(rules_dir.join("short-notes.yaml")).unwrap();
     assert!(before.contains("file.lines > 3"));
     let updated = client
         .tool(
-            "rule_update",
+            "decision_update",
             json!({ "id": "local/short-notes", "patch": { "intent": "Notes fit one screen." } }),
         )
         .unwrap();
@@ -366,7 +373,7 @@ fn rule_create_writes_a_tested_rule_and_rolls_back_a_bad_one() {
     // A bundled pattern is adjusted through the overlay file.
     let overlay = client
         .tool(
-            "rule_update",
+            "decision_update",
             json!({ "id": "core/max-file-lines", "patch": { "exceptions": "Generated files." } }),
         )
         .unwrap();
@@ -379,11 +386,11 @@ fn rule_create_writes_a_tested_rule_and_rolls_back_a_bad_one() {
 }
 
 #[test]
-fn rule_list_and_explain_describe_rules() {
+fn decision_list_and_explain_describe_decisions() {
     let dir = text_project();
     let mut client = Client::start(dir.path());
-    let list = client.tool("rule_list", json!({})).unwrap();
-    let row = list["rules"]
+    let list = client.tool("decision_list", json!({})).unwrap();
+    let row = list["decisions"]
         .as_array()
         .unwrap()
         .iter()
@@ -402,25 +409,21 @@ fn rule_list_and_explain_describe_rules() {
 }
 
 #[test]
-fn rule_names_cannot_leave_the_rules_directory() {
+fn decision_names_cannot_leave_the_decisions_directory() {
     let dir = text_project();
     let mut client = Client::start(dir.path());
-    let evil = LONG_FILE_PATTERN.replace("local/short-notes", "local/../../../evil");
-    for pattern in [
-        evil,
-        LONG_FILE_PATTERN.replace("local/short-notes", "local/a/b"),
-    ] {
+    for id in ["local/../../../evil", "local/a/b"] {
         let rejected = client.tool(
-            "rule_create",
-            json!({ "pattern": pattern, "rule": LONG_FILE_RULE, "examples": examples("a\nb\nc\nd\n") }),
+            "decision_create",
+            json!({ "id": id, "spec": LONG_FILE_SPEC, "examples": examples("a\nb\nc\nd\n") }),
         );
-        assert!(rejected.unwrap_err().contains("not a valid rule name"));
+        assert!(rejected.unwrap_err().contains("not a valid decision name"));
     }
     let escaped = dir.path().parent().unwrap().join("evil.yaml");
     assert!(!escaped.exists());
-    assert!(!dir.path().join(".lighthouse/rules").exists());
+    assert!(!dir.path().join(".lighthouse/decisions").exists());
     let update = client.tool(
-        "rule_update",
+        "decision_update",
         json!({ "id": "local/../x", "patch": { "intent": "x" } }),
     );
     assert!(update.is_err());
@@ -462,10 +465,10 @@ fn fix_previews_with_dry_run_then_applies_and_reports_both_lists() {
     let mut client = Client::start(dir.path());
 
     let preview = client
-        .tool("fix", json!({ "paths": ["src"], "dry_run": true }))
+        .tool("fix", json!({ "paths": ["src"], "dryRun": true }))
         .unwrap();
 
-    assert_eq!(preview["dry_run"], true);
+    assert_eq!(preview["dryRun"], true);
     let diff = preview["diff"].as_str().unwrap();
     assert!(
         diff.contains("--- a/src/lib.rs") && diff.contains("+pub struct Store;"),
@@ -480,7 +483,7 @@ fn fix_previews_with_dry_run_then_applies_and_reports_both_lists() {
 
     let applied = client.tool("fix", json!({ "paths": ["src"] })).unwrap();
 
-    assert_eq!(applied["dry_run"], false);
+    assert_eq!(applied["dryRun"], false);
     assert_eq!(applied["applied"].as_array().unwrap().len(), 1);
     assert_eq!(applied["applied"][0]["files"][0], "src/lib.rs");
     assert!(applied["declined"].is_array());
@@ -521,7 +524,7 @@ fn fix_selects_by_fingerprint_and_holds_suggestions_back_until_asked() {
         held["declined"][0]["reason"]
             .as_str()
             .unwrap()
-            .contains("`unsafe_fixes`")
+            .contains("`unsafeFixes`")
     );
     assert_eq!(
         fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),
@@ -531,7 +534,7 @@ fn fix_selects_by_fingerprint_and_holds_suggestions_back_until_asked() {
     let done = client
         .tool(
             "fix",
-            json!({ "fingerprints": [fingerprint], "unsafe_fixes": true }),
+            json!({ "fingerprints": [fingerprint], "unsafeFixes": true }),
         )
         .unwrap();
     assert_eq!(done["applied"][0]["safety"], "suggested");

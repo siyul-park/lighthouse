@@ -4,11 +4,15 @@ use std::{
 };
 
 use lighthouse_model::{Diagnostic, Incomplete, Severity};
+use lighthouse_spec::{Catalog, Decision, help_path};
 use serde::Serialize;
 
 const SCHEMA: &str = "https://json.schemastore.org/sarif-2.1.0.json";
 const FINGERPRINT_KEY: &str = "lighthouse/v1";
 const SRCROOT: &str = "%SRCROOT%";
+/// Where the generated decision pages are served; a rule's `helpUri` is a
+/// page below it.
+const DOCS_URL_BASE: &str = "https://github.com/siyul-park/lighthouse/blob/main";
 
 #[derive(Serialize)]
 struct Log<'a> {
@@ -66,15 +70,41 @@ struct Driver<'a> {
     rules: Vec<RuleRef<'a>>,
 }
 
+/// A rule of the driver: the decision a finding cites, when the catalog has it.
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct RuleRef<'a> {
     id: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    short_description: Option<Message<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    full_description: Option<Message<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    help_uri: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_configuration: Option<Configuration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    properties: Option<RuleProperties<'a>>,
+}
+
+#[derive(Serialize)]
+struct Configuration {
+    level: &'static str,
+}
+
+#[derive(Serialize)]
+struct RuleProperties<'a> {
+    enforcement: String,
+    tags: Vec<&'a str>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SarifResult<'a> {
     rule_id: &'a str,
+    rule_index: usize,
     level: &'static str,
     message: Message<'a>,
     locations: [Location; 1],
@@ -122,9 +152,17 @@ struct Region {
 
 /// Renders a SARIF 2.1.0 log with one result per diagnostic and a tool
 /// notification per incomplete entry; an incomplete analysis marks the
-/// invocation unsuccessful.
-pub fn render(diagnostics: &[Diagnostic], incomplete: &[Incomplete]) -> String {
-    let rules: BTreeSet<&str> = diagnostics.iter().map(|d| d.rule_id.as_str()).collect();
+/// invocation unsuccessful. A finding's rule is the decision it cites: with
+/// the `catalog` the rule carries the decision's title, requirement, default
+/// level and a `helpUri` to its entry in the generated docs; a result carries
+/// the fingerprint of the finding as a partial fingerprint.
+pub fn render(
+    diagnostics: &[Diagnostic],
+    incomplete: &[Incomplete],
+    catalog: Option<&Catalog>,
+) -> String {
+    let ids: BTreeSet<&str> = diagnostics.iter().map(|d| d.rule_id.as_str()).collect();
+    let rules: Vec<&str> = ids.into_iter().collect();
     let log = Log {
         schema: SCHEMA,
         version: "2.1.0",
@@ -133,7 +171,7 @@ pub fn render(diagnostics: &[Diagnostic], incomplete: &[Incomplete]) -> String {
                 SRCROOT,
                 BaseId {
                     description: Message {
-                        text: "directory containing lighthouse.toml",
+                        text: "the project root, where Lighthouse was run",
                     },
                 },
             )]),
@@ -145,10 +183,13 @@ pub fn render(diagnostics: &[Diagnostic], incomplete: &[Incomplete]) -> String {
                 driver: Driver {
                     name: "lighthouse",
                     version: env!("CARGO_PKG_VERSION"),
-                    rules: rules.into_iter().map(|id| RuleRef { id }).collect(),
+                    rules: rules
+                        .iter()
+                        .map(|id| rule_ref(id, catalog.and_then(|c| c.decision(id))))
+                        .collect(),
                 },
             },
-            results: diagnostics.iter().map(result).collect(),
+            results: diagnostics.iter().map(|d| result(d, &rules)).collect(),
         }],
     };
     let mut out = serde_json::to_string_pretty(&log).expect("sarif serializes");
@@ -172,9 +213,45 @@ fn notification(item: &Incomplete) -> Notification<'_> {
     }
 }
 
-fn result(d: &Diagnostic) -> SarifResult<'_> {
+fn rule_ref<'a>(id: &'a str, decision: Option<&'a Decision>) -> RuleRef<'a> {
+    let Some(decision) = decision else {
+        return RuleRef {
+            id,
+            name: None,
+            short_description: None,
+            full_description: None,
+            help_uri: None,
+            default_configuration: None,
+            properties: None,
+        };
+    };
+    RuleRef {
+        id,
+        name: Some(decision.short_name()),
+        short_description: Some(Message {
+            text: &decision.title,
+        }),
+        full_description: Some(Message {
+            text: &decision.requirement,
+        }),
+        help_uri: Some(format!("{DOCS_URL_BASE}/{}", help_path(decision))),
+        default_configuration: decision
+            .severity()
+            .map(|s| Configuration { level: level(s) }),
+        properties: Some(RuleProperties {
+            enforcement: decision.enforcement.to_string(),
+            tags: vec![decision.pack()],
+        }),
+    }
+}
+
+fn result<'a>(d: &'a Diagnostic, rules: &[&str]) -> SarifResult<'a> {
     SarifResult {
         rule_id: &d.rule_id,
+        rule_index: rules
+            .iter()
+            .position(|r| *r == d.rule_id)
+            .expect("every result's rule is in the driver's rules"),
         level: level(d.severity),
         message: Message { text: &d.message },
         locations: [Location {
@@ -203,7 +280,7 @@ fn level(severity: Severity) -> &'static str {
     match severity {
         Severity::Error => "error",
         Severity::Warn => "warning",
-        Severity::Review | Severity::Info => "note",
+        Severity::Info => "note",
     }
 }
 

@@ -6,15 +6,17 @@ use std::{
 
 use clap::{Parser, Subcommand, ValueEnum};
 use lighthouse_config::FILE_NAME;
+use lighthouse_engine::FailOn;
 use lighthouse_report::{Format, render_with};
 use lighthouse_session::{CheckRequest, DEFAULT_CONFIG, FixRequest, Session};
 use review::ReviewCommand;
 
+mod decisions;
 mod docs;
 mod hook;
 mod review;
-mod rules;
 mod setup;
+mod spec;
 
 /// Where `docs generate` writes the agent skill.
 const SKILL_PATH: &str = "skills/lighthouse/SKILL.md";
@@ -42,10 +44,11 @@ enum Command {
     /// whole project is always analyzed, because rules and language providers
     /// need more than the reported files (callers, packages, build context).
     ///
-    /// Exit codes: 0 clean, 1 findings at or above the failing level, 2 usage
-    /// or runtime error, 3 the analysis was incomplete (a file could not be
-    /// read or loaded, a plugin crashed or timed out). "Not checked" is never
-    /// "passed"; --allow-incomplete reports it but does not fail on it.
+    /// Exit codes: 0 clean, 1 an error was found (or warnings fail the run:
+    /// --strict, --max-warnings; info never does), 2 usage or runtime error,
+    /// 3 the analysis was incomplete (a file could not be read or loaded, a
+    /// plugin crashed or timed out). "Not checked" is never "passed";
+    /// --allow-incomplete reports it but does not fail on it.
     ///
     /// Plugins named by the config are started and run with your privileges,
     /// like build scripts: only check projects whose config you trust. A plugin
@@ -83,6 +86,9 @@ enum Command {
         /// Fail on warnings too.
         #[arg(long)]
         strict: bool,
+        /// Fail when there are more than N warnings (errors always fail).
+        #[arg(long, value_name = "N")]
+        max_warnings: Option<usize>,
         /// Exit by findings even when the analysis was incomplete; the
         /// incompleteness is still printed.
         #[arg(long)]
@@ -103,7 +109,7 @@ enum Command {
         #[arg(long, requires = "fix")]
         unsafe_fixes: bool,
         /// With --fix: use this registered fixer for the selected findings
-        /// instead of the one their rule's pattern names. Its fixes count as
+        /// instead of the one their decision names. Its fixes count as
         /// suggested.
         #[arg(long, requires = "fix", value_name = "ID")]
         fixer: Option<String>,
@@ -120,14 +126,34 @@ enum Command {
         #[command(subcommand)]
         command: ReviewCommand,
     },
-    /// Inspect bundled rules.
-    Rule {
+    /// Inspect and test decisions.
+    Decision {
         #[command(subcommand)]
-        command: RuleCommand,
+        command: DecisionCommand,
     },
-    /// Show a pattern or rule: intent, requirement, examples and status.
+    /// Renamed to `decision`; kept so the old command says what to run.
+    #[command(hide = true)]
+    Rule {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Show a decision or rule: intent, requirement, examples and status.
     Explain { id: String },
-    /// Generate or verify the Markdown docs derived from the pattern catalog.
+    /// Validate and migrate spec documents.
+    Spec {
+        #[command(subcommand)]
+        command: SpecCommand,
+    },
+    /// Print the JSON Schema of a kind of spec document; without a kind, list
+    /// the kinds.
+    Schema {
+        /// A kind such as `Decision` or `Project`, in any letter case.
+        kind: Option<String>,
+        /// Write the schema of every kind into this directory instead.
+        #[arg(long, value_name = "DIR", conflicts_with = "kind")]
+        write: Option<PathBuf>,
+    },
+    /// Generate or verify the Markdown docs derived from the decision catalog.
     Docs {
         #[command(subcommand)]
         command: DocsCommand,
@@ -163,7 +189,7 @@ enum Command {
         yes: bool,
     },
     /// Serve the Model Context Protocol on stdio, for coding agents: tools to
-    /// check, explain, review and author rules, and resources for the
+    /// check, explain, review and author decisions, and resources for the
     /// catalog. Verdicts recorded through it are reviews by an `agent`
     /// (the id is $LIGHTHOUSE_REVIEWER, else the client's name).
     Mcp,
@@ -192,20 +218,20 @@ enum HookAgent {
 }
 
 #[derive(Subcommand)]
-enum RuleCommand {
-    /// List bundled rules.
+enum DecisionCommand {
+    /// List the decisions that have a rule.
     List {
-        /// Include every catalog pattern with its implementation status.
+        /// Include every catalog decision with its implementation status.
         #[arg(long)]
         all: bool,
     },
-    /// Run the examples of implemented patterns: the bundled catalog and the
-    /// project's `.lighthouse/rules`. Exits 1 when any example fails.
+    /// Run the examples of checked decisions: the bundled catalog and the
+    /// project's `.lighthouse/decisions`. Exits 1 when any example fails.
     ///
     /// Examples run in each language whose plugin the config lists (or only
-    /// in --language); a pattern needs an example for every language run.
+    /// in --language); a decision needs an example for every language run.
     Test {
-        /// Pattern ids; default: every implemented pattern.
+        /// Decision ids; default: every checked decision.
         ids: Vec<String>,
         #[arg(long)]
         language: Option<String>,
@@ -216,8 +242,36 @@ enum RuleCommand {
 }
 
 #[derive(Subcommand)]
+enum SpecCommand {
+    /// Check every spec document under PATHS (default: the project's
+    /// configuration and `.lighthouse/decisions`): each against the schema of
+    /// its kind, and against the others: presets name decisions that exist,
+    /// fix operations name registered order keys, `extends` names a decision,
+    /// CEL compiles, examples are well formed. Exits 1 when anything is wrong.
+    Validate {
+        paths: Vec<PathBuf>,
+        /// Also run the examples of the decisions found, through the whole
+        /// engine.
+        #[arg(long)]
+        examples: bool,
+    },
+    /// Rewrite documents in the formats from before the resource model
+    /// (`lighthouse.toml`, `lighthouse-plugin.toml`, a catalog of decision files of the earlier format,
+    /// `.lighthouse/rules`) as `lighthouse/v1alpha1` resources. A document that
+    /// already is one is left alone, so running it again changes nothing.
+    Migrate {
+        /// Files or directories (default: the project's configuration and
+        /// `.lighthouse/rules`).
+        paths: Vec<PathBuf>,
+        /// Say what would change and change nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum DocsCommand {
-    /// Write the pattern docs and the agent skill.
+    /// Write the decision docs and the agent skill.
     Generate {
         #[arg(long, default_value = "docs")]
         out: PathBuf,
@@ -225,7 +279,7 @@ enum DocsCommand {
         #[arg(long, default_value = SKILL_PATH)]
         skill: PathBuf,
     },
-    /// Exit 1 when the pattern docs or the agent skill are stale.
+    /// Exit 1 when the decision docs or the agent skill are stale.
     Check {
         #[arg(long, default_value = "docs")]
         out: PathBuf,
@@ -240,7 +294,7 @@ struct Options {
     format: Format,
     limit: Option<usize>,
     store: bool,
-    strict: bool,
+    fail_on: FailOn,
     allow_incomplete: bool,
 }
 
@@ -277,6 +331,7 @@ fn run(cli: Cli) -> Result<u8> {
             limit,
             no_store,
             strict,
+            max_warnings,
             allow_incomplete,
             rules,
             fix,
@@ -294,7 +349,10 @@ fn run(cli: Cli) -> Result<u8> {
                 format,
                 limit,
                 store: !no_store,
-                strict,
+                fail_on: FailOn {
+                    strict,
+                    max_warnings,
+                },
                 allow_incomplete,
             },
             &rules,
@@ -306,18 +364,30 @@ fn run(cli: Cli) -> Result<u8> {
             }),
         ),
         Command::Review { command } => review::run(command),
-        Command::Rule {
-            command: RuleCommand::List { all },
-        } => rules::list(all),
-        Command::Rule {
+        Command::Decision {
+            command: DecisionCommand::List { all },
+        } => decisions::list(all),
+        Command::Decision {
             command:
-                RuleCommand::Test {
+                DecisionCommand::Test {
                     ids,
                     language,
                     config,
                 },
-        } => rules::test(&ids, language.as_deref(), config.as_deref()),
-        Command::Explain { id } => rules::explain(&id),
+        } => decisions::test(&ids, language.as_deref(), config.as_deref()),
+        Command::Rule { args } => Err(format!(
+            "`lighthouse rule` is now `lighthouse decision`: run `lighthouse decision {}`",
+            args.join(" ")
+        )
+        .trim_end()
+        .to_owned()
+        .into()),
+        Command::Explain { id } => decisions::explain(&id),
+        Command::Spec { command } => match command {
+            SpecCommand::Validate { paths, examples } => spec::validate(&paths, examples),
+            SpecCommand::Migrate { paths, dry_run } => spec::migrate(&paths, dry_run),
+        },
+        Command::Schema { kind, write } => spec::schema(kind.as_deref(), write.as_deref()),
         Command::Docs { command } => match command {
             DocsCommand::Generate { out, skill } => docs::generate(&out, &skill),
             DocsCommand::Check { out, skill } => docs::check(&out, &skill),
@@ -346,7 +416,7 @@ fn check(
     config: Option<&Path>,
     fix: Option<FixOptions>,
 ) -> Result<u8> {
-    if options.limit.is_some() && !briefed(options.format) {
+    if options.limit.is_some() && !matches!(options.format, Format::Agent | Format::AgentJson) {
         return Err("--limit applies to the agent formats only".into());
     }
     if let Some(fix) = fix {
@@ -374,15 +444,10 @@ fn check(
             options.format,
             &outcome.diagnostics,
             &outcome.incomplete,
-            &checked.briefing(briefed(options.format), options.limit)
+            &checked.briefing(options.limit)
         )
     );
-    Ok(outcome.exit_code(options.strict, options.allow_incomplete))
-}
-
-/// Whether the format draws on the catalog.
-fn briefed(format: Format) -> bool {
-    matches!(format, Format::Agent | Format::AgentJson)
+    Ok(outcome.exit_code(options.fail_on, options.allow_incomplete))
 }
 
 fn trust(revoke: bool, yes: bool) -> Result<u8> {

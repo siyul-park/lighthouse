@@ -45,28 +45,37 @@ value starting with `-` is refused).
 | Tool | Arguments | Result |
 |------|-----------|--------|
 | `check` | `paths?`, `changed?`, `diff?`, `rules?`, `limit?` (default 25) | `status` (`clean`, `findings`, `incomplete`), `findings` (the agent-json records: rule, severity, tier, location, requirement, evidence, expected structure, fingerprint, resolve hint), `incomplete`, `omitted`, `summary` (counts, suppressed, allowed, reasons table), `messages` |
-| `explain` | `id` | Markdown of the pattern or rule |
-| `rule_list` | `all?` | rules with severity, title, status, `enabled` in this config |
-| `review_tasks` | `status?` (default `open`), `rule?`, `tier?` (`review` default, or `all`), `limit?` (default 50) | findings of severity `review` (or all) with `fingerprint`, `last_seen`, evidence, latest verdict |
+| `explain` | `id` | Markdown of the decision or rule |
+| `decision_list` | `all?` | decisions with severity, title, status, `enabled` in this config |
+| `review_tasks` | `status?` (default `open`), `rule?`, `tier?` (`review` default, or `all`), `limit?` (default 50) | findings that ask for a verdict (those of heuristic and judgment decisions, whatever their severity; or all) with `fingerprint`, `lastSeen`, evidence, latest verdict |
 | `review_resolve` | `fingerprint`, `verdict`, `reason?`, `note?`, `seen?` | the recorded verdict, its `standing`, warnings |
 | `review_history` | `fingerprint` | every verdict on the finding, oldest first |
-| `rule_create` | `pattern` (object or YAML/JSON text), `rule?`, `examples` | `id`, written `path`, test runs, whether the `local` plugin is listed |
-| `rule_update` | `id`, `patch` (JSON merge patch) | like `rule_create` |
-| `rule_test` | `ids?` | `ok`, counts, `failures` |
-| `fix` | `fingerprints?`, `paths?`, `rules?` (at least one), `dry_run?`, `unsafe_fixes?` | `dry_run`, `diff` (unified, every changed file), `applied` (`fingerprint`, `rule`, `fixer`, `safety`, `description`, `files`), `declined` (`fingerprint`, `rule`, `path`, `line`, `reason`), `rounds`, `messages` |
+| `decision_create` | `id` (`local/<name>`), `spec` (object or YAML/JSON text), `examples` | `id`, written `path`, test runs, whether the `local` plugin is listed |
+| `decision_update` | `id`, `patch` (JSON merge patch over the spec) | like `decision_create` |
+| `decision_test` | `ids?` | `ok`, counts, `failures` |
+| `fix` | `fingerprints?`, `paths?`, `rules?` (at least one), `dryRun?`, `unsafeFixes?` | `dryRun`, `diff` (unified, every changed file), `applied` (`fingerprint`, `rule`, `fixer`, `safety`, `description`, `files`), `declined` (`fingerprint`, `rule`, `path`, `line`, `reason`), `rounds`, `messages` |
 
-`pattern_similar` and `rule_proposals` are reserved for later phases and are
-not offered; calling them is an error that says so.
+`decision_similar` and `decision_proposals` are reserved for later phases and are
+not offered; calling them is an error that says so. The tools of the same names
+before the rename, `rule_list`, `rule_create`, `rule_update`, `rule_test`, are
+errors that name the `decision_*` tool to call instead.
+
+Every key an agent reads or writes is lowerCamelCase: the arguments (`dryRun`,
+`unsafeFixes`), the results (`ruleId`, `lastSeen`, `catalogError`, `endLine`) and the
+`check --format json` and `agent-json` records. The contents of `evidence`, `facts` and
+`options` are data and keep their names: option names are the decision's own, and the
+code-model facts keep the snake_case of the plugin protocol (`max_nesting`), which
+external plugins already speak (see [plugin-protocol.md](plugin-protocol.md)).
 
 ### Fixing
 
 `fix` applies the fixes that the catalog attaches to rules (`fixable: safe` or
-`suggested` in `rule_list`, `explain` and the skill; see "Fixing" in
+`suggested` in `decision_list`, `explain` and the skill; see "Fixing" in
 [architecture.md](architecture.md)). Name what to fix with `fingerprints` (from
 `check`; prefixes are accepted), `paths` (under the project root) or `rules`: a
-fix never defaults to the whole project. Use `dry_run` first: it returns the
+fix never defaults to the whole project. Use `dryRun` first: it returns the
 `diff` and leaves every file as it was. Only safe fixes of mechanical rules are
-applied unless `unsafe_fixes` is set; suggested ones are then judgment calls to
+applied unless `unsafeFixes` is set; suggested ones are then judgment calls to
 review in the diff, and without it they come back in `declined` with the
 reason. Every applied fix has been formatted (the `[languages.<id>] formatter`
 of `lighthouse.toml`), re-checked and, for a file that gained an error or stopped
@@ -86,9 +95,9 @@ are resolved by the run that ends the fixing. Recheck with `check` afterwards.
 
 ### Resources
 
-- `lighthouse://patterns/{id}`: one pattern rendered as Markdown (the id keeps its
-  slash: `lighthouse://patterns/design/exported-doc`).
-- `lighthouse://catalog`: `id`, tier and title of every pattern, tab separated.
+- `lighthouse://decisions/{id}`: one decision rendered as Markdown (the id keeps its
+  slash: `lighthouse://decisions/design/exported-doc`).
+- `lighthouse://catalog`: `id`, tier and title of every decision, tab separated.
 - `lighthouse://config`: root, plugins, `extends`, the active rule ids and the
   `lighthouse.toml` text.
 
@@ -99,29 +108,31 @@ Every verdict recorded through the server is a review of kind `agent`. The id is
 `initialize`, else `mcp-agent`. The CLI keeps its own rule (`--reviewer-kind`,
 `$LIGHTHOUSE_REVIEWER_KIND`, `$LIGHTHOUSE_REVIEWER`, `$USER`).
 
-### Authoring rules
+### Authoring decisions
 
-`rule_create` takes a pattern (id `local/<name>`, title, intent, scope,
-requirement with MUST or SHOULD, enforcement, evidence), the declarative rule
-(`select`, `where` as a CEL expression that is true for a violation, `message`,
-`evidence`) and examples (at least one valid and one invalid per language the
-project runs). The candidate is validated, compiled and tested through the whole
-engine before anything is written; a failure names the example and writes
-nothing. `rule_update` applies a JSON merge patch to a local rule, or, for a
-bundled pattern, to the project's overlay file `override-<pack>-<name>.yaml`
-(`severity`, `exceptions`, `options`, `tuning`, `examples`), through the same
-gate. Rule names are lowercase letters, digits, `.`, `_` and `-` (no `/`, `\`
-or `..`), checked before anything else runs, and authoring takes a per-project
+`decision_create` takes an `id` (`local/<name>`), the `spec` of a `Decision`
+(title, intent, `scope: {subject}`, requirement with MUST or SHOULD,
+enforcement, evidence, and a `check` of `type: cel` with `select`, `where` as a
+CEL expression that is true for a violation, `message` and `evidence`) and
+examples (at least one valid and one invalid per language the project runs).
+The candidate is validated, compiled and tested through the whole engine before
+anything is written, to `.lighthouse/decisions/<name>.yaml`; a failure names the
+example and writes nothing. `decision_update` applies a JSON merge patch to the
+spec of a local decision, or, for a bundled decision, to the project's
+`DecisionOverride` file `override-<pack>-<name>.yaml` (`severity`, `exceptions`,
+`options` as new defaults, `languages`, `examples`), through the same gate.
+Decision names are lowercase letters, digits, `.`, `_` and `-` (no `/`, `\` or
+`..`), checked before anything else runs, and authoring takes a per-project
 lock (`.lighthouse/authoring.db-lock`, ignored by version control) around its
-read-modify-write. The `local` plugin must be listed in `lighthouse.toml` for `check` to run
-local rules; the result says when it is not.
+read-modify-write. The `local` plugin must be listed in `lighthouse.toml` for
+`check` to run local decisions; the result says when it is not.
 
 Example:
 
 ```json
-{ "name": "rule_create", "arguments": {
-  "pattern": "id: local/short-notes\ntitle: Notes stay short\nintent: Notes are read at a glance.\nscope: file\nrequirement: A note file MUST NOT exceed three lines.\nenforcement: mechanical\nevidence: [path]",
-  "rule": "select: file\nwhere: 'file.lines > 3'\nmessage: '{{ file.path }} is too long'\nevidence:\n  path: file.path",
+{ "name": "decision_create", "arguments": {
+  "id": "local/short-notes",
+  "spec": "title: Notes stay short\nintent: Notes are read at a glance.\nscope: { subject: file }\nrequirement: A note file MUST NOT exceed three lines.\nenforcement: mechanical\nevidence: [path]\ncheck:\n  type: cel\n  select: file\n  where: 'file.lines > 3'\n  message: '{{ file.path }} is too long'\n  evidence:\n    path: file.path",
   "examples": [
     { "name": "long", "language": "text", "kind": "invalid",
       "files": [{ "path": "a.txt", "body": "a\nb\nc\nd\n" }], "expect": [{ "line": 1 }] },
@@ -151,8 +162,8 @@ treats as non-blocking.
 
 | Event | Scope | Behavior |
 |-------|-------|----------|
-| `post-tool-use` | the edited file (`Edit`, `Write`, `MultiEdit` only) | error or warn findings: `decision: block` with up to 5 findings in agent format; review findings only: `additionalContext` with the count and how to resolve them through MCP; incomplete analysis is stated and, without `--allow-incomplete`, blocks; clean and complete: silent |
-| `stop` | the session's changed set (`--changed` semantics) | remaining errors, or an incomplete analysis (with or without `--allow-incomplete`; the flag only changes the wording), block once with up to 10 findings and the gaps; otherwise allowed, with a `systemMessage` when warnings, reviews or gaps remain |
+| `post-tool-use` | the edited file (`Edit`, `Write`, `MultiEdit` only) | error or warn findings: `decision: block` with up to 5 findings in agent format; info findings that ask for a verdict only: `additionalContext` with the count and how to resolve them through MCP; incomplete analysis is stated and, without `--allow-incomplete`, blocks; clean and complete: silent |
+| `stop` | the session's changed set (`--changed` semantics) | remaining errors, or an incomplete analysis (with or without `--allow-incomplete`; the flag only changes the wording), block once with up to 10 findings and the gaps; otherwise allowed, with a `systemMessage` when warnings, infos, findings asking for a verdict or gaps remain |
 
 Failures are never silent. Only a directory with no `lighthouse.toml` gets
 silence. A broken config, broken local rules or a plugin that cannot start are
@@ -179,14 +190,14 @@ The skill is generated, never hand-written: purpose (decision memory), the loop
 (check, understand, fix, recheck, judge with reasons), rules of conduct (never
 suppress a mechanical finding except through an annotated exception with a
 reason), how to look rules up (resources and `explain`, not the rule text), and
-a digest of the active patterns (id, tier, title). `lighthouse docs generate`
+a digest of the active decisions (id, tier, title). `lighthouse docs generate`
 writes `skills/lighthouse/SKILL.md` for this repository and `docs check` fails
 when it is stale; `init --agent claude-code` writes the project's copy from its
 own catalog and config.
 
 The skill and `explain` read the catalog, not running plugins. The invariant
 that keeps them complete: every rule, including a future out-of-process rule
-plugin, ships its pattern spec into the catalog, so the digest never has to start
+plugin, ships its decisions into the catalog, so the digest never has to start
 a plugin process. Today language plugins supply only languages and every rule is
 in-process; a test checks that the skill lists every rule the engine's registry
 enables.

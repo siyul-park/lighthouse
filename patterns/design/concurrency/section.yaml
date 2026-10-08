@@ -1,6 +1,0 @@
-id: concurrency
-title: Concurrency
-intro: >-
-  Concurrency rules prevent races and leaks by making shared state and
-  shutdown ownership explicit.
-patterns: [explicit-shutdown, context-first, no-stored-request-context]

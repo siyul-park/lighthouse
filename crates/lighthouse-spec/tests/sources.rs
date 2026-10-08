@@ -78,7 +78,7 @@ fn catalog_verify_sources() {
 
     let markdown = "## H\n\n- one\n";
     let sources = format!(
-        "- ref: {}\n  text: one\n  omitted: project-specific\n",
+        "apiVersion: lighthouse/v1alpha1\nkind: SourceMap\nmetadata:\n  name: sources\nspec:\n  sources:\n    - ref: {}\n      text: one\n      omitted: project-specific\n",
         reference(markdown, "one")
     );
     let files = BTreeMap::from([("sources.yaml".to_owned(), sources)]);

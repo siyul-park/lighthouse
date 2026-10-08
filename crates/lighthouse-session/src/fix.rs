@@ -76,7 +76,7 @@ impl Fixed {
     }
 }
 
-/// The fixer of every rule whose pattern has a `fix`; see
+/// The fixer of every rule whose decision has a `fix`; see
 /// [`FixPlan::from_catalog`].
 pub fn fix_plan(catalog: &Catalog) -> FixPlan {
     FixPlan::from_catalog(catalog)

@@ -1,33 +1,12 @@
-//! The `fix:` block of a pattern: what a catalog accepts and what it refuses.
+//! The `fix:` block of a decision: what a catalog accepts and what it refuses.
 
-use std::collections::BTreeMap;
+mod support;
 
 use lighthouse_model::{Capability, Safety};
-use lighthouse_spec::{Catalog, Fix, FixKind, OpSpec, ReorderScope, timeout_seconds};
+use lighthouse_spec::{Catalog, Fix, FixKind, OpSpec, ReorderScope};
+use support::*;
 
-const PATTERN: &str = "id: p/a\ntitle: A\nintent: i\nscope: file\nrequirement: A MUST b.\nenforcement: mechanical\nevidence: [x]\n";
-
-fn base() -> BTreeMap<String, String> {
-    [
-        ("p/pack.yaml", "id: p\ntitle: P\nintro: x\nsections: [s]\n"),
-        (
-            "p/s/section.yaml",
-            "id: s\ntitle: S\nintro: x\npatterns: [a]\n",
-        ),
-        ("p/s/a.yaml", PATTERN),
-    ]
-    .into_iter()
-    .map(|(k, v)| (k.to_owned(), v.to_owned()))
-    .collect()
-}
-
-fn pattern_with(extra: &str) -> BTreeMap<String, String> {
-    let mut files = base();
-    files.insert("p/s/a.yaml".to_owned(), format!("{PATTERN}{extra}"));
-    files
-}
-
-fn rejected(files: BTreeMap<String, String>, needle: &str) {
+fn rejected(files: Files, needle: &str) {
     let err = Catalog::from_files(files).unwrap_err();
     assert!(
         err.to_string().contains(needle),
@@ -35,58 +14,59 @@ fn rejected(files: BTreeMap<String, String>, needle: &str) {
     );
 }
 
-const IMPLEMENTED: &str = "implementation:\n  builtin: p/a\n";
-const EXAMPLES: &str = "examples:
-  - name: bad
-    language: go
-    kind: invalid
-    files: [{ path: a.go, body: x }]
-    fixed: [{ path: a.go, body: y }]
-  - name: good
-    language: go
-    kind: valid
-    files: [{ path: a.go, body: y }]
+const CHECKED: &str = "  check:\n    type: builtin\n    id: p/a\n";
+const EXAMPLES: &str = "  examples:
+    - name: bad
+      language: go
+      kind: invalid
+      files: [{ path: a.go, body: x }]
+      fixed: [{ path: a.go, body: y }]
+    - name: good
+      language: go
+      kind: valid
+      files: [{ path: a.go, body: y }]
 ";
 
-fn fixable(fix: &str) -> std::collections::BTreeMap<String, String> {
-    pattern_with(&format!("{IMPLEMENTED}{fix}{EXAMPLES}"))
+fn fixable(fix: &str) -> Files {
+    decision_with(&format!("{CHECKED}{fix}{EXAMPLES}"))
 }
 
-const MOVE: &str = "fix:
-  safety: safe
-  requires: [extent, complete-references]
-  ops:
-    - op: move
-      node: finding.evidence.callee
-      after: finding.evidence.caller
-    - op: reorder
-      scope: owner
-      by: [design/group]
-      when: finding.symbol != ''
-    - op: delete
-      file: finding.file
-      span: finding.span
-    - op: rename
-      symbol: finding.symbol
-      name: '{{ symbol.name }}Value'
-    - op: replace
-      file: finding.file
-      span: finding.span
-      text: '// {{ finding.rule }}'
+const MOVE: &str = "  fix:
+    safety: safe
+    requires: [extent, complete-references]
+    type: ops
+    ops:
+      - op: move
+        node: finding.evidence.callee
+        after: finding.evidence.caller
+      - op: reorder
+        scope: owner
+        by: [design/group]
+        when: finding.symbol != ''
+      - op: delete
+        file: finding.file
+        span: finding.span
+      - op: rename
+        symbol: finding.symbol
+        name: '{{ symbol.name }}Value'
+      - op: replace
+        file: finding.file
+        span: finding.span
+        text: '// {{ finding.rule }}'
 ";
 
 #[test]
 fn a_fix_of_every_operation_loads_and_is_readable() {
     let catalog = Catalog::from_files(fixable(MOVE)).unwrap();
 
-    let fix: &Fix = catalog.pattern("p/a").unwrap().fix.as_ref().unwrap();
+    let fix: &Fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
 
     assert_eq!(fix.safety, Safety::Safe);
     assert_eq!(
         fix.requires,
         [Capability::Extent, Capability::CompleteReferences]
     );
-    let FixKind::Ops(ops) = &fix.kind else {
+    let FixKind::Ops { ops } = &fix.kind else {
         panic!("ops expected");
     };
     let names: Vec<_> = ops.iter().map(OpSpec::name).collect();
@@ -98,133 +78,169 @@ fn a_fix_of_every_operation_loads_and_is_readable() {
 }
 
 #[test]
-fn a_fix_needs_exactly_one_kind() {
-    let both =
-        "fix:\n  safety: suggested\n  ops: [{ op: delete, node: x }]\n  command: { argv: [x] }\n";
-    rejected(fixable(both), "exactly one of `ops`, `command` or `rpc`");
-    let none = "fix:\n  safety: suggested\n";
-    rejected(fixable(none), "exactly one of `ops`, `command` or `rpc`");
+fn a_fix_names_its_type_and_the_type_decides_its_fields() {
+    let untyped = "  fix:\n    safety: suggested\n    ops: [{ op: delete, node: x }]\n";
+    rejected(fixable(untyped), "type");
+    let none = "  fix:\n    safety: suggested\n    type: ops\n";
+    rejected(fixable(none), "ops");
+    let stray = "  fix:\n    safety: suggested\n    type: ops\n    ops: [{ op: delete, node: x }]\n    argv: [x]\n";
+    rejected(fixable(stray), "argv");
+    let unknown = "  fix:\n    safety: suggested\n    type: wasm\n";
+    rejected(fixable(unknown), "wasm");
 }
 
 #[test]
-fn the_rpc_kind_is_kept_without_failing_the_pack() {
-    let rpc = "fix:\n  safety: suggested\n  rpc: { method: fix }\n";
+fn the_rpc_type_is_kept_without_failing_the_pack() {
+    let rpc = "  fix:\n    safety: suggested\n    type: rpc\n    params: { method: fix }\n";
 
     let catalog = Catalog::from_files(fixable(rpc)).unwrap();
 
-    let fix = catalog.pattern("p/a").unwrap().fix.as_ref().unwrap();
-    assert!(matches!(fix.kind, FixKind::Rpc(_)));
+    let fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
+    assert!(matches!(fix.kind, FixKind::Rpc { .. }));
 }
 
 #[test]
 fn an_unknown_operation_or_parameter_is_refused() {
-    let op = "fix:\n  safety: suggested\n  ops: [{ op: shuffle }]\n";
+    let op = "  fix:\n    safety: suggested\n    type: ops\n    ops: [{ op: shuffle }]\n";
     rejected(fixable(op), "shuffle");
-    let param = "fix:\n  safety: suggested\n  ops: [{ op: delete, node: x, colour: red }]\n";
+    let param = "  fix:\n    safety: suggested\n    type: ops\n    ops: [{ op: delete, node: x, colour: red }]\n";
     rejected(fixable(param), "colour");
+}
+
+fn ops(list: &str) -> String {
+    format!("  fix:\n    safety: suggested\n    type: ops\n    ops: {list}\n")
 }
 
 #[test]
 fn operation_parameters_are_checked() {
-    let both = "fix:\n  safety: suggested\n  ops: [{ op: move, node: x, before: y, after: z }]\n";
-    rejected(fixable(both), "exactly one of `before` or `after`");
-    let neither = "fix:\n  safety: suggested\n  ops: [{ op: move, node: x }]\n";
-    rejected(fixable(neither), "exactly one of `before` or `after`");
-    let delete = "fix:\n  safety: suggested\n  ops: [{ op: delete, file: x }]\n";
-    rejected(fixable(delete), "delete needs `node`, or `file` and `span`");
-    let key = "fix:\n  safety: suggested\n  ops: [{ op: reorder, scope: file, by: [group] }]\n";
-    rejected(fixable(key), "qualified `plugin/name`");
-    let scope = "fix:\n  safety: suggested\n  ops: [{ op: reorder, scope: world, by: [a/b] }]\n";
-    rejected(fixable(scope), "world");
+    rejected(
+        fixable(&ops("[{ op: move, node: x, before: y, after: z }]")),
+        "exactly one of `before` or `after`",
+    );
+    rejected(
+        fixable(&ops("[{ op: move, node: x }]")),
+        "exactly one of `before` or `after`",
+    );
+    rejected(
+        fixable(&ops("[{ op: delete, file: x }]")),
+        "delete needs `node`, or `file` and `span`",
+    );
+    rejected(
+        fixable(&ops("[{ op: reorder, scope: file, by: [group] }]")),
+        "qualified `plugin/name`",
+    );
+    rejected(
+        fixable(&ops("[{ op: reorder, scope: world, by: [a/b] }]")),
+        "world",
+    );
 }
 
 #[test]
 fn expressions_must_compile() {
-    let bad = "fix:\n  safety: suggested\n  ops: [{ op: delete, node: 'finding..x(' }]\n";
-    rejected(fixable(bad), "delete `node`");
-    let guard = "fix:\n  safety: suggested\n  ops: [{ op: delete, node: x, when: '1 +' }]\n";
-    rejected(fixable(guard), "`when`");
-    let text = "fix:\n  safety: suggested\n  ops: [{ op: replace, file: x, span: y, text: '{{ 1 + }}' }]\n";
-    rejected(fixable(text), "replace `text`");
-    let open =
-        "fix:\n  safety: suggested\n  ops: [{ op: replace, file: x, span: y, text: '{{ x' }]\n";
-    rejected(fixable(open), "never closed");
-}
-
-#[test]
-fn safe_is_reserved_for_mechanical_patterns() {
-    let heuristic = fixable("fix:\n  safety: safe\n  ops: [{ op: delete, node: x }]\n")
-        .into_iter()
-        .map(|(k, v)| (k, v.replace("mechanical", "heuristic")))
-        .collect();
-    rejected(heuristic, "reserved for mechanical patterns");
-}
-
-#[test]
-fn a_fix_belongs_to_an_implemented_pattern_with_a_fixed_example() {
-    let fix = "fix:\n  safety: safe\n  ops: [{ op: delete, node: x }]\n";
     rejected(
-        pattern_with(&format!("{fix}{EXAMPLES}")),
+        fixable(&ops("[{ op: delete, node: 'finding..x(' }]")),
+        "delete `node`",
+    );
+    rejected(
+        fixable(&ops("[{ op: delete, node: x, when: '1 +' }]")),
+        "`when`",
+    );
+    rejected(
+        fixable(&ops(
+            "[{ op: replace, file: x, span: y, text: '{{ 1 + }}' }]",
+        )),
+        "replace `text`",
+    );
+    rejected(
+        fixable(&ops("[{ op: replace, file: x, span: y, text: '{{ x' }]")),
+        "never closed",
+    );
+}
+
+#[test]
+fn safe_is_reserved_for_mechanical_decisions() {
+    let heuristic =
+        fixable("  fix:\n    safety: safe\n    type: ops\n    ops: [{ op: delete, node: x }]\n")
+            .into_iter()
+            .map(|(k, v)| (k, v.replace("mechanical", "heuristic")))
+            .collect();
+    rejected(heuristic, "reserved for mechanical decisions");
+}
+
+#[test]
+fn a_fix_belongs_to_a_checked_decision_with_a_fixed_example() {
+    let fix = "  fix:\n    safety: safe\n    type: ops\n    ops: [{ op: delete, node: x }]\n";
+    rejected(
+        decision_with(&format!("{fix}{EXAMPLES}")),
         "no findings to fix",
     );
-    let unfixed = EXAMPLES.replace("    fixed: [{ path: a.go, body: y }]\n", "");
+    let unfixed = EXAMPLES.replace("      fixed: [{ path: a.go, body: y }]\n", "");
     rejected(
-        pattern_with(&format!("{IMPLEMENTED}{fix}{unfixed}")),
+        decision_with(&format!("{CHECKED}{fix}{unfixed}")),
         "needs an invalid example with `fixed`",
     );
 }
 
 #[test]
 fn fixed_examples_must_name_files_of_an_invalid_example() {
-    let fix = "fix:\n  safety: safe\n  ops: [{ op: delete, node: x }]\n";
+    let fix = "  fix:\n    safety: safe\n    type: ops\n    ops: [{ op: delete, node: x }]\n";
     let elsewhere = EXAMPLES.replace("fixed: [{ path: a.go,", "fixed: [{ path: b.go,");
     rejected(
-        pattern_with(&format!("{IMPLEMENTED}{fix}{elsewhere}")),
+        decision_with(&format!("{CHECKED}{fix}{elsewhere}")),
         "not a file of the example",
     );
     let valid = EXAMPLES.replace(
-        "    files: [{ path: a.go, body: y }]\n",
-        "    files: [{ path: a.go, body: y }]\n    fixed: [{ path: a.go, body: y }]\n",
+        "      files: [{ path: a.go, body: y }]\n",
+        "      files: [{ path: a.go, body: y }]\n      fixed: [{ path: a.go, body: y }]\n",
     );
     rejected(
-        pattern_with(&format!("{IMPLEMENTED}{fix}{valid}")),
+        decision_with(&format!("{CHECKED}{fix}{valid}")),
         "only an invalid example has `fixed`",
     );
     rejected(
-        pattern_with(&format!("{IMPLEMENTED}{EXAMPLES}")),
+        decision_with(&format!("{CHECKED}{EXAMPLES}")),
         "`fixed` needs a `fix`",
     );
 }
 
 #[test]
 fn a_command_needs_a_program_and_a_usable_timeout() {
-    let empty = "fix:\n  safety: suggested\n  command: { argv: [] }\n";
-    rejected(fixable(empty), "needs a program");
-    let slow = "fix:\n  safety: suggested\n  command: { argv: [gofmt], timeout: soon }\n";
-    rejected(fixable(slow), "command.timeout");
-    let ok = "fix:\n  safety: suggested\n  command: { argv: [gofmt, -w, '{file}'], output: text, timeout: 2m }\n";
-    let catalog = Catalog::from_files(fixable(ok)).unwrap();
-    let fix: &Fix = catalog.pattern("p/a").unwrap().fix.as_ref().unwrap();
-    assert!(matches!(&fix.kind, FixKind::Command(c) if c.argv.len() == 3));
+    let command =
+        |fields: &str| format!("  fix:\n    safety: suggested\n    type: command\n    {fields}\n");
+    rejected(fixable(&command("argv: []")), "needs a program");
+    rejected(
+        fixable(&command("argv: [gofmt]\n    timeout: soon")),
+        "`timeout` is `soon`",
+    );
+    rejected(
+        fixable(&command("argv: [gofmt]\n    timeout: '30'")),
+        "expected a duration",
+    );
+    rejected(
+        fixable(&command("argv: [gofmt]\n    output: inPlace")),
+        "inPlace",
+    );
+    let ok = command("argv: [gofmt, -w, '{file}']\n    output: text\n    timeout: 2m");
+    let catalog = Catalog::from_files(fixable(&ok)).unwrap();
+    let fix: &Fix = catalog.decision("p/a").unwrap().fix.as_ref().unwrap();
+    let FixKind::Command(command) = &fix.kind else {
+        panic!("command expected");
+    };
+    assert_eq!(command.argv.len(), 3);
+    assert_eq!(
+        command.timeout_duration(),
+        Some(std::time::Duration::from_secs(120))
+    );
 }
 
 #[test]
-fn timeouts_read_seconds_and_minutes() {
-    assert_eq!(timeout_seconds("30s"), Some(30));
-    assert_eq!(timeout_seconds("30"), Some(30));
-    assert_eq!(timeout_seconds("2m"), Some(120));
-    assert_eq!(timeout_seconds("soon"), None);
-    assert_eq!(timeout_seconds("5h"), None);
-}
-
-#[test]
-fn a_fix_is_part_of_the_pattern_version_but_not_of_what_it_demands() {
-    let unfixed = EXAMPLES.replace("    fixed: [{ path: a.go, body: y }]\n", "");
-    let plain = Catalog::from_files(pattern_with(&format!("{IMPLEMENTED}{unfixed}"))).unwrap();
+fn a_fix_is_part_of_the_decision_version_but_not_of_what_it_demands() {
+    let unfixed = EXAMPLES.replace("      fixed: [{ path: a.go, body: y }]\n", "");
+    let plain = Catalog::from_files(decision_with(&format!("{CHECKED}{unfixed}"))).unwrap();
     let with_fix = Catalog::from_files(fixable(MOVE)).unwrap();
     let (a, b) = (
-        plain.pattern("p/a").unwrap(),
-        with_fix.pattern("p/a").unwrap(),
+        plain.decision("p/a").unwrap(),
+        with_fix.decision("p/a").unwrap(),
     );
 
     assert_ne!(a.version(), b.version());
@@ -233,9 +249,11 @@ fn a_fix_is_part_of_the_pattern_version_but_not_of_what_it_demands() {
 
 #[test]
 fn an_operations_guard_is_readable() {
-    let guarded = "fix:\n  safety: suggested\n  ops:\n    - { op: delete, node: finding.symbol, when: \"finding.evidence.role == 'x'\" }\n    - { op: delete, node: finding.symbol }\n";
-    let catalog = Catalog::from_files(fixable(guarded)).unwrap();
-    let FixKind::Ops(ops) = &catalog.pattern("p/a").unwrap().fix.as_ref().unwrap().kind else {
+    let guarded = ops(
+        "\n      - { op: delete, node: finding.symbol, when: \"finding.evidence.role == 'x'\" }\n      - { op: delete, node: finding.symbol }",
+    );
+    let catalog = Catalog::from_files(fixable(&guarded)).unwrap();
+    let FixKind::Ops { ops } = &catalog.decision("p/a").unwrap().fix.as_ref().unwrap().kind else {
         panic!("ops expected");
     };
 
@@ -258,6 +276,7 @@ fn the_fix_operations_page_documents_every_operation_and_key() {
     }
     assert!(page.contains("| `design/group` | the declaration group |"));
     assert!(page.contains("Every operation also takes `when`"));
-    assert!(page.contains("`rpc` kind"));
+    assert!(page.contains("`rpc` type"));
+    assert!(page.contains("type: command"));
     assert!(page.starts_with("<!-- Generated by `lighthouse docs generate`"));
 }

@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/parity-across-paths
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: evidence
+spec:
+  title: Test parity across execution paths
+  intent: Two paths for one contract can silently diverge.
+  scope:
+    domain: code
+    subject: project
+  requirement: >-
+    Parity MUST be tested wherever multiple execution paths are required to
+    implement the same public contract.
+  enforcement: judgment

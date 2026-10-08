@@ -1,8 +1,0 @@
-id: testing/freshness-gates-are-separate
-title: Freshness is a repository gate
-intent: Generated output and docs drift independent of test coverage.
-scope: project
-requirement: >-
-  Generated output and documentation freshness MUST be enforced as repository
-  gates, not as test-completeness rules.
-enforcement: doc

@@ -1,6 +1,6 @@
 //! The tools the server offers: name, description and the JSON Schema of the
-//! arguments. `pattern_similar` and `rule_proposals` are reserved for later
-//! phases and deliberately absent.
+//! arguments. `decision_similar` and `decision_proposals` are reserved for
+//! later phases and deliberately absent.
 
 use rmcp::model::{JsonObject, Tool};
 use serde_json::{Value, json};
@@ -23,35 +23,35 @@ pub fn all() -> Vec<Tool> {
         ),
         tool(
             "fix",
-            "Fix findings with the fixers the rules' patterns name (`fixable: safe|suggested` in `rule_list` and `explain`). Select what to fix with `fingerprints` (findings from `check`, prefixes allowed), `paths` or `rules`; at least one is required. A fix is proposed as edits over the code model, applied, formatted, re-checked and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only safe fixes of mechanical rules are applied unless `unsafe_fixes` is set. Use `dry_run` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a verdict suppresses are never fixed.",
+            "Fix findings with the fixers the rules' decisions name (`fixable: safe|suggested` in `decision_list` and `explain`). Select what to fix with `fingerprints` (findings from `check`, prefixes allowed), `paths` or `rules`; at least one is required. A fix is proposed as edits over the code model, applied, formatted, re-checked and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only safe fixes of mechanical rules are applied unless `unsafeFixes` is set. Use `dryRun` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a verdict suppresses are never fixed.",
             json!({
                 "fingerprints": { "type": "array", "items": { "type": "string" }, "description": "Fix these findings; a fingerprint or an unambiguous prefix each." },
                 "paths": { "type": "array", "items": { "type": "string" }, "description": "Fix findings under these paths (relative to the server's working directory)." },
                 "rules": { "type": "array", "items": { "type": "string" }, "description": format!("Fix findings of these rules; {FORMATS}.") },
-                "dry_run": { "type": "boolean", "description": "Return the diff and leave every file as it was." },
-                "unsafe_fixes": { "type": "boolean", "description": "Also apply suggested fixes, which are judgment calls: review the diff." }
+                "dryRun": { "type": "boolean", "description": "Return the diff and leave every file as it was." },
+                "unsafeFixes": { "type": "boolean", "description": "Also apply suggested fixes, which are judgment calls: review the diff." }
             }),
             &[],
         ),
         tool(
             "explain",
-            "Explain a pattern or rule: intent, requirement, examples, exceptions and status, as Markdown.",
-            json!({ "id": { "type": "string", "description": "A pattern or rule id such as `design/exported-doc`." } }),
+            "Explain a decision or rule: intent, requirement, examples, exceptions and status, as Markdown.",
+            json!({ "id": { "type": "string", "description": "A decision or rule id such as `design/exported-doc`." } }),
             &["id"],
         ),
         tool(
-            "rule_list",
-            "List the rules with severity, title and whether this project's configuration enables them.",
-            json!({ "all": { "type": "boolean", "description": "Include every catalog pattern, implemented or not." } }),
+            "decision_list",
+            "List the decisions with severity, title and whether this project's configuration enables them.",
+            json!({ "all": { "type": "boolean", "description": "Include every catalog decision, checked or not." } }),
             &[],
         ),
         tool(
             "review_tasks",
-            "List remembered findings that wait for a judgment (by default open findings of severity `review`), each with the fingerprint and `last_seen` that `review_resolve` needs.",
+            "List remembered findings that ask for a verdict (by default the open findings of heuristic and judgment decisions, whatever their severity), each with the fingerprint and `last_seen` that `review_resolve` needs.",
             json!({
                 "status": { "type": "string", "enum": ["open", "suppressed", "narrowing", "inactive", "resolved", "all"], "description": "Default `open`." },
                 "rule": { "type": "string", "description": "Only this rule." },
-                "tier": { "type": "string", "enum": ["review", "all"], "description": "Default `review`: findings of severity review, which ask for a judgment. `all` lists every severity." },
+                "tier": { "type": "string", "enum": ["review", "all"], "description": "Default `review`: findings that ask for a verdict because their decision is a heuristic or a judgment. `all` lists every remembered finding." },
                 "limit": { "type": "integer", "minimum": 1, "description": "Default 50." }
             }),
             &[],
@@ -75,28 +75,28 @@ pub fn all() -> Vec<Tool> {
             &["fingerprint"],
         ),
         tool(
-            "rule_create",
-            "Add a project-local declarative rule under .lighthouse/rules. The pattern (id `local/<name>`, title, intent, scope, requirement with MUST/SHOULD, enforcement, evidence) and the rule (select, where as a CEL expression that is true for a violation, message, evidence) may each be an object or a YAML/JSON string. Nothing is written unless the candidate validates, compiles and every example passes the whole engine; a rejection leaves the project untouched. The rule also needs the `local` plugin in lighthouse.toml to run in `check`.",
+            "decision_create",
+            "Add a project-local decision under .lighthouse/decisions. `id` is `local/<name>`; `spec` is the spec of a Decision (title, intent, scope {subject}, requirement with MUST/SHOULD, enforcement, evidence, and a `check` of `type: cel` with select, where as a CEL expression that is true for a violation, message and evidence); it may be an object or a YAML/JSON string. Nothing is written unless the candidate validates, compiles and every example passes the whole engine; a rejection leaves the project untouched. The decision also needs the `local` plugin in lighthouse.toml to run in `check`.",
             json!({
-                "pattern": { "type": ["object", "string"], "description": "The pattern definition (YAML or JSON text, or an object)." },
-                "rule": { "type": ["object", "string"], "description": "The declarative rule; omit when `pattern` has a `rule` key." },
-                "examples": { "type": ["array", "string"], "description": "Examples appended to the pattern's own: at least one valid and one invalid per language the project runs; each {name, language, kind: valid|invalid, files: [{path, body}], expect: [{line, message?}]}." }
+                "id": { "type": "string", "description": "`local/<name>`." },
+                "spec": { "type": ["object", "string"], "description": "The Decision spec (YAML or JSON text, or an object)." },
+                "examples": { "type": ["array", "string"], "description": "Examples appended to the spec's own: at least one valid and one invalid per language the project runs; each {name, language, kind: valid|invalid, files: [{path, body}], expect: [{line, message?}]}." }
             }),
-            &["pattern", "examples"],
+            &["id", "spec", "examples"],
         ),
         tool(
-            "rule_update",
-            "Change a project-local rule, or adjust a bundled one through the project's overlay file. `patch` is a JSON merge patch (null removes a key). For a bundled pattern only severity, exceptions, options, tuning and examples can change. The same gate as rule_create applies, and nothing is written when it fails.",
+            "decision_update",
+            "Change a project-local decision, or adjust a bundled one through the project's override file. `patch` is a JSON merge patch over the spec (null removes a key). For a bundled decision only severity, exceptions, options (new defaults), languages and examples can change. The same gate as decision_create applies, and nothing is written when it fails.",
             json!({
-                "id": { "type": "string", "description": "A local rule or any catalog pattern." },
+                "id": { "type": "string", "description": "A local decision or any catalog decision." },
                 "patch": { "type": ["object", "string"], "description": "JSON merge patch, as an object or JSON/YAML text." }
             }),
             &["id", "patch"],
         ),
         tool(
-            "rule_test",
-            "Run the examples of implemented patterns through the whole engine, in each language the project's plugins provide. `ok` is false when any example fails.",
-            json!({ "ids": { "type": "array", "items": { "type": "string" }, "description": "Pattern ids; default every implemented pattern." } }),
+            "decision_test",
+            "Run the examples of checked decisions through the whole engine, in each language the project's plugins provide. `ok` is false when any example fails.",
+            json!({ "ids": { "type": "array", "items": { "type": "string" }, "description": "Decision ids; default every checked decision." } }),
             &[],
         ),
     ]

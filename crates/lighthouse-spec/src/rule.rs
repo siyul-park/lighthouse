@@ -1,32 +1,21 @@
 use std::marker::PhantomData;
 
 use lighthouse_model::{Diagnostic, Options};
-use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest, Scope as RunScope};
+use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::{Catalog, Pattern, Scope};
+use crate::{Catalog, Decision};
 
-impl Scope {
-    /// Symbol, file and test patterns are checked once per file; module and
-    /// project patterns once over the merged project.
-    pub fn rule_scope(self) -> RunScope {
-        match self {
-            Self::Symbol | Self::File | Self::Test => RunScope::File,
-            Self::Module | Self::Project => RunScope::Project,
-        }
-    }
-}
-
-impl Pattern {
-    /// Rule metadata of an implemented pattern; `None` while it has no
-    /// implementation. Analyzers and capabilities belong to the implementation.
+impl Decision {
+    /// Rule metadata of a checked decision; `None` while it has no check.
+    /// Analyzers and capabilities belong to the check.
     pub fn rule_manifest(&self) -> Option<RuleManifest> {
-        self.implementation.as_ref()?;
+        self.check.as_ref()?;
         Some(RuleManifest {
-            id: self.id.clone(),
+            id: self.id().to_owned(),
             severity: self.severity()?,
-            scope: self.scope.rule_scope(),
+            scope: self.scope.subject.rule_scope(),
             description: self.title.clone(),
             docs: self.requirement.clone(),
             analyzers: Vec::new(),
@@ -37,32 +26,32 @@ impl Pattern {
     }
 }
 
-/// A rule whose metadata and option defaults come from its catalog pattern.
+/// A rule whose metadata and option defaults come from its catalog decision.
 /// `check` receives the options resolved for the focused file's language.
-pub struct PatternRule<O, F> {
+pub struct DecisionRule<O, F> {
     meta: RuleManifest,
-    pattern: &'static Pattern,
+    decision: &'static Decision,
     check: F,
     options: PhantomData<fn() -> O>,
 }
 
-impl<O, F> PatternRule<O, F>
+impl<O, F> DecisionRule<O, F>
 where
     O: DeserializeOwned,
     F: Fn(&RuleManifest, &Ctx, O) -> Result<Vec<Diagnostic>, Error> + Send + Sync,
 {
-    /// Panics when the bundled catalog has no implemented pattern `id`.
+    /// Panics when the bundled catalog has no checked decision `id`.
     pub fn new(id: &str, analyzers: &[&str], check: F) -> Self {
-        let pattern = Catalog::bundled()
-            .pattern(id)
+        let decision = Catalog::bundled()
+            .decision(id)
             .unwrap_or_else(|| panic!("bundled catalog defines {id}"));
-        let mut meta = pattern
+        let mut meta = decision
             .rule_manifest()
-            .unwrap_or_else(|| panic!("{id} is implemented"));
+            .unwrap_or_else(|| panic!("{id} has a check"));
         meta.analyzers = analyzers.iter().map(|a| (*a).to_owned()).collect();
         Self {
             meta,
-            pattern,
+            decision,
             check,
             options: PhantomData,
         }
@@ -74,24 +63,24 @@ where
             message,
         };
         let resolved = self
-            .pattern
+            .decision
             .resolve_options(configured, language)
             .map_err(|e| fail(e.to_string()))?;
         serde_json::from_value(Value::Object(resolved)).map_err(|e| fail(e.to_string()))
     }
 }
 
-impl<O, F> Rule for PatternRule<O, F>
+impl<O, F> Rule for DecisionRule<O, F>
 where
     O: DeserializeOwned + Send + Sync,
     F: Fn(&RuleManifest, &Ctx, O) -> Result<Vec<Diagnostic>, Error> + Send + Sync,
 {
-    /// The metadata of the pattern the rule was built from.
+    /// The metadata of the decision the rule was built from.
     fn manifest(&self) -> &RuleManifest {
         &self.meta
     }
 
-    /// Accepts the options when they resolve against the pattern's declared
+    /// Accepts the options when they resolve against the decision's declared
     /// options: known keys of the declared types.
     fn validate(&self, options: &Options) -> Result<(), Error> {
         self.resolve(options, None).map(drop)

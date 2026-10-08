@@ -54,7 +54,7 @@ impl Plugin for Design {
         rules
     }
 
-    /// The fixes of the pack's patterns, compiled from the catalog.
+    /// The fixes of the pack's decisions, compiled from the catalog.
     fn fixers(&self) -> Vec<Box<dyn Fixer>> {
         lighthouse_declarative::Declarative::bundled_fixers(ID)
     }

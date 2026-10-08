@@ -1,9 +1,0 @@
-id: testing/expand-validation-to-contract
-title: Expand validation to the contract
-intent: Validation breadth follows what the change can break.
-scope: project
-requirement: >-
-  Package, race, coverage, architecture, and repository checks MUST be applied
-  when relevant; only genuinely inapplicable checks MAY be skipped, and the
-  reason MUST be stated.
-enforcement: doc

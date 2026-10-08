@@ -1,6 +1,6 @@
 use lighthouse_model::{Diagnostic, Project, Symbol, SymbolId, SymbolKind, Visibility};
 use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
-use lighthouse_spec::PatternRule;
+use lighthouse_spec::DecisionRule;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -19,7 +19,7 @@ struct Options {
 }
 
 pub(crate) fn rule() -> Box<dyn Rule> {
-    Box::new(PatternRule::new(ID, &[], check))
+    Box::new(DecisionRule::new(ID, &[], check))
 }
 
 /// A private free function whose every production caller is a method of one

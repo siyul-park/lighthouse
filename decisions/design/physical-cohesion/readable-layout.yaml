@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/readable-layout
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: physical-cohesion
+spec:
+  title: Layout shows ownership
+  intent: Layout is documentation that cannot go stale.
+  scope:
+    domain: code
+    subject: file
+  requirement: >-
+    Files and declaration order MUST make ownership, responsibility, and
+    relationships easy to read.
+  enforcement: judgment

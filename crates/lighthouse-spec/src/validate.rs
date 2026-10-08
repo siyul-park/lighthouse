@@ -1,18 +1,18 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    Catalog, Enforcement, Error, Example, Implementation, Kind, Pattern,
+    Catalog, Check, Decision, Enforcement, Error, Example, ExampleKind,
     sources::{Source, has_keyword},
 };
 
 /// Everything a single layer must satisfy on its own.
 pub(crate) fn layer(catalog: &Catalog) -> Result<(), Error> {
-    patterns(catalog)?;
+    decisions(catalog)?;
     sources(catalog)
 }
 
-/// Pattern-level rules; also run on a merged overlay.
-pub(crate) fn patterns(catalog: &Catalog) -> Result<(), Error> {
+/// Decision-level rules; also run on a merged overlay.
+pub(crate) fn decisions(catalog: &Catalog) -> Result<(), Error> {
     for pack in &catalog.packs {
         kebab(&pack.id)?;
         for section in &pack.sections {
@@ -20,89 +20,89 @@ pub(crate) fn patterns(catalog: &Catalog) -> Result<(), Error> {
         }
     }
     let mut ids = BTreeSet::new();
-    for pattern in catalog.patterns() {
-        if !ids.insert(pattern.id.as_str()) {
-            return Err(Error::invalid(&pattern.id, "defined twice"));
+    for decision in catalog.decisions() {
+        if !ids.insert(decision.id()) {
+            return Err(Error::invalid(decision.id(), "defined twice"));
         }
-        self::pattern(pattern)?;
+        self::decision(decision)?;
     }
     Ok(())
 }
 
-pub(crate) fn pattern(pattern: &Pattern) -> Result<(), Error> {
-    let id = pattern.id.as_str();
+pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {
+    let id = decision.id();
     let (pack, name) = id
         .split_once('/')
         .ok_or_else(|| Error::invalid(id, "an id is `<pack>/<name>`"))?;
     kebab(pack)?;
     kebab(name)?;
-    if pattern.title.trim().is_empty() || pattern.intent.trim().is_empty() {
+    if decision.title.trim().is_empty() || decision.intent.trim().is_empty() {
         return Err(Error::invalid(id, "title and intent must not be empty"));
     }
-    if !has_keyword(&pattern.requirement) {
+    if !has_keyword(&decision.requirement) {
         return Err(Error::invalid(
             id,
             "the requirement needs MUST, SHOULD or MAY",
         ));
     }
-    let doc = pattern.enforcement == Enforcement::Doc;
-    if doc && pattern.severity_override.is_some() {
-        return Err(Error::invalid(id, "a `doc` pattern has no severity"));
+    let doc = decision.enforcement == Enforcement::Doc;
+    if doc && decision.severity.is_some() {
+        return Err(Error::invalid(id, "a `doc` decision has no severity"));
     }
-    if doc && pattern.implementation.is_some() {
-        return Err(Error::invalid(id, "a `doc` pattern has no implementation"));
+    if doc && decision.check.is_some() {
+        return Err(Error::invalid(id, "a `doc` decision has no check"));
     }
     let checkable = matches!(
-        pattern.enforcement,
+        decision.enforcement,
         Enforcement::Mechanical | Enforcement::Heuristic
     );
-    if checkable && pattern.evidence.is_empty() {
+    if checkable && decision.evidence.is_empty() {
         return Err(Error::invalid(
             id,
-            "a checkable pattern lists its evidence fields",
+            "a checkable decision lists its evidence fields",
         ));
     }
-    options(pattern)?;
-    pattern
+    options(decision)?;
+    decision
         .examples
         .iter()
-        .try_for_each(|e| example(pattern, e))?;
-    canonical(pattern)?;
-    implementation(pattern, checkable)?;
-    fix(pattern)
+        .try_for_each(|e| example(decision, e))?;
+    canonical(decision)?;
+    check(decision, checkable)?;
+    fix(decision)
 }
 
 pub(crate) fn relative(path: &str) -> bool {
     !path.is_empty() && !path.starts_with('/') && path.split('/').all(|part| part != "..")
 }
 
-fn fix(pattern: &Pattern) -> Result<(), Error> {
-    let id = pattern.id.as_str();
-    if let Some(fix) = &pattern.fix {
+fn fix(decision: &Decision) -> Result<(), Error> {
+    let id = decision.id();
+    if let Some(fix) = &decision.fix {
         crate::fix::validate(
             id,
             fix,
-            pattern.enforcement == Enforcement::Mechanical,
-            pattern.implementation.is_some(),
+            decision.enforcement == Enforcement::Mechanical,
+            decision.check.is_some(),
         )?;
-        let fixed = pattern
+        let fixed = decision
             .examples
             .iter()
-            .any(|e| e.kind == Kind::Invalid && !e.fixed.is_empty());
+            .any(|e| e.kind == ExampleKind::Invalid && !e.fixed.is_empty());
         if !fixed {
             return Err(Error::invalid(
                 id,
-                "a fixable pattern needs an invalid example with `fixed`",
+                "a fixable decision needs an invalid example with `fixed`",
             ));
         }
     }
-    for example in pattern.examples.iter().filter(|e| !e.fixed.is_empty()) {
+    for example in decision.examples.iter().filter(|e| !e.fixed.is_empty()) {
         let fail =
             |reason: &str| Error::invalid(id, format!("example `{}`: {reason}", example.name));
-        if pattern.fix.is_none() {
-            return Err(fail("`fixed` needs a `fix` on the pattern"));
+        if decision.fix.is_none() {
+            return Err(fail("`fixed` needs a `fix` on the decision"));
         }
-        if example.kind != Kind::Invalid {
+        if example.kind != ExampleKind::Invalid {
             return Err(fail("only an invalid example has `fixed`"));
         }
         let mut seen = BTreeSet::new();
@@ -118,34 +118,57 @@ fn fix(pattern: &Pattern) -> Result<(), Error> {
     Ok(())
 }
 
-fn options(pattern: &Pattern) -> Result<(), Error> {
-    for (key, spec) in &pattern.options {
-        let values = std::iter::once(&spec.default).chain(spec.per_language.values());
-        if values.into_iter().any(|v| !spec.kind.accepts(v)) {
+fn options(decision: &Decision) -> Result<(), Error> {
+    let id = decision.id();
+    let empty = crate::OptionsSchema::default();
+    let schema = decision.options.as_ref().unwrap_or(&empty);
+    if schema.additional_properties {
+        return Err(Error::invalid(
+            id,
+            "`options.additionalProperties` must be false: undeclared options are refused",
+        ));
+    }
+    for (key, property) in &schema.properties {
+        if !property.kind.accepts(&property.default) {
             return Err(Error::invalid(
-                &pattern.id,
-                format!("option `{key}` has a value that is not {}", spec.kind),
+                id,
+                format!("option `{key}` has a default that is not {}", property.kind),
             ));
         }
-        if spec.description.trim().is_empty() {
+        if property.description.trim().is_empty() {
             return Err(Error::invalid(
-                &pattern.id,
+                id,
                 format!("option `{key}` needs a description"),
             ));
+        }
+    }
+    for (language, spec) in &decision.languages {
+        for (key, value) in &spec.options {
+            let property = schema.properties.get(key).ok_or_else(|| {
+                Error::invalid(
+                    id,
+                    format!("`languages.{language}` sets unknown option `{key}`"),
+                )
+            })?;
+            if !property.kind.accepts(value) {
+                return Err(Error::invalid(
+                    id,
+                    format!(
+                        "`languages.{language}` sets option `{key}` to a value that is not {}",
+                        property.kind
+                    ),
+                ));
+            }
         }
     }
     Ok(())
 }
 
-fn example(pattern: &Pattern, example: &Example) -> Result<(), Error> {
-    let fail = |reason: String| {
-        Error::invalid(&pattern.id, format!("example `{}`: {reason}", example.name))
-    };
+fn example(decision: &Decision, example: &Example) -> Result<(), Error> {
+    let id = decision.id();
+    let fail = |reason: String| Error::invalid(id, format!("example `{}`: {reason}", example.name));
     if example.name.trim().is_empty() || example.language.is_empty() {
-        return Err(Error::invalid(
-            &pattern.id,
-            "an example needs a name and a language",
-        ));
+        return Err(Error::invalid(id, "an example needs a name and a language"));
     }
     if example.files.is_empty() {
         return Err(fail("has no files".to_owned()));
@@ -159,21 +182,21 @@ fn example(pattern: &Pattern, example: &Example) -> Result<(), Error> {
             )));
         }
     }
-    if example.kind == Kind::Valid && !example.expect.is_empty() {
+    if example.kind == ExampleKind::Valid && !example.expect.is_empty() {
         return Err(fail("a valid example expects no diagnostics".to_owned()));
     }
-    pattern
+    decision
         .resolve_options(&example.options, Some(&example.language))
         .map(drop)
 }
 
 /// A language has at most one canonical example per kind.
-fn canonical(pattern: &Pattern) -> Result<(), Error> {
+fn canonical(decision: &Decision) -> Result<(), Error> {
     let mut seen = BTreeSet::new();
-    for example in pattern.examples.iter().filter(|e| e.canonical) {
+    for example in decision.examples.iter().filter(|e| e.canonical) {
         if !seen.insert((example.language.as_str(), example.kind.to_string())) {
             return Err(Error::invalid(
-                &pattern.id,
+                decision.id(),
                 format!(
                     "more than one canonical {} example for language `{}`",
                     example.kind, example.language
@@ -184,28 +207,37 @@ fn canonical(pattern: &Pattern) -> Result<(), Error> {
     Ok(())
 }
 
-fn implementation(pattern: &Pattern, checkable: bool) -> Result<(), Error> {
-    let id = pattern.id.as_str();
-    let Some(implementation) = &pattern.implementation else {
+fn check(decision: &Decision, checkable: bool) -> Result<(), Error> {
+    let id = decision.id();
+    let Some(check) = &decision.check else {
         return Ok(());
     };
-    match implementation {
-        Implementation::Builtin(rule) if rule.is_empty() => {
-            return Err(Error::invalid(id, "builtin implementation needs a rule id"));
+    match check {
+        Check::Builtin(builtin) if builtin.id.is_empty() => {
+            return Err(Error::invalid(id, "a builtin check needs a rule id"));
         }
-        Implementation::Declarative(path) if !relative(path) || !path.ends_with(".yaml") => {
-            return Err(Error::invalid(
-                id,
-                "declarative implementation needs a relative .yaml path",
-            ));
+        Check::Builtin(_) => {}
+        Check::Cel(cel) => {
+            if let Some(problem) = cel.problem() {
+                return Err(Error::invalid(id, problem));
+            }
+            let subject = decision.scope.subject;
+            if cel.select.scope() != subject.rule_scope() {
+                return Err(Error::invalid(
+                    id,
+                    format!(
+                        "selects `{}`, which a `{subject}` decision cannot run over",
+                        cel.select.name()
+                    ),
+                ));
+            }
         }
-        _ => {}
     }
-    let has = |kind| pattern.examples.iter().any(|e| e.kind == kind);
-    if checkable && !(has(Kind::Valid) && has(Kind::Invalid)) {
+    let has = |kind| decision.examples.iter().any(|e| e.kind == kind);
+    if checkable && !(has(ExampleKind::Valid) && has(ExampleKind::Invalid)) {
         return Err(Error::invalid(
             id,
-            "an implemented pattern needs a valid and an invalid example",
+            "a checked decision needs a valid and an invalid example",
         ));
     }
     Ok(())
@@ -233,22 +265,22 @@ fn sources(catalog: &Catalog) -> Result<(), Error> {
         if seen.insert(&source.reference, source).is_some() {
             return Err(fail("listed twice"));
         }
-        match (source.patterns.is_empty(), &source.omitted) {
-            (true, None) => return Err(fail("maps to no pattern and has no `omitted` reason")),
-            (false, Some(_)) => return Err(fail("has patterns and an `omitted` reason")),
+        match (source.decisions.is_empty(), &source.omitted) {
+            (true, None) => return Err(fail("maps to no decision and has no `omitted` reason")),
+            (false, Some(_)) => return Err(fail("has decisions and an `omitted` reason")),
             (true, Some(reason)) if reason.trim().is_empty() => {
                 return Err(fail("`omitted` reason is empty"));
             }
             _ => {}
         }
         if let Some(id) = source
-            .patterns
+            .decisions
             .iter()
-            .find(|id| catalog.pattern(id).is_none())
+            .find(|id| catalog.decision(id).is_none())
         {
             return Err(Error::invalid(
                 &source.reference,
-                format!("maps to unknown pattern `{id}`"),
+                format!("maps to unknown decision `{id}`"),
             ));
         }
     }

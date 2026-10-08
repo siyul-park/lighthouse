@@ -1,0 +1,148 @@
+# yaml-language-server: $schema=../../schema/pack.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Pack
+metadata:
+  name: design
+spec:
+  title: Design Decisions
+  intro: >-
+    Language-neutral rules for structure, naming, APIs, ownership, errors and
+    comments. Each decision states its requirement and how it is enforced;
+    language-specific wording lives in its tuning.
+  sections:
+    - name: principles
+      title: Principles
+      intro: >-
+        Design minimizes conceptual surface while keeping responsibility and
+        ownership boundaries explicit.
+      decisions:
+        - minimal-symbols
+        - symbol-earns-existence
+        - single-owner
+        - coherent-responsibility
+        - no-forced-reuse
+    - name: dependency-direction
+      title: Dependency Direction
+      intro: >-
+        Dependency direction keeps stable, general code independent from
+        specific policy and context.
+      decisions:
+        - no-upward-dependency
+        - general-lower-level
+        - no-dependency-on-callers
+        - generalize-when-extracting
+    - name: physical-cohesion
+      title: Physical Cohesion
+      intro: >-
+        Physical layout should make ownership and collaboration visible while
+        preserving real structural boundaries.
+      decisions:
+        - single-file-per-owner
+        - related-symbols-close
+        - readable-layout
+        - separation-is-a-boundary
+    - name: structural-rules
+      title: Structural Rules
+      intro: >-
+        These rules reduce accidental duplication and unnecessary boundaries
+        without hiding genuine differences.
+      decisions:
+        - abstract-semantic-duplication
+        - merge-overlapping-symbols
+        - split-real-boundaries
+        - reuse-before-extension
+    - name: structural-signals
+      title: Structural Signals
+      intro: "Structural metrics are review signals, not proof of a design violation."
+      decisions:
+        - complexity-signal
+        - coupling-signal
+        - near-clone-signal
+        - adjacent-siblings
+        - signals-are-advisory
+    - name: functions
+      title: Functions
+      intro: >-
+        Function structure should make meaningful behavior reusable and
+        readable, not merely make functions smaller.
+      decisions:
+        - justified-helper
+        - private-helper-callers
+        - single-use-wrapper
+        - receiver-owned-behavior
+        - single-abstraction-level
+        - callers-before-callees
+    - name: naming
+      title: Naming
+      intro: >-
+        Names should expose role, contract, or ownership with the smallest
+        vocabulary that preserves the required distinction.
+      decisions:
+        - single-term-per-concept
+        - minimal-names
+        - no-redundant-qualifiers
+        - standard-abbreviations
+        - short-names-limited
+        - predicate-names
+        - reserved-action-verbs
+        - singular-capability-plural-collection
+    - name: types-and-apis
+      title: Types and APIs
+      intro: >-
+        Public APIs are stable contracts: expose the minimum caller-facing
+        abstraction and keep implementation state behind its owner.
+      decisions:
+        - interface-at-consumer
+        - narrow-inputs-concrete-outputs
+        - no-private-types-in-public-api
+        - contract-not-state
+        - validated-constructors
+        - required-args-optional-options
+        - no-speculative-api
+    - name: ownership
+      title: Ownership
+      intro: >-
+        Ownership makes it explicit who creates, changes, and ends mutable state
+        or resources.
+      decisions:
+        - single-state-owner
+        - private-state-behind-owner
+        - borrow-within-boundary
+        - single-resource-owner
+        - layout-declarations-hold-no-state
+        - no-exported-mutable-global
+    - name: concurrency
+      title: Concurrency
+      intro: >-
+        Concurrency rules prevent races and leaks by making shared state and
+        shutdown ownership explicit.
+      decisions: [explicit-shutdown, context-first, no-stored-request-context]
+    - name: errors
+      title: Errors
+      intro: >-
+        Errors are contracts: callers should be able to classify failures,
+        preserve causes, and avoid leaking implementation state.
+      decisions:
+        - stable-error-categories
+        - error-identity
+        - translate-errors-at-boundary
+        - errors-hide-private-state
+        - errors-not-panics
+    - name: file-order
+      title: File Order
+      intro: >-
+        Declaration order should let a reader follow ownership and behavior from
+        public concepts to implementation mechanics.
+      decisions: [declaration-groups, top-down-reading, order-is-not-a-reason-to-split]
+    - name: comments
+      title: Comments
+      intro: >-
+        Comments preserve facts that code cannot express; they should not
+        narrate code that is already visible.
+      decisions: [comments-preserve-facts, no-narration, section-banners, exported-doc]
+    - name: generated-and-platform
+      title: Generated and Platform Code
+      intro: >-
+        Generated and platform-specific code should remain behind the mechanism
+        and boundary that own it.
+      decisions: [generated-via-generator, platform-behind-owner]

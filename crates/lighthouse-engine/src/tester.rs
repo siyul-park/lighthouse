@@ -2,7 +2,7 @@ use std::{fmt::Write as _, fs, path::Path};
 
 use lighthouse_config::Config;
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Catalog, Example, Kind, Pattern};
+use lighthouse_spec::{Catalog, Decision, Example, ExampleKind};
 use serde_json::Value;
 
 use crate::{Engine, FixPlan, FixRun, unified_diff};
@@ -10,7 +10,7 @@ use crate::{Engine, FixPlan, FixRun, unified_diff};
 /// Language of examples that need no language provider.
 const NEUTRAL: &str = "text";
 
-/// Runs the examples of catalog patterns through the whole engine, the way
+/// Runs the examples of catalog decisions through the whole engine, the way
 /// `lighthouse check` would see them. The registry is built per example
 /// because an engine owns its registry.
 pub struct RuleTester<'a> {
@@ -45,21 +45,21 @@ impl<'a> RuleTester<'a> {
         self
     }
 
-    /// Failures of every implemented pattern; empty when all examples hold.
+    /// Failures of every checked decision; empty when all examples hold.
     pub fn check_all(&self) -> Vec<String> {
         self.catalog
-            .patterns()
-            .filter(|p| p.implementation.is_some())
+            .decisions()
+            .filter(|d| d.check.is_some())
             .flat_map(|p| self.check(p))
             .collect()
     }
 
-    /// Failures of one pattern's examples, each prefixed `<id> <example>:`.
-    /// With a language filter, a pattern that has no example for that language
-    /// (and no language-neutral `text` example) is itself a failure: an
-    /// implemented rule must show what it does in every language under test.
-    pub fn check(&self, pattern: &Pattern) -> Vec<String> {
-        let selected: Vec<&Example> = pattern
+    /// Failures of one decision's examples, each prefixed `<id> <example>:`.
+    /// With a language filter, a decision that has no example for that language
+    /// (and no language-neutral `text` example) is itself a failure: a checked
+    /// rule must show what it does in every language under test.
+    pub fn check(&self, decision: &Decision) -> Vec<String> {
+        let selected: Vec<&Example> = decision
             .examples
             .iter()
             .filter(|example| self.selects(example))
@@ -67,15 +67,15 @@ impl<'a> RuleTester<'a> {
         if selected.is_empty() && self.language.is_some() {
             return vec![format!(
                 "{}: no example for language `{}`",
-                pattern.id,
+                decision.id(),
                 self.language.as_deref().unwrap_or_default()
             )];
         }
         selected
             .into_iter()
             .filter_map(|example| {
-                let failure = self.run(pattern, example).err()?;
-                Some(format!("{} {}: {failure}", pattern.id, example.name))
+                let failure = self.run(decision, example).err()?;
+                Some(format!("{} {}: {failure}", decision.id(), example.name))
             })
             .collect()
     }
@@ -86,7 +86,7 @@ impl<'a> RuleTester<'a> {
             .is_none_or(|language| *language == example.language || example.language == NEUTRAL)
     }
 
-    fn run(&self, pattern: &Pattern, example: &Example) -> Result<(), String> {
+    fn run(&self, decision: &Decision, example: &Example) -> Result<(), String> {
         let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
         for file in &example.files {
             let path = dir.path().join(&file.path);
@@ -96,10 +96,10 @@ impl<'a> RuleTester<'a> {
             fs::write(&path, file.text()).map_err(|e| e.to_string())?;
         }
         let registry = (self.registry)();
-        let config = config(&registry, pattern, example)?;
+        let config = config(&registry, decision, example)?;
         let engine = Engine::new(registry, config, dir.path()).map_err(|e| e.to_string())?;
         let outcome = engine
-            .check(&[], std::slice::from_ref(&pattern.id))
+            .check(&[], &[decision.id().to_owned()])
             .map_err(|e| e.to_string())?;
         let found: Vec<(u32, &str)> = outcome
             .diagnostics
@@ -107,31 +107,31 @@ impl<'a> RuleTester<'a> {
             .map(|d| (d.span.start.line, d.message.as_str()))
             .collect();
         match example.kind {
-            Kind::Valid if found.is_empty() => Ok(()),
-            Kind::Valid => Err(format!("expected no diagnostics, got {}", describe(&found))),
-            Kind::Invalid => {
+            ExampleKind::Valid if found.is_empty() => Ok(()),
+            ExampleKind::Valid => Err(format!("expected no diagnostics, got {}", describe(&found))),
+            ExampleKind::Invalid => {
                 compare(example, &found)?;
-                if pattern.fix.is_some() && !example.fixed.is_empty() {
-                    self.check_fix(&engine, pattern, example, dir.path())?;
+                if decision.fix.is_some() && !example.fixed.is_empty() {
+                    self.check_fix(&engine, decision, example, dir.path())?;
                 }
                 Ok(())
             }
         }
     }
 
-    /// Applies the pattern's fix to the written example and holds it to the
+    /// Applies the decision's fix to the written example and holds it to the
     /// example's `fixed` files: the text is exactly that, the rule no longer
     /// fires, and a second application changes nothing.
     fn check_fix(
         &self,
         engine: &Engine,
-        pattern: &Pattern,
+        decision: &Decision,
         example: &Example,
         dir: &Path,
     ) -> Result<(), String> {
         let plan = FixPlan::from_catalog(self.catalog);
         let run = FixRun {
-            rules: vec![pattern.id.clone()],
+            rules: vec![decision.id().to_owned()],
             unsafe_fixes: true,
             trusted: self.trusted,
             ..FixRun::default()
@@ -158,7 +158,7 @@ impl<'a> RuleTester<'a> {
             }
         }
         let again = engine
-            .check(&[], std::slice::from_ref(&pattern.id))
+            .check(&[], &[decision.id().to_owned()])
             .map_err(|e| e.to_string())?;
         if !again.diagnostics.is_empty() {
             let found: Vec<(u32, &str)> = again
@@ -183,25 +183,29 @@ impl<'a> RuleTester<'a> {
     }
 }
 
-fn config(registry: &Registry, pattern: &Pattern, example: &Example) -> Result<Config, String> {
-    let level = pattern
+fn config(registry: &Registry, decision: &Decision, example: &Example) -> Result<Config, String> {
+    let level = decision
         .severity()
-        .ok_or_else(|| "a pattern without severity has no rule".to_owned())?;
+        .ok_or_else(|| "a decision without severity has no rule".to_owned())?;
     let mut rule = toml::Table::new();
     rule.insert("level".to_owned(), level.to_string().into());
-    for (key, value) in &example.options {
-        rule.insert(key.clone(), toml_value(value)?);
+    if !example.options.is_empty() {
+        let mut options = toml::Table::new();
+        for (key, value) in &example.options {
+            options.insert(key.clone(), toml_value(value)?);
+        }
+        rule.insert("options".to_owned(), options.into());
     }
     let plugins: Vec<toml::Value> = registry
         .plugins()
         .map(|id| toml::Value::String(id.to_owned()))
         .collect();
     let mut rules = toml::Table::new();
-    rules.insert(pattern.id.clone(), rule.into());
+    rules.insert(decision.id().to_owned(), rule.into());
     let mut root = toml::Table::new();
     root.insert("plugins".to_owned(), plugins.into());
     root.insert("rules".to_owned(), rules.into());
-    Config::parse(&root.to_string()).map_err(|e| e.to_string())
+    Config::parse_inline(&root.to_string()).map_err(|e| e.to_string())
 }
 
 fn toml_value(value: &Value) -> Result<toml::Value, String> {

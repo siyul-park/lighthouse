@@ -1,0 +1,95 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/standard-assertions
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: readability
+spec:
+  title: Assertions use the standard library
+  intent: >-
+    A hand-written compare-and-fail repeats what the project's assertion library
+    already states, with worse failure output.
+  scope:
+    domain: code
+    subject: test
+  requirement: >-
+    Tests SHOULD assert through the project's standard assertion library, and a
+    test helper SHOULD NOT reimplement a comparison and failure that the library
+    already provides.
+  enforcement: heuristic
+  evidence: [symbol, manual_assertions]
+  languages:
+    go:
+      tuning: >-
+        The library is `github.com/stretchr/testify/require`. A function of a
+        test file that has an `if` with no `else` whose condition compares or
+        negates and whose only effect is `t.Fatal`, `t.Fatalf`, `t.Error`,
+        `t.Errorf`, `t.Fail` or `t.FailNow` is reported with the number of such
+        checks. A check that does more than fail, such as one that also returns,
+        is not a plain assertion.
+    rust:
+      tuning: >-
+        Use `assert_eq!`, `assert_ne!` and `assert!` with a message instead of
+        helpers that compare and `panic!`. Not enforced for Rust, whose provider
+        does not count hand-written checks.
+  check:
+    type: builtin
+    id: testing/standard-assertions
+  examples:
+    - name: hand-written-comparison
+      language: go
+      kind: invalid
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/store
+
+            go 1.26
+        - path: store.go
+          body: |-
+            package store
+
+            func Get() int { return 1 }
+        - path: store_test.go
+          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc TestGet(t *testing.T) {\n\tif got := store.Get(); got != 1 {\n\t\tt.Fatalf(\"got %d\", got)\n\t}\n}"
+      expect:
+        - line: 9
+    - name: check-that-does-more
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/store
+
+            go 1.26
+        - path: store.go
+          body: |-
+            package store
+
+            func Get() int { return 1 }
+        - path: store_test.go
+          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc TestGet(t *testing.T) {\n\tgot := store.Get()\n\tif got != 1 {\n\t\tt.Errorf(\"got %d\", got)\n\t\treturn\n\t}\n}"
+    - name: rust-assert-macros
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn get() -> i32 {
+                1
+            }
+
+            #[cfg(test)]
+            mod tests {
+                use super::*;
+
+                #[test]
+                fn get_returns_one() {
+                    assert_eq!(get(), 1);
+                }
+            }

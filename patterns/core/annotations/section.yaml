@@ -1,4 +1,0 @@
-id: annotations
-title: Source annotations
-intro: A finding that is right to leave in place can be allowed where it happens, in a comment that a reviewer sees in the diff.
-patterns: [allow-annotation, annotation-reason, unused-allow]

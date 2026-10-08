@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/evidence-by-layer
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: evidence
+spec:
+  title: Each layer proves its own facts
+  intent: Using the wrong layer either over-claims or leaves facts unproven.
+  scope:
+    domain: code
+    subject: project
+  requirement: >-
+    Each required fact MUST be proven by the layer that owns it: public tests
+    prove exported behavior, errors, and lifecycle; parity tests prove
+    equivalent public behavior across distinct execution paths; golden tests
+    prove exact low-level output for a specified input shape; async tests prove
+    publication, shutdown, and race behavior; fuzz tests prove bounded
+    trust-boundary or differential properties; integration tests prove public
+    end-to-end behavior.
+  enforcement: doc

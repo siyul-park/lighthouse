@@ -14,7 +14,7 @@ fn project(max: usize) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        format!("plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = {{ level = \"warn\", max = {max} }}\n"),
+        lighthouse_testkit::project(&format!("plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = {{ level = \"warn\", options = {{ max = {max} }} }}\n")),
     )
     .unwrap();
     fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\ne\nf\ng\nh\n").unwrap();
@@ -29,7 +29,7 @@ fn check_reports_warning_and_passes_without_strict() {
         .arg("check")
         .assert()
         .success()
-        .stdout("big.txt:7:1: warn core/max-file-lines: file has 8 lines, limit is 6\nsummary: 0 error, 1 warn, 0 review, 0 incomplete\n");
+        .stdout("big.txt:7:1: warn core/max-file-lines: file has 8 lines, limit is 6\nsummary: 0 error, 1 warn, 0 info, 0 incomplete\n");
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn json_and_sarif_formats() {
         .output()
         .unwrap();
     let line: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(line["rule_id"], "core/max-file-lines");
+    assert_eq!(line["ruleId"], "core/max-file-lines");
     assert_eq!(line["evidence"]["lines"], 8);
 
     let out = lighthouse(dir.path())
@@ -93,11 +93,13 @@ fn gitignored_files_are_skipped_and_rules_filter_applies() {
 fn override_can_turn_a_rule_off_for_a_file() {
     let dir = project(6);
     let config = dir.path().join("lighthouse.toml");
-    let mut text = fs::read_to_string(&config).unwrap();
-    text.push_str(
-        "[[overrides]]\nfiles = [\"big.txt\"]\nrules = { \"core/max-file-lines\" = \"off\" }\n",
-    );
-    fs::write(&config, text).unwrap();
+    fs::write(
+        &config,
+        lighthouse_testkit::project(
+            "plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"warn\", options = { max = 6 } }\n[[overrides]]\nfiles = [\"big.txt\"]\nrules = { \"core/max-file-lines\" = \"off\" }\n",
+        ),
+    )
+    .unwrap();
     lighthouse(dir.path())
         .arg("check")
         .assert()
@@ -149,10 +151,10 @@ fn init_keeps_the_store_out_of_version_control() {
 }
 
 #[test]
-fn rule_list_and_explain() {
+fn decision_list_and_explain() {
     let dir = tempfile::tempdir().unwrap();
     let list = lighthouse(dir.path())
-        .args(["rule", "list"])
+        .args(["decision", "list"])
         .output()
         .unwrap();
     let list = String::from_utf8(list.stdout).unwrap();
@@ -161,7 +163,7 @@ fn rule_list_and_explain() {
         "design/complexity-signal\twarn\tComplexity is a review signal",
         "design/declaration-groups\terror\t",
         "design/no-exported-mutable-global\twarn\t",
-        "design/private-helper-callers\treview\t",
+        "design/private-helper-callers\tinfo\t",
         "testing/owner-test\twarn\t",
         "testing/single-owner-test\terror\t",
     ] {
@@ -186,10 +188,10 @@ fn rule_list_and_explain() {
 }
 
 #[test]
-fn rule_list_all_shows_status_of_every_pattern() {
+fn decision_list_all_shows_status_of_every_decision() {
     let dir = tempfile::tempdir().unwrap();
     let out = lighthouse(dir.path())
-        .args(["rule", "list", "--all"])
+        .args(["decision", "list", "--all"])
         .output()
         .unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
@@ -203,7 +205,7 @@ fn rule_list_all_shows_status_of_every_pattern() {
 }
 
 #[test]
-fn explain_describes_unimplemented_patterns() {
+fn explain_describes_unimplemented_decisions() {
     let dir = tempfile::tempdir().unwrap();
     let out = lighthouse(dir.path())
         .args(["explain", "design/error-identity"])
@@ -231,7 +233,7 @@ fn docs_check_fails_until_generated_and_after_edits() {
         .assert()
         .success();
 
-    let page = dir.path().join("docs/patterns/design.md");
+    let page = dir.path().join("docs/decisions/design.md");
     fs::write(&page, "edited\n").unwrap();
     lighthouse(dir.path())
         .args(["docs", "check"])
@@ -241,7 +243,7 @@ fn docs_check_fails_until_generated_and_after_edits() {
         .args(["docs", "generate", "--out", "other"])
         .assert()
         .success();
-    assert!(dir.path().join("other/patterns/testing.md").exists());
+    assert!(dir.path().join("other/decisions/testing.md").exists());
 }
 
 #[test]
@@ -251,7 +253,7 @@ fn docs_generate_removes_orphans_and_check_flags_them() {
         .args(["docs", "generate"])
         .assert()
         .success();
-    let orphan = dir.path().join("docs/patterns/old.md");
+    let orphan = dir.path().join("docs/decisions/old.md");
     fs::write(&orphan, "x").unwrap();
     let out = lighthouse(dir.path())
         .args(["docs", "check"])
@@ -277,7 +279,7 @@ fn docs_generate_removes_orphans_and_check_flags_them() {
 #[test]
 fn docs_check_reports_unreadable_output_as_an_error() {
     let dir = tempfile::tempdir().unwrap();
-    fs::create_dir_all(dir.path().join("docs/patterns/design.md")).unwrap();
+    fs::create_dir_all(dir.path().join("docs/decisions/design.md")).unwrap();
     lighthouse(dir.path())
         .args(["docs", "check"])
         .assert()
@@ -294,10 +296,10 @@ fn go_project(source: &str) -> Option<(TempDir, std::path::PathBuf)> {
     let config = project.path().join("lighthouse.toml");
     fs::write(
         &config,
-        format!(
+        lighthouse_testkit::project(&format!(
             "plugins = [{{ id = \"lang-go\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n",
             plugin.to_str().unwrap()
-        ),
+        )),
     )
     .unwrap();
     Some((project, config))
@@ -312,7 +314,7 @@ fn go_files_are_analyzed_by_the_go_plugin_over_rpc() {
         .arg("check")
         .assert()
         .success()
-        .stdout("api.go:3:1: warn design/exported-doc: exported function Open must have a doc comment\nsummary: 0 error, 1 warn, 0 review, 0 incomplete\n");
+        .stdout("api.go:3:1: warn design/exported-doc: exported function Open must have a doc comment\nsummary: 0 error, 1 warn, 0 info, 0 incomplete\n");
 }
 
 #[test]
@@ -366,7 +368,7 @@ fn a_plugin_listed_but_missing_is_a_usage_error() {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        "plugins = [\"nowhere\"]\n",
+        lighthouse_testkit::project("plugins = [\"nowhere\"]\n"),
     )
     .unwrap();
     lighthouse(dir.path()).arg("check").assert().code(2);
@@ -382,10 +384,10 @@ fn config_flag_checks_the_current_directory_with_another_config_file() {
     let config = elsewhere.path().join("lh.toml");
     fs::write(
         &config,
-        format!(
+        lighthouse_testkit::project(&format!(
             "plugins = [{{ id = \"lang-go\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n",
             plugin.to_str().unwrap()
-        ),
+        )),
     )
     .unwrap();
     fs::remove_file(project.path().join("lighthouse.toml")).unwrap();
@@ -394,7 +396,7 @@ fn config_flag_checks_the_current_directory_with_another_config_file() {
         .arg(&config)
         .assert()
         .success()
-        .stdout("api.go:3:1: warn design/exported-doc: exported function Open must have a doc comment\nsummary: 0 error, 1 warn, 0 review, 0 incomplete\n");
+        .stdout("api.go:3:1: warn design/exported-doc: exported function Open must have a doc comment\nsummary: 0 error, 1 warn, 0 info, 0 incomplete\n");
     lighthouse(project.path())
         .args(["check", "--config", "missing.toml"])
         .assert()
@@ -492,47 +494,58 @@ fn predicates_lacks(text: &'static str) -> impl predicates::Predicate<[u8]> {
     predicates::str::contains(text).not().from_utf8()
 }
 
-const LOCAL_RULE: &str = "id: local/long-file
-title: Files stay short
-intent: Long files are hard to read.
-scope: file
-requirement: A file MUST have at most three lines.
-enforcement: mechanical
-evidence: [path]
-examples:
-  - name: long
-    language: text
-    kind: invalid
-    files: [{ path: a.txt, body: \"1\\n2\\n3\\n4\" }]
-    expect: [{ line: 1 }]
-  - name: short
-    language: text
-    kind: valid
-    files: [{ path: a.txt, body: \"1\\n2\" }]
-rule:
-  select: file
-  where: 'file.lines > 3 && !file.generated'
-  message: 'file {{ file.path }} has {{ file.lines }} lines'
-  evidence:
-    path: file.path
+const LOCAL_RULE: &str = "apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/long-file
+spec:
+  title: Files stay short
+  intent: Long files are hard to read.
+  scope: { subject: file }
+  requirement: A file MUST have at most three lines.
+  enforcement: mechanical
+  evidence: [path]
+  check:
+    type: cel
+    select: file
+    where: 'file.lines > 3 && !file.generated'
+    message: 'file {{ file.path }} has {{ file.lines }} lines'
+    evidence:
+      path: file.path
+  examples:
+    - name: long
+      language: text
+      kind: invalid
+      files: [{ path: a.txt, body: \"1\\n2\\n3\\n4\" }]
+      expect: [{ line: 1 }]
+    - name: short
+      language: text
+      kind: valid
+      files: [{ path: a.txt, body: \"1\\n2\" }]
 ";
 
 fn local_project(rule: &str) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        "plugins = [\"core\", \"local\"]\n[rules]\n\"local/long-file\" = \"error\"\n",
+        lighthouse_testkit::project(
+            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/long-file\" = \"error\"\n",
+        ),
     )
     .unwrap();
-    fs::create_dir_all(dir.path().join(".lighthouse/rules")).unwrap();
-    fs::write(dir.path().join(".lighthouse/rules/long-file.yaml"), rule).unwrap();
+    fs::create_dir_all(dir.path().join(".lighthouse/decisions")).unwrap();
+    fs::write(
+        dir.path().join(".lighthouse/decisions/long-file.yaml"),
+        rule,
+    )
+    .unwrap();
     fs::write(dir.path().join("big.txt"), "1\n2\n3\n4\n5\n").unwrap();
     fs::write(dir.path().join("small.txt"), "1\n").unwrap();
     dir
 }
 
 #[test]
-fn local_declarative_rules_run_in_check_and_are_tested_by_rule_test() {
+fn local_declarative_rules_run_in_check_and_are_tested_by_decision_test() {
     let dir = local_project(LOCAL_RULE);
     lighthouse(dir.path())
         .arg("check")
@@ -542,28 +555,40 @@ fn local_declarative_rules_run_in_check_and_are_tested_by_rule_test() {
             "big.txt:1:1: error local/long-file: file big.txt has 5 lines",
         ));
     lighthouse(dir.path())
-        .args(["rule", "test", "local/long-file"])
+        .args(["decision", "test", "local/long-file"])
         .assert()
         .success()
         .stdout(predicates_contains("0 failure(s)"));
 }
 
 #[test]
-fn rule_test_fails_when_an_example_does_not_hold() {
+fn decision_test_fails_when_an_example_does_not_hold() {
     let broken = LOCAL_RULE.replace("where: 'file.lines > 3", "where: 'file.lines > 30");
     let dir = local_project(&broken);
     lighthouse(dir.path())
-        .args(["rule", "test", "local/long-file"])
+        .args(["decision", "test", "local/long-file"])
         .assert()
         .code(1)
         .stdout(predicates_contains("FAIL [text] local/long-file long"));
 }
 
 #[test]
-fn rule_test_rejects_unknown_ids() {
+fn decision_test_rejects_unknown_ids() {
     let dir = local_project(LOCAL_RULE);
     lighthouse(dir.path())
-        .args(["rule", "test", "local/nope"])
+        .args(["decision", "test", "local/nope"])
         .assert()
         .code(2);
+}
+
+#[test]
+fn the_old_rule_command_names_the_decision_command() {
+    let dir = project(6);
+    lighthouse(dir.path())
+        .args(["rule", "list", "--all"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "run `lighthouse decision list --all`",
+        ));
 }

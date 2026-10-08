@@ -1,5 +1,5 @@
 //! The agent skill, generated from the catalog and the configuration so that
-//! rules, config and guidance have one source.
+//! decisions, config and guidance have one source.
 
 use std::{collections::BTreeSet, fmt::Write};
 
@@ -24,9 +24,9 @@ pub fn skill_for(session: &Session) -> Result<String> {
 }
 
 /// The text of `skills/lighthouse/SKILL.md`: what Lighthouse is for, the loop
-/// an agent follows, how to look rules up, and a digest (id, title, tier) of
-/// the patterns `active` names. The rule text itself is never copied: the
-/// agent reads it from the MCP resources or `lighthouse explain`.
+/// an agent follows, how to look decisions up, and a digest (id, title, tier)
+/// of the decisions `active` names. The decision text itself is never copied:
+/// the agent reads it from the MCP resources or `lighthouse explain`.
 pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
     let mut out = String::from(HEAD);
     let mut by_pack: Vec<(&str, Vec<String>)> = Vec::new();
@@ -34,15 +34,15 @@ pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
         let lines: Vec<String> = pack
             .sections
             .iter()
-            .flat_map(|s| &s.patterns)
-            .filter(|p| active.contains(&p.id))
-            .map(|p| {
-                let level = p.severity().map_or("doc", |s| tier(s, Some(p)));
-                let fixable = p
+            .flat_map(|s| &s.decisions)
+            .filter(|d| active.contains(d.id()))
+            .map(|d| {
+                let level = d.severity().map_or("doc", |s| tier(s, Some(d)));
+                let fixable = d
                     .fix
                     .as_ref()
                     .map_or(String::new(), |f| format!(", fixable: {}", f.safety));
-                format!("- `{}` ({level}{fixable}) {}", p.id, p.title)
+                format!("- `{}` ({level}{fixable}) {}", d.id(), d.title)
             })
             .collect();
         if !lines.is_empty() {
@@ -50,8 +50,8 @@ pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
         }
     }
     let total: usize = by_pack.iter().map(|(_, l)| l.len()).sum();
-    let _ = writeln!(out, "\n## Active patterns ({total})\n");
-    out.push_str("Tiers: mechanical (error), heuristic (warn), judgment (review). `fixable: safe|suggested` marks a rule with a fixer.\n");
+    let _ = writeln!(out, "\n## Active decisions ({total})\n");
+    out.push_str("A decision's tier is its enforcement: mechanical (default error), heuristic (default warn), judgment (default info). Heuristic and judgment findings are review tasks and verdicts can suppress them, at any severity; mechanical findings cannot be suppressed. `fixable: safe|suggested` marks a decision with a fixer.\n");
     for (pack, lines) in by_pack {
         let _ = writeln!(out, "\n### {pack}\n");
         for line in lines {

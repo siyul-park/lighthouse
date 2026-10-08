@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/expand-validation-to-contract
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: validation
+spec:
+  title: Expand validation to the contract
+  intent: Validation breadth follows what the change can break.
+  scope:
+    domain: code
+    subject: project
+  requirement: >-
+    Package, race, coverage, architecture, and repository checks MUST be applied
+    when relevant; only genuinely inapplicable checks MAY be skipped, and the
+    reason MUST be stated.
+  enforcement: doc

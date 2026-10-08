@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-private-types-in-public-api
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: types-and-apis
+spec:
+  title: Public APIs do not expose private types
+  intent: Callers must be able to use an API without naming private types.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: Public APIs MUST be usable without callers naming private types.
+  enforcement: mechanical
+  evidence: [api, private_type]
+  examples:
+    - name: invalid
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            type config struct{}
+
+            func New() config { return config{} }
+    - name: valid
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            type Config struct{}
+
+            func New() Config { return Config{} }

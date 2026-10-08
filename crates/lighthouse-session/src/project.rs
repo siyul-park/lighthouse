@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_config::{Config, FILE_NAME};
+use lighthouse_config::{Config, FILE_NAME, Format};
 use lighthouse_declarative::{Declarative, load_local, local_files};
 use lighthouse_plugin::Registry;
 use lighthouse_rpc::Registered;
@@ -19,23 +19,23 @@ use crate::{
 };
 
 /// What `init` writes and what a project without a config is checked with.
-pub const DEFAULT_CONFIG: &str = "plugins = [\"core\"]\nextends = [\"core/recommended\"]\n";
+pub const DEFAULT_CONFIG: &str = "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Project\"\n\n[metadata]\nname = \"project\"\n\n[spec]\nplugins = [\"core\"]\nextends = [\"core/recommended\"]\n";
 
 /// A project as the frontends open it: its configuration, its root directory
-/// and its local rules layer.
+/// and its local decisions layer.
 pub struct Session {
     pub config: Config,
     pub root: PathBuf,
-    /// The catalog layer of `.lighthouse/rules`, when the project has one.
+    /// The catalog layer of `.lighthouse/decisions`, when the project has one.
     pub local: Option<Catalog>,
     /// What the project asks to be trusted for, computed from the same bytes
-    /// the configuration and the rules were loaded from.
+    /// the configuration and the decisions were loaded from.
     pub basis: Basis,
 }
 
 impl Session {
     /// Loads `config`, or discovers `lighthouse.toml` upward from the current
-    /// directory, and the project's local rules.
+    /// directory, and the project's local decisions.
     pub fn load(config: Option<&Path>) -> Result<Self> {
         Self::open(config, true)
     }
@@ -48,16 +48,15 @@ impl Session {
 
     /// The project that `dir` or a directory above it configures with a
     /// `lighthouse.toml`; `None` when there is none, an error when the config
-    /// or the local rules are broken. Unlike `load`, it never reads the
+    /// or the local decisions are broken. Unlike `load`, it never reads the
     /// process's current directory, so a hook can name the project it was
     /// started for.
     pub fn find_in(dir: &Path) -> Result<Option<Self>> {
         for ancestor in dir.ancestors() {
-            let path = ancestor.join(FILE_NAME);
-            if path.is_file() {
+            if let Some(path) = Config::file_in(ancestor) {
                 let text =
                     fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-                return Ok(Some(Self::assemble(&text, ancestor.to_owned())?));
+                return Ok(Some(Self::assemble(&path, &text, ancestor.to_owned())?));
             }
         }
         Ok(None)
@@ -72,19 +71,21 @@ impl Session {
         let here = env::current_dir()?;
         if let Some(path) = config {
             let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-            return Self::assemble(&text, here);
+            return Self::assemble(path, &text, here);
         }
         match Self::find_in(&here)? {
             Some(session) => Ok(session),
             None if required => Err(format!("no {FILE_NAME} found (run `lighthouse init`)").into()),
-            None => Self::assemble(DEFAULT_CONFIG, here),
+            None => Self::assemble(Path::new(FILE_NAME), DEFAULT_CONFIG, here),
         }
     }
 
-    /// Builds the session from the text of `lighthouse.toml` and the rule
-    /// files read here, once: what is parsed is what trust is judged on.
-    fn assemble(text: &str, root: PathBuf) -> Result<Self> {
-        let config = Config::parse(text)?;
+    /// Builds the session from the text of the configuration file at `path`
+    /// and the decision files read here, once: what is parsed is what trust is
+    /// judged on.
+    fn assemble(path: &Path, text: &str, root: PathBuf) -> Result<Self> {
+        let format = Format::of_path(path).unwrap_or(Format::Toml);
+        let config = Config::parse_as(format, &path.display().to_string(), text)?;
         let files = local_files(&root)?;
         let local = files.clone().map(Catalog::from_local).transpose()?;
         let catalog = layered(local.as_ref())?;
@@ -95,6 +96,18 @@ impl Session {
             root,
             local,
             basis,
+        })
+    }
+
+    /// A session over `root` with the default configuration and no local
+    /// decisions: for commands that must work on a project whose own files
+    /// are broken or out of date.
+    pub fn bare(root: PathBuf) -> Result<Self> {
+        Ok(Self {
+            config: Config::parse(DEFAULT_CONFIG)?,
+            root,
+            local: None,
+            basis: Basis::default(),
         })
     }
 
@@ -123,7 +136,7 @@ impl Session {
     }
 
     /// Plugins that run in this process only: the bundled ones and the local
-    /// rules. Nothing is started, so it is cheap and cannot fail on a
+    /// decisions. Nothing is started, so it is cheap and cannot fail on a
     /// language plugin.
     pub fn in_process_registry(&self) -> Result<Registry> {
         let mut registry = lighthouse_builtin::registry();
@@ -144,14 +157,12 @@ impl Session {
 
 /// The project root as commands that need no plugins see it: the directory of
 /// the `lighthouse.toml` found upward from the current directory, else the
-/// current directory. Nothing of the project is loaded, so a broken rule or
+/// current directory. Nothing of the project is loaded, so a broken decision or
 /// catalog cannot get in the way.
 pub fn project_root() -> Result<PathBuf> {
     let here = env::current_dir()?;
-    match Config::discover(&here)? {
-        Some((path, _)) => Ok(path.parent().ok_or("config path has no parent")?.to_owned()),
-        None => Ok(here),
-    }
+    let found = here.ancestors().find(|dir| Config::file_in(dir).is_some());
+    Ok(found.map_or(here.clone(), Path::to_owned))
 }
 
 /// The catalog of the project at `root`: the bundled one with the project's
@@ -170,12 +181,12 @@ fn commands(config: &Config, catalog: &Catalog) -> Vec<Command> {
             argv: f.argv.clone(),
         })
         .collect();
-    for pattern in catalog.patterns() {
-        if let Some(fix) = &pattern.fix
+    for decision in catalog.decisions() {
+        if let Some(fix) = &decision.fix
             && let FixKind::Command(command) = &fix.kind
         {
             found.push(Command {
-                what: format!("fixer of {}: {}", pattern.id, command.argv.join(" ")),
+                what: format!("fixer of {}: {}", decision.id(), command.argv.join(" ")),
                 argv: command.argv.clone(),
             });
         }

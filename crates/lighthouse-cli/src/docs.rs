@@ -9,7 +9,7 @@ use lighthouse_spec::Catalog;
 
 use crate::Result;
 
-const PATTERNS_DIR: &str = "patterns";
+const DECISIONS_DIR: &str = lighthouse_spec::DOCS_DIR;
 
 pub fn generate(out: &Path, skill: &Path) -> Result<u8> {
     let docs = generated();
@@ -45,7 +45,7 @@ fn generated() -> BTreeMap<String, String> {
         })
         .collect();
     docs.insert(
-        format!("{PATTERNS_DIR}/fix-operations.md"),
+        format!("{DECISIONS_DIR}/fix-operations.md"),
         lighthouse_spec::fix_operations_markdown(&keys),
     );
     docs
@@ -92,7 +92,7 @@ pub fn check(out: &Path, skill: &Path) -> Result<u8> {
 
 /// Files in the generated directory that no pack produces.
 fn orphans(out: &Path, docs: &BTreeMap<String, String>) -> Result<Vec<PathBuf>> {
-    let dir = out.join(PATTERNS_DIR);
+    let dir = out.join(DECISIONS_DIR);
     let entries = match fs::read_dir(&dir) {
         Ok(entries) => entries,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
@@ -105,7 +105,7 @@ fn orphans(out: &Path, docs: &BTreeMap<String, String>) -> Result<Vec<PathBuf>> 
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or_default();
-        if !docs.contains_key(&format!("{PATTERNS_DIR}/{name}")) {
+        if !docs.contains_key(&format!("{DECISIONS_DIR}/{name}")) {
             found.push(path);
         }
     }

@@ -14,7 +14,7 @@ use serde_json::Value;
 /// Id of the plugin and prefix of every rule it provides.
 pub const ID: &str = "testing";
 
-/// The test-contract rules of the `testing` pattern pack.
+/// The test-contract rules of the `testing` decision pack.
 pub struct Testing;
 
 impl Plugin for Testing {
@@ -38,7 +38,7 @@ impl Plugin for Testing {
         ]
     }
 
-    /// The fixes of the pack's patterns, compiled from the catalog.
+    /// The fixes of the pack's decisions, compiled from the catalog.
     fn fixers(&self) -> Vec<Box<dyn Fixer>> {
         lighthouse_declarative::Declarative::bundled_fixers(ID)
     }

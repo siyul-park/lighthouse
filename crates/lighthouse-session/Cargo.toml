@@ -12,6 +12,7 @@ lighthouse-engine.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-report.workspace = true
+lighthouse-resource.workspace = true
 lighthouse-rpc.workspace = true
 lighthouse-spec.workspace = true
 lighthouse-store.workspace = true

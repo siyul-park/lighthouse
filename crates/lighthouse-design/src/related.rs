@@ -1,6 +1,6 @@
 use lighthouse_model::{Diagnostic, Symbol, SymbolKind};
 use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
-use lighthouse_spec::PatternRule;
+use lighthouse_spec::DecisionRule;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -18,7 +18,7 @@ struct Options {
 }
 
 pub(crate) fn rule() -> Box<dyn Rule> {
-    Box::new(PatternRule::new(ID, &[], check))
+    Box::new(DecisionRule::new(ID, &[], check))
 }
 
 /// The members of one owner are contiguous: nothing but members of that owner

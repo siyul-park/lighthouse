@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/contract-not-state
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: types-and-apis
+spec:
+  title: "Exported types expose contract, not state"
+  intent: Exposed state becomes part of the contract by accident.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Exported types SHOULD expose contract rather than mutable implementation
+    state; data-only values and ABI bridge types MAY expose their fields.
+  enforcement: judgment

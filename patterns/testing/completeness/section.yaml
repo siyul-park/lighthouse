@@ -1,6 +1,0 @@
-id: completeness
-title: Completeness
-intro: >-
-  A complete change has evidence for every contract that the change affects,
-  including cross-layer and architecture-specific obligations.
-patterns: [architecture-specific-evidence, freshness-gates-are-separate]

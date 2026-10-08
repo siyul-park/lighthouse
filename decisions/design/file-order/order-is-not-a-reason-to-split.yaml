@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/order-is-not-a-reason-to-split
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: file-order
+spec:
+  title: Ordering never justifies splits
+  intent: "Order rules serve readability; they are not a mandate for structure."
+  scope:
+    domain: code
+    subject: file
+  requirement: >-
+    These ordering rules MUST NOT justify artificial file splits, wrappers, or
+    duplicated helpers.
+  enforcement: doc

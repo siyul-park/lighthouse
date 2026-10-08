@@ -1,9 +1,0 @@
-id: design/justified-helper
-title: Helpers are justified
-intent: A helper that earns nothing is indirection.
-scope: symbol
-requirement: >-
-  A helper MUST be extracted only to remove semantic duplication, name
-  reusable behavior or policy, isolate an abstraction level, or serve as a
-  function value.
-enforcement: judgment

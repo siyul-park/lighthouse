@@ -1,8 +1,0 @@
-id: testing/cover-contract-dimensions
-title: Cover every contract dimension
-intent: Untested failure and boundary behavior is unspecified behavior.
-scope: test
-requirement: >-
-  Tests MUST cover applicable success, failure, boundaries, ownership and
-  lifecycle, compatibility, parity, and architecture contracts.
-enforcement: judgment

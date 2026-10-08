@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/merge-overlapping-symbols
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: structural-rules
+spec:
+  title: Merge overlapping symbols
+  intent: Parallel variants multiply what readers must learn.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Symbols with substantially the same responsibility at the same abstraction
+    level MUST be consolidated; one general symbol SHOULD be preferred over
+    parallel variants, wrappers, aliases, or coordinators.
+  enforcement: judgment

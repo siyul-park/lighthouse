@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/short-names-limited
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: naming
+spec:
+  title: One-letter names stay small
+  intent: One-letter names are only readable where context is a few lines.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    One-letter names MUST be limited to conventional receivers, indexes, and
+    tiny scopes.
+  enforcement: heuristic
+  evidence: [name, scope_lines]

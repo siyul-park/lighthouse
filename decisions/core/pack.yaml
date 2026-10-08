@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../schema/pack.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Pack
+metadata:
+  name: core
+spec:
+  title: Core Decisions
+  intro: Language-independent checks that need nothing beyond file contents.
+  sections:
+    - name: limits
+      title: Limits
+      intro: Size limits that keep files reviewable.
+      decisions: [max-file-lines, split-by-cohesion]
+    - name: annotations
+      title: Source annotations
+      intro: >-
+        A finding that is right to leave in place can be allowed where it
+        happens, in a comment that a reviewer sees in the diff.
+      decisions: [allow-annotation, annotation-reason, unused-allow]

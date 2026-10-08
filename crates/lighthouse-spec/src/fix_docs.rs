@@ -166,11 +166,11 @@ pub struct Operation {
 pub fn fix_operations_markdown(keys: &[(String, String)]) -> String {
     let mut out = format!(
         "{NOTICE}\n\n# Fix operations\n\n\
-         A pattern's `fix:` block says how the findings of its rule are fixed. It \
-         names exactly one kind and a `safety` cap, and may list the provider \
-         capabilities it `requires`:\n\n\
-         ```yaml\nfix:\n  safety: safe        # safe | suggested\n  requires: [extent]  # optional\n  ops: [...]          # or command: {{...}}\n```\n\n\
-         The `ops` kind is a list of the generic operations below. Operations state \
+         A decision's `fix:` block says how the findings of its rule are fixed. Its \
+         `type` is one of `ops`, `command` and `rpc`; it carries a `safety` cap, and \
+         may list the provider capabilities it `requires`:\n\n\
+         ```yaml\nfix:\n  safety: safe        # safe | suggested\n  requires: [extent]  # optional\n  type: ops           # ops | command | rpc\n  ops: [...]\n```\n\n\
+         The `ops` type is a list of the generic operations below. Operations state \
          edits over code-model nodes; the orchestrator lowers them to text edits with \
          the spans the language provider reports, formats, re-checks and rolls back \
          what gets worse. Expressions are CEL over `finding` (`rule`, `message`, \
@@ -201,14 +201,14 @@ pub fn fix_operations_markdown(keys: &[(String, String)]) -> String {
     }
     out.push_str(
         "\n## Commands\n\n\
-         The `command` kind is the simple text contract: a program, without a shell, on a \
+         The `command` type is the simple text contract: a program, without a shell, on a \
          scratch copy of the finding's file. Structured data goes through `rpc`, not through \
          commands.\n\n\
-         ```yaml\nfix:\n  safety: suggested\n  command:\n    argv: [\"gofmt\", \"-s\", \"-w\", \"{file}\"]\n    output: inPlace    # inPlace | text\n    stdin: none        # none | file\n    env: {}            # extra variables\n    timeout: 30s\n    scope: file\n```\n\n\
+         ```yaml\nfix:\n  safety: suggested\n  type: command\n  argv: [\"gofmt\", \"-s\", \"-w\", \"{file}\"]\n  output: in-place   # in-place | text\n  stdin: none        # none | file\n  env: {}            # extra variables\n  timeout: 30s\n  scope: file\n```\n\n\
          - **Exit codes:** `0` succeeds, with the result per `output`; an empty result changes \
          nothing. `1` declines, with the reason from stderr. `2` and above, a signal or a \
          timeout is an error: nothing is applied and the capped stderr goes into the notice.\n\
-         - **Output:** `inPlace` diffs the scratch copy against the original; `text` takes the \
+         - **Output:** `in-place` diffs the scratch copy against the original; `text` takes the \
          new text of the file from stdout, which carries only that. stderr is for people and \
          is never parsed.\n\
          - **stdin:** `none` (default) or `file`, the content of the target file.\n\
@@ -223,7 +223,7 @@ pub fn fix_operations_markdown(keys: &[(String, String)]) -> String {
          grace period; stdout and stderr are capped.\n\
          - **Trust:** a command runs only in a project the user trusts (`lighthouse trust`), \
          whoever wrote it; the repository cannot grant trust itself.\n\n\
-         The `rpc` kind, a language plugin's own fix method, is reserved: it loads, and the \
+         The `rpc` type, a language plugin's own fix method, is reserved: it loads, and the \
          findings of its rule are declined as not yet supported.\n",
     );
     out

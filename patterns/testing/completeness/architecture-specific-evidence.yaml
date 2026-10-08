@@ -1,6 +1,0 @@
-id: testing/architecture-specific-evidence
-title: Architecture-specific contracts need specific evidence
-intent: Generic tests cannot prove contracts that only exist on one architecture.
-scope: project
-requirement: Architecture-specific contracts MUST have architecture-specific evidence.
-enforcement: judgment

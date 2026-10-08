@@ -1,0 +1,299 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/single-use-wrapper
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: functions
+spec:
+  title: Inline single-use wrappers
+  intent: A forwarding wrapper adds a name without adding meaning.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    A simple single-use wrapper SHOULD be inlined unless its name expresses a
+    real policy or mechanic; complex one-use mechanics require review rather
+    than mechanical removal.
+  enforcement: heuristic
+  evidence: [callee, callers]
+  languages:
+    rust:
+      tuning: >-
+        Applies to private functions and methods (items without `pub`); a trait
+        impl method is as visible as its trait and is not a candidate. Calls are
+        resolved syntactically, so a method call on a receiver whose type is not
+        written in the code is recorded as a possible use of every private
+        method of that name in the crate, and keeps such a method from being
+        reported.
+  check:
+    type: builtin
+    id: design/single-use-wrapper
+  examples:
+    - name: invalid
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Store struct{ data map[string][]byte }
+
+            func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
+
+            func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+            func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+      expect:
+        - line: 5
+    - name: valid
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: "package sample\n\ntype Store struct {\n\tclosed bool\n\tdata   map[string][]byte\n}\n\nfunc (s *Store) load(k string) ([]byte, error) {\n\tif s.closed {\n\t\treturn nil, ErrClosed\n\t}\n\treturn s.read(k)\n}\n\nfunc (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }\n\nfunc (s *Store) Get(k string) ([]byte, error) { return s.load(k) }"
+    - name: used-as-value
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Store struct{ data map[string][]byte }
+
+            func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
+
+            func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+            func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+
+            func (s *Store) Loader() func(string) ([]byte, error) { return s.load }
+    - name: adds-an-argument
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Store struct{ data map[string][]byte }
+
+            func (s *Store) load(k string) ([]byte, error) { return s.read(k, true) }
+
+            func (s *Store) read(k string, fresh bool) ([]byte, error) { return s.data[k], nil }
+
+            func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+    - name: called-from-a-test
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Store struct{ data map[string][]byte }
+
+            func (s *Store) load(k string) ([]byte, error) { return s.read(k) }
+
+            func (s *Store) read(k string) ([]byte, error) { return s.data[k], nil }
+
+            func (s *Store) Get(k string) ([]byte, error) { return s.load(k) }
+        - path: example_test.go
+          body: "package sample\n\nimport \"testing\"\n\nfunc TestLoad(t *testing.T) {\n\ts := &Store{}\n\ts.load(\"k\")\n}"
+    - name: rust-invalid
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store {
+                data: Vec<u8>,
+            }
+
+            impl Store {
+                fn load(&self, k: usize) -> u8 {
+                    self.read(k)
+                }
+
+                fn read(&self, k: usize) -> u8 {
+                    self.data[k]
+                }
+
+                pub fn get(&self, k: usize) -> u8 {
+                    self.load(k)
+                }
+            }
+      expect:
+        - line: 6
+    - name: rust-valid
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store {
+                closed: bool,
+                data: Vec<u8>,
+            }
+
+            impl Store {
+                fn load(&self, k: usize) -> u8 {
+                    if self.closed {
+                        return 0;
+                    }
+                    self.read(k)
+                }
+
+                fn read(&self, k: usize) -> u8 {
+                    self.data[k]
+                }
+
+                pub fn get(&self, k: usize) -> u8 {
+                    self.load(k)
+                }
+            }
+    - name: rust-used-as-value
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store {
+                data: Vec<u8>,
+            }
+
+            impl Store {
+                fn load(&self, k: usize) -> u8 {
+                    self.read(k)
+                }
+
+                fn read(&self, k: usize) -> u8 {
+                    self.data[k]
+                }
+
+                pub fn get(&self, k: usize) -> u8 {
+                    self.load(k)
+                }
+
+                pub fn loader(&self) -> fn(&Store, usize) -> u8 {
+                    Store::load
+                }
+            }
+    - name: rust-adds-an-argument
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store {
+                data: Vec<u8>,
+            }
+
+            impl Store {
+                fn load(&self, k: usize) -> u8 {
+                    self.read(k, true)
+                }
+
+                fn read(&self, k: usize, fresh: bool) -> u8 {
+                    if fresh { self.data[k] } else { 0 }
+                }
+
+                pub fn get(&self, k: usize) -> u8 {
+                    self.load(k)
+                }
+            }
+    - name: rust-called-from-a-test
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store {
+                data: Vec<u8>,
+            }
+
+            impl Store {
+                fn load(&self, k: usize) -> u8 {
+                    self.read(k)
+                }
+
+                fn read(&self, k: usize) -> u8 {
+                    self.data[k]
+                }
+
+                pub fn get(&self, k: usize) -> u8 {
+                    self.load(k)
+                }
+            }
+
+            #[cfg(test)]
+            mod tests {
+                use super::*;
+
+                #[test]
+                fn loads() {
+                    let s = Store { data: vec![1] };
+                    s.load(0);
+                }
+            }
+    - name: rust-trait-method
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub trait Reader {
+                fn read_one(&self, k: usize) -> u8;
+            }
+
+            pub struct Store {
+                data: Vec<u8>,
+            }
+
+            impl Reader for Store {
+                fn read_one(&self, k: usize) -> u8 {
+                    self.read(k)
+                }
+            }
+
+            impl Store {
+                fn read(&self, k: usize) -> u8 {
+                    self.data[k]
+                }
+            }
+
+            pub fn use_it(r: &dyn Reader) -> u8 {
+                r.read_one(0)
+            }
+    - name: rust-caller-through-unknown-receiver
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store {
+                data: Vec<u8>,
+            }
+
+            impl Store {
+                fn load(&self, k: usize) -> u8 {
+                    self.read(k)
+                }
+
+                fn read(&self, k: usize) -> u8 {
+                    self.data[k]
+                }
+
+                pub fn get(&self, k: usize) -> u8 {
+                    self.load(k)
+                }
+            }
+
+            pub fn elsewhere(store: &external::Handle) -> u8 {
+                store.load(0)
+            }

@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "Metadata": {
+      "additionalProperties": false,
+      "description": "Who a resource is. Identity is `name`; grouping is by label, never by\nwhere the document is stored.",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Free notes; never used to select.",
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Selectable facts, keyed `lighthouse/<name>`.",
+          "type": "object"
+        },
+        "name": {
+          "description": "Fully qualified name, such as `design/minimal-names`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "PluginSpec": {
+      "additionalProperties": false,
+      "description": "The spec of the `Plugin` kind: how to start a plugin process, and what the\nplugin provides.",
+      "properties": {
+        "provides": {
+          "$ref": "#/$defs/Provides"
+        },
+        "runtime": {
+          "$ref": "#/$defs/Runtime"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "runtime"
+      ],
+      "type": "object"
+    },
+    "Provides": {
+      "additionalProperties": false,
+      "description": "What a plugin contributes, declared so that tools can list it without\nstarting the process. `languages` is checked against what the process\nreports when it starts; the other lists are read by the tooling that\nhandles their kind.",
+      "properties": {
+        "decisions": {
+          "description": "Catalog directories of decisions, relative to the manifest.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "embedders": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "fixOps": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "languages": {
+          "description": "Language ids.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "orderKeys": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Runtime": {
+      "additionalProperties": false,
+      "description": "How a plugin process is started.",
+      "properties": {
+        "args": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "command": {
+          "description": "Executable. A relative path with a separator is resolved against the\nmanifest directory; a bare name is looked up on `PATH`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/plugin.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "lighthouse/v1alpha1"
+    },
+    "kind": {
+      "const": "Plugin"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "spec": {
+      "$ref": "#/$defs/PluginSpec"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "title": "Plugin",
+  "type": "object"
+}

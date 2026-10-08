@@ -1,4 +1,4 @@
-//! The bundled rules through the Rust provider: every catalog pattern that
+//! The bundled rules through the Rust provider: every catalog decision that
 //! has Rust examples passes them, the same intent cases as for Go.
 
 use std::{fs, path::Path};
@@ -11,7 +11,7 @@ use lighthouse_plugin::Registry;
 fn registry() -> Registry {
     let plugin = lighthouse_testkit::lang_rust();
     let mut registry = lighthouse_builtin::registry();
-    let config = Config::parse(&format!(
+    let config = Config::parse_inline(&format!(
         "plugins = [{{ id = \"lang-rust\", path = {:?} }}]",
         plugin.to_str().unwrap()
     ))
@@ -21,7 +21,7 @@ fn registry() -> Registry {
 }
 
 #[test]
-fn every_implemented_pattern_passes_its_rust_examples() {
+fn every_checked_decision_passes_its_rust_examples() {
     let failures =
         lighthouse_engine::RuleTester::new(registry, lighthouse_spec::Catalog::bundled())
             .language("rust")
@@ -30,7 +30,7 @@ fn every_implemented_pattern_passes_its_rust_examples() {
 }
 
 #[test]
-fn the_design_patterns_have_rust_examples() {
+fn the_design_decisions_have_rust_examples() {
     let catalog = lighthouse_spec::Catalog::bundled();
     for id in [
         "design/complexity-signal",
@@ -38,17 +38,18 @@ fn the_design_patterns_have_rust_examples() {
         "design/exported-doc",
         "design/single-use-wrapper",
     ] {
-        let pattern = catalog.pattern(id).unwrap();
-        let rust: Vec<_> = pattern
+        let decision = catalog.decision(id).unwrap();
+        let rust: Vec<_> = decision
             .examples
             .iter()
             .filter(|e| e.language == "rust")
             .collect();
         assert!(
-            rust.iter().any(|e| e.kind == lighthouse_spec::Kind::Valid)
+            rust.iter()
+                .any(|e| e.kind == lighthouse_spec::ExampleKind::Valid)
                 && rust
                     .iter()
-                    .any(|e| e.kind == lighthouse_spec::Kind::Invalid),
+                    .any(|e| e.kind == lighthouse_spec::ExampleKind::Invalid),
             "{id} lacks a valid and an invalid Rust example"
         );
     }
@@ -80,7 +81,7 @@ fn exported_doc_findings(source: &str) -> Vec<(String, Fingerprint)> {
     fs::create_dir(dir.path().join("src")).unwrap();
     fs::write(dir.path().join("src/lib.rs"), source).unwrap();
     let plugin = lighthouse_testkit::lang_rust();
-    let config = Config::parse(&format!(
+    let config = Config::parse_inline(&format!(
         "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\n[rules]\n\"design/exported-doc\" = \"warn\"\n",
         plugin.to_str().unwrap()
     ))

@@ -6,59 +6,57 @@ use lighthouse_engine::RuleTester;
 use lighthouse_plugin::Registry;
 use lighthouse_spec::Catalog;
 
-const PATTERN: &str = r#"id: demo/shout
-title: Scratch notes are emptied
-intent: A scratch note holds nothing.
-scope: file
-requirement: A scratch note MUST be empty.
-enforcement: mechanical
-evidence: [path]
-implementation:
-  declarative: demo/s/rules/shout.yaml
-fix:
-  safety: safe
-  command:
+const DECISION: &str = r#"apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: demo/shout
+  labels:
+    lighthouse/pack: demo
+    lighthouse/section: s
+spec:
+  title: Scratch notes are emptied
+  intent: A scratch note holds nothing.
+  scope: { subject: file }
+  requirement: A scratch note MUST be empty.
+  enforcement: mechanical
+  evidence: [path]
+  check:
+    type: cel
+    select: file
+    where: 'file.path == "a.txt" && file.lines > 0'
+    message: not empty
+  fix:
+    safety: safe
+    type: command
     argv: ["sh", "-c", ": > \"$1\"", "sh", "{file}"]
-    output: inPlace
-examples:
-  - name: quiet
-    language: text
-    kind: invalid
-    files:
-      - path: a.txt
-        body: hello
-    expect:
-      - line: 1
-    fixed:
-      - path: a.txt
-        body: ""
-  - name: empty
-    language: text
-    kind: valid
-    files:
-      - path: a.txt
-        body: ""
+    output: in-place
+  examples:
+    - name: quiet
+      language: text
+      kind: invalid
+      files:
+        - path: a.txt
+          body: hello
+      expect:
+        - line: 1
+      fixed:
+        - path: a.txt
+          body: ""
+    - name: empty
+      language: text
+      kind: valid
+      files:
+        - path: a.txt
+          body: ""
 "#;
 
-const RULE: &str =
-    "select: file\nwhere: 'file.path == \"a.txt\" && file.lines > 0'\nmessage: not empty\n";
+const PACK: &str = "apiVersion: lighthouse/v1alpha1\nkind: Pack\nmetadata:\n  name: demo\nspec:\n  title: Demo\n  intro: x\n  sections:\n    - name: s\n      title: S\n      intro: x\n      decisions: [shout]\n";
 
 fn catalog() -> Catalog {
-    let files = [
-        (
-            "demo/pack.yaml",
-            "id: demo\ntitle: Demo\nintro: x\nsections: [s]\n",
-        ),
-        (
-            "demo/s/section.yaml",
-            "id: s\ntitle: S\nintro: x\npatterns: [shout]\n",
-        ),
-        ("demo/s/shout.yaml", PATTERN),
-        ("demo/s/rules/shout.yaml", RULE),
-    ]
-    .into_iter()
-    .map(|(k, v)| (k.to_owned(), v.to_owned()))
-    .collect();
+    let files = [("demo/pack.yaml", PACK), ("demo/s/shout.yaml", DECISION)]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        .collect();
     Catalog::from_files(files).unwrap()
 }
 

@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/interface-at-consumer
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: types-and-apis
+spec:
+  title: Interfaces live at the consumer
+  intent: "An interface describes what a caller needs, so it belongs to the caller."
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Interfaces MUST be used only when callers supply behavior and MUST be
+    defined where that behavior is consumed.
+  enforcement: heuristic
+  evidence: [interface, consumers]
+  languages:
+    go:
+      tuning: >-
+        Declare the interface in the consuming package, not beside its only
+        implementation.

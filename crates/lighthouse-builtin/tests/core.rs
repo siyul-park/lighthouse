@@ -120,40 +120,32 @@ fn missing_fact_is_a_distinct_error() {
 }
 
 #[test]
-fn registered_rules_are_exactly_the_implemented_catalog_patterns() {
+fn registered_rules_are_exactly_the_checked_catalog_decisions() {
     let registry = lighthouse_builtin::registry();
     let catalog = lighthouse_spec::Catalog::bundled();
     let registered: std::collections::BTreeSet<_> =
         registry.rules().map(|r| r.manifest().id.clone()).collect();
     for id in &registered {
-        let pattern = catalog
-            .pattern(id)
-            .unwrap_or_else(|| panic!("{id} has no pattern"));
+        let decision = catalog
+            .decision(id)
+            .unwrap_or_else(|| panic!("{id} has no decision"));
         assert_ne!(
-            pattern.enforcement,
+            decision.enforcement,
             lighthouse_spec::Enforcement::Doc,
             "{id}"
         );
-        match &pattern.implementation {
-            Some(lighthouse_spec::Implementation::Builtin(rule)) => assert_eq!(rule, id),
-            Some(lighthouse_spec::Implementation::Declarative(_)) => {}
-            None => panic!("{id} is registered but its pattern has no implementation"),
+        match &decision.check {
+            Some(lighthouse_spec::Check::Builtin(rule)) => assert_eq!(&rule.id, id),
+            Some(lighthouse_spec::Check::Cel(_)) => {}
+            None => panic!("{id} is registered but its decision has no check"),
         }
     }
-    let implemented: std::collections::BTreeSet<_> = catalog
-        .patterns()
-        .filter(|p| {
-            matches!(
-                p.implementation,
-                Some(
-                    lighthouse_spec::Implementation::Builtin(_)
-                        | lighthouse_spec::Implementation::Declarative(_)
-                )
-            )
-        })
-        .map(|p| p.id.clone())
+    let checked: std::collections::BTreeSet<_> = catalog
+        .decisions()
+        .filter(|d| d.check.is_some())
+        .map(|d| d.id().to_owned())
         .collect();
-    assert_eq!(registered, implemented);
+    assert_eq!(registered, checked);
 }
 
 #[test]
@@ -164,9 +156,9 @@ fn every_fix_names_a_registered_fixer_and_the_registry_holds_no_other() {
     let registry = lighthouse_builtin::registry();
     let catalog = lighthouse_spec::Catalog::bundled();
     let mut fixable = std::collections::BTreeSet::new();
-    for pattern in catalog.patterns() {
-        let Some(fix) = &pattern.fix else { continue };
-        let id = &pattern.id;
+    for decision in catalog.decisions() {
+        let Some(fix) = &decision.fix else { continue };
+        let id = &decision.id().to_owned();
         fixable.insert(id.clone());
         assert!(registry.rule(id).is_some(), "{id} has a fix but no rule");
         let fixer = registry
@@ -174,7 +166,7 @@ fn every_fix_names_a_registered_fixer_and_the_registry_holds_no_other() {
             .unwrap_or_else(|| panic!("{id} has a fix but no registered fixer"));
         assert_eq!(&fixer.manifest().id, id);
         assert_eq!(fixer.manifest().requires, fix.requires, "{id}");
-        let FixKind::Ops(ops) = &fix.kind else {
+        let FixKind::Ops { ops } = &fix.kind else {
             continue;
         };
         for op in ops {
@@ -212,8 +204,8 @@ fn the_bundled_fixes_say_what_each_rule_needs_to_be_fixed() {
     let catalog = lighthouse_spec::Catalog::bundled();
     let safety = |id: &str| {
         catalog
-            .pattern(id)
-            .and_then(|p| p.fix.as_ref())
+            .decision(id)
+            .and_then(|d| d.fix.as_ref())
             .map(|f| f.safety.to_string())
     };
     for id in ["design/declaration-groups", "testing/test-file-layout"] {

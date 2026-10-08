@@ -1,8 +1,0 @@
-id: design/readable-layout
-title: Layout shows ownership
-intent: Layout is documentation that cannot go stale.
-scope: file
-requirement: >-
-  Files and declaration order MUST make ownership, responsibility, and
-  relationships easy to read.
-enforcement: judgment

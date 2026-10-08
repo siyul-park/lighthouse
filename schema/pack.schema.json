@@ -1,0 +1,111 @@
+{
+  "$defs": {
+    "Metadata": {
+      "additionalProperties": false,
+      "description": "Who a resource is. Identity is `name`; grouping is by label, never by\nwhere the document is stored.",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Free notes; never used to select.",
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Selectable facts, keyed `lighthouse/<name>`.",
+          "type": "object"
+        },
+        "name": {
+          "description": "Fully qualified name, such as `design/minimal-names`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "PackSpec": {
+      "additionalProperties": false,
+      "description": "The spec of the `Pack` kind: an ordered set of sections, each an ordered\nlist of decisions. A decision belongs to a pack and section by its labels\n(`lighthouse/pack`, `lighthouse/section`); this list only orders them.",
+      "properties": {
+        "intro": {
+          "type": "string"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/SectionSpec"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "intro",
+        "sections"
+      ],
+      "type": "object"
+    },
+    "SectionSpec": {
+      "additionalProperties": false,
+      "description": "A section of a pack, listing its decisions by name inside the pack.",
+      "properties": {
+        "decisions": {
+          "description": "Names of the decisions, without the pack prefix, in reading order.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "intro": {
+          "type": "string"
+        },
+        "name": {
+          "description": "Kebab-case name; the value of the decisions' section label.",
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "title",
+        "intro",
+        "decisions"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/pack.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "lighthouse/v1alpha1"
+    },
+    "kind": {
+      "const": "Pack"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "spec": {
+      "$ref": "#/$defs/PackSpec"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "title": "Pack",
+  "type": "object"
+}

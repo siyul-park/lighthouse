@@ -23,10 +23,10 @@ fn rust_project(files: &[(&str, &str)]) -> TempDir {
     let plugin = lighthouse_testkit::lang_rust();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        format!(
+        lighthouse_testkit::project(&format!(
             "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n",
             plugin.to_str().unwrap()
-        ),
+        )),
     )
     .unwrap();
     fs::write(
@@ -64,14 +64,14 @@ fn listing(dir: &TempDir, status: &str) -> Vec<Value> {
 
 fn fingerprint_of(dir: &TempDir, rule: &str) -> String {
     let all = listing(dir, "all");
-    let found = all.iter().find(|f| f["rule_id"] == rule).unwrap();
+    let found = all.iter().find(|f| f["ruleId"] == rule).unwrap();
     found["fingerprint"].as_str().unwrap().to_owned()
 }
 
 fn rules(records: &[Value]) -> Vec<&str> {
     let mut rules: Vec<_> = records
         .iter()
-        .map(|f| f["rule_id"].as_str().unwrap())
+        .map(|f| f["ruleId"].as_str().unwrap())
         .collect();
     rules.sort_unstable();
     rules
@@ -88,7 +88,7 @@ fn check_remembers_findings_and_marks_fixed_ones_resolved() {
     );
     let helper = open
         .iter()
-        .find(|f| f["rule_id"] == "design/private-helper-callers")
+        .find(|f| f["ruleId"] == "design/private-helper-callers")
         .unwrap();
     assert_eq!(helper["symbol"], "demo::clamp#function");
     assert_eq!(helper["facts"]["language"], "rust");
@@ -104,7 +104,7 @@ fn check_remembers_findings_and_marks_fixed_ones_resolved() {
     assert!(listing(&dir, "open").is_empty());
     let all = listing(&dir, "all");
     assert_eq!(all.len(), 2);
-    assert!(all.iter().all(|f| f["resolved_at"].is_string()));
+    assert!(all.iter().all(|f| f["resolvedAt"].is_string()));
 
     write(&dir, "src/lib.rs", HELPER);
     lighthouse(dir.path()).arg("check").assert().success();
@@ -162,18 +162,18 @@ fn a_rejected_verdict_keeps_the_finding_out_of_later_reports() {
     let event = &history[0];
     assert_eq!(event["verdict"], "rejected");
     assert_eq!(event["reason"], "intentional-exception");
-    assert_eq!(event["reason_text"], "named policy");
-    assert_eq!(event["reviewer_kind"], "agent");
-    assert_eq!(event["reviewer_id"], "claude");
+    assert_eq!(event["reasonText"], "named policy");
+    assert_eq!(event["reviewerKind"], "agent");
+    assert_eq!(event["reviewerId"], "claude");
     assert_eq!(event["language"], "rust");
     assert_eq!(event["scope"], "symbol");
     assert_eq!(event["label"], "separate");
     assert_eq!(event["snapshot"]["facts"]["callers"], 1);
     assert_eq!(event["snapshot"]["evidence"]["callers"], 1);
-    assert_eq!(event["snapshot"]["v"], 1);
+    assert_eq!(event["snapshot"]["v"], 2);
     assert_eq!(event["snapshot"]["dirty"], false);
-    assert_eq!(event["rule_version"].as_str().unwrap().len(), 16);
-    assert_eq!(event["catalog_version"].as_str().unwrap().len(), 16);
+    assert_eq!(event["ruleVersion"].as_str().unwrap().len(), 16);
+    assert_eq!(event["catalogVersion"].as_str().unwrap().len(), 16);
 
     lighthouse(dir.path())
         .args(["review", "resolve", &fingerprint, "--verdict", "deferred"])
@@ -338,13 +338,13 @@ fn agent_format_briefs_the_agent_and_agent_json_carries_the_same_records() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     let text = stdout(lighthouse(dir.path()).args(["check", "--format", "agent"]));
     for expected in [
-        "design/private-helper-callers  review (heuristic)  src/lib.rs:5:1",
+        "design/private-helper-callers  info (heuristic)  src/lib.rs:5:1",
         "  owner:       demo::clamp#function",
         "  requirement: A private helper SHOULD have at least two callers.",
         "  evidence:    caller=demo::run#function callers=1 statements=3",
         "  expected:    valid rust example `rust-valid` (src/lib.rs)",
         "lighthouse review resolve ",
-        "summary: 0 error, 1 warn, 1 review, 0 incomplete, 0 suppressed",
+        "summary: 0 error, 1 warn, 1 info, 2 review, 0 incomplete, 0 suppressed",
     ] {
         assert!(text.contains(expected), "{expected}\n{text}");
     }
@@ -356,7 +356,7 @@ fn agent_format_briefs_the_agent_and_agent_json_carries_the_same_records() {
     ])));
     let findings: Vec<_> = json.iter().filter(|r| r["type"] == "finding").collect();
     assert_eq!(findings.len(), 2);
-    let review = findings.iter().find(|f| f["severity"] == "review").unwrap();
+    let review = findings.iter().find(|f| f["severity"] == "info").unwrap();
     let command = review["resolve"]["command"].as_str().unwrap();
     assert!(command.contains(&review["fingerprint"].as_str().unwrap()[..12]));
     assert_eq!(json.last().unwrap()["type"], "summary");
@@ -370,7 +370,7 @@ fn the_resolve_command_of_an_agent_finding_runs_as_given() {
         "--format",
         "agent-json",
     ])));
-    let review = json.iter().find(|r| r["severity"] == "review").unwrap();
+    let review = json.iter().find(|r| r["severity"] == "info").unwrap();
     let command = review["resolve"]["command"].as_str().unwrap();
     let args: Vec<&str> = command
         .split_whitespace()
@@ -389,7 +389,7 @@ fn the_resolve_command_of_an_agent_finding_runs_as_given() {
         "--format",
         "json",
     ])));
-    assert_eq!(history[0]["reviewer_kind"], "agent");
+    assert_eq!(history[0]["reviewerKind"], "agent");
     assert_eq!(history[0]["label"], "positive");
 }
 
@@ -434,10 +434,10 @@ fn go_findings_are_remembered_and_resolved_like_any_other() {
     fs::write(dir.path().join("api.go"), "package app\n\nfunc Open() {}\n").unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        format!(
+        lighthouse_testkit::project(&format!(
             "plugins = [{{ id = \"lang-go\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n",
             plugin.to_str().unwrap()
-        ),
+        )),
     )
     .unwrap();
     lighthouse(dir.path()).arg("check").assert().success();
@@ -462,7 +462,7 @@ fn go_findings_are_remembered_and_resolved_like_any_other() {
         records(&stdout(lighthouse(dir.path()).args([
             "review", "list", "--status", "all", "--format", "json",
         ])));
-    assert!(all[0]["resolved_at"].is_string());
+    assert!(all[0]["resolvedAt"].is_string());
 }
 
 #[test]
@@ -497,21 +497,43 @@ fn git_in(dir: &TempDir, args: &[&str]) {
 }
 
 fn error_level(dir: &TempDir) {
-    let config = dir.path().join("lighthouse.toml");
-    let text = fs::read_to_string(&config).unwrap();
+    let plugin = lighthouse_testkit::lang_rust();
     fs::write(
-        config,
-        format!("{text}[rules]\n\"design/exported-doc\" = \"error\"\n"),
+        dir.path().join("lighthouse.toml"),
+        lighthouse_testkit::project(&format!(
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n[rules]\n\"design/exported-doc\" = \"error\"\n",
+            plugin.to_str().unwrap()
+        )),
     )
     .unwrap();
 }
 
+/// The findings of any tier, mechanical included, in a status.
+fn every(dir: &TempDir, status: &str) -> Vec<Value> {
+    records(&stdout(lighthouse(dir.path()).args([
+        "review", "list", "--all", "--status", status, "--format", "json",
+    ])))
+}
+
 #[test]
 fn a_mechanical_finding_stays_reported_whatever_the_verdict() {
-    let dir = rust_project(&[("src/lib.rs", "pub fn run() {}\n")]);
-    error_level(&dir);
+    let source = "// lighthouse:allow design/exported-doc\npub fn run() {}\n";
+    let dir = rust_project(&[("src/lib.rs", source)]);
+    let plugin = lighthouse_testkit::lang_rust();
+    fs::write(
+        dir.path().join("lighthouse.toml"),
+        lighthouse_testkit::project(&format!(
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\", \"core\"]\nextends = [\"design/recommended\", \"core/recommended\"]\n",
+            plugin.to_str().unwrap()
+        )),
+    )
+    .unwrap();
     lighthouse(dir.path()).arg("check").assert().code(1);
-    let fingerprint = fingerprint_of(&dir, "design/exported-doc");
+    let fingerprint = every(&dir, "all")
+        .iter()
+        .find(|f| f["ruleId"] == "core/annotation-reason")
+        .map(|f| f["fingerprint"].as_str().unwrap().to_owned())
+        .unwrap();
     let out = lighthouse(dir.path())
         .args([
             "review",
@@ -530,7 +552,6 @@ fn a_mechanical_finding_stays_reported_whatever_the_verdict() {
             .unwrap()
             .contains("mechanical finding")
     );
-
     let check = lighthouse(dir.path())
         .args(["check", "--format", "agent"])
         .output()
@@ -546,8 +567,27 @@ fn a_mechanical_finding_stays_reported_whatever_the_verdict() {
         notice.contains("mechanical findings are not suppressible"),
         "{notice}"
     );
-    assert_eq!(listing(&dir, "suppressed").len(), 0);
-    assert_eq!(listing(&dir, "open").len(), 1);
+    assert!(every(&dir, "suppressed").is_empty());
+    assert!(
+        every(&dir, "open")
+            .iter()
+            .any(|f| f["fingerprint"] == fingerprint.as_str())
+    );
+}
+
+#[test]
+fn a_heuristic_finding_configured_as_error_is_suppressed_by_a_verdict() {
+    let dir = rust_project(&[("src/lib.rs", "pub fn run() {}\n")]);
+    error_level(&dir);
+    lighthouse(dir.path()).arg("check").assert().code(1);
+    let fingerprint = fingerprint_of(&dir, "design/exported-doc");
+    lighthouse(dir.path())
+        .args(["review", "resolve", &fingerprint])
+        .args(["--verdict", "rejected", "--reason", "false-positive"])
+        .assert()
+        .success();
+    lighthouse(dir.path()).arg("check").assert().success();
+    assert_eq!(listing(&dir, "suppressed").len(), 1);
 }
 
 #[test]
@@ -636,8 +676,8 @@ fn the_reviewer_comes_from_flags_then_the_environment_then_a_human() {
         .iter()
         .map(|e| {
             (
-                e["reviewer_kind"].as_str().unwrap(),
-                e["reviewer_id"].as_str().unwrap(),
+                e["reviewerKind"].as_str().unwrap(),
+                e["reviewerId"].as_str().unwrap(),
             )
         })
         .collect();
@@ -747,10 +787,10 @@ fn history_says_when_nothing_was_reviewed_and_resolve_survives_a_broken_catalog(
         .stdout("")
         .stderr(predicates::str::contains("no reviews recorded"));
 
-    fs::create_dir_all(dir.path().join(".lighthouse/rules")).unwrap();
+    fs::create_dir_all(dir.path().join(".lighthouse/decisions")).unwrap();
     fs::write(
-        dir.path().join(".lighthouse/rules/broken.yaml"),
-        "id: [not, a, pattern\n",
+        dir.path().join(".lighthouse/decisions/broken.yaml"),
+        "id: [not, a, decision\n",
     )
     .unwrap();
     let out = lighthouse(dir.path())
@@ -774,7 +814,7 @@ fn history_says_when_nothing_was_reviewed_and_resolve_survives_a_broken_catalog(
         "--format",
         "json",
     ])));
-    assert!(history[0].get("rule_version").is_none());
+    assert!(history[0].get("ruleVersion").is_none());
 }
 
 #[test]
@@ -785,10 +825,10 @@ fn findings_of_a_rule_taken_out_of_the_config_are_inactive_and_can_be_pruned() {
     let plugin = lighthouse_testkit::lang_rust();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        format!(
+        lighthouse_testkit::project(&format!(
             "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n",
             plugin.to_str().unwrap()
-        ),
+        )),
     )
     .unwrap();
     lighthouse(dir.path()).arg("check").assert().success();
@@ -810,10 +850,10 @@ fn changed_resolves_the_findings_of_a_deleted_file() {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        "plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"warn\", max = 3 }\n",
+        lighthouse_testkit::project("plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"warn\", options = { max = 5 } }\n"),
     )
     .unwrap();
-    fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\n").unwrap();
+    fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\ne\nf\n").unwrap();
     fs::write(dir.path().join(".gitignore"), ".lighthouse/*.db*\n").unwrap();
     git_in(&dir, &["init", "-q", "-b", "main"]);
     git_in(&dir, &["add", "."]);
@@ -849,12 +889,15 @@ fn source_annotations_allow_findings_and_are_counted() {
     let agent = stdout(lighthouse(dir.path()).args(["check", "--format", "agent"]));
     assert!(agent.contains("0 suppressed, 1 allowed"), "{agent}");
 
-    let config = dir.path().join("lighthouse.toml");
-    let text = fs::read_to_string(&config).unwrap();
-    let with_core = text
-        .replace("\"design\"]", "\"design\", \"core\"]")
-        .replace("extends = [", "extends = [\"core/recommended\", ");
-    fs::write(config, with_core).unwrap();
+    let plugin = lighthouse_testkit::lang_rust();
+    fs::write(
+        dir.path().join("lighthouse.toml"),
+        lighthouse_testkit::project(&format!(
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\", \"core\"]\nextends = [\"core/recommended\", \"design/recommended\", \"design/strict\"]\n",
+            plugin.to_str().unwrap()
+        )),
+    )
+    .unwrap();
     let stale = "// lighthouse:allow design/exported-doc -- stale\n/// Runs.\npub fn run() {}\n";
     write(&dir, "src/lib.rs", stale);
     let text = stdout(lighthouse(dir.path()).arg("check"));

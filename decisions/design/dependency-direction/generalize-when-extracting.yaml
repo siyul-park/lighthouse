@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/generalize-when-extracting
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: dependency-direction
+spec:
+  title: Generalize when extracting
+  intent: Moving code downward without generalizing only relocates the complexity.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Shared functionality MUST be generalized when extracted; it MUST NOT be
+    moved downward merely to relocate complexity.
+  enforcement: judgment

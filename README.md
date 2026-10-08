@@ -40,37 +40,42 @@ lighthouse review resolve 395d1985afe8 --verdict rejected --reason intentional-e
   Annotations that stop matching anything are reported, so they cannot rot.
 - **Valid while it still applies.** A verdict holds while the rule's meaning and the
   finding's evidence stay the same. Change the code materially or redefine the rule, and
-  the question comes back. Mechanical errors are never hidden by a verdict, only by an
-  annotated, reviewed exception.
+  the question comes back. Mechanical findings are never hidden by a verdict, only by an
+  annotated, reviewed exception; heuristic and judgment findings can be, at any severity.
 - **Evidence kept.** Every verdict stores a snapshot of what was judged: metrics, symbol
   shape, rule options, commit. That history is what later turns decisions into rules.
 
-## Pattern Catalog
+## Decision Catalog
 
 Each decision has one canonical specification. The checks, the rendered docs
-([docs/patterns](docs/patterns)) and the guidance agents read are all generated from it,
+([docs/decisions](docs/decisions)) and the guidance agents read are all generated from it,
 so docs, linter and agent cannot disagree.
 
 ```yaml
-id: design/single-use-wrapper
-title: Inline single-use wrappers
-intent: A forwarding wrapper adds a name without adding meaning.
-requirement: >-
-  A simple single-use wrapper SHOULD be inlined unless its name expresses a
-  real policy or mechanic.
-enforcement: heuristic     # mechanical → error · heuristic → warn · judgment → review
-implementation:
-  builtin: design/single-use-wrapper
-examples: [...]            # executable valid/invalid fixtures, per language
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/single-use-wrapper
+  labels: { lighthouse/pack: design, lighthouse/section: functions }
+spec:
+  title: Inline single-use wrappers
+  intent: A forwarding wrapper adds a name without adding meaning.
+  scope: { domain: code, subject: symbol }
+  requirement: >-
+    A simple single-use wrapper SHOULD be inlined unless its name expresses a
+    real policy or mechanic.
+  enforcement: heuristic     # mechanical → error · heuristic → warn · judgment → info
+  check: { type: builtin, id: design/single-use-wrapper }
+  examples: [...]            # executable valid/invalid fixtures, per language
 ```
 
-A pattern states its intent once; each language realizes it in its own terms. Rules can
+A decision states its intent once; each language realizes it in its own terms. Rules can
 be built in, written as CEL expressions over the code model, or added per project under
-`.lighthouse/rules/`. Every rule ships executable examples, and `lighthouse rule test`
-runs them.
+`.lighthouse/decisions/`. Every decision ships executable examples, and `lighthouse decision test`
+runs them. Every spec document, `lighthouse.toml` included, has a JSON Schema in [schema/](schema).
 
 Precision comes before recall. A design rule that cries wolf gets ignored, so heuristics
-default to high thresholds, judgment calls become review tasks instead of errors, and
+default to high thresholds, judgment calls become `info` review tasks instead of errors, and
 each rule's precision is measured from its verdicts.
 
 ## Rule Evolution
@@ -92,7 +97,7 @@ A hook runs `lighthouse check` on what the agent just changed and returns feedba
 agent can act on:
 
 ```text
-design/private-helper-callers  review (heuristic)  src/lib.rs:5:1
+design/private-helper-callers  info (heuristic)  src/lib.rs:5:1
   owner:       demo::clamp#function
   message:     private function clamp has one caller (run)
   requirement: A private helper SHOULD have at least two callers.
@@ -127,20 +132,25 @@ lighthouse check                              # analyze the project
 lighthouse check --changed --format agent     # what the working tree changed, for an agent
 lighthouse explain design/single-use-wrapper  # intent, requirement, examples
 lighthouse review list                        # findings Lighthouse remembers
-lighthouse rule test                          # run every rule's examples
+lighthouse decision test                      # run every decision's examples
 ```
 
 A minimal `lighthouse.toml` for a Go project:
 
 ```toml
+apiVersion = "lighthouse/v1alpha1"
+kind = "Project"
+metadata = { name = "demo" }
+
+[spec]
 plugins = [{ id = "lang-go", path = "target/plugins/lang-go" }, "design"]
 extends = ["design/recommended"]
 
-[rules]
-"design/complexity-signal" = { level = "warn", cognitive = 30 }
+[spec.rules]
+"design/complexity-signal" = { level = "warn", options = { cognitive = 30 } }
 ```
 
-Exit codes: `0` clean, `1` findings, `2` usage or configuration error, `3` analysis
+Exit codes: `0` clean, `1` an error (a warning too with `--strict` or `--max-warnings N`), `2` usage or configuration error, `3` analysis
 incomplete. "Not checked" never counts as "passed".
 
 ## Built from plugins
@@ -161,8 +171,8 @@ documents and design files can follow.
 | Area | Available now | Next |
 | --- | --- | --- |
 | Decision Memory | committed decision log, expiring verdicts with evidence snapshots, source annotations, finding history | MCP tools for agents, hooks |
-| Pattern Catalog | `design` and `testing` packs, generated docs, project overlays, CEL rules, `rule test` | more executable examples |
-| Rule Evolution | | pattern index and similarity, coverage analysis, rule proposals |
+| Decision Catalog | `design` and `testing` packs, generated docs, JSON Schemas, SARIF, project overrides, CEL checks, `decision test` | more executable examples |
+| Rule Evolution | | decision index and similarity, coverage analysis, rule proposals |
 | Rules | complexity, coupling, docs, wrappers, declaration order and layout, naming, banners, test contracts | dependency direction, cohesion, clones |
 | Languages | Go (semantic), Rust (syntactic) | TypeScript, Python |
 | Fixing | | one fixer interface: rule-based fixes first, then plugin and agent fixers |
@@ -170,7 +180,7 @@ documents and design files can follow.
 
 ## Documentation
 
-- [Pattern catalog, rendered](docs/patterns): every decision Lighthouse knows
+- [Decision catalog, rendered](docs/decisions): every decision Lighthouse knows
 - [Architecture](docs/architecture.md): code model, scopes, incomplete analysis, memory and shared decisions
 - [Plugin protocol](docs/plugin-protocol.md): writing a language plugin in any language
 

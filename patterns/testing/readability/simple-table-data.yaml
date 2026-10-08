@@ -1,8 +1,0 @@
-id: testing/simple-table-data
-title: Table data stays simple
-intent: A table that needs its own logic is no longer a specification.
-scope: test
-requirement: >-
-  Table data and generation code MUST remain simple enough to read as
-  specification.
-enforcement: judgment

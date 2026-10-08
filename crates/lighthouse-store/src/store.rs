@@ -32,10 +32,10 @@ const OPEN_ATTEMPTS: u32 = 100;
 const OPEN_PAUSE: Duration = Duration::from_millis(20);
 /// SQL for the current UTC time, millisecond resolution.
 const NOW: &str = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
-/// Format version of the feature snapshot of a review.
-const SNAPSHOT_VERSION: u32 = 1;
+/// Format version of the feature snapshot of a review: 2 has camelCase keys.
+const SNAPSHOT_VERSION: u32 = 2;
 
-const EVENT_COLUMNS: &str = "event_id, fingerprint, rule_id, rule_version, pattern_hash, \
+const EVENT_COLUMNS: &str = "event_id, fingerprint, rule_id, rule_version, decision_hash, \
      catalog_version, lighthouse_version, pattern_fingerprint, verdict, reason_code, reason_text, \
      reviewer_kind, reviewer_id, language, scope, evidence_digest, feature_snapshot, git_commit, \
      timestamp";
@@ -48,6 +48,7 @@ const EVENT_COLUMNS: &str = "event_id, fingerprint, rule_id, rule_version, patte
 pub struct Store {
     conn: Connection,
     log: Option<PathBuf>,
+    notices: Vec<String>,
 }
 
 impl Store {
@@ -97,9 +98,19 @@ impl Store {
         conn.pragma_update_and_check(None, "journal_mode", "WAL", |row| row.get::<_, String>(0))?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         migrations::migrate(&mut conn)?;
-        let mut store = Self { conn, log };
+        let mut store = Self {
+            conn,
+            log,
+            notices: Vec::new(),
+        };
         store.sync()?;
         Ok(store)
+    }
+
+    /// What the user should know about how the log was read: records a newer
+    /// build wrote that this one skipped.
+    pub fn notices(&self) -> &[String] {
+        &self.notices
     }
 
     /// The number of schema migrations the database has applied.
@@ -129,7 +140,8 @@ impl Store {
 
     /// What the latest rejection does to each finding it applies to: keeps it
     /// out of reports, has expired because the rule or the evidence moved, or
-    /// cannot apply because the finding is mechanical.
+    /// cannot apply because the finding is mechanical (its tier, not its
+    /// severity, decides).
     pub fn standings(&self) -> Result<BTreeMap<String, Judgment>, Error> {
         let mut stmt = self
             .conn
@@ -326,7 +338,15 @@ impl Store {
         let Some(path) = self.log.clone() else {
             return Ok(());
         };
-        let logged = log::read(&path)?;
+        let read = log::read(&path)?;
+        if read.skipped > 0 {
+            self.notices.push(format!(
+                "{} record(s) in {} are of a kind or version this build does not know and were skipped; a newer lighthouse wrote them",
+                read.skipped,
+                path.display()
+            ));
+        }
+        let logged = read.events;
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -408,10 +428,10 @@ fn upsert(
         "INSERT INTO findings (fingerprint, rule_id, last_severity, tier, path, locator, symbol, \
              first_seen, last_seen, last_message, last_evidence, last_facts, last_options, \
              last_commit, last_dirty, lighthouse_version, catalog_version, rule_version, \
-             pattern_hash, evidence_digest) \
+             legacy_rule_version, decision_hash, evidence_digest) \
          VALUES (:fingerprint, :rule_id, :severity, :tier, :path, :locator, :symbol, :now, :now, \
              :message, :evidence, :facts, :options, :commit, :dirty, :version, :catalog, \
-             :rule_version, :pattern_hash, :digest) \
+             :rule_version, :legacy_rule_version, :decision_hash, :digest) \
          ON CONFLICT (fingerprint) DO UPDATE SET \
              rule_id = excluded.rule_id, last_severity = excluded.last_severity, \
              tier = excluded.tier, path = excluded.path, locator = excluded.locator, \
@@ -422,7 +442,8 @@ fn upsert(
              last_options = excluded.last_options, last_commit = excluded.last_commit, \
              last_dirty = excluded.last_dirty, lighthouse_version = excluded.lighthouse_version, \
              catalog_version = excluded.catalog_version, rule_version = excluded.rule_version, \
-             pattern_hash = excluded.pattern_hash, evidence_digest = excluded.evidence_digest",
+             legacy_rule_version = excluded.legacy_rule_version, \
+             decision_hash = excluded.decision_hash, evidence_digest = excluded.evidence_digest",
         named_params! {
             ":fingerprint": observed.fingerprint,
             ":rule_id": observed.rule_id,
@@ -441,7 +462,8 @@ fn upsert(
             ":version": run.lighthouse_version,
             ":catalog": run.catalog_version,
             ":rule_version": observed.rule_version,
-            ":pattern_hash": observed.pattern_hash,
+            ":legacy_rule_version": observed.legacy_rule_version,
+            ":decision_hash": observed.decision_hash,
             ":digest": observed.evidence_digest(),
         },
     )?;
@@ -578,18 +600,18 @@ fn event_of(
         "options": finding.options,
         "severity": finding.severity,
         "tier": finding.tier,
-        "seen_at": finding.last_seen,
+        "seenAt": finding.last_seen,
         "commit": finding.commit,
         "dirty": finding.dirty,
-        "lighthouse_version": finding.lighthouse_version,
-        "pattern_fingerprint": Value::Null,
+        "lighthouseVersion": finding.lighthouse_version,
+        "patternFingerprint": Value::Null,
     });
     let mut event = ReviewEvent {
         id: String::new(),
         fingerprint: finding.fingerprint.clone(),
         rule_id: finding.rule_id.clone(),
         rule_version: stamp.rule_version,
-        pattern_hash: stamp.pattern_hash,
+        decision_hash: stamp.decision_hash,
         catalog_version: stamp.catalog_version,
         lighthouse_version: Some(review.lighthouse_version.clone()),
         pattern_fingerprint: None,
@@ -616,10 +638,10 @@ fn event_of(
 fn insert_event(tx: &Transaction, event: &ReviewEvent) -> Result<(), Error> {
     tx.execute(
         "INSERT OR IGNORE INTO review_events (event_id, fingerprint, rule_id, rule_version, \
-             pattern_hash, catalog_version, lighthouse_version, pattern_fingerprint, verdict, \
+             decision_hash, catalog_version, lighthouse_version, pattern_fingerprint, verdict, \
              reason_code, reason_text, reviewer_kind, reviewer_id, language, scope, \
              evidence_digest, feature_snapshot, git_commit, timestamp) \
-         VALUES (:id, :fingerprint, :rule_id, :rule_version, :pattern_hash, :catalog, :version, \
+         VALUES (:id, :fingerprint, :rule_id, :rule_version, :decision_hash, :catalog, :version, \
              :pattern_fingerprint, :verdict, :reason, :reason_text, :kind, :reviewer, :language, \
              :scope, :digest, :snapshot, :commit, :timestamp)",
         named_params! {
@@ -627,7 +649,7 @@ fn insert_event(tx: &Transaction, event: &ReviewEvent) -> Result<(), Error> {
             ":fingerprint": event.fingerprint,
             ":rule_id": event.rule_id,
             ":rule_version": event.rule_version,
-            ":pattern_hash": event.pattern_hash,
+            ":decision_hash": event.decision_hash,
             ":catalog": event.catalog_version,
             ":version": event.lighthouse_version,
             ":pattern_fingerprint": event.pattern_fingerprint,
@@ -692,7 +714,7 @@ fn review_event(row: &Row) -> rusqlite::Result<ReviewEvent> {
         fingerprint: row.get("fingerprint")?,
         rule_id: row.get("rule_id")?,
         rule_version: row.get("rule_version")?,
-        pattern_hash: row.get("pattern_hash")?,
+        decision_hash: row.get("decision_hash")?,
         catalog_version: row.get("catalog_version")?,
         lighthouse_version: row.get("lighthouse_version")?,
         pattern_fingerprint: row.get("pattern_fingerprint")?,

@@ -16,7 +16,7 @@ use std::{
 };
 
 use lighthouse_model::{Fingerprint, Safety};
-use lighthouse_plugin::FixPattern;
+use lighthouse_plugin::FixDecision;
 use lighthouse_spec::{Catalog, Enforcement, FixKind};
 
 pub use diff::unified_diff;
@@ -35,39 +35,39 @@ pub struct FixBinding {
     pub cap: Safety,
     /// The rule is mechanical: its safe fixes apply without asking.
     pub mechanical: bool,
-    pub pattern: FixPattern,
+    pub decision: FixDecision,
     /// Why the fix cannot run at all, such as a kind this version does not
     /// support; the rule's findings are then declined with this text.
     pub unsupported: Option<String>,
 }
 
 /// The fixer of each rule, by rule id. Built from the catalog by the caller:
-/// the engine knows no patterns.
+/// the engine knows no decisions.
 #[derive(Debug, Clone, Default)]
 pub struct FixPlan {
     bindings: BTreeMap<String, FixBinding>,
 }
 
 impl FixPlan {
-    /// The fixer of every rule whose pattern has a `fix`: the pattern's id,
+    /// The fixer of every rule whose decision has a `fix`: the decision's id,
     /// under which its fixer is registered, with the cap its `safety` puts on
     /// what the fixer may claim.
     pub fn from_catalog(catalog: &Catalog) -> Self {
         let mut plan = Self::default();
-        for pattern in catalog.patterns() {
-            let Some(fix) = &pattern.fix else { continue };
+        for decision in catalog.decisions() {
+            let Some(fix) = &decision.fix else { continue };
             plan.insert(
-                pattern.id.clone(),
+                decision.id(),
                 FixBinding {
-                    fixer: pattern.id.clone(),
+                    fixer: decision.id().to_owned(),
                     cap: fix.safety,
-                    mechanical: pattern.enforcement == Enforcement::Mechanical,
-                    pattern: FixPattern {
-                        id: pattern.id.clone(),
-                        requirement: pattern.requirement.clone(),
-                        intent: pattern.intent.clone(),
+                    mechanical: decision.enforcement == Enforcement::Mechanical,
+                    decision: FixDecision {
+                        id: decision.id().to_owned(),
+                        requirement: decision.requirement.clone(),
+                        intent: decision.intent.clone(),
                     },
-                    unsupported: matches!(fix.kind, FixKind::Rpc(_)).then(|| {
+                    unsupported: matches!(fix.kind, FixKind::Rpc { .. }).then(|| {
                         "the fix of this rule is of kind `rpc`, which is not yet supported"
                             .to_owned()
                     }),

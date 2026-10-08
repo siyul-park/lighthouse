@@ -1,18 +1,21 @@
 use std::{collections::BTreeMap, fs, path::Path};
 
+use lighthouse_resource::Format;
 use lighthouse_spec::Catalog;
 
 use crate::Error;
 
-/// Where a project keeps its own rules, relative to the project root.
-const LOCAL_DIR: &str = ".lighthouse/rules";
+/// Where a project keeps its own decisions, relative to the project root.
+const LOCAL_DIR: &str = ".lighthouse/decisions";
+/// Where the project's own rules lived before the resource model.
+const LEGACY_DIR: &str = ".lighthouse/rules";
 
-/// Where a project keeps its own rules: `<root>/.lighthouse/rules`.
+/// Where a project keeps its own decisions: `<root>/.lighthouse/decisions`.
 pub fn local_dir(root: &Path) -> std::path::PathBuf {
     root.join(LOCAL_DIR)
 }
 
-/// The catalog layer of `<root>/.lighthouse/rules/*.yaml`; `None` when the
+/// The catalog layer of `<root>/.lighthouse/decisions/*.yaml`; `None` when the
 /// directory does not exist.
 pub fn load_local(root: &Path) -> Result<Option<Catalog>, Error> {
     match local_files(root)? {
@@ -21,9 +24,16 @@ pub fn load_local(root: &Path) -> Result<Option<Catalog>, Error> {
     }
 }
 
-/// The texts of `<root>/.lighthouse/rules/*.yaml` by file name; `None` when
-/// the directory does not exist.
+/// The texts of `<root>/.lighthouse/decisions/*` (YAML, TOML or JSON) by file name; `None` when
+/// the directory does not exist. A project that still has `.lighthouse/rules`
+/// is refused: its rules would otherwise be ignored without a word.
 pub fn local_files(root: &Path) -> Result<Option<BTreeMap<String, String>>, Error> {
+    let legacy = root.join(LEGACY_DIR);
+    if legacy.exists() {
+        return Err(Error::Legacy {
+            path: legacy.display().to_string(),
+        });
+    }
     let dir = local_dir(root);
     if !dir.is_dir() {
         return Ok(None);
@@ -35,7 +45,7 @@ pub fn local_files(root: &Path) -> Result<Option<BTreeMap<String, String>>, Erro
     let mut files = BTreeMap::new();
     for entry in fs::read_dir(&dir).map_err(|e| io(&dir, e))? {
         let path = entry.map_err(|e| io(&dir, e))?.path();
-        if path.extension().is_some_and(|e| e == "yaml") {
+        if Format::of_path(&path).is_some() {
             let name = path
                 .file_name()
                 .unwrap_or_default()

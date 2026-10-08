@@ -11,7 +11,7 @@ use lighthouse_model::{
     Options, Position, Safety, Severity, Span, Symbol, SymbolId, SymbolKind, Visibility,
 };
 use lighthouse_plugin::{
-    Ctx, Error as PluginError, FixPattern, FixRequest, Fixer, FixerManifest, Indexed,
+    Ctx, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, Indexed,
     LanguageProvider, Plugin, PluginManifest, ProviderManifest, Registry, Rule, RuleManifest,
     Scope, Source, Workspace,
 };
@@ -264,7 +264,7 @@ pub static PLUGIN: LazyLock<PluginManifest> = LazyLock::new(|| PluginManifest {
 pub fn engine(dir: &TempDir, extra: &str) -> Engine {
     let mut registry = Registry::default();
     registry.register(&Fake(PLUGIN.clone())).unwrap();
-    let config = Config::parse(&format!(
+    let config = Config::parse_inline(&format!(
         "plugins = [\"fake\"]\n[rules]\n\"fake/todo\" = \"error\"\n\"fake/bad\" = \"error\"\n{extra}"
     ))
     .unwrap();
@@ -285,7 +285,7 @@ pub fn plan(fixer: &str, cap: Safety, mechanical: bool) -> FixPlan {
             fixer: fixer.to_owned(),
             cap,
             mechanical,
-            pattern: FixPattern {
+            decision: FixDecision {
                 id: "fake/todo".to_owned(),
                 requirement: String::new(),
                 intent: String::new(),

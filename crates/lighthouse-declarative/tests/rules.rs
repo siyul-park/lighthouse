@@ -12,11 +12,12 @@ use lighthouse_spec::Catalog;
 use serde_json::json;
 use support::{Subject, World};
 
-/// A local rule `local/probe` over `scope` with the rule file `rule`.
-fn local(scope: &str, rule: &str) -> Result<Declarative, String> {
-    let indented: String = rule.lines().map(|l| format!("  {l}\n")).collect();
+/// A local decision `local/probe` over `scope` with the CEL check `check`: the
+/// lines of its `select`, `where`, `message` and `evidence`.
+fn local(scope: &str, check: &str) -> Result<Declarative, String> {
+    let indented: String = check.lines().map(|l| format!("    {l}\n")).collect();
     let text = format!(
-        "id: local/probe\ntitle: Probe\nintent: A probe.\nscope: {scope}\nrequirement: A probe MUST hold.\nenforcement: mechanical\nevidence: [x]\nexamples:\n  - name: bad\n    language: text\n    kind: invalid\n    files: [{{ path: a.txt, body: x }}]\n    expect: [{{ line: 1 }}]\n  - name: good\n    language: text\n    kind: valid\n    files: [{{ path: a.txt, body: x }}]\nrule:\n{indented}"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  intent: A probe.\n  scope: {{ subject: {scope} }}\n  requirement: A probe MUST hold.\n  enforcement: mechanical\n  evidence: [x]\n  check:\n    type: cel\n{indented}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
     );
     let layer = Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)]))
         .map_err(|e| e.to_string())?;
@@ -143,7 +144,7 @@ fn error() {
         (
             "symbol",
             "select: nonsense\nwhere: 'true'\nmessage: x",
-            "select",
+            "nonsense",
         ),
         (
             "symbol",
@@ -176,22 +177,40 @@ fn an_expression_that_fails_to_evaluate_fails_the_run_loudly() {
 }
 
 #[test]
-fn local_files_need_the_local_prefix_a_rule_section_and_inline_examples() {
+fn local_files_need_the_local_prefix_and_a_cel_check_and_inline_examples() {
     let files = |text: &str| BTreeMap::from([("x.yaml".to_owned(), text.to_owned())]);
-    let bad_id = "id: other/x\ntitle: t\nintent: i\nscope: symbol\nrequirement: A MUST b.\nenforcement: doc\nrule: {}\n";
+    let header = |name: &str| {
+        format!(
+            "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: {name}\nspec:\n  title: t\n  intent: i\n  scope: {{ subject: symbol }}\n  requirement: A MUST b.\n  enforcement: doc\n"
+        )
+    };
     assert!(
-        Catalog::from_local(files(bad_id))
+        Catalog::from_local(files(&header("other/x")))
             .unwrap_err()
             .to_string()
             .contains("local/<name>")
     );
-    let no_rule = "id: local/x\ntitle: t\nintent: i\nscope: symbol\nrequirement: A MUST b.\nenforcement: doc\n";
+    let builtin = format!(
+        "{}  check:\n    type: builtin\n    id: local/x\n",
+        header("local/x").replace("doc", "judgment")
+    );
     assert!(
-        Catalog::from_local(files(no_rule))
+        Catalog::from_local(files(&builtin))
             .unwrap_err()
             .to_string()
-            .contains("rule:")
+            .contains("`cel` check")
     );
+    let sourced = format!(
+        "{}  examples:\n    - name: e\n      language: text\n      kind: valid\n      files: [{{ path: a, source: a.txt }}]\n",
+        header("local/x")
+    );
+    assert!(
+        Catalog::from_local(files(&sourced))
+            .unwrap_err()
+            .to_string()
+            .contains("does not exist")
+    );
+    assert!(Catalog::from_local(files(&header("local/x"))).is_ok());
 }
 
 #[test]
@@ -217,9 +236,9 @@ fn load_local() {
             .is_none()
     );
 
-    let dir = root.path().join(".lighthouse/rules");
+    let dir = root.path().join(".lighthouse/decisions");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("notes.txt"), "not a rule").unwrap();
+    std::fs::write(dir.join("notes.txt"), "not a decision").unwrap();
     std::fs::write(dir.join("bad.yaml"), "id: other/x\n").unwrap();
     assert!(lighthouse_declarative::load_local(root.path()).is_err());
 
@@ -236,7 +255,7 @@ fn local_files_and_local_dir() {
     let root = tempfile::tempdir().unwrap();
     assert_eq!(
         lighthouse_declarative::local_dir(root.path()),
-        root.path().join(".lighthouse/rules")
+        root.path().join(".lighthouse/decisions")
     );
     assert!(
         lighthouse_declarative::local_files(root.path())
@@ -247,10 +266,29 @@ fn local_files_and_local_dir() {
     let dir = lighthouse_declarative::local_dir(root.path());
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("a.yaml"), "id: local/a\n").unwrap();
-    std::fs::write(dir.join("notes.txt"), "not a rule").unwrap();
+    std::fs::write(dir.join("notes.txt"), "not a decision").unwrap();
     let files = lighthouse_declarative::local_files(root.path())
         .unwrap()
         .unwrap();
     assert_eq!(files.keys().collect::<Vec<_>>(), ["a.yaml"]);
     assert_eq!(files["a.yaml"], "id: local/a\n");
+}
+
+#[test]
+fn a_project_with_legacy_rules_is_refused_instead_of_ignored() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(root.path().join(".lighthouse/rules")).unwrap();
+    std::fs::create_dir_all(root.path().join(".lighthouse/decisions")).unwrap();
+
+    for error in [
+        lighthouse_declarative::local_files(root.path())
+            .unwrap_err()
+            .to_string(),
+        lighthouse_declarative::load_local(root.path())
+            .unwrap_err()
+            .to_string(),
+    ] {
+        assert!(error.contains(".lighthouse/rules"), "{error}");
+        assert!(error.contains("lighthouse spec migrate"), "{error}");
+    }
 }

@@ -48,10 +48,10 @@ fn go_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> {
     write(
         dir.path(),
         "lighthouse.toml",
-        &format!(
+        &lighthouse_testkit::project(&format!(
             "plugins = [\"core\", \"design\", \"testing\", {local}{{ id = \"lang-go\", path = {:?} }}]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"]\n{extra}",
             plugin.to_str().unwrap()
-        ),
+        )),
     );
     write(dir.path(), "go.mod", "module example.com/demo\n\ngo 1.26\n");
     for (name, text) in files {
@@ -71,10 +71,10 @@ fn rust_project(source: &str, extra: &str) -> TempDir {
     write(
         dir.path(),
         "lighthouse.toml",
-        &format!(
+        &lighthouse_testkit::project(&format!(
             "plugins = [\"core\", \"design\", {local}{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\"]\n{extra}",
             plugin.to_str().unwrap()
-        ),
+        )),
     );
     write(
         dir.path(),
@@ -220,7 +220,11 @@ fn a_configured_formatter_runs_on_the_files_a_fix_changed() {
 #[test]
 fn flags_that_only_make_sense_with_fix_are_refused_without_it() {
     let dir = tempfile::tempdir().unwrap();
-    write(dir.path(), "lighthouse.toml", "plugins = [\"core\"]\n");
+    write(
+        dir.path(),
+        "lighthouse.toml",
+        &lighthouse_testkit::project("plugins = [\"core\"]\n"),
+    );
 
     for flag in ["--dry-run", "--unsafe-fixes"] {
         lighthouse(dir.path())
@@ -236,7 +240,7 @@ fn a_rename_is_declined_because_no_provider_has_complete_references_yet() {
     let Some(dir) = go_project(
         &[
             ("a.go", source),
-            (".lighthouse/rules/old.yaml", RENAME_RULE),
+            (".lighthouse/decisions/old.yaml", RENAME_RULE),
         ],
         "[rules]\n\"local/old-suffix\" = \"error\"\n",
     ) else {
@@ -257,8 +261,8 @@ fn a_rename_is_declined_in_rust_too() {
     let dir = rust_project(source, "[rules]\n\"local/old-suffix\" = \"error\"\n");
     write(
         dir.path(),
-        ".lighthouse/rules/old.yaml",
-        &RENAME_RULE.replace("endsWith(\"Old\")", "endsWith(\"_old\")"),
+        ".lighthouse/decisions/old.yaml",
+        &RENAME_RULE.replace("endsWith(\\\"Old\\\")", "endsWith(\\\"_old\\\")"),
     );
 
     lighthouse(dir.path())
@@ -269,105 +273,120 @@ fn a_rename_is_declined_in_rust_too() {
     assert_eq!(read(&dir, "src/lib.rs"), source);
 }
 
-const RENAME_RULE: &str = r#"id: local/old-suffix
-title: Functions do not end in Old
-intent: Names do not carry their history.
-scope: symbol
-requirement: A function MUST NOT have a name that ends in Old.
-enforcement: mechanical
-evidence: [name]
-fix:
-  safety: safe
-  requires: [reference-sites, complete-references]
-  ops:
-    - op: rename
-      symbol: finding.symbol
-      name: '{{ symbol.name }}New'
-examples:
-  - name: old
-    language: go
-    kind: invalid
-    files:
-      - path: go.mod
-        body: |-
-          module example.com/demo
+const RENAME_RULE: &str = r#"apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/old-suffix
+spec:
+  title: Functions do not end in Old
+  intent: Names do not carry their history.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: A function MUST NOT have a name that ends in Old.
+  enforcement: mechanical
+  evidence: [name]
+  check:
+    type: cel
+    select: function
+    where: "func.kind == \"function\" && func.name.endsWith(\"Old\")"
+    message: "function {{ func.name }} ends in Old"
+    evidence:
+      name: func.name
+  fix:
+    safety: safe
+    requires: [reference-sites, complete-references]
+    type: ops
+    ops:
+      - op: rename
+        symbol: finding.symbol
+        name: "{{ symbol.name }}New"
+  examples:
+    - name: old
+      language: go
+      kind: invalid
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/demo
 
-          go 1.26
-      - path: a.go
-        body: |-
-          package demo
+            go 1.26
+        - path: a.go
+          body: |-
+            package demo
 
-          func DoOld() int { return 1 }
+            func DoOld() int { return 1 }
 
-          func Use() int { return DoOld() }
-    expect:
-      - line: 3
-    fixed:
-      - path: a.go
-        body: |-
-          package demo
+            func Use() int { return DoOld() }
+      expect:
+        - line: 3
+      fixed:
+        - path: a.go
+          body: |-
+            package demo
 
-          func DoOldNew() int { return 1 }
+            func DoOldNew() int { return 1 }
 
-          func Use() int { return DoOldNew() }
-  - name: new
-    language: go
-    kind: valid
-    files:
-      - path: go.mod
-        body: |-
-          module example.com/demo
+            func Use() int { return DoOldNew() }
+    - name: new
+      language: go
+      kind: valid
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/demo
 
-          go 1.26
-      - path: a.go
-        body: |-
-          package demo
+            go 1.26
+        - path: a.go
+          body: |-
+            package demo
 
-          func DoNew() int { return 1 }
-rule:
-  select: function
-  where: 'func.kind == "function" && func.name.endsWith("Old")'
-  message: 'function {{ func.name }} ends in Old'
-  evidence:
-    name: func.name
+            func DoNew() int { return 1 }
 "#;
 
-const UPPERCASE: &str = r#"id: local/shout
-title: Notes are upper case
-intent: Notes are read from far away.
-scope: file
-requirement: A note MUST be written in upper case.
-enforcement: mechanical
-evidence: [path]
-fix:
-  safety: safe
-  command:
-    argv: ["sh", "-c", "tr a-z A-Z < \"$1\"", "sh", "{file}"]
+const UPPERCASE: &str = r#"apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/shout
+spec:
+  title: Notes are upper case
+  intent: Notes are read from far away.
+  scope:
+    domain: code
+    subject: file
+  requirement: A note MUST be written in upper case.
+  enforcement: mechanical
+  evidence: [path]
+  check:
+    type: cel
+    select: file
+    where: "file.path.endsWith(\".txt\") && file.lines > 0"
+    message: "{{ file.path }} is not shouting"
+    evidence:
+      path: file.path
+  fix:
+    safety: safe
+    type: command
+    argv: [sh, "-c", "tr a-z A-Z < \"$1\"", sh, "{file}"]
     output: text
-examples:
-  - name: quiet
-    language: text
-    kind: invalid
-    files:
-      - path: a.txt
-        body: hello
-    expect:
-      - line: 1
-    fixed:
-      - path: a.txt
-        body: HELLO
-  - name: loud
-    language: text
-    kind: valid
-    files:
-      - path: a.txt
-        body: HELLO
-rule:
-  select: file
-  where: 'file.path.endsWith(".txt") && file.lines > 0'
-  message: '{{ file.path }} is not shouting'
-  evidence:
-    path: file.path
+  examples:
+    - name: quiet
+      language: text
+      kind: invalid
+      files:
+        - path: a.txt
+          body: hello
+      expect:
+        - line: 1
+      fixed:
+        - path: a.txt
+          body: HELLO
+    - name: loud
+      language: text
+      kind: valid
+      files:
+        - path: a.txt
+          body: HELLO
 "#;
 
 fn text_project(rule: &str) -> TempDir {
@@ -375,9 +394,11 @@ fn text_project(rule: &str) -> TempDir {
     write(
         dir.path(),
         "lighthouse.toml",
-        "plugins = [\"core\", \"local\"]\n[rules]\n\"local/shout\" = \"error\"\n",
+        &lighthouse_testkit::project(
+            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/shout\" = \"error\"\n",
+        ),
     );
-    write(dir.path(), ".lighthouse/rules/shout.yaml", rule);
+    write(dir.path(), ".lighthouse/decisions/shout.yaml", rule);
     write(dir.path(), "a.txt", "hello\n");
     dir
 }
@@ -424,10 +445,10 @@ fn a_change_to_the_configuration_or_the_rules_withdraws_trust() {
         .assert()
         .stderr(predicate::str::contains("would fix local/shout"));
 
-    let rule = read(&dir, ".lighthouse/rules/shout.yaml");
+    let rule = read(&dir, ".lighthouse/decisions/shout.yaml");
     write(
         dir.path(),
-        ".lighthouse/rules/shout.yaml",
+        ".lighthouse/decisions/shout.yaml",
         &rule.replace("tr a-z A-Z", "tr a-z B-Z"),
     );
     lighthouse(dir.path())
@@ -462,7 +483,9 @@ fn a_fix_table_in_lighthouse_toml_cannot_grant_trust() {
     write(
         dir.path(),
         "lighthouse.toml",
-        "plugins = [\"core\", \"local\"]\n[fix]\ncommands = \"allow\"\n[rules]\n\"local/shout\" = \"error\"\n",
+        &lighthouse_testkit::project(
+            "plugins = [\"core\", \"local\"]\n[fix]\ncommands = \"allow\"\n[rules]\n\"local/shout\" = \"error\"\n",
+        ),
     );
 
     lighthouse(dir.path())
@@ -477,11 +500,13 @@ fn a_fixer_can_be_named_for_a_rule_that_has_none() {
     let dir = text_project(UPPERCASE);
     // A rule with no fix of its own flags the same file; the fixer of
     // `local/shout` is named for it and counts as a suggestion.
-    write(dir.path(), ".lighthouse/rules/plain.yaml", PLAIN);
+    write(dir.path(), ".lighthouse/decisions/plain.yaml", PLAIN);
     write(
         dir.path(),
         "lighthouse.toml",
-        "plugins = [\"core\", \"local\"]\n[rules]\n\"local/plain\" = \"error\"\n",
+        &lighthouse_testkit::project(
+            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/plain\" = \"error\"\n",
+        ),
     );
     let named = [
         "check",
@@ -507,34 +532,41 @@ fn a_fixer_can_be_named_for_a_rule_that_has_none() {
     assert_eq!(read(&dir, "a.txt"), "HELLO\n");
 }
 
-const PLAIN: &str = r#"id: local/plain
-title: Notes are not lowercase
-intent: Notes are read from far away.
-scope: file
-requirement: A note MUST NOT be written in lower case.
-enforcement: mechanical
-evidence: [path]
-examples:
-  - name: quiet
-    language: text
-    kind: invalid
-    files:
-      - path: a.txt
-        body: hello
-    expect:
-      - line: 1
-  - name: loud
-    language: text
-    kind: valid
-    files:
-      - path: a.txt
-        body: HELLO
-rule:
-  select: file
-  where: 'file.path == "a.txt" && file.lines > 0'
-  message: '{{ file.path }} is lower case'
-  evidence:
-    path: file.path
+const PLAIN: &str = r#"apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/plain
+spec:
+  title: Notes are not lowercase
+  intent: Notes are read from far away.
+  scope:
+    domain: code
+    subject: file
+  requirement: A note MUST NOT be written in lower case.
+  enforcement: mechanical
+  evidence: [path]
+  check:
+    type: cel
+    select: file
+    where: "file.path == \"a.txt\" && file.lines > 0"
+    message: "{{ file.path }} is lower case"
+    evidence:
+      path: file.path
+  examples:
+    - name: quiet
+      language: text
+      kind: invalid
+      files:
+        - path: a.txt
+          body: hello
+      expect:
+        - line: 1
+    - name: loud
+      language: text
+      kind: valid
+      files:
+        - path: a.txt
+          body: HELLO
 "#;
 
 #[test]
@@ -552,8 +584,8 @@ fn an_unknown_fixer_is_a_usage_error() {
 fn a_command_that_fails_is_declined_and_leaves_the_file() {
     let failing = UPPERCASE
         .replace(
-            "argv: [\"sh\", \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", \"sh\", \"{file}\"]",
-            "argv: [\"sh\", \"-c\", \"exit 3\"]",
+            "argv: [sh, \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", sh, \"{file}\"]",
+            "argv: [sh, \"-c\", \"exit 3\"]",
         )
         .replace(
             "fixed:\n      - path: a.txt\n        body: HELLO\n",
@@ -573,65 +605,74 @@ fn a_command_that_fails_is_declined_and_leaves_the_file() {
     assert_eq!(read(&dir, "a.txt"), "hello\n");
 }
 
-const DOCUMENT_RULE: &str = r#"id: local/documented
-title: Public functions have a doc line
-intent: A reader should not have to guess what an exported function is for.
-scope: symbol
-requirement: A public function MUST have a doc comment.
-enforcement: mechanical
-evidence: [name]
-fix:
-  safety: safe
-  ops:
-    - op: replace
-      file: finding.file
-      span: '{"start": finding.span.start, "end": finding.span.start}'
-      text: "// {{ symbol.name }} is documented.\n"
-examples:
-  - name: bare
-    language: go
-    kind: invalid
-    files:
-      - path: go.mod
-        body: |-
-          module example.com/demo
+const DOCUMENT_RULE: &str = r#"apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/documented
+spec:
+  title: Public functions have a doc line
+  intent: A reader should not have to guess what an exported function is for.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: A public function MUST have a doc comment.
+  enforcement: mechanical
+  evidence: [name]
+  check:
+    type: cel
+    select: function
+    where: "func.kind == \"function\" && func.visibility == \"public\" && !func.documented"
+    message: "function {{ func.name }} has no doc comment"
+    evidence:
+      name: func.name
+  fix:
+    safety: safe
+    type: ops
+    ops:
+      - op: replace
+        file: finding.file
+        span: "{\"start\": finding.span.start, \"end\": finding.span.start}"
+        text: |
+          // {{ symbol.name }} is documented.
+  examples:
+    - name: bare
+      language: go
+      kind: invalid
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/demo
 
-          go 1.26
-      - path: a.go
-        body: |-
-          package demo
+            go 1.26
+        - path: a.go
+          body: |-
+            package demo
 
-          func Run() int { return 1 }
-    expect:
-      - line: 3
-    fixed:
-      - path: a.go
-        body: |-
-          package demo
+            func Run() int { return 1 }
+      expect:
+        - line: 3
+      fixed:
+        - path: a.go
+          body: |-
+            package demo
 
-          // Run is documented.
-          func Run() int { return 1 }
-  - name: documented
-    language: go
-    kind: valid
-    files:
-      - path: go.mod
-        body: |-
-          module example.com/demo
+            // Run is documented.
+            func Run() int { return 1 }
+    - name: documented
+      language: go
+      kind: valid
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/demo
 
-          go 1.26
-      - path: a.go
-        body: |-
-          package demo
+            go 1.26
+        - path: a.go
+          body: |-
+            package demo
 
-          // Run runs.
-          func Run() int { return 1 }
-rule:
-  select: function
-  where: 'func.kind == "function" && func.visibility == "public" && !func.documented'
-  message: 'function {{ func.name }} has no doc comment'
-  evidence:
-    name: func.name
+            // Run runs.
+            func Run() int { return 1 }
 "#;
 
 #[test]
@@ -639,7 +680,7 @@ fn a_replace_inserts_a_doc_line_in_go() {
     let Some(dir) = go_project(
         &[
             ("a.go", "package demo\n\nfunc Run() int { return 1 }\n"),
-            (".lighthouse/rules/doc.yaml", DOCUMENT_RULE),
+            (".lighthouse/decisions/doc.yaml", DOCUMENT_RULE),
         ],
         "[rules]\n\"local/documented\" = \"error\"\n",
     ) else {
@@ -665,8 +706,8 @@ fn a_replace_inserts_a_doc_line_in_rust() {
     );
     write(
         dir.path(),
-        ".lighthouse/rules/doc.yaml",
-        &DOCUMENT_RULE.replace("\"// {{", "\"/// {{"),
+        ".lighthouse/decisions/doc.yaml",
+        &DOCUMENT_RULE.replace("// {{ symbol.name }}", "/// {{ symbol.name }}"),
     );
 
     lighthouse(dir.path())
@@ -771,7 +812,9 @@ fn trust_lists_what_it_trusts_and_needs_a_terminal_or_yes() {
     write(
         dir.path(),
         "lighthouse.toml",
-        "plugins = [\"core\", \"local\"]\n[rules]\n\"local/shout\" = \"error\"\n[languages.go]\nformatter = [\"gofmt\"]\n",
+        &lighthouse_testkit::project(
+            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/shout\" = \"error\"\n[languages.go]\nformatter = [\"gofmt\"]\n",
+        ),
     );
 
     lighthouse(dir.path())
@@ -803,11 +846,11 @@ fn a_program_inside_the_project_is_trusted_by_its_content() {
         "tools/shout.sh",
         "#!/bin/sh\ntr a-z A-Z < \"$1\"\n",
     );
-    let rule = read(&dir, ".lighthouse/rules/shout.yaml").replace(
-        "argv: [\"sh\", \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", \"sh\", \"{file}\"]",
+    let rule = read(&dir, ".lighthouse/decisions/shout.yaml").replace(
+        "argv: [sh, \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", sh, \"{file}\"]",
         "argv: [\"./tools/shout.sh\", \"{file}\"]",
     );
-    write(dir.path(), ".lighthouse/rules/shout.yaml", &rule);
+    write(dir.path(), ".lighthouse/decisions/shout.yaml", &rule);
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

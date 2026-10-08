@@ -64,7 +64,7 @@ pub fn render_with(
     match format {
         Format::Text => text(diagnostics, incomplete),
         Format::Json => json_lines(diagnostics, incomplete),
-        Format::Sarif => sarif::render(diagnostics, incomplete),
+        Format::Sarif => sarif::render(diagnostics, incomplete, briefing.catalog),
         Format::Agent => agent::text(diagnostics, incomplete, briefing),
         Format::AgentJson => agent::json_lines(diagnostics, incomplete, briefing),
     }
@@ -98,10 +98,10 @@ fn text(diagnostics: &[Diagnostic], incomplete: &[Incomplete]) -> String {
         let count = |s: Severity| diagnostics.iter().filter(|d| d.severity == s).count();
         let _ = writeln!(
             out,
-            "summary: {} error, {} warn, {} review, {} incomplete",
+            "summary: {} error, {} warn, {} info, {} incomplete",
             count(Severity::Error),
             count(Severity::Warn),
-            count(Severity::Review),
+            count(Severity::Info),
             incomplete.len()
         );
     }

@@ -1,9 +1,0 @@
-id: design/errors-not-panics
-title: Return errors, do not panic
-intent: "Panics bypass the caller's control flow."
-scope: symbol
-requirement: >-
-  Panic MUST be limited to impossible programmer errors, `Must*`-style APIs,
-  or documented hot-path invariants with one recovery boundary; normal runtime
-  failures MUST return errors.
-enforcement: judgment

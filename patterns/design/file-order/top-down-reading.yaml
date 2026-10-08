@@ -1,8 +1,0 @@
-id: design/top-down-reading
-title: Read from behavior to machinery
-intent: The top of a cohesive implementation states what it does.
-scope: file
-requirement: >-
-  A cohesive implementation MUST read from higher-level behavior toward shared
-  machinery.
-enforcement: judgment

@@ -1,9 +1,0 @@
-id: design/short-names-limited
-title: One-letter names stay small
-intent: One-letter names are only readable where context is a few lines.
-scope: symbol
-requirement: >-
-  One-letter names MUST be limited to conventional receivers, indexes, and
-  tiny scopes.
-enforcement: heuristic
-evidence: [name, scope_lines]

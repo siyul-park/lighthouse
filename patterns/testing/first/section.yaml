@@ -1,6 +1,0 @@
-id: first
-title: F.I.R.S.T.
-intro: >-
-  F.I.R.S.T. keeps tests reliable evidence rather than intermittent
-  diagnostics.
-patterns: [first-properties, independent-tests]

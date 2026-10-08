@@ -18,7 +18,7 @@ fn check(source: &str, rules: &str) -> Outcome {
     fs::create_dir(dir.path().join("src")).unwrap();
     fs::write(dir.path().join("src/lib.rs"), source).unwrap();
     let plugin = lighthouse_testkit::lang_rust();
-    let config = Config::parse(&format!(
+    let config = Config::parse_inline(&format!(
         "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\", \"core\"]\n\
          extends = [\"core/recommended\"]\n[rules]\n{rules}",
         plugin.to_str().unwrap()
@@ -182,7 +182,7 @@ fn facts_describe_the_subject_with_callers_split_and_file_measures() {
     let long = "// a\n".repeat(5);
     let lines = check(
         &format!("{long}pub fn open() {{}}\n"),
-        "\"core/max-file-lines\" = { level = \"warn\", max = 2 }\n",
+        "\"core/max-file-lines\" = { level = \"warn\", options = { max = 2 } }\n",
     );
     let finding = lines
         .diagnostics
@@ -199,7 +199,7 @@ fn facts_describe_the_subject_with_callers_split_and_file_measures() {
 fn outcome_lists_configured_rules_and_the_options_each_finding_ran_with() {
     let outcome = check(
         "pub fn open() {}\n",
-        "\"design/exported-doc\" = \"warn\"\n\"core/max-file-lines\" = { level = \"warn\", max = 1 }\n",
+        "\"design/exported-doc\" = \"warn\"\n\"core/max-file-lines\" = { level = \"warn\", options = { max = 1 } }\n",
     );
     assert!(
         outcome

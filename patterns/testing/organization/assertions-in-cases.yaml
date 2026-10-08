@@ -1,8 +1,0 @@
-id: testing/assertions-in-cases
-title: Assertions belong to cases
-intent: Assertions outside cases blur which behavior failed.
-scope: test
-requirement: >-
-  Assertions outside cases SHOULD describe setup, preconditions, or test-wide
-  invariants, not case behavior.
-enforcement: judgment

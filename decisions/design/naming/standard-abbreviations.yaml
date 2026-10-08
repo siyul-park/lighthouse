@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/standard-abbreviations
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: naming
+spec:
+  title: Keep standard abbreviations
+  intent: Conventional abbreviations are recognized faster than their expansions.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: Standard abbreviations MUST be kept in their conventional form.
+  enforcement: heuristic
+  evidence: [name, abbreviation]
+  languages:
+    go:
+      tuning: "Initialisms keep a uniform case, for example `ID` and `IP`."

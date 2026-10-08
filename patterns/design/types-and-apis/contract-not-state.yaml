@@ -1,8 +1,0 @@
-id: design/contract-not-state
-title: Exported types expose contract, not state
-intent: Exposed state becomes part of the contract by accident.
-scope: symbol
-requirement: >-
-  Exported types SHOULD expose contract rather than mutable implementation
-  state; data-only values and ABI bridge types MAY expose their fields.
-enforcement: judgment

@@ -1,8 +1,0 @@
-id: testing/scenario-per-behavior
-title: One case per scenario
-intent: Different scenarios are different specifications and need different names.
-scope: test
-requirement: >-
-  Different scenarios MUST use one case per scenario, named for the behavior
-  it states.
-enforcement: judgment

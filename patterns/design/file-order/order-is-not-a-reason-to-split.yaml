@@ -1,8 +1,0 @@
-id: design/order-is-not-a-reason-to-split
-title: Ordering never justifies splits
-intent: "Order rules serve readability; they are not a mandate for structure."
-scope: file
-requirement: >-
-  These ordering rules MUST NOT justify artificial file splits, wrappers, or
-  duplicated helpers.
-enforcement: doc

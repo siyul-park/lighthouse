@@ -1,9 +1,0 @@
-id: design/single-owner
-title: One implementation, one owner
-intent: "Duplicated behavior drifts; a single owner keeps it consistent."
-scope: project
-requirement: >-
-  Each behavior MUST have one implementation and each semantic rule MUST have
-  one owner.
-enforcement: judgment
-evidence: [owner, duplicates]

@@ -3,7 +3,7 @@ mod registry;
 
 use std::{collections::BTreeMap, path::PathBuf};
 
-use lighthouse_config::{RuleConfig, Rules};
+use lighthouse_config::{Metadata, PresetSpec, Resource, RuleConfig, RuleSetting, Rules};
 use lighthouse_model::{
     Capability, Diagnostic, File, Fragment, Incomplete, Options, Project, Severity,
 };
@@ -12,7 +12,8 @@ use serde_json::Value;
 use thiserror::Error;
 
 pub use fix::{
-    FixPattern, FixRequest, Fixer, FixerManifest, KeyCtx, OrderKey, OrderKeyManifest, OrderKeys,
+    FixDecision, FixRequest, Fixer, FixerManifest, KeyCtx, OrderKey, OrderKeyManifest,
+    OrderKeySpec, OrderKeys,
 };
 pub use registry::{Registry, plugin_of};
 
@@ -68,6 +69,9 @@ pub struct Workspace {
     pub overlays: BTreeMap<PathBuf, String>,
 }
 
+/// Fact key: analyzer id and scope key (file path, or empty for project scope).
+pub type Facts = BTreeMap<(String, String), Value>;
+
 impl Workspace {
     /// A workspace at `root` with no language options.
     pub fn new(root: impl Into<PathBuf>) -> Self {
@@ -79,9 +83,6 @@ impl Workspace {
     }
 }
 
-/// Fact key: analyzer id and scope key (file path, or empty for project scope).
-pub type Facts = BTreeMap<(String, String), Value>;
-
 /// Everything an analyzer or rule may read in one run.
 pub struct Ctx<'a> {
     pub ws: &'a Workspace,
@@ -89,6 +90,12 @@ pub struct Ctx<'a> {
     /// The focused file and its text; `None` for project scope.
     pub file: Option<(&'a File, &'a str)>,
     pub facts: &'a Facts,
+}
+
+/// Layout conventions a language declares; the engine applies them to every file of that language.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Conventions {
+    pub test_globs: Vec<String>,
 }
 
 impl Ctx<'_> {
@@ -110,12 +117,6 @@ impl Ctx<'_> {
     }
 }
 
-/// Layout conventions a language declares; the engine applies them to every file of that language.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Conventions {
-    pub test_globs: Vec<String>,
-}
-
 /// What a language provider declares about itself: which files are its own and
 /// what it guarantees about them. The `initialize` result of a plugin process
 /// carries one per language, field for field.
@@ -132,6 +133,13 @@ pub struct ProviderManifest {
     pub priority: i32,
 }
 
+/// A file handed to a provider with its text as read by the engine.
+#[derive(Debug, Clone, Copy)]
+pub struct Source<'a> {
+    pub file: &'a File,
+    pub text: &'a str,
+}
+
 impl ProviderManifest {
     /// A regular provider of `id` for `globs`, with no conventions or
     /// capabilities; set those directly.
@@ -145,13 +153,6 @@ impl ProviderManifest {
             priority: 0,
         }
     }
-}
-
-/// A file handed to a provider with its text as read by the engine.
-#[derive(Debug, Clone, Copy)]
-pub struct Source<'a> {
-    pub file: &'a File,
-    pub text: &'a str,
 }
 
 /// What a provider produced for a batch of files.
@@ -222,7 +223,66 @@ pub trait Rule: Send + Sync {
 pub struct PresetManifest {
     /// Fully qualified `plugin/name`.
     pub id: String,
+    /// Presets whose rules this one starts from.
+    pub extends: Vec<String>,
     pub rules: Rules,
+}
+
+/// A bundle of language providers, analyzers, rules and presets, all of whose
+/// ids are qualified with `manifest().id`. Everything defaults to empty.
+pub trait Plugin {
+    fn manifest(&self) -> &PluginManifest;
+    fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
+        Vec::new()
+    }
+    fn analyzers(&self) -> Vec<Box<dyn Analyzer>> {
+        Vec::new()
+    }
+    fn rules(&self) -> Vec<Box<dyn Rule>> {
+        Vec::new()
+    }
+    fn presets(&self) -> Vec<PresetManifest> {
+        Vec::new()
+    }
+    /// The fixers of the plugin's decisions; see [`Fixer`].
+    fn fixers(&self) -> Vec<Box<dyn Fixer>> {
+        Vec::new()
+    }
+    /// Ways to order declarations that fix operations may name.
+    fn order_keys(&self) -> Vec<Box<dyn OrderKey>> {
+        Vec::new()
+    }
+}
+
+impl PresetManifest {
+    /// The `Preset` document that describes this preset.
+    pub fn to_resource(&self) -> Resource<PresetSpec> {
+        Resource::new(
+            Metadata::named(&self.id),
+            PresetSpec {
+                extends: self.extends.clone(),
+                rules: self
+                    .rules
+                    .iter()
+                    .map(|(id, config)| (id.clone(), RuleSetting::from(config)))
+                    .collect(),
+            },
+        )
+    }
+
+    /// The preset a `Preset` document describes.
+    pub fn from_resource(preset: Resource<PresetSpec>) -> Self {
+        Self {
+            id: preset.metadata.name,
+            extends: preset.spec.extends,
+            rules: preset
+                .spec
+                .rules
+                .into_iter()
+                .map(|(id, setting)| (id, setting.into()))
+                .collect(),
+        }
+    }
 }
 
 impl PresetManifest {
@@ -236,6 +296,7 @@ impl PresetManifest {
         let metas: Vec<&RuleManifest> = metas.into_iter().collect();
         let preset = |name: &str, include: fn(&RuleManifest) -> bool| Self {
             id: format!("{plugin}/{name}"),
+            extends: Vec::new(),
             rules: metas
                 .iter()
                 .filter(|meta| include(meta))
@@ -256,30 +317,9 @@ impl PresetManifest {
     }
 }
 
-/// A bundle of language providers, analyzers, rules and presets, all of whose
-/// ids are qualified with `manifest().id`. Everything defaults to empty.
-pub trait Plugin {
-    fn manifest(&self) -> &PluginManifest;
-    fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
-        Vec::new()
-    }
-    fn analyzers(&self) -> Vec<Box<dyn Analyzer>> {
-        Vec::new()
-    }
-    fn rules(&self) -> Vec<Box<dyn Rule>> {
-        Vec::new()
-    }
-    fn presets(&self) -> Vec<PresetManifest> {
-        Vec::new()
-    }
-    /// The fixers of the plugin's patterns; see [`Fixer`].
-    fn fixers(&self) -> Vec<Box<dyn Fixer>> {
-        Vec::new()
-    }
-    /// Ways to order declarations that fix operations may name.
-    fn order_keys(&self) -> Vec<Box<dyn OrderKey>> {
-        Vec::new()
-    }
+/// The JSON Schema of the kinds this crate defines.
+pub fn descriptors() -> Vec<lighthouse_resource::Descriptor> {
+    vec![lighthouse_resource::Descriptor::of::<OrderKeySpec>()]
 }
 
 /// Deserializes rule options; unknown keys are rejected when `T` denies them.

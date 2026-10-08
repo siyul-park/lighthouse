@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/required-args-optional-options
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: types-and-apis
+spec:
+  title: "Required arguments, optional options"
+  intent: The signature shows what is mandatory.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Required constructor values MUST be passed as arguments; optional values
+    MUST be injected through options.
+  enforcement: judgment
+  languages:
+    go:
+      tuning: Optional values are injected through functional options.

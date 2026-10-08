@@ -3,7 +3,7 @@ use lighthouse_metrics::{
 };
 use lighthouse_model::FunctionSummary;
 use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
-use lighthouse_spec::PatternRule;
+use lighthouse_spec::DecisionRule;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -23,7 +23,7 @@ struct Thresholds {
 }
 
 pub(crate) fn rule() -> Box<dyn Rule> {
-    Box::new(PatternRule::new(
+    Box::new(DecisionRule::new(
         ID,
         &[SIZE, CYCLOMATIC, COGNITIVE, NESTING],
         check,

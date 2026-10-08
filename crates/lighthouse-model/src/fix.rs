@@ -1,11 +1,14 @@
 use std::{fmt, path::PathBuf, str::FromStr};
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{Node, Span, SymbolId};
 
 /// How much a proposed fix may be trusted to keep the program's meaning.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Safety {
     /// Mechanical and meaning-preserving: applied by default.
@@ -20,7 +23,7 @@ pub enum Safety {
 pub struct UnknownSafety(pub String);
 
 impl Safety {
-    /// The weaker of two claims: what a pattern's cap makes of a fixer's claim.
+    /// The weaker of two claims: what a decision's cap makes of a fixer's claim.
     pub fn capped(self, cap: Self) -> Self {
         self.max(cap)
     }
