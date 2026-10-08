@@ -67,6 +67,12 @@ languages and editors are added.
 - `command` checks follow the process contract:
   - exit code `0` clean, `1` findings, `≥2` error;
   - findings are stdout lines, with an optional `path:line:col:` prefix.
+- Agent output is compact:
+  - MCP `check`, `review_tasks`, `--format agent` and hooks group findings by decision,
+    then by file;
+  - each decision's requirement, expected example and verdict instructions appear once;
+  - one finding is one short line: location, message and fingerprint prefix;
+  - the full per-finding shape is available with `detail: full`.
 - Plugin protocol 0.2 is LSP-shaped:
   - LSP lifecycle, with Lighthouse capabilities under `experimental`;
   - text sync replaces overlays;
