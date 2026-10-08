@@ -35,12 +35,19 @@ says what exists today (see [Status](#status)).
 ## Decision
 
 A decision is a `Decision` resource committed with the catalog (see
-[architecture](architecture.md)):
-- **Meaning:** `requirement` (RFC 2119 wording), `scope`, `severity`, `options`.
-- **Record:** `title`, `intent`, `rationale`, `consequences`, `provenance`.
-- **Status**, as in MADR: `proposed`, `accepted`, `rejected`, `deprecated`, `superseded`.
-- **`supersedes`**, a list. One decision superseding several is a merge; several superseding one is a split.
-- **`check`**, optional. A decision without one is documentation: it appears in docs and agent guidance and produces no results.
+[architecture](architecture.md)). Its fields, and nothing more:
+
+| Group | Fields |
+| --- | --- |
+| Meaning (hashed into the meaning version) | `requirement` (RFC 2119 wording, exceptions included), `scope`, `severity`, `options`, `languages.<id>.options` |
+| Record (ADR) | `title`, `context` (why), `consequences`, `status`, `supersedes` |
+| Enforcement | `check` (optional; none = documentation), `fix` (optional) |
+| Examples | `examples`: authored judgments (`valid`, `invalid`, `fixed`) |
+| Provenance | `provenance`: PROV `wasDerivedFrom` (papers, source documents, issues, signals) |
+
+- `status` follows MADR: `proposed`, `accepted`, `rejected`, `deprecated`, `superseded`.
+- `supersedes` is a list: one decision superseding several is a merge; several superseding one is a split.
+- Grouping (pack, section, preset membership) is `metadata.labels`, not spec fields.
 
 Severity belongs to the meaning. An authored `error` is *definitive*: it needs no judgment,
 and only a suppression waives it.

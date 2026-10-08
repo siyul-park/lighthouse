@@ -81,6 +81,22 @@ languages and editors are added.
   - UTF-8 positions;
   - `lighthouse/index`, `lighthouse/check` and `lighthouse/fix` methods.
 
+### 2d-3: fewer concepts
+- Decision fields shrink to:
+  - meaning: `requirement`, `scope`, `severity`, `options`;
+  - record: `title`, `context`, `consequences`, `status`, `supersedes`;
+  - `check`, `fix`, `examples` and `provenance`.
+- Merged away:
+  - `intent` and `rationale` become `context`;
+  - `exceptions` moves into the requirement;
+  - `citation` moves into provenance;
+  - declared `evidence` comes from the check;
+  - `strict` becomes a label;
+  - per-language `tuning` is replaced by examples.
+- Kinds: `Preset` becomes a shareable `Project`, `DecisionOverride` folds into project rules, and `SourceMap` moves into provenance.
+- Verdicts become judgments (`pass`, `fail`, `notApplicable`) and suppressions. Signals and fix records become evidence.
+- Names follow standards (MADR, SARIF, W3C PROV-O). `spec migrate` converts existing files, and judgments survive.
+
 ### 3: decision graph and evaluation
 - Queries over the decision graph: decision, finding, verdict with reason and actor,
   evidence, and revision.
