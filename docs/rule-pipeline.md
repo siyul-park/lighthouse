@@ -266,7 +266,7 @@ judgment, meaning version and check revision.
 | Part | State |
 | --- | --- |
 | Decisions, packs, verdicts, annotations, `decisions.jsonl`, SQLite memory | done (verdicts in today's form) |
-| `check` providers (`builtin`, `cel`, `command`, `rpc`, and `model` served by agent review tasks), capabilities, meaning version and check revision | in progress (2d-2) |
+| `check` providers (`builtin`, `cel`, `command`, `model` served by agent review tasks; `rpc` reserved), meaning version and check revision | done |
 | Verdicts become judgments and suppressions; naming alignment (`intent` → `context`, provenance fields) | after 2d-2 |
 | Judgments on subjects, sampling, evaluation, `Revision` records, log compaction, snapshot budgets | Phase 3 |
 | Evidence sources (grouping, mining) and revision proposals | Phase 4 (mining at `init` in Phase 5) |

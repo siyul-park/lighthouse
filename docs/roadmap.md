@@ -41,34 +41,11 @@ languages and editors are added.
 | Agent loop | MCP server, Claude Code hooks, generated skill, `init --agent` |
 | Autofix | one canonical fix per decision (`ops`, `command`), in-memory verification, rollback, atomic writes, user-level trust |
 | Resource model | `apiVersion`/`kind`/`metadata`/`spec` for every spec, JSON Schema per kind, `spec validate`/`migrate`, SARIF, `pattern` renamed to `decision`, severity `error`/`warn`/`info` |
+| Check providers | `check:` as `builtin` (standard ops `order`, `proximity`, `cycle`), `cel` with a standard library, `command`, `rpc` (reserved) or `model` (served by agent review tasks); every bundled decision re-expressed with identical findings; `severity` replaces `enforcement`; meaning version separate from check revision; ADR `status`, `supersedes`, `consequences` |
 
 ## Next
 
-### 2d-2: one provider model for checks
-- `check:` takes one provider, like `fix:` does: `builtin`, `cel`, `command`, `rpc` or
-  `model`. Whether a check is deterministic is a capability the provider declares, not a
-  type. `type: model` asks the bound model the decision's requirement, with its examples
-  as shots; agent review tasks serve it for now.
-- Builtins become standard, decision-agnostic operations:
-  - Per-element predicates are written in `cel`, with a standard function library
-    (`metrics`, `callers`, `edges`, `tests`, `annotations`, …).
-  - Aggregate checks use builtin `order`, `proximity` and `cycle`.
-  - Analyzers compute facts; checks only judge.
-  - Every bundled decision is re-expressed this way, and the gate is identical findings
-    before and after.
-- `enforcement` is removed. A decision declares `severity: error|warn|info`:
-  - `error` is definitive: it needs no verdict, and only an annotation can waive it.
-  - `warn` and `info` are review tasks.
-  - A decision without `check:` is documentation only.
-- ADR lifecycle fields: `status`, `supersedes`, `rationale`, `consequences`, `provenance`.
-- The decision version is split in two:
-  - The *meaning version* (requirement, scope, severity, options) decides whether a
-    verdict still holds.
-  - The *check revision* only records which implementation produced a finding.
-  - Promoting a decision to a better check therefore keeps its verdicts.
-- `command` checks follow the process contract:
-  - exit code `0` clean, `1` findings, `≥2` error;
-  - findings are stdout lines, with an optional `path:line:col:` prefix.
+### 2d-2b: compact agent output and protocol 0.2
 - Agent output is compact:
   - MCP `check`, `review_tasks`, `--format agent` and hooks group findings by decision,
     then by file;
@@ -79,7 +56,8 @@ languages and editors are added.
   - LSP lifecycle, with Lighthouse capabilities under `experimental`;
   - text sync replaces overlays;
   - UTF-8 positions;
-  - `lighthouse/index`, `lighthouse/check` and `lighthouse/fix` methods.
+  - `lighthouse/index`, `lighthouse/check` and `lighthouse/fix` methods, which make
+    `rpc` checks real.
 
 ### 2d-3: fewer concepts
 - Decision fields shrink to:
