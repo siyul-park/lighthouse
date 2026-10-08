@@ -21,9 +21,9 @@ exists today (see [Status](#status)).
 | Decision | the identity: what was decided and why (`Decision` resource) | a state machine; a decision has no `stage` field |
 | Meaning | what the decision demands; its hash is the **meaning version** | how it is checked |
 | Check | how the meaning is enforced now; its hash is the **check revision** | part of the meaning |
-| Evidence | what was observed: examples, signals, snapshots, incidents, mined edits, each with provenance | a label; it carries no `violates`/`conforms` |
-| Judgment | a recorded label (`violates`/`conforms`) on one subject, drawn from evidence by an author | ground truth; a judgment can be wrong and is superseded by a stronger one |
-| Revision | a change to a decision, of one declared kind, with its evaluation and approval | a mutation in place |
+| Evidence | what was observed: examples, signals, snapshots, incidents, mined edits, each with provenance | a result; it carries no `pass`/`fail` |
+| Judgment | a recorded result (`fail`/`pass`) on one subject, drawn from evidence by an author | ground truth; a judgment can be wrong and is superseded by a stronger one |
+| Revision | a change to a decision, classified by what it changed, with its evaluation and approval | a mutation in place |
 
 **Meaning version and check revision are the central axis.**
 - A judgment belongs to the meaning version it was made under. It holds while that version and its evidence are unchanged.
@@ -38,7 +38,8 @@ exists today (see [Status](#status)).
 A decision is a `Decision` resource committed with the catalog (see
 [architecture](architecture.md)). Besides its meaning, it carries ADR fields:
 - `title`, `intent`, `rationale`, `consequences`;
-- `status` (`proposed`, `accepted`, `superseded`, `deprecated`), `supersedes`;
+- `status`, as in MADR: `proposed`, `accepted`, `rejected`, `deprecated`, `superseded`;
+- `supersedes`, a list. One decision superseding several is a merge; several superseding one is a split;
 - `provenance`, the evidence that produced it.
 
 ## Check
@@ -71,7 +72,7 @@ judge:            # judge part: candidates and a prompt
 ```text
  candidates
    ├─ deterministic   cheap, certain        ── decides what it covers
-   ├─ learned         cheap, probabilistic  ── violates ≥ upper · conforms ≤ lower · else abstains
+   ├─ learned         cheap, probabilistic  ── fail ≥ upper · pass ≤ lower · else review (abstains)
    └─ judge           expensive, semantic   ── decides the rest (Judge plugin, else an agent review task)
 ```
 
@@ -96,8 +97,8 @@ The last column shows what a producer typically draws.
 | Existing artifact | a convention, an ADR, a style guide, an external standard; an agent writes the decision (no importer) | authored examples |
 | Existing tool rule | a golangci-lint, clippy, ruff or semgrep rule, or a script, wrapped by `command`/`rpc` | the tool's findings, then verdicts |
 | Recorded history | verdicts, annotations, repeated fixes of one shape, review comments, agent-session corrections | signals with polarity |
-| Incident | a bug fix, postmortem, CI break or revert | the incident site `violates`, the fixed code `conforms` |
-| Repository mining | change direction in refactor-like commits; prevalence in the tree ([learning.md](learning.md)) | weak `violates` (before, outlier) and `conforms` (after, dominant) |
+| Incident | a bug fix, postmortem, CI break or revert | the incident site `fail`, the fixed code `pass` |
+| Repository mining | change direction in refactor-like commits; prevalence in the tree ([learning.md](learning.md)) | weak `fail` (before, outlier) and `pass` (after, dominant) |
 | Snapshot | current metrics frozen as a budget | the baseline; the decision is a ratchet |
 | Another project | an organisation catalog, a third-party pack | that project's examples (its labels never travel) |
 
@@ -121,12 +122,12 @@ Two records with different meanings:
 
 | Record | About | Values | Means |
 | --- | --- | --- | --- |
-| **Judgment** | a subject (a symbol, file, edge…) | `violates`, `conforms` | a recorded label for one meaning version, with its producer, strength and the evidence it was drawn from |
+| **Judgment** | a subject (a symbol, file, edge…) | `pass`, `fail`, `notApplicable` (SARIF `result.kind`) | a recorded label for one meaning version, with its producer, strength and the evidence it was drawn from |
 | **Verdict** | a finding produced by a check | `confirmed`, `rejected` (with a reason), `deferred` | a reviewer's response to the check's output |
 
 - A verdict implies a judgment only for some reasons:
-  - `confirmed` implies `violates`;
-  - `rejected: false-positive` implies `conforms`;
+  - `confirmed` implies `fail`;
+  - `rejected: false-positive` implies `pass`;
   - `rejected: not-worth-fixing`, `intentional-exception` or `scope-too-broad` imply nothing about the subject. They are evidence about the check's scope or the decision's value.
 - Judgments also exist where no finding does:
   - **audit samples**, which the deterministic or learned parts left unflagged;
@@ -143,8 +144,8 @@ the CLI or MCP:
 
 | Metric | Measured on |
 | --- | --- |
-| Precision, false-positive rate | `violates` judgments and confirmed verdicts |
-| Recall, false-negative rate | `conforms`/`violates` judgments, audit samples |
+| Precision, false-positive rate | `fail` judgments and confirmed verdicts |
+| Recall, false-negative rate | `pass`/`fail` judgments, audit samples |
 | Coverage, abstention rate | the learned part |
 | Agreement | the current revision, on the same subjects |
 | Examples | every `valid`/`invalid`/`fixed` example passes |
@@ -153,25 +154,54 @@ Each decision has an evaluation policy: its precision target and which error it 
 
 ## Revision
 
-Every change to a decision is a revision:
-`{kind, decision, parent, meaning version, check revision, evaluation, approval}`.
-`kind` is mandatory and decides which fields apply and what happens to judgments.
+A revision is a change to a decision: `{decision, parent, meaningVersion, checkRevision,
+change, evaluation, approval}`.
 - Authored edits to the YAML are revisions whose history is git.
 - Derived parts (a trained model, thresholds) and approvals are `Revision` records in `decisions.jsonl`.
 - Lighthouse proposes revisions; it never applies one without approval.
 
-Revision kinds:
+**`change` is derived, never declared.** Following Semantic Versioning, it is classified by
+which version moved:
 
-| `kind` | Changes | Operations | Evaluation required | Judgments |
+| `change` | When | Examples | Evaluation | Judgments |
 | --- | --- | --- | --- | --- |
-| `refine` | the check, not the meaning | add or replace a deterministic part, attach or retrain a learned part, drop a part (demote), narrow or widen a selector | yes, against the current revision | kept |
-| `restructure` | the decision's boundary and meaning | split one decision into two, merge two into one | yes, for each resulting decision | reused as evidence, revalidated per resulting meaning version |
-| `lifecycle` | whether it enforces | accept, supersede, deprecate | no; approval only | kept as history |
-| `distribute` | where it lives | upstream to an organisation pack, adopt from one | yes, on the target project's labels once they exist | not transferred; models retrained and thresholds recalibrated locally |
-| `amend` | the meaning itself (requirement, scope, severity, options) | an edit to the meaning | yes | reused as evidence, revalidated (see [Primitives](#primitives)) |
+| `major` | the meaning version changed (requirement, scope, severity, options) | a stricter requirement, a new option default | required | reused only as evidence, revalidated (see [Primitives](#primitives)) |
+| `minor` | only the check revision changed | add or replace a deterministic part, attach or retrain a learned part, drop a part, narrow or widen a selector | required, against the current revision | kept |
+| `patch` | neither changed | wording, rationale, examples used only for docs | none | kept |
 
-"Promotion" (judged → learned → deterministic) is not a state change. It is a sequence of
-refinement revisions, each of which must pass evaluation against the current one.
+Status and distribution are not change classes:
+- **Status** follows the ADR lifecycle: `proposed → accepted | rejected`, `accepted → deprecated | superseded`. A status change needs approval only.
+  - **Split and merge** are supersession: new decisions supersede old ones and their judgments are reused only as evidence.
+- **Distribution** uses package-manager terms:
+  - `publish` moves a decision into an organisation pack;
+  - `add` enables a pack in a project.
+
+  Labels never travel. Models are retrained and thresholds recalibrated on local judgments.
+
+"Promotion" (judged → learned → deterministic) is not a state. It is a sequence of `minor`
+revisions, each of which must pass evaluation against the current one.
+
+## Vocabulary
+
+Names follow an existing standard wherever one fits:
+
+| Concept | Name | Standard |
+| --- | --- | --- |
+| Resource envelope | `apiVersion`, `kind`, `metadata`, `spec` | Kubernetes Resource Model |
+| Decision fields and status | `title`, `status` (`proposed`/`accepted`/`rejected`/`deprecated`/`superseded`), `supersedes`, `consequences` | ADR (Nygard), MADR |
+| Requirement wording | MUST, SHOULD, MAY | RFC 2119 |
+| Severity | `error`, `warn`, `info` | ESLint levels; mapped to SARIF `error`/`warning`/`note` and LSP Error/Warning/Information |
+| Judgment result | `pass`, `fail`, `notApplicable`, `review` (abstained) | SARIF `result.kind` |
+| Finding identity, suppressions | `partialFingerprints`, in-source and external suppressions | SARIF 2.1.0 |
+| Provenance | `attributedTo` (person or software agent), `derivedFrom`, `generatedAt` | W3C PROV |
+| Revision change class | `major`, `minor`, `patch` | Semantic Versioning |
+| Distribution | `publish`, `add` | package managers (cargo, npm) |
+| Evaluation | precision, recall, false-positive rate, coverage, abstention | selective classification |
+| Editor and provider protocol | `initialize`, `textDocument/*`, `window/logMessage` | Language Server Protocol |
+| Options | JSON Schema 2020-12 | JSON Schema |
+
+Lighthouse-specific terms are kept only where no standard fits: decision, check, judge,
+verdict, evidence, meaning version and check revision.
 
 ## Open questions
 
@@ -188,5 +218,6 @@ refinement revisions, each of which must pass evaluation against the current one
 | Decisions, packs, verdicts, annotations, `decisions.jsonl`, SQLite memory | done |
 | `check` providers, reserved `judge` block, meaning version and check revision | in progress (2d-2) |
 | Judgments on subjects, audit sampling, evaluation, `Revision` records, log compaction, snapshot budgets | Phase 3 |
-| Evidence producers (signals, grouping, mining) and refinement/restructuring proposals | Phase 4 (mining at `init` in Phase 5) |
+| Naming alignment of existing code (verdict reasons, `intent` → `context`, provenance fields) | after 2d-2 |
+| Evidence producers (signals, grouping, mining) and `minor`/supersession proposals | Phase 4 (mining at `init` in Phase 5) |
 | Judge providers, learned part, Embedder | Phase 7 (Embedder starts in Phase 3) |

@@ -2,7 +2,7 @@
 
 This page holds the methods behind the learned part of a check and behind repository mining.
 The model they serve is defined in [rule-pipeline.md](rule-pipeline.md). Everything here is a
-policy for plugins (Embedder, Detector, Judge), not part of the core. Methods can change
+policy for plugins (Embedder, Classifier, Judge), not part of the core. Methods can change
 without changing the decision model.
 
 ## Contract
@@ -10,7 +10,7 @@ without changing the decision model.
 A learned part must:
 - be trained only from recorded evidence of its decision, by an explicit `lighthouse learn train <decision>`;
 - beat the baselines on held-out data;
-- output calibrated probabilities and abstain between two thresholds;
+- output calibrated probabilities and abstain (`review`) between two thresholds;
 - be reproducible from a recorded tuple:
   - meaning version and check revision;
   - feature version;
@@ -18,14 +18,14 @@ A learned part must:
   - model version.
 
 Models are local derived artifacts, rebuildable from `decisions.jsonl`, and are not committed.
-Attaching one is a refinement revision with an evaluation report.
+Attaching one is a `minor` revision with an evaluation report.
 
 ## Features
 
 | Group | Examples |
 | --- | --- |
 | Structural | code-model facts of the subject and delta: edge direction, depth, kind, ownership, graph distance, metrics |
-| Semantic (compact) | similarity to the nearest `violates`/`conforms`, prototype similarity, cluster distance |
+| Semantic (compact) | similarity to the nearest `fail`/`pass`, prototype similarity, cluster distance |
 | Historical | the decision's precision, judgment counts of similar subjects |
 
 - **No leakage.** Inputs are only what is known before judging. A judge's reason is never an input.
@@ -52,13 +52,13 @@ Attaching one is a refinement revision with an evaluation report.
 Mining produces weak evidence and `proposed` decisions.
 
 1. **Collect.** On `init` over a bounded window (the last N commits), then after each commit:
-   - **Change direction.** Only refactor-like commits are labelled: symbols moved or renamed, edges removed, tests unchanged, behaviour-neutral. Before is `violates`, after is `conforms`. A later revert flips the label.
-   - **Prevalence.** Within a cluster of similar code in the current tree, the dominant shape is `conforms` and outliers are candidates. Needs no history.
+   - **Change direction.** Only refactor-like commits are labelled: symbols moved or renamed, edges removed, tests unchanged, behaviour-neutral. Before is `fail`, after is `pass`. A later revert flips the label.
+   - **Prevalence.** Within a cluster of similar code in the current tree, the dominant shape is `pass` and outliers are candidates. Needs no history.
 2. **Group.**
    - **Structure first.** The key is the code-model delta signature, with identifiers abstracted: edge kind added or removed, symbol moved across an owner or module, visibility changed, test added, order changed. Embeddings alone would cluster by topic, not by decision.
    - **Embedding second.** Within one signature, embeddings refine the clusters.
    - **Support and consistency.** A cluster needs at least *k* members, at least two commits or authors, and no reverse edits. Contradictions produce a conflict report.
-   - **Match before create.** A cluster matching an existing decision becomes a refinement proposal instead.
+   - **Match before create.** A cluster matching an existing decision becomes a `minor` revision proposal instead.
 3. **Propose.** A `proposed` decision with:
    - a requirement drafted from the delta signature;
    - examples from members (before → `invalid`, after → `valid`/`fixed`);

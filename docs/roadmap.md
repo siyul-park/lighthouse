@@ -78,7 +78,7 @@ languages and editors are added.
   evidence, and revision.
 - Judgments on subjects, not only on findings:
   - A decision's `judge` selects candidate subjects, and an agent or judge records
-    `violates` or `conforms` for each.
+    `pass` or `fail` for each.
   - Unflagged subjects are sampled for audit.
   - Together these give labels for recall, not just precision.
 - Per-decision precision and estimated recall.
