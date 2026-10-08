@@ -10,7 +10,7 @@ without changing the decision model.
 A learned part must:
 - be trained only from recorded evidence of its decision, by an explicit `lighthouse learn train <decision>`;
 - beat the baselines on held-out data;
-- output calibrated probabilities and abstain between two thresholds; an abstained case goes to the prompted model or an agent, and is reported as SARIF `review` until one answers;
+- output calibrated probabilities and abstain between two thresholds; an abstained case falls through to the next binding (the project model, then an agent), and is reported as SARIF `review` until one answers;
 - be reproducible from a recorded tuple:
   - meaning version and check revision;
   - feature version;
@@ -35,7 +35,7 @@ Attaching one is a `minor` revision with an evaluation report.
 ## Models and calibration
 
 - **Baselines.** A smoothed rate per cluster (Beta prior from the decision's precision) and a kNN model. A gradient-boosted tree model (LightGBM-class) is used only when it beats both.
-- **Label weights** follow judgment strength (see [rule-pipeline.md](rule-pipeline.md#evidence)). A model trained mostly on prompted-model or mined labels is capped at `warn`/`info`, and its agreement with human judgments is reported separately.
+- **Label weights** follow judgment strength (see [rule-pipeline.md](rule-pipeline.md#evidence)). A model trained mostly on model or mined labels is capped at `warn`/`info`, and its agreement with human judgments is reported separately.
 - **Calibration.** Isotonic or Platt calibration on a holdout set. Thresholds are recomputed on every retrain to meet the decision's precision target.
 - **Exploration.** A fixed fraction of confident calls on both sides is re-judged.
 

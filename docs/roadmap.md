@@ -15,11 +15,11 @@ adds is:
    (symbols, extents, edges, metrics). Rules are written once against that model instead
    of grep scripts per rule.
 3. **Checks that evolve without losing history.** A decision can start as plain text and
-   is enforced from day one by a prompted classifier or an agent. Later check revisions
-   add a trained classifier and, when the boundary can be expressed faithfully, a
-   deterministic rule. Each revision
-   passes an evaluation against recorded judgments and needs explicit approval. Judgments
-   survive, because they are tied to the decision's meaning, not to its check.
+   is enforced from day one by a model or an agent answering a prompt. Later check
+   revisions bind a model trained on its judgments and, when the boundary can be expressed
+   faithfully, a deterministic rule. Each revision passes an evaluation against recorded
+   judgments and needs explicit approval. Judgments survive, because they are tied to the
+   decision's meaning, not to its check.
 4. **Measured trust.** Each decision's precision is computed from its verdicts. Noisy
    decisions get narrowing or demotion proposals.
 
@@ -87,7 +87,7 @@ languages and editors are added.
 - Judgments on subjects, not only on findings:
   - A `classify` check selects candidate subjects, and an agent or model records
     `pass` or `fail` for each.
-  - Unflagged subjects are sampled for audit.
+  - A fraction of already decided subjects is sampled and re-judged.
   - Together these give labels for recall, not just precision.
 - Per-decision precision and estimated recall.
 - An evaluation harness that replays a candidate check against recorded verdicts and all

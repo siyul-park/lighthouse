@@ -56,21 +56,12 @@ parts, and each answers a different question:
 | evaluator | does the subject conform? | `pass` or `fail` |
 
 A check is one provider, configured like every other provider in Lighthouse (fix,
-formatter). Its vocabulary has two layers:
+formatter):
+- **`type`** names where the code runs: `builtin` (in process), `cel` (expression), `command` (process) or `rpc` (plugin process).
+- **Capabilities** in the manifest say how it behaves: `deterministic`, `abstains`, `cost`.
 
-| Layer | Says | Values |
-| --- | --- | --- |
-| Runtime (`type`) | where the code runs | `builtin` (in process), `cel` (expression), `command` (process), `rpc` (plugin process) |
-| Capabilities (manifest) | how it behaves | `deterministic`, `abstains`, `cost` |
-
-Deterministic checks and classifiers are not types. They are capability profiles,
-and the engine keys behaviour off capabilities, never off type or op names:
-
-| Profile | Capabilities | Examples |
-| --- | --- | --- |
-| deterministic | `deterministic: true`, never abstains, cheap | builtin `order`/`proximity`/`cycle`, `cel`, `command`, `rpc` checks |
-| trained classifier | `deterministic: false`, `abstains: true`, cheap | a `classification` model trained on the decision, attached by a revision |
-| prompted classifier | `deterministic: false`, expensive | builtin op `classify` with a prompt, served by the project's `classification` model or an agent |
+The engine keys every behaviour off capabilities, never off type, op or model names. There
+are no profiles or tiers beyond that.
 
 **Results and execution errors are different things.** A provider that runs and finds a
 violation produces a `fail` result, which is a normal finding. An **execution error** (a
@@ -80,7 +71,7 @@ crash, a timeout, unparsable output) is not a result:
 
 Execution errors are reported as SARIF tool execution notifications.
 
-### Classification and the Model kind
+### Models
 
 ```yaml
 check:
@@ -91,40 +82,45 @@ check:
   shots: examples   # the decision's examples are the few-shot set
 ```
 
-Models are one plugin kind, `Model`. Its manifest declares one of two tasks, because each
-task has its own call shape:
+`op: classify` asks a model. Models are one plugin kind, `Model`, with one of two tasks,
+because each task has its own call shape:
 
-| Task | Call | Used for |
-| --- | --- | --- |
-| `classification` | subject + decision (prompt, shots) → `pass`/`fail` with a confidence, or abstain | answering `op: classify` |
-| `embedding` | texts → vectors | similarity, grouping, classifier features |
+| Task | Call |
+| --- | --- |
+| `classification` | subject + decision (prompt, shots) → `pass`/`fail` with a confidence, or abstain |
+| `embedding` | texts → vectors |
 
-A model's name says which model it is; its task says how Lighthouse calls it. Whether a
-classifier is prompted (zero- or few-shot, e.g. a jev-class System 1 model or an LLM) or
-trained on the decision's judgments is not a separate task. It shows in the manifest's
-capabilities (`cost`, `abstains`, `needs: prompt | training`) and in how the model is bound:
-- **Project binding:** a decision says what to ask; the project binds which models answer `classification` and `embedding`, the way other tools configure providers. With no classification model bound, an agent answers `op: classify` through a review task.
-- **Revision attachment:** a classifier trained on one decision's judgments is attached to that decision by an approved revision.
+How a model answers is its own business. An LLM, a jev-class System 1 model, or a gradient-
+boosted classifier trained on the decision's judgments all serve `classification` the same
+way. A binding picks the model, and bindings layer like any other configuration:
 
-- **Routing.** A `classify` check routes each candidate to the cheapest confident model first:
+```toml
+[models]
+classification = "my-llm"        # project default
+embedding = "embeddinggemma"
 
-  ```text
-   candidate ─► trained (abstains): P(fail) ≥ upper → fail · ≤ lower → pass · else ─► prompted, else agent
-  ```
+# attached to one decision by an approved revision:
+# models.classification = "gbdt-d42"
+```
 
+- A decision-level binding overrides the project binding.
+- **An abstention falls through** to the next binding: decision, then project, then an agent through a review task. Putting a cheap model that abstains in front of an expensive one is just a decision-level binding, not a separate mechanism.
 - The order is about **cost and confidence**, not quality. A trained classifier approximates a boundary that has no faithful predicate; it is not a weaker deterministic rule.
 - A deterministic check decides every subject it selects. Partial deterministic coverage of a classified decision is expressed by narrowing the `classify` selector, not by stacking providers.
 - Deterministic evaluation is the **preferred** endpoint when the boundary can be expressed faithfully. It is not a required one: some decisions stay classified for good.
 
 ## Evidence
 
-Evidence is what was observed. It carries no result.
-- **Origin:** what brought it up.
-- **Provenance:** who recorded it and what it came from, in W3C PROV-O terms.
+Evidence is what was observed. It carries no result. Every record (evidence, judgment,
+suppression, revision, decision) has the same provenance, in W3C PROV-O terms:
+- `wasAttributedTo`: the person or software agent (an agent, a model, a mining rule, Lighthouse);
+- `wasDerivedFrom`: what it came from;
+- `generatedAtTime`: when it was made.
 
-A **producer** draws judgments from evidence: a person, an agent, a model, or a mining rule.
+There is no separate author, producer or reviewer field. The origins below are examples of
+`wasDerivedFrom`, not a type.
 
-| Origin | Examples | Judgments a producer may draw |
+| Origin | Examples | Judgments that may be drawn |
 | --- | --- | --- |
 | Intent | a person or agent decides up front | example judgments |
 | Existing artifact | a convention, an ADR, a style guide, an external standard; an agent writes the decision (no importer) | example judgments |
@@ -135,10 +131,10 @@ A **producer** draws judgments from evidence: a person, an agent, a model, or a 
 | Snapshot | current metrics frozen as a budget | the baseline; the decision is a ratchet |
 | Another project | an organisation catalog, a third-party pack | its examples (its other judgments never travel) |
 
-- **Decision author:** a person, an agent, or Lighthouse. Lighthouse only *proposes* (`status: proposed`); a person or agent accepts.
-- **Judgment strength** follows the producer: human > agent > incident > prompted model > trained model > mining rule. A stronger judgment on the same subject and meaning version supersedes a weaker one. A check whose judgments are mostly weak is capped at `warn`/`info`.
+- Lighthouse only *proposes* (`status: proposed`); a decision attributed to Lighthouse becomes `accepted` only by a person or agent.
+- **Judgment strength** follows `wasAttributedTo`: person > agent > model > mining rule. A model's own outputs never train that model. A stronger judgment on the same subject and meaning version supersedes a weaker one. A check whose judgments are mostly weak is capped at `warn`/`info`.
 
-Mining, grouping and similarity are evidence producers. The model holds without them:
+Mining, grouping and similarity are evidence sources. The model holds without them:
 intent → decision is a complete loop.
 
 ## Judgment and suppression
@@ -168,12 +164,9 @@ What a run **reports** uses SARIF results with their standard meaning:
 - `review` is a case nobody has decided yet.
 - `notApplicable` is a subject outside the selector, or judged so.
 
-Judgments also exist where no finding does:
-- **audit samples**, which a deterministic check or trained classifier left unflagged;
-- **exploration samples**, a fixed fraction of confident trained-classifier calls re-judged;
-- prompted-model or agent results on `classify` candidates.
-
-These give recall and drift, not only precision.
+Judgments also exist where no finding does. **Sampling** re-judges a fixed fraction of
+subjects a check already decided, unflagged ones and confident ones alike, with a stronger
+attribution. This gives recall and drift, not only precision.
 
 Judgments and suppressions are appended to `.lighthouse/decisions.jsonl` (shared through git)
 and cached in SQLite. `lighthouse log compact` folds expired and superseded records; the raw
@@ -184,7 +177,7 @@ history stays in git.
 A revision is a change to a decision: `{decision, parent, meaningVersion, checkRevision,
 change, evaluation, approval}`.
 - Authored edits to the YAML are revisions whose history is git.
-- Derived parts (a trained model, thresholds) and approvals are `Revision` records in `decisions.jsonl`.
+- Decision-level model bindings, thresholds and approvals are `Revision` records in `decisions.jsonl`.
 - Lighthouse proposes revisions; it never applies one without approval.
 
 **`change` is derived, never declared.** The classification is inspired by Semantic
@@ -193,7 +186,7 @@ Versioning but is not SemVer: it says which version of the decision moved.
 | `change` | When | Examples | Evaluation | Judgments |
 | --- | --- | --- | --- | --- |
 | `major` | the meaning version changed | a stricter requirement, a new option default | required | reused only as evidence, revalidated |
-| `minor` | only the check revision changed | replace `op: classify` with a `cel` check, attach or retrain a trained classifier, narrow or widen a selector | required, against the current revision | kept |
+| `minor` | only the check revision changed | replace `op: classify` with a `cel` check, bind or retrain a decision-level model, narrow or widen a selector | required, against the current revision | kept |
 | `patch` | neither changed | wording, rationale | none | kept |
 
 **Evaluation** replays the candidate against the decision's judgments, examples included:
@@ -201,21 +194,17 @@ Versioning but is not SemVer: it says which version of the decision moved.
 | Metric | Measured on |
 | --- | --- |
 | Precision, false-positive rate | conformance judgments (`pass`/`fail`) |
-| Recall, false-negative rate | conformance judgments, audit samples |
+| Recall, false-negative rate | conformance judgments, sampled judgments |
 | Selector precision | share of selected subjects not judged `notApplicable` |
-| Coverage, abstention rate | the trained classifier |
+| Coverage, abstention rate | models that abstain |
 | Agreement | the current revision, on the same subjects |
 
 Each decision has an evaluation policy: its precision target and which error it tolerates.
 
 Beyond change classes:
 - **Status** follows the ADR lifecycle: `proposed → accepted | rejected`, `accepted → deprecated | superseded`. Split and merge are supersession, and the old judgments are reused only as evidence.
-- **Distribution** uses package-manager terms:
-  - `publish` moves a decision into an organisation pack;
-  - `add` enables a pack in a project.
-
-  Judgments never travel. Models are retrained and thresholds recalibrated locally.
-- **Promotion** (prompted → trained → deterministic) is not a state. It is a sequence of `minor` revisions, each passing evaluation against the current one.
+- Moving a decision between a project and a pack is packaging, not a change to the decision. Judgments never travel with it, and models are retrained locally.
+- **Promotion** (a prompted model, then a trained one, then a deterministic check) is not a state. It is a sequence of `minor` revisions, each passing evaluation against the current one.
 
 ## Vocabulary
 
@@ -235,7 +224,6 @@ Names follow an existing standard wherever one fits, with the standard's meaning
 | Model tasks | `classification`, `embedding` | common ML task names (one call shape each) |
 | Execution errors | tool execution notifications | SARIF `invocation` |
 | Revision change class | `major`, `minor`, `patch` | inspired by Semantic Versioning |
-| Distribution | `publish`, `add` | package managers (cargo, npm) |
 | Evaluation | precision, recall, false-positive rate, coverage, abstention | classification metrics |
 | Editor and provider protocol | `initialize`, `textDocument/*`, `window/logMessage`, capabilities in the manifest | Language Server Protocol |
 | Options | JSON Schema 2020-12 | JSON Schema |
@@ -258,6 +246,6 @@ judgment, meaning version and check revision.
 | Decisions, packs, verdicts, annotations, `decisions.jsonl`, SQLite memory | done (verdicts in today's form) |
 | `check` providers by runtime, builtin op `classify` (served by agent review tasks), provider capabilities, meaning version and check revision | in progress (2d-2) |
 | Verdicts become judgments and suppressions; naming alignment (`intent` → `context`, provenance fields) | after 2d-2 |
-| Judgments on subjects, audit sampling, evaluation, `Revision` records, log compaction, snapshot budgets | Phase 3 |
-| Evidence producers (grouping, mining) and revision proposals | Phase 4 (mining at `init` in Phase 5) |
-| `Model` kind: `embedding` (Phase 3), `classification` with routing (Phase 7) | Phase 3, 7 |
+| Judgments on subjects, sampling, evaluation, `Revision` records, log compaction, snapshot budgets | Phase 3 |
+| Evidence sources (grouping, mining) and revision proposals | Phase 4 (mining at `init` in Phase 5) |
+| `Model` kind: `embedding` (Phase 3), `classification` with layered bindings (Phase 7) | Phase 3, 7 |
