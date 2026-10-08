@@ -2,8 +2,7 @@
 
 This page holds the methods behind the learned part of a check and behind repository mining.
 The model they serve is defined in [rule-pipeline.md](rule-pipeline.md). Everything here is a
-policy for `Model` plugins (tasks `feature-extraction`, `text-classification`,
-`zero-shot-classification`), not part of the core. Methods can change
+policy for `Model` plugins (tasks `classification` and `embedding`), not part of the core. Methods can change
 without changing the decision model.
 
 ## Contract
@@ -11,7 +10,7 @@ without changing the decision model.
 A learned part must:
 - be trained only from recorded evidence of its decision, by an explicit `lighthouse learn train <decision>`;
 - beat the baselines on held-out data;
-- output calibrated probabilities and abstain between two thresholds; an abstained case goes to the zero-shot model or an agent, and is reported as SARIF `review` until one answers;
+- output calibrated probabilities and abstain between two thresholds; an abstained case goes to the prompted model or an agent, and is reported as SARIF `review` until one answers;
 - be reproducible from a recorded tuple:
   - meaning version and check revision;
   - feature version;
@@ -36,13 +35,13 @@ Attaching one is a `minor` revision with an evaluation report.
 ## Models and calibration
 
 - **Baselines.** A smoothed rate per cluster (Beta prior from the decision's precision) and a kNN model. A gradient-boosted tree model (LightGBM-class) is used only when it beats both.
-- **Label weights** follow judgment strength (see [rule-pipeline.md](rule-pipeline.md#evidence)). A model trained mostly on zero-shot or mined labels is capped at `warn`/`info`, and its agreement with human judgments is reported separately.
+- **Label weights** follow judgment strength (see [rule-pipeline.md](rule-pipeline.md#evidence)). A model trained mostly on prompted-model or mined labels is capped at `warn`/`info`, and its agreement with human judgments is reported separately.
 - **Calibration.** Isotonic or Platt calibration on a holdout set. Thresholds are recomputed on every retrain to meet the decision's precision target.
 - **Exploration.** A fixed fraction of confident calls on both sides is re-judged.
 
 ## Embeddings
 
-- Provided by a `Model` with task `feature-extraction`: `embed(texts) → vectors`, with model-specific prompts in its manifest.
+- Provided by a `Model` with task `embedding`: `embed(texts) → vectors`, with model-specific prompts in its manifest.
 - Local by default; a remote provider is opt-in per project.
 - Vectors are cached by content hash and are never written to `decisions.jsonl`.
 - Without an embedder, similarity falls back to structural signals.

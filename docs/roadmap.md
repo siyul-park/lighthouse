@@ -15,7 +15,7 @@ adds is:
    (symbols, extents, edges, metrics). Rules are written once against that model instead
    of grep scripts per rule.
 3. **Checks that evolve without losing history.** A decision can start as plain text and
-   is enforced from day one by a zero-shot classifier or an agent. Later check revisions
+   is enforced from day one by a prompted classifier or an agent. Later check revisions
    add a trained classifier and, when the boundary can be expressed faithfully, a
    deterministic rule. Each revision
    passes an evaluation against recorded judgments and needs explicit approval. Judgments
@@ -94,7 +94,7 @@ languages and editors are added.
   examples, and measures agreement with the previous tier. This is the promotion gate
   used by people and agents alike, via CLI and MCP.
 - Structural similarity (normalized AST and token shingles, MinHash) and an optional
-  `Model` plugin kind (task `feature-extraction`) as retrieval aids, never as deciders.
+  `Model` plugin kind (task `embedding`) as retrieval aids, never as deciders.
 - Baseline and ratchet; cycle, clone and stability analyzers.
 - `lighthouse log compact` folds expired and superseded events in `decisions.jsonl`;
   the full history stays in git.
@@ -123,7 +123,7 @@ languages and editors are added.
 | Artifact graph | domain-neutral nodes and edges; a markdown provider as the first non-code domain |
 | Breadth | `lsp-bridge` (any off-the-shelf language server, at lower capability), then native TypeScript and Python providers |
 | Ecosystem | `lighthouse lsp` for editors (diagnostics, fixes, verdicts); external rule plugins over RPC that ship their decision specs; `plugin add` with a lockfile |
-| Learning | per-decision routing: a classifier trained on that decision's judgments decides only when confident and passes the rest to a zero-shot model or an agent. Models are opt-in, cached and budgeted. A model must beat a statistical baseline before use, and a sample of its confident calls is still re-judged. |
+| Learning | per-decision routing: a classifier trained on that decision's judgments decides only when confident and passes the rest to a prompted model or an agent. Models are opt-in, cached and budgeted. A model must beat a statistical baseline before use, and a sample of its confident calls is still re-judged. |
 | Session domain | decisions about agent actions; a PreToolUse gate that allows, asks or denies |
 
 ## Known gaps

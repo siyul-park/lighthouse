@@ -69,8 +69,8 @@ and the engine keys behaviour off capabilities, never off type or op names:
 | Profile | Capabilities | Examples |
 | --- | --- | --- |
 | deterministic | `deterministic: true`, never abstains, cheap | builtin `order`/`proximity`/`cycle`, `cel`, `command`, `rpc` checks |
-| trained classifier | `deterministic: false`, `abstains: true`, cheap | a `text-classification` model attached by a revision |
-| zero-shot classifier | `deterministic: false`, expensive | builtin op `classify` with a prompt, served by a `zero-shot-classification` model or an agent |
+| trained classifier | `deterministic: false`, `abstains: true`, cheap | a `classification` model trained on the decision, attached by a revision |
+| prompted classifier | `deterministic: false`, expensive | builtin op `classify` with a prompt, served by the project's `classification` model or an agent |
 
 **Results and execution errors are different things.** A provider that runs and finds a
 violation produces a `fail` result, which is a normal finding. An **execution error** (a
@@ -91,20 +91,25 @@ check:
   shots: examples   # the decision's examples are the few-shot set
 ```
 
-Models are one plugin kind, `Model`. Its manifest declares a task, using the standard task
-names of model hubs:
+Models are one plugin kind, `Model`. Its manifest declares one of two tasks, because each
+task has its own call shape:
 
-| Task | Used for |
-| --- | --- |
-| `zero-shot-classification` | answering `op: classify` from the prompt and shots (for example a jev-class System 1 model, or a local or remote LLM) |
-| `text-classification` | a classifier trained on the decision's judgments, attached by a revision |
-| `feature-extraction` | embeddings for similarity, grouping and classifier features |
+| Task | Call | Used for |
+| --- | --- | --- |
+| `classification` | subject + decision (prompt, shots) → `pass`/`fail` with a confidence, or abstain | answering `op: classify` |
+| `embedding` | texts → vectors | similarity, grouping, classifier features |
 
-- **Binding.** A decision says what to ask; the project binds which model answers each task, the way other tools configure providers. With no `zero-shot-classification` model bound, an agent answers `op: classify` through a review task.
+A model's name says which model it is; its task says how Lighthouse calls it. Whether a
+classifier is prompted (zero- or few-shot, e.g. a jev-class System 1 model or an LLM) or
+trained on the decision's judgments is not a separate task. It shows in the manifest's
+capabilities (`cost`, `abstains`, `needs: prompt | training`) and in how the model is bound:
+- **Project binding:** a decision says what to ask; the project binds which models answer `classification` and `embedding`, the way other tools configure providers. With no classification model bound, an agent answers `op: classify` through a review task.
+- **Revision attachment:** a classifier trained on one decision's judgments is attached to that decision by an approved revision.
+
 - **Routing.** A `classify` check routes each candidate to the cheapest confident model first:
 
   ```text
-   candidate ─► trained (abstains): P(fail) ≥ upper → fail · ≤ lower → pass · else ─► zero-shot, else agent
+   candidate ─► trained (abstains): P(fail) ≥ upper → fail · ≤ lower → pass · else ─► prompted, else agent
   ```
 
 - The order is about **cost and confidence**, not quality. A trained classifier approximates a boundary that has no faithful predicate; it is not a weaker deterministic rule.
@@ -131,7 +136,7 @@ A **producer** draws judgments from evidence: a person, an agent, a model, or a 
 | Another project | an organisation catalog, a third-party pack | its examples (its other judgments never travel) |
 
 - **Decision author:** a person, an agent, or Lighthouse. Lighthouse only *proposes* (`status: proposed`); a person or agent accepts.
-- **Judgment strength** follows the producer: human > agent > incident > zero-shot model > trained model > mining rule. A stronger judgment on the same subject and meaning version supersedes a weaker one. A check whose judgments are mostly weak is capped at `warn`/`info`.
+- **Judgment strength** follows the producer: human > agent > incident > prompted model > trained model > mining rule. A stronger judgment on the same subject and meaning version supersedes a weaker one. A check whose judgments are mostly weak is capped at `warn`/`info`.
 
 Mining, grouping and similarity are evidence producers. The model holds without them:
 intent → decision is a complete loop.
@@ -166,7 +171,7 @@ What a run **reports** uses SARIF results with their standard meaning:
 Judgments also exist where no finding does:
 - **audit samples**, which a deterministic check or trained classifier left unflagged;
 - **exploration samples**, a fixed fraction of confident trained-classifier calls re-judged;
-- zero-shot or agent results on `classify` candidates.
+- prompted-model or agent results on `classify` candidates.
 
 These give recall and drift, not only precision.
 
@@ -210,7 +215,7 @@ Beyond change classes:
   - `add` enables a pack in a project.
 
   Judgments never travel. Models are retrained and thresholds recalibrated locally.
-- **Promotion** (zero-shot → trained → deterministic) is not a state. It is a sequence of `minor` revisions, each passing evaluation against the current one.
+- **Promotion** (prompted → trained → deterministic) is not a state. It is a sequence of `minor` revisions, each passing evaluation against the current one.
 
 ## Vocabulary
 
@@ -227,7 +232,7 @@ Names follow an existing standard wherever one fits, with the standard's meaning
 | Finding identity | `partialFingerprints` | SARIF 2.1.0 |
 | Provenance | `wasAttributedTo` (a `Person` or `SoftwareAgent`), `wasDerivedFrom`, `generatedAtTime` | W3C PROV-O |
 | Classifier outcome | decide or abstain | selective classification (reject option) |
-| Model tasks | `zero-shot-classification`, `text-classification`, `feature-extraction` | Hugging Face task names |
+| Model tasks | `classification`, `embedding` | common ML task names (one call shape each) |
 | Execution errors | tool execution notifications | SARIF `invocation` |
 | Revision change class | `major`, `minor`, `patch` | inspired by Semantic Versioning |
 | Distribution | `publish`, `add` | package managers (cargo, npm) |
@@ -255,4 +260,4 @@ judgment, meaning version and check revision.
 | Verdicts become judgments and suppressions; naming alignment (`intent` → `context`, provenance fields) | after 2d-2 |
 | Judgments on subjects, audit sampling, evaluation, `Revision` records, log compaction, snapshot budgets | Phase 3 |
 | Evidence producers (grouping, mining) and revision proposals | Phase 4 (mining at `init` in Phase 5) |
-| `Model` kind: `feature-extraction` (Phase 3), `zero-shot-classification` and `text-classification` with routing (Phase 7) | Phase 3, 7 |
+| `Model` kind: `embedding` (Phase 3), `classification` with routing (Phase 7) | Phase 3, 7 |
