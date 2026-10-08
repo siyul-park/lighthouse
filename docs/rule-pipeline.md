@@ -101,19 +101,32 @@ because each task has its own call shape:
 
 How a model answers is its own business. An LLM, a jev-class System 1 model, or a gradient-
 boosted classifier trained on the decision's judgments all serve `classification` the same
-way. A binding picks the model, and bindings layer like any other configuration:
+way.
+
+**A decision never names a model.** Decisions are shared through git and packs, while which
+models exist (local or remote, allowed or not, at what cost) depends on the machine and the
+project. A decision says what to ask; bindings say who answers. Bindings resolve from the
+most specific layer to the least, and an **abstention falls through** to the next one:
+
+| Layer | Where | Set by |
+| --- | --- | --- |
+| 1. Trained for this decision | a `Revision` record in `decisions.jsonl` naming the model id and version; the artifact is local and rebuildable | Lighthouse trains on request (`lighthouse learn train <decision>`); a person or agent approves the revision |
+| 2. Project, per decision | `[rules."<id>"] model = "…"` | the project |
+| 3. Project default | `[models] classification = "…"`, `embedding = "…"` | the project |
+| 4. Agent | a review task | always available; how `type: model` is served today |
 
 ```toml
 [models]
-classification = "my-llm"        # project default
+classification = "my-llm"
 embedding = "embeddinggemma"
 
-# attached to one decision by an approved revision:
-# models.classification = "gbdt-d42"
+[rules."design/naming-result"]
+model = "local-small"            # cheaper model for this decision only
 ```
 
-- A decision-level binding overrides the project binding.
-- **An abstention falls through** to the next binding: decision, then project, then an agent through a review task, which is how `type: model` is served today. Putting a cheap model that abstains in front of an expensive one is just a decision-level binding, not a separate mechanism.
+- A cheap model that abstains in front of an expensive one is just layer 1 or 2 over layer 3. It is not a separate mechanism.
+- If a layer-1 artifact is missing on a machine (a fresh clone, say), it is rebuilt from `decisions.jsonl`, or skipped with a notice and the case falls through.
+- `embedding` is bound only per project. Classifiers trained on embeddings record the embedding model in their version tuple, and changing the embedding model invalidates them.
 - The order is about **cost and confidence**, not quality. A trained classifier approximates a boundary that has no faithful predicate; it is not a weaker deterministic rule.
 - A deterministic check decides every subject it selects. Partial deterministic coverage of a model-evaluated decision is expressed by narrowing its `select`, not by stacking providers.
 - Deterministic evaluation is the **preferred** endpoint when the boundary can be expressed faithfully. It is not a required one: some decisions stay model-evaluated for good.
