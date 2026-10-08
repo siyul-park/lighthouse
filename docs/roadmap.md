@@ -20,6 +20,8 @@ adds is:
 4. **Measured trust.** Each decision's precision is computed from its verdicts. Noisy
    decisions get narrowing or demotion proposals.
 
+The stages from source to promoted rule are described in [rule-pipeline.md](rule-pipeline.md).
+
 Depth comes before breadth: the loop must work end to end on Go and Rust before more
 languages and editors are added.
 
@@ -89,6 +91,10 @@ languages and editors are added.
 ### 4: decision evolution
 - Signals are captured from verdicts, annotations, fix outcomes and decision edits.
 - Signals are grouped into `proposed` decisions.
+- The repository itself is a signal source. Refactor-like commits label the old code
+  as violating and the new code as conforming, and in a cluster of similar code the
+  dominant shape counts as conforming. Changes are grouped by their structural change
+  first and refined with a local embedding model.
 - Proposals narrow, widen or demote a decision, with generated examples.
 - Promotion `judged → learned → deterministic` through the evaluation gate. Nothing is
   enabled automatically.
@@ -96,7 +102,8 @@ languages and editors are added.
 ### 5: adoption
 - Prebuilt release binaries that bundle the Go and Rust providers, and a one-command
   install.
-- `lighthouse init` detects languages and proposes a starter set of decisions.
+- `lighthouse init` detects languages and proposes a starter set of decisions, including
+  decisions mined from the repository's own history and conventions.
 
 ### Later
 | Step | Scope |
@@ -104,7 +111,7 @@ languages and editors are added.
 | Artifact graph | domain-neutral nodes and edges; a markdown provider as the first non-code domain |
 | Breadth | `lsp-bridge` (any off-the-shelf language server, at lower capability), then native TypeScript and Python providers |
 | Ecosystem | `lighthouse lsp` for editors (diagnostics, fixes, verdicts); external rule plugins over RPC that ship their decision specs; `plugin add` with a lockfile |
-| Learning | statistical baseline, learned detectors gated on beating it, Judge providers (opt-in, cached, budgeted) |
+| Learning | a per-decision judge cascade: a learned model trained on that decision's judgments decides only when confident and passes the rest to a judge. Judge providers are opt-in, cached and budgeted. A model must beat a statistical baseline before use, and a sample of its confident calls is still re-judged. |
 | Session domain | decisions about agent actions; a PreToolUse gate that allows, asks or denies |
 
 ## Known gaps
