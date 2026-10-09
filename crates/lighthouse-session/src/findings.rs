@@ -22,6 +22,32 @@ pub struct Remembered {
     pub messages: Vec<String>,
 }
 
+/// What identifies a decision's wording and check, hashed once per decision
+/// however many findings it has.
+struct Versions {
+    meaning: String,
+    legacy: String,
+    check: String,
+    wording: String,
+}
+
+/// The versions of the decisions seen so far in a run, by decision id.
+#[derive(Default)]
+struct Seen(BTreeMap<String, Versions>);
+
+impl Seen {
+    fn of(&mut self, decision: &Decision) -> &Versions {
+        self.0
+            .entry(decision.id().to_owned())
+            .or_insert_with(|| Versions {
+                meaning: decision.meaning_version(),
+                legacy: decision.earlier_versions().join(","),
+                check: decision.check_revision(),
+                wording: decision.version(),
+            })
+    }
+}
+
 /// Records the run in the project's store and removes the findings whose
 /// latest verdict keeps them out of reports from `outcome`. A verdict whose
 /// rule or evidence changed no longer applies, and a mechanical finding is
@@ -143,11 +169,14 @@ fn read_only(root: &Path) -> BTreeMap<String, Judgment> {
 /// check, and where and with which tools it ran.
 fn run_of(root: &Path, catalog: &Catalog, outcome: &Outcome) -> Run {
     Run {
-        observed: outcome
-            .diagnostics
-            .iter()
-            .map(|d| observed(d, catalog, outcome))
-            .collect(),
+        observed: {
+            let mut seen = Seen::default();
+            outcome
+                .diagnostics
+                .iter()
+                .map(|d| observed(d, catalog, outcome, &mut seen))
+                .collect()
+        },
         reported: outcome
             .reported
             .iter()
@@ -163,16 +192,17 @@ fn run_of(root: &Path, catalog: &Catalog, outcome: &Outcome) -> Run {
     }
 }
 
-fn observed(d: &Diagnostic, catalog: &Catalog, outcome: &Outcome) -> Observed {
+fn observed(d: &Diagnostic, catalog: &Catalog, outcome: &Outcome, seen: &mut Seen) -> Observed {
     let facts = outcome.facts.get(&d.fingerprint);
     let decision = catalog.decision(&d.rule_id);
     let mut record = Observed::from_diagnostic(d, facts.cloned().unwrap_or_else(|| json!({})));
     record.authored_severity = authored_severity(d.severity, decision).to_string();
     record.options = options(decision, d, facts, outcome);
-    record.rule_version = decision.map(|d| d.meaning_version());
-    record.legacy_rule_version = decision.map(|d| d.earlier_versions().join(","));
-    record.check_revision = decision.map(|d| d.check_revision());
-    record.decision_hash = decision.map(Decision::version);
+    let versions = decision.map(|d| seen.of(d));
+    record.rule_version = versions.map(|v| v.meaning.clone());
+    record.legacy_rule_version = versions.map(|v| v.legacy.clone());
+    record.check_revision = versions.map(|v| v.check.clone());
+    record.decision_hash = versions.map(|v| v.wording.clone());
     record
 }
 

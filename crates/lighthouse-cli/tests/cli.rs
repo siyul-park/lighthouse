@@ -52,6 +52,70 @@ fn clean_project_exits_zero_with_no_output() {
 }
 
 #[test]
+fn check_twice_prints_identical_findings_and_exit_codes() {
+    let dir = project(2);
+    for i in 0..40 {
+        let name = format!("d{}/f{i}.txt", i % 5);
+        fs::create_dir_all(dir.path().join(&name).parent().unwrap()).unwrap();
+        fs::write(dir.path().join(name), "a\n".repeat(3 + i % 4)).unwrap();
+    }
+    let run = || {
+        lighthouse(dir.path())
+            .args(["check", "--format", "json", "--no-store"])
+            .output()
+            .unwrap()
+    };
+
+    let first = run();
+    let second = run();
+
+    assert!(!first.stdout.is_empty());
+    assert_eq!(first.stdout, second.stdout);
+    assert_eq!(first.status.code(), second.status.code());
+}
+
+#[test]
+fn timings_go_to_stderr_and_leave_the_report_alone() {
+    let dir = project(6);
+    let plain = lighthouse(dir.path())
+        .args(["check", "--no-store"])
+        .output()
+        .unwrap();
+
+    let timed = lighthouse(dir.path())
+        .args(["check", "--no-store", "--timings"])
+        .output()
+        .unwrap();
+
+    assert_eq!(timed.stdout, plain.stdout);
+    assert_eq!(timed.status.code(), plain.status.code());
+    let stderr = String::from_utf8(timed.stderr).unwrap();
+    let phases: Vec<String> = stderr
+        .lines()
+        .filter_map(|l| l.strip_prefix("timings: "))
+        .map(|l| {
+            let words: Vec<&str> = l.split(' ').collect();
+            let spent = words.iter().position(|w| w.ends_with("ms")).unwrap();
+            words[..spent].join(" ")
+        })
+        .collect();
+    for phase in [
+        "setup",
+        "read",
+        "index text",
+        "merge",
+        "rules",
+        "rule core/max-file-lines",
+        "identity",
+        "store",
+        "report",
+        "total",
+    ] {
+        assert!(phases.iter().any(|p| p == phase), "{phase} in {phases:?}");
+    }
+}
+
+#[test]
 fn json_and_sarif_formats() {
     let dir = project(6);
     let out = lighthouse(dir.path())

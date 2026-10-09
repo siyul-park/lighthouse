@@ -1,6 +1,8 @@
 //! Which test names an owner test: the convention that ties a top-level test
 //! function to one public symbol.
 
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
 use lighthouse_model::{Module, Project, Symbol, SymbolId, SymbolKind, TestCase};
 use serde::Deserialize;
 
@@ -36,6 +38,96 @@ impl Match {
     }
 }
 
+/// The tests of a project by the convention of a [`Naming`]. The tests of a
+/// set of modules are indexed by their names once, however many symbols ask.
+pub(crate) struct Tests<'p> {
+    naming: Naming,
+    project: &'p Project,
+    indexes: RefCell<HashMap<Vec<String>, Rc<Index<'p>>>>,
+}
+
+/// The tests of some modules with the part of their names after the prefix,
+/// sorted by it, and where each came in the modules' order.
+struct Index<'p> {
+    names: Vec<(&'p str, usize, &'p TestCase)>,
+}
+
+impl<'p> Tests<'p> {
+    pub(crate) fn new(naming: Naming, project: &'p Project) -> Self {
+        Self {
+            naming,
+            project,
+            indexes: RefCell::default(),
+        }
+    }
+
+    /// The tests of the modules that test `symbol`'s module from inside or
+    /// outside, whose names map to `symbol`. Names resolve within the one
+    /// module the symbol belongs to, so a name never maps to two symbols of
+    /// different modules. With `ancestor_tests` also the tests of a module
+    /// that tests an ancestor of the symbol's module, so the integration tests
+    /// of a crate root count for every module of the crate, including the
+    /// private ones whose public items the root re-exports.
+    pub(crate) fn credited_tests(&self, symbol: &Symbol) -> Vec<(&'p TestCase, Match)> {
+        let module = symbol.id.module();
+        if !self.naming.ancestor_tests {
+            return self.mapped(symbol, testing_modules(self.project, module));
+        }
+        let modules = self
+            .project
+            .modules
+            .iter()
+            .filter(|m| m.path == module || tests_ancestor(m, module))
+            .map(|m| m.path.clone())
+            .collect();
+        self.mapped(symbol, modules)
+    }
+
+    fn mapped(&self, symbol: &Symbol, modules: Vec<String>) -> Vec<(&'p TestCase, Match)> {
+        let naming = &self.naming;
+        let Some(key) = naming.key(self.project, symbol) else {
+            return Vec::new();
+        };
+        let index = self.index(modules);
+        let from = index
+            .names
+            .partition_point(|(rest, ..)| *rest < key.as_str());
+        let mut found: Vec<(usize, &'p TestCase, Match)> = index.names[from..]
+            .iter()
+            .take_while(|(rest, ..)| rest.starts_with(key.as_str()))
+            .filter_map(|&(rest, order, test)| {
+                let kind = naming.maps(self.project, rest, &key, symbol)?;
+                Some((order, test, kind))
+            })
+            .collect();
+        found.sort_by_key(|(order, ..)| *order);
+        found
+            .into_iter()
+            .map(|(_, test, kind)| (test, kind))
+            .collect()
+    }
+
+    fn index(&self, modules: Vec<String>) -> Rc<Index<'p>> {
+        if let Some(index) = self.indexes.borrow().get(&modules) {
+            return Rc::clone(index);
+        }
+        let mut names = Vec::new();
+        for module in &modules {
+            for test in self.project.tests_in(module) {
+                let rest = test_name(&test.symbol)
+                    .and_then(|name| name.strip_prefix(self.naming.test_prefix.as_str()));
+                if let Some(rest) = rest {
+                    names.push((rest, names.len(), test));
+                }
+            }
+        }
+        names.sort_by_key(|&(rest, order, _)| (rest, order));
+        let index = Rc::new(Index { names });
+        self.indexes.borrow_mut().insert(modules, Rc::clone(&index));
+        index
+    }
+}
+
 impl Naming {
     /// The naming convention a decision's options declare (`test_prefix`,
     /// `snake_case`, `variant_tests`, `ancestor_tests`); `None` for a decision
@@ -47,69 +139,13 @@ impl Naming {
         serde_json::from_value(serde_json::Value::Object(options.clone())).ok()
     }
 
-    /// The tests of the modules that test `symbol`'s module from inside or
-    /// outside, whose names map to `symbol`. Names resolve within the one
-    /// module the symbol belongs to, so a name never maps to two symbols of
-    /// different modules.
-    pub(crate) fn owner_tests<'p>(
-        &self,
-        project: &'p Project,
-        symbol: &Symbol,
-    ) -> Vec<(&'p TestCase, Match)> {
-        self.mapped(
-            project,
-            symbol,
-            testing_modules(project, symbol.id.module()),
-        )
-    }
-
-    /// Like [`Naming::owner_tests`], but with `ancestor_tests` also the tests
-    /// of a module that tests an ancestor of the symbol's module, so the
-    /// integration tests of a crate root count for every module of the crate,
-    /// including the private ones whose public items the root re-exports.
-    pub(crate) fn credited_tests<'p>(
-        &self,
-        project: &'p Project,
-        symbol: &Symbol,
-    ) -> Vec<(&'p TestCase, Match)> {
-        let module = symbol.id.module();
-        if !self.ancestor_tests {
-            return self.owner_tests(project, symbol);
-        }
-        let modules = project
-            .modules
-            .iter()
-            .filter(|m| m.path == module || tests_ancestor(m, module))
-            .map(|m| m.path.clone())
-            .collect();
-        self.mapped(project, symbol, modules)
-    }
-
-    fn mapped<'p>(
-        &self,
-        project: &'p Project,
-        symbol: &Symbol,
-        modules: Vec<String>,
-    ) -> Vec<(&'p TestCase, Match)> {
-        let mut found = Vec::new();
-        for tests in modules {
-            for test in project.tests_in(&tests) {
-                if let Some(kind) = self.maps(project, test, symbol) {
-                    found.push((test, kind));
-                }
-            }
-        }
-        found
-    }
-
-    fn maps(&self, project: &Project, test: &TestCase, symbol: &Symbol) -> Option<Match> {
-        let name = test_name(&test.symbol)?;
-        let rest = name.strip_prefix(self.test_prefix.as_str())?;
-        let key = self.key(project, symbol)?;
+    /// How the test whose name is `rest` after the prefix maps to `symbol`,
+    /// whose name for tests is `key`.
+    fn maps(&self, project: &Project, rest: &str, key: &str, symbol: &Symbol) -> Option<Match> {
         if rest == key {
             return Some(Match::Exact);
         }
-        let tail = rest.strip_prefix(key.as_str())?.strip_prefix('_')?;
+        let tail = rest.strip_prefix(key)?.strip_prefix('_')?;
         if tail.is_empty() || !self.variant_tests || self.names_a_member(project, symbol, tail) {
             return None;
         }

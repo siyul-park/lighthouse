@@ -6,6 +6,7 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sort"
 	"strconv"
@@ -47,6 +48,21 @@ type declaredType struct {
 	unit *unit
 }
 
+// loaded is what loading the packages of one batch gave.
+type loaded struct {
+	pkgs []*packages.Package
+	err  error
+}
+
+// loader loads the batches in the background, at most one load per CPU in
+// flight or waiting to be read, and hands the results out in batch order, so
+// that what is read from them does not depend on which load finished first.
+type loader struct {
+	ready []chan loaded
+	slots chan struct{}
+	read  int
+}
+
 const loadMode = packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 	packages.NeedImports | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo
 
@@ -84,8 +100,10 @@ func (r *run) index() {
 		candidates = append(candidates, rel)
 	}
 	sort.Strings(candidates)
-	for _, b := range r.batches(candidates) {
-		r.analyze(b)
+	batches := r.batches(candidates)
+	loads := r.loadAll(batches)
+	for _, b := range batches {
+		r.analyze(b, loads.next())
 	}
 	for _, rel := range candidates {
 		if !r.claimed[rel] {
@@ -144,8 +162,9 @@ func (r *run) batches(files []string) []*batch {
 	return out
 }
 
-func (r *run) analyze(b *batch) {
-	pkgs, ok := r.load(b)
+// analyze reads the code model out of the packages that loading b gave.
+func (r *run) analyze(b *batch, l loaded) {
+	pkgs, ok := r.unpack(b, l)
 	if !ok {
 		return
 	}
@@ -155,9 +174,53 @@ func (r *run) analyze(b *batch) {
 	r.packageErrors(pkgs)
 }
 
-// load type-checks the packages of b, recording why when the go command
-// fails.
-func (r *run) load(b *batch) ([]*packages.Package, bool) {
+// loadAll starts loading the packages of every batch. Batches share nothing
+// but the go command's caches, so their loads are independent; the load of a
+// run that sets the go binary edits this process's PATH, so those go one by
+// one.
+func (r *run) loadAll(batches []*batch) *loader {
+	limit := runtime.GOMAXPROCS(0)
+	if r.opts.Go != "" {
+		limit = 1
+	}
+	l := &loader{ready: make([]chan loaded, len(batches)), slots: make(chan struct{}, limit)}
+	for i := range l.ready {
+		l.ready[i] = make(chan loaded, 1)
+	}
+	go func() {
+		for i, b := range batches {
+			l.slots <- struct{}{}
+			go func() {
+				pkgs, err := r.loadPackages(b)
+				l.ready[i] <- loaded{pkgs: pkgs, err: err}
+			}()
+		}
+	}()
+	return l
+}
+
+// unpack returns the packages of b, recording why when the go command failed.
+func (r *run) unpack(b *batch, l loaded) ([]*packages.Package, bool) {
+	if l.err == nil {
+		return l.pkgs, true
+	}
+	dir, inside := r.rel(b.dir)
+	if !inside {
+		dir = b.dir
+	}
+	r.result.Incomplete = append(r.result.Incomplete, sdk.Incomplete{
+		Reason: fmt.Sprintf("go list failed in %s, %d file(s) not analyzed: %v", dir, len(b.files), l.err),
+	})
+	for _, rel := range b.files {
+		r.fileOnly(rel)
+		r.problems[rel] = "go list failed"
+	}
+	return nil, false
+}
+
+// loadPackages type-checks the packages of b. It reads the run and changes
+// nothing in it.
+func (r *run) loadPackages(b *batch) ([]*packages.Package, error) {
 	cfg := &packages.Config{
 		Mode:       loadMode,
 		Dir:        b.dir,
@@ -176,21 +239,7 @@ func (r *run) load(b *batch) ([]*packages.Package, bool) {
 	var pkgs []*packages.Package
 	var err error
 	r.opts.load(func() { pkgs, err = packages.Load(cfg, b.patterns(r.root)...) })
-	if err == nil {
-		return pkgs, true
-	}
-	dir, inside := r.rel(b.dir)
-	if !inside {
-		dir = b.dir
-	}
-	r.result.Incomplete = append(r.result.Incomplete, sdk.Incomplete{
-		Reason: fmt.Sprintf("go list failed in %s, %d file(s) not analyzed: %v", dir, len(b.files), err),
-	})
-	for _, rel := range b.files {
-		r.fileOnly(rel)
-		r.problems[rel] = "go list failed"
-	}
-	return nil, false
+	return pkgs, err
 }
 
 // localModule reads the module path of the batch's go.mod.
@@ -404,6 +453,14 @@ func (r *run) isRequested(rel string) bool {
 }
 
 // patterns are the package directories of b's files, relative to its go.mod.
+// next waits for the load of the next batch in order and frees its slot.
+func (l *loader) next() loaded {
+	got := <-l.ready[l.read]
+	l.read++
+	<-l.slots
+	return got
+}
+
 func (b *batch) patterns(root string) []string {
 	dirs := map[string]bool{}
 	for _, rel := range b.files {

@@ -413,18 +413,15 @@ fn upsert(
     summary: &mut RunSummary,
 ) -> Result<(), Error> {
     let was_resolved: Option<bool> = tx
-        .query_row(
-            "SELECT resolved_at IS NOT NULL FROM findings WHERE fingerprint = ?1",
-            params![observed.fingerprint],
-            |row| row.get(0),
-        )
+        .prepare_cached("SELECT resolved_at IS NOT NULL FROM findings WHERE fingerprint = ?1")?
+        .query_row(params![observed.fingerprint], |row| row.get(0))
         .optional()?;
     match was_resolved {
         None => summary.opened += 1,
         Some(true) => summary.reopened += 1,
         Some(false) => {}
     }
-    tx.execute(
+    tx.prepare_cached(
         "INSERT INTO findings (fingerprint, rule_id, last_severity, authored_severity, path, locator, symbol, \
              first_seen, last_seen, last_message, last_evidence, last_facts, last_options, \
              last_commit, last_dirty, lighthouse_version, catalog_version, rule_version, \
@@ -445,6 +442,8 @@ fn upsert(
              legacy_rule_version = excluded.legacy_rule_version, \
              check_revision = excluded.check_revision, \
              decision_hash = excluded.decision_hash, evidence_digest = excluded.evidence_digest",
+    )?
+    .execute(
         named_params! {
             ":fingerprint": observed.fingerprint,
             ":rule_id": observed.rule_id,

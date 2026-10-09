@@ -637,6 +637,41 @@ fn engine_with_incomplete() {
 }
 
 #[test]
+fn engine_check_gives_the_same_outcome_on_every_run_however_the_rules_interleave() {
+    let names: Vec<String> = (0..48).map(|i| format!("d{}/f{i}.txt", i % 7)).collect();
+    let files: Vec<(&str, &[u8])> = names.iter().map(|n| (n.as_str(), &b"x"[..])).collect();
+    let dir = project(&files);
+    let engine = engine(&dir, ALL).unwrap();
+    let first = engine.check(&[], &[]).unwrap();
+    assert!(first.diagnostics.len() > names.len());
+
+    for _ in 0..8 {
+        let again = engine.check(&[], &[]).unwrap();
+
+        assert_eq!(again.diagnostics, first.diagnostics);
+        assert_eq!(again.facts, first.facts);
+        assert_eq!(again.options, first.options);
+        assert_eq!(again.notices, first.notices);
+        assert_eq!(again.incomplete, first.incomplete);
+    }
+}
+
+#[test]
+fn timings() {
+    let dir = project(&[("a/x.txt", b"1"), ("b/y.txt", b"2")]);
+    let engine = engine(&dir, ALL).unwrap();
+
+    let timings = engine.check(&[], &[]).unwrap().timings;
+
+    let indexed: Vec<&str> = timings.index.iter().map(|(id, _)| id.as_str()).collect();
+    assert_eq!(indexed, ["any"]);
+    let mut ruled: Vec<&str> = timings.rules.iter().map(|(id, _)| id.as_str()).collect();
+    ruled.sort_unstable();
+    assert_eq!(ruled, ["fake/all", "fake/each"]);
+    assert!(timings.rules.windows(2).all(|pair| pair[0].1 >= pair[1].1));
+}
+
+#[test]
 fn outcome_states_report_scope_rules_that_ran_and_subject_facts() {
     let dir = project(&[("a/x.txt", b"1"), ("b/y.txt", b"2")]);
     let engine = engine(&dir, ALL).unwrap();

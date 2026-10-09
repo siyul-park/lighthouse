@@ -2,6 +2,7 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
     process::ExitCode,
+    time::Instant,
 };
 
 use clap::{Parser, Subcommand, ValueEnum};
@@ -17,6 +18,7 @@ mod hook;
 mod review;
 mod setup;
 mod spec;
+mod timings;
 
 /// Where `docs generate` writes the agent skill.
 const SKILL_PATH: &str = "skills/lighthouse/SKILL.md";
@@ -96,6 +98,11 @@ enum Command {
         /// Run only these fully qualified rule ids.
         #[arg(long, value_delimiter = ',')]
         rules: Vec<String>,
+        /// Print where the time went to stderr, phase by phase: reading, each
+        /// language provider, merging, analyzers, the slowest rules, identity,
+        /// the store and the report. Findings and exit code do not change.
+        #[arg(long)]
+        timings: bool,
         /// Fix what the catalog's fixers can fix, then report what is left.
         /// Only safe fixes of mechanical rules are applied; each is verified
         /// (formatted, re-checked) and a file that gets worse is rolled back.
@@ -296,6 +303,7 @@ struct Options {
     store: bool,
     fail_on: FailOn,
     allow_incomplete: bool,
+    timings: bool,
 }
 
 /// What `check --fix` is asked to do.
@@ -334,6 +342,7 @@ fn run(cli: Cli) -> Result<u8> {
             max_warnings,
             allow_incomplete,
             rules,
+            timings,
             fix,
             dry_run,
             unsafe_fixes,
@@ -354,6 +363,7 @@ fn run(cli: Cli) -> Result<u8> {
                     max_warnings,
                 },
                 allow_incomplete,
+                timings,
             },
             &rules,
             config.as_deref(),
@@ -416,6 +426,7 @@ fn check(
     config: Option<&Path>,
     fix: Option<FixOptions>,
 ) -> Result<u8> {
+    let started = Instant::now();
     if options.limit.is_some() && !matches!(options.format, Format::Agent | Format::AgentJson) {
         return Err("--limit applies to the agent formats only".into());
     }
@@ -438,6 +449,7 @@ fn check(
         eprintln!("lighthouse: {message}");
     }
     let outcome = &checked.outcome;
+    let reporting = Instant::now();
     print!(
         "{}",
         render_with(
@@ -447,6 +459,11 @@ fn check(
             &checked.briefing(options.limit)
         )
     );
+    if options.timings {
+        for line in timings::lines(&outcome.timings, reporting.elapsed(), started.elapsed()) {
+            eprintln!("{line}");
+        }
+    }
     Ok(outcome.exit_code(options.fail_on, options.allow_incomplete))
 }
 

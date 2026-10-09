@@ -50,17 +50,38 @@ func ReadMessage(r *bufio.Reader) (*Message, error) {
 	return &m, nil
 }
 
-// WriteMessage writes one Content-Length framed message.
+// WriteMessage writes one Content-Length framed message in a single write.
+// A Result is already encoded, so it is spliced into the encoded envelope
+// instead of being encoded, and checked, a second time.
 func WriteMessage(w io.Writer, m *Message) error {
 	m.JSONRPC = "2.0"
-	body, err := json.Marshal(m)
+	result := m.Result
+	m.Result = nil
+	envelope, err := json.Marshal(m)
+	m.Result = result
 	if err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "Content-Length: %d\r\n\r\n", len(body)); err != nil {
-		return err
+	const header = "Content-Length: "
+	const separator = "\r\n\r\n"
+	const field = `,"result":`
+	size := len(envelope)
+	if len(result) > 0 {
+		size += len(field) + len(result)
 	}
-	_, err = w.Write(body)
+	frame := make([]byte, 0, len(header)+len(separator)+10+size)
+	frame = append(frame, header...)
+	frame = strconv.AppendInt(frame, int64(size), 10)
+	frame = append(frame, separator...)
+	if len(result) == 0 {
+		frame = append(frame, envelope...)
+	} else {
+		frame = append(frame, envelope[:len(envelope)-1]...)
+		frame = append(frame, field...)
+		frame = append(frame, result...)
+		frame = append(frame, '}')
+	}
+	_, err = w.Write(frame)
 	return err
 }
 

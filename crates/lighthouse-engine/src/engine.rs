@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs, io,
     path::{Path, PathBuf},
+    time::{Duration, Instant},
 };
 
 use ignore::WalkBuilder;
@@ -9,7 +10,10 @@ use lighthouse_config::{Config, GlobSet, Rules, glob_set};
 use lighthouse_model::{
     Diagnostic, File, Fingerprint, Fragment, Incomplete, Options, Project, Severity,
 };
-use lighthouse_plugin::{Ctx, Facts, LanguageProvider, Registry, Rule, Scope, Source, Workspace};
+use lighthouse_plugin::{
+    Ctx, Facts, Indexed, LanguageProvider, Memo, Registry, Rule, Scope, Source, Workspace,
+};
+use rayon::prelude::*;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -18,6 +22,7 @@ use crate::{
     annotations::{self, Allowed},
     identity,
     subject::Subjects,
+    timings::{Timings, pool},
 };
 
 /// Name of the file, in `.gitignore` syntax, that keeps files out of the
@@ -89,6 +94,8 @@ pub struct Outcome {
     pub allowed: Vec<Allowed>,
     /// The analysis the findings came from; fixes read it.
     pub project: Project,
+    /// Where the time of the run went.
+    pub timings: Timings,
 }
 
 impl Outcome {
@@ -152,6 +159,38 @@ pub(crate) struct Input {
     pub(crate) file: File,
     pub(crate) text: String,
     language: usize,
+}
+
+/// What the rules of a run read: the selected rules and everything they may
+/// look at.
+struct Scene<'a> {
+    rules: &'a [&'a dyn Rule],
+    inputs: &'a [Input],
+    project: &'a Project,
+    facts: &'a Facts,
+    memo: &'a Memo,
+}
+
+/// What some rule runs found and noted.
+#[derive(Default)]
+struct Gathered {
+    found: Vec<Diagnostic>,
+    notices: BTreeSet<String>,
+    incomplete: Vec<Incomplete>,
+    /// The time spent in each rule.
+    spent: BTreeMap<String, Duration>,
+}
+
+impl Gathered {
+    /// Adds what `later` gathered after this.
+    fn merge(&mut self, later: Self) {
+        self.found.extend(later.found);
+        self.notices.extend(later.notices);
+        self.incomplete.extend(later.incomplete);
+        for (rule, time) in later.spent {
+            *self.spent.entry(rule).or_default() += time;
+        }
+    }
 }
 
 /// A configured set of plugins that analyzes one project root. Running it does
@@ -255,22 +294,39 @@ impl Engine {
             .collect();
 
         let mut outcome = Outcome::default();
+        let mut timings = Timings::default();
         let mut incomplete = self.startup.clone();
         let scopes = match reported {
             Reported::Paths(paths) => self.scopes(paths, &mut incomplete)?,
             Reported::Files(files) => files.to_vec(),
         };
+        let started = Instant::now();
         let inputs = self.read(overlays, &mut outcome.notices, &mut incomplete);
-        let (inputs, project) =
-            self.build_project(inputs, overlays, &mut outcome.notices, &mut incomplete);
-        let facts = self.analyze(&selected, &inputs, &project)?;
-        let found = self.apply(
-            &selected,
-            &inputs,
-            &project,
-            &facts,
+        timings.read = started.elapsed();
+        let (inputs, project) = self.build_project(
+            inputs,
+            overlays,
             (&mut outcome.notices, &mut incomplete),
-        )?;
+            &mut timings,
+        );
+        let memo = Memo::default();
+        let facts = self.analyze(&selected, &inputs, &project, &memo, &mut timings)?;
+        let started = Instant::now();
+        let scene = Scene {
+            rules: &selected,
+            inputs: &inputs,
+            project: &project,
+            facts: &facts,
+            memo: &memo,
+        };
+        let applied = self.apply(&scene)?;
+        timings.rules_wall = started.elapsed();
+        timings.add_rules(applied.spent);
+        outcome.notices.extend(applied.notices);
+        incomplete.extend(applied.incomplete);
+        let found = applied.found;
+
+        let started = Instant::now();
 
         let ran: BTreeSet<String> = selected.iter().map(|r| r.manifest().id.clone()).collect();
         let level = |rule: &str, file: &Path, lang: &str| self.level_at(rule, file, lang);
@@ -301,6 +357,8 @@ impl Engine {
             })
             .collect();
         outcome.options = self.options_of(&found, &project)?;
+        timings.identity = started.elapsed();
+        outcome.timings = timings;
         outcome.diagnostics = found;
         outcome.reported = scopes;
         outcome.project = project;
@@ -479,14 +537,15 @@ impl Engine {
             .expect("language index comes from the registry")
     }
 
-    /// Has each provider index its files in one batch and merges the fragments. Files a provider did not
-    /// index drop out; the reason is recorded as incomplete.
+    /// Has each provider index its files in one batch, the providers side by
+    /// side, and merges the fragments. Files a provider did not index drop
+    /// out; the reason is recorded as incomplete.
     fn build_project(
         &self,
         inputs: Vec<Input>,
         overlays: &Overlays,
-        notices: &mut BTreeSet<String>,
-        incomplete: &mut Vec<Incomplete>,
+        (notices, incomplete): (&mut BTreeSet<String>, &mut Vec<Incomplete>),
+        timings: &mut Timings,
     ) -> (Vec<Input>, Project) {
         let ws = Workspace {
             overlays: overlays.clone(),
@@ -496,17 +555,30 @@ impl Engine {
         for input in &inputs {
             batches.entry(input.language).or_default().push(input);
         }
+        let batches: Vec<(usize, Vec<&Input>)> = batches.into_iter().collect();
+        let indexed: Vec<(Result<Indexed, lighthouse_plugin::Error>, Duration)> =
+            pool().install(|| {
+                batches
+                    .par_iter()
+                    .map(|(language, batch)| {
+                        let sources: Vec<Source> = batch
+                            .iter()
+                            .map(|i| Source {
+                                file: &i.file,
+                                text: &i.text,
+                            })
+                            .collect();
+                        let started = Instant::now();
+                        let indexed = self.provider(*language).index(&ws, &sources);
+                        (indexed, started.elapsed())
+                    })
+                    .collect()
+            });
         let mut parts: Vec<Fragment> = Vec::new();
-        for (language, batch) in batches {
-            let provider = self.provider(language);
-            let sources: Vec<Source> = batch
-                .iter()
-                .map(|i| Source {
-                    file: &i.file,
-                    text: &i.text,
-                })
-                .collect();
-            match provider.index(&ws, &sources) {
+        for ((language, batch), (indexed, spent)) in batches.iter().zip(indexed) {
+            let provider = self.provider(*language);
+            timings.index.push((provider.manifest().id.clone(), spent));
+            match indexed {
                 Ok(indexed) => {
                     parts.extend(indexed.fragments);
                     notices.extend(indexed.notices);
@@ -522,7 +594,9 @@ impl Engine {
                 }),
             }
         }
+        let started = Instant::now();
         let project = Project::merge(parts);
+        timings.merge = started.elapsed();
         notices.extend(project.notices().iter().cloned());
         let kept = inputs
             .into_iter()
@@ -536,12 +610,15 @@ impl Engine {
         rules: &[&dyn Rule],
         inputs: &[Input],
         project: &Project,
+        memo: &Memo,
+        timings: &mut Timings,
     ) -> Result<Facts, Error> {
         let wanted = rules
             .iter()
             .flat_map(|r| r.manifest().analyzers.iter().map(String::as_str));
         let mut facts = Facts::new();
         for analyzer in self.registry.order(wanted)? {
+            let started = Instant::now();
             let runs: Vec<(Option<&Input>, String)> = match analyzer.manifest().scope {
                 Scope::Project => vec![(None, String::new())],
                 Scope::File => inputs
@@ -557,130 +634,167 @@ impl Engine {
                     facts: &facts,
                     keys: &self.registry,
                     trusted: self.trusted,
+                    memo,
                 };
                 let fact = analyzer.run(&ctx)?;
                 facts.insert((analyzer.manifest().id.clone(), key), fact);
             }
+            timings
+                .analyzers
+                .push((analyzer.manifest().id.clone(), started.elapsed()));
         }
         Ok(facts)
     }
 
-    fn apply(
-        &self,
-        rules: &[&dyn Rule],
-        inputs: &[Input],
-        project: &Project,
-        facts: &Facts,
-        (notices, incomplete): (&mut BTreeSet<String>, &mut Vec<Incomplete>),
-    ) -> Result<Vec<Diagnostic>, Error> {
-        let mut found =
-            self.apply_file_rules(rules, inputs, project, facts, notices, incomplete)?;
-        found.extend(self.apply_project_rules(rules, inputs, project, facts, notices, incomplete)?);
-        Ok(found)
+    /// Runs the rules over the files and the project, in parallel; what they
+    /// found comes back in a fixed order: the findings of each file in file
+    /// order, rule by rule, then those of the project rules in rule order.
+    fn apply(&self, scene: &Scene) -> Result<Gathered, Error> {
+        let (files, project) = pool().install(|| {
+            rayon::join(
+                || self.apply_file_rules(scene),
+                || self.apply_project_rules(scene),
+            )
+        });
+        let mut all = files?;
+        all.merge(project?);
+        Ok(all)
     }
 
-    fn apply_file_rules(
-        &self,
-        rules: &[&dyn Rule],
-        inputs: &[Input],
-        project: &Project,
-        facts: &Facts,
-        notices: &mut BTreeSet<String>,
-        incomplete: &mut Vec<Incomplete>,
-    ) -> Result<Vec<Diagnostic>, Error> {
-        let mut found = Vec::new();
-        for input in inputs {
-            let resolved = self
-                .config
-                .resolve(&input.file.path, &input.file.lang, &|id| {
-                    self.preset_rules(id)
-                })?;
-            let provider = self.provider(input.language);
-            for rule in rules.iter().filter(|r| r.manifest().scope == Scope::File) {
-                let meta = rule.manifest();
-                let Some(config) = resolved.get(&meta.id) else {
-                    continue;
-                };
-                let Some(level) = config.level else { continue };
-                if let Some(missing) = meta
-                    .capabilities
-                    .iter()
-                    .find(|c| !provider.manifest().capabilities.contains(c))
-                {
-                    notices.insert(format!(
-                        "{}: skipped for language `{}`, missing capability {missing}",
-                        meta.id, input.file.lang
-                    ));
-                    continue;
-                }
-                let ctx = Ctx {
-                    ws: &self.ws,
-                    project,
-                    file: Some((&input.file, input.text.as_str())),
-                    facts,
-                    keys: &self.registry,
-                    trusted: self.trusted,
-                };
-                let checked = rule.check(&ctx, &config.options);
-                for mut d in unfinished(checked, &meta.id, Some(&input.file.path), incomplete)? {
-                    d.severity = level;
-                    found.push(d);
-                }
-            }
+    fn apply_file_rules(&self, scene: &Scene) -> Result<Gathered, Error> {
+        let per_file: Vec<Result<Gathered, Error>> = scene
+            .inputs
+            .par_iter()
+            .map(|input| self.apply_to_file(scene, input))
+            .collect();
+        let mut all = Gathered::default();
+        for gathered in per_file {
+            all.merge(gathered?);
         }
-        Ok(found)
+        Ok(all)
     }
 
-    fn apply_project_rules(
-        &self,
-        rules: &[&dyn Rule],
-        inputs: &[Input],
-        project: &Project,
-        facts: &Facts,
-        notices: &mut BTreeSet<String>,
-        incomplete: &mut Vec<Incomplete>,
-    ) -> Result<Vec<Diagnostic>, Error> {
-        let languages: BTreeSet<usize> = inputs.iter().map(|i| i.language).collect();
+    fn apply_to_file(&self, scene: &Scene, input: &Input) -> Result<Gathered, Error> {
+        let mut gathered = Gathered::default();
         let resolved = self
             .config
-            .resolve(Path::new(""), "", &|id| self.preset_rules(id))?;
-        let mut found = Vec::new();
-        for rule in rules
+            .resolve(&input.file.path, &input.file.lang, &|id| {
+                self.preset_rules(id)
+            })?;
+        let provider = self.provider(input.language);
+        for rule in scene
+            .rules
             .iter()
-            .filter(|r| r.manifest().scope == Scope::Project)
+            .filter(|r| r.manifest().scope == Scope::File)
         {
             let meta = rule.manifest();
             let Some(config) = resolved.get(&meta.id) else {
                 continue;
             };
             let Some(level) = config.level else { continue };
-            let missing = meta.capabilities.iter().find(|c| {
-                languages
-                    .iter()
-                    .any(|&l| !self.provider(l).manifest().capabilities.contains(c))
-            });
-            if let Some(missing) = missing {
-                notices.insert(format!(
-                    "{}: skipped, missing capability {missing}",
-                    meta.id
+            if let Some(missing) = meta
+                .capabilities
+                .iter()
+                .find(|c| !provider.manifest().capabilities.contains(c))
+            {
+                gathered.notices.insert(format!(
+                    "{}: skipped for language `{}`, missing capability {missing}",
+                    meta.id, input.file.lang
                 ));
                 continue;
             }
             let ctx = Ctx {
                 ws: &self.ws,
-                project,
-                file: None,
-                facts,
+                project: scene.project,
+                file: Some((&input.file, input.text.as_str())),
+                facts: scene.facts,
                 keys: &self.registry,
                 trusted: self.trusted,
+                memo: scene.memo,
             };
+            let started = Instant::now();
             let checked = rule.check(&ctx, &config.options);
-            for mut d in unfinished(checked, &meta.id, None, incomplete)? {
+            *gathered.spent.entry(meta.id.clone()).or_default() += started.elapsed();
+            let found = unfinished(
+                checked,
+                &meta.id,
+                Some(&input.file.path),
+                &mut gathered.incomplete,
+            )?;
+            gathered.found.extend(found.into_iter().map(|mut d| {
                 d.severity = level;
-                found.push(d);
-            }
+                d
+            }));
         }
-        Ok(found)
+        Ok(gathered)
+    }
+
+    fn apply_project_rules(&self, scene: &Scene) -> Result<Gathered, Error> {
+        let languages: BTreeSet<usize> = scene.inputs.iter().map(|i| i.language).collect();
+        let resolved = self
+            .config
+            .resolve(Path::new(""), "", &|id| self.preset_rules(id))?;
+        let rules: Vec<&&dyn Rule> = scene
+            .rules
+            .iter()
+            .filter(|r| r.manifest().scope == Scope::Project)
+            .collect();
+        let per_rule: Vec<Result<Gathered, Error>> = rules
+            .par_iter()
+            .map(|rule| self.apply_project_rule(scene, **rule, &languages, &resolved))
+            .collect();
+        let mut all = Gathered::default();
+        for gathered in per_rule {
+            all.merge(gathered?);
+        }
+        Ok(all)
+    }
+
+    fn apply_project_rule(
+        &self,
+        scene: &Scene,
+        rule: &dyn Rule,
+        languages: &BTreeSet<usize>,
+        resolved: &Rules,
+    ) -> Result<Gathered, Error> {
+        let mut gathered = Gathered::default();
+        let meta = rule.manifest();
+        let Some(config) = resolved.get(&meta.id) else {
+            return Ok(gathered);
+        };
+        let Some(level) = config.level else {
+            return Ok(gathered);
+        };
+        let missing = meta.capabilities.iter().find(|c| {
+            languages
+                .iter()
+                .any(|&l| !self.provider(l).manifest().capabilities.contains(c))
+        });
+        if let Some(missing) = missing {
+            gathered.notices.insert(format!(
+                "{}: skipped, missing capability {missing}",
+                meta.id
+            ));
+            return Ok(gathered);
+        }
+        let ctx = Ctx {
+            ws: &self.ws,
+            project: scene.project,
+            file: None,
+            facts: scene.facts,
+            keys: &self.registry,
+            trusted: self.trusted,
+            memo: scene.memo,
+        };
+        let started = Instant::now();
+        let checked = rule.check(&ctx, &config.options);
+        *gathered.spent.entry(meta.id.clone()).or_default() += started.elapsed();
+        let found = unfinished(checked, &meta.id, None, &mut gathered.incomplete)?;
+        gathered.found.extend(found.into_iter().map(|mut d| {
+            d.severity = level;
+            d
+        }));
+        Ok(gathered)
     }
 
     fn preset_rules(&self, id: &str) -> Option<Rules> {

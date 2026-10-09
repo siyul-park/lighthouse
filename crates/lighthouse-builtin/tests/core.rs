@@ -31,6 +31,7 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
         facts: &facts,
         keys: &lighthouse_plugin::NoKeys,
         trusted: false,
+        memo: &lighthouse_plugin::Memo::default(),
     };
     registry
         .rule("core/max-file-lines")

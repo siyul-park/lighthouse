@@ -172,7 +172,7 @@ fn an_expression_with_an_execution_error_leaves_the_analysis_incomplete() {
     .unwrap();
     let mut w = World::default();
     w.func("m", "Run", "m/a.ucm");
-    let outcome = std::panic::catch_unwind(|| found(&plugin, &w));
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| found(&plugin, &w)));
     assert!(outcome.is_err(), "an execution error is not a silent pass");
 }
 

@@ -12,8 +12,12 @@
 use std::{collections::HashMap, sync::Arc};
 
 use cel::{
-    Context, ExecutionError, Value,
-    objects::{Key, Map},
+    Context, ExecutionError, FunctionContext, ResolveResult, Value,
+    common::{
+        types::{CelBool, CelMap, CelMapKey, CelString},
+        value::Val,
+    },
+    objects::Map,
 };
 
 /// The functions the library defines and the hidden field of a node each one
@@ -79,6 +83,11 @@ impl Needs {
     }
 }
 
+/// A library function as the runtime calls it, over arguments it has already
+/// resolved. Reading a field of the node argument in place spares converting
+/// the whole node, with its lists of related nodes, on every call.
+type Builtin = Box<dyn Fn(&mut FunctionContext) -> ResolveResult + Send + Sync>;
+
 /// A context with the library installed.
 pub(crate) fn context() -> Context<'static> {
     let mut context = Context::default();
@@ -86,30 +95,87 @@ pub(crate) fn context() -> Context<'static> {
         if name == "edges" || name == "rank" {
             continue;
         }
-        context.add_function(name, move |node: Value| read(&node, field));
+        context.add_function(name, field_reader(name, field));
     }
-    context.add_function("edges", |node: Value, kind: Value| {
-        let Value::Map(edges) = read(&node, "__edges")? else {
-            return Ok(Value::List(Vec::new().into()));
-        };
-        Ok(lookup(&edges, &text(&kind)).unwrap_or_else(|| Value::List(Vec::new().into())))
-    });
-    context.add_function("rank", |node: Value, key: Value| {
-        let Value::Map(ranks) = read(&node, "__ranks")? else {
-            return Ok(Value::Int(-1));
-        };
-        Ok(lookup(&ranks, &text(&key)).unwrap_or(Value::Int(-1)))
-    });
-    context.add_function("exposed", |node: Value, internal: bool| {
-        let visibility = match &node {
-            Value::Map(map) => lookup(map, "visibility").map(|v| text(&v)),
-            _ => None,
-        }
-        .unwrap_or_default();
-        visibility == "public" || (internal && visibility == "internal")
-    });
+    context.add_function("edges", keyed_reader("edges", "__edges", empty_list));
+    context.add_function("rank", keyed_reader("rank", "__ranks", unranked));
+    context.add_function("exposed", exposed());
     text_helpers(&mut context);
     context
+}
+
+/// `name(node)`: the hidden field `field` of the node.
+fn field_reader(name: &'static str, field: &'static str) -> Builtin {
+    Box::new(move |ftx| {
+        let [node] = arguments(ftx)?;
+        match member(node, field, name)? {
+            Some(value) => Value::try_from(value),
+            None => Ok(empty()),
+        }
+    })
+}
+
+/// `name(node, key)`: the entry `key` of the hidden map `field` of the node,
+/// or what `absent` makes when the node has none.
+fn keyed_reader(name: &'static str, field: &'static str, absent: fn() -> Value) -> Builtin {
+    Box::new(move |ftx| {
+        let [node, key] = arguments(ftx)?;
+        let key = text(&Value::try_from(key)?);
+        let Some(map) = member(node, field, name)?.and_then(|v| v.downcast_ref::<CelMap>()) else {
+            return Ok(absent());
+        };
+        match map
+            .inner()
+            .get(&CelMapKey::String(CelString::from(key.as_str())))
+        {
+            Some(value) => Value::try_from(value.as_ref()),
+            None => Ok(absent()),
+        }
+    })
+}
+
+/// `exposed(node, internal)`: whether the node is public, or internal as well
+/// when `internal` says so.
+fn exposed() -> Builtin {
+    Box::new(|ftx| {
+        let [node, internal] = arguments(ftx)?;
+        let internal = internal
+            .downcast_ref::<CelBool>()
+            .map(|b| *b.inner())
+            .ok_or_else(|| ExecutionError::function_error("exposed", "needs a bool"))?;
+        let visibility = match member(node, "visibility", "exposed") {
+            Ok(Some(value)) => text(&Value::try_from(value)?),
+            _ => String::new(),
+        };
+        Ok(Value::Bool(
+            visibility == "public" || (internal && visibility == "internal"),
+        ))
+    })
+}
+
+/// The `N` arguments of a call.
+fn arguments<'a, const N: usize>(
+    ftx: &'a FunctionContext,
+) -> Result<[&'a dyn Val; N], ExecutionError> {
+    let args: Vec<&dyn Val> = ftx.args.iter().map(AsRef::as_ref).collect();
+    <[&dyn Val; N]>::try_from(args)
+        .map_err(|args| ExecutionError::invalid_argument_count(N, args.len()))
+}
+
+/// The field `field` of `node`; `None` when the node has no such field and
+/// an error when it is no node.
+fn member<'a>(
+    node: &'a dyn Val,
+    field: &str,
+    function: &str,
+) -> Result<Option<&'a dyn Val>, ExecutionError> {
+    let map = node
+        .downcast_ref::<CelMap>()
+        .ok_or_else(|| ExecutionError::function_error(function, "needs a node"))?;
+    Ok(map
+        .inner()
+        .get(&CelMapKey::String(CelString::from(field)))
+        .map(AsRef::as_ref))
 }
 
 /// Whether `source` calls the function whose name and `(` are `call`, as a
@@ -169,18 +235,12 @@ fn text_helpers(context: &mut Context<'static>) {
     });
 }
 
-fn read(node: &Value, field: &str) -> Result<Value, ExecutionError> {
-    let Value::Map(map) = node else {
-        return Err(ExecutionError::function_error(
-            field.trim_start_matches('_'),
-            "needs a node",
-        ));
-    };
-    Ok(lookup(map, field).unwrap_or_else(empty))
+fn empty_list() -> Value {
+    Value::List(Vec::new().into())
 }
 
-fn lookup(map: &Map, key: &str) -> Option<Value> {
-    map.map.get(&Key::String(Arc::new(key.to_owned()))).cloned()
+fn unranked() -> Value {
+    Value::Int(-1)
 }
 
 fn empty() -> Value {
