@@ -1,5 +1,6 @@
 use std::{
     env, fs,
+    io::{self, Write},
     path::{Path, PathBuf},
     process::ExitCode,
     time::Instant,
@@ -461,7 +462,7 @@ fn check(
     );
     if options.timings {
         for line in timings::lines(&outcome.timings, reporting.elapsed(), started.elapsed()) {
-            eprintln!("{line}");
+            writeln!(io::stderr(), "{line}").ok();
         }
     }
     Ok(outcome.exit_code(options.fail_on, options.allow_incomplete))

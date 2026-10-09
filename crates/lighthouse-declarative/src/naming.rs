@@ -1,7 +1,10 @@
 //! Which test names an owner test: the convention that ties a top-level test
 //! function to one public symbol.
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex, PoisonError},
+};
 
 use lighthouse_model::{Module, Project, Symbol, SymbolId, SymbolKind, TestCase};
 use serde::Deserialize;
@@ -39,25 +42,33 @@ impl Match {
 }
 
 /// The tests of a project by the convention of a [`Naming`]. The tests of a
-/// set of modules are indexed by their names once, however many symbols ask.
+/// set of modules are indexed by their names once per run, however many
+/// symbols and checks ask.
 pub(crate) struct Tests<'p> {
     naming: Naming,
     project: &'p Project,
-    indexes: RefCell<HashMap<Vec<String>, Rc<Index<'p>>>>,
+    indexes: Arc<Indexes>,
 }
+
+/// The indexes of a run, by test prefix and the modules indexed; they live in
+/// the run's [`lighthouse_plugin::Memo`], shared by every check.
+#[derive(Default)]
+pub(crate) struct Indexes(Mutex<HashMap<IndexKey, Arc<Index>>>);
+
+type IndexKey = (String, Vec<String>);
 
 /// The tests of some modules with the part of their names after the prefix,
 /// sorted by it, and where each came in the modules' order.
-struct Index<'p> {
-    names: Vec<(&'p str, usize, &'p TestCase)>,
+struct Index {
+    names: Vec<(String, usize, SymbolId)>,
 }
 
 impl<'p> Tests<'p> {
-    pub(crate) fn new(naming: Naming, project: &'p Project) -> Self {
+    pub(crate) fn new(naming: Naming, project: &'p Project, indexes: Arc<Indexes>) -> Self {
         Self {
             naming,
             project,
-            indexes: RefCell::default(),
+            indexes,
         }
     }
 
@@ -91,13 +102,13 @@ impl<'p> Tests<'p> {
         let index = self.index(modules);
         let from = index
             .names
-            .partition_point(|(rest, ..)| *rest < key.as_str());
+            .partition_point(|(rest, ..)| rest.as_str() < key.as_str());
         let mut found: Vec<(usize, &'p TestCase, Match)> = index.names[from..]
             .iter()
             .take_while(|(rest, ..)| rest.starts_with(key.as_str()))
-            .filter_map(|&(rest, order, test)| {
+            .filter_map(|(rest, order, id)| {
                 let kind = naming.maps(self.project, rest, &key, symbol)?;
-                Some((order, test, kind))
+                Some((*order, self.project.test(id)?, kind))
             })
             .collect();
         found.sort_by_key(|(order, ..)| *order);
@@ -107,23 +118,29 @@ impl<'p> Tests<'p> {
             .collect()
     }
 
-    fn index(&self, modules: Vec<String>) -> Rc<Index<'p>> {
-        if let Some(index) = self.indexes.borrow().get(&modules) {
-            return Rc::clone(index);
+    fn index(&self, modules: Vec<String>) -> Arc<Index> {
+        let key = (self.naming.test_prefix.clone(), modules);
+        let mut indexes = self
+            .indexes
+            .0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if let Some(index) = indexes.get(&key) {
+            return Arc::clone(index);
         }
         let mut names = Vec::new();
-        for module in &modules {
+        for module in &key.1 {
             for test in self.project.tests_in(module) {
                 let rest = test_name(&test.symbol)
                     .and_then(|name| name.strip_prefix(self.naming.test_prefix.as_str()));
                 if let Some(rest) = rest {
-                    names.push((rest, names.len(), test));
+                    names.push((rest.to_owned(), names.len(), test.symbol.clone()));
                 }
             }
         }
-        names.sort_by_key(|&(rest, order, _)| (rest, order));
-        let index = Rc::new(Index { names });
-        self.indexes.borrow_mut().insert(modules, Rc::clone(&index));
+        names.sort_by(|a, b| (&a.0, a.1).cmp(&(&b.0, b.1)));
+        let index = Arc::new(Index { names });
+        indexes.insert(key, Arc::clone(&index));
         index
     }
 }

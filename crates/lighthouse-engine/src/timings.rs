@@ -47,17 +47,25 @@ impl Timings {
     }
 }
 
-/// The worker threads the independent steps of a run share. A worker gets the
-/// stack the main thread has, as the expressions of a check recurse deeply.
-pub(crate) fn pool() -> &'static ThreadPool {
+/// Runs `op` on the worker threads the independent steps of a run share. A
+/// worker gets the stack the main thread has, as the expressions of a check
+/// recurse deeply. If such workers cannot start, workers with the default
+/// stack do, and failing that `op` runs on the global pool.
+pub(crate) fn in_pool<R: Send>(op: impl FnOnce() -> R + Send) -> R {
     use std::sync::OnceLock;
     const STACK: usize = 8 << 20;
-    static POOL: OnceLock<ThreadPool> = OnceLock::new();
-    POOL.get_or_init(|| {
-        rayon::ThreadPoolBuilder::new()
+    static POOL: OnceLock<Option<ThreadPool>> = OnceLock::new();
+    let pool = POOL.get_or_init(|| {
+        let named =
+            || rayon::ThreadPoolBuilder::new().thread_name(|n| format!("lighthouse-worker-{n}"));
+        named()
             .stack_size(STACK)
-            .thread_name(|n| format!("lighthouse-worker-{n}"))
             .build()
-            .expect("worker threads start")
-    })
+            .or_else(|_| named().build())
+            .ok()
+    });
+    match pool {
+        Some(pool) => pool.install(op),
+        None => op(),
+    }
 }

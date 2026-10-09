@@ -22,7 +22,7 @@ use crate::{
     annotations::{self, Allowed},
     identity,
     subject::Subjects,
-    timings::{Timings, pool},
+    timings::{Timings, in_pool},
 };
 
 /// Name of the file, in `.gitignore` syntax, that keeps files out of the
@@ -556,24 +556,23 @@ impl Engine {
             batches.entry(input.language).or_default().push(input);
         }
         let batches: Vec<(usize, Vec<&Input>)> = batches.into_iter().collect();
-        let indexed: Vec<(Result<Indexed, lighthouse_plugin::Error>, Duration)> =
-            pool().install(|| {
-                batches
-                    .par_iter()
-                    .map(|(language, batch)| {
-                        let sources: Vec<Source> = batch
-                            .iter()
-                            .map(|i| Source {
-                                file: &i.file,
-                                text: &i.text,
-                            })
-                            .collect();
-                        let started = Instant::now();
-                        let indexed = self.provider(*language).index(&ws, &sources);
-                        (indexed, started.elapsed())
-                    })
-                    .collect()
-            });
+        let indexed: Vec<(Result<Indexed, lighthouse_plugin::Error>, Duration)> = in_pool(|| {
+            batches
+                .par_iter()
+                .map(|(language, batch)| {
+                    let sources: Vec<Source> = batch
+                        .iter()
+                        .map(|i| Source {
+                            file: &i.file,
+                            text: &i.text,
+                        })
+                        .collect();
+                    let started = Instant::now();
+                    let indexed = self.provider(*language).index(&ws, &sources);
+                    (indexed, started.elapsed())
+                })
+                .collect()
+        });
         let mut parts: Vec<Fragment> = Vec::new();
         for ((language, batch), (indexed, spent)) in batches.iter().zip(indexed) {
             let provider = self.provider(*language);
@@ -650,7 +649,7 @@ impl Engine {
     /// found comes back in a fixed order: the findings of each file in file
     /// order, rule by rule, then those of the project rules in rule order.
     fn apply(&self, scene: &Scene) -> Result<Gathered, Error> {
-        let (files, project) = pool().install(|| {
+        let (files, project) = in_pool(|| {
             rayon::join(
                 || self.apply_file_rules(scene),
                 || self.apply_project_rules(scene),

@@ -52,6 +52,52 @@ func TestWriteMessage(t *testing.T) {
 	header, body, _ := strings.Cut(out.String(), "\r\n\r\n")
 	require.Equal(t, "Content-Length: "+strconv.Itoa(len(body)), header)
 	require.Equal(t, `{"jsonrpc":"2.0","id":7,"result":"日本語"}`, body)
+
+	t.Run("result and error", func(t *testing.T) {
+		id := json.RawMessage("7")
+		var out bytes.Buffer
+		result := json.RawMessage(`{"a":[1,2]}`)
+		require.True(t, json.Valid(result))
+
+		err := sdk.WriteMessage(&out, &sdk.Message{ID: &id, Result: result, Error: &sdk.ResponseError{Code: 1, Message: "x"}})
+
+		require.NoError(t, err)
+		header, body, _ := strings.Cut(out.String(), "\r\n\r\n")
+		require.Equal(t, "Content-Length: "+strconv.Itoa(len(body)), header)
+		require.True(t, json.Valid([]byte(body)), body)
+		var got sdk.Message
+		require.NoError(t, json.Unmarshal([]byte(body), &got))
+		require.JSONEq(t, string(result), string(got.Result))
+		require.Equal(t, &sdk.ResponseError{Code: 1, Message: "x"}, got.Error)
+	})
+
+	t.Run("content length", func(t *testing.T) {
+		for _, tc := range []struct {
+			name   string
+			result json.RawMessage
+		}{
+			{"null", json.RawMessage("null")},
+			{"multibyte", json.RawMessage(`"日本語"`)},
+			{"large", json.RawMessage(`"` + strings.Repeat("x", 100000) + `"`)},
+			{"none", nil},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				id := json.RawMessage("12")
+				var out bytes.Buffer
+				require.True(t, tc.result == nil || json.Valid(tc.result))
+
+				require.NoError(t, sdk.WriteMessage(&out, &sdk.Message{ID: &id, Result: tc.result}))
+
+				raw := out.Bytes()
+				sep := bytes.Index(raw, []byte("\r\n\r\n"))
+				require.Equal(t, "Content-Length: "+strconv.Itoa(len(raw)-sep-4), string(raw[:sep]))
+				require.True(t, json.Valid(raw[sep+4:]))
+				m, err := sdk.ReadMessage(bufio.NewReader(&out))
+				require.NoError(t, err)
+				require.Equal(t, string(tc.result), string(m.Result))
+			})
+		}
+	})
 }
 
 func TestReadMessage(t *testing.T) {

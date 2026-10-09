@@ -175,17 +175,22 @@ func (r *run) analyze(b *batch, l loaded) {
 }
 
 // loadAll starts loading the packages of every batch. Batches share nothing
-// but the go command's caches, so their loads are independent; the load of a
-// run that sets the go binary edits this process's PATH, so those go one by
-// one.
+// but the go command's caches, so their loads are independent. The load of a
+// run that sets the go binary edits this process's PATH (options.load), which
+// concurrent loads would race on; those loads therefore all finish here, one
+// after the other, before any analysis starts, and nothing else runs while
+// PATH is edited.
 func (r *run) loadAll(batches []*batch) *loader {
-	limit := runtime.GOMAXPROCS(0)
-	if r.opts.Go != "" {
-		limit = 1
-	}
-	l := &loader{ready: make([]chan loaded, len(batches)), slots: make(chan struct{}, limit)}
+	l := &loader{ready: make([]chan loaded, len(batches)), slots: make(chan struct{}, runtime.GOMAXPROCS(0))}
 	for i := range l.ready {
 		l.ready[i] = make(chan loaded, 1)
+	}
+	if r.opts.Go != "" {
+		for i, b := range batches {
+			pkgs, err := r.loadPackages(b)
+			l.ready[i] <- loaded{pkgs: pkgs, err: err}
+		}
+		return l
 	}
 	go func() {
 		for i, b := range batches {
@@ -452,15 +457,18 @@ func (r *run) isRequested(rel string) bool {
 	return ok
 }
 
-// patterns are the package directories of b's files, relative to its go.mod.
 // next waits for the load of the next batch in order and frees its slot.
 func (l *loader) next() loaded {
 	got := <-l.ready[l.read]
 	l.read++
-	<-l.slots
+	select {
+	case <-l.slots:
+	default: // loaded up front, no slot was taken
+	}
 	return got
 }
 
+// patterns are the package directories of b's files, relative to its go.mod.
 func (b *batch) patterns(root string) []string {
 	dirs := map[string]bool{}
 	for _, rel := range b.files {

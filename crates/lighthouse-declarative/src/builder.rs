@@ -80,7 +80,8 @@ impl<'a> Builder<'a> {
             language: ctx
                 .file
                 .map_or_else(String::new, |(file, _)| file.lang.clone()),
-            naming: Naming::from_options(options).map(|naming| Tests::new(naming, ctx.project)),
+            naming: Naming::from_options(options)
+                .map(|naming| Tests::new(naming, ctx.project, ctx.memo.slot())),
             keys,
             measures,
             table: ctx.memo.slot(),
