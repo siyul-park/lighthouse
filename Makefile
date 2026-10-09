@@ -3,14 +3,18 @@ PLUGINS := target/plugins
 .PHONY: plugins test lint ci
 
 # Builds the bundled out-of-process plugins; each directory holds the binary
-# and its lighthouse-plugin.toml, the layout plugin discovery expects.
+# and its lighthouse-plugin.toml, the layout plugin discovery expects. Binaries
+# are replaced by rename, never overwritten in place: macOS caches a binary's
+# code signature per file, and new bytes under the old file are killed on launch.
 plugins:
 	mkdir -p $(PLUGINS)/lang-go
-	cd plugins/lang-go && go build -o ../../$(PLUGINS)/lang-go/lang-go ./cmd/lang-go
+	cd plugins/lang-go && go build -o ../../$(PLUGINS)/lang-go/lang-go.new ./cmd/lang-go
+	mv -f $(PLUGINS)/lang-go/lang-go.new $(PLUGINS)/lang-go/lang-go
 	cp plugins/lang-go/lighthouse-plugin.toml $(PLUGINS)/lang-go/
 	mkdir -p $(PLUGINS)/lang-rust
 	cargo build --release -p lang-rust
-	cp target/release/lang-rust $(PLUGINS)/lang-rust/
+	cp target/release/lang-rust $(PLUGINS)/lang-rust/lang-rust.new
+	mv -f $(PLUGINS)/lang-rust/lang-rust.new $(PLUGINS)/lang-rust/lang-rust
 	cp plugins/lang-rust/lighthouse-plugin.toml $(PLUGINS)/lang-rust/
 
 test: plugins
