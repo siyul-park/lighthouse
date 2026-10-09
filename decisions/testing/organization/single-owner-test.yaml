@@ -36,9 +36,15 @@ spec:
         description: >-
           Count `TestGet_Missing` as a second owner of `Get`; a name that adds a
           suffix to the symbol's own name restates the same contract.
+      include_internal:
+        type: boolean
+        default: false
+        description: Also judge symbols public only inside the project.
     additionalProperties: false
   languages:
     go:
+      options:
+        include_internal: true
       tuning: >-
         `TestGet` and `TestGet_Missing` both own `Get`: the second is a case of
         the first, written with `t.Run`. A name matches the longest symbol it
@@ -62,7 +68,7 @@ spec:
         expr: tests(symbol)
     where: >-
       !symbol.file_test && !symbol.generated && !symbol.test
-      && symbol.visibility == 'public'
+      && exposed(symbol, options.include_internal)
       && (symbol.kind == 'function' || symbol.kind == 'method'
           || symbol.kind == 'type' || symbol.kind == 'interface')
       && size(owners) >= 2

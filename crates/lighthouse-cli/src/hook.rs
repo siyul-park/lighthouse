@@ -24,7 +24,7 @@ use std::{
 };
 
 use clap::ValueEnum;
-use lighthouse_report::{Format, render_with};
+use lighthouse_report::{Briefing, Detail, Format, render_with};
 use lighthouse_session::{CheckRequest, Checked, Session, Status};
 use serde_json::{Value, json};
 
@@ -274,10 +274,14 @@ fn at_stop(
 /// The agent-format text of the findings and gaps, at most `limit` findings.
 fn feedback(checked: &Checked, limit: usize) -> String {
     let outcome = &checked.outcome;
+    let fixes = checked.shown_fixes(Some(limit), Detail::default());
     render_with(
         Format::Agent,
         &outcome.diagnostics,
         &outcome.incomplete,
-        &checked.briefing(Some(limit)),
+        &Briefing {
+            fixes: Some(&fixes),
+            ..checked.briefing(Some(limit))
+        },
     )
 }

@@ -1,10 +1,13 @@
 //! Running a check: analyze, narrow the report, remember the run.
 
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
-use lighthouse_engine::{Engine, Outcome};
-use lighthouse_model::Severity;
-use lighthouse_report::Briefing;
+use lighthouse_engine::{Engine, FixPlan, Outcome};
+use lighthouse_model::{Diagnostic, Severity};
+use lighthouse_report::{Briefing, Detail, Fix, FixEdit, FixFile};
 use lighthouse_spec::Catalog;
 use serde::Serialize;
 
@@ -59,6 +62,8 @@ pub struct Checked {
     pub remembered: Remembered,
     /// What the user should know, in the order it happened.
     pub messages: Vec<String>,
+    /// The engine that ran, kept to propose fixes for the findings.
+    engine: Engine,
 }
 
 impl Checked {
@@ -99,6 +104,60 @@ impl Checked {
         }
     }
 
+    /// The fixes proposed for `findings`, by fingerprint, computed in memory:
+    /// nothing is written, formatted or re-checked, and a finding whose fix
+    /// does not apply cleanly, runs a program or does not exist has none.
+    /// Applying a fix goes through a fix run, which verifies it.
+    pub fn fixes(&self, findings: &[&Diagnostic]) -> BTreeMap<String, Fix> {
+        let plan = FixPlan::from_catalog(&self.catalog);
+        self.engine
+            .preview_fixes(&plan, &self.outcome, findings)
+            .into_iter()
+            .map(|preview| {
+                let files = preview
+                    .changes
+                    .into_iter()
+                    .map(|change| {
+                        let edits = preview
+                            .edits
+                            .iter()
+                            .filter(|e| e.file == change.path)
+                            .map(|e| FixEdit {
+                                start: e.start,
+                                end: e.end,
+                                text: e.text.clone(),
+                            })
+                            .collect();
+                        FixFile {
+                            path: change.path.to_string_lossy().replace('\\', "/"),
+                            before: change.before,
+                            after: change.after,
+                            edits,
+                        }
+                    })
+                    .collect();
+                let fix = Fix {
+                    safety: preview.safety,
+                    description: preview.description,
+                    files,
+                };
+                (preview.fingerprint.as_str().to_owned(), fix)
+            })
+            .collect()
+    }
+
+    /// The fixes of the findings an agent format shows at `detail` under
+    /// `limit`, or of the first `cap` findings for a format that shows them
+    /// all.
+    pub fn shown_fixes(&self, limit: Option<usize>, detail: Detail) -> BTreeMap<String, Fix> {
+        let briefing = Briefing {
+            detail,
+            ..self.briefing(limit)
+        };
+        let shown = lighthouse_report::shown(&self.outcome.diagnostics, &briefing);
+        self.fixes(&shown)
+    }
+
     /// The briefing the agent formats draw on. It always carries the
     /// catalog, so that the summary and every format agree on which findings
     /// ask for a verdict.
@@ -110,6 +169,9 @@ impl Checked {
             suppressed: self.remembered.suppressed,
             allowed: self.outcome.allowed.len(),
             limit,
+            detail: Detail::default(),
+            fixes: None,
+            mcp: false,
         }
     }
 }
@@ -144,6 +206,7 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
         catalog,
         remembered,
         messages,
+        engine,
     })
 }
 

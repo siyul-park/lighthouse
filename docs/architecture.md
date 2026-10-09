@@ -415,9 +415,13 @@ mentions the marker mid-line is not an annotation.
 
 ### Agent output
 
-`check --format agent` prints one block per finding that an agent can act on without
-another lookup, `--format agent-json` the same records as JSON lines (`finding`,
-`incomplete`, `truncated` and `summary` records tagged by `type`):
+`check --format agent` groups findings by decision, then by file: a header with the
+requirement and the expected structure once, then one line per finding (location,
+message, fingerprint prefix of at least 7 characters); `--format agent-json` is the same
+groups as one JSON object. See "Compact output" in [agents.md](agents.md). `--detail full`
+restores the per-finding shape described below: one block per finding that an agent can
+act on without another lookup, as JSON lines (`finding`, `incomplete`, `truncated` and
+`summary` records tagged by `type`) for `agent-json`:
 
 ```text
 design/private-helper-callers  info (heuristic)  src/lib.rs:5:1

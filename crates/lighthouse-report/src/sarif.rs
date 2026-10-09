@@ -5,6 +5,8 @@ use std::{
 
 use lighthouse_model::{Diagnostic, Incomplete, Severity};
 use lighthouse_spec::{Catalog, Decision, help_path};
+
+use crate::fix::{Fix, FixEdit};
 use serde::Serialize;
 
 const SCHEMA: &str = "https://json.schemastore.org/sarif-2.1.0.json";
@@ -109,6 +111,35 @@ struct SarifResult<'a> {
     message: Message<'a>,
     locations: [Location; 1],
     partial_fingerprints: BTreeMap<&'static str, &'a str>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    fixes: Vec<SarifFix<'a>>,
+}
+
+/// A SARIF `fix`: what to change, as replacements of regions per artifact.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifFix<'a> {
+    description: Message<'a>,
+    artifact_changes: Vec<ArtifactChange>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ArtifactChange {
+    artifact_location: Artifact,
+    replacements: Vec<Replacement>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Replacement {
+    deleted_region: Region,
+    inserted_content: Content,
+}
+
+#[derive(Serialize)]
+struct Content {
+    text: String,
 }
 
 #[derive(Serialize)]
@@ -155,11 +186,13 @@ struct Region {
 /// invocation unsuccessful. A finding's rule is the decision it cites: with
 /// the `catalog` the rule carries the decision's title, requirement, default
 /// level and a `helpUri` to its entry in the generated docs; a result carries
-/// the fingerprint of the finding as a partial fingerprint.
+/// the fingerprint of the finding as a partial fingerprint, and the fix
+/// proposed for it (by fingerprint in `fixes`) as a SARIF `fix`.
 pub fn render(
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
     catalog: Option<&Catalog>,
+    fixes: Option<&BTreeMap<String, Fix>>,
 ) -> String {
     let ids: BTreeSet<&str> = diagnostics.iter().map(|d| d.rule_id.as_str()).collect();
     let rules: Vec<&str> = ids.into_iter().collect();
@@ -189,7 +222,10 @@ pub fn render(
                         .collect(),
                 },
             },
-            results: diagnostics.iter().map(|d| result(d, &rules)).collect(),
+            results: diagnostics
+                .iter()
+                .map(|d| result(d, &rules, fixes.and_then(|f| f.get(d.fingerprint.as_str()))))
+                .collect(),
         }],
     };
     let mut out = serde_json::to_string_pretty(&log).expect("sarif serializes");
@@ -245,7 +281,7 @@ fn rule_ref<'a>(id: &'a str, decision: Option<&'a Decision>) -> RuleRef<'a> {
     }
 }
 
-fn result<'a>(d: &'a Diagnostic, rules: &[&str]) -> SarifResult<'a> {
+fn result<'a>(d: &'a Diagnostic, rules: &[&str], fix: Option<&'a Fix>) -> SarifResult<'a> {
     SarifResult {
         rule_id: &d.rule_id,
         rule_index: rules
@@ -266,6 +302,37 @@ fn result<'a>(d: &'a Diagnostic, rules: &[&str]) -> SarifResult<'a> {
             },
         }],
         partial_fingerprints: BTreeMap::from([(FINGERPRINT_KEY, d.fingerprint.as_str())]),
+        fixes: fix.map(sarif_fix).into_iter().collect(),
+    }
+}
+
+fn sarif_fix(fix: &Fix) -> SarifFix<'_> {
+    SarifFix {
+        description: Message {
+            text: &fix.description,
+        },
+        artifact_changes: fix
+            .files
+            .iter()
+            .map(|file| ArtifactChange {
+                artifact_location: artifact(Path::new(&file.path)),
+                replacements: file.edits.iter().map(replacement).collect(),
+            })
+            .collect(),
+    }
+}
+
+fn replacement(edit: &FixEdit) -> Replacement {
+    Replacement {
+        deleted_region: Region {
+            start_line: edit.start.line,
+            start_column: edit.start.col,
+            end_line: edit.end.line,
+            end_column: edit.end.col,
+        },
+        inserted_content: Content {
+            text: edit.text.clone(),
+        },
     }
 }
 

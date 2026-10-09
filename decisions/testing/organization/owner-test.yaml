@@ -68,6 +68,8 @@ spec:
     additionalProperties: false
   languages:
     go:
+      options:
+        include_internal: true
       tuning: >-
         The owner of a function or type is `TestName`, of a method
         `TestType_Method`. A symbol that no test names and no test code calls or

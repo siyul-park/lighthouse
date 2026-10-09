@@ -122,6 +122,25 @@ fn single_owner_flags_variants_of_one_symbol() {
 }
 
 #[test]
+fn single_owner_judges_internal_symbols_only_when_asked() {
+    let (mut w, made) = package(&[("TestGet", None), ("TestGet_Missing", None)]);
+    let get = made[0].clone();
+    w.symbols
+        .iter_mut()
+        .find(|s| s.id == get.id)
+        .unwrap()
+        .visibility = Visibility::Internal;
+    assert!(
+        check(&w, SINGLE, json!({})).is_empty(),
+        "internal by default"
+    );
+    assert_eq!(
+        w.names(&check(&w, SINGLE, json!({ "include_internal": true }))),
+        ["Get"]
+    );
+}
+
+#[test]
 fn single_owner_lets_a_longer_name_belong_to_the_method() {
     let mut w = World::default();
     w.module("m", None, None);

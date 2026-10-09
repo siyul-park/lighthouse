@@ -44,11 +44,11 @@ value starting with `-` is refused).
 
 | Tool | Arguments | Result |
 |------|-----------|--------|
-| `check` | `paths?`, `changed?`, `diff?`, `rules?`, `limit?` (default 25) | `status` (`clean`, `findings`, `incomplete`), `findings` (the agent-json records: rule, severity, authored severity, location, requirement, evidence, expected structure, fingerprint, resolve hint), `incomplete`, `omitted`, `summary` (counts, suppressed, allowed, reasons table), `messages` |
+| `check` | `paths?`, `changed?`, `diff?`, `rules?`, `limit?` (default 25, counts findings), `detail?` (`compact` default, or `full`) | compact: `status` (`clean`, `findings`, `incomplete`), `counts` (`error`, `warn`, `review`; `info`, `suppressed`, `allowed` when not zero), `groups`, then when they apply `incomplete` (`[path, reason]`), `omitted` (`groups`, `findings`), `resolve` and `reasons` once, `messages`. Full: `findings` (one agent-json record each), `incomplete`, `omitted`, `summary`, `reasons`, `messages` |
 | `explain` | `id` | Markdown of the decision or rule |
 | `decision_list` | `all?` | decisions with severity, title, status, `enabled` in this config |
-| `review_tasks` | `status?` (default `open`), `rule?`, `tier?` (`review` default, or `all`), `limit?` (default 50) | findings that ask for a verdict (those of decisions that authored `warn` or `info`, whatever level they are reported at; or all) with `fingerprint`, `lastSeen`, evidence, latest verdict |
-| `review_resolve` | `fingerprint`, `verdict`, `reason?`, `note?`, `seen?` | the recorded verdict, its `standing`, warnings |
+| `review_tasks` | `status?` (default `open`), `rule?`, `tier?` (`review` default, or `all`), `limit?` (default 50), `detail?` | findings that ask for a verdict (those of decisions that authored `warn` or `info`, whatever level they are reported at; or all), grouped like `check`; the finding's last-seen time is its `seen` evidence, `state` and `verdict` appear when not open or when reviewed. `detail: full` gives one task each with `fingerprint`, `lastSeen`, evidence, latest verdict |
+| `review_resolve` | `fingerprint` (or a unique prefix; an ambiguous one is refused), `verdict`, `reason?`, `note?`, `seen?` | the recorded verdict, its `standing`, warnings |
 | `review_history` | `fingerprint` | every verdict on the finding, oldest first |
 | `decision_create` | `id` (`local/<name>`), `spec` (object or YAML/JSON text), `examples` | `id`, written `path`, test runs, whether the `local` plugin is listed |
 | `decision_update` | `id`, `patch` (JSON merge patch over the spec) | like `decision_create` |
@@ -66,6 +66,60 @@ Every key an agent reads or writes is lowerCamelCase: the arguments (`dryRun`,
 `options` are data and keep their names: option names are the decision's own, and the
 code-model facts keep the snake_case of the plugin protocol (`max_nesting`), which
 external plugins already speak (see [plugin-protocol.md](plugin-protocol.md)).
+
+### Compact output
+
+`check`, `review_tasks`, `lighthouse check --format agent|agent-json` and the hooks
+share one token-lean shape (`--detail full`, or `detail: "full"`, gives the
+per-finding records instead; the text, json and SARIF reporters are unchanged).
+Findings are grouped by decision and severity, errors first, then larger groups:
+
+```json
+{"status":"findings","counts":{"error":0,"warn":2,"review":2},
+ "groups":[{"rule":"design/exported-doc","severity":"warn","review":true,
+   "requirement":"<one line>","expected":"<excerpt, once>",
+   "evidence":{"keys":"identical across the group"},
+   "files":{"bar/bar.go":[["3:1","message","a1b2c3d"],["5:6","message","e4f5a6b",{"varying":"evidence"}]]}}],
+ "resolve":"review_resolve {fingerprint, verdict, reason}","reasons":{}}
+```
+
+An instance is `[line:col, message, fingerprint prefix]` plus, when present, the
+evidence that varies within the group and a `note` (why a verdict did not hide
+the finding). The prefix is the shortest unique one, at least 7 characters;
+`review_resolve`, `fix` and `lighthouse review resolve` accept it. The symbol
+is evidence unless the message names it; `authored` appears on a group only when
+it differs from the severity; `intent` is left to `explain`. `limit` counts
+findings and what is cut is in `omitted`. The agent text prints a header per
+group (`rule severity [review] - requirement`), `expected:` once, then
+`path:line:col message fingerprint` per finding, the gaps, `resolve:` and
+`reasons:` once, and the summary.
+
+### Fix previews
+
+A finding whose decision has a fix shows what the fix would change, computed on
+demand and in memory by the fixer and orchestrator that `fix` uses: nothing is
+written, formatted or re-checked, so treat it as a preview of the proposal
+(applying still goes through the verified path). Only proposals that apply
+cleanly are shown, and only for the findings the report shows after `limit`.
+Fixers that run a program (`command`) are not previewed: they need the project's
+trust and are slow; their group carries only `apply`.
+
+- Agent formats and `check`/`fix` MCP: an instance carries
+  `fix: {"safety": "safe"|"suggested", "diff": "@@ -l,n +l,n @@ ..."}` in its
+  fourth element, a unified diff with one line of context, at most about 12
+  lines. A longer fix is `{"safety", "summary": "<description> (N lines)"}`.
+  `safety` is `suggested` whenever applying needs unsafe fixes (a suggested
+  fix, or a rule that is not mechanical). `detail: full` has the same `fix`
+  object. In the text format the hunk is printed indented under the finding.
+- A group of a fixable decision has `apply`: `lighthouse check --fix --rules
+  <id>` (with `--unsafe-fixes` for suggested fixes), or the `fix` tool call
+  through MCP.
+- SARIF: `result.fixes[]` with the proposal's `description` and
+  `artifactChanges[{artifactLocation, replacements[{deletedRegion,
+  insertedContent}]}]`, for up to 200 findings.
+
+Prefer `check --fix` for safe fixes, and read the diff before applying
+suggested ones.
 
 ### Fixing
 

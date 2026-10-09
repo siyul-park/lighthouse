@@ -1,4 +1,8 @@
 mod agent;
+mod evidence;
+mod expected;
+mod fix;
+mod group;
 mod sarif;
 
 use std::{fmt::Write, str::FromStr};
@@ -6,7 +10,9 @@ use std::{fmt::Write, str::FromStr};
 use lighthouse_model::{Diagnostic, Incomplete, Severity};
 use thiserror::Error;
 
-pub use agent::{AgentReport, Briefing, agent_report};
+pub use agent::{AgentReport, Briefing, Detail, UnknownDetail, agent_report, shown};
+pub use fix::{Fix, FixEdit, FixFile};
+pub use group::{Entry, GroupOptions, Grouped};
 
 /// Output format of [`render`]; parsed from `text`, `json`, `sarif`, `agent`
 /// or `agent-json`.
@@ -15,9 +21,11 @@ pub enum Format {
     Text,
     Json,
     Sarif,
-    /// Self-contained blocks an agent can act on without another lookup.
+    /// Findings grouped by decision for a coding agent: what a decision says
+    /// once, a line per finding. One block per finding with
+    /// [`Detail::Full`].
     Agent,
-    /// The agent records as JSON lines.
+    /// The same groups as one JSON object; JSON lines with [`Detail::Full`].
     AgentJson,
 }
 
@@ -64,7 +72,7 @@ pub fn render_with(
     match format {
         Format::Text => text(diagnostics, incomplete),
         Format::Json => json_lines(diagnostics, incomplete),
-        Format::Sarif => sarif::render(diagnostics, incomplete, briefing.catalog),
+        Format::Sarif => sarif::render(diagnostics, incomplete, briefing.catalog, briefing.fixes),
         Format::Agent => agent::text(diagnostics, incomplete, briefing),
         Format::AgentJson => agent::json_lines(diagnostics, incomplete, briefing),
     }

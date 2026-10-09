@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     env, fs,
     path::{Path, PathBuf},
     process::ExitCode,
@@ -7,7 +8,7 @@ use std::{
 use clap::{Parser, Subcommand, ValueEnum};
 use lighthouse_config::FILE_NAME;
 use lighthouse_engine::FailOn;
-use lighthouse_report::{Format, render_with};
+use lighthouse_report::{Briefing, Detail, Format, render_with};
 use lighthouse_session::{CheckRequest, DEFAULT_CONFIG, FixRequest, Session};
 use review::ReviewCommand;
 
@@ -28,6 +29,9 @@ const STORE_IGNORE: &str = ".lighthouse/*.db*";
 /// The decision log is committed; branches that both appended merge by
 /// keeping the lines of both.
 const LOG_ATTRIBUTES: &str = ".lighthouse/decisions.jsonl merge=union";
+
+/// Most findings of a SARIF report whose fix is previewed.
+const SARIF_FIXES: usize = 200;
 
 #[derive(Parser)]
 #[command(name = "lighthouse", version, about = "Design-quality linter")]
@@ -68,14 +72,19 @@ enum Command {
         /// including the working tree and untracked files. A report filter.
         #[arg(long, value_name = "BASE")]
         diff: Option<String>,
-        /// text, json, sarif, agent (self-contained blocks for a coding agent)
-        /// or agent-json (the same records as JSON lines).
+        /// text, json, sarif, agent (findings grouped for a coding agent) or
+        /// agent-json (the same groups as one JSON object).
         #[arg(long, default_value = "text")]
         format: Format,
         /// Print at most this many findings, errors first, and say how many
         /// were left out. Agent formats only.
         #[arg(long)]
         limit: Option<usize>,
+        /// compact (default): findings grouped by decision, then by file, a
+        /// decision's text said once. full: one self-contained record per
+        /// finding. Agent formats only.
+        #[arg(long, default_value = "compact")]
+        detail: Detail,
         /// Do not record this run in `.lighthouse/lighthouse.db` and do not
         /// apply review verdicts. By default a run is recorded: findings it
         /// no longer reports in the reported scope are marked resolved (never
@@ -293,6 +302,7 @@ type Result<T> = lighthouse_session::Result<T>;
 struct Options {
     format: Format,
     limit: Option<usize>,
+    detail: Detail,
     store: bool,
     fail_on: FailOn,
     allow_incomplete: bool,
@@ -329,6 +339,7 @@ fn run(cli: Cli) -> Result<u8> {
             diff,
             format,
             limit,
+            detail,
             no_store,
             strict,
             max_warnings,
@@ -348,6 +359,7 @@ fn run(cli: Cli) -> Result<u8> {
             Options {
                 format,
                 limit,
+                detail,
                 store: !no_store,
                 fail_on: FailOn {
                     strict,
@@ -416,8 +428,12 @@ fn check(
     config: Option<&Path>,
     fix: Option<FixOptions>,
 ) -> Result<u8> {
-    if options.limit.is_some() && !matches!(options.format, Format::Agent | Format::AgentJson) {
+    let agent = matches!(options.format, Format::Agent | Format::AgentJson);
+    if options.limit.is_some() && !agent {
         return Err("--limit applies to the agent formats only".into());
+    }
+    if options.detail != Detail::default() && !agent {
+        return Err("--detail applies to the agent formats only".into());
     }
     if let Some(fix) = fix {
         let dry_run = fix.dry_run;
@@ -438,13 +454,25 @@ fn check(
         eprintln!("lighthouse: {message}");
     }
     let outcome = &checked.outcome;
+    let fixes = match options.format {
+        Format::Agent | Format::AgentJson => checked.shown_fixes(options.limit, options.detail),
+        Format::Sarif => {
+            let all: Vec<_> = outcome.diagnostics.iter().take(SARIF_FIXES).collect();
+            checked.fixes(&all)
+        }
+        Format::Text | Format::Json => BTreeMap::new(),
+    };
     print!(
         "{}",
         render_with(
             options.format,
             &outcome.diagnostics,
             &outcome.incomplete,
-            &checked.briefing(options.limit)
+            &Briefing {
+                detail: options.detail,
+                fixes: Some(&fixes),
+                ..checked.briefing(options.limit)
+            }
         )
     );
     Ok(outcome.exit_code(options.fail_on, options.allow_incomplete))

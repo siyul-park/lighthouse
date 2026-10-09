@@ -1,17 +1,20 @@
-use std::{collections::BTreeMap, fmt::Write, path::Path};
+use std::{collections::BTreeMap, fmt::Write, str::FromStr};
 
-use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Severity, Verdict};
-use lighthouse_spec::{Catalog, Decision, Example, ExampleKind, authored_severity};
-use serde::Serialize;
+use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Severity};
+use lighthouse_spec::{Catalog, authored_severity};
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
+use thiserror::Error;
 
-/// Longest excerpt of an example, in lines and in characters.
-const EXCERPT_LINES: usize = 12;
-const EXCERPT_CHARS: usize = 600;
-/// Longest tuning text and longest single evidence value, in characters.
-const TUNING_CHARS: usize = 300;
-const VALUE_CHARS: usize = 120;
-/// Shortest fingerprint prefix shown; longer when needed to stay unambiguous.
+use crate::{
+    evidence::{evidence, evidence_line},
+    expected::{Expected, Subject, expected, one_line},
+    fix::{Fix, Shown},
+    group::{Entry, GroupOptions, Grouped, reasons, reasons_line},
+};
+
+/// Shortest fingerprint prefix the full shape shows; longer when needed to
+/// stay unambiguous.
 const PREFIX_MIN: usize = 12;
 
 /// What the agent formats add to a bare diagnostic: the catalog the rules
@@ -36,9 +39,53 @@ pub struct Briefing<'a> {
     /// Print at most this many findings, errors first, and say how many were
     /// left out.
     pub limit: Option<usize>,
+    pub detail: Detail,
+    /// The fixes proposed for findings, by fingerprint: shown with the
+    /// finding, and as `fixes` in SARIF.
+    pub fixes: Option<&'a BTreeMap<String, Fix>>,
+    /// The report is read through MCP, so fixing is the `fix` tool.
+    pub mcp: bool,
+}
+
+/// How much each finding carries.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Detail {
+    /// Findings grouped by decision, then by file: what is common to a
+    /// decision is said once and a finding is one short line.
+    #[default]
+    Compact,
+    /// One self-contained record per finding.
+    Full,
+}
+
+/// The text given to [`Detail::from_str`] names no level of detail.
+#[derive(Debug, Error)]
+#[error("unknown detail `{0}` (expected compact or full)")]
+pub struct UnknownDetail(String);
+
+impl FromStr for Detail {
+    type Err = UnknownDetail;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "compact" => Ok(Self::Compact),
+            "full" => Ok(Self::Full),
+            _ => Err(UnknownDetail(s.to_owned())),
+        }
+    }
 }
 
 impl Briefing<'_> {
+    /// How the compact shape is cut.
+    pub fn group_options(&self) -> GroupOptions<'_> {
+        GroupOptions {
+            catalog: self.catalog,
+            limit: self.limit,
+            mcp: self.mcp,
+        }
+    }
+
     /// Whether the finding is a review task: its decision authored `warn` or
     /// `info`, whatever severity the configuration reports it at. An authored
     /// `error` is definitive and needs no verdict. A rule without a decision
@@ -51,15 +98,26 @@ impl Briefing<'_> {
     }
 }
 
-/// The agent records as typed data: the findings that fit `briefing.limit`,
-/// the gaps, how many findings were left out, and the reasons table when a
-/// shown finding asks for a verdict.
+/// The agent report as typed data, the fields of the JSON object a frontend
+/// prints or wraps.
+///
+/// Compact: `status`, `counts`, `groups`, then when they apply `incomplete`
+/// (`[path, reason]` pairs), `omitted`, and the `resolve` hint and `reasons`
+/// table once for all shown findings that ask for a verdict. Full: `findings`,
+/// `incomplete` and `reasons` as records, `omitted` as a count.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentReport {
-    pub findings: Vec<Value>,
-    pub incomplete: Vec<Value>,
-    pub omitted: usize,
-    pub reasons: Option<Value>,
+    pub fields: Map<String, Value>,
+}
+
+/// The full shape: the findings that fit `briefing.limit`, the gaps, how many
+/// findings were left out, and the reasons table when a shown finding asks
+/// for a verdict.
+struct FullReport {
+    findings: Vec<Value>,
+    incomplete: Vec<Value>,
+    omitted: usize,
+    reasons: Option<Value>,
 }
 
 #[derive(Serialize)]
@@ -69,23 +127,6 @@ struct Location {
     line: u32,
     column: u32,
     end_line: u32,
-}
-
-/// A short picture of what the code should look like.
-#[derive(Serialize)]
-struct Expected {
-    /// `example` (a valid example of the decision) or `tuning` (its note for
-    /// the language).
-    source: &'static str,
-    language: String,
-    /// Why this one: `canonical`, `matches kind=function`, `shortest valid
-    /// example` or `tuning`.
-    basis: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    path: Option<String>,
-    excerpt: String,
 }
 
 #[derive(Serialize)]
@@ -111,35 +152,133 @@ struct Finding<'a> {
     note: Option<String>,
     fingerprint: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
+    fix: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     resolve: Option<Value>,
 }
 
-/// What the expected structure is chosen by: the file's language and the kind
-/// and visibility of the finding's symbol.
-struct Subject<'a> {
-    language: Option<&'a str>,
-    kind: Option<&'a str>,
-    visibility: Option<&'a str>,
-}
-
-impl<'a> Subject<'a> {
-    fn of(facts: Option<&'a Value>) -> Self {
-        let text = |key: &str| facts.and_then(|f| f.get(key)).and_then(Value::as_str);
-        Self {
-            language: text("language"),
-            kind: text("kind"),
-            visibility: text("visibility"),
-        }
-    }
-}
-
-/// One block per finding, then the gaps, a footer naming the reasons review
-/// verdicts accept when a finding asks for review, and the summary.
+/// The agent text: grouped by decision unless `briefing.detail` is full.
 pub(crate) fn text(
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
     briefing: &Briefing,
 ) -> String {
+    match briefing.detail {
+        Detail::Compact => compact_text(diagnostics, incomplete, briefing),
+        Detail::Full => full_text(diagnostics, incomplete, briefing),
+    }
+}
+
+/// The findings the agent formats show under `briefing.limit`: what a fix
+/// preview is worth computing for.
+pub fn shown<'d>(diagnostics: &'d [Diagnostic], briefing: &Briefing) -> Vec<&'d Diagnostic> {
+    if briefing.detail == Detail::Full {
+        return select(diagnostics, briefing.limit).0;
+    }
+    let grouped = Grouped::of(entries(diagnostics, briefing), &briefing.group_options());
+    let kept = grouped.fingerprints();
+    diagnostics
+        .iter()
+        .filter(|d| kept.contains(d.fingerprint.as_str()))
+        .collect()
+}
+
+/// Builds the [`AgentReport`] that [`json_lines`] prints.
+pub fn agent_report(
+    diagnostics: &[Diagnostic],
+    incomplete: &[Incomplete],
+    briefing: &Briefing,
+) -> AgentReport {
+    let fields = match briefing.detail {
+        Detail::Compact => compact_fields(diagnostics, incomplete, briefing),
+        Detail::Full => {
+            let full = full_report(diagnostics, incomplete, briefing);
+            let mut fields = Map::new();
+            fields.insert("findings".to_owned(), Value::Array(full.findings));
+            fields.insert("incomplete".to_owned(), Value::Array(full.incomplete));
+            fields.insert("omitted".to_owned(), json!(full.omitted));
+            if let Some(reasons) = full.reasons {
+                fields.insert("reasons".to_owned(), reasons);
+            }
+            fields
+        }
+    };
+    AgentReport { fields }
+}
+
+/// The agent JSON: one object on one line in the compact shape; with full
+/// detail one object per line, see [`full_json_lines`].
+pub(crate) fn json_lines(
+    diagnostics: &[Diagnostic],
+    incomplete: &[Incomplete],
+    briefing: &Briefing,
+) -> String {
+    match briefing.detail {
+        Detail::Compact => {
+            let fields = compact_fields(diagnostics, incomplete, briefing);
+            format!("{}\n", Value::Object(fields))
+        }
+        Detail::Full => full_json_lines(diagnostics, incomplete, briefing),
+    }
+}
+
+/// One header per decision with its requirement and expected structure, one
+/// line per finding under it, then the gaps, how to record a verdict and the
+/// reasons it accepts when a shown finding asks for review, and the summary.
+fn compact_text(
+    diagnostics: &[Diagnostic],
+    incomplete: &[Incomplete],
+    briefing: &Briefing,
+) -> String {
+    let grouped = Grouped::of(entries(diagnostics, briefing), &briefing.group_options());
+    let mut out = grouped.text();
+    for item in incomplete {
+        let _ = writeln!(out, "{}", incomplete_line(item));
+    }
+    if grouped.asks_review() {
+        let _ = writeln!(
+            out,
+            "resolve: lighthouse review resolve <fingerprint> --verdict <verdict> --reason <reason> --reviewer-kind agent"
+        );
+        let _ = writeln!(out, "reasons: {}", reasons_line());
+    }
+    let _ = writeln!(out, "{}", summary_line(diagnostics, incomplete, briefing));
+    out
+}
+
+/// The diagnostics as entries of the compact shape.
+fn entries(diagnostics: &[Diagnostic], briefing: &Briefing) -> Vec<Entry> {
+    diagnostics
+        .iter()
+        .map(|d| {
+            let decision = briefing.catalog.and_then(|c| c.decision(&d.rule_id));
+            Entry {
+                rule: d.rule_id.clone(),
+                severity: d.severity,
+                authored: authored_severity(d.severity, decision),
+                review: briefing.needs_verdict(d),
+                path: d.file.display().to_string(),
+                line: d.span.start.line,
+                col: d.span.start.col,
+                message: d.message.clone(),
+                symbol: d.symbol.clone(),
+                evidence: d.evidence.clone(),
+                attributes: Map::new(),
+                note: briefing.notes.and_then(|n| n.get(&d.fingerprint)).cloned(),
+                fingerprint: d.fingerprint.as_str().to_owned(),
+                facts: briefing.facts.and_then(|f| f.get(&d.fingerprint)).cloned(),
+                fix: briefing
+                    .fixes
+                    .and_then(|f| f.get(d.fingerprint.as_str()))
+                    .cloned(),
+            }
+        })
+        .collect()
+}
+
+/// One block per finding, then the gaps, a footer naming the reasons review
+/// verdicts accept when a finding asks for review, and the summary.
+fn full_text(diagnostics: &[Diagnostic], incomplete: &[Incomplete], briefing: &Briefing) -> String {
     let (shown, omitted) = select(diagnostics, briefing.limit);
     let width = prefix_len(&shown);
     let mut out = String::new();
@@ -163,12 +302,63 @@ pub(crate) fn text(
     out
 }
 
-/// Builds the [`AgentReport`] that [`json_lines`] prints.
-pub fn agent_report(
+/// The compact fields: the grouped findings with the status and counts of the
+/// whole run, and the gaps.
+fn compact_fields(
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
     briefing: &Briefing,
-) -> AgentReport {
+) -> Map<String, Value> {
+    let grouped = Grouped::of(entries(diagnostics, briefing), &briefing.group_options());
+    let mut fields = grouped.fields();
+    let status = if !incomplete.is_empty() {
+        "incomplete"
+    } else if diagnostics.is_empty() {
+        "clean"
+    } else {
+        "findings"
+    };
+    fields.insert("status".to_owned(), json!(status));
+    fields.insert("counts".to_owned(), counts(diagnostics, briefing));
+    if !incomplete.is_empty() {
+        let gaps: Vec<Value> = incomplete
+            .iter()
+            .map(|item| json!([item.path, item.reason]))
+            .collect();
+        fields.insert("incomplete".to_owned(), Value::Array(gaps));
+    }
+    fields
+}
+
+/// Errors, warnings and findings asking for a verdict always; the other
+/// counts when they are not zero.
+fn counts(diagnostics: &[Diagnostic], briefing: &Briefing) -> Value {
+    let count = |s: Severity| diagnostics.iter().filter(|d| d.severity == s).count();
+    let reviews = diagnostics
+        .iter()
+        .filter(|d| briefing.needs_verdict(d))
+        .count();
+    let mut counts = Map::new();
+    counts.insert("error".to_owned(), json!(count(Severity::Error)));
+    counts.insert("warn".to_owned(), json!(count(Severity::Warn)));
+    counts.insert("review".to_owned(), json!(reviews));
+    for (key, n) in [
+        ("info", count(Severity::Info)),
+        ("suppressed", briefing.suppressed),
+        ("allowed", briefing.allowed),
+    ] {
+        if n > 0 {
+            counts.insert(key.to_owned(), json!(n));
+        }
+    }
+    Value::Object(counts)
+}
+
+fn full_report(
+    diagnostics: &[Diagnostic],
+    incomplete: &[Incomplete],
+    briefing: &Briefing,
+) -> FullReport {
     let (shown, omitted) = select(diagnostics, briefing.limit);
     let width = prefix_len(&shown);
     let findings = shown
@@ -179,7 +369,7 @@ pub fn agent_report(
         .iter()
         .map(|item| json!({ "type": "incomplete", "path": item.path, "reason": item.reason }))
         .collect();
-    AgentReport {
+    FullReport {
         findings,
         incomplete,
         omitted,
@@ -194,12 +384,12 @@ pub fn agent_report(
 /// record when `limit` left findings out, then the summary, each tagged with
 /// `type`. The summary carries the reasons table once, when a shown finding
 /// asks for review.
-pub(crate) fn json_lines(
+fn full_json_lines(
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
     briefing: &Briefing,
 ) -> String {
-    let report = agent_report(diagnostics, incomplete, briefing);
+    let report = full_report(diagnostics, incomplete, briefing);
     let mut lines: Vec<String> = report
         .findings
         .iter()
@@ -286,152 +476,13 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
             .and_then(|notes| notes.get(&diagnostic.fingerprint))
             .cloned(),
         fingerprint: diagnostic.fingerprint.as_str(),
+        fix: briefing
+            .fixes
+            .and_then(|f| f.get(diagnostic.fingerprint.as_str()))
+            .map(|fix| Shown::of(fix).json()),
         resolve: briefing
             .needs_verdict(diagnostic)
             .then(|| resolve(diagnostic, width)),
-    }
-}
-
-/// The canonical valid example for the file's language; else the valid
-/// example whose name (or whose invalid counterpart's) mentions the kind or
-/// visibility of the finding's symbol; else the shortest valid example; else
-/// the decision's tuning note for the language. Each kept short.
-fn expected(decision: &Decision, subject: &Subject, file: &Path) -> Option<Expected> {
-    let valid: Vec<&Example> = decision
-        .examples
-        .iter()
-        .filter(|e| e.kind == ExampleKind::Valid)
-        .filter(|e| subject.language.is_none_or(|l| e.language == l))
-        .collect();
-    let chosen = valid
-        .iter()
-        .find(|e| e.canonical)
-        .map(|e| (*e, "canonical".to_owned()))
-        .or_else(|| matching(decision, &valid, subject))
-        .or_else(|| {
-            let shortest = valid.iter().min_by_key(|e| size(e))?;
-            Some((*shortest, "shortest valid example".to_owned()))
-        });
-    if let Some((example, basis)) = chosen {
-        return Some(from_example(example, basis, file));
-    }
-    let language = subject.language?;
-    let text = decision.languages.get(language)?.tuning.as_ref()?;
-    Some(Expected {
-        source: "tuning",
-        language: language.to_owned(),
-        basis: "tuning".to_owned(),
-        name: None,
-        path: None,
-        excerpt: truncate(&one_line(text), TUNING_CHARS),
-    })
-}
-
-/// The valid example that mentions the most of the subject's kind and
-/// visibility, in its own name or in its invalid counterpart's; none when no
-/// example mentions either.
-fn matching<'a>(
-    decision: &'a Decision,
-    valid: &[&'a Example],
-    subject: &Subject,
-) -> Option<(&'a Example, String)> {
-    let score = |example: &Example| {
-        let counterpart = decision
-            .examples
-            .iter()
-            .filter(|e| e.kind == ExampleKind::Invalid && e.language == example.language)
-            .find(|e| pair_key(&e.name) == pair_key(&example.name))
-            .map_or("", |e| e.name.as_str());
-        let names = format!("{} {counterpart}", example.name).to_lowercase();
-        [subject.kind, subject.visibility]
-            .into_iter()
-            .flatten()
-            .filter(|word| names.contains(*word))
-            .count()
-    };
-    let best = valid
-        .iter()
-        .map(|e| (score(e), *e))
-        .filter(|(score, _)| *score > 0)
-        .max_by_key(|(score, _)| *score)?
-        .1;
-    let kind = subject.kind.unwrap_or("symbol");
-    Some((best, format!("matches kind={kind}")))
-}
-
-/// A name without the words that mark an example valid or invalid, so
-/// `rust-valid` and `rust-invalid` pair up.
-fn pair_key(name: &str) -> String {
-    name.replace("invalid", "").replace("valid", "")
-}
-
-fn size(example: &Example) -> usize {
-    example.files.iter().map(|f| f.text().len()).sum()
-}
-
-fn from_example(example: &Example, basis: String, file: &Path) -> Expected {
-    let extension = file.extension();
-    let chosen = example
-        .files
-        .iter()
-        .find(|f| Path::new(&f.path).extension() == extension)
-        .or(example.files.first());
-    Expected {
-        source: "example",
-        language: example.language.clone(),
-        basis,
-        name: Some(example.name.clone()),
-        path: chosen.map(|f| f.path.clone()),
-        excerpt: chosen.map(|f| excerpt(f.text())).unwrap_or_default(),
-    }
-}
-
-fn excerpt(text: &str) -> String {
-    let lines: Vec<&str> = text.trim_end().lines().collect();
-    let kept = lines[..lines.len().min(EXCERPT_LINES)].join("\n");
-    let cut = truncate(&kept, EXCERPT_CHARS);
-    if lines.len() > EXCERPT_LINES && cut == kept {
-        format!("{cut}\n...")
-    } else {
-        cut
-    }
-}
-
-fn truncate(text: &str, limit: usize) -> String {
-    match text.char_indices().nth(limit) {
-        Some((end, _)) => format!("{}...", &text[..end]),
-        None => text.to_owned(),
-    }
-}
-
-fn one_line(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-/// The evidence without values that repeat the owner symbol, each value cut
-/// to a bounded length.
-fn evidence(evidence: &Value, symbol: Option<&str>) -> Value {
-    let Some(map) = evidence.as_object() else {
-        return evidence.clone();
-    };
-    let kept: Map<String, Value> = map
-        .iter()
-        .filter(|(_, value)| value.as_str().is_none_or(|s| Some(s) != symbol))
-        .map(|(key, value)| (key.clone(), bounded(value)))
-        .collect();
-    if kept.is_empty() {
-        Value::Null
-    } else {
-        Value::Object(kept)
-    }
-}
-
-fn bounded(value: &Value) -> Value {
-    let text = value.to_string();
-    if text.chars().count() > VALUE_CHARS {
-        Value::String(truncate(&text, VALUE_CHARS))
-    } else {
-        value.clone()
     }
 }
 
@@ -442,26 +493,6 @@ fn resolve(diagnostic: &Diagnostic, width: usize) -> Value {
             prefix(diagnostic.fingerprint.as_str(), width)
         ),
     })
-}
-
-fn reasons() -> Value {
-    let verdicts: BTreeMap<&str, Vec<&str>> =
-        [Verdict::Confirmed, Verdict::Rejected, Verdict::Deferred]
-            .into_iter()
-            .map(|v| (v.as_str(), v.reasons().iter().map(|r| r.as_str()).collect()))
-            .collect();
-    json!(verdicts)
-}
-
-fn reasons_line() -> String {
-    [Verdict::Confirmed, Verdict::Rejected, Verdict::Deferred]
-        .into_iter()
-        .map(|v| {
-            let reasons: Vec<&str> = v.reasons().iter().map(|r| r.as_str()).collect();
-            format!("{v}={}", reasons.join("|"))
-        })
-        .collect::<Vec<_>>()
-        .join("; ")
 }
 
 fn block(finding: &Finding, width: usize) -> String {
@@ -510,6 +541,11 @@ fn fields(finding: &Finding, width: usize) -> Vec<(&'static str, String)> {
         fields.push(("expected:", lines.join("\n")));
     }
     fields.extend(finding.note.clone().map(|text| ("note:", text)));
+    if let Some(fix) = &finding.fix {
+        let safety = fix["safety"].as_str().unwrap_or_default();
+        let body = fix["diff"].as_str().or(fix["summary"].as_str());
+        fields.push(("fix:", format!("{safety}\n{}", body.unwrap_or_default())));
+    }
     fields.push((
         "fingerprint:",
         prefix(finding.fingerprint, width).to_owned(),
@@ -532,23 +568,6 @@ fn expected_heading(expected: &Expected) -> String {
             expected.language, expected.basis
         ),
         _ => format!("{} tuning", expected.language),
-    }
-}
-
-/// `key=value` pairs of an evidence object.
-fn evidence_line(evidence: &Value) -> Option<String> {
-    let pairs: Vec<String> = evidence
-        .as_object()?
-        .iter()
-        .map(|(key, value)| format!("{key}={}", evidence_value(value)))
-        .collect();
-    (!pairs.is_empty()).then(|| pairs.join(" "))
-}
-
-fn evidence_value(value: &Value) -> String {
-    match value {
-        Value::String(s) if !s.contains(char::is_whitespace) && !s.is_empty() => s.clone(),
-        other => other.to_string(),
     }
 }
 

@@ -158,7 +158,7 @@ Tuning (rust): The owner of a function or type is the test named after it in sna
 | `ancestor_tests` | `false`; rust: `true` | Count the tests of a module that tests an ancestor module as tests of the nested module too: the integration tests of a Rust crate test all of it, private modules whose items the root re-exports included. |
 | `exempt_methods` | `["String","Error","Unwrap","GoString"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]` | Method names that implement well-known interfaces. |
 | `include_data_types` | `false` | Also require owner tests for types that declare no method; such a type is specified by the functions that build and read it. |
-| `include_internal` | `false` | Also require owner tests for symbols public only inside the project. |
+| `include_internal` | `false`; go: `true` | Also require owner tests for symbols public only inside the project. |
 | `kinds` | `["function","method","type"]` | Kinds of public symbols that need an owner test. Interfaces are tested through their implementations and are left out by default. |
 | `snake_case` | `false`; rust: `true` | Compare names in snake case, as Rust tests are written. |
 | `test_prefix` | `"Test"`; rust: `""` | Prefix of the name of an owner test; a test without it is not one. |
@@ -216,6 +216,7 @@ Tuning (rust): A test is an owner of the item it is named after in snake case. R
 
 | option | default | meaning |
 | --- | --- | --- |
+| `include_internal` | `false`; go: `true` | Also judge symbols public only inside the project. |
 | `snake_case` | `false`; rust: `true` | Compare names in snake case, as Rust tests are written. |
 | `test_prefix` | `"Test"`; rust: `""` | Prefix of the name of an owner test; a test without it is not one. |
 | `variant_tests` | `true`; rust: `false` | Count `TestGet_Missing` as a second owner of `Get`; a name that adds a suffix to the symbol's own name restates the same contract. |

@@ -47,16 +47,16 @@ struct Candidates {
 }
 
 /// A finding's fix, lowered and ready to apply.
-struct Proposal {
+pub(super) struct Proposal {
     fingerprint: Fingerprint,
     rule_id: String,
     /// Where the finding is, for reports.
     file: PathBuf,
     line: u32,
     fixer: String,
-    description: String,
-    safety: Safety,
-    edits: Vec<TextEdit>,
+    pub(super) description: String,
+    pub(super) safety: Safety,
+    pub(super) edits: Vec<TextEdit>,
 }
 
 impl Proposal {
@@ -74,7 +74,7 @@ impl Proposal {
 }
 
 /// The state of one fix run.
-struct Orchestrator<'e> {
+pub(super) struct Orchestrator<'e> {
     engine: &'e Engine,
     plan: &'e FixPlan,
     run: &'e FixRun,
@@ -124,6 +124,25 @@ impl Engine {
         };
         let outcome = orchestrator.rounds();
         orchestrator.finish(outcome)
+    }
+}
+
+impl<'e> Orchestrator<'e> {
+    /// An orchestrator that only proposes: it holds no text and writes nothing.
+    pub(super) fn for_preview(engine: &'e Engine, plan: &'e FixPlan, run: &'e FixRun) -> Self {
+        Self {
+            engine,
+            plan,
+            run,
+            texts: Overlays::new(),
+            original: BTreeMap::new(),
+            states: BTreeSet::new(),
+            trusted: false,
+            applied: Vec::new(),
+            declined: BTreeMap::new(),
+            notes: Vec::new(),
+            rounds: 0,
+        }
     }
 }
 
@@ -396,7 +415,7 @@ impl Orchestrator<'_> {
 
     /// Why a fix may not be applied in this run, if it may not: judged from
     /// the binding alone.
-    fn ineligible(&self, binding: &FixBinding) -> Option<String> {
+    pub(super) fn ineligible(&self, binding: &FixBinding) -> Option<String> {
         if self.run.unsafe_fixes {
             return None;
         }
@@ -466,7 +485,7 @@ impl Orchestrator<'_> {
         }
     }
 
-    fn propose_one(
+    pub(super) fn propose_one(
         &self,
         outcome: &Outcome,
         finding: &Diagnostic,
@@ -842,7 +861,7 @@ impl Orchestrator<'_> {
 }
 
 /// Whether the provider of `language` declares `capability`.
-fn provides(engine: &Engine, language: &str, capability: Capability) -> bool {
+pub(super) fn provides(engine: &Engine, language: &str, capability: Capability) -> bool {
     engine
         .registry
         .languages()

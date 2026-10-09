@@ -11,13 +11,14 @@ pub fn all() -> Vec<Tool> {
     [
         tool(
             "check",
-            "Check the project and report findings as agent records (rule, location, requirement, evidence, expected structure, fingerprint) with a summary. Analysis always covers the whole project; the arguments only narrow what is reported. `status` is `clean` only when nothing is reported AND the analysis was complete: `incomplete` is never a pass.",
+            "Check the project and report findings grouped by decision, then by file: each group carries the rule, severity, requirement, expected structure and shared evidence once, and a finding is `[line:col, message, fingerprintPrefix, {evidence that varies}?]`; counts, gaps, what was omitted and how to resolve come once per response. Analysis always covers the whole project; the arguments only narrow what is reported. `status` is `clean` only when nothing is reported AND the analysis was complete: `incomplete` is never a pass.",
             json!({
                 "paths": { "type": "array", "items": { "type": "string" }, "description": "Report only under these paths (relative to the server's working directory)." },
                 "changed": { "type": "boolean", "description": "Report only files changed in the working tree against HEAD (untracked included)." },
                 "diff": { "type": "string", "description": "Report only files changed since the merge base with this git ref." },
                 "rules": { "type": "array", "items": { "type": "string" }, "description": format!("Run only these rules; {FORMATS}.") },
-                "limit": { "type": "integer", "minimum": 1, "description": "Most findings to return, errors first (default 25)." }
+                "limit": { "type": "integer", "minimum": 1, "description": "Most findings to return, errors first, then larger groups (default 25); `omitted` says what was left out." },
+                "detail": { "type": "string", "enum": ["compact", "full"], "description": "Default `compact`. `full` returns one self-contained record per finding (requirement, intent, evidence, expected structure, resolve command)." }
             }),
             &[],
         ),
@@ -47,12 +48,13 @@ pub fn all() -> Vec<Tool> {
         ),
         tool(
             "review_tasks",
-            "List remembered findings that ask for a verdict (by default the open findings of heuristic and judgment decisions, whatever their severity), each with the fingerprint and `last_seen` that `review_resolve` needs.",
+            "List remembered findings that ask for a verdict (by default the open findings of heuristic and judgment decisions, whatever their severity), grouped by decision, then by file, each as `[line:col, message, fingerprintPrefix, {evidence}?]`. The finding's `last_seen` is its `seen` evidence, which `review_resolve` takes.",
             json!({
                 "status": { "type": "string", "enum": ["open", "suppressed", "narrowing", "inactive", "resolved", "all"], "description": "Default `open`." },
                 "rule": { "type": "string", "description": "Only this rule." },
                 "tier": { "type": "string", "enum": ["review", "all"], "description": "Default `review`: findings that ask for a verdict because their decision is a heuristic or a judgment. `all` lists every remembered finding." },
-                "limit": { "type": "integer", "minimum": 1, "description": "Default 50." }
+                "limit": { "type": "integer", "minimum": 1, "description": "Default 50." },
+                "detail": { "type": "string", "enum": ["compact", "full"], "description": "Default `compact`. `full` returns one record per task with the full fingerprint and `lastSeen`." }
             }),
             &[],
         ),

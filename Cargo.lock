@@ -897,6 +897,7 @@ dependencies = [
  "lighthouse-spec",
  "serde",
  "serde_json",
+ "similar",
  "thiserror",
 ]
 

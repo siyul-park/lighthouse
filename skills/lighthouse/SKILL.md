@@ -17,12 +17,20 @@ judged intentional is remembered with its reason and is not raised again.
 
 1. **Check** the files you changed: MCP tool `check` (with `changed: true`), or
    `lighthouse check --changed --format agent`.
-2. **Understand** each finding: it carries the requirement, the evidence and an
-   expected structure. For more, read the decision: MCP resource
-   `lighthouse://decisions/<id>`, tool `explain`, or `lighthouse explain <id>`.
+2. **Understand** the findings: they come grouped by decision, then by file.
+   A group says once what its decision requires and what the code should look
+   like (`expected`), plus the evidence all its findings share; a finding is
+   `[line:col, message, fingerprint prefix]` with the evidence that sets it
+   apart as an optional fourth element. For more (the intent, every example),
+   read the decision: MCP resource `lighthouse://decisions/<id>`, tool
+   `explain`, or `lighthouse explain <id>`. `detail: "full"` (`--detail full`)
+   returns one self-contained record per finding instead.
 3. **Fix** the code, then **recheck**. Findings of a rule marked `fixable` in
    the digest below can be fixed for you: MCP tool `fix` (by `fingerprints` or
    `paths`, `dryRun` first to see the diff), or `lighthouse check --fix`.
+   A fixable finding carries its fix as a unified diff (`fix`) and its group an
+   `apply` command: prefer `check --fix` for safe fixes, and read the diff of a
+   suggested one before applying it.
    Only safe fixes of mechanical rules apply by default; `unsafeFixes` also
    applies suggested ones. Every fix is verified and rolled back if it makes
    the file worse. Review the diff like any other change. A run that reports `incomplete` did not
@@ -33,8 +41,9 @@ judged intentional is remembered with its reason and is not raised again.
    (reason `fixed` or `accepted-debt`); `rejected` means it is wrong or
    intentional and needs a reason (`false-positive`, `intentional-exception`,
    `scope-too-broad`, `project-allowed`, `not-worth-fixing`) and a note that
-   says why, written for the next reader. Pass `seen` from the finding so a
-   verdict is refused if the finding changed under you.
+   says why, written for the next reader. Pass `seen` (the `seen` evidence of a
+   review task) so a verdict is refused if the finding changed under you. A
+   fingerprint prefix as shown names the finding; an ambiguous one is refused.
 
 ## Rules of conduct
 

@@ -1,3 +1,4 @@
+# testing/owner-test and testing/single-owner-test moved on purpose: their Go options now include internal packages (include_internal), and options are part of the meaning, so verdicts recorded on them expire.
 core/max-file-lines	6bc840cb56d2e387
 core/split-by-cohesion	69fc9f0c91230ae3
 core/allow-annotation	5751d64761c3ae2a
@@ -78,8 +79,8 @@ testing/no-private-symbol-access	63c24dbf6a3b7dd6
 testing/no-hiding-wrappers	c522a5d0cce70248
 testing/simple-table-data	4a59dea6adad69c2
 testing/standard-assertions	373243f6121c58cb
-testing/owner-test	3fe2b031ca7156b7
-testing/single-owner-test	df63ac3ee95223b6
+testing/owner-test	64e315eb4fa39314
+testing/single-owner-test	eeba98ab051ee16f
 testing/test-file-layout	2a40629cf0dbe0be
 testing/case-depth	23bfad72e7f2a03e
 testing/table-for-same-behavior	004c0355f2f5f33b

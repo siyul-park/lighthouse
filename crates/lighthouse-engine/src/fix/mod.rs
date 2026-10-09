@@ -7,6 +7,7 @@
 mod diff;
 mod edits;
 mod lower;
+mod preview;
 mod run;
 mod scan;
 
@@ -21,6 +22,7 @@ use lighthouse_plugin::FixDecision;
 use lighthouse_spec::{Catalog, FixKind};
 
 pub use diff::unified_diff;
+pub use preview::{FixPreview, PreviewEdit};
 
 use crate::Outcome;
 
@@ -47,6 +49,8 @@ pub struct FixBinding {
 #[derive(Debug, Clone, Default)]
 pub struct FixPlan {
     bindings: BTreeMap<String, FixBinding>,
+    /// The rules whose fixer runs a program, which needs the project's trust.
+    commands: BTreeSet<String>,
 }
 
 impl FixPlan {
@@ -57,6 +61,9 @@ impl FixPlan {
         let mut plan = Self::default();
         for decision in catalog.decisions() {
             let Some(fix) = &decision.fix else { continue };
+            if matches!(fix.kind, FixKind::Command(_)) {
+                plan.commands.insert(decision.id().to_owned());
+            }
             plan.insert(
                 decision.id(),
                 FixBinding {
@@ -81,6 +88,11 @@ impl FixPlan {
     /// Names `binding` as the fix of `rule`.
     pub fn insert(&mut self, rule: impl Into<String>, binding: FixBinding) {
         self.bindings.insert(rule.into(), binding);
+    }
+
+    /// Whether the fixer of `rule` runs a program.
+    pub fn runs_command(&self, rule: &str) -> bool {
+        self.commands.contains(rule)
     }
 
     /// How the findings of `rule` are fixed, if they are.

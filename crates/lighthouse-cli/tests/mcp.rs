@@ -219,24 +219,51 @@ fn the_server_lists_its_tools_and_resources() {
     assert!(missing["error"].is_object(), "{missing}");
 }
 
+/// The rules of the groups of a compact report.
+fn rules_of(report: &Value) -> Vec<&str> {
+    report["groups"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|g| g["rule"].as_str().unwrap())
+        .collect()
+}
+
+/// How many findings the groups of a compact report hold.
+fn shown(report: &Value) -> usize {
+    report["groups"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|g| g["files"].as_object().unwrap().values())
+        .map(|rows| rows.as_array().unwrap().len())
+        .sum()
+}
+
 #[test]
 fn check_reports_findings_and_never_calls_an_incomplete_run_clean() {
     let dir = rust_project();
     let mut client = Client::start(dir.path());
     let found = client.tool("check", json!({})).unwrap();
     assert_eq!(found["status"], "findings");
-    let rules: Vec<&str> = found["findings"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|f| f["rule"].as_str().unwrap())
-        .collect();
-    assert!(rules.contains(&"design/exported-doc"), "{rules:?}");
-    assert!(found["summary"]["warnings"].as_u64().unwrap() >= 1);
+    assert!(rules_of(&found).contains(&"design/exported-doc"), "{found}");
+    assert!(found["counts"]["warn"].as_u64().unwrap() >= 1);
+    assert!(found.get("summary").is_none() && found.get("findings").is_none());
 
     let limited = client.tool("check", json!({ "limit": 1 })).unwrap();
-    assert_eq!(limited["findings"].as_array().unwrap().len(), 1);
-    assert!(limited["omitted"].as_u64().unwrap() >= 1);
+    assert_eq!(shown(&limited), 1);
+    assert!(limited["omitted"]["findings"].as_u64().unwrap() >= 1);
+
+    let full = client.tool("check", json!({ "detail": "full" })).unwrap();
+    let records = full["findings"].as_array().unwrap();
+    assert!(records.iter().any(|f| f["rule"] == "design/exported-doc"));
+    assert!(records[0]["location"]["line"].is_u64(), "{full}");
+    assert!(full["summary"]["warnings"].as_u64().unwrap() >= 1);
+    assert!(
+        client
+            .tool("check", json!({ "detail": "verbose" }))
+            .is_err()
+    );
 
     fs::write(dir.path().join("src/lib.rs"), "fn (((\n").unwrap();
     let broken = client.tool("check", json!({})).unwrap();
@@ -252,52 +279,79 @@ fn a_verdict_recorded_through_mcp_is_an_agent_review_that_later_checks_honor() {
     let mut client = Client::start(dir.path());
     client.tool("check", json!({})).unwrap();
     let tasks = client.tool("review_tasks", json!({})).unwrap();
-    let task = &tasks["tasks"][0];
-    assert_eq!(task["rule"], "design/private-helper-callers", "{tasks}");
-    let fingerprint = task["fingerprint"].as_str().unwrap();
-    let seen = task["lastSeen"].as_str().unwrap();
+    let group = tasks["groups"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|g| g["rule"] == "design/private-helper-callers")
+        .unwrap_or_else(|| panic!("{tasks}"));
+    let (path, rows) = group["files"].as_object().unwrap().iter().next().unwrap();
+    let instance = &rows[0];
+    let prefix = instance[2].as_str().unwrap();
+    assert_eq!(prefix.len(), 7, "{path} {instance}");
+    let seen = group["evidence"]["seen"]
+        .as_str()
+        .or_else(|| instance[3]["seen"].as_str())
+        .unwrap();
+    assert!(tasks["resolve"].is_string() && tasks["reasons"].is_object());
 
+    let full = client
+        .tool("review_tasks", json!({ "detail": "full" }))
+        .unwrap();
+    let task = full["tasks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["rule"] == "design/private-helper-callers")
+        .unwrap();
+    let fingerprint = task["fingerprint"].as_str().unwrap();
+    assert!(fingerprint.starts_with(prefix));
+    assert_eq!(task["lastSeen"], seen);
+
+    let ambiguous = client
+        .tool(
+            "review_resolve",
+            json!({ "fingerprint": "", "verdict": "deferred" }),
+        )
+        .unwrap_err();
+    assert!(ambiguous.contains("matches several"), "{ambiguous}");
     let stale = client.tool(
         "review_resolve",
-        json!({ "fingerprint": fingerprint, "verdict": "rejected", "reason": "intentional-exception",
+        json!({ "fingerprint": prefix, "verdict": "rejected", "reason": "intentional-exception",
                 "seen": "1999-01-01T00:00:00Z" }),
     );
     assert!(stale.is_err());
     let no_reason = client.tool(
         "review_resolve",
-        json!({ "fingerprint": fingerprint, "verdict": "rejected" }),
+        json!({ "fingerprint": prefix, "verdict": "rejected" }),
     );
     assert!(no_reason.is_err());
 
     let done = client
         .tool(
             "review_resolve",
-            json!({ "fingerprint": fingerprint, "verdict": "rejected",
+            json!({ "fingerprint": prefix, "verdict": "rejected",
                     "reason": "intentional-exception", "note": "named policy", "seen": seen }),
         )
         .unwrap();
     assert_eq!(done["recorded"]["reviewer"], "agent:test-agent");
+    assert_eq!(done["recorded"]["fingerprint"], fingerprint);
     assert_eq!(done["standing"], "suppressed");
 
     let history = client
-        .tool("review_history", json!({ "fingerprint": fingerprint }))
+        .tool("review_history", json!({ "fingerprint": prefix }))
         .unwrap();
     let event = &history["events"][0];
     assert_eq!(event["reviewerKind"], "agent");
     assert_eq!(event["reasonText"], "named policy");
 
     let after = client.tool("check", json!({})).unwrap();
-    let still: Vec<&str> = after["findings"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|f| f["rule"].as_str().unwrap())
-        .collect();
+    let still = rules_of(&after);
     assert!(
         !still.contains(&"design/private-helper-callers"),
         "{still:?}"
     );
-    assert_eq!(after["summary"]["suppressed"], 1);
+    assert_eq!(after["counts"]["suppressed"], 1);
 }
 
 #[test]
@@ -492,12 +546,7 @@ fn fix_previews_with_dry_run_then_applies_and_reports_both_lists() {
         ORDERED
     );
     let after = client.tool("check", json!({})).unwrap();
-    let rules: Vec<&str> = after["findings"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter_map(|f| f["rule"].as_str())
-        .collect();
+    let rules = rules_of(&after);
     assert!(!rules.contains(&"design/declaration-groups"), "{rules:?}");
 }
 
@@ -508,13 +557,13 @@ fn fix_selects_by_fingerprint_and_holds_suggestions_back_until_asked() {
     fs::write(dir.path().join("src/lib.rs"), banner).unwrap();
     let mut client = Client::start(dir.path());
     let found = client.tool("check", json!({})).unwrap();
-    let finding = found["findings"]
+    let banners = found["groups"]
         .as_array()
         .unwrap()
         .iter()
-        .find(|f| f["rule"] == "design/section-banners")
+        .find(|g| g["rule"] == "design/section-banners")
         .unwrap_or_else(|| panic!("{found}"));
-    let fingerprint = finding["fingerprint"].as_str().unwrap();
+    let fingerprint = banners["files"]["src/lib.rs"][0][2].as_str().unwrap();
 
     let held = client
         .tool("fix", json!({ "fingerprints": [fingerprint] }))

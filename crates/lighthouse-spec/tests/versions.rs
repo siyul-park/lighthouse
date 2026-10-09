@@ -269,7 +269,7 @@ const LEGACY: &str = include_str!("legacy-semantic-versions.tsv");
 #[test]
 fn migrated_decisions_keep_the_semantic_version_their_verdicts_were_recorded_under() {
     let mut seen = 0;
-    for line in LEGACY.lines() {
+    for line in LEGACY.lines().filter(|l| !l.starts_with('#')) {
         let (id, version) = line.split_once('\t').unwrap();
         let decision = bundled(id);
         assert_eq!(

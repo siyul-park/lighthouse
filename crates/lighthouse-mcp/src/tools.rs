@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use lighthouse_engine::active_rules;
-use lighthouse_report::agent_report;
+use lighthouse_report::{Briefing, Detail, agent_report};
 use lighthouse_session::{CheckRequest, Session, decision_rows, explain};
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
@@ -33,6 +33,7 @@ struct CheckArgs {
     #[serde(default)]
     rules: Vec<String>,
     limit: Option<usize>,
+    detail: Option<Detail>,
 }
 
 #[derive(Deserialize)]
@@ -131,21 +132,34 @@ fn check(args: CheckArgs) -> Outcome {
     let checked = lighthouse_session::check(session, &request).map_err(fail)?;
     let outcome = &checked.outcome;
     let limit = Some(args.limit.unwrap_or(DEFAULT_LIMIT));
+    let detail = args.detail.unwrap_or_default();
+    let fixes = checked.shown_fixes(limit, detail);
     let report = agent_report(
         &outcome.diagnostics,
         &outcome.incomplete,
-        &checked.briefing(limit),
+        &Briefing {
+            detail,
+            fixes: Some(&fixes),
+            mcp: true,
+            ..checked.briefing(limit)
+        },
     );
-    let summary = checked.summary();
-    Ok(json!({
-        "status": summary.status,
-        "findings": report.findings,
-        "incomplete": report.incomplete,
-        "omitted": report.omitted,
-        "summary": summary,
-        "reasons": report.reasons,
-        "messages": checked.messages,
-    }))
+    let mut body = report.fields;
+    match detail {
+        Detail::Compact => {
+            if !checked.messages.is_empty() {
+                body.insert("messages".to_owned(), json!(checked.messages));
+            }
+        }
+        Detail::Full => {
+            let summary = checked.summary();
+            body.insert("status".to_owned(), json!(summary.status));
+            body.insert("summary".to_owned(), json!(summary));
+            body.insert("messages".to_owned(), json!(checked.messages));
+            body.entry("reasons").or_insert(Value::Null);
+        }
+    }
+    Ok(Value::Object(body))
 }
 
 fn explain_tool(args: ExplainArgs) -> Outcome {
