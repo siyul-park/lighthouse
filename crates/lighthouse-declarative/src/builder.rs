@@ -7,6 +7,7 @@
 use std::{
     cell::OnceCell,
     collections::{BTreeMap, BTreeSet},
+    sync::Arc,
 };
 
 use lighthouse_metrics::{
@@ -19,7 +20,13 @@ use lighthouse_model::{
 use lighthouse_plugin::{Ctx, Error, KeyCtx, OrderKey};
 use serde_json::{Map, Value, json};
 
-use crate::{facts, layout, library::Needs, naming::Naming};
+use crate::{
+    eval::{Fact, cel_fact, with_entries},
+    facts, layout,
+    library::Needs,
+    naming::{Naming, Tests},
+    table::Table,
+};
 
 /// The analyzers a check needs when its expressions call `metrics`.
 pub(crate) const METRIC_ANALYZERS: [&str; 5] = [SIZE, CYCLOMATIC, COGNITIVE, NESTING, FAN];
@@ -41,9 +48,10 @@ pub(crate) struct Builder<'a> {
     options: &'a Map<String, Value>,
     rule: &'a str,
     language: String,
-    naming: Option<Naming>,
+    naming: Option<Tests<'a>>,
     keys: Vec<(String, &'a dyn OrderKey)>,
     measures: Option<Measures>,
+    table: Arc<Table>,
     first_test: OnceCell<Option<Value>>,
 }
 
@@ -72,9 +80,11 @@ impl<'a> Builder<'a> {
             language: ctx
                 .file
                 .map_or_else(String::new, |(file, _)| file.lang.clone()),
-            naming: Naming::from_options(options),
+            naming: Naming::from_options(options)
+                .map(|naming| Tests::new(naming, ctx.project, ctx.memo.slot())),
             keys,
             measures,
+            table: ctx.memo.slot(),
             first_test: OnceCell::new(),
         })
     }
@@ -113,20 +123,37 @@ impl<'a> Builder<'a> {
         value
     }
 
-    /// A symbol with its function summary, or `None` for one without a body.
-    pub(crate) fn function(&self, symbol: &Symbol) -> Option<Value> {
-        let summary = self.project.function(&symbol.id)?;
-        let mut value = facts::function(self.project, symbol)?;
-        self.enrich(&mut value, symbol, Some(summary));
-        Some(value)
+    /// Like [`Builder::symbol`], in the form the CEL runtime holds it; the
+    /// base fields are built once per run for all checks.
+    pub(crate) fn symbol_fact(&self, symbol: &Symbol) -> Fact {
+        let extras = self.extras(symbol, self.project.function(&symbol.id));
+        let base = || Some(cel_fact(&facts::symbol(self.project, symbol)));
+        self.table
+            .symbols
+            .with(&symbol.id, base, |base| {
+                with_entries(base.as_ref(), &extras)
+            })
+            .unwrap_or_else(|| cel_fact(&Value::Null))
     }
 
-    /// A test case as a test value.
-    pub(crate) fn test(&self, symbol: &Symbol) -> Option<Value> {
+    /// Like [`Builder::function`], in the form the CEL runtime holds it.
+    pub(crate) fn function_fact(&self, symbol: &Symbol) -> Option<Fact> {
+        let summary = self.project.function(&symbol.id)?;
+        let extras = self.extras(symbol, Some(summary));
+        let base = || facts::function(self.project, symbol).map(|v| cel_fact(&v));
+        self.table.functions.with(&symbol.id, base, |base| {
+            with_entries(base.as_ref(), &extras)
+        })
+    }
+
+    /// Like [`Builder::test`], in the form the CEL runtime holds it.
+    pub(crate) fn test_fact(&self, symbol: &Symbol) -> Option<Fact> {
         let case = self.project.test(&symbol.id)?;
-        let mut value = facts::test(self.project, symbol, case);
-        self.enrich(&mut value, symbol, self.project.function(&symbol.id));
-        Some(value)
+        let extras = self.extras(symbol, self.project.function(&symbol.id));
+        let base = || Some(cel_fact(&facts::test(self.project, symbol, case)));
+        self.table.tests.with(&symbol.id, base, |base| {
+            with_entries(base.as_ref(), &extras)
+        })
     }
 
     /// A file with the facts about its text and its symbols.
@@ -153,9 +180,16 @@ impl<'a> Builder<'a> {
     }
 
     fn enrich(&self, value: &mut Value, symbol: &Symbol, summary: Option<&FunctionSummary>) {
-        let Some(map) = value.as_object_mut() else {
-            return;
-        };
+        if let Some(map) = value.as_object_mut() {
+            map.extend(self.extras(symbol, summary));
+        }
+    }
+
+    /// The fields on top of the base fields of a symbol, which only the
+    /// expressions of this check ask for.
+    fn extras(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> Map<String, Value> {
+        let mut extras = Map::new();
+        let map = &mut extras;
         let project = self.project;
         let needs = self.needs;
         if needs.function("metrics") {
@@ -189,6 +223,7 @@ impl<'a> Builder<'a> {
             map.insert("__ranks".to_owned(), self.ranks(symbol));
         }
         self.facts(map, symbol, summary);
+        extras
     }
 
     fn facts(
@@ -334,7 +369,7 @@ impl<'a> Builder<'a> {
         };
         Value::Array(
             naming
-                .credited_tests(self.project, symbol)
+                .credited_tests(symbol)
                 .into_iter()
                 .map(|(case, kind)| {
                     json!({

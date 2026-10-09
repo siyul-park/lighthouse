@@ -80,6 +80,7 @@ fn run<T: DeserializeOwned>(project: &Project, analyzer: &str, path: &str) -> Ve
         facts: &facts,
         keys: &lighthouse_plugin::NoKeys,
         trusted: false,
+        memo: &lighthouse_plugin::Memo::default(),
     };
     serde_json::from_value(analyzer.run(&ctx).unwrap()).unwrap()
 }
@@ -315,6 +316,7 @@ fn read_maps_the_metric_fact_by_function_and_fails_when_it_is_missing() {
         facts: &facts,
         keys: &lighthouse_plugin::NoKeys,
         trusted: false,
+        memo: &lighthouse_plugin::Memo::default(),
     };
 
     let by_function = lighthouse_metrics::read::<u32>(&ctx, CYCLOMATIC).unwrap();

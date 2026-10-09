@@ -1,4 +1,5 @@
 mod fix;
+mod memo;
 mod registry;
 
 use std::{collections::BTreeMap, path::PathBuf};
@@ -15,6 +16,7 @@ pub use fix::{
     FixDecision, FixRequest, Fixer, FixerManifest, KeyCtx, NoKeys, OrderKey, OrderKeyManifest,
     OrderKeySpec, OrderKeys,
 };
+pub use memo::Memo;
 pub use registry::{Registry, plugin_of};
 
 /// Why registering a plugin, resolving analyzers, reading facts or running a
@@ -100,6 +102,8 @@ pub struct Ctx<'a> {
     /// The user trusts the project to run the commands it names. The user
     /// decides that, never the repository.
     pub trusted: bool,
+    /// Values the rules of this run share, so that each is computed once.
+    pub memo: &'a Memo,
 }
 
 /// Layout conventions a language declares; the engine applies them to every file of that language.

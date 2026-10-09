@@ -17,6 +17,7 @@ mod local;
 mod naming;
 mod ops;
 mod rule;
+mod table;
 mod text;
 
 use fix::SpecFixer;

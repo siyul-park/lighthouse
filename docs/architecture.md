@@ -230,6 +230,25 @@ config names, like build scripts (see the trust model in
 Exit codes: 0 clean, 1 findings, 2 usage or runtime error (a configured plugin
 that cannot start is one), 3 incomplete.
 
+## Speed and determinism
+
+A run does the work that is independent in parallel and the rest once. Language
+providers index side by side (`lang-go` also loads its nested modules
+concurrently); files are checked in parallel, each by every rule that applies to
+it, and project-scope rules in parallel with them. What each step returns is
+gathered in a fixed order (files in path order, rules in id order), so findings,
+fingerprints and exit codes are the same on every run whatever the schedule;
+identity and fingerprint assignment run after the findings are collected and
+ordered. What several rules would compute alike is computed once per run and
+shared through `Ctx::memo`: the base facts of a symbol that CEL checks read, and
+the versions of a decision that the store records with each finding. Set
+`RAYON_NUM_THREADS=1` to run on one worker.
+
+`lighthouse check --timings` prints where a run's time went to stderr, one
+`timings:` line per phase: setup, read, each provider's index, merge, each
+analyzer, the rules (wall clock, then the five slowest rules summed over the
+files they ran on), identity, store, report and the total.
+
 ## Memory: findings, verdicts and the feedback loop
 
 Memory has two parts with different owners. **Sightings** (what `check` saw, when, with

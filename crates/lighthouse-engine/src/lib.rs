@@ -4,6 +4,7 @@ mod fix;
 mod identity;
 mod subject;
 mod tester;
+mod timings;
 
 pub use annotations::Allowed;
 pub use engine::{
@@ -14,3 +15,4 @@ pub use fix::{
     MAX_ROUNDS, PreviewEdit, unified_diff,
 };
 pub use tester::RuleTester;
+pub use timings::Timings;

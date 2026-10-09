@@ -1,7 +1,15 @@
 //! Evaluating the CEL of a check: compiled programs, message templates, and
 //! the frame in which one selected value is judged.
 
-use cel::{Context, Program};
+use std::collections::HashMap;
+
+use cel::{
+    Context, Program,
+    common::{
+        types::{CelMap, CelMapKey, CelNull, CelString},
+        value::Val,
+    },
+};
 use lighthouse_plugin::Error as PluginError;
 use serde_json::{Map, Value};
 
@@ -53,8 +61,12 @@ impl<'a> Frame<'a> {
     }
 
     pub(crate) fn set(&mut self, name: &str, value: &Value) -> Result<(), PluginError> {
-        self.context.add_variable_from_value(name, cel_value(value));
+        self.set_fact(name, cel_fact(value));
         Ok(())
+    }
+
+    pub(crate) fn set_fact(&mut self, name: &str, value: Fact) {
+        self.context.add_variable_as_val(name, value);
     }
 
     pub(crate) fn set_cel(&mut self, name: &str, value: cel::Value) {
@@ -114,6 +126,10 @@ impl<'a> Frame<'a> {
         PluginError::Incomplete(format!("{}: execution error: {message}", self.rule))
     }
 }
+
+/// A variable as the CEL runtime holds it. Cloning one copies what it holds,
+/// which is cheaper than converting a JSON value anew for every judgment.
+pub(crate) type Fact = Box<dyn Val>;
 
 /// Compiles `source`, naming `rule` and `what` in the error.
 pub(crate) fn compile(rule: &str, what: &str, source: &str) -> Result<Program, Error> {
@@ -188,4 +204,29 @@ pub(crate) fn cel_value(value: &Value) -> cel::Value {
                 .collect::<HashMap<String, cel::Value>>(),
         )),
     }
+}
+
+/// A JSON value as a variable of the CEL runtime.
+pub(crate) fn cel_fact(value: &Value) -> Fact {
+    Fact::try_from(cel_value(value)).unwrap_or_else(|_| Box::new(CelNull))
+}
+
+/// A copy of the map `base` with the entries of `extra` set over it; a copy
+/// of `base` itself when `base` is no map or `extra` is empty.
+pub(crate) fn with_entries(base: &dyn Val, extra: &Map<String, Value>) -> Fact {
+    let Some(map) = base.downcast_ref::<CelMap>().filter(|_| !extra.is_empty()) else {
+        return base.clone_as_boxed();
+    };
+    let mut entries: HashMap<CelMapKey, Fact> = map
+        .inner()
+        .iter()
+        .map(|(key, value)| (key.clone(), value.clone_as_boxed()))
+        .collect();
+    for (key, value) in extra {
+        entries.insert(
+            CelMapKey::String(CelString::from(key.as_str())),
+            cel_fact(value),
+        );
+    }
+    Box::new(CelMap::from(entries))
 }

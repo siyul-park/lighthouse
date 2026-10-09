@@ -66,6 +66,7 @@ fn measure(plugin: &Path, analyzer: &str, source: &str) -> BTreeMap<String, u32>
         facts: &facts,
         keys: &lighthouse_plugin::NoKeys,
         trusted: false,
+        memo: &lighthouse_plugin::Memo::default(),
     };
     let analyzer = registry.order([analyzer]).unwrap().remove(0);
     let value: Value = analyzer.run(&ctx).unwrap();

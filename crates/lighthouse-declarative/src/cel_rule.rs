@@ -12,7 +12,7 @@ use serde_json::{Map, Value};
 use crate::{
     Error,
     builder::{Builder, METRIC_ANALYZERS},
-    eval::{Frame, Template, compile, compile_all},
+    eval::{Fact, Frame, Template, cel_fact, compile, compile_all},
     facts,
     library::{self, Needs},
 };
@@ -27,6 +27,7 @@ pub(crate) struct CelRule {
     at: Option<At>,
     identity: Option<Identity>,
     needs: Needs,
+    library: cel::Context<'static>,
 }
 
 struct At {
@@ -104,6 +105,7 @@ impl CelRule {
                 })
                 .transpose()?,
             needs: Needs::of(sources),
+            library: library::context(),
         })
     }
 
@@ -127,8 +129,7 @@ impl CelRule {
             rule: self,
             meta,
             builder,
-            base: library::context(),
-            options,
+            options: cel_fact(&Value::Object(options.clone())),
         };
         match meta.scope {
             lighthouse_plugin::Scope::File => run.check_file(ctx),
@@ -141,8 +142,7 @@ struct Run<'a> {
     rule: &'a CelRule,
     meta: &'a RuleManifest,
     builder: Builder<'a>,
-    base: cel::Context<'static>,
-    options: &'a Map<String, Value>,
+    options: Fact,
 }
 
 impl Run<'_> {
@@ -154,43 +154,43 @@ impl Run<'_> {
         let mut found = Vec::new();
         match self.rule.select {
             Select::File => {
-                let value = self.builder.file(file, text);
+                let value = cel_fact(&self.builder.file(file, text));
                 let anchor = Place {
                     file: file.path.clone(),
                     span: top_of_file(),
                     symbol: None,
                 };
-                found.extend(self.judge(&value, anchor, &file.path.to_string_lossy())?);
+                found.extend(self.judge(value, anchor, &file.path.to_string_lossy())?);
             }
             Select::Symbol => {
                 for symbol in project.symbols_in(&file.path) {
-                    let value = self.builder.symbol(symbol);
-                    found.extend(self.judge_symbol(symbol, &value)?);
+                    let value = self.builder.symbol_fact(symbol);
+                    found.extend(self.judge_symbol(symbol, value)?);
                 }
             }
             Select::Function => {
                 for symbol in project.symbols_in(&file.path) {
-                    if let Some(value) = self.builder.function(symbol) {
-                        found.extend(self.judge_symbol(symbol, &value)?);
+                    if let Some(value) = self.builder.function_fact(symbol) {
+                        found.extend(self.judge_symbol(symbol, value)?);
                     }
                 }
             }
             Select::Test => {
                 for symbol in project.symbols_in(&file.path) {
-                    if let Some(value) = self.builder.test(symbol) {
-                        found.extend(self.judge_symbol(symbol, &value)?);
+                    if let Some(value) = self.builder.test_fact(symbol) {
+                        found.extend(self.judge_symbol(symbol, value)?);
                     }
                 }
             }
             Select::Comment => {
                 for comment in project.comments_in(&file.path) {
-                    let value = self.builder.comment(comment, text);
+                    let value = cel_fact(&self.builder.comment(comment, text));
                     let place = Place {
                         file: file.path.clone(),
                         span: comment.span,
                         symbol: None,
                     };
-                    found.extend(self.judge(&value, place, &comment.text)?);
+                    found.extend(self.judge(value, place, &comment.text)?);
                 }
             }
             Select::Edge | Select::Module => {}
@@ -210,13 +210,13 @@ impl Run<'_> {
                         continue;
                     };
                     let files = files_of.get(module.path.as_str()).map_or(0, BTreeSet::len);
-                    let value = facts::module(module, files, *count);
+                    let value = cel_fact(&facts::module(module, files, *count));
                     let place = Place {
                         file: anchor.file.clone(),
                         span: top_of_file(),
                         symbol: None,
                     };
-                    found.extend(self.judge(&value, place, &module.path)?);
+                    found.extend(self.judge(value, place, &module.path)?);
                 }
             }
             Select::Edge => {
@@ -226,14 +226,14 @@ impl Run<'_> {
                         Node::Module(m) => first_file.get(m.as_str()).map(|(s, _)| *s),
                     };
                     let Some(anchor) = anchor else { continue };
-                    let value = facts::edge(project, edge);
+                    let value = cel_fact(&facts::edge(project, edge));
                     let key = format!("{:?}->{:?}", edge.from, edge.to);
                     let place = Place {
                         file: anchor.file.clone(),
                         span: anchor.span,
                         symbol: None,
                     };
-                    found.extend(self.judge(&value, place, &key)?);
+                    found.extend(self.judge(value, place, &key)?);
                 }
             }
             _ => {}
@@ -244,7 +244,7 @@ impl Run<'_> {
     fn judge_symbol(
         &self,
         symbol: &Symbol,
-        value: &Value,
+        value: Fact,
     ) -> Result<Option<Diagnostic>, PluginError> {
         let place = Place {
             file: symbol.file.clone(),
@@ -258,14 +258,14 @@ impl Run<'_> {
     /// `place` unless the check says otherwise.
     fn judge(
         &self,
-        value: &Value,
+        value: Fact,
         place: Place,
         key: &str,
     ) -> Result<Option<Diagnostic>, PluginError> {
         let rule = self.rule;
-        let mut frame = Frame::new(&self.meta.id, &self.base);
-        frame.set(rule.select.variable(), value)?;
-        frame.options(self.options)?;
+        let mut frame = Frame::new(&self.meta.id, &rule.library);
+        frame.set_fact(rule.select.variable(), value);
+        frame.set_fact("options", self.options.clone_as_boxed());
         for (name, program) in &rule.bindings {
             let bound = frame.run(program)?;
             frame.set_cel(name, bound);

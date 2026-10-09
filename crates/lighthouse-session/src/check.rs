@@ -3,6 +3,7 @@
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
+    time::Instant,
 };
 
 use lighthouse_engine::{Engine, FixPlan, Outcome};
@@ -179,6 +180,7 @@ impl Checked {
 /// Analyzes the project, reports what `request` selects and, when asked,
 /// records the run and drops the findings that verdicts keep out.
 pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
+    let started = Instant::now();
     let (registry, plugins) = session.registry()?;
     let trusted = session.trusted();
     let root = session.root.clone();
@@ -186,14 +188,18 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     let engine = Engine::new(registry, session.config, &root)?
         .with_incomplete(plugins.incomplete)
         .with_trust(trusted);
+    let setup = started.elapsed();
     let mut messages = Vec::new();
     let mut outcome = analyze(&engine, &root, request, &mut messages)?;
+    outcome.timings.setup = setup;
     messages.extend(plugins.notices.iter().chain(&outcome.notices).cloned());
+    let started = Instant::now();
     let remembered = if request.store {
         findings::remember(&root, &catalog, &mut outcome)
     } else {
         Remembered::default()
     };
+    outcome.timings.store = started.elapsed();
     messages.extend(remembered.messages.iter().cloned());
     if !outcome.allowed.is_empty() {
         messages.push(format!(
