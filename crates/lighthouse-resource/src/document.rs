@@ -44,20 +44,6 @@ pub fn documents(format: Format, path: &str, text: &str) -> Result<Vec<Value>, E
     }
 }
 
-/// The documents of YAML `text` with their keys in the order written, for
-/// tools that rewrite a document and keep it readable. Empty documents are
-/// skipped.
-pub fn yaml_values(path: &str, text: &str) -> Result<Vec<serde_norway::Value>, Error> {
-    let mut docs = Vec::new();
-    for doc in serde_norway::Deserializer::from_str(text) {
-        let value = serde_norway::Value::deserialize(doc).map_err(|e| Error::parse(path, e))?;
-        if !value.is_null() {
-            docs.push(value);
-        }
-    }
-    Ok(docs)
-}
-
 /// The `kind` a parsed document declares.
 pub fn kind_of(document: &Value) -> Option<&str> {
     document.get("kind")?.as_str()

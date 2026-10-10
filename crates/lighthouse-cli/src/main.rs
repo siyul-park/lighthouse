@@ -87,10 +87,10 @@ enum Command {
         #[arg(long, default_value = "compact")]
         detail: Detail,
         /// Do not record this run in `.lighthouse/lighthouse.db` and do not
-        /// apply review verdicts. By default a run is recorded: findings it
+        /// apply judgments. By default a run is recorded: findings it
         /// no longer reports in the reported scope are marked resolved (never
         /// when the analysis was incomplete), and findings whose latest
-        /// verdict is a rejection stay out of the report.
+        /// judgment hides them stay out of the report.
         #[arg(long)]
         no_store: bool,
         /// Fail on warnings too.
@@ -132,11 +132,11 @@ enum Command {
         #[arg(long)]
         config: Option<PathBuf>,
     },
-    /// Review the findings `check` remembers and record verdicts on them.
+    /// Review the findings `check` remembers and record judgments on them.
     ///
     /// Exit codes of every subcommand: 0 on success, 2 on a usage or runtime
-    /// error (unknown or ambiguous fingerprint, a reason that does not fit the
-    /// verdict, a finding seen again since --seen, an unusable store).
+    /// error (unknown or ambiguous fingerprint, a suppression that does not fit the
+    /// judgment, a finding seen again since --seen, an unusable store).
     Review {
         #[command(subcommand)]
         command: ReviewCommand,
@@ -199,7 +199,7 @@ enum Command {
     },
     /// Serve the Model Context Protocol on stdio, for coding agents: tools to
     /// check, explain, review and author decisions, and resources for the
-    /// catalog. Verdicts recorded through it are reviews by an `agent`
+    /// catalog. Judgments recorded through it are attributed to a `SoftwareAgent`
     /// (the id is $LIGHTHOUSE_REVIEWER, else the client's name).
     Mcp,
     /// Entry points for agent hooks. Reads the hook payload on stdin.

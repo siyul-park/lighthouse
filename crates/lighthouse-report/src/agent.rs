@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Severity, Suppressed, needs_review};
+use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Severity, Suppressed};
 use lighthouse_spec::{Catalog, authored_severity};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
@@ -111,7 +111,7 @@ impl Briefing<'_> {
         let judged = self
             .judged
             .is_some_and(|judged| judged.contains(&diagnostic.fingerprint));
-        needs_review(authored_severity(diagnostic.severity, decision), judged)
+        authored_severity(diagnostic.severity, decision).needs_review(judged)
     }
 }
 
@@ -120,7 +120,7 @@ impl Briefing<'_> {
 ///
 /// Compact: `status`, `counts`, `groups`, then when they apply `incomplete`
 /// (`[path, reason]` pairs), `omitted`, and the `resolve` hint and `judgments`
-/// table once for all shown findings that ask for a verdict. Full: `findings`,
+/// table once for all shown findings that ask for review. Full: `findings`,
 /// `incomplete` and `judgments` as records, `omitted` as a count.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentReport {
@@ -344,7 +344,7 @@ fn compact_fields(
     fields
 }
 
-/// Errors, warnings and findings asking for a verdict always; the other
+/// Errors, warnings and findings asking for review always; the other
 /// counts when they are not zero.
 fn counts(diagnostics: &[Diagnostic], briefing: &Briefing) -> Value {
     let count = |s: Severity| diagnostics.iter().filter(|d| d.severity == s).count();

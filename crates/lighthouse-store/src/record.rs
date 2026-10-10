@@ -2,7 +2,6 @@ use std::fmt;
 
 use lighthouse_model::{
     Attribution, Diagnostic, Judgment, Label, Severity, SuppressionKind, SuppressionStatus,
-    needs_review,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -266,10 +265,8 @@ impl FindingRecord {
     /// Whether the finding asks for review: its decision authored `warn` or
     /// `info`, and no judgment stands for it.
     pub fn needs_review(&self) -> bool {
-        needs_review(
-            self.authored_severity,
-            self.standing.is_some_and(Standing::stands),
-        )
+        self.authored_severity
+            .needs_review(self.standing.is_some_and(Standing::stands))
     }
 
     /// Where the finding is in its life; a judgment that hides it wins over

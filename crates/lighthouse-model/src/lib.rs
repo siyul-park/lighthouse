@@ -8,9 +8,7 @@ mod scope;
 mod text;
 mod ucm;
 
-pub use diagnostic::{
-    Diagnostic, Fingerprint, Incomplete, Severity, UnknownSeverity, needs_review,
-};
+pub use diagnostic::{Diagnostic, Fingerprint, Incomplete, Severity, UnknownSeverity};
 pub use document::Document;
 pub use fix::{Anchor, EditOp, FixOutcome, Owner, Safety, UnknownSafety};
 pub use review::{

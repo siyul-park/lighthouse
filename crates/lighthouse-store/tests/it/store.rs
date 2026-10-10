@@ -674,3 +674,12 @@ fn changing_only_how_a_decision_is_checked_keeps_its_judgments_and_changing_what
     store.record(&run(vec![reworded])).unwrap();
     assert_eq!(standing_of(&store, "f1"), Some(Standing::RuleChanged));
 }
+
+#[test]
+fn a_standing_stands_while_it_neither_expired_nor_was_refused() {
+    assert!(Standing::Suppressed.stands());
+    assert!(Standing::Judged.stands());
+    assert!(!Standing::RuleChanged.stands());
+    assert!(!Standing::EvidenceChanged.stands());
+    assert!(!Standing::Unsuppressible.stands());
+}

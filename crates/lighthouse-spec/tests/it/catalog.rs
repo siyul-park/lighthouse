@@ -1,4 +1,4 @@
-use lighthouse_model::{RunScope, Severity, needs_review};
+use lighthouse_model::{RunScope, Severity};
 use lighthouse_spec::{Catalog, Content, Decision, ExampleFile, Subject, authored_severity};
 use lighthouse_test_support::catalog::*;
 use serde_json::{Map, json};
@@ -22,19 +22,13 @@ fn a_finding_asks_for_review_unless_its_decision_authored_an_error_or_a_judgment
         (Severity::Warn, true),
         (Severity::Info, true),
     ] {
-        assert_eq!(needs_review(authored, false), asks, "{authored}");
-        assert!(!needs_review(authored, true), "{authored} judged");
+        assert_eq!(authored.needs_review(false), asks, "{authored}");
+        assert!(!authored.needs_review(true), "{authored} judged");
     }
     let warn = bundled("design/private-helper-callers");
-    assert!(needs_review(
-        authored_severity(Severity::Error, Some(warn)),
-        false
-    ));
+    assert!(authored_severity(Severity::Error, Some(warn)).needs_review(false));
     let definitive = bundled("design/declaration-groups");
-    assert!(!needs_review(
-        authored_severity(Severity::Warn, Some(definitive)),
-        false
-    ));
+    assert!(!authored_severity(Severity::Warn, Some(definitive)).needs_review(false));
 }
 
 #[test]
@@ -829,4 +823,20 @@ fn scope_applicability() {
     let all = bundled("core/max-lines").scope.applicability();
     assert!(all.generated);
     assert_eq!(all.tests, lighthouse_model::TestScope::Include);
+}
+
+#[test]
+fn a_document_without_an_envelope_is_a_document_error() {
+    let error = Catalog::from_files(with("p/s/a.yaml", "id: p/a\n")).unwrap_err();
+    assert!(
+        matches!(error, lighthouse_spec::Error::Document(_)),
+        "{error}"
+    );
+}
+
+#[test]
+fn with_uid_gives_a_decision_the_identity_it_keeps_across_renames() {
+    let decision = bundled("core/allow-annotation").clone();
+    let uid = "5d6b1c1e-2b0e-4a43-9a3e-0f1b6f5d2a11";
+    assert_eq!(decision.with_uid(uid).uid(), Some(uid));
 }

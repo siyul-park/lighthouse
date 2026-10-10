@@ -110,7 +110,7 @@ pub struct FixRun {
     pub rules: Vec<String>,
     /// Fix the findings with these fingerprints or unambiguous prefixes.
     pub fingerprints: Vec<String>,
-    /// Findings to leave alone, such as those a verdict suppresses.
+    /// Findings to leave alone, such as those a judgment hides.
     pub skip: BTreeSet<Fingerprint>,
     /// Do everything but leave the files as they were.
     pub dry_run: bool,

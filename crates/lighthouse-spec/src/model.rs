@@ -261,7 +261,7 @@ pub struct Example {
 }
 
 /// The severity a finding's decision authored, else the severity the finding
-/// has: what decides whether a verdict may hide it and a fix may be safe.
+/// has: what decides whether a judgment may hide it and a fix may be safe.
 pub fn authored_severity(severity: Severity, decision: Option<&crate::Decision>) -> Severity {
     decision.and_then(|d| d.severity()).unwrap_or(severity)
 }

@@ -12,7 +12,7 @@ Lighthouse remembers them. It records each decision with its reasons, applies it
 every later change, and turns the decisions that keep coming back into rules.
 
 ```text
- code ─▶ check ─▶ finding ─▶ review ─▶ verdict ─▶ memory
+ code ─▶ check ─▶ finding ─▶ review ─▶ judgment ─▶ memory
                                                     │
         every change ◀── rule ◀── rule proposal ◀── recurring decision
 ```
@@ -27,23 +27,23 @@ A finding is a question: *does this code follow the decision?* When the answer i
 on purpose", that answer is kept, so nobody is asked again.
 
 ```sh
-lighthouse review resolve 395d1985afe8 --verdict rejected --reason intentional-exception \
-  --note "composition root wires every service"
+lighthouse review resolve 395d1985afe8 --judgment fail --suppress intentional-exception \
+  --reason "composition root wires every service"
 ```
 
-- **Shared, not local.** Verdicts are appended to `.lighthouse/decisions.jsonl`, which
+- **Shared, not local.** Judgments and suppressions are appended to `.lighthouse/decisions.jsonl`, which
   is committed with the code (`merge=union`, so branches merge cleanly). Teammates and
   CI see the same decisions.
 - **At the code, when it belongs there.** A decision about one place can be written
   where it happens and reviewed in the diff:
   `// lighthouse-disable-next-line design/coupling -- composition root wires every service`
   (ESLint's directive forms; `-line`, and `lighthouse-disable` / `lighthouse-enable` ranges too).
-  Annotations that stop matching anything are reported, so they cannot rot.
-- **Valid while it still applies.** A verdict holds while the rule's meaning and the
-  finding's evidence stay the same. Change the code materially or redefine the rule, and
-  the question comes back. Mechanical findings are never hidden by a verdict, only by an
-  annotated, reviewed exception; heuristic and judgment findings can be, at any severity.
-- **Evidence kept.** Every verdict stores a snapshot of what was judged: metrics, symbol
+  Directives that stop matching anything are reported, so they cannot rot.
+- **Valid while it still applies.** A judgment holds while the decision's meaning and the
+  finding's evidence stay the same. Change the code materially or redefine the decision, and
+  the question comes back. Errors are never hidden by a judgment, only by a
+  directive in the code, reviewed in the diff; `warn` and `info` findings can be, at any level.
+- **Evidence kept.** Every judgment stores a snapshot of what was judged: metrics, symbol
   shape, rule options, commit. That history is what later turns decisions into rules.
 
 ## Decision Catalog
@@ -65,7 +65,7 @@ spec:
   requirement: >-
     A simple single-use wrapper SHOULD be inlined unless its name expresses a
     real policy or mechanic.
-  severity: warn             # error: definitive · warn, info: a reviewer's verdict may hide it
+  severity: warn             # error: definitive · warn, info: a reviewer's judgment may hide it
   check:                     # builtin | cel | command | rpc | model
     type: cel
     select: function
@@ -81,13 +81,13 @@ runs them. Every spec document, `lighthouse.toml` included, has a JSON Schema in
 
 Precision comes before recall. A design rule that cries wolf gets ignored, so heuristics
 default to high thresholds, judgment calls become `info` review tasks instead of errors, and
-each rule's precision is measured from its verdicts.
+each rule's precision is measured from its judgments.
 
 ## Rule Evolution
 
-When structurally similar code keeps receiving the same verdict and no rule covers it,
+When structurally similar code keeps receiving the same judgment and no rule covers it,
 or a rule keeps being rejected in the same way, Lighthouse proposes a change: a new rule,
-a wider one, or a narrower one. A proposal carries the occurrences, the verdicts and
+a wider one, or a narrower one. A proposal carries the occurrences, the judgments and
 generated valid/invalid examples. It must pass every existing fixture before anyone
 approves it. Nothing is enabled automatically.
 
@@ -175,7 +175,7 @@ documents and design files can follow.
 
 | Area | Available now | Next |
 | --- | --- | --- |
-| Decision Memory | committed decision log, expiring verdicts with evidence snapshots, source annotations, finding history | MCP tools for agents, hooks |
+| Decision Memory | committed decision log, expiring judgments with evidence snapshots, source directives, finding history | MCP tools for agents, hooks |
 | Decision Catalog | `design` and `testing` packs, generated docs, JSON Schemas, SARIF, shareable projects, CEL checks, `decision test` | more executable examples |
 | Rule Evolution | | decision index and similarity, coverage analysis, rule proposals |
 | Rules | complexity, coupling, docs, wrappers, declaration order and layout, naming, banners, test contracts | dependency direction, cohesion, clones |

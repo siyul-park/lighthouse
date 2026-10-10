@@ -28,7 +28,7 @@ Files are written atomically (a uniquely named temporary file, flushed, then
 renamed) and a file that is a symlink is refused, not followed or replaced. JSON
 files are rewritten with sorted keys when something is added: insertion order
 is not kept, because enabling serde_json's `preserve_order` would change the
-hashes behind rule versions and expire stored verdicts. Without `--agent`,
+hashes behind meaning versions and expire stored judgments. Without `--agent`,
 `init` is unchanged. `lighthouse` must be on the agent's `PATH`. The generated
 hooks carry a `timeout` (120 s after an edit, 300 s at Stop).
 
@@ -47,9 +47,9 @@ value starting with `-` is refused).
 | `check` | `paths?`, `changed?`, `diff?`, `rules?`, `limit?` (default 25, counts findings), `detail?` (`compact` default, or `full`) | compact: `status` (`clean`, `findings`, `incomplete`), `counts` (`error`, `warn`, `review`; `info`, `suppressed`, `allowed` when not zero), `groups`, then when they apply `incomplete` (`[path, reason]`), `omitted` (`groups`, `findings`), `resolve` and `reasons` once, `messages`. Full: `findings` (one agent-json record each), `incomplete`, `omitted`, `summary`, `reasons`, `messages` |
 | `explain` | `id` | Markdown of the decision or rule |
 | `decision_list` | `all?` | decisions with severity, title, status, `enabled` in this config |
-| `review_tasks` | `status?` (default `open`), `rule?`, `tier?` (`review` default, or `all`), `limit?` (default 50), `detail?` | findings that ask for a verdict (those of decisions that authored `warn` or `info`, whatever level they are reported at; or all), grouped like `check`; the finding's last-seen time is its `seen` evidence, `state` and `verdict` appear when not open or when reviewed. `detail: full` gives one task each with `fingerprint`, `lastSeen`, evidence, latest verdict |
-| `review_resolve` | `fingerprint` (or a unique prefix; an ambiguous one is refused), `verdict`, `reason?`, `note?`, `seen?` | the recorded verdict, its `standing`, warnings |
-| `review_history` | `fingerprint` | every verdict on the finding, oldest first |
+| `review_tasks` | `status?` (default `open`), `rule?`, `tier?` (`review` default, or `all`), `limit?` (default 50), `detail?` | findings that ask for review (those of decisions that authored `warn` or `info`, whatever level they are reported at, that no judgment stands for; or all), grouped like `check`; the finding's last-seen time is its `seen` evidence, `state` and `judgment` appear when not open or when judged. `detail: full` gives one task each with `fingerprint`, `lastSeen`, evidence, latest judgment |
+| `review_resolve` | `fingerprint` (or a unique prefix; an ambiguous one is refused), `judgment` (`pass`, `fail` or `notApplicable`), `suppress?` (`{justification}`, with `fail`: an external suppression), `reason?`, `seen?` | the recorded judgment and suppression, its `standing`, warnings |
+| `review_history` | `fingerprint` | every judgment on the finding, oldest first |
 | `decision_create` | `id` (`local/<name>`), `spec` (object or YAML/JSON text), `examples` | `id`, written `path`, test runs, whether the `local` plugin is listed |
 | `decision_update` | `id`, `patch` (JSON merge patch over the spec) | like `decision_create` |
 | `decision_test` | `ids?` | `ok`, counts, `failures` |
@@ -80,13 +80,13 @@ Findings are grouped by decision and severity, errors first, then larger groups:
    "requirement":"<one line>","expected":"<excerpt, once>",
    "evidence":{"keys":"identical across the group"},
    "files":{"bar/bar.go":[["3:1","message","a1b2c3d"],["5:6","message","e4f5a6b",{"varying":"evidence"}]]}}],
- "resolve":"review_resolve {fingerprint, verdict, reason}","reasons":{}}
+ "resolve":"review_resolve {fingerprint, judgment, suppress?, reason?}","judgments":{}}
 ```
 
 An instance is `[line:col, message, fingerprint prefix]` plus, when anything
 applies, a fourth object with separate slots: `evidence` (what varies within the
-group), `note` (why a verdict did not hide the finding), `fix` and `review`
-(true on an instance that asks for a verdict, only in a group where some do and
+group), `note` (why a judgment did not hide the finding), `fix` and `review`
+(true on an instance that asks for review, only in a group where some do and
 some do not; the group's own `review` is true when any does). The prefix is the
 shortest unique one among the findings of the report, at least 7 characters;
 `review_resolve`, `fix` and `lighthouse review resolve` accept it. Recorded
@@ -145,7 +145,7 @@ review in the diff, and without it they come back in `declined` with the
 reason. Every applied fix has been formatted (the `[languages.<id>] formatter`
 of `lighthouse.toml`), re-checked and, for a file that gained an error or stopped
 being analyzable, rolled back, so `declined` also says what was undone and why.
-Findings that a verdict suppresses are never fixed, and a run refuses to start
+Findings that a judgment hides are never fixed, and a run refuses to start
 while the analysis is incomplete. The tool does not offer `fixer` (the CLI's
 `--fixer` override); commands run only in a project the user trusted with
 `lighthouse trust`, and without trust a command fix is declined and formatting is
@@ -168,7 +168,7 @@ are resolved by the run that ends the fixing. Recheck with `check` afterwards.
 
 ### Reviewer identity
 
-Every verdict recorded through the server is a review of kind `agent`. The id is
+Every judgment recorded through the server is attributed to a `SoftwareAgent`. The id is
 `$LIGHTHOUSE_REVIEWER`, else the name the client sent in `clientInfo` at
 `initialize`, else `mcp-agent`. The CLI keeps its own rule (`--reviewer-kind`,
 `$LIGHTHOUSE_REVIEWER_KIND`, `$LIGHTHOUSE_REVIEWER`, `$USER`).
@@ -227,8 +227,8 @@ treats as non-blocking.
 
 | Event | Scope | Behavior |
 |-------|-------|----------|
-| `post-tool-use` | the edited file (`Edit`, `Write`, `MultiEdit` only) | error or warn findings: `decision: block` with up to 5 findings in agent format; info findings that ask for a verdict only: `additionalContext` with the count and how to resolve them through MCP; incomplete analysis is stated and, without `--allow-incomplete`, blocks; clean and complete: silent |
-| `stop` | the session's changed set (`--changed` semantics) | remaining errors, or an incomplete analysis (with or without `--allow-incomplete`; the flag only changes the wording), block once with up to 10 findings and the gaps; otherwise allowed, with a `systemMessage` when warnings, infos, findings asking for a verdict or gaps remain |
+| `post-tool-use` | the edited file (`Edit`, `Write`, `MultiEdit` only) | error or warn findings: `decision: block` with up to 5 findings in agent format; info findings that ask for review only: `additionalContext` with the count and how to resolve them through MCP; incomplete analysis is stated and, without `--allow-incomplete`, blocks; clean and complete: silent |
+| `stop` | the session's changed set (`--changed` semantics) | remaining errors, or an incomplete analysis (with or without `--allow-incomplete`; the flag only changes the wording), block once with up to 10 findings and the gaps; otherwise allowed, with a `systemMessage` when warnings, infos, findings asking for review or gaps remain |
 
 Failures are never silent. Only a directory with no `lighthouse.toml` gets
 silence. A broken config, broken local rules or a plugin that cannot start are
@@ -246,7 +246,7 @@ outside the project, is under `.git`, `.lighthouse` or `node_modules`, or is
 binary. Analysis always covers the whole project, so the scope only narrows the
 report. The loop guard: when `stop_hook_active` is true the stop is never blocked
 again; the user gets a `systemMessage` instead. The hook records the run in the
-store like `check` does and records no verdicts, so the reviewer kind does not
+store like `check` does and records no judgments, so the reviewer kind does not
 come into play.
 
 ## Skill

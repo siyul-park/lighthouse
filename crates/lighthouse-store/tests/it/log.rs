@@ -283,3 +283,19 @@ fn the_judgment_and_suppression_records_have_schemas() {
         .collect();
     assert_eq!(kinds, ["Judgment", "Suppression"]);
 }
+
+#[test]
+fn a_judgment_spec_is_what_a_recorded_judgment_shows() {
+    let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
+    let event = store
+        .resolve(&review("f1", Judgment::Pass), stamp("sem1"))
+        .unwrap()
+        .event;
+
+    let spec: lighthouse_store::JudgmentSpec = serde_json::from_value(event.to_json()).unwrap();
+
+    assert_eq!(spec.decision_name, "design/a");
+    assert_eq!(spec.judgment, Judgment::Pass);
+    assert_eq!(spec.meaning_version.as_deref(), Some("sem1"));
+    assert_eq!(spec.generated_at_time, event.generated_at_time);
+}

@@ -1,7 +1,7 @@
 //! Fixing: the findings a request selects are fixed by the fixers the
 //! catalog names, verified, written and remembered. The engine's orchestrator
 //! does the work; this adds what only a session knows: the catalog, the
-//! verdicts that keep findings out of reach, and the store.
+//! judgments that keep findings out of reach, and the store.
 
 use std::{collections::BTreeSet, path::PathBuf};
 

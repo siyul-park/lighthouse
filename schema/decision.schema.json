@@ -617,7 +617,7 @@
               "type": "null"
             }
           ],
-          "description": "The severity of the decision's findings, as authored. `error` is\ndefinitive: it needs no verdict and only an annotation in the code\nwaives it, and its fix may be safe. `warn` and `info` are review\ntasks: a reviewer's verdict may hide them and a fix is at most\nsuggested. A decision without a `check` has none. A configuration\n`level` changes what is reported and the exit code, never this."
+          "description": "The severity of the decision's findings, as authored. `error` is\ndefinitive: it needs no review and only a directive in the code\nwaives it, and its fix may be safe. `warn` and `info` are review\ntasks: a reviewer's judgment may hide them and a fix is at most\nsuggested. A decision without a `check` has none. A configuration\n`level` changes what is reported and the exit code, never this."
         },
         "status": {
           "$ref": "#/$defs/DecisionStatus",

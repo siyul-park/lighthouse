@@ -25,7 +25,7 @@ pub struct CheckRequest {
     pub diff: Option<String>,
     /// Run only these fully qualified rule ids.
     pub rules: Vec<String>,
-    /// Record the run and apply review verdicts.
+    /// Record the run and apply judgments.
     pub store: bool,
 }
 
@@ -184,7 +184,7 @@ impl Checked {
 
     /// The briefing the agent formats draw on. It always carries the
     /// catalog, so that the summary and every format agree on which findings
-    /// ask for a verdict.
+    /// ask for review.
     pub fn briefing(&self, limit: Option<usize>) -> Briefing<'_> {
         Briefing {
             catalog: Some(&self.catalog),
@@ -204,7 +204,7 @@ impl Checked {
 }
 
 /// Analyzes the project, reports what `request` selects and, when asked,
-/// records the run and drops the findings that verdicts keep out.
+/// records the run and drops the findings that judgments keep out.
 pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     let started = Instant::now();
     let (registry, plugins) = session.registry()?;

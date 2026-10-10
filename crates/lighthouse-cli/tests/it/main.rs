@@ -5,6 +5,7 @@ mod checks;
 mod cli;
 mod fix;
 mod internal;
+mod judgments;
 mod mcp;
 mod preview;
 mod review;

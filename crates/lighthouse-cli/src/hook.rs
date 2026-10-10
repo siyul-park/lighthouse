@@ -172,7 +172,7 @@ fn is_text(path: &Path) -> bool {
 
 /// An edit: error and warn findings go back to the agent as the reason of a
 /// block so that it fixes them (or judges them, when their decision asks for a
-/// verdict); the remaining findings that ask for a verdict, and incompleteness,
+/// judgment); the remaining findings that ask for review, and incompleteness,
 /// are context. Clean and complete is silent.
 fn after_edit(checked: &Checked, allow_incomplete: bool) -> Option<Value> {
     let summary = checked.summary();
@@ -189,8 +189,8 @@ fn after_edit(checked: &Checked, allow_incomplete: bool) -> Option<Value> {
     let mut notes = Vec::new();
     if summary.reviews > 0 {
         notes.push(format!(
-            "Lighthouse: {} finding(s) in the edited file ask for a verdict, not necessarily a fix. \
-             List them with the MCP tool `review_tasks`, then fix the code or record a verdict with \
+            "Lighthouse: {} finding(s) in the edited file ask for review, not necessarily a fix. \
+             List them with the MCP tool `review_tasks`, then fix the code or record a judgment with \
              `review_resolve` (a reason is required to reject).",
             summary.reviews
         ));
@@ -253,7 +253,7 @@ fn at_stop(
     for (n, what) in [
         (summary.warnings, "warning(s)"),
         (summary.infos, "info finding(s)"),
-        (summary.reviews, "finding(s) asking for a verdict"),
+        (summary.reviews, "finding(s) asking for review"),
         (summary.incomplete, "incomplete gap(s)"),
     ] {
         if n > 0 {

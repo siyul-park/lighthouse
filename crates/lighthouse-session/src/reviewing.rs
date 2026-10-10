@@ -92,17 +92,6 @@ pub fn review_tasks(root: &Path, query: &TaskQuery) -> Result<Option<Tasks>> {
     }))
 }
 
-/// Whether a finding is a task of a listing: among the open ones, those that
-/// ask for review; in any other status, those of decisions that did not
-/// author an error, judged or not.
-fn waits(finding: &FindingRecord, status: StatusFilter) -> bool {
-    if status == StatusFilter::Open {
-        finding.needs_review()
-    } else {
-        finding.authored_severity != Severity::Error
-    }
-}
-
 /// The finding whose fingerprint starts with `fingerprint`, as remembered.
 pub fn review_finding(root: &Path, fingerprint: &str) -> Result<FindingRecord> {
     Ok(existing_store(root)?.finding(fingerprint)?)
@@ -141,6 +130,17 @@ pub fn record_judgment(root: &Path, review: &NewJudgment) -> Result<Recorded> {
         standing,
         catalog_error,
     })
+}
+
+/// Whether a finding is a task of a listing: among the open ones, those that
+/// ask for review; in any other status, those of decisions that did not
+/// author an error, judged or not.
+fn waits(finding: &FindingRecord, status: StatusFilter) -> bool {
+    if status == StatusFilter::Open {
+        finding.needs_review()
+    } else {
+        finding.authored_severity != Severity::Error
+    }
 }
 
 /// The store, which must already exist: nothing is remembered before a check.

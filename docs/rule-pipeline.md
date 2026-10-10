@@ -21,7 +21,7 @@ says what exists today (see [Status](#status)).
 | --- | --- | --- |
 | Decision | what was decided and why, and how it is evaluated (`Decision` resource) | rule, pattern, proposal (a decision with `status: proposed`) |
 | Evidence | what was observed, with provenance; carries no result | signal, snapshot, incident, mined edit |
-| Judgment | a recorded result on one subject for one meaning version, drawn from evidence: conformance (`pass`/`fail`) or applicability (`notApplicable`) | verdict, label, example (an authored judgment on an example subject), audit and exploration samples |
+| Judgment | a recorded result on one subject for one meaning version, drawn from evidence: conformance (`pass`/`fail`) or applicability (`notApplicable`) | label, example (an authored judgment on an example subject), audit and exploration samples |
 | Suppression | a recorded reason not to act on a `fail` (SARIF suppression) | annotation (`inSource`), intentional exception and won't-fix (`external`) |
 | Revision | a change to a decision, with its evaluation and approval | promotion, demotion, narrowing, widening, model attachment |
 
@@ -168,18 +168,22 @@ A **judgment** is a result on one subject, and it labels one of the check's two 
 The values share one field because SARIF `result.kind` does the same, but they are never
 mixed in metrics. A judgment is a recorded label, not ground truth.
 
-What used to be a verdict on a finding is now one judgment, plus a suppression when the
-finding is right but will not be acted on:
+A reviewer records one judgment on a finding, plus a suppression when the finding is
+right but will not be acted on:
 
 | Reviewer says | Judgment | Suppression |
 | --- | --- | --- |
-| the finding is right (`fixed`, `accepted-debt`) | `fail` | — |
+| the finding is right | `fail` | — |
 | false positive | `pass` | — |
 | the decision should not apply here (scope too broad) | `notApplicable` | — |
-| intentional exception, project allows it | `fail` | `external`, with a justification |
-| won't fix | `fail` | `external`, justification `wont-fix` |
+| the finding is right and stays (an intentional exception, the project allows it, won't fix) | `fail` | `external`, with a justification |
 | `lighthouse-disable-next-line <decision> -- <reason>` (or `-line`, or a `lighthouse-disable` range) in code | — | `inSource`, with the reason |
-| not sure yet | — (stays `review`) | — |
+| not sure yet | nothing is recorded (it stays `review`) | — |
+
+A judgment carries `wasAttributedTo` (a `Person` or a `SoftwareAgent`) and `generatedAtTime`
+(W3C PROV), and belongs to the decision's `meaningVersion`: it stops standing when that
+moves. The two kinds are the only records of the decision log; they are one line each, a
+`Suppression` naming the id of the `Judgment` it goes with.
 
 What a run **reports** uses SARIF results with their standard meaning:
 - `fail` is a finding. A suppressed `fail` stays in SARIF with its suppression.
@@ -190,7 +194,7 @@ Judgments also exist where no finding does. **Sampling** re-judges a fixed fract
 subjects a check already decided, unflagged ones and confident ones alike, with a stronger
 attribution. This gives recall and drift, not only precision.
 
-A finding's identity (its fingerprint) is seeded by the decision's uid, so verdicts survive
+A finding's identity (its fingerprint) is seeded by the decision's uid, so judgments survive
 a rename; see [architecture](architecture.md#fingerprints).
 
 Judgments and suppressions are appended to `.lighthouse/decisions.jsonl` (shared through git)
@@ -268,9 +272,9 @@ judgment, meaning version and check revision.
 
 | Part | State |
 | --- | --- |
-| Decisions, packs, verdicts, annotations, `decisions.jsonl`, SQLite memory | done (verdicts in today's form) |
+| Decisions, packs, judgments, suppressions (reviewer-declared and in the code), `decisions.jsonl`, SQLite memory | done |
 | `check` providers (`builtin`, `cel`, `command`, `model` served by agent review tasks; `rpc` reserved), meaning version and check revision | done |
-| Verdicts become judgments and suppressions; naming alignment (`intent` → `context`, provenance fields) | after 2d-2 |
+| Judgments and suppressions replace verdicts; naming alignment (`intent` → `context`, provenance fields) | done |
 | Judgments on subjects, sampling, evaluation, `Revision` records, log compaction, snapshot budgets | Phase 3 |
 | Evidence sources (grouping, mining) and revision proposals | Phase 4 (mining at `init` in Phase 5) |
 | `Model` kind: `embedding` (Phase 3), `classification` with layered bindings (Phase 7) | Phase 3, 7 |

@@ -53,7 +53,7 @@ pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
     }
     let total: usize = by_pack.iter().map(|(_, l)| l.len()).sum();
     let _ = writeln!(out, "\n## Active decisions ({total})\n");
-    out.push_str("A decision declares the severity of its findings: `error` is definitive, so it needs no verdict and only an annotation in the code waives it; `warn` and `info` are review tasks, and a verdict can hide them whatever level the configuration reports them at. `fixable: safe|suggested` marks a decision with a fixer.\n");
+    out.push_str("A decision declares the severity of its findings: `error` is definitive, so it needs no review and only a directive in the code suppresses it; `warn` and `info` are review tasks, and a judgment can hide them whatever level the configuration reports them at. `fixable: safe|suggested` marks a decision with a fixer.\n");
     for (pack, lines) in by_pack {
         let _ = writeln!(out, "\n### {pack}\n");
         for line in lines {

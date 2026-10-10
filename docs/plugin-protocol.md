@@ -301,8 +301,7 @@ languages = ["go"]          # checked against what the process reports
 
 `provides` also lists `decisions` (catalog directories), `orderKeys`,
 `embedders` and `fixOps`, so tools can see a plugin's contributions without
-starting it; only `languages` is checked today. A manifest from before the
-resource model is rewritten by `lighthouse spec migrate`.
+starting it; only `languages` is checked today.
 
 Only plugins listed in `lighthouse.toml` are started. Manifests that do not parse are ignored (with a notice) unless the directory
 is named after a listed id. A bare id is looked up in

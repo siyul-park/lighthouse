@@ -51,11 +51,13 @@ impl fmt::Display for Severity {
     }
 }
 
-/// Whether a finding of a decision that authored `authored` asks for review:
-/// the check is not deterministic (an `error` is definitive: only a
-/// suppression waives it) and nobody has judged the finding yet.
-pub fn needs_review(authored: Severity, judged: bool) -> bool {
-    authored != Severity::Error && !judged
+impl Severity {
+    /// Whether a finding of a decision that authored this severity asks for
+    /// review: the check is not deterministic (an `error` is definitive: only a
+    /// suppression waives it) and nobody has judged the finding yet.
+    pub fn needs_review(self, judged: bool) -> bool {
+        self != Self::Error && !judged
+    }
 }
 
 /// Stable identity of a finding across runs and line shifts.

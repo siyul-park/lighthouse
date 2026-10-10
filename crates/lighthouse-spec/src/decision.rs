@@ -69,9 +69,9 @@ pub struct DecisionSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub consequences: Option<String>,
     /// The severity of the decision's findings, as authored. `error` is
-    /// definitive: it needs no verdict and only an annotation in the code
+    /// definitive: it needs no review and only a directive in the code
     /// waives it, and its fix may be safe. `warn` and `info` are review
-    /// tasks: a reviewer's verdict may hide them and a fix is at most
+    /// tasks: a reviewer's judgment may hide them and a fix is at most
     /// suggested. A decision without a `check` has none. A configuration
     /// `level` changes what is reported and the exit code, never this.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -250,17 +250,17 @@ impl DecisionSpec {
 
     /// Identifies what the decision means: the hash of its requirement,
     /// severity, scope and options (types and defaults, with the values each
-    /// language sets). A verdict stays valid exactly while this does not
+    /// language sets). A judgment stays valid exactly while this does not
     /// change. How the decision is checked is not part of it, so a decision
     /// may move from review to a rule, or from one provider to another, and
-    /// keep its verdicts. Wording, examples, option descriptions, the
+    /// keep its judgments. Wording, examples, option descriptions, the
     /// ADR fields, the envelope and the file format do not change it either.
     pub fn meaning_version(&self) -> String {
         hash::short(&self.meaning_content().to_string(), 8)
     }
 
     /// Identifies how the decision is checked: the hash of its `check`. It is
-    /// recorded with findings for evaluation and never expires a verdict.
+    /// recorded with findings for evaluation and never expires a judgment.
     pub fn check_revision(&self) -> String {
         hash::short(&json!(self.check).to_string(), 8)
     }

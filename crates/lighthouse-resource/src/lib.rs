@@ -18,7 +18,7 @@ use std::{
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-pub use document::{Format, documents, kind_of, resource, yaml_values};
+pub use document::{Format, documents, kind_of, resource};
 pub use duration::parse_duration;
 pub use error::Error;
 pub use schema::{Descriptor, SCHEMA_URL_BASE, header, schema, schema_file};

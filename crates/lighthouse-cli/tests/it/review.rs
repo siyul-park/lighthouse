@@ -10,7 +10,7 @@ use tempfile::TempDir;
 const HELPER: &str = "pub fn run(x: u8) -> u8 {\n    clamp(x) + 1\n}\n\nfn clamp(x: u8) -> u8 {\n    if x > 10 { 10 } else { x }\n}\n";
 const DOCUMENTED: &str = "/// Runs.\npub fn run(x: u8) -> u8 {\n    x + 1\n}\n";
 
-fn lighthouse(dir: &Path) -> Command {
+pub(crate) fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
     cmd.current_dir(dir);
     cmd
@@ -18,7 +18,7 @@ fn lighthouse(dir: &Path) -> Command {
 
 /// A one-crate Rust project whose config enables the design rules, review
 /// advice included.
-fn rust_project(files: &[(&str, &str)]) -> TempDir {
+pub(crate) fn rust_project(files: &[(&str, &str)]) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     let plugin = lighthouse_test_support::lang_rust();
     fs::write(
@@ -45,17 +45,17 @@ fn write(dir: &TempDir, path: &str, text: &str) {
     fs::write(dir.path().join(path), text).unwrap();
 }
 
-fn stdout(command: &mut Command) -> String {
+pub(crate) fn stdout(command: &mut Command) -> String {
     String::from_utf8(command.output().unwrap().stdout).unwrap()
 }
 
-fn records(text: &str) -> Vec<Value> {
+pub(crate) fn records(text: &str) -> Vec<Value> {
     text.lines()
         .map(|l| serde_json::from_str(l).unwrap())
         .collect()
 }
 
-fn listing(dir: &TempDir, status: &str) -> Vec<Value> {
+pub(crate) fn listing(dir: &TempDir, status: &str) -> Vec<Value> {
     let out = stdout(
         lighthouse(dir.path()).args(["review", "list", "--status", status, "--format", "json"]),
     );

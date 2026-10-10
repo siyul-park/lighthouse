@@ -15,7 +15,7 @@ const DEFAULT_LIMIT: usize = 25;
 
 /// What a tool needs to know about its caller.
 pub struct Caller {
-    /// Recorded as the reviewer id of verdicts.
+    /// Recorded as the agent id of judgments.
     pub reviewer: String,
 }
 

@@ -66,8 +66,8 @@ in `.gitignore` syntax; unlike a report filter, that removes them from analysis.
 | --- | --- |
 | **decision** | What was decided and why: the catalog entry (`Decision`), with its severity, check, options, examples and fix. The one authored concept. |
 | **rule** | The executable form the engine compiles from a decision's `check`: the `Rule` trait, the rule ids that findings carry (a rule id is the id of its decision). |
-| **verdict** | A judgment about one finding (confirmed, rejected, deferred, with a reason), appended to the decision log. |
-| **annotation** | A verdict written at the code: `lighthouse-disable-next-line <rule> -- <reason>` (or another directive form). |
+| **judgment** | A recorded label on one subject, as SARIF's `result.kind` says it: `pass`, `fail` or `notApplicable`. Not ground truth. It belongs to a decision's meaning version and is attributed (PROV `wasAttributedTo`, `generatedAtTime`). |
+| **suppression** | A finding that is right and is left in place on purpose, as SARIF says it: `inSource` (a directive in the code: `lighthouse-disable-next-line <rule> -- <reason>` or another form) or `external` (recorded with a `fail`), with a `justification`; `status` is `accepted` unless said otherwise. |
 
 ## Resource model
 
@@ -93,19 +93,15 @@ spec: { ... }
 | `SourceMap` | which decision covers each normative line of the documents a catalog came from | `decisions/sources.yaml` |
 | `Project` | `lighthouse.toml`: `plugins extends languages rules overrides generated`; also a shareable configuration, which `extends` names like an ESLint shareable config. `<pack>/recommended` and `<pack>/strict` are Projects derived from the decisions (a decision joins `strict` by the label `lighthouse/preset: strict`); a catalog layer may hold more | project root, `.lighthouse/decisions/` |
 | `Plugin` | `lighthouse-plugin.toml`: `runtime {command, args}` and `provides` | plugin directory |
-| `Verdict` | a record of the decision log | `.lighthouse/decisions.jsonl` |
+| `Judgment`, `Suppression` | records of the decision log | `.lighthouse/decisions.jsonl` |
 
 A decision's `metadata.uid` (Kubernetes `metadata.uid`) is its identity; the name is
 only what people call it. It is a random UUID v4, assigned once and never derived from
-the name, so renaming a decision touches no record. `spec migrate` writes one into
-every decision that lacks it (a line after `name:`, the rest of the file as it was),
-`decision_create` assigns one, and `spec validate` asks for one and refuses two decisions
-with the same. The names a decision had before it was renamed are listed in the annotation
-`lighthouse/was-names` (comma separated); they resolve to it, and the store and the
-decision log read records made under them as the decision's.
+the name, so renaming a decision touches no record: fingerprints and judgments are
+seeded by the uid. `decision_create` assigns one, and `spec validate` asks for one and
+refuses two decisions with the same.
 
-Conventions: keys are lowerCamelCase, option names included (`hubFanIn`; `spec migrate`
-converts the old snake_case), durations are strings (`30s`), enums are lowercase kebab,
+Conventions: keys are lowerCamelCase, option names included (`hubFanIn`), durations are strings (`30s`), enums are lowercase kebab,
 paths are relative with `/`. A decision belongs to a pack and section by its
 labels; the `Pack` document only orders them, so where the file lies carries no
 meaning. `scope` is `{domain, subject, generated, tests}` (`domain` is `code`; `generated: true` makes generated code a subject, default false; `tests: exclude|include|only`, default `exclude`, set explicitly where a decision is about tests or covers them). The host tells generated code apart once (the provider's marker such as Go's `// Code generated ... DO NOT EDIT.`, `.gitattributes` `linguist-generated`, the project's `[generated] files`) and the engine leaves out the subjects the scope excludes before any check runs, so no expression guards against `generated` or `test`. A project overrides it with `[generated] check = "skip"|"include"` for all decisions, or `rules."<id>".generated = true|false` for one. A `cel` check's `select` defaults to the scope's subject. `options` is a JSON
@@ -122,37 +118,7 @@ writes all; a test fails when the files are stale). Documents carry a
 `lighthouse spec validate [paths]` checks each document against its schema and
 against the others (extended projects and rules name things that exist, fix operations name
 registered order keys, CEL compiles, examples are well formed; `--examples` also
-runs them). `lighthouse spec migrate [paths]` rewrites the formats from before the
-model (decision files of the earlier format, `pack.yaml` with `section.yaml`, rule files, `sources.yaml`,
-`lighthouse.toml`, `lighthouse-plugin.toml`, `.lighthouse/rules`) and, for documents that already have
-an `apiVersion`, the shapes Revision 27 and 28 retired: a `Preset` becomes a `Project`; a `DecisionOverride`
-is folded into the `rules` of the project that owns its `.lighthouse` directory (level and options;
-one that says more, such as wording or examples, stays and is reported: write a local decision);
-`intent` and `rationale` become `context`, a language's `tuning` is appended to it; `exceptions` are appended
-to the `requirement`; `citation` becomes `provenance.wasDerivedFrom`; the declared `evidence` goes (the check
-says what it emits); `strict` becomes a label; a `select` that repeats the scope goes; option names become
-camelCase, in the decision and in the `rules` of a project. It is idempotent.
-Meaning versions do not move: a migrated decision records the text it appended in
-`lighthouse/was-exceptions`, and `Decision::earlier_versions` includes the meaning
-hashed before (requirement without the appended text, the scope without applicability,
-snake_case option names), so recorded verdicts survive; `legacy_semantic_version`
-undoes the same changes. Readers
-accept the new format only, and say so: a project that still has `.lighthouse/rules`,
-a catalog of the earlier format or a configuration without an envelope fails to load
-with a pointer to `lighthouse spec migrate`. TOML comments are not preserved by the
-migration.
-
-The migration touches only shapes it recognizes: a decision has an `id` and a
-`requirement`, an override an `extends` and an override key, a configuration one of the
-keys of the old one; a key it does not know is an error rather than dropped. A directory
-scan covers the catalogs it finds (a directory with a `pack.yaml`), `.lighthouse/` and
-the configuration files; other YAML or JSON (an `.eslintrc.yml`) is not read. A file
-of several documents with one in the old format is refused, to be split first. Changes
-are applied together: every target is written next to its destination and renamed into
-place, and only then are files removed, so a failure never leaves a rule removed
-before the decision that inlines it exists. A rule file or `section.yaml` is removed
-only when a migrated document consumed it (a decision names a rule file relative to
-the catalog root, or its own directory); otherwise it stays, with a warning.
+runs them). Readers accept the current format only.
 
 ## Severity
 
@@ -162,17 +128,14 @@ three levels map to SARIF (`error`, `warning`, `note`). Exit code: `1` if any er
 a warning fails only with `--strict` or past `--max-warnings N`; `info` never
 fails; an incomplete analysis is `3`.
 
-Needing a verdict follows the *authored* severity: `error` is definitive (no verdict, only an annotation in the code waives it, its fix may be `safe`); `warn` and `info` are review tasks whatever level the configuration reports them at.
+Needing review follows the *authored* severity: `error` is definitive (no review, only a directive in the code suppresses it, its fix may be `safe`); `warn` and `info` are review tasks whatever level the configuration reports them at, until a judgment stands for them (`needs_review`: a non-error authored severity and no judgment).
 `review list`, the MCP `review_tasks` tool, the agent format and the hooks select by
-that property. A rule that has no decision is treated by its severity. History keeps
-the severity string it recorded, including `review` from older builds.
+that property. A rule that has no decision is treated by its severity.
 
-Suppression follows the same property, not the severity: a verdict can suppress a
-finding of a heuristic or judgment decision even when the project configured it as
-`error`, and never one of a mechanical decision even when configured as `warn`. So an
-agent is only asked for a verdict that can take effect. (A cache row from before authored severities were recorded has none; its recorded
-severity stands in for it. Schema migration 6 turned the recorded tiers into
-authored severities: mechanical is `error`, heuristic `warn`, judgment `info`.)
+Hiding follows the same property, not the severity: a judgment can hide a finding of a
+`warn` or `info` decision even when the project configured it as `error`, and never one
+of an `error` decision even when configured as `warn`. So an agent is only asked for a
+judgment that can take effect.
 
 ## Rules
 
@@ -185,7 +148,7 @@ one provider of the union `builtin | cel | command | rpc | model`, with the comm
 - `rpc` is reserved until plugin protocol 0.2 and refused at load.
 - `model` hands the decision to agent review (`select` and `prompt` optional); it is not deterministic and caps the severity at `warn`.
 
-A decision with no `check` is documentation. How a decision is checked is not part of what it means: the *meaning version* hashes requirement, severity, scope (with its applicability) and options, and the `check_revision` records the check on findings and verdicts without ever expiring one.
+A decision with no `check` is documentation. How a decision is checked is not part of what it means: the *meaning version* hashes requirement, severity, scope (with its applicability) and options, and the `check_revision` records the check on findings and judgments without ever expiring one.
 
 ```yaml
 check:
@@ -265,25 +228,26 @@ the versions of a decision that the store records with each finding. Set
 analyzer, the rules (wall clock, then the five slowest rules summed over the
 files they ran on), identity, store, report and the total.
 
-## Memory: findings, verdicts and the feedback loop
+## Memory: findings, judgments and the feedback loop
 
 Memory has two parts with different owners. **Sightings** (what `check` saw, when, with
 which facts) stay on one machine, in `.lighthouse/lighthouse.db` (SQLite, the
-`lighthouse-store` crate). **Decisions** (verdicts on findings) are shared through a
-committed file, `.lighthouse/decisions.jsonl`, and the database holds a copy of them
-that it rebuilds from the file. See [Shared decisions](#shared-decisions).
+`lighthouse-store` crate). **Decisions** (judgments and suppressions on findings) are shared
+through a committed file, `.lighthouse/decisions.jsonl`, and the database holds a copy of
+them that it rebuilds from the file. See [Shared decisions](#shared-decisions).
 
 `lighthouse init` ignores `.lighthouse/*.db*` and marks the decision log `merge=union`
 in `.gitattributes`. A run is recorded by default whenever the project has a
 `lighthouse.toml`; `--no-store` runs without reading or writing the store and applies no
-verdicts. A store that cannot be used never fails a check: the run goes on, says so on
-stderr, and still applies the verdicts it can read. The database uses WAL with
+judgments. A store that cannot be used never fails a check: the run goes on, says so on
+stderr, and still applies the judgments it can read. The database uses WAL with
 `synchronous=NORMAL`, writers take the write lock up front (`BEGIN IMMEDIATE`) and wait
-for each other, and opening and migrating are serialized the same way, so a hook, a
-stop script and a human can run at once. The schema is versioned with
-`PRAGMA user_version`; a database written by a newer build is refused, and a file that
-is not a database is named in the error and left where it is (move it aside; it is
-rebuilt from the log, and only the history of sightings is lost).
+for each other, and opening is serialized the same way, so a hook, a stop script and a
+human can run at once. The database is a cache with one schema and no migrations: its
+version is `PRAGMA user_version`, and a database of another version is emptied and
+filled again from the log (only the history of sightings is lost). A file that is not a
+database is named in the error and left where it is (move it aside; it is rebuilt from
+the log).
 
 The store is artifact-neutral: a finding's artifact is a path string and its locator is
 JSON (`{"span": {...}}` for text, a JSON pointer or region id for other artifacts), and
@@ -295,12 +259,12 @@ evidence, facts and options are JSON, so nothing in it is specific to code.
 owner symbol, `first_seen`, `last_seen`, `resolved_at`, `inactive_at`, how often it came
 back (`reopened`), and the last sighting: message, evidence, facts, the options the rule
 ran with, the commit and whether the tracked files were dirty, the Lighthouse and
-catalog versions, the semantic version of the rule and a digest of the evidence. The
+catalog versions, the meaning version of the decision and a digest of the evidence. The
 facts are what the analysis knew about the subject: language; for a symbol its kind,
 visibility, owner, callers (split into same-module and other-module), callees, function
 summary and the measures analyzers took (cognitive, cyclomatic, fan-in and fan-out,
 size); for any other finding the file's size and the measures taken of the file. They are
-kept per finding so a review can snapshot them without re-analyzing.
+kept per finding so a judgment can snapshot them without re-analyzing.
 
 A run updates `findings` like this:
 
@@ -317,7 +281,7 @@ A run updates `findings` like this:
   reactivated if the rule is enabled again.
 
 `review prune [--older-than DAYS]` deletes resolved and inactive findings that nobody
-reviewed; findings with verdicts stay, because the verdicts are labels.
+judged; findings with judgments stay, because the judgments are labels.
 
 ### Fingerprints
 
@@ -331,100 +295,77 @@ are marked in the facts (`ordinal`), and `review resolve` warns about them: the 
 moves when an identical finding appears before it. A finding that stops colliding goes
 back to its undistinguished fingerprint.
 
-**Seeding by uid.** The decision's uid seeds the hash, so a rename moves no fingerprint.
-Builds before it seeded the hash with the name. For one release the engine computes both
-for a decision that has a uid: the legacy fingerprints (seeded by the id and by each name
-in `lighthouse/was-names`) and the current one, and the store moves what it kept:
+**Seeding by uid.** The decision's uid seeds the hash, so a rename moves no fingerprint
+and no judgment. A rule that has no decision (and so no uid) is seeded by its id.
 
-- a `findings` row found under a legacy fingerprint is rewritten in place to the current
-  one, history and fix records included;
-- the verdicts recorded under it are read as the current fingerprint's from then on
-  (`review_events.subject`; the append-only rows are not edited) and the first run to see
-  both appends a `Rewrite` record (`legacy`, `current`, `decisionUid`) to
-  `decisions.jsonl`. Every other clone reads the same rewrite when it pulls the log, and
-  `log compact` (planned, not built yet) is to fold the pair;
-- a verdict never matched again keeps its legacy fingerprint and stays readable through
-  `decisionUid`, which store migration V7 fills from the catalog's name-to-uid table (renamed-from
-  names included);
-- a run that does not record (`fix`) still honors a verdict recorded under a legacy
-  fingerprint.
+### Meaning version
 
-### Semantic version
+`meaningVersion` is the hash of a decision's normalized semantic content (requirement with
+whitespace squashed, severity, scope, and the option types and defaults including each
+language's values; never the `check`): the envelope, the labels, the file format and the
+prose do not change it. A judgment belongs to the meaning version it was given under and
+stops standing when the decision's moves.
 
-`rule_version` is the *meaning version*: the hash of a decision's normalized semantic content
-(requirement with whitespace squashed, severity, scope, and the option
-types and defaults including each language's values; never the `check`): the envelope, the labels, the
-file format and the prose do not change it. Hashing a different set of fields gives a
-different number than builds before the resource model recorded, so a verdict
-written then would expire for the change of format alone. Each finding therefore
-also carries the *earlier* versions: what the build with `enforcement` and what the
-build before the resource model gave for the same content
-(`Decision::earlier_versions`, which reads the old shapes back out of the new; a
-decision that moved from a bespoke rule to a standard operation remembers its old
-id in `lighthouse/was-builtin`, one whose `enforcement` is not its severity's default
-in `lighthouse/was-enforcement`). The store treats a verdict as current when its
-`rule_version` equals the meaning version or any of them, so
-existing verdicts keep applying while the decision demands the same, and expire as
-before when it changes (one exception: `scope` was not hashed before, so changing
-it expires only verdicts recorded after the model). A test pins the legacy value of
-every bundled decision to the number the previous build computed. A CEL check
-migrated from a rule file remembers the file name in the annotation
-`lighthouse/migrated-from`, which the old formula hashed; a CEL decision authored
-since has no legacy version.
+### Judgments
 
-### Verdicts
+A judgment is a recorded label on one finding (a subject): `pass` (the code conforms: a
+false positive), `fail` (the finding is right) or `notApplicable` (the decision does not
+apply here, a hint to narrow it). The first two label the check's conformance part, the
+last its applicability part, and they are never mixed in metrics. A record holds the
+finding's fingerprint, the decision's name then (kept to be read) and `decisionUid` (what
+identifies it), `meaningVersion`, `checkRevision` (a hash of the `check`, recorded for
+evaluation and never compared to expire a judgment), `decisionHash` (the whole decision
+definition), `catalogVersion`, the Lighthouse version, the judgment, a free-text `reason`,
+`wasAttributedTo` (`{type: Person | SoftwareAgent, id}`), `generatedAtTime`, language,
+scope, a digest of the evidence, a **snapshot** frozen at judgment time, and the commit.
+The snapshot is one JSON object, versioned (`"v": 2`): message, path, locator, symbol,
+evidence, facts, options, severity, `authored` (the severity the decision authored), when
+the finding was seen (`seenAt`), the commit and dirtiness at that sighting and the
+Lighthouse version. The snapshot is the single owner of the frozen evidence.
 
-A verdict is a review event: the finding's fingerprint, rule id (the name the decision had
-then, kept to be read) and `decisionUid` (what identifies it), `rule_version` (the
-*meaning* version of the decision: a hash of its requirement, severity, scope and options,
-not of its check, prose or examples), `check_revision` (a hash of the
-`check`, recorded for evaluation and never compared to expire a verdict), `decision_hash` (the whole
-decision definition), `catalog_version`, the Lighthouse version, a nullable
-`pattern_fingerprint` (code-shape identity, filled by the similarity index), the
-verdict, the reason, free text, the reviewer (`agent | human` and id), language, scope,
-a digest of the evidence, a **snapshot** frozen at review time, the commit and a
-timestamp. The snapshot is one JSON object, versioned (`"v": 2`, camelCase keys; `1`
-had snake_case keys): message, path, locator, symbol, evidence, facts, options, severity,
-`authored` (the severity the decision authored; builds before it recorded a `tier`; the severity string is what was recorded, so history may say `review`), when the
-finding was seen (`seenAt`), the commit and dirtiness at that sighting, the Lighthouse
-version and `patternFingerprint: null`. The snapshot is the single owner of the frozen evidence.
+A `fail` may go with a **suppression**: the finding is right and is left in place on
+purpose. `review resolve --judgment fail --suppress <justification>` records an `external`
+suppression, with status `accepted`, in the same transaction and the same breath as the
+judgment; a suppression goes with a `fail` only. A directive in the code is the
+`inSource` kind of the same type.
 
-| Verdict | Reasons | Effect |
+| Judgment | Suppression | Effect |
 | --- | --- | --- |
-| `confirmed` | `fixed`, `accepted-debt`, or none | the finding is right; stays visible |
-| `rejected` | `false-positive`, `intentional-exception`, `scope-too-broad`, `project-allowed`, `not-worth-fixing` (required) | suppressed while valid |
-| `deferred` | none | stays visible, marked deferred in `review list` |
+| `fail` | none | the finding is right; stays visible, no longer asks for review |
+| `fail` | `external`, accepted | the finding is right and left in place; hidden while valid |
+| `pass` | | a false positive; hidden while valid |
+| `notApplicable` | | the decision does not apply; hidden while valid, flagged to narrow the decision |
 
 The reviewer is `--reviewer-kind` / `--reviewer-id`, else `LIGHTHOUSE_REVIEWER_KIND` /
-`LIGHTHOUSE_REVIEWER`, else `human` and `$USER`. Tools that run reviews for an agent
-(hooks, an MCP server) set both variables, so `agent` is recorded without the agent
-having to remember it. `review resolve --seen <last seen>` refuses the verdict when the
-finding has been seen again since the reviewer read it, and the finding is read in the
-same transaction that records the verdict. `review resolve` works without a readable
+`LIGHTHOUSE_REVIEWER`, else a person and `$USER`. The kind is the PROV class (`Person` or
+`SoftwareAgent`; `human` and `agent` are read too). Tools that run reviews for an agent
+(hooks, an MCP server) set both variables, so `SoftwareAgent` is recorded without the
+agent having to remember it. `review resolve --seen <last seen>` refuses the judgment when
+the finding has been seen again since the reviewer read it, and the finding is read in the
+same transaction that records the judgment. `review resolve` works without a readable
 catalog: it warns, and the versions are left out.
 
-**Suppression is derived**, never stored, from the latest verdict per finding (ordered by
-time, then event id). A rejected verdict suppresses only while it is valid:
+**What a judgment does is derived**, never stored, from the latest judgment per finding
+(ordered by time, then record id). A hiding judgment (`pass`, `notApplicable`, or `fail`
+with an accepted suppression) hides the finding only while it is valid:
 
-- the finding is not mechanical: findings of mechanical decisions are decided by the rule,
-  whatever severity they are configured at, so a verdict on one is recorded but never
-  suppresses it, and `check` says so (`rejected as
-  <reason> - mechanical findings are not suppressible; fix the rule`);
-- the semantic version of the rule is the one the verdict judged (otherwise `verdict
-  expired: rule changed`);
-- the digest of the finding's normalized evidence is the one the verdict judged (otherwise
-  `verdict expired: evidence changed`).
+- the finding is not an error: findings of `error` decisions are decided by the rule,
+  whatever severity they are configured at, so a judgment on one is recorded but never
+  hides it, and `check` says so (`judged <judgment> - errors are definitive ...`);
+- the meaning version of the decision is the one the judgment was given under (otherwise
+  `judgment expired: decision changed`);
+- the digest of the finding's normalized evidence is the one the judgment was given under
+  (otherwise `judgment expired: evidence changed`).
 
-An expired verdict leaves the finding in the report with a note, so it is asked again. A
-verdict from before a version or digest was recorded matches anything. `scope-too-broad`
-also suppresses and is flagged as a hint to narrow the rule: `review list --status
-narrowing` lists those. `check` prints how many findings verdicts suppressed.
+An expired judgment leaves the finding in the report with a note, and asks for review
+again. A `notApplicable` judgment also hides and is flagged as a hint to narrow the
+decision: `review list --status narrowing` lists those. `check` prints how many findings
+judgments hid.
 
-**Labels** are what a verdict teaches later models about its rule: `confirmed` is
-positive; `rejected` as `false-positive` or `scope-too-broad` is negative; the other
-rejections (`intentional-exception`, `project-allowed`, `not-worth-fixing`) are separate
-targets that say nothing about precision; `deferred` is unlabeled. A finding nobody
-reviewed has no label and is never a negative.
+**Labels** are what a judgment teaches later models about its decision: `fail` is
+positive; `pass` and `notApplicable` are negative; a `fail` left in place by a suppression
+is a separate target that says nothing about precision. A finding nobody judged has no
+label and is never a negative.
 
 ## Shared decisions
 
@@ -432,30 +373,27 @@ Three things decide that a finding is not reported, with different lifetimes:
 
 | | Lives in | Shared by | Holds while |
 | --- | --- | --- | --- |
-| Verdict | `.lighthouse/decisions.jsonl` (committed) | git | the rule's semantic version and the finding's evidence are unchanged; never for mechanical findings |
-| Source annotation | a comment in the code | git, in the diff | the comment is there; reported when it suppresses nothing |
+| Judgment, external suppression | `.lighthouse/decisions.jsonl` (committed) | git | the decision's meaning version and the finding's evidence are unchanged; never for errors |
+| Source directive (`inSource` suppression) | a comment in the code | git, in the diff | the comment is there; reported when it suppresses nothing |
 | Sighting history | `.lighthouse/lighthouse.db` (ignored) | nobody | it is a local cache |
 
-**The decision log** is the source of truth for verdicts. `review resolve` appends one
-line per verdict, a `Verdict` record of the resource model (`apiVersion`, `kind`,
+**The decision log** is the source of truth for judgments. `review resolve` appends one
+line per record, a `Judgment` record of the resource model (`apiVersion`, `kind`,
 `metadata.name` = the record's id, `spec` with camelCase keys; canonical, compact, keys
-sorted, so diffs are one line) with a single write and `fsync`, then updates the cache.
-The `id` is a hash of the spec. The reader accepts both this and the flat snake_case
-line that earlier builds wrote (the log is append-only, history is never rewritten; the
-name is `decisionName` in a record of this build and was `ruleId`),
-and skips records of a kind or `apiVersion` it does not know, so new kinds never
-break an older reader. Opening the store imports the entries the cache does not have and
-ignores the ones it has, so the cache can always be deleted and rebuilt, a teammate's
-verdicts apply as soon as the log is pulled, and CI suppresses what developers
-suppressed. Two branches that both appended merge by keeping both lines
-(`.gitattributes`: `merge=union`); the same entry twice is one entry; ordering uses the
-entries' timestamps. A line that is not an entry, whose id does not match its content, or
-whose verdict and reason do not belong together stops the store with the line number, so a
-decision is never skipped silently. A verdict recorded in a cache from before the log
-existed is exported to the log once. Verdicts are never edited or deleted; a later
-verdict replaces the standing of the finding.
+sorted, so diffs are one line) and, with `--suppress`, a `Suppression` record that names
+the judgment's id, each with a single write and `fsync`, then updates the cache. The `id`
+is a hash of the spec. No other kind is read: a line of another kind, an unknown
+`apiVersion`, a line whose id does not match its content or one that is not valid stops
+the store with the file and the line number, so a decision is never skipped silently.
+Opening the store imports the records the cache does not have and ignores the ones it has,
+so the cache can always be deleted and rebuilt, a teammate's judgments apply as soon as
+the log is pulled, and CI hides what developers hid. Two branches that both appended merge
+by keeping both lines (`.gitattributes`: `merge=union`); the same record twice is one
+record; ordering uses the records' timestamps. A record the cache has and the log lacks
+(the log was deleted) is written to the log again. Records are never edited or deleted; a
+later judgment replaces the standing of the finding.
 
-**Source annotations** put the decision next to the code it is about, where a reviewer
+**Source directives** put the decision next to the code it is about, where a reviewer
 sees it change. They are directives in ESLint's forms, in a comment line that starts with
 the marker (the description follows ESLint's ` -- `):
 
@@ -473,16 +411,13 @@ comment may precede the directive and an import may not. A documentation
 comment (`///`, `//!`, `/** */`) never holds a directive. `-next-line` counts
 from the directive's own line; stacked directives each look at the line below
 themselves, and only one on the last line of its comment reaches the symbol
-declared there. An id a decision was renamed from still works, with a notice.
-The findings the engine reports about a directive keep their identity when its
-marker or ids are rewritten.
+declared there.
 
-There is no form without ids, and `lighthouse:allow` stays as an alias of
-`lighthouse-disable-next-line` (`spec migrate` rewrites it in source files). A directive
-applies at every severity, mechanical errors included, because it is reviewed in the
-diff, and the report counts what was allowed (`N allowed`); in SARIF terms it is a
-suppression of kind `inSource`. The reason is required on every form that disables: a
-directive without one is ignored and reported by the mechanical rule
+There is no form without ids. A directive applies at every severity, errors included,
+because it is reviewed in the diff, and the report counts what it suppressed (`N allowed`);
+it is a suppression of kind `inSource`, the same type a reviewer's `external` one has, and
+SARIF lists the suppressed finding with it. The reason is required on every form that disables: a
+directive without one is ignored and reported by the error rule
 `core/allow-reason`. A directive or range whose rule no longer fires there, or is not
 enabled, an `lighthouse-enable` that closes nothing and a directive that names no id are
 reported by `core/no-unused-allow` so annotations do not rot (when `--rules` leaves the
@@ -514,7 +449,7 @@ design/private-helper-callers  info (heuristic)  src/lib.rs:5:1
   expected:    valid rust example `rust-valid` (src/lib.rs), canonical
                  pub fn run(x: u8) -> u8 { ... }
   fingerprint: 395d1985afe8
-  resolve:     lighthouse review resolve 395d1985afe8 --verdict <verdict> --reason <reason> --reviewer-kind agent
+  resolve:     lighthouse review resolve 395d1985afe8 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent
 ```
 
 The requirement and context come from the catalog. The expected structure is a valid
@@ -525,10 +460,10 @@ or whose invalid counterpart's name mentions the kind or visibility of the findi
 symbol; the shortest valid example. Evidence
 that repeats the owner symbol is left out and long values are cut. Fingerprints are
 shown as 12-character prefixes, longer when two shown findings would collide, and the
-store accepts any unambiguous prefix. Only findings that ask for a verdict carry a
-resolve command; the choices to make are the verdict and the reason, listed once after the
-blocks (`reasons:`) and in the summary record of the JSON. A finding reported although a
-verdict exists says why in a `note`. `--limit N` prints the N most severe findings (errors
+store accepts any unambiguous prefix. Only findings that ask for review carry a
+resolve command; the choices to make are the judgment, its suppression and its reason, listed once after the
+blocks (`judgments:`) and in the summary record of the JSON. A finding reported although a
+judgment exists says why in a `note`. `--limit N` prints the N most severe findings (errors
 first, original order kept) and a `... N more` tail or a `truncated` record; the summary
 always counts everything. Both formats end with a summary, printed for clean runs too,
 with the incomplete, suppressed and allowed counts, so silence is never read as success.
@@ -606,7 +541,7 @@ at most five:
 
 1. check the whole project with every enabled rule; the run refuses to start when the
    analysis is incomplete, because a fix that rests on a partial analysis is a guess;
-2. select the findings (paths, rules, fingerprints; never those a verdict suppresses),
+2. select the findings (paths, rules, fingerprints; never those a judgment hides),
    ask each one's fixer for a proposal, lower it, and keep the proposals that do not
    collide (safe ones first, then report order; a proposal with exactly the edits of a
    kept one is covered by it);
@@ -751,9 +686,9 @@ Dependencies point down only; the project model (`Project`, rule levels, overrid
 
 ```
 L5  cli, mcp                  -> session, report            (nothing else: no store, registry or engine)
-L4  session                   -> every layer below          (composition root; owns every legacy reader: `migrate`)
+L4  session                   -> every layer below          (composition root)
     report                    -> model, spec
-L3  store                     -> model, resource            (findings, verdicts, the decision log)
+L3  store                     -> model, resource            (findings, judgments, the decision log)
 L2  engine                    -> plugin, spec, model, process   (analysis, fix orchestration, rule tester)
     checks                    -> plugin, spec, model, process, resource (declarative checks, metrics, order keys,
                                                                        the bundled registry derived from the catalog's packs)
@@ -777,10 +712,10 @@ it has unit tests.
 
 The CLI, the MCP server and the agent hooks are frontends over one shared layer,
 `lighthouse-session`: it loads a project (configuration, local rules, catalog),
-runs a check and remembers it, records verdicts, tests and authors rules, and
+runs a check and remembers it, records judgments, tests and authors rules, and
 renders the agent skill. A frontend parses its own input and prints the result;
-it holds no logic of its own, so a verdict recorded through MCP, the CLI or a
-hook is the same event in the same log. Fixing is the same: `check --fix [--dry-run]
+it holds no logic of its own, so a judgment recorded through MCP, the CLI or a
+hook is the same record in the same log. Fixing is the same: `check --fix [--dry-run]
 [--unsafe-fixes] [--fixer <id>]` and the MCP `fix` tool call one session operation.
 Hooks never fix.
 

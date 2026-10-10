@@ -20,8 +20,21 @@ use crate::{
 const PREFIX_MIN: usize = 7;
 /// Longest a symbol's own name may be to count as mentioned by a message.
 const NAME_MIN: usize = 3;
-/// How a verdict is recorded, said once per report.
+/// How a judgment is recorded, said once per report.
 const RESOLVE: &str = "review_resolve {fingerprint, judgment, suppress?, reason?}";
+
+/// What each judgment says, and how to leave a finding that is right in place.
+const MEANINGS: [(Judgment, &str); 3] = [
+    (
+        Judgment::Fail,
+        "the finding is right; add `suppress` with a justification to leave it in place",
+    ),
+    (Judgment::Pass, "false positive: the code conforms"),
+    (
+        Judgment::NotApplicable,
+        "the decision does not apply here; a hint to narrow it",
+    ),
+];
 
 /// One finding as the compact shape sees it, wherever it comes from: a fresh
 /// diagnostic or a remembered finding.
@@ -31,7 +44,7 @@ pub struct Entry<'a> {
     pub severity: Severity,
     /// The severity the decision authored; shown only when it differs.
     pub authored: Severity,
-    /// Whether the finding asks for a verdict.
+    /// Whether the finding asks for review.
     pub review: bool,
     pub path: String,
     pub line: u32,
@@ -41,7 +54,7 @@ pub struct Entry<'a> {
     pub evidence: Value,
     /// More evidence-like facts, shared by a group when they agree.
     pub attributes: Map<String, Value>,
-    /// Why the finding is reported although a verdict was recorded on it.
+    /// Why the finding is reported although a judgment was recorded on it.
     pub note: Option<String>,
     pub fingerprint: String,
     /// Subject facts: `language`, `kind` and `visibility` pick the expected
@@ -77,7 +90,7 @@ struct Group {
     rule: String,
     severity: Severity,
     authored: Option<Severity>,
-    /// Some finding of the group asks for a verdict; when only some do,
+    /// Some finding of the group asks for review; when only some do,
     /// their instances say which.
     review: bool,
     requirement: Option<String>,
@@ -101,7 +114,7 @@ struct Instance {
     evidence: Map<String, Value>,
     note: Option<String>,
     fix: Option<Shown>,
-    /// Asks for a verdict; set only in a mixed group.
+    /// Asks for review; set only in a mixed group.
     review: bool,
 }
 
@@ -149,7 +162,7 @@ impl Grouped {
             .collect()
     }
 
-    /// Whether any shown finding asks for a verdict.
+    /// Whether any shown finding asks for review.
     pub fn asks_review(&self) -> bool {
         self.groups.iter().any(|g| g.review)
     }
@@ -389,19 +402,6 @@ impl Instance {
         }
     }
 }
-
-/// What each judgment says, and how to leave a finding that is right in place.
-const MEANINGS: [(Judgment, &str); 3] = [
-    (
-        Judgment::Fail,
-        "the finding is right; add `suppress` with a justification to leave it in place",
-    ),
-    (Judgment::Pass, "false positive: the code conforms"),
-    (
-        Judgment::NotApplicable,
-        "the decision does not apply here; a hint to narrow it",
-    ),
-];
 
 pub(crate) fn judgments() -> Value {
     let meanings: BTreeMap<&str, &str> = MEANINGS.iter().map(|(j, m)| (j.as_str(), *m)).collect();

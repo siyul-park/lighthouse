@@ -16,7 +16,7 @@ pub struct UnknownTerm {
 }
 
 impl UnknownTerm {
-    pub(crate) fn new(what: &'static str, text: &str, expected: String) -> Self {
+    fn new(what: &'static str, text: &str, expected: String) -> Self {
         Self {
             what,
             text: text.to_owned(),
@@ -143,15 +143,6 @@ pub struct Suppression {
 }
 
 impl Suppression {
-    /// An accepted suppression of the given kind.
-    pub fn new(kind: SuppressionKind, justification: impl Into<String>) -> Self {
-        Self {
-            kind,
-            status: SuppressionStatus::Accepted,
-            justification: justification.into(),
-        }
-    }
-
     /// An accepted suppression a directive in the code declares.
     pub fn in_source(justification: impl Into<String>) -> Self {
         Self::new(SuppressionKind::InSource, justification)
@@ -160,6 +151,15 @@ impl Suppression {
     /// An accepted suppression recorded outside the code.
     pub fn external(justification: impl Into<String>) -> Self {
         Self::new(SuppressionKind::External, justification)
+    }
+
+    /// An accepted suppression of the given kind.
+    fn new(kind: SuppressionKind, justification: impl Into<String>) -> Self {
+        Self {
+            kind,
+            status: SuppressionStatus::Accepted,
+            justification: justification.into(),
+        }
     }
 
     /// Whether the suppression is in force.

@@ -1,6 +1,6 @@
 //! The MCP frontend: `lighthouse mcp` serves the same operations as the CLI
 //! (`lighthouse-session`) to a coding agent over stdio, as tools with JSON
-//! schemas and as resources. Every verdict recorded here is an `agent` review.
+//! schemas and as resources. Every judgment recorded here is attributed to a `SoftwareAgent`.
 
 mod decisions;
 mod definitions;

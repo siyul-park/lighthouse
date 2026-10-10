@@ -28,7 +28,7 @@ pub struct Timings {
     /// Applying source annotations, ordering the findings, giving them their
     /// identity and gathering what is known about each.
     pub identity: Duration,
-    /// Recording the run in the store and applying verdicts; set by the
+    /// Recording the run in the store and applying judgments; set by the
     /// session that ran it.
     pub store: Duration,
 }

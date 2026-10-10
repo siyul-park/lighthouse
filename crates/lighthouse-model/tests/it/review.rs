@@ -1,6 +1,6 @@
 use lighthouse_model::{
     AgentKind, Attribution, Judgment, Label, Severity, Suppression, SuppressionKind,
-    SuppressionStatus, needs_review,
+    SuppressionStatus,
 };
 
 #[test]
@@ -71,8 +71,18 @@ fn label_follows_the_documented_semantics() {
 
 #[test]
 fn only_a_non_error_finding_nobody_judged_needs_review() {
-    assert!(needs_review(Severity::Warn, false));
-    assert!(needs_review(Severity::Info, false));
-    assert!(!needs_review(Severity::Error, false));
-    assert!(!needs_review(Severity::Warn, true));
+    assert!(Severity::Warn.needs_review(false));
+    assert!(Severity::Info.needs_review(false));
+    assert!(!Severity::Error.needs_review(false));
+    assert!(!Severity::Warn.needs_review(true));
+}
+
+#[test]
+fn an_unknown_term_names_the_text_and_what_was_expected() {
+    let error: lighthouse_model::UnknownTerm = "maybe".parse::<Judgment>().unwrap_err();
+    let message = error.to_string();
+    assert!(
+        message.contains("`maybe`") && message.contains("expected"),
+        "{message}"
+    );
 }
