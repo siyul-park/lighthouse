@@ -20,6 +20,7 @@ type cacheUnit struct {
 	content   string
 	api       string
 	ifaces    string
+	cgo       bool // imports "C": always analyzed, never recorded
 	imports   []string
 	deps      []*cacheUnit
 	// apiKey covers everything but the unit's own text; key covers that too.
@@ -45,6 +46,7 @@ type planner struct {
 // dirDigest collects what the files of one directory contribute to its unit.
 type dirDigest struct {
 	content, api, ifaces, imports []string // ifaces holds only the non-empty
+	cgo                           bool
 }
 
 // cacheOtherSuffixes are the non-Go files that go into a package.
@@ -62,13 +64,19 @@ var goEnvVars = []string{
 // source: its own environment (version, GOOS/GOARCH, flags), the module files
 // and the workspace. It is empty when the project cannot be cached safely.
 func (pl *planner) environment(batches []*batch) (string, []moduleRoot, bool) {
-	env, err := pl.goEnv(batches[0].dir)
-	if err != nil {
-		return "", nil, false
-	}
-	parts := []string{env}
+	var parts []string
 	var modules []moduleRoot
 	for _, b := range batches {
+		env, err := pl.goEnv(b.dir)
+		if err != nil {
+			return "", nil, false
+		}
+		work, extra, ok := workspaceOf(env)
+		if !ok {
+			return "", nil, false
+		}
+		parts = append(parts, env, work)
+		modules = append(modules, extra...)
 		local := pl.r.localModule(b)
 		if local == nil {
 			return "", nil, false
@@ -81,13 +89,9 @@ func (pl *planner) environment(batches []*batch) (string, []moduleRoot, bool) {
 		if !ok {
 			return "", nil, false
 		}
-		parts = append(parts, text, stamp(filepath.Join(b.dir, "vendor")))
+		parts = append(parts, text, vendorStamp(filepath.Join(b.dir, "vendor")))
 	}
-	work, extra, ok := workspaceOf(env)
-	if !ok {
-		return "", nil, false
-	}
-	return digest(append(parts, work)...), append(modules, extra...), true
+	return digest(parts...), modules, true
 }
 
 // goEnv is the output of `go env -json` for goEnvVars.
@@ -174,6 +178,7 @@ func (pl *planner) goFile(u *cacheUnit, d *dirDigest, name string) bool {
 		d.ifaces = append(d.ifaces, name, facts.Interfaces)
 	}
 	d.imports = append(d.imports, facts.Imports...)
+	d.cgo = d.cgo || facts.Cgo
 	return true
 }
 
@@ -230,6 +235,7 @@ func (pl *planner) importDir(path string) (string, bool) {
 
 // seal sets the digests of u from what its files contributed.
 func (d *dirDigest) seal(u *cacheUnit) {
+	u.cgo = d.cgo
 	sort.Strings(u.requested)
 	slices.Sort(d.imports)
 	u.imports = slices.Compact(d.imports)

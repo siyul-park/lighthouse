@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"slices"
 	"sort"
 	"strconv"
 )
@@ -24,6 +25,9 @@ type fileFacts struct {
 	// empty when there are none. `implements` edges read every project
 	// interface, so any change here changes every key.
 	Interfaces string `json:"interfaces"`
+	// Cgo is set when the file imports "C": its package is never cached, as the
+	// C side is outside the keys.
+	Cgo bool `json:"cgo"`
 }
 
 // digest hashes parts without letting their boundaries blur.
@@ -53,6 +57,7 @@ func factsOf(src []byte) fileFacts {
 		return fileFacts{API: whole, Interfaces: whole}
 	}
 	facts := fileFacts{Imports: importsOf(file)}
+	facts.Cgo = slices.Contains(facts.Imports, "C")
 	tf := fset.File(file.Pos())
 	if err != nil || tf == nil {
 		whole := contentHash(src)

@@ -147,3 +147,45 @@ fn an_unusable_cache_directory_still_gives_the_same_result() {
     plain["notices"] = got["notices"].clone();
     assert_eq!(got, plain);
 }
+
+#[test]
+fn an_orphan_file_added_or_removed_and_a_comment_edit_still_answer_like_an_uncached_run() {
+    let dir = demo();
+    let cache = tempfile::tempdir().unwrap();
+    json_of(dir.path(), Some(cache.path()));
+
+    fs::write(dir.path().join("src/orphan.rs"), "pub fn lost() {}\n").unwrap();
+    assert_eq!(
+        json_of(dir.path(), Some(cache.path())),
+        json_of(dir.path(), None)
+    );
+
+    fs::write(
+        dir.path().join("src/a.rs"),
+        "// moved\npub fn one() -> u32 { 1 }\n",
+    )
+    .unwrap();
+    assert_eq!(
+        json_of(dir.path(), Some(cache.path())),
+        json_of(dir.path(), None)
+    );
+
+    fs::remove_file(dir.path().join("src/orphan.rs")).unwrap();
+    assert_eq!(
+        json_of(dir.path(), Some(cache.path())),
+        json_of(dir.path(), None)
+    );
+}
+
+#[test]
+fn a_corrupt_cache_file_is_a_miss() {
+    let dir = demo();
+    let cache = tempfile::tempdir().unwrap();
+    json_of(dir.path(), Some(cache.path()));
+    fs::write(cache.path().join("fragments.json"), "{not json").unwrap();
+
+    let warm = json_of(dir.path(), Some(cache.path()));
+
+    assert_eq!(warm, json_of(dir.path(), None));
+    assert_eq!(keys(cache.path()).len(), 3);
+}

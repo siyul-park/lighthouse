@@ -103,6 +103,9 @@ func (p *Provider) record(store *cacheStore, plan *cachePlan, sub *run) {
 		current[unitStem(u.rel)] = u.key
 	}
 	for _, u := range plan.misses {
+		if u.cgo {
+			continue
+		}
 		if rec, ok := recordOf(u, sub); ok {
 			store.write(unitName(u.rel, u.key), rec)
 		}

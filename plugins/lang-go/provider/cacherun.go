@@ -2,6 +2,7 @@ package provider
 
 import (
 	"path/filepath"
+	"reflect"
 	"slices"
 	"sort"
 
@@ -43,7 +44,7 @@ func (p *Provider) indexCached(r *run, params sdk.IndexParams) bool {
 	}
 	store := &cacheStore{dir: params.Context.Cache.Dir}
 	pl := &planner{r: r, used: map[string]fileFacts{}, units: map[string]*cacheUnit{}}
-	version := digest(cacheSchema, executableHash())
+	version := digest(cacheSchema, p.identity())
 	plan, ok := p.prepare(pl, store, version, params)
 	if !ok {
 		return false
@@ -61,7 +62,9 @@ func (p *Provider) indexCached(r *run, params sdk.IndexParams) bool {
 func (p *Provider) finish(r *run, store *cacheStore, plan *cachePlan, sub *run, pl *planner) {
 	install(r, plan, sub)
 	p.record(store, plan, sub)
-	store.write(factsFile, factsRecord{Version: digest(cacheSchema, executableHash()), Files: pl.used})
+	if !reflect.DeepEqual(pl.used, pl.facts) {
+		store.write(factsFile, factsRecord{Version: digest(cacheSchema, p.identity()), Files: pl.used})
+	}
 	if notice := store.notice(); notice != "" {
 		r.result.Notices = append(r.result.Notices, notice)
 	}
@@ -109,13 +112,14 @@ func (p *Provider) plan(pl *planner, store *cacheStore, env string, candidates [
 	}
 	sort.Slice(pl.requestedUnits, func(i, j int) bool { return pl.requestedUnits[i].rel < pl.requestedUnits[j].rel })
 	options := string(params.Context.Options[language])
-	base := digest(cacheSchema, executableHash(), p.id, p.version, options, env, pl.interfaceDigest())
+	base := digest(cacheSchema, p.identity(), p.id, p.version, options, env, pl.interfaceDigest())
 	plan := &cachePlan{units: pl.requestedUnits, hits: map[*cacheUnit]unitRecord{}, previous: map[*cacheUnit]unitRecord{}}
 	for _, u := range plan.units {
 		u.apiKey = unitAPIKey(base, u)
 		u.key = digest(u.apiKey, u.content)
 		var rec unitRecord
-		if store.read(unitName(u.rel, u.key), &rec) && rec.covers(u) {
+		if !u.cgo && store.read(unitName(u.rel, u.key), &rec) && rec.covers(u) {
+			store.touch(unitName(u.rel, u.key))
 			plan.hits[u] = rec
 			if u.ifaces != "" {
 				plan.interfaces = append(plan.interfaces, u)
@@ -123,7 +127,7 @@ func (p *Provider) plan(pl *planner, store *cacheStore, env string, candidates [
 			continue
 		}
 		plan.misses = append(plan.misses, u)
-		if old, ok := store.previous(u); ok {
+		if old, ok := store.previous(u); ok && !u.cgo {
 			plan.previous[u] = old
 		}
 	}

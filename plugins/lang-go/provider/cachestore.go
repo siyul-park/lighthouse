@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // cacheStore is the directory the host lets the provider keep results in.
@@ -15,6 +16,9 @@ import (
 type cacheStore struct {
 	dir    string
 	failed error
+	// listing is the directory as it was when first needed.
+	listing []os.DirEntry
+	listed  bool
 }
 
 const (
@@ -80,12 +84,8 @@ func (s *cacheStore) notice() string {
 
 // previous is the record a unit had before its text changed, if one is kept.
 func (s *cacheStore) previous(u *cacheUnit) (unitRecord, bool) {
-	entries, err := os.ReadDir(s.dir)
-	if err != nil {
-		return unitRecord{}, false
-	}
 	prefix := unitPrefix + unitStem(u.rel) + "-"
-	for _, e := range entries {
+	for _, e := range s.entries() {
 		var rec unitRecord
 		if strings.HasPrefix(e.Name(), prefix) && s.read(e.Name(), &rec) && rec.API == u.apiKey && rec.covers(u) {
 			return rec, true
@@ -94,8 +94,27 @@ func (s *cacheStore) previous(u *cacheUnit) (unitRecord, bool) {
 	return unitRecord{}, false
 }
 
+// entries lists the directory once per run.
+func (s *cacheStore) entries() []os.DirEntry {
+	if !s.listed {
+		s.listing, _ = os.ReadDir(s.dir)
+		s.listed = true
+	}
+	return s.listing
+}
+
+// touch marks a record as used now, so that eviction drops the least recently
+// used first. A directory that cannot be written keeps its old times.
+func (s *cacheStore) touch(name string) {
+	now := time.Now()
+	_ = os.Chtimes(filepath.Join(s.dir, name), now, now)
+}
+
 // sweep removes the records of units that are gone or have a newer record, and
-// then the oldest records while the directory is over its limit.
+// then the least recently used records while the directory is over its limit.
+// It assumes the host sends the whole project in every request: a record of a
+// unit that is not in this request is taken to belong to a deleted unit.
+// Temporary files left by an interrupted write go after an hour.
 func (s *cacheStore) sweep(current map[string]string) {
 	if s.failed != nil {
 		return
@@ -113,6 +132,12 @@ func (s *cacheStore) sweep(current map[string]string) {
 	var total int64
 	for _, e := range entries {
 		name := e.Name()
+		if strings.HasPrefix(name, ".tmp-") {
+			if info, err := e.Info(); err == nil && time.Since(info.ModTime()) > time.Hour {
+				_ = os.Remove(filepath.Join(s.dir, name))
+			}
+			continue
+		}
 		if !strings.HasPrefix(name, unitPrefix) {
 			continue
 		}

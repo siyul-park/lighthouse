@@ -114,9 +114,10 @@ impl LanguageProvider for Provider {
     /// Never fails as a whole: a crash, timeout or malformed answer becomes an
     /// incomplete entry next to the plugin's captured stderr.
     fn index(&self, ws: &Workspace, files: &[Source]) -> Result<Indexed, Error> {
+        let (request, cache_notice) = self.request(ws, files);
         let response = self
             .client
-            .call::<_, wire::IndexResult>(wire::INDEX, self.request(ws, files))
+            .call::<_, wire::IndexResult>(wire::INDEX, request)
             .and_then(|result| {
                 convert::indexed(result, files)
                     .map_err(|e| format!("plugin `{}` sent a malformed result: {e}", self.plugin))
@@ -128,14 +129,20 @@ impl LanguageProvider for Provider {
             }],
             ..Indexed::default()
         });
+        indexed.notices.extend(cache_notice);
         indexed.notices.extend(self.client.drain_stderr());
         Ok(indexed)
     }
 }
 
 impl Provider {
-    fn request(&self, ws: &Workspace, files: &[Source]) -> wire::IndexParams {
-        wire::IndexParams {
+    /// The request, and a notice when the cache directory could not be made.
+    fn request(&self, ws: &Workspace, files: &[Source]) -> (wire::IndexParams, Option<String>) {
+        let (cache, notice) = match self.cache_of(ws) {
+            Ok(cache) => (cache, None),
+            Err(reason) => (None, Some(reason)),
+        };
+        let params = wire::IndexParams {
             project: wire::ProjectRef {
                 root: ws.root.to_string_lossy().into_owned(),
             },
@@ -154,27 +161,40 @@ impl Provider {
                     .map(|(id, options)| (id.clone(), Value::Object(options.clone())))
                     .collect(),
                 overlays: overlays_of(ws, files),
-                cache: self.cache_of(ws),
+                cache,
             },
-        }
+        };
+        (params, notice)
     }
 }
 
 impl Provider {
     /// The directory of this plugin's cache, created on demand and kept out of
-    /// version control; none when the run has no cache or the directory cannot
-    /// be made.
-    fn cache_of(&self, ws: &Workspace) -> Option<wire::CacheRef> {
-        let base = ws.cache_dir.as_ref()?;
+    /// version control; `Ok(None)` when the run has no cache, and the reason
+    /// when the directory cannot be made.
+    fn cache_of(&self, ws: &Workspace) -> Result<Option<wire::CacheRef>, String> {
+        let Some(base) = ws.cache_dir.as_ref() else {
+            return Ok(None);
+        };
         let dir = base.join(&self.plugin);
-        fs::create_dir_all(&dir).ok()?;
-        let ignore = base.join(".gitignore");
-        if !ignore.exists() {
-            fs::write(&ignore, "*\n").ok()?;
-        }
-        Some(wire::CacheRef {
+        let made = fs::create_dir_all(&dir).and_then(|()| {
+            let ignore = base.join(".gitignore");
+            if ignore.exists() {
+                Ok(())
+            } else {
+                fs::write(&ignore, "*\n")
+            }
+        });
+        made.map_err(|e| {
+            format!(
+                "cache directory {} cannot be made, `{}` runs without a cache: {e}",
+                dir.display(),
+                self.plugin
+            )
+        })?;
+        Ok(Some(wire::CacheRef {
             dir: dir.to_string_lossy().into_owned(),
-        })
+        }))
     }
 }
 

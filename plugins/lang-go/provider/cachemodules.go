@@ -6,31 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"sync"
+	"strings"
 
 	"golang.org/x/mod/modfile"
 )
-
-var executable struct {
-	once sync.Once
-	hash string
-}
-
-// executableHash identifies the provider binary: a rebuilt provider must not
-// read what an older one wrote.
-func executableHash() string {
-	executable.once.Do(func() {
-		if path, err := os.Executable(); err == nil {
-			if data, err := os.ReadFile(path); err == nil {
-				executable.hash = contentHash(data)
-			}
-		}
-		if executable.hash == "" {
-			executable.hash = "unknown"
-		}
-	})
-	return executable.hash
-}
 
 // moduleFiles digests a module's go.mod and go.sum, and stamps the directories
 // its replace directives point to.
@@ -39,7 +18,7 @@ func moduleFiles(dir, mod, sum string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	file, err := modfile.ParseLax(mod, data, nil)
+	file, err := modfile.Parse(mod, data, nil)
 	if err != nil {
 		return "", false
 	}
@@ -67,6 +46,7 @@ func workspaceOf(env string) (string, []moduleRoot, bool) {
 		return "", nil, false
 	}
 	var modules []moduleRoot
+	var members []string
 	for _, use := range file.Use {
 		dir := filepath.Join(filepath.Dir(path), filepath.FromSlash(use.Path))
 		mod, ok := os.ReadFile(filepath.Join(dir, "go.mod"))
@@ -75,14 +55,20 @@ func workspaceOf(env string) (string, []moduleRoot, bool) {
 			return "", nil, false
 		}
 		modules = append(modules, moduleRoot{parsed.Module.Mod.Path, dir})
+		member, found := moduleFiles(dir, "go.mod", "go.sum")
+		if !found {
+			return "", nil, false
+		}
+		members = append(members, member)
 	}
 	sums, _ := os.ReadFile(path + ".sum")
-	return digest(string(data), string(sums), localReplaces(filepath.Dir(path), file.Replace)), modules, true
+	return digest(append(members, string(data), string(sums), localReplaces(filepath.Dir(path), file.Replace))...), modules, true
 }
 
-// localReplaces stamps the directories that replace directives point to.
+// localReplaces digests the code that replace directives point to, by content:
+// a replaced module is project code that the keys must see.
 func localReplaces(dir string, replaces []*modfile.Replace) string {
-	var stamps []string
+	var parts []string
 	for _, rep := range replaces {
 		if rep.New.Version != "" {
 			continue
@@ -91,16 +77,36 @@ func localReplaces(dir string, replaces []*modfile.Replace) string {
 		if !filepath.IsAbs(target) {
 			target = filepath.Join(dir, target)
 		}
-		stamps = append(stamps, stamp(target))
+		if resolved, err := filepath.EvalSymlinks(target); err == nil {
+			target = resolved
+		}
+		parts = append(parts, rep.New.Path, contents(target))
 	}
-	return digest(stamps...)
+	return digest(parts...)
 }
 
-// stamp fingerprints a directory tree by the names, sizes and modification
-// times of its files, without reading them: code the project does not own is
-// too large to hash on every run, and a touched file is only a miss.
-func stamp(root string) string {
+// contents hashes the Go sources and module files under root.
+func contents(root string) string {
 	var parts []string
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		name := d.Name()
+		if err != nil || d.IsDir() || !(strings.HasSuffix(name, ".go") || name == "go.mod") {
+			return nil
+		}
+		if data, err := os.ReadFile(path); err == nil {
+			parts = append(parts, path, contentHash(data))
+		}
+		return nil
+	})
+	return digest(parts...)
+}
+
+// vendorStamp fingerprints a vendor directory by the names, sizes and
+// modification times of its files, and by the content of modules.txt: code the
+// project does not own is too large to hash on every run.
+func vendorStamp(root string) string {
+	modules, _ := os.ReadFile(filepath.Join(root, "modules.txt"))
+	parts := []string{contentHash(modules)}
 	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -111,4 +117,19 @@ func stamp(root string) string {
 		return nil
 	})
 	return digest(parts...)
+}
+
+// identity names the running binary by its size and modification time: a
+// rebuilt provider must not read what an older one wrote.
+func (p *Provider) identity() string {
+	if p.build != "" {
+		return p.build
+	}
+	p.build = "unknown"
+	if path, err := os.Executable(); err == nil {
+		if info, err := os.Stat(path); err == nil {
+			p.build = digest(path, strconv.FormatInt(info.Size(), 10), strconv.FormatInt(info.ModTime().UnixNano(), 10))
+		}
+	}
+	return p.build
 }

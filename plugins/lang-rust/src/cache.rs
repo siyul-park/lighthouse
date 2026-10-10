@@ -10,6 +10,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 use lighthouse_protocol::{Fragment, IndexParams};
@@ -26,6 +27,9 @@ use crate::{
 const SCHEMA: &str = "lang-rust-cache/1";
 const FILE: &str = "fragments.json";
 const LANGUAGE: &str = "rust";
+
+/// Makes the name of each temporary file unique within the process.
+static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// What the cache keeps of one analyzed file.
 #[derive(Clone, Serialize, Deserialize)]
@@ -50,6 +54,8 @@ pub struct Cache {
     stored: BTreeMap<String, Entry>,
     fresh: BTreeMap<String, Entry>,
     analyzed: usize,
+    /// How many files the cache file held when it was read.
+    opened: usize,
 }
 
 impl Cache {
@@ -78,6 +84,7 @@ impl Cache {
             .filter(|s| s.version == version)
             .map(|s| s.files)
             .unwrap_or_default();
+        let opened = stored.len();
         let mut cache = Self {
             path,
             version,
@@ -85,6 +92,7 @@ impl Cache {
             stored,
             fresh: BTreeMap::new(),
             analyzed: 0,
+            opened,
         };
         cache.bind(tree, params, files);
         Some(cache)
@@ -125,16 +133,17 @@ impl Cache {
     /// The stored analysis of `file` if its text and context are unchanged.
     pub fn get(&mut self, file: &SourceFile) -> Option<(Fragment, MacroStats)> {
         let key = self.key(file)?;
-        let entry = self.stored.get(&file.rel).filter(|e| e.key == key)?.clone();
-        let hit = (
-            entry.fragment.clone(),
-            MacroStats {
-                defines: entry.defines,
-                unread: entry.unread,
-            },
-        );
+        if self.stored.get(&file.rel)?.key != key {
+            return None;
+        }
+        let entry = self.stored.remove(&file.rel)?;
+        let stats = MacroStats {
+            defines: entry.defines,
+            unread: entry.unread,
+        };
+        let fragment = entry.fragment.clone();
         self.fresh.insert(file.rel.clone(), entry);
-        Some(hit)
+        Some((fragment, stats))
     }
 
     /// Remembers the analysis of `file`.
@@ -163,7 +172,7 @@ impl Cache {
     /// notice; the results of the run do not depend on it.
     pub fn save(self) -> Option<String> {
         self.context.as_ref()?;
-        let unchanged = self.analyzed == 0 && self.fresh.len() == self.stored.len();
+        let unchanged = self.analyzed == 0 && self.fresh.len() == self.opened;
         if unchanged {
             return None;
         }
@@ -183,7 +192,11 @@ impl Cache {
 fn write_atomic(path: &Path, stored: &Stored) -> Result<(), String> {
     let dir = path.parent().ok_or("no directory")?;
     fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    let tmp = dir.join(format!(".tmp-{}", std::process::id()));
+    let tmp = dir.join(format!(
+        ".tmp-{}-{}",
+        std::process::id(),
+        TEMP_COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
     let bytes = serde_json::to_vec(stored).map_err(|e| e.to_string())?;
     fs::write(&tmp, bytes)
         .and_then(|()| fs::rename(&tmp, path))
@@ -194,17 +207,13 @@ fn write_atomic(path: &Path, stored: &Stored) -> Result<(), String> {
 }
 
 /// The digest of every `Cargo.toml` at or above the directories of the files,
-/// within the root: what decides packages, targets and dependencies.
+/// above the root too (`publish.workspace` reads the workspace manifest there):
+/// what decides packages, targets and dependencies.
 fn manifests(root: &Path, files: &[String]) -> Vec<String> {
     let dirs: BTreeSet<PathBuf> = files
         .iter()
         .filter_map(|rel| root.join(rel).parent().map(Path::to_owned))
-        .flat_map(|dir| {
-            dir.ancestors()
-                .take_while(|d| d.starts_with(root))
-                .map(Path::to_owned)
-                .collect::<Vec<_>>()
-        })
+        .flat_map(|dir| dir.ancestors().map(Path::to_owned).collect::<Vec<_>>())
         .collect();
     dirs.iter()
         .filter_map(|dir| {

@@ -14,6 +14,8 @@ type Provider struct {
 	id      string
 	version string
 	last    RunStats
+	// build identifies the running binary, once known.
+	build string
 }
 
 const language = "go"
@@ -59,5 +61,6 @@ func (p *Provider) Index(params sdk.IndexParams) (sdk.IndexResult, error) {
 }
 
 // Stats says which units the last index request read from the cache and which
-// it analyzed; both are empty when the request ran without the cache.
+// it analyzed; both are empty when the request ran without the cache. Tests
+// use it to assert what an edit re-indexes.
 func (p *Provider) Stats() RunStats { return p.last }
