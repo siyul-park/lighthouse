@@ -16,7 +16,7 @@ use thiserror::Error;
 
 pub use manifest::{
     Discovered, FILE_NAME, FILE_NAMES, Found, PluginManifest, PluginSpec, Provides, Runtime,
-    discover, file_in, is_legacy, load, migrate, parse,
+    discover, file_in, load, parse,
 };
 pub use plugin::RpcPlugin;
 

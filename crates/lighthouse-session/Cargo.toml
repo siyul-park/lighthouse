@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
+[lib]
+test = false
+doctest = false
+
 [dependencies]
 lighthouse-config.workspace = true
 lighthouse-checks.workspace = true
@@ -22,3 +26,4 @@ toml.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+lighthouse-test-support = { path = "../lighthouse-test-support" }

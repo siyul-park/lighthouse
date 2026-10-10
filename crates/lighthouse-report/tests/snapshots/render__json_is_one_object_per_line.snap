@@ -1,6 +1,0 @@
----
-source: crates/lighthouse-report/tests/render.rs
-expression: out
----
-{"ruleId":"core/max-file-lines","severity":"warn","message":"file has 12 lines, limit is 10","file":"src/a.txt","span":{"start":{"line":11,"col":1},"end":{"line":12,"col":1}},"fingerprint":"49ee8394ac08c5c995a7bf36eb5d0a55d2975f52e7dbe09b05742b425af6e676","evidence":{"lines":12,"max":10},"fix":"split the file"}
-{"ruleId":"demo/boom","severity":"error","message":"boom","file":"src/b c/é#1.txt","span":{"start":{"line":2,"col":5},"end":{"line":2,"col":1}},"fingerprint":"1fa2732690a3fc011323ea71d775322f6cb0e8721179758374a42f64f71ce241"}

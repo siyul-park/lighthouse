@@ -1,6 +1,8 @@
 //! Test support: builds the bundled language plugins from source, and writes
 //! the documents tests put in a project.
 
+pub mod catalog;
+
 use std::{
     env, fs,
     path::{Path, PathBuf},

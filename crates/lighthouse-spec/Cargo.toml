@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
+[lib]
+test = false
+doctest = false
+
 [dependencies]
 cel.workspace = true
 include_dir.workspace = true
@@ -18,5 +22,6 @@ lighthouse-plugin.workspace = true
 lighthouse-resource.workspace = true
 
 [dev-dependencies]
+lighthouse-test-support = { path = "../lighthouse-test-support" }
 insta.workspace = true
 tempfile.workspace = true

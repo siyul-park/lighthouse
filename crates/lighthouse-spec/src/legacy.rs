@@ -83,7 +83,7 @@ impl Decision {
 }
 
 /// The option type the pattern format called `name`.
-pub(crate) fn from_legacy_type(name: &str) -> Option<OptionType> {
+pub fn from_legacy_type(name: &str) -> Option<OptionType> {
     TYPE_NAMES
         .iter()
         .find_map(|(legacy, kind)| (*legacy == name).then_some(*kind))

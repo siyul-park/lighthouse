@@ -1,0 +1,95 @@
+---
+source: crates/lighthouse-report/tests/it/render.rs
+expression: "render(Format::Sarif, &fixture(), &[])"
+---
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "lighthouse",
+          "version": "0.1.0",
+          "rules": [
+            {
+              "id": "core/max-file-lines"
+            },
+            {
+              "id": "demo/boom"
+            }
+          ]
+        }
+      },
+      "originalUriBaseIds": {
+        "%SRCROOT%": {
+          "description": {
+            "text": "the project root, where Lighthouse was run"
+          }
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "core/max-file-lines",
+          "ruleIndex": 0,
+          "level": "warning",
+          "message": {
+            "text": "file has 12 lines, limit is 10"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/a.txt",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 11,
+                  "startColumn": 1,
+                  "endLine": 12,
+                  "endColumn": 1
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "lighthouse/v1": "49ee8394ac08c5c995a7bf36eb5d0a55d2975f52e7dbe09b05742b425af6e676"
+          }
+        },
+        {
+          "ruleId": "demo/boom",
+          "ruleIndex": 1,
+          "level": "error",
+          "message": {
+            "text": "boom"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/b%20c/%C3%A9%231.txt",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 2,
+                  "startColumn": 5,
+                  "endLine": 2,
+                  "endColumn": 1
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "lighthouse/v1": "1fa2732690a3fc011323ea71d775322f6cb0e8721179758374a42f64f71ce241"
+          }
+        }
+      ]
+    }
+  ]
+}
