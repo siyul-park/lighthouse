@@ -7,7 +7,7 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::TempDir;
 
-fn lighthouse(dir: &Path) -> Command {
+pub(crate) fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
     cmd.current_dir(dir)
         .env("LIGHTHOUSE_HOME", dir.join(".home"))
@@ -15,24 +15,24 @@ fn lighthouse(dir: &Path) -> Command {
     cmd
 }
 
-fn trust(dir: &Path) {
+pub(crate) fn trust(dir: &Path) {
     lighthouse(dir).args(["trust", "--yes"]).assert().success();
 }
 
-fn write(dir: &Path, name: &str, text: &str) {
+pub(crate) fn write(dir: &Path, name: &str, text: &str) {
     let path = dir.join(name);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(path, text).unwrap();
 }
 
 /// A local decision `local/probe` with `extra` after its spec lines.
-fn decision(extra: &str) -> String {
+pub(crate) fn decision(extra: &str) -> String {
     format!(
         "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: file }}\n  requirement: A file MUST NOT say hello.\n  severity: error\n{extra}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: bad.txt, body: hello }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: good.txt, body: bye }}]\n"
     )
 }
 
-fn project(rule: &str) -> TempDir {
+pub(crate) fn project(rule: &str) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     write(
         dir.path(),

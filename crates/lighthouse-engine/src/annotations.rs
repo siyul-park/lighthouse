@@ -170,8 +170,18 @@ pub(crate) fn apply<'g>(
     project: &Project,
     gate: &'g Gate<'g>,
 ) -> Result<Applied, ProjectError> {
-    let mut found: Vec<Option<Diagnostic>> = found.into_iter().map(Some).collect();
     let mut allowed = Vec::new();
+    let mut open = Vec::new();
+    for mut diagnostic in found {
+        match diagnostic.take_tool_suppression() {
+            Some(suppression) => allowed.push(Suppressed {
+                diagnostic,
+                suppression,
+            }),
+            None => open.push(diagnostic),
+        }
+    }
+    let mut found: Vec<Option<Diagnostic>> = open.into_iter().map(Some).collect();
     let mut extra = Vec::new();
     for file in &project.files {
         let located = locate(project, &file.path);

@@ -375,7 +375,7 @@ fn kind_problem(decision: &Decision, kind: &CheckKind) -> Option<String> {
         }),
         CheckKind::Command(command) => command.problem().or_else(|| {
             let per_file = subject.run_scope() == RunScope::File;
-            (command.batch == crate::check::Batch::All && per_file).then(|| {
+            (command.batch == crate::Batch::All && per_file).then(|| {
                 "check `batch: all` needs a module or project decision: a file-scope decision is checked one file at a time"
                     .to_owned()
             })

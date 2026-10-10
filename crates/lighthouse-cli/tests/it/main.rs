@@ -3,6 +3,7 @@
 mod agent;
 mod checks;
 mod cli;
+mod command_sarif;
 mod fix;
 mod internal;
 mod judgments;

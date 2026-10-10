@@ -1,5 +1,6 @@
 mod catalog;
 mod check;
+mod command;
 mod decision;
 mod error;
 mod fix;
@@ -19,10 +20,11 @@ use lighthouse_resource::Descriptor;
 
 pub use catalog::{Catalog, write_atomic, write_atomic_guarded};
 pub use check::{
-    At, Batch, Binding, BuiltinCheck, BuiltinOp, CelCheck, Check, CheckKind, CheckStdin,
-    CommandCheck, CycleLevel, DEFAULT_TIMEOUT, ExitCodes, Identity, ModelCheck, NamedRule,
-    OrderClause, OrderReport, OrderScope, RpcCheck, Select, TemplatePart, parse_template,
+    At, Binding, BuiltinCheck, BuiltinOp, CelCheck, Check, CheckKind, CycleLevel, DEFAULT_TIMEOUT,
+    Identity, ModelCheck, NamedRule, OrderClause, OrderReport, OrderScope, RpcCheck, Select,
+    TemplatePart, parse_template,
 };
+pub use command::{Batch, CheckOutput, CheckStdin, CommandCheck, ExitCodes, SarifSelect};
 pub use decision::{
     Decision, DecisionSpec, LanguageSpec, PACK_LABEL, PRESET_LABEL, Provenance, SECTION_LABEL,
     STRICT,

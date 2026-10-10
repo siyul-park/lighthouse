@@ -1,6 +1,6 @@
 use lighthouse_model::{
-    AgentKind, Attribution, Judgment, Label, Severity, Suppression, SuppressionKind,
-    SuppressionStatus,
+    AgentKind, Attribution, Diagnostic, Fingerprint, Judgment, Label, Position, Severity, Span,
+    Suppression, SuppressionKind, SuppressionStatus,
 };
 
 #[test]
@@ -16,6 +16,38 @@ fn judgment_round_trips_through_text_and_serde() {
         error.to_string(),
         "unknown judgment `nope` (expected pass, fail, notApplicable)"
     );
+}
+
+fn finding() -> Diagnostic {
+    let at = Position { line: 1, col: 1 };
+    let span = Span { start: at, end: at };
+    Diagnostic::new(
+        "p/a",
+        Severity::Error,
+        "m",
+        "a.go",
+        span,
+        Fingerprint::from_raw("f"),
+    )
+}
+
+#[test]
+fn diagnostic_suppressed_by_tool_keeps_the_evidence_it_had() {
+    let mut finding = finding();
+    finding.evidence = serde_json::json!({ "tool": "fake" });
+    let marked = finding.suppressed_by_tool("known");
+    assert_eq!(marked.evidence["tool"], "fake");
+    assert!(marked.evidence.as_object().unwrap().len() == 2);
+}
+
+#[test]
+fn diagnostic_take_tool_suppression_removes_the_mark_and_reads_it_as_in_source() {
+    let mut marked = finding().suppressed_by_tool("known");
+    let taken = marked.take_tool_suppression().unwrap();
+    assert_eq!(taken, Suppression::in_source("known"));
+    assert!(marked.evidence.as_object().unwrap().is_empty());
+    assert_eq!(marked.take_tool_suppression(), None);
+    assert_eq!(finding().take_tool_suppression(), None);
 }
 
 #[test]

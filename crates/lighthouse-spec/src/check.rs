@@ -7,7 +7,7 @@ use std::{collections::BTreeMap, time::Duration};
 use cel::Program;
 use lighthouse_model::{Capability, RunScope};
 
-use crate::Subject;
+use crate::{CommandCheck, Subject};
 use lighthouse_resource::parse_duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -80,7 +80,15 @@ impl<'de> Deserialize<'de> for Check {
             Some("cel") => &[
                 "select", "with", "where", "message", "evidence", "at", "identity",
             ],
-            Some("command") => &["argv", "batch", "stdin", "env", "exitCodes"],
+            Some("command") => &[
+                "argv",
+                "batch",
+                "stdin",
+                "env",
+                "exitCodes",
+                "output",
+                "select",
+            ],
             Some("rpc") => &["params"],
             Some("model") => &["select", "prompt"],
             other => {
@@ -533,119 +541,6 @@ impl CelCheck {
     }
 }
 
-/// How a `command` check batches the files it is given.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum Batch {
-    /// One run per file.
-    #[default]
-    File,
-    /// Runs over many files at once, as many per run as the argument list
-    /// allows; `{files}` expands to several arguments.
-    All,
-}
-
-/// What a `command` check gives the program on stdin.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum CheckStdin {
-    #[default]
-    None,
-    /// The content of the file (only with `batch: file`).
-    File,
-}
-
-/// Which exit codes mean what; every other code, a signal or a timeout is an
-/// error and leaves the analysis incomplete.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct ExitCodes {
-    #[serde(default = "default_clean")]
-    pub clean: Vec<i32>,
-    #[serde(default = "default_findings")]
-    pub findings: Vec<i32>,
-}
-
-impl Default for ExitCodes {
-    fn default() -> Self {
-        Self {
-            clean: default_clean(),
-            findings: default_findings(),
-        }
-    }
-}
-
-/// An external program that checks files, by the process contract: exit `0`
-/// ran and found nothing, `1` ran and printed findings on stdout (one per
-/// line; a leading `path:line[:col]: ` places it, else it attaches to the file
-/// or the project), anything else (`>= 2`, a signal, a timeout) is an error
-/// that leaves the analysis incomplete, never clean. stderr is for people.
-/// It runs without a shell in the project root, read-only by contract, with an
-/// environment cleared to `PATH`, `LANG`, `TMPDIR`, the declared
-/// `env` and `LIGHTHOUSE_*`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct CommandCheck {
-    /// Program and arguments; `{file}`, `{files}` and `{rule}` fill whole
-    /// arguments.
-    pub argv: Vec<String>,
-    #[serde(default)]
-    pub batch: Batch,
-    #[serde(default)]
-    pub stdin: CheckStdin,
-    /// Extra environment variables.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub env: BTreeMap<String, String>,
-    #[serde(default, skip_serializing_if = "is_default_codes")]
-    pub exit_codes: ExitCodes,
-}
-
-impl CommandCheck {
-    /// The first problem with the command, described.
-    pub(crate) fn problem(&self) -> Option<String> {
-        const KNOWN: [&str; 3] = ["{file}", "{files}", "{rule}"];
-        if self.argv.first().is_none_or(|p| p.trim().is_empty()) {
-            return Some("check: `argv` needs a program".to_owned());
-        }
-        if KNOWN.contains(&self.argv[0].as_str()) {
-            return Some("check: the program cannot be a placeholder".to_owned());
-        }
-        if let Some(arg) = self
-            .argv
-            .iter()
-            .find(|a| !KNOWN.contains(&a.as_str()) && (a.contains('{') && a.contains('}')))
-        {
-            return Some(format!(
-                "check: `{arg}` is not a placeholder of its own: `{{file}}`, `{{files}}` and `{{rule}}` fill a whole argument"
-            ));
-        }
-        let uses = |p: &str| self.argv.iter().any(|a| a == p);
-        if uses("{files}") && self.batch == Batch::File {
-            return Some("check: `{files}` needs `batch: all`".to_owned());
-        }
-        if uses("{file}") && self.batch == Batch::All {
-            return Some(
-                "check: `{file}` needs `batch: file`; use `{files}` with `batch: all`".to_owned(),
-            );
-        }
-        if self.stdin == CheckStdin::File && self.batch == Batch::All {
-            return Some("check: `stdin: file` needs `batch: file`".to_owned());
-        }
-        let overlap = self
-            .exit_codes
-            .clean
-            .iter()
-            .any(|c| self.exit_codes.findings.contains(c));
-        if overlap || self.exit_codes.clean.is_empty() {
-            return Some(
-                "check: `exitCodes` needs at least one clean code and no code in both lists"
-                    .to_owned(),
-            );
-        }
-        None
-    }
-}
-
 /// A check a model answers: the subjects `select` picks are put to it with
 /// the decision's examples as its few shots. Read and validated only; agent
 /// review tasks serve the decision today.
@@ -722,18 +617,6 @@ pub(crate) fn template_problem(text: &str) -> Option<String> {
             .map(|e| format!("`{source}`: {e}")),
         TemplatePart::Text(_) => None,
     })
-}
-
-fn default_clean() -> Vec<i32> {
-    vec![0]
-}
-
-fn default_findings() -> Vec<i32> {
-    vec![1]
-}
-
-fn is_default_codes(codes: &ExitCodes) -> bool {
-    *codes == ExitCodes::default()
 }
 
 /// The loader refuses a field its `type` does not have; so does the schema:

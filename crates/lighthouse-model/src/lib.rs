@@ -18,7 +18,7 @@ pub use review::{
     SuppressionStatus, UnknownTerm,
 };
 pub use scope::{Applicability, RunScope, TestScope};
-pub use text::LineIndex;
+pub use text::{ColumnUnit, LineIndex, byte_position, utf16_position};
 pub use ucm::{
     Capability, Comment, Edge, EdgeKind, Event, EventKind, File, Flow, FlowKind, Fragment,
     FunctionSummary, Module, Node, Position, Project, Resolution, Signature, Site, Span, Symbol,

@@ -3,10 +3,12 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Diagnostic, Incomplete, Position, Severity, Suppressed, Suppression};
+use lighthouse_model::{
+    Diagnostic, Incomplete, Position, Severity, Suppressed, Suppression, utf16_position,
+};
 use lighthouse_spec::{Catalog, Decision, help_path};
 
-use crate::fix::{FixEdit, ProposedFix, utf16_position};
+use crate::fix::{FixEdit, ProposedFix};
 use serde::Serialize;
 
 const SCHEMA: &str = "https://json.schemastore.org/sarif-2.1.0.json";

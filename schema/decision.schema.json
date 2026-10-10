@@ -350,12 +350,27 @@
             "exitCodes": {
               "$ref": "#/$defs/ExitCodes"
             },
+            "output": {
+              "$ref": "#/$defs/CheckOutput",
+              "description": "How stdout is read when the program found something: one finding per\nline (default), or a SARIF 2.1.0 log."
+            },
             "requires": {
               "description": "Capabilities the language provider must offer; without them the check\nis not run for that language.",
               "items": {
                 "$ref": "#/$defs/Capability"
               },
               "type": "array"
+            },
+            "select": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SarifSelect"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Which SARIF results become findings; only with `output: sarif`."
             },
             "stdin": {
               "$ref": "#/$defs/CheckStdin",
@@ -471,6 +486,21 @@
         }
       },
       "type": "object"
+    },
+    "CheckOutput": {
+      "description": "How a `command` check reads what the program printed.",
+      "oneOf": [
+        {
+          "const": "lines",
+          "description": "One finding per line, with an optional `path:line[:col]: ` prefix.",
+          "type": "string"
+        },
+        {
+          "const": "sarif",
+          "description": "A SARIF 2.1.0 log: one finding per result.",
+          "type": "string"
+        }
+      ]
     },
     "CheckStdin": {
       "description": "What a `command` check gives the program on stdin.",
@@ -1360,6 +1390,27 @@
           "type": "string"
         }
       ]
+    },
+    "SarifSelect": {
+      "additionalProperties": false,
+      "description": "The results of a SARIF log that become findings; a result must pass both\nlists. This `select` is a field of the command check, not the CEL `select`\nof other checks.",
+      "properties": {
+        "levels": {
+          "description": "SARIF `level`s to keep: `error`, `warning`, `note` or `none`; a result\nwithout a level is a `warning`. Default: every level.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ruleIds": {
+          "description": "Globs over the result's `ruleId`, such as `errcheck` or `govet:*`: `*`\nis any run of characters inside one segment, segments being separated\nby `/` or `::`, and `**` is any number of segments, as in module path\nglobs. Default: every rule.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
     },
     "Scope": {
       "additionalProperties": false,

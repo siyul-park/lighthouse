@@ -1,7 +1,7 @@
 //! The fix of a finding as reports show it: SARIF replacements and, for the
 //! agent formats, a unified diff or a one-line summary.
 
-use lighthouse_model::{Position, Safety};
+use lighthouse_model::{Position, Safety, utf16_position};
 use serde_json::{Value, json};
 use similar::{ChangeTag, TextDiff};
 
@@ -143,16 +143,4 @@ pub(crate) fn diff(fix: &ProposedFix, finding_file: &str) -> String {
         out.push('\n');
     }
     out.trim_end_matches('\n').to_owned()
-}
-
-/// `at` with its byte column turned into a count of UTF-16 code units of the
-/// line in `text`; a position outside the text is returned as it is.
-pub(crate) fn utf16_position(text: &str, at: Position) -> Position {
-    let line = text.split('\n').nth(at.line.saturating_sub(1) as usize);
-    let Some(line) = line else { return at };
-    let end = (at.col.saturating_sub(1) as usize).min(line.len());
-    let col = line.get(..end).map_or(at.col, |head| {
-        u32::try_from(head.encode_utf16().count()).map_or(at.col, |n| n + 1)
-    });
-    Position { col, ..at }
 }

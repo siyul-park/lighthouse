@@ -62,3 +62,52 @@ impl<'a> LineIndex<'a> {
         self.starts.get(line).copied().unwrap_or(self.text.len())
     }
 }
+
+/// The unit in which a SARIF run counts columns (`columnKind`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ColumnUnit {
+    /// UTF-16 code units, the unit Lighthouse assumes for a log that does not
+    /// say.
+    #[default]
+    Utf16,
+    /// Unicode code points.
+    CodePoints,
+}
+
+/// `at` with its byte column turned into a count of UTF-16 code units of the
+/// line in `text`; a position outside the text is returned as it is.
+pub fn utf16_position(text: &str, at: Position) -> Position {
+    let line = text.split('\n').nth(at.line.saturating_sub(1) as usize);
+    let Some(line) = line else { return at };
+    let end = (at.col.saturating_sub(1) as usize).min(line.len());
+    let col = line.get(..end).map_or(at.col, |head| {
+        u32::try_from(head.encode_utf16().count()).map_or(at.col, |n| n + 1)
+    });
+    Position { col, ..at }
+}
+
+/// `at` with its column, counted in `unit` on the line in `text`, turned into
+/// a byte column: the reverse of [`utf16_position`]. A column past the end of
+/// the line is clamped to it, and a position outside the text is returned as
+/// it is.
+pub fn byte_position(text: &str, at: Position, unit: ColumnUnit) -> Position {
+    let line = text.split('\n').nth(at.line.saturating_sub(1) as usize);
+    let Some(line) = line else { return at };
+    let wanted = at.col.saturating_sub(1) as usize;
+    let mut counted = 0;
+    let mut bytes = line.len();
+    for (offset, ch) in line.char_indices() {
+        if counted >= wanted {
+            bytes = offset;
+            break;
+        }
+        counted += match unit {
+            ColumnUnit::Utf16 => ch.len_utf16(),
+            ColumnUnit::CodePoints => 1,
+        };
+    }
+    Position {
+        col: u32::try_from(bytes).map_or(at.col, |n| n + 1),
+        ..at
+    }
+}

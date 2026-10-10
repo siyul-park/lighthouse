@@ -1,7 +1,26 @@
-use lighthouse_model::{LineIndex, Position, Span};
+use lighthouse_model::{ColumnUnit, LineIndex, Position, Span, byte_position, utf16_position};
 
 fn at(line: u32, col: u32) -> Position {
     Position { line, col }
+}
+
+#[test]
+fn byte_columns_invert_utf16_columns_and_count_code_points_on_request() {
+    // `é` is 2 bytes and 1 unit; the emoji is 4 bytes, 2 units, 1 code point.
+    let text = "ok\né😀x\n";
+    for (bytes, units, points) in [(1, 1, 1), (3, 2, 2), (7, 4, 3)] {
+        let by = |col, unit| byte_position(text, at(2, col), unit);
+        assert_eq!(by(units, ColumnUnit::Utf16), at(2, bytes));
+        assert_eq!(by(points, ColumnUnit::CodePoints), at(2, bytes));
+        assert_eq!(utf16_position(text, at(2, bytes)), at(2, units));
+    }
+}
+
+#[test]
+fn a_column_past_the_line_is_clamped_and_a_missing_line_is_left_alone() {
+    let text = "ab\n";
+    assert_eq!(byte_position(text, at(1, 99), ColumnUnit::Utf16), at(1, 3));
+    assert_eq!(byte_position(text, at(9, 4), ColumnUnit::Utf16), at(9, 4));
 }
 
 const TEXT: &str = "ab\ncde\n\nf";

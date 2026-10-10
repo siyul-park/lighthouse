@@ -1,8 +1,8 @@
 //! The providers a `check:` block can name, and what the types around them say.
 
 use lighthouse_spec::{
-    Batch, BuiltinCheck, Catalog, Check, CheckKind, CommandCheck, Decision, DecisionStatus,
-    ExitCodes, ModelCheck, NamedRule,
+    Batch, BuiltinCheck, Catalog, Check, CheckKind, CheckOutput, CommandCheck, Decision,
+    DecisionStatus, ExitCodes, ModelCheck, NamedRule,
 };
 use lighthouse_test_support::catalog::*;
 use serde_json::json;
@@ -77,6 +77,37 @@ fn command_check_reads_argv_batch_and_exit_codes_and_refuses_strays() {
     assert_eq!(exit_codes.findings, [2]);
     assert!(check(json!({"type":"command","argv":["x"],"where":"true"})).is_err());
     assert!(check(json!({"type":"command","argv":["x"],"scope":"file"})).is_err());
+}
+
+#[test]
+fn command_check_select_belongs_to_sarif_output_and_names_sarif_levels() {
+    let load = |fields: &str| {
+        let spec = format!(
+            "  severity: error\n  check:\n    type: command\n    argv: [lint]\n{fields}  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{{ path: a.go, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: go\n      kind: valid\n      files: [{{ path: a.go, body: y }}]\n"
+        );
+        Catalog::from_files(decision_with(&spec)).map_err(|e| e.to_string())
+    };
+    let select = "    select: { ruleIds: [\"govet:*\"], levels: [error, note] }\n";
+    assert!(load(&format!("    output: sarif\n{select}")).is_ok());
+    assert!(load(select).unwrap_err().contains("needs `output: sarif`"));
+    let level = "    output: sarif\n    select: { levels: [fatal] }\n";
+    assert!(load(level).unwrap_err().contains("SARIF levels"));
+    let stray = "    output: sarif\n    select: { rules: [x] }\n";
+    assert!(load(stray).is_err());
+}
+
+#[test]
+fn check_output_is_lines_unless_the_check_says_sarif() {
+    let command = |value| match check(value).unwrap().kind {
+        CheckKind::Command(command) => command,
+        other => panic!("command expected, got {}", other.label()),
+    };
+    assert_eq!(
+        command(json!({"type": "command", "argv": ["x"]})).output,
+        CheckOutput::Lines
+    );
+    let sarif = command(json!({"type": "command", "argv": ["x"], "output": "sarif"}));
+    assert_eq!(sarif.output, CheckOutput::Sarif);
 }
 
 #[test]

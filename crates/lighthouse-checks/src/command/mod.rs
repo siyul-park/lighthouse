@@ -3,7 +3,10 @@
 //! a cleared environment. Exit `0` ran and found nothing; `1` ran and printed
 //! one finding per stdout line; anything else (`>= 2`, a signal, a timeout, a
 //! program that cannot start) is an error that leaves the analysis incomplete,
-//! never clean. stderr is for people and only ever explains an error.
+//! never clean. stderr is for people and only ever explains an error. With
+//! `output: sarif` stdout is a SARIF log instead of lines (see [`sarif`]).
+
+mod sarif;
 
 use std::{
     env, fs,
@@ -15,7 +18,7 @@ use lighthouse_model::RunScope;
 use lighthouse_model::{Diagnostic, Position, Project, Span};
 use lighthouse_plugin::{Ctx, Error as PluginError, RuleManifest};
 use lighthouse_process::Spec;
-use lighthouse_spec::{Batch, Check, CheckStdin, CommandCheck};
+use lighthouse_spec::{Batch, Check, CheckOutput, CheckStdin, CommandCheck};
 use serde_json::{Map, Value, json};
 
 /// How long a command that was told to stop may take before it is killed.
@@ -85,6 +88,28 @@ impl CommandRule {
     }
 }
 
+/// What a program that ran printed, and whether its exit code says it found
+/// something.
+#[derive(Default)]
+struct Ran {
+    stdout: String,
+    /// The start of stderr, which explains a failure.
+    stderr: String,
+    found: bool,
+}
+
+impl Ran {
+    /// The non-blank lines of stdout.
+    fn lines(&self) -> Vec<String> {
+        self.stdout
+            .lines()
+            .map(str::trim_end)
+            .filter(|l| !l.trim().is_empty())
+            .map(str::to_owned)
+            .collect()
+    }
+}
+
 struct Run<'a> {
     rule: &'a CommandRule,
     meta: &'a RuleManifest,
@@ -100,8 +125,31 @@ impl Run<'_> {
             CheckStdin::None => Vec::new(),
             CheckStdin::File => text.unwrap_or_default().as_bytes().to_vec(),
         };
-        let lines = self.invoke(&argv, &stdin)?;
-        Ok(self.findings(&lines, Some(file)))
+        let ran = self.invoke(&argv, &stdin)?;
+        self.collect(&ran, &argv, Some(file))
+    }
+
+    /// What the program printed, read as the check says: lines, or SARIF.
+    fn collect(
+        &self,
+        ran: &Ran,
+        argv: &[String],
+        file: Option<&Path>,
+    ) -> Result<Vec<Diagnostic>, PluginError> {
+        match self.rule.spec.output {
+            CheckOutput::Lines => Ok(self.findings(&ran.lines(), file)),
+            CheckOutput::Sarif => {
+                let read = sarif::Reading {
+                    ctx: self.ctx,
+                    meta: self.meta,
+                    select: self.rule.spec.select.as_ref(),
+                    found: ran.found,
+                };
+                read.diagnostics(&ran.stdout).map_err(|e| {
+                    PluginError::Incomplete(format!("`{}` {e}: {}", argv.join(" "), ran.stderr))
+                })
+            }
+        }
     }
 
     /// Invocations over every file of the project, as many files per run as
@@ -117,8 +165,8 @@ impl Run<'_> {
         let mut found = Vec::new();
         for chunk in chunks(&self.rule.spec.argv, &files) {
             let argv = self.arguments(chunk)?;
-            let lines = self.invoke(&argv, &[])?;
-            found.extend(self.findings(&lines, None));
+            let ran = self.invoke(&argv, &[])?;
+            found.extend(self.collect(&ran, &argv, None)?);
         }
         Ok(found)
     }
@@ -150,8 +198,9 @@ impl Run<'_> {
         Ok(argv)
     }
 
-    /// Runs the command; the lines it printed when it found something.
-    fn invoke(&self, argv: &[String], stdin: &[u8]) -> Result<Vec<String>, PluginError> {
+    /// Runs the command; what it printed when it found something (or, for a
+    /// SARIF log, when it ran clean too).
+    fn invoke(&self, argv: &[String], stdin: &[u8]) -> Result<Ran, PluginError> {
         let shown = argv.join(" ");
         let incomplete = |what: String| PluginError::Incomplete(format!("`{shown}` {what}"));
         let output = lighthouse_process::run(&Spec {
@@ -170,11 +219,13 @@ impl Run<'_> {
             return Err(incomplete(format!("was ended by a signal: {stderr}")));
         };
         let codes = &self.rule.spec.exit_codes;
-        if codes.clean.contains(&code) {
-            return Ok(Vec::new());
-        }
-        if !codes.findings.contains(&code) {
+        let found = codes.findings.contains(&code);
+        let clean = codes.clean.contains(&code);
+        if !found && !clean {
             return Err(incomplete(format!("exited {code}: {stderr}")));
+        }
+        if clean && self.rule.spec.output == CheckOutput::Lines {
+            return Ok(Ran::default());
         }
         if output.truncated {
             return Err(incomplete(
@@ -183,18 +234,17 @@ impl Run<'_> {
         }
         let stdout = String::from_utf8(output.stdout)
             .map_err(|_| incomplete("printed output that is not UTF-8".to_owned()))?;
-        let lines: Vec<String> = stdout
-            .lines()
-            .map(str::trim_end)
-            .filter(|l| !l.trim().is_empty())
-            .map(str::to_owned)
-            .collect();
-        if lines.is_empty() {
+        let ran = Ran {
+            stdout,
+            found,
+            stderr: stderr.clone(),
+        };
+        if found && self.rule.spec.output == CheckOutput::Lines && ran.lines().is_empty() {
             return Err(incomplete(format!(
                 "exited {code}, which says it found something, but printed no finding: {stderr}"
             )));
         }
-        Ok(lines)
+        Ok(ran)
     }
 
     /// The environment a command gets and nothing else: the inherited
