@@ -19,7 +19,7 @@ spec:
     is blocking, does I/O or crosses a process boundary, and so needs a
     context at all, stays with review.
 
-    Rust has no such convention and is judged by review only.
+    Go only: Rust has no equivalent convention, and no other check covers it.
   scope:
     domain: code
     subject: symbol

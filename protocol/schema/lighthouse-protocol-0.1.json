@@ -753,7 +753,7 @@
       ]
     },
     "Signature": {
-      "description": "The parameter and result types of a function, receiver excluded.",
+      "description": "The parameter and result types of a function, receiver excluded. A Rust\ntuple result is one `results` entry.",
       "properties": {
         "params": {
           "default": [],
@@ -952,7 +952,7 @@
           ]
         },
         "symbol": {
-          "description": "The project type it names, as a kind-less symbol id (`module::name`),\nwith pointers, references and slice elements stripped.",
+          "description": "The project type it names, as a kind-less symbol id (`module::name`),\nwith pointers, references and aliases stripped; a slice or map names\nnothing.",
           "type": [
             "string",
             "null"

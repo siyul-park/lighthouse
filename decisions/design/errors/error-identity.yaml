@@ -25,7 +25,12 @@ spec:
     Whether callers depend on the cause, and whether a cause is to be hidden
     on purpose, stays with review.
 
-    Rust has no such convention and is judged by review only.
+    Narrower than go-errorlint on purpose: `==` and `!=` are reported only
+    when an operand has the `error` interface type itself (two values of
+    concrete error types compare as they are), and an assertion only when the
+    asserted type has an `Error()` method.
+
+    Go only: Rust has no equivalent convention, and no other check covers it.
   scope:
     domain: code
     subject: symbol

@@ -84,13 +84,13 @@ func (w *eventWalker) call(n *ast.CallExpr) {
 }
 
 // errorf reports a fmt.Errorf whose format has no %w and whose arguments
-// include an error; the detail is the verb that formats the first one.
+// include an error. The format is read as the compiler folded it, so a
+// constant or a concatenation counts and anything else is skipped; the detail is the verb that formats the first one.
 func (w *eventWalker) errorf(n *ast.CallExpr) {
-	lit, ok := n.Args[0].(*ast.BasicLit)
-	if len(n.Args) < 2 || !ok {
+	if len(n.Args) < 2 {
 		return
 	}
-	value := w.info().Types[lit].Value
+	value := w.info().Types[n.Args[0]].Value
 	if value == nil || value.Kind() != constant.String {
 		return
 	}

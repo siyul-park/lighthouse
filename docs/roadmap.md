@@ -150,6 +150,10 @@ Public adoption waits until the decision loop has been shown working.
 | Session domain | decisions about agent actions; a PreToolUse gate that allows, asks or denies |
 
 ## Known gaps
+- A per-language check, `spec.languages.<id>.check`, does not exist. A decision whose
+  deterministic part rests on facts only some providers give (`design/context-first`,
+  `no-stored-context`, `error-identity`, `no-private-types`: Go only) guards its `where` on
+  the language and cannot keep a `model` check for the others.
 - `testing/no-hidden-target` cannot tell a helper that returns or asserts on the target's
   result from one that only builds with it (a data-flow fact: built or consumed against
   returned or asserted), so it is info.

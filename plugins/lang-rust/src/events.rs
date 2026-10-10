@@ -4,7 +4,7 @@
 
 use lighthouse_protocol::{Event, EventKind};
 use syn::{
-    Block, ExprMethodCall, ItemFn, Macro,
+    Block, ExprMethodCall, ItemFn, ItemImpl, Macro,
     visit::{self, Visit},
 };
 
@@ -17,8 +17,8 @@ use crate::{
 /// The macros that panic or mark code that must not run.
 const PANICKING: [&str; 4] = ["panic", "unreachable", "todo", "unimplemented"];
 
-/// The methods that panic on `None` and `Err`.
-const UNWRAPPING: [&str; 2] = ["unwrap", "expect"];
+/// The methods that panic on `None`, `Err` and `Ok`.
+const UNWRAPPING: [&str; 4] = ["unwrap", "expect", "unwrap_err", "expect_err"];
 
 struct Collector<'a> {
     src: &'a SourceFile,
@@ -27,6 +27,8 @@ struct Collector<'a> {
 
 impl<'ast> Visit<'ast> for Collector<'_> {
     fn visit_item_fn(&mut self, _: &'ast ItemFn) {}
+
+    fn visit_item_impl(&mut self, _: &'ast ItemImpl) {}
 
     fn visit_macro(&mut self, mac: &'ast Macro) {
         let name = mac.path.segments.last().map(|s| s.ident.to_string());

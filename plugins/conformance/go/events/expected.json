@@ -351,6 +351,80 @@
             }
           },
           "to": ".::ErrNotFound"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::format#const"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::ConstFormat#function"
+        },
+        {
+          "from": {
+            "symbol": ".::ConstFormat#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 61,
+              "line": 79
+            },
+            "start": {
+              "col": 55,
+              "line": 79
+            }
+          },
+          "to": ".::format"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Concat#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Dynamic#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Indexed#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Star#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::NoArgs#function"
         }
       ],
       "file": {
@@ -829,6 +903,188 @@
           "statements": 2,
           "symbol": ".::Closure#function",
           "tokens": 13,
+          "top_level": 1
+        },
+        {
+          "events": [
+            {
+              "detail": "%v",
+              "kind": "errorf-unwrapped",
+              "span": {
+                "end": {
+                  "col": 67,
+                  "line": 79
+                },
+                "start": {
+                  "col": 44,
+                  "line": 79
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::ConstFormat#function",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "events": [
+            {
+              "detail": "%v",
+              "kind": "errorf-unwrapped",
+              "span": {
+                "end": {
+                  "col": 70,
+                  "line": 81
+                },
+                "start": {
+                  "col": 39,
+                  "line": 81
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Concat#function",
+          "tokens": 13,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              },
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Dynamic#function",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Indexed#function",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "events": [
+            {
+              "detail": "%v",
+              "kind": "errorf-unwrapped",
+              "span": {
+                "end": {
+                  "col": 75,
+                  "line": 87
+                },
+                "start": {
+                  "col": 44,
+                  "line": 87
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              },
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Star#function",
+          "tokens": 15,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::NoArgs#function",
+          "tokens": 9,
           "top_level": 1
         }
       ],
@@ -1448,6 +1704,1473 @@
             "start": {
               "col": 1,
               "line": 73
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 77
+            },
+            "start": {
+              "col": 1,
+              "line": 77
+            }
+          },
+          "file": "events.go",
+          "id": ".::format#const",
+          "kind": "const",
+          "name": "format",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 77
+            },
+            "start": {
+              "col": 7,
+              "line": 77
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 69,
+              "line": 79
+            },
+            "start": {
+              "col": 1,
+              "line": 79
+            }
+          },
+          "file": "events.go",
+          "id": ".::ConstFormat#function",
+          "kind": "function",
+          "name": "ConstFormat",
+          "span": {
+            "end": {
+              "col": 69,
+              "line": 79
+            },
+            "start": {
+              "col": 1,
+              "line": 79
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 72,
+              "line": 81
+            },
+            "start": {
+              "col": 1,
+              "line": 81
+            }
+          },
+          "file": "events.go",
+          "id": ".::Concat#function",
+          "kind": "function",
+          "name": "Concat",
+          "span": {
+            "end": {
+              "col": 72,
+              "line": 81
+            },
+            "start": {
+              "col": 1,
+              "line": 81
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 70,
+              "line": 83
+            },
+            "start": {
+              "col": 1,
+              "line": 83
+            }
+          },
+          "file": "events.go",
+          "id": ".::Dynamic#function",
+          "kind": "function",
+          "name": "Dynamic",
+          "span": {
+            "end": {
+              "col": 70,
+              "line": 83
+            },
+            "start": {
+              "col": 1,
+              "line": 83
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 66,
+              "line": 85
+            },
+            "start": {
+              "col": 1,
+              "line": 85
+            }
+          },
+          "file": "events.go",
+          "id": ".::Indexed#function",
+          "kind": "function",
+          "name": "Indexed",
+          "span": {
+            "end": {
+              "col": 66,
+              "line": 85
+            },
+            "start": {
+              "col": 1,
+              "line": 85
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 77,
+              "line": 87
+            },
+            "start": {
+              "col": 1,
+              "line": 87
+            }
+          },
+          "file": "events.go",
+          "id": ".::Star#function",
+          "kind": "function",
+          "name": "Star",
+          "span": {
+            "end": {
+              "col": 77,
+              "line": 87
+            },
+            "start": {
+              "col": 1,
+              "line": 87
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 51,
+              "line": 89
+            },
+            "start": {
+              "col": 1,
+              "line": 89
+            }
+          },
+          "file": "events.go",
+          "id": ".::NoArgs#function",
+          "kind": "function",
+          "name": "NoArgs",
+          "span": {
+            "end": {
+              "col": 51,
+              "line": 89
+            },
+            "start": {
+              "col": 1,
+              "line": 89
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [
+        {
+          "attached_to": ".::Shielded#type",
+          "span": {
+            "end": {
+              "col": 50,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "text": "// Shielded replaces the Close it gets from Base."
+        },
+        {
+          "attached_to": ".::Holder#type",
+          "span": {
+            "end": {
+              "col": 69,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 22
+            }
+          },
+          "text": "// Holder gets Name from Leaf; the interface is satisfied by Holder."
+        },
+        {
+          "attached_to": ".::entry#type",
+          "span": {
+            "end": {
+              "col": 74,
+              "line": 35
+            },
+            "start": {
+              "col": 1,
+              "line": 35
+            }
+          },
+          "text": "// entry is only ever used as a value of an interface of another package."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "io/fs"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "os"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "time"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Base#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Base#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Base::Close#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Shielded#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Shielded#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Shielded::Base#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Shielded#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Shielded::Close#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Shielded::Close#method"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 54,
+              "line": 16
+            },
+            "start": {
+              "col": 49,
+              "line": 16
+            }
+          },
+          "to": ".::Base::Close"
+        },
+        {
+          "from": {
+            "symbol": ".::Shielded::Close#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 48,
+              "line": 16
+            },
+            "start": {
+              "col": 44,
+              "line": 16
+            }
+          },
+          "to": ".::Shielded::Base"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Leaf#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Leaf#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Leaf::Name#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Holder#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Holder#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Holder::Leaf#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::namer#interface"
+        },
+        {
+          "from": {
+            "symbol": ".::namer#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::namer::Name#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Use#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Use#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 27
+            },
+            "start": {
+              "col": 37,
+              "line": 27
+            }
+          },
+          "to": ".::namer::Name"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Pass#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Pass#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 32,
+              "line": 29
+            },
+            "start": {
+              "col": 29,
+              "line": 29
+            }
+          },
+          "to": ".::Use"
+        },
+        {
+          "from": {
+            "symbol": ".::Pass#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 39,
+              "line": 29
+            },
+            "start": {
+              "col": 33,
+              "line": 29
+            }
+          },
+          "to": ".::Holder"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Simple#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Simple#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Simple::Other#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::entry#type"
+        },
+        {
+          "from": {
+            "symbol": ".::entry#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::entry::Name#method"
+        },
+        {
+          "from": {
+            "symbol": ".::entry#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::entry::Size#method"
+        },
+        {
+          "from": {
+            "symbol": ".::entry#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::entry::Mode#method"
+        },
+        {
+          "from": {
+            "symbol": ".::entry#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::entry::ModTime#method"
+        },
+        {
+          "from": {
+            "symbol": ".::entry#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::entry::IsDir#method"
+        },
+        {
+          "from": {
+            "symbol": ".::entry#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::entry::Sys#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Stat#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Stat#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 48
+            },
+            "start": {
+              "col": 10,
+              "line": 48
+            }
+          },
+          "to": ".::entry"
+        }
+      ],
+      "file": {
+        "path": "promoted.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Base::Close#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Shielded::Close#method",
+          "tokens": 10,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Leaf::Name#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": false,
+                "symbol": ".::namer",
+                "text": "example.com/events.namer"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Use#function",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Pass#function",
+          "tokens": 9,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Simple::Other#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::entry::Name#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int64"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::entry::Size#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "io/fs.FileMode"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::entry::Mode#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "time.Time"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::entry::ModTime#method",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "bool"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::entry::IsDir#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "any"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::entry::Sys#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "io/fs.FileInfo"
+              }
+            ]
+          },
+          "statements": 4,
+          "symbol": ".::Stat#function",
+          "tokens": 24,
+          "top_level": 3
+        }
+      ],
+      "modules": [
+        {
+          "name": "events",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 9
+            },
+            "start": {
+              "col": 1,
+              "line": 9
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Base#type",
+          "kind": "type",
+          "name": "Base",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 9
+            },
+            "start": {
+              "col": 6,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 41,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Base::Close#method",
+          "kind": "method",
+          "name": "Close",
+          "owner": ".::Base#type",
+          "span": {
+            "end": {
+              "col": 41,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 11
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Shielded replaces the Close it gets from Base.",
+          "extent": {
+            "end": {
+              "col": 29,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Shielded#type",
+          "kind": "type",
+          "name": "Shielded",
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 14
+            },
+            "start": {
+              "col": 6,
+              "line": 14
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 14
+            },
+            "start": {
+              "col": 23,
+              "line": 14
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Shielded::Base#field",
+          "kind": "field",
+          "name": "Base",
+          "owner": ".::Shielded#type",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 14
+            },
+            "start": {
+              "col": 23,
+              "line": 14
+            }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": ".::Base",
+            "text": "example.com/events.Base"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 58,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Shielded::Close#method",
+          "kind": "method",
+          "name": "Close",
+          "owner": ".::Shielded#type",
+          "span": {
+            "end": {
+              "col": 58,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Leaf#type",
+          "kind": "type",
+          "name": "Leaf",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 18
+            },
+            "start": {
+              "col": 6,
+              "line": 18
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 40,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Leaf::Name#method",
+          "kind": "method",
+          "name": "Name",
+          "owner": ".::Leaf#type",
+          "span": {
+            "end": {
+              "col": 40,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Holder gets Name from Leaf; the interface is satisfied by Holder.",
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 22
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Holder#type",
+          "kind": "type",
+          "name": "Holder",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 23
+            },
+            "start": {
+              "col": 6,
+              "line": 23
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 23
+            },
+            "start": {
+              "col": 21,
+              "line": 23
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Holder::Leaf#field",
+          "kind": "field",
+          "name": "Leaf",
+          "owner": ".::Holder#type",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 23
+            },
+            "start": {
+              "col": 21,
+              "line": 23
+            }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": ".::Leaf",
+            "text": "example.com/events.Leaf"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 38,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 25
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::namer#interface",
+          "kind": "interface",
+          "name": "namer",
+          "span": {
+            "end": {
+              "col": 38,
+              "line": 25
+            },
+            "start": {
+              "col": 6,
+              "line": 25
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 36,
+              "line": 25
+            },
+            "start": {
+              "col": 23,
+              "line": 25
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::namer::Name#method",
+          "kind": "method",
+          "name": "Name",
+          "owner": ".::namer#interface",
+          "span": {
+            "end": {
+              "col": 36,
+              "line": 25
+            },
+            "start": {
+              "col": 23,
+              "line": 25
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 45,
+              "line": 27
+            },
+            "start": {
+              "col": 1,
+              "line": 27
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Use#function",
+          "kind": "function",
+          "name": "Use",
+          "span": {
+            "end": {
+              "col": 45,
+              "line": 27
+            },
+            "start": {
+              "col": 1,
+              "line": 27
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 44,
+              "line": 29
+            },
+            "start": {
+              "col": 1,
+              "line": 29
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Pass#function",
+          "kind": "function",
+          "name": "Pass",
+          "span": {
+            "end": {
+              "col": 44,
+              "line": 29
+            },
+            "start": {
+              "col": 1,
+              "line": 29
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 31
+            },
+            "start": {
+              "col": 1,
+              "line": 31
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Simple#type",
+          "kind": "type",
+          "name": "Simple",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 31
+            },
+            "start": {
+              "col": 6,
+              "line": 31
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 39,
+              "line": 33
+            },
+            "start": {
+              "col": 1,
+              "line": 33
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Simple::Other#method",
+          "kind": "method",
+          "name": "Other",
+          "owner": ".::Simple#type",
+          "span": {
+            "end": {
+              "col": 39,
+              "line": 33
+            },
+            "start": {
+              "col": 1,
+              "line": 33
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "entry is only ever used as a value of an interface of another package.",
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 35
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::entry#type",
+          "kind": "type",
+          "name": "entry",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 36
+            },
+            "start": {
+              "col": 6,
+              "line": 36
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 47,
+              "line": 38
+            },
+            "start": {
+              "col": 1,
+              "line": 38
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::entry::Name#method",
+          "kind": "method",
+          "name": "Name",
+          "owner": ".::entry#type",
+          "span": {
+            "end": {
+              "col": 47,
+              "line": 38
+            },
+            "start": {
+              "col": 1,
+              "line": 38
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 46,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 39
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::entry::Size#method",
+          "kind": "method",
+          "name": "Size",
+          "owner": ".::entry#type",
+          "span": {
+            "end": {
+              "col": 46,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 39
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 46,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 40
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::entry::Mode#method",
+          "kind": "method",
+          "name": "Mode",
+          "owner": ".::entry#type",
+          "span": {
+            "end": {
+              "col": 46,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 40
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 56,
+              "line": 41
+            },
+            "start": {
+              "col": 1,
+              "line": 41
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::entry::ModTime#method",
+          "kind": "method",
+          "name": "ModTime",
+          "owner": ".::entry#type",
+          "span": {
+            "end": {
+              "col": 56,
+              "line": 41
+            },
+            "start": {
+              "col": 1,
+              "line": 41
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 50,
+              "line": 42
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::entry::IsDir#method",
+          "kind": "method",
+          "name": "IsDir",
+          "owner": ".::entry#type",
+          "span": {
+            "end": {
+              "col": 50,
+              "line": 42
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 48,
+              "line": 43
+            },
+            "start": {
+              "col": 1,
+              "line": 43
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::entry::Sys#method",
+          "kind": "method",
+          "name": "Sys",
+          "owner": ".::entry#type",
+          "span": {
+            "end": {
+              "col": 48,
+              "line": 43
+            },
+            "start": {
+              "col": 1,
+              "line": 43
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 51
+            },
+            "start": {
+              "col": 1,
+              "line": 45
+            }
+          },
+          "file": "promoted.go",
+          "id": ".::Stat#function",
+          "kind": "function",
+          "name": "Stat",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 51
+            },
+            "start": {
+              "col": 1,
+              "line": 45
             }
           },
           "visibility": "public"

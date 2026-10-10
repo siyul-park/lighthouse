@@ -297,7 +297,7 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
         ]
     );
     let recommended = preset("design/recommended");
-    assert_eq!(recommended.len(), design.len() - 6);
+    assert_eq!(recommended.len(), design.len() - 7);
     for strict in [
         "design/private-helper-callers",
         "design/max-name-words",
@@ -305,6 +305,7 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
         "design/tiny-modules",
         "design/feature-envy",
         "design/misplaced-symbol",
+        "design/no-panic",
     ] {
         assert!(!recommended.contains_key(strict), "{strict}");
     }

@@ -605,3 +605,36 @@ fn no_panic_reports_each_event_at_its_place() {
     let found = w.check("design/no-panic", json!({ "allowPrefixes": [] }));
     assert_eq!(found.len(), 3, "the prefix is what exempts must_run");
 }
+
+#[test]
+fn an_event_keeps_its_identity_when_a_different_event_comes_before_it() {
+    let mut w = World::default();
+    let run = w.func("m", "run", "m/a.ucm");
+    with_events(
+        &mut w,
+        &run,
+        &[
+            (EventKind::Unwrap, 8, "unwrap"),
+            (EventKind::Unwrap, 9, "unwrap"),
+        ],
+    );
+    let before = w.fingerprints("design/no-panic", json!({}));
+    with_events(
+        &mut w,
+        &run,
+        &[
+            (EventKind::Panic, 5, "todo"),
+            (EventKind::Unwrap, 8, "unwrap"),
+            (EventKind::Unwrap, 9, "unwrap"),
+        ],
+    );
+    let after = w.fingerprints("design/no-panic", json!({}));
+    assert_eq!(after.len(), 3);
+    assert_eq!(before.len(), 2);
+    assert_eq!(
+        &after[1..],
+        &before[..],
+        "same kind and detail, same ordinal"
+    );
+    assert_ne!(before[0], before[1], "the second unwrap is another event");
+}

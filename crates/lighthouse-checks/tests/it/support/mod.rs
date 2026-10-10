@@ -228,6 +228,31 @@ impl World {
     }
 
     pub fn check_in(&self, subject: &Subject, rule: &str, options: Value) -> Vec<(String, u32)> {
+        self.diagnose_in(subject, rule, options)
+            .iter()
+            .map(|d| (d.file.to_string_lossy().into_owned(), d.span.start.line))
+            .collect()
+    }
+
+    /// The fingerprints of what `rule` reports, in report order.
+    pub fn fingerprints(&self, rule: &str, options: Value) -> Vec<String> {
+        let design = Pack::of("design", Catalog::bundled());
+        let subject = Subject {
+            plugin: &design,
+            id: "design",
+        };
+        self.diagnose_in(&subject, rule, options)
+            .iter()
+            .map(|d| format!("{:?}", d.fingerprint))
+            .collect()
+    }
+
+    fn diagnose_in(
+        &self,
+        subject: &Subject,
+        rule: &str,
+        options: Value,
+    ) -> Vec<lighthouse_model::Diagnostic> {
         let dir = tempfile::tempdir().unwrap();
         for (path, generated) in &self.files {
             let file = File {
@@ -321,11 +346,7 @@ impl World {
             "the check did not finish: {:?}",
             outcome.incomplete
         );
-        outcome
-            .diagnostics
-            .iter()
-            .map(|d| (d.file.to_string_lossy().into_owned(), d.span.start.line))
-            .collect()
+        outcome.diagnostics
     }
 
     pub fn names(&self, found: &[(String, u32)]) -> Vec<String> {

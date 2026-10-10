@@ -7,6 +7,7 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: errors
+    lighthouse/preset: strict
 spec:
   title: "Return errors, do not panic"
   context: >-
@@ -22,7 +23,8 @@ spec:
     APIs and documented hot-path invariants are allowed by the requirement
     and stay with review. Test code, entrypoints (`main`, `init`) and
     functions whose name starts with one of `allowPrefixes` are not reported.
-    Clippy's restriction lints are opt-in for the same reason.
+    The decision is in the `strict` preset only, as clippy's restriction lints
+    and forbidigo are opt-in for the same reason.
   scope:
     domain: code
     subject: symbol
@@ -40,10 +42,10 @@ spec:
         description: Name prefixes of functions that may panic.
       kinds:
         type: array
-        default: [panic, unwrap, expect, todo, unimplemented, unreachable]
+        default: [panic, unwrap, expect, unwrap_err, expect_err, todo, unimplemented, unreachable]
         description: >-
           What to report: a Go call of `panic`, a Rust macro (`panic`, `todo`,
-          `unimplemented`, `unreachable`) or method (`unwrap`, `expect`).
+          `unimplemented`, `unreachable`) or method (`unwrap`, `expect`, `unwrap_err`, `expect_err`).
     additionalProperties: false
   check:
     type: cel
@@ -247,4 +249,25 @@ spec:
           body: |-
             pub fn must_parse(text: &str) -> u32 {
                 text.parse().unwrap()
+            }
+    - name: rust-helper-in-a-test-module
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn double(n: u32) -> u32 {
+                n * 2
+            }
+
+            #[cfg(test)]
+            mod tests {
+                fn parse(text: &str) -> u32 {
+                    text.parse().unwrap()
+                }
+
+                #[test]
+                fn doubles() {
+                    assert_eq!(super::double(parse("2")), 4);
+                }
             }

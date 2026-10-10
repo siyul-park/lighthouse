@@ -73,3 +73,17 @@ func Choose(err error) int {
 func Closure(err error) func() bool {
 	return func() bool { return err == ErrNotFound }
 }
+
+const format = "fetch: %v"
+
+func ConstFormat(err error) error { return fmt.Errorf(format, err) }
+
+func Concat(err error) error { return fmt.Errorf("fetch"+": %v", err) }
+
+func Dynamic(f string, err error) error { return fmt.Errorf(f, err) }
+
+func Indexed(err error) error { return fmt.Errorf("%[1]v", err) }
+
+func Star(w int, err error) error { return fmt.Errorf("%*d %v", w, 1, err) }
+
+func NoArgs() error { return fmt.Errorf("plain") }

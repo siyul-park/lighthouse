@@ -21,8 +21,8 @@ spec:
     into. Whether callers could use the API without the type, say through an
     interface it satisfies, stays with review.
 
-    Rust: the compiler already rejects a private type in a public interface
-    (`private_interfaces`, `private_bounds`), so no check is needed.
+    Go only: Rust is covered by the compiler (`private_interfaces`,
+    `private_bounds`), so no check is needed.
   scope:
     domain: code
     subject: symbol

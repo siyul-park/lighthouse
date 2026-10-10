@@ -429,7 +429,8 @@ pub struct TypeRef {
     /// (`Option<Ctx>`, `&mut Builder`).
     pub text: String,
     /// The project type it names, as a kind-less symbol id (`module::name`),
-    /// with pointers, references and slice elements stripped.
+    /// with pointers, references and aliases stripped; a slice or map names
+    /// nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub symbol: Option<String>,
     /// Whether that named type is visible outside its module, when known.
@@ -437,7 +438,8 @@ pub struct TypeRef {
     pub exported: Option<bool>,
 }
 
-/// The parameter and result types of a function, receiver excluded.
+/// The parameter and result types of a function, receiver excluded. A Rust
+/// tuple result is one `results` entry.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Signature {
     #[serde(default)]

@@ -244,14 +244,15 @@ associated function without a receiver that returns `Self` or its owner type, ba
 or in a `Result` or `Option`.
 
 `signature` (optional) is `{ params, results }`, the types of the parameters
-(receiver excluded) and results, one `TypeRef` per occurrence in order. A
+(receiver excluded) and results, one `TypeRef` per occurrence in order (a Rust
+tuple result is one entry). A
 `TypeRef` is `{ text, symbol?, exported? }`:
 - `text` is the type as written, normalized. Go prints it with `types.TypeString`
   and the full import path as qualifier (`context.Context`, `*example.com/m/x.T`,
   `[]string`); Rust prints the type's tokens without the spaces between them
   (`Option<Ctx>`, `&mut Builder`).
 - `symbol` is the project type it names, as a kind-less symbol id (`module::Type`),
-  behind pointers and references (Go also looks through aliases), so rules can ask
+  behind pointers, references and aliases, so rules can ask
   whether a function takes a value of some type and find the struct that exists only
   for one function. A slice or map of the type names nothing.
 - `exported` is whether that named type is exported, when `symbol` is set: Go
@@ -272,7 +273,7 @@ summaries of their own.
 | kind | maps |
 |---|---|
 | `panic` | Go: a call of the builtin `panic`. Rust: the `panic!`, `unreachable!`, `todo!` and `unimplemented!` macros; `detail` is the macro name |
-| `unwrap` | Rust: a `.unwrap()` or `.expect(..)` call on any receiver, as clippy's `unwrap_used` and `expect_used` see it; `detail` is the method name |
+| `unwrap` | Rust: a `.unwrap()`, `.expect(..)`, `.unwrap_err()` or `.expect_err(..)` call on any receiver, as clippy's `unwrap_used` and `expect_used` see it; `detail` is the method name |
 | `error-compare` | Go: `==` or `!=` where one operand has type `error` and the other is not `nil` (or a `switch` on an error with a case other than `nil`), after go-errorlint's `comparison`; `detail` is the error operand. `io.EOF`, `sql.ErrNoRows` and the body of an `Is(error) bool` method are exempt |
 | `error-assert` | Go: a type assertion to an error type, or a type switch, on an `error` value, after go-errorlint's `asserts`; `detail` is the asserted type, or the operand of a type switch |
 | `errorf-unwrapped` | Go: `fmt.Errorf` with a literal format that has no `%w` and an argument that is an error, after go-errorlint's `errorf`; `detail` is the verb that formats the first such argument |

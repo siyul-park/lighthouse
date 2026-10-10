@@ -983,7 +983,7 @@ Public APIs are stable contracts: expose the minimum caller-facing abstraction a
 
 `design/no-private-types` · symbol · warn · cel
 
-*Callers must be able to use an API without naming private types. Go: An exported function, or an exported method of an exported type, whose parameters or results name a project type that is not exported is reported (revive `unexported-return` for results, golint's "exported func returns unexported type"; parameters follow the same reasoning). An alias that exports the type (`type Option = option`) is the remedy and passes; the type behind pointers is what counts, a slice or map of it is not looked into. Whether callers could use the API without the type, say through an interface it satisfies, stays with review. Rust: the compiler already rejects a private type in a public interface (`private_interfaces`, `private_bounds`), so no check is needed.*
+*Callers must be able to use an API without naming private types. Go: An exported function, or an exported method of an exported type, whose parameters or results name a project type that is not exported is reported (revive `unexported-return` for results, golint's "exported func returns unexported type"; parameters follow the same reasoning). An alias that exports the type (`type Option = option`) is the remedy and passes; the type behind pointers is what counts, a slice or map of it is not looked into. Whether callers could use the API without the type, say through an interface it satisfies, stays with review. Go only: Rust is covered by the compiler (`private_interfaces`, `private_bounds`), so no check is needed.*
 
 Public APIs MUST be usable without callers naming private types.
 
@@ -1062,7 +1062,7 @@ Concurrency rules prevent races and leaks by making shared state and shutdown ow
 
 `design/context-first` · symbol · warn · cel
 
-*A uniform position makes cancellation visible and checkable. Go: `ctx context.Context` is the first parameter. The position is checked (revive `context-as-argument`): a function with a body that takes a `context.Context` after another parameter is reported, unless every parameter before it is one of `allowTypesBefore`. Whether the operation is blocking, does I/O or crosses a process boundary, and so needs a context at all, stays with review. Rust has no such convention and is judged by review only.*
+*A uniform position makes cancellation visible and checkable. Go: `ctx context.Context` is the first parameter. The position is checked (revive `context-as-argument`): a function with a body that takes a `context.Context` after another parameter is reported, unless every parameter before it is one of `allowTypesBefore`. Whether the operation is blocking, does I/O or crosses a process boundary, and so needs a context at all, stays with review. Go only: Rust has no equivalent convention, and no other check covers it.*
 
 Blocking, I/O, and process-boundary operations MUST take the cancellation context as their first parameter.
 
@@ -1094,7 +1094,7 @@ Also: rust
 
 `design/no-stored-context` · symbol · warn · cel
 
-*A request context outliving its request carries stale cancellation. Go: A struct field of type `context.Context` is reported (containedctx). Whether the struct is long-lived, and whether the context is a request context at all, stays with review: a struct that is itself the request is the usual exception. Rust has no request context type and is judged by review only.*
+*A request context outliving its request carries stale cancellation. Go: A struct field of type `context.Context` is reported (containedctx). Whether the struct is long-lived, and whether the context is a request context at all, stays with review: a struct that is itself the request is the usual exception. Go only: Rust has no request context type, and no other check covers it.*
 
 Request contexts MUST NOT be stored in long-lived objects.
 
@@ -1139,7 +1139,7 @@ Errors are contracts: callers should be able to classify failures, preserve caus
 
 `design/error-identity` · symbol · warn · cel
 
-*Adding context must not hide the cause callers depend on. Go: Wrap with `%w` when adding context. The three ways code stops working once an error is wrapped are reported, one finding each at the place (go-errorlint): an error compared with `==` or `!=`, or switched on (`comparison`); a type assertion or type switch on an error (`asserts`); a `fmt.Errorf` that formats an error without `%w` (`errorf`). Comparing with `nil`, `io.EOF` or `sql.ErrNoRows`, and the body of an `Is(error) bool` method are not reported. go-errorlint lets these and a longer list of standard library sentinels through only when the error comes straight from the function that documents returning it; this check does not follow that flow, and reports the other sentinels. Whether callers depend on the cause, and whether a cause is to be hidden on purpose, stays with review. Rust has no such convention and is judged by review only.*
+*Adding context must not hide the cause callers depend on. Go: Wrap with `%w` when adding context. The three ways code stops working once an error is wrapped are reported, one finding each at the place (go-errorlint): an error compared with `==` or `!=`, or switched on (`comparison`); a type assertion or type switch on an error (`asserts`); a `fmt.Errorf` that formats an error without `%w` (`errorf`). Comparing with `nil`, `io.EOF` or `sql.ErrNoRows`, and the body of an `Is(error) bool` method are not reported. go-errorlint lets these and a longer list of standard library sentinels through only when the error comes straight from the function that documents returning it; this check does not follow that flow, and reports the other sentinels. Whether callers depend on the cause, and whether a cause is to be hidden on purpose, stays with review. Narrower than go-errorlint on purpose: `==` and `!=` are reported only when an operand has the `error` interface type itself (two values of concrete error types compare as they are), and an assertion only when the asserted type has an `Error()` method. Go only: Rust has no equivalent convention, and no other check covers it.*
 
 Dependency identity MUST be preserved when callers depend on it; context added to an error MUST keep the cause reachable.
 
@@ -1175,9 +1175,9 @@ Also: rust
 
 ### Return errors, do not panic
 
-`design/no-panic` · symbol · info · cel
+`design/no-panic` · symbol · info · cel · strict
 
-*Panics bypass the caller's control flow. Every place production code can panic is reported, one finding each (forbidigo `^panic$`; clippy's restriction lints `panic`, `unwrap_used`, `expect_used`, `todo`, `unimplemented`, `unreachable`): Go reports a call of `panic`; Rust reports the `panic!`, `unreachable!`, `todo!` and `unimplemented!` macros and any `.unwrap()` or `.expect(..)` call (syntactically, on any receiver, as clippy does). The findings are candidates, not violations: impossible programmer errors, `Must*`-style APIs and documented hot-path invariants are allowed by the requirement and stay with review. Test code, entrypoints (`main`, `init`) and functions whose name starts with one of `allowPrefixes` are not reported. Clippy's restriction lints are opt-in for the same reason.*
+*Panics bypass the caller's control flow. Every place production code can panic is reported, one finding each (forbidigo `^panic$`; clippy's restriction lints `panic`, `unwrap_used`, `expect_used`, `todo`, `unimplemented`, `unreachable`): Go reports a call of `panic`; Rust reports the `panic!`, `unreachable!`, `todo!` and `unimplemented!` macros and any `.unwrap()` or `.expect(..)` call (syntactically, on any receiver, as clippy does). The findings are candidates, not violations: impossible programmer errors, `Must*`-style APIs and documented hot-path invariants are allowed by the requirement and stay with review. Test code, entrypoints (`main`, `init`) and functions whose name starts with one of `allowPrefixes` are not reported. The decision is in the `strict` preset only, as clippy's restriction lints and forbidigo are opt-in for the same reason.*
 
 Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
 
@@ -1186,7 +1186,7 @@ Derived from: forbidigo patterns: https://github.com/ashanbrown/forbidigo#readme
 | option | default | meaning |
 | --- | --- | --- |
 | `allowPrefixes` | `["Must","must"]` | Name prefixes of functions that may panic. |
-| `kinds` | `["panic","unwrap","expect","todo","unimplemented","unreachable"]` | What to report: a Go call of `panic`, a Rust macro (`panic`, `todo`, `unimplemented`, `unreachable`) or method (`unwrap`, `expect`). |
+| `kinds` | `["panic","unwrap","expect","unwrap_err","expect_err","todo","unimplemented","unreachable"]` | What to report: a Go call of `panic`, a Rust macro (`panic`, `todo`, `unimplemented`, `unreachable`) or method (`unwrap`, `expect`, `unwrap_err`, `expect_err`). |
 
 ```go invalid
 package sample

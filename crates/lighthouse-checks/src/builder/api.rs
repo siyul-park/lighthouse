@@ -49,7 +49,8 @@ impl Builder<'_> {
     }
 
     /// The events of a function, each as `event` sees it: `kind`, `detail`,
-    /// the place (`line`, `end_line`, `col`) and the function it is in (`func`).
+    /// the place (`line`, `end_line`, `col`, `end_col`) and the function it is in
+    /// (`func`).
     pub(crate) fn event_facts(&self, symbol: &Symbol) -> Vec<EventFact> {
         let Some(summary) = self.project.function(&symbol.id) else {
             return Vec::new();
@@ -58,32 +59,34 @@ impl Builder<'_> {
             return Vec::new();
         }
         let func = self.symbol(symbol);
-        let mut seen: Vec<(&str, u32)> = Vec::new();
+        let mut seen: Vec<((&str, &str), u32)> = Vec::new();
         summary
             .events
             .iter()
             .map(|event| {
                 let kind = event.kind.as_str();
-                let ordinal = ordinal(&mut seen, kind);
+                let detail = event.detail.as_deref().unwrap_or_default();
+                let ordinal = ordinal(&mut seen, (kind, detail));
                 EventFact {
                     fact: cel_fact(&event_value(event, &func)),
                     span: event.span,
-                    key: format!("{}#{kind}#{ordinal}", symbol.id.as_str()),
+                    key: format!("{}#{kind}#{detail}#{ordinal}", symbol.id.as_str()),
                 }
             })
             .collect()
     }
 }
 
-/// How many events of `kind` came before, counting this one afterwards.
-fn ordinal<'a>(seen: &mut Vec<(&'a str, u32)>, kind: &'a str) -> u32 {
-    match seen.iter_mut().find(|(k, _)| *k == kind) {
+/// How many events of the same kind and detail came before this one, so that
+/// a different event in front of it does not move its identity.
+fn ordinal<'a>(seen: &mut Vec<((&'a str, &'a str), u32)>, id: (&'a str, &'a str)) -> u32 {
+    match seen.iter_mut().find(|(k, _)| *k == id) {
         Some((_, n)) => {
             *n += 1;
             *n
         }
         None => {
-            seen.push((kind, 0));
+            seen.push((id, 0));
             0
         }
     }
@@ -96,6 +99,7 @@ fn event_value(event: &Event, func: &Value) -> Value {
         "line": event.span.start.line,
         "end_line": event.span.end.line,
         "col": event.span.start.col,
+        "end_col": event.span.end.col,
         "func": func,
     })
 }

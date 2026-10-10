@@ -12,6 +12,9 @@ import (
 type interfaceSet struct {
 	once     sync.Once
 	byMethod map[string][]*types.Interface
+	// embedders are the types of the package that embed a type, by the
+	// embedded type: its methods are promoted into them.
+	embedders map[*types.TypeName][]*types.Named
 }
 
 // roles: what a function is for, as far as the types say. A method whose
@@ -37,9 +40,18 @@ func (u *unit) implementation(d *ast.FuncDecl) bool {
 	if !ok || named.TypeParams().Len() > 0 {
 		return false
 	}
-	for _, iface := range u.res.interfacesOf(u.pkg).byMethod[d.Name.Name] {
-		if types.Implements(named, iface) || types.Implements(types.NewPointer(named), iface) {
+	if overridesPromoted(named, u.pkg.Types, d.Name.Name) {
+		return true
+	}
+	set := u.res.interfacesOf(u.pkg)
+	for _, iface := range set.byMethod[d.Name.Name] {
+		if satisfies(named, iface) {
 			return true
+		}
+		for _, holder := range set.embedders[named.Obj()] {
+			if satisfies(holder, iface) {
+				return true
+			}
 		}
 	}
 	return false
@@ -88,7 +100,10 @@ func receiverNamed(t types.Type) (*types.Named, bool) {
 func (r *resolver) interfacesOf(pkg *packages.Package) *interfaceSet {
 	cached, _ := r.interfaces.LoadOrStore(pkg, &interfaceSet{})
 	set := cached.(*interfaceSet)
-	set.once.Do(func() { set.byMethod = collectInterfaces(pkg) })
+	set.once.Do(func() {
+		set.byMethod = collectInterfaces(pkg)
+		set.embedders = collectEmbedders(pkg)
+	})
 	return set
 }
 
@@ -116,6 +131,11 @@ func collectInterfaces(pkg *packages.Package) map[string][]*types.Interface {
 			}
 		}
 	}
+	for _, tv := range pkg.TypesInfo.Types {
+		if tv.Type != nil && !tv.IsType() {
+			add(tv.Type)
+		}
+	}
 	for _, file := range pkg.Syntax {
 		ast.Inspect(file, func(n ast.Node) bool {
 			if call, ok := n.(*ast.CallExpr); ok {
@@ -123,6 +143,33 @@ func collectInterfaces(pkg *packages.Package) map[string][]*types.Interface {
 			}
 			return true
 		})
+	}
+	return found
+}
+
+// collectEmbedders maps each type embedded in a struct type of the package
+// (behind a pointer or not) to the struct types that embed it.
+func collectEmbedders(pkg *packages.Package) map[*types.TypeName][]*types.Named {
+	found := map[*types.TypeName][]*types.Named{}
+	scope := pkg.Types.Scope()
+	for _, name := range scope.Names() {
+		tn, ok := scope.Lookup(name).(*types.TypeName)
+		if !ok {
+			continue
+		}
+		holder, ok := tn.Type().(*types.Named)
+		if !ok || holder.TypeParams().Len() > 0 {
+			continue
+		}
+		st, ok := holder.Underlying().(*types.Struct)
+		if !ok {
+			continue
+		}
+		for field := range st.Fields() {
+			if embedded, ok := receiverNamed(field.Type()); ok && field.Embedded() {
+				found[embedded.Obj()] = append(found[embedded.Obj()], holder)
+			}
+		}
 	}
 	return found
 }
@@ -145,4 +192,29 @@ func addParameters(info *types.Info, call *ast.CallExpr, add func(types.Type)) {
 		}
 		add(pt)
 	}
+}
+
+// satisfies reports whether the type, or a pointer to it, implements iface.
+func satisfies(named *types.Named, iface *types.Interface) bool {
+	return types.Implements(named, iface) || types.Implements(types.NewPointer(named), iface)
+}
+
+// overridesPromoted reports whether a struct type embeds a field that has a
+// method of this name: the declaration replaces a promoted method, so the
+// embedded type's contract is what it keeps.
+func overridesPromoted(named *types.Named, pkg *types.Package, name string) bool {
+	st, ok := named.Underlying().(*types.Struct)
+	if !ok {
+		return false
+	}
+	for field := range st.Fields() {
+		if !field.Embedded() {
+			continue
+		}
+		obj, _, _ := types.LookupFieldOrMethod(field.Type(), true, pkg, name)
+		if _, isMethod := obj.(*types.Func); isMethod {
+			return true
+		}
+	}
+	return false
 }

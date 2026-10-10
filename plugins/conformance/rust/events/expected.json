@@ -141,6 +141,22 @@
           },
           "kind": "contains",
           "resolution": "syntactic",
+          "to": "events::flipped#function"
+        },
+        {
+          "from": {
+            "module": "events"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::declared#function"
+        },
+        {
+          "from": {
+            "module": "events"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
           "to": "events::quiet#function"
         }
       ],
@@ -417,6 +433,62 @@
           "statements": 1,
           "symbol": "events::inner::helper#function",
           "tokens": 10,
+          "top_level": 1
+        },
+        {
+          "events": [
+            {
+              "detail": "unwrap_err",
+              "kind": "unwrap",
+              "span": {
+                "end": {
+                  "col": 17,
+                  "line": 43
+                },
+                "start": {
+                  "col": 7,
+                  "line": 43
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Result<u32,String>"
+              }
+            ],
+            "results": [
+              {
+                "text": "String"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "events::flipped#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "events::declared#function",
+          "tokens": 32,
           "top_level": 1
         },
         {
@@ -791,9 +863,9 @@
             }
           },
           "file": "src/lib.rs",
-          "id": "events::quiet#function",
+          "id": "events::flipped#function",
           "kind": "function",
-          "name": "quiet",
+          "name": "flipped",
           "span": {
             "end": {
               "col": 2,
@@ -802,6 +874,60 @@
             "start": {
               "col": 1,
               "line": 42
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 54
+            },
+            "start": {
+              "col": 1,
+              "line": 46
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::declared#function",
+          "kind": "function",
+          "name": "declared",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 54
+            },
+            "start": {
+              "col": 1,
+              "line": 46
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 58
+            },
+            "start": {
+              "col": 1,
+              "line": 56
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::quiet#function",
+          "kind": "function",
+          "name": "quiet",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 58
+            },
+            "start": {
+              "col": 1,
+              "line": 56
             }
           },
           "visibility": "public"

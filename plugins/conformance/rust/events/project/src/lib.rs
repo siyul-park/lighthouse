@@ -39,6 +39,20 @@ pub fn inner() -> u32 {
     f() + helper()
 }
 
+pub fn flipped(r: Result<u32, String>) -> String {
+    r.unwrap_err()
+}
+
+pub fn declared() -> u32 {
+    struct Local;
+    impl Local {
+        fn value(&self) -> u32 {
+            Some(3).unwrap()
+        }
+    }
+    Local.value()
+}
+
 pub fn quiet() -> Option<u32> {
     Some(1).map(|v| v + 1)
 }

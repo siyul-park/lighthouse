@@ -17,7 +17,7 @@ spec:
     context at all, stays with review: a struct that is itself the request
     is the usual exception.
 
-    Rust has no request context type and is judged by review only.
+    Go only: Rust has no request context type, and no other check covers it.
   scope:
     domain: code
     subject: symbol
