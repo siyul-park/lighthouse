@@ -13,6 +13,9 @@ import (
 type Provider struct {
 	id      string
 	version string
+	last    RunStats
+	// build identifies the running binary, once known.
+	build string
 }
 
 const language = "go"
@@ -49,6 +52,15 @@ func (p *Provider) Index(params sdk.IndexParams) (sdk.IndexResult, error) {
 		return result, nil
 	}
 	r := newRun(params, opts)
-	r.index()
+	p.last = RunStats{}
+	if !p.indexCached(r, params) {
+		r = newRun(params, opts)
+		r.index()
+	}
 	return r.finish(), nil
 }
+
+// Stats says which units the last index request read from the cache and which
+// it analyzed; both are empty when the request ran without the cache. Tests
+// use it to assert what an edit re-indexes.
+func (p *Provider) Stats() RunStats { return p.last }

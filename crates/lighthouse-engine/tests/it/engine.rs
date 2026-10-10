@@ -242,6 +242,33 @@ impl LanguageProvider for Fallback {
     }
 }
 
+/// A provider that records the cache directory of every workspace it is given.
+struct CacheProbe(ProviderManifest, Arc<Mutex<Vec<Option<PathBuf>>>>);
+
+impl LanguageProvider for CacheProbe {
+    fn manifest(&self) -> &ProviderManifest {
+        &self.0
+    }
+    fn index(&self, ws: &Workspace, _: &[Source]) -> Result<Indexed, PluginError> {
+        self.1.lock().unwrap().push(ws.cache_dir.clone());
+        Ok(Indexed::default())
+    }
+}
+
+struct CacheProbePlugin(PluginManifest, Arc<Mutex<Vec<Option<PathBuf>>>>);
+
+impl Plugin for CacheProbePlugin {
+    fn manifest(&self) -> &PluginManifest {
+        &self.0
+    }
+    fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
+        vec![Box::new(CacheProbe(
+            ProviderManifest::new("any", vec!["**".to_owned()]),
+            Arc::clone(&self.1),
+        ))]
+    }
+}
+
 struct FallbackPlugin(PluginManifest);
 
 impl Plugin for FallbackPlugin {
@@ -636,6 +663,41 @@ fn engine_with_trust_tells_the_rules_the_user_trusts_the_project() {
             .iter()
             .all(|d| d.message == "file (trusted)")
     );
+}
+
+#[test]
+fn engine_without_cache_gives_the_providers_no_directory_to_keep_results_in() {
+    let dir = project(&[("x.txt", b"1")]);
+    let seen = Arc::default();
+    let probe = |cached: bool| {
+        let mut registry = Registry::default();
+        registry
+            .register(&CacheProbePlugin(
+                plugin_manifest("probe"),
+                Arc::clone(&seen),
+            ))
+            .unwrap();
+        let engine = Engine::new(
+            registry,
+            Config::parse_inline("plugins = [\"probe\"]").unwrap(),
+            Catalog::bundled(),
+            dir.path(),
+        )
+        .unwrap();
+        let engine = if cached {
+            engine
+        } else {
+            engine.without_cache()
+        };
+        engine.check(&root(&dir), &[]).unwrap();
+    };
+
+    probe(true);
+    probe(false);
+
+    let seen = seen.lock().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    assert_eq!(*seen, [Some(root.join(".lighthouse/cache")), None]);
 }
 
 #[test]

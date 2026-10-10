@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"encoding/json"
 	"fmt"
 	"go/token"
 	"go/types"
@@ -33,6 +34,10 @@ type run struct {
 	excluded        int
 	excludedExample string
 	result          sdk.IndexResult
+	// failed counts, per batch the go command could not list, its files.
+	failed map[string]int
+	// encoded holds fragments that are already JSON, from the cache.
+	encoded map[string]json.RawMessage
 }
 
 // batch is the set of files that one go.mod governs. Files with no go.mod form
@@ -79,6 +84,8 @@ func newRun(params sdk.IndexParams, opts options) *run {
 		claimed:       map[string]bool{},
 		problems:      map[string]string{},
 		excludedFiles: map[string]bool{},
+		failed:        map[string]int{},
+		encoded:       map[string]json.RawMessage{},
 		result:        emptyResult(),
 	}
 	for _, f := range params.Files {
@@ -120,6 +127,9 @@ func (r *run) finish() sdk.IndexResult {
 	sort.Strings(paths)
 	for _, path := range paths {
 		r.result.Fragments = append(r.result.Fragments, *r.fragments[path])
+	}
+	for path, data := range r.encoded {
+		r.result.Encoded = append(r.result.Encoded, sdk.EncodedFragment{Path: path, JSON: data})
 	}
 	for path, reason := range r.problems {
 		r.result.Incomplete = append(r.result.Incomplete, sdk.Incomplete{Path: path, Reason: reason})
@@ -213,6 +223,7 @@ func (r *run) unpack(b *batch, l loaded) ([]*packages.Package, bool) {
 	if !inside {
 		dir = b.dir
 	}
+	r.failed[b.dir] = len(b.files)
 	r.result.Incomplete = append(r.result.Incomplete, sdk.Incomplete{
 		Reason: fmt.Sprintf("go list failed in %s, %d file(s) not analyzed: %v", dir, len(b.files), l.err),
 	})
@@ -304,7 +315,8 @@ func (r *run) claim(pkgs []*packages.Package, res *resolver) []*unit {
 // declared interface it satisfies, by value or by pointer.
 func (r *run) implements(units []*unit) {
 	interfaces, concrete := r.declaredTypes(units)
-	sort.Slice(concrete, func(i, j int) bool { return concrete[i].obj.Pos() < concrete[j].obj.Pos() })
+	sort.Slice(concrete, func(i, j int) bool { return declaredBefore(concrete[i], concrete[j]) })
+	sort.Slice(interfaces, func(i, j int) bool { return declaredBefore(interfaces[i], interfaces[j]) })
 	for _, t := range concrete {
 		for _, i := range interfaces {
 			iface := i.obj.Type().Underlying().(*types.Interface)
@@ -440,6 +452,7 @@ func (r *run) unclaimed(rel string) {
 }
 
 func (r *run) fileOnly(rel string) {
+	delete(r.encoded, rel)
 	r.fragments[rel] = emptyFragment(sdk.FileInfo{Path: rel})
 }
 
@@ -601,4 +614,17 @@ func emptyFragment(file sdk.FileInfo) *sdk.Fragment {
 		Tests:     []sdk.TestCase{},
 		Comments:  []sdk.Comment{},
 	}
+}
+
+// declaredBefore orders types by where they are declared, which does not
+// depend on the order in which the go command's packages were parsed.
+func declaredBefore(a, b declaredType) bool {
+	pa, pb := a.unit.fset.PositionFor(a.obj.Pos(), false), b.unit.fset.PositionFor(b.obj.Pos(), false)
+	if pa.Filename != pb.Filename {
+		return pa.Filename < pb.Filename
+	}
+	if pa.Offset != pb.Offset {
+		return pa.Offset < pb.Offset
+	}
+	return a.obj.Id() < b.obj.Id()
 }

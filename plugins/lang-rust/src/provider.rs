@@ -14,6 +14,7 @@ use lighthouse_protocol::{
 use serde::Deserialize;
 
 use crate::{
+    cache::Cache,
     cargo::{self, Package, Target, TargetKind},
     extract,
     names::Index,
@@ -79,7 +80,8 @@ impl Handler for Provider {
             },
             None => Options::default(),
         };
-        Ok(index_files(&params, &options))
+        let provider = format!("{}@{}", self.id, self.version);
+        Ok(index_files(&params, &options, &provider))
     }
 }
 
@@ -168,7 +170,7 @@ pub fn normalize(path: &Path) -> PathBuf {
     out
 }
 
-fn index_files(params: &IndexParams, options: &Options) -> IndexResult {
+fn index_files(params: &IndexParams, options: &Options, provider: &str) -> IndexResult {
     let root = normalize(Path::new(&params.project.root));
     let (skipped, files) = requested_files(params);
     let mut fragments: BTreeMap<String, Fragment> = skipped
@@ -181,13 +183,14 @@ fn index_files(params: &IndexParams, options: &Options) -> IndexResult {
     let found = packages(&root, &files);
     let tree = module_tree(&root, &found.list, options, overlays(params, &root));
     let idx = Index::build(&tree, &found.list);
+    let mut cache = Cache::open(params, provider, &tree, &files);
     let mut orphans = Vec::new();
     let mut macros = MacroSummary::default();
     for rel in &files {
         let mut fragment = empty_fragment(rel);
         match (found.of.get(rel), tree.file_of(&normalize(&root.join(rel)))) {
             (_, Some(file)) => {
-                let (extracted, stats) = extract::fragment(&idx, file);
+                let (extracted, stats) = analyzed(&idx, file, cache.as_mut());
                 macros.add(rel, &stats);
                 fragment = extracted;
             }
@@ -205,6 +208,7 @@ fn index_files(params: &IndexParams, options: &Options) -> IndexResult {
     notices.extend(included(&tree, &files));
     notices.extend(macros.notice());
     notices.extend(shared(&tree));
+    notices.extend(cache.and_then(Cache::save));
     IndexResult {
         fragments: fragments.into_values().collect(),
         notices,
@@ -213,6 +217,24 @@ fn index_files(params: &IndexParams, options: &Options) -> IndexResult {
             .map(|(path, reason)| Incomplete { path, reason })
             .collect(),
     }
+}
+
+/// The fragment of a file, from the cache when its text and context are
+/// unchanged.
+fn analyzed(
+    idx: &Index,
+    file: usize,
+    mut cache: Option<&mut Cache>,
+) -> (Fragment, extract::MacroStats) {
+    let source = &idx.tree.files[file];
+    if let Some(hit) = cache.as_deref_mut().and_then(|c| c.get(source)) {
+        return hit;
+    }
+    let (fragment, stats) = extract::fragment(idx, file);
+    if let Some(c) = cache {
+        c.put(source, &fragment, &stats);
+    }
+    (fragment, stats)
 }
 
 /// The requested paths, sorted and deduplicated: the ones left alone, then

@@ -123,7 +123,7 @@ fn index(
     options: &Value,
     files: &[String],
 ) -> Value {
-    index_overlaid(plugin, root, language, options, files, None)
+    index_overlaid(plugin, root, language, options, files, None, None)
 }
 
 fn index_overlaid(
@@ -133,6 +133,7 @@ fn index_overlaid(
     options: &Value,
     files: &[String],
     overlays: Option<Vec<wire::Overlay>>,
+    cache: Option<&Path>,
 ) -> Value {
     let params = IndexParams {
         project: wire::ProjectRef {
@@ -154,6 +155,9 @@ fn index_overlaid(
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect::<BTreeMap<_, _>>(),
             overlays,
+            cache: cache.map(|dir| wire::CacheRef {
+                dir: dir.to_string_lossy().into_owned(),
+            }),
         },
     };
     plugin.call::<Value>(wire::INDEX, params)
@@ -204,6 +208,59 @@ fn golden(lang: &Lang) {
         failures.is_empty(),
         "stale goldens (UPDATE_GOLDEN=1 to regenerate): {failures:#?}"
     );
+}
+
+/// Every case indexed cold and then warm, each in a plugin process of its own,
+/// answers byte for byte what an uncached run does.
+fn cached_runs_equal_uncached(lang: &Lang) {
+    let Some(dir) = (lang.plugin)() else {
+        return;
+    };
+    let cases = workspace().join("plugins/conformance").join(lang.id);
+    let mut names: Vec<_> = fs::read_dir(&cases)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    names.sort();
+    for case in names {
+        let root = case.join("project").canonicalize().unwrap();
+        let mut sources = Vec::new();
+        files(&root, &root, lang.ext, &mut sources);
+        for (variant, options) in variants(&case) {
+            let cache = tempfile::tempdir().unwrap();
+            let run = |cache: Option<&Path>| {
+                let mut plugin = Plugin::start(&dir, &root);
+                plugin.initialize(&root);
+                let result =
+                    index_overlaid(&mut plugin, &root, lang.id, &options, &sources, None, cache);
+                assert_eq!(plugin.finish(), Some(0));
+                pretty(&result)
+            };
+            let plain = run(None);
+            assert_eq!(
+                run(Some(cache.path())),
+                plain,
+                "{} {variant} cold",
+                case.display()
+            );
+            assert_eq!(
+                run(Some(cache.path())),
+                plain,
+                "{} {variant} warm",
+                case.display()
+            );
+        }
+    }
+}
+
+#[test]
+fn go_plugin_answers_the_same_with_a_cache() {
+    cached_runs_equal_uncached(&GO);
+}
+
+#[test]
+fn rust_plugin_answers_the_same_with_a_cache() {
+    cached_runs_equal_uncached(&RUST);
 }
 
 #[test]
@@ -338,6 +395,7 @@ fn framing_survives_bodies_larger_than_one_read_and_mixed_case_headers() {
             context: wire::Context {
                 options,
                 overlays: None,
+                cache: None,
             },
         };
         let result: wire::IndexResult = plugin.call(wire::INDEX, params);
@@ -400,6 +458,7 @@ fn overlays_replace_the_text_a_provider_reads() {
                 path: file.to_owned(),
                 text: format!("{on_disk}{added}"),
             }]),
+            None,
         );
 
         assert!(

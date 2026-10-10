@@ -54,7 +54,7 @@ files = ["plugins/conformance/**"]
 rules = { "core/max-lines" = "off", "design/complexity" = "off", "design/coupling" = "off", "design/exported-doc" = "off", "design/no-single-use-wrapper" = "off", "design/declaration-groups" = "off", "design/contiguity" = "off", "design/callers-before-callees" = "off", "design/private-helper-callers" = "off", "design/no-banners" = "off", "design/no-redundant-qualifiers" = "off", "design/no-mutable-globals" = "off", "testing/external-package" = "off", "testing/owner" = "off", "testing/unique-owner" = "off" }
 
 [[spec.overrides]]
-files = ["docs/decisions/**", "schema/**"]
+files = ["docs/decisions/**", "schema/**", "protocol/schema/**"]
 rules = { "core/max-lines" = "off" }
 
 [[spec.overrides]]

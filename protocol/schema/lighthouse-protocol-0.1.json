@@ -1,5 +1,18 @@
 {
   "$defs": {
+    "CacheRef": {
+      "description": "The directory a provider may keep derived results in between runs.",
+      "properties": {
+        "dir": {
+          "description": "Absolute path of a directory the host owns, `.lighthouse/cache/<plugin\nid>/`. The provider reads and writes only inside it and its results are\nthe same with or without it.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dir"
+      ],
+      "type": "object"
+    },
     "Call": {
       "description": "Params and result types of one method.",
       "properties": {
@@ -75,6 +88,17 @@
     "Context": {
       "description": "Host-side settings that accompany an index request.",
       "properties": {
+        "cache": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CacheRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where the provider may cache derived results; absent when the host runs\nwithout a cache."
+        },
         "options": {
           "additionalProperties": true,
           "default": {},

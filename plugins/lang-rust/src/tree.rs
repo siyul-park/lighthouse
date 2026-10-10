@@ -53,6 +53,21 @@ impl SourceFile {
     }
 }
 
+impl SourceFile {
+    /// Byte offset of a proc-macro2 position (1-based line, 0-based
+    /// character column).
+    pub fn offset(&self, line: usize, col: usize) -> Option<usize> {
+        let start = *self.line_starts.get(line.checked_sub(1)?)?;
+        let rest = self.text.get(start..)?;
+        let line_text = rest.split('\n').next()?;
+        let at = line_text
+            .char_indices()
+            .nth(col)
+            .map_or(line_text.len(), |(at, _)| at);
+        Some(start + at)
+    }
+}
+
 pub struct Crate {
     pub package: usize,
     pub kind: TargetKind,

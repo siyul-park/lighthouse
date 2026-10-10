@@ -450,6 +450,14 @@
           },
           "kind": "implements",
           "resolution": "semantic",
+          "to": ".::Logger"
+        },
+        {
+          "from": {
+            "symbol": ".::Base#type"
+          },
+          "kind": "implements",
+          "resolution": "semantic",
           "to": ".::Closer"
         },
         {
@@ -462,7 +470,7 @@
         },
         {
           "from": {
-            "symbol": ".::Base#type"
+            "symbol": ".::Service#type"
           },
           "kind": "implements",
           "resolution": "semantic",
@@ -483,14 +491,6 @@
           "kind": "implements",
           "resolution": "semantic",
           "to": ".::LogCloser"
-        },
-        {
-          "from": {
-            "symbol": ".::Service#type"
-          },
-          "kind": "implements",
-          "resolution": "semantic",
-          "to": ".::Logger"
         }
       ],
       "file": {

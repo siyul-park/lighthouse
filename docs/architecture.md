@@ -225,6 +225,19 @@ shared through `Ctx::memo`: the base facts of a symbol that CEL checks read, and
 the versions of a decision that the store records with each finding. Set
 `RAYON_NUM_THREADS=1` to run on one worker.
 
+Language providers keep what they derive from a file or package in
+`.lighthouse/cache/<plugin id>/`, a directory the host passes in `context.cache`
+(see the protocol). The cache is local and derived: never committed, always safe to delete, and
+bounded in size (oldest first). Every key covers the provider build, the options and
+the toolchain, and any doubt is a miss. A warm run must answer exactly like a cold one,
+which conformance checks over every fixture. The model is the build systems that proved
+it: Go's build action IDs (a content hash of the inputs plus the export data of the
+dependencies, so a dependent is rebuilt only when what it sees changed), rustc's
+incremental compilation with the red-green "early cutoff" of Salsa (a dependent is not
+recomputed when an input's output did not change), ESLint's `--cache` (file content plus
+configuration) and Bazel's action cache. For the dependents the "output" is the API, the text of
+a package without function bodies, so a body edit re-indexes one unit.
+
 `lighthouse check --timings` prints where a run's time went to stderr, one
 `timings:` line per phase: setup, read, each provider's index, merge, each
 analyzer, the rules (wall clock, then the five slowest rules summed over the
