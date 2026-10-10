@@ -1,0 +1,22 @@
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run
+fingerprint	repo	location	verdict	reason
+6da4a53fc0441331b8a9e45f91e462e852bcf93bb3a240f65edf611db1fab34d	strict-root	crates/lighthouse-session/src/reviewing.rs:59 record_verdict	TP	5 results over the limit of its role (counts fields of a struct used only here, as specified)
+e65e7355a1c02304cacbffdc79c95f96374b611eb1e04f291572bd1b73252bd0	strict-root	crates/lighthouse-session/src/check.rs:66 summary	TP	8 results over the limit of its role (counts fields of a struct used only here, as specified)
+1e55c7200c74103b78d1abd86e25968213d8cbc28552d54f50f6d34bd8e5119c	minivm	internal/asm/arm64/encoder.go:1137 decodeMovImm	TP	4 results over the limit of its role
+01a59728fa7e6141804ebbdd03a1cfd679474c2f2639aac66c3b96399f901183	strict-root	crates/lighthouse-session/src/migrate.rs:157 migrate_paths	TP	4 results over the limit of its role (counts fields of a struct used only here, as specified)
+5250180c6fa497a084b8adae214589553b56aa797f0da5f66925940846a70453	strict-root	crates/lighthouse-session/src/fix.rs:136 declined_row	TP	5 results over the limit of its role (counts fields of a struct used only here, as specified)
+d06554f1ef9124ec359055ba127c8707113d4ed449012d3aedef20877695b082	minivm	internal/jit/compile/compile.go:133 Lower	TP	4 results over the limit of its role
+64b7a5f3f5e78c965ec5ed25df3064adebe56e31a07940d702d53e6ca4b8615e	cel	interpreter/vm_control.go:105 vmControlRoot	TP	5 results over the limit of its role
+75e98e7963294c01cf91b23cae4bd42919cbbeefa4e7ee2babe410cb77cf8530	minivm	internal/asm/arm64/encoder.go:1057 decodeRegImm	TP	4 results over the limit of its role
+7e3160ec69bd4024fd19b658c4c09018ddef5b18145cd22c7fd8a01fcd7c7774	minivm	interp/interp.go:441 Frame	TP	4 results over the limit of its role
+c6a7f737db48408fc506cf4b78350c7fa63d2144ee686639af5a50da32734b6c	minivm	internal/asm/arm64/encoder.go:1073 decodeRegImm2	TP	5 results over the limit of its role
+8cbed374ee0208190fa198756d5f84fd7926bf645452f790d8467d4ddb4a34bd	cel	internal/minivm/differential/runner/main.go:199 canonicalValue	TP	5 results over the limit of its role (counts fields of a struct used only here, as specified)
+b427b902c9532c033f58b2f33bfdaea9b2155049d3753115743698617987cf98	minivm	internal/asm/arm64/encoder.go:1227 decodeTestBranch	TP	4 results over the limit of its role
+afbaaa6a3f177f5f89dfb1acddbabbc9c8f650dfdb58a5b007514835afdb8be1	cel	parser/unescape.go:104 unescapeChar	TP	4 results over the limit of its role
+5a29f538908b19a138c7935218d6b02e3480ec6c9034b48bf26fd4a1fc22f1d6	minivm	internal/asm/arm64/encoder.go:1182 decodeStrOp	TP	4 results over the limit of its role
+d596b1d5e16c5a332ce18a1b0d22db6f3ecb72008570666cf5c17fbc9c2615d2	strict-root	crates/lighthouse-engine/src/fix/lower.rs:219 block	TP	4 results over the limit of its role (counts fields of a struct used only here, as specified)
+10b83dc1a3a04c9ed86806e83f25cfbc9fb094f6d1db805f7690049b71de6513	strict-root	crates/lighthouse-session/src/fix.rs:125 applied_row	TP	6 results over the limit of its role (counts fields of a struct used only here, as specified)
+0f94c39d6bf0d62d2ae5b56f3ed0a03b411a5c6722f6d5a22a3e01dcefa1201a	minivm	internal/asm/arm64/encoder.go:1014 decodeReg4	TP	5 results over the limit of its role
+1586139c4d61ed911ea25dbc8ccfa57459fa563445ca8dd9a087107fd328cf16	minivm	internal/asm/arm64/encoder.go:1166 decodeMemOp	TP	4 results over the limit of its role
+04c8a98647265df5adefdab518f2fcfd2c02b3ff0edc3148b31791ae6e0ca7a8	strict-root	plugins/lang-rust/src/body.rs:871 analyze	TP	8 results over the limit of its role (counts fields of a struct used only here, as specified)
+a186a51f8b5dc78dfe5b268baef4d4148437203df0d7d9e2c4ed1a952d45ad83	strict-root	crates/lighthouse-report/src/sarif.rs:216 rule_ref	TP	7 results over the limit of its role (counts fields of a struct used only here, as specified)

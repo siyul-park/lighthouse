@@ -1,0 +1,7 @@
+# R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -
+fingerprint	repo	location	verdict	reason
+ec88fab3d70e363b21e10fc97b292aa2207226b67d344a57e3cb1463a51a8f3c	cel	cel/async/async.go:1 cel/async	TP	205 lines, one dependent
+6c03b85c770676a7c57f87bad9af9d3a588a26e24f10342950abb122ffdad131	qlbridge	datasource/mockcsv/mockcsv.go:1 mockcsv	TP	176 lines
+a183d07455d5f28c6e9ad9ace3a51ec6f91bc0d6ad1a6aca8ac52c4c3700c5ad	qlbridge	datasource/mockcsvtestdata/testdata.go:1 mockcsvtestdata	TP	47 lines
+4b3922d872cb16c19bb05042e3a2b6908fec67ba5d3edbe37ad0520ce39307c0	minivm	debug/debugger.go:1 debug	TP	224 lines
+a96cabc7362f57451a94048079130ae1790c3bcbb7d136be8f65326529bbbc5b	qlbridge	qlbdriver/driver.go:1 qlbdriver	TP	3 lines

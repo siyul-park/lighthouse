@@ -1,0 +1,22 @@
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run
+fingerprint	repo	location	verdict	reason
+07779c2e0f2110db1ab0ee791b9f8ed0d4ba0557efc5a71c627f93796038fb5a	qlbridge	lex/lexer.go:834 LexStatement	TP	7 levels of nesting over the limit of its role
+e7c4e0166e43a05fc9bdbf798c6859f81636e91b9c38dd25e5fa2ce7dbb11768	minivm	internal/asm/alloc.go:150 liveness	TP	5 levels of nesting over the limit of its role
+4f782a13a46a838054d464852c5192d069bfe500befe823a3e32763782150f14	qlbridge	exec/mutations.go:184 insertRows	TP	5 levels of nesting over the limit of its role
+38037d044bc39d5b086c0c2f542da6d8e1bc10b16ddc817ad93a61841712b359	qlbridge	exec/order.go:59 Run	TP	6 levels of nesting over the limit of its role
+efb01dae4c00fb38195fb5c55a605d05852b6207e307baef07ee7aed6d7a1b18	qlbridge	exec/groupby.go:72 Run	TP	5 levels of nesting over the limit of its role
+3a4adc3e2f662c42f7eb5832ccfc075f5602f0f8c57403a4e08aa63f9c651607	minivm	transform/forward.go:29 Run	TP	5 levels of nesting over the limit of its role
+ca91a51e15e725e9a8b01e61cbc5110ddf2c6a193f5245abded7d217c97ac97a	qlbridge	exec/groupby.go:180 Run	TP	5 levels of nesting over the limit of its role
+135488ccd53005576630eade4a5f720893574ee049f21944a0f62c2299189861	qlbridge	exec/projection.go:113 projectionEvaluator	TP	6 levels of nesting over the limit of its role
+13465fb34fb60dfb65781f6636e58ca3b4fd977ed2af3ec9efec04264614f8dd	minivm	transform/fold.go:24 Run	TP	5 levels of nesting over the limit of its role
+500c89303b3e38630aeeacaa4885e0d8b43491929e1118ebfb2fde9d12b82437	qlbridge	plan/projection.go:148 projectionForSourcePlan	TP	5 levels of nesting over the limit of its role
+d7c2e2a8d2c5981140178b062876610f577d739e97be33271c71ba811d932ebe	minivm	internal/vigil/declarations.go:14 docs	TP	6 levels of nesting over the limit of its role
+5c7dfaa7281b4cb6e79efd2c88f50db5af81ab439bfb7eb6cee2cd5381e6858d	minivm	interp/interp.go:208 New	TP	5 levels of nesting over the limit of its role
+de83addfd82128f16bc06d81a4862185669fa159e060829402d0b9a3651c58c8	qlbridge	testutil/harness.go:98 ExecSqlSpec	TP	5 levels of nesting over the limit of its role
+ea9d11c3382af8502c4b298708900126954bace7bae9314a66389345b9506ac0	qlbridge	datasource/membtree/btree.go:167 Next	TP	5 levels of nesting over the limit of its role
+f6d6a7c2dee990a7f9321e105ed7c5f3981786205584d25ddd043b5367e4109f	cel	cel/options.go:345 Types	TP	5 levels of nesting over the limit of its role
+d812c4afee90af9e2a07a38596719aff1dd1b0d36072bf6bf7930d8685a999b6	qlbridge	lex/lexer.go:778 LexDialectForStatement	TP	5 levels of nesting over the limit of its role
+1174eda9f5151027c0e98ec31b139caf654cfdbab57d3992beeaafa12c8c758f	qlbridge	expr/builtins/filter.go:212 FilterMatchEval	TP	5 levels of nesting over the limit of its role
+719c2e52fd0c30223256560506dd187a6b3ead6068e223b297f77e8755b2ca7a	qlbridge	exec/join.go:54 Run	TP	5 levels of nesting over the limit of its role
+20a2a127b098374e5853bf18e6ff02db1fd3e2c0f7cc00af35a460b712fb69ab	qlbridge	lex/lexer.go:2876 LexJsonIdentity	TP	5 levels of nesting over the limit of its role
+a8f91ecadc277ed7cabf717e4905523ddecf0f5bd39b57c17d7a8efc7b995fd8	minivm	internal/jit/compile/compile.go:240 Lowering	TP	5 levels of nesting over the limit of its role

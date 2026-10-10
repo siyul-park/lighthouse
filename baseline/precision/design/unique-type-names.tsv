@@ -1,0 +1,7 @@
+# R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -
+fingerprint	repo	location	verdict	reason
+3f71a323d1300f743b54f175f73b8406ed4289c4b36a88033231d38b0dad839c	cel	checker/options.go:25 Option	TP	two different option types in checker and parser
+4de741ee38a19c1270808f44dd623a4b5f6ab1a29b0183bcf5c78b9d2ee0b6c1	cel	common/types/provider.go:75 FieldType	TP	near-duplicate structs in common/types and common/types/ref
+70111dcf3b04e0385f52db4f8e46d07b6eb0a066e8163212a59f097ca51c2ad5	qlbridge	generators/elasticsearch/es2gen/estypes.go:22 BoolOccurrence	TP	duplicated struct in es2gen and esgen
+c0317e50b9d0919072895fe876ac3b608d4e68dde88e332e3df95a2dcc1a3f3e	minivm	instr/builder.go:14 Builder	TP	two builders in instr and program
+40bd5691be3792cc499913aa329d0b17379eb0a24b7dd631c603a5641401d8a1	minivm	instr/builder.go:24 Label	TP	two concepts under one name in prof and instr

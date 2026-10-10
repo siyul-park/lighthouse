@@ -1,0 +1,21 @@
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run
+fingerprint	repo	location	verdict	reason
+aedcdbba20f5b83bf9f7f47931b7d325a1d5758b6dffdddf85090adcf79f2e5d	qlbridge	schema/schema.go:635 Field	TP	8 parameters over the limit of its role
+c943f243b0608a421dbf4192a8e03bfbcde027bf24c8d1ad25a84e5828b97032	strict-root	crates/lighthouse-session/src/fix.rs:88 fix	TP	8 parameters over the limit of its role (counts fields of a struct used only here, as specified)
+ab9be5404f11d77c15fa66fb9f73a3895041ee7041bf45a09430af2845dd0f7d	minivm	interp/native.go:883 settle	TP	8 parameters over the limit of its role
+df428df97da72852a280faf9f92ab2d5d90a374151c5e3b15b113ada3a82cb94	minivm	interp/native.go:554 run	TP	7 parameters over the limit of its role
+14ae53e45f629f8726475590716f8f178871439c0a364498bfe2ffb84635b803	cel	parser/helper.go:120 Comprehension	TP	8 parameters over the limit of its role
+cfb8e90ab2cc727f966615b1aa3e281f9c2fdb64e994dcdcdddcf212a5a0e42c	cel	internal/minivm/differential/runner/main.go:92 evaluate	TP	7 parameters over the limit of its role (counts fields of a struct used only here, as specified)
+b7447d80292032eab3407835b444a6f64ee6f163fb7dce752e856f142a9932b7	minivm	internal/vigil/ownership.go:58 access	TP	7 parameters over the limit of its role
+e463f4ffa41ab0a3fc03dab0ef03ae7e0ef81a6e877b0e85db1b36cd9f16e339	strict-root	crates/lighthouse-store/src/store.rs:242 record_fix	TP	8 parameters over the limit of its role (counts fields of a struct used only here, as specified)
+7c2aef716b5373a30cff522f43819f3ca30063f1db3df4fd654bdf51f17b6d38	strict-root	crates/lighthouse-cli/src/main.rs:411 check	TP	10 parameters over the limit of its role (counts fields of a struct used only here, as specified)
+e990a2ef42b223a255a8ae34e3e71e529cf141f841d74601db6fa3d856d19d67	cel	parser/parser.go:941 ReportAmbiguity	FP	the method implements antlr.ErrorListener, an interface outside the project, so its signature is not its own
+04b34fd1bbb6bf573e5be4b1abebfdbb48c0b20fc0d209e91736c9e1b03a735a	strict-root	plugins/lang-rust/src/extract.rs:197 declare	TP	9 parameters over the limit of its role (counts fields of a struct used only here, as specified)
+a8936b51de26c851495aae5832ff24e36bf8952ae10789c748229efa1233a7b0	minivm	internal/jit/code.go:62 Code	TP	10 parameters over the limit of its role
+689671e55117b7559c9eef48421899a0934a60a97e0118438596128c15a4b490	cel	parser/helper.go:132 ComprehensionTwoVar	TP	9 parameters over the limit of its role
+90edcbb756040872fce2feb3a5865b685fa670772bd495d1e3874c8709880bc0	minivm	benchmarks/fixtures/n-body.go:68 nBodyAdvance	TP	9 parameters over the limit of its role
+7cf05ba098c75ff172798032c162e276e3589120bfb21e5bf68bfe391351a31d	minivm	internal/jit/compile/compile.go:133 Lower	TP	7 parameters over the limit of its role
+6d85da33dfe58ad608ec138a20dc2c20aac2ac094f8a827a4d3a83635a3996cd	strict-root	crates/lighthouse-design/src/coupling.rs:26 check	TP	8 parameters over the limit of its role (counts fields of a struct used only here, as specified)
+9e66c6ddbe01e14b2c09938dc25074ba54099032255a49057f74f2bb6b1fc8ff	minivm	benchmarks/fixtures/n-body.go:19 nBodyEnergy	TP	8 parameters over the limit of its role
+25650a5dd74ec920d3e296d135c708c916654af237cc13e457a5d6e05c04bc2a	strict-root	plugins/lang-go/provider/unit.go:307 symbol	TP	8 parameters over the limit of its role
+f453572365f30246ac505186e9c0c889507f82f02bab19b0b0744c9bc4edc66b	cel	test/expr.go:354 ExprComprehension	TP	8 parameters over the limit of its role

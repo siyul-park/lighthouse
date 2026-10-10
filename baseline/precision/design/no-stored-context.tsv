@@ -1,0 +1,4 @@
+# R3b review: both findings of the final run
+fingerprint	repo	location	verdict	reason
+f856b8b982e9d1cfc1ce0381cda81ee784d6056320bbf2e6273fc0ecd9bff1fb	cel	interpreter/frame.go:53	TP	frame context kept in a struct
+8d5ac4456d32d8c8b4e1a6f707c40c39d87155a06191fe3b74691d3d5935b3ad	minivm	interp/interp.go:20	debatable	non-nil only while Run executes, cleared before it returns

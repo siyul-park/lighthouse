@@ -1,0 +1,17 @@
+# R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -
+fingerprint	repo	location	verdict	reason
+3f3599a1d1e9a41358a4061e38d1d61df281fdac23d1ccf7865c93379e45b700	cel	interpreter/decorators.go:198 maybeBuildMapLiteral	TP	
+103d159867f9deaee8b8123865db0e4e87454ffa8ff8570d61798ba3a8ac0f93	cel	interpreter/vm_ir.go:379 evalVMComparison	TP	
+1a1aa8e45a1face4fd9a17fb2b4b4dd86cb4ac98e4621090f4a31bc7d64a6023	cel	interpreter/vm_ir.go:418 evalVMEquality	TP	
+0989c8e46086fa4a77b8c28a1b30cb59e869cedc6099e9f4f579a4170437e967	cel	interpreter/vm_program.go:232 emitVMConstant	TP	
+855fb7f1e1a69eb28bff6e899ce292636ebfd591916f8ef2edb2913aa1a52d82	cel	interpreter/vm_program.go:676 vmRefFromScalar	TP	
+57fe280a90869203d44a39eee81f853848e6e2399197b541d21b2d6d25dc563b	qlbridge	lex/lexer.go:1275 lexExpressionIdentifier	FP	lexer state function
+54710e5c720d7fe7cf38998a0abc440afa7852d40403ff99949059e494118bf0	qlbridge	lex/lexer.go:1408 lexIdentifierOfTypeNoWs	FP	lexer state function
+46962ca51efcc83312f9b3d84903440eb8b2a9492e5d2028ac72d9e34c8c7b48	qlbridge	lex/lexer.go:3138 scanNumericOrDuration	FP	lexer state function
+6cdeb549a15c01e9af5b6ba5bbe26c6e692eee8a292e3d02aa381251bcd11942	qlbridge	rel/parse_sql.go:32 parseSqlResolver	TP	
+48707490247cf2fc7f225ee4b7855d2a131d74286826b4c1228e77f1e394af37	qlbridge	schema/registry.go:296 discoverSchemaFromSource	TP	
+1fc30a6d19dae0f2d937deea779b4ced6887d5287d56e25c9152b3f87a1fea1a	minivm	internal/codegen/slot.go:435 materialize	TP	
+9dbb45977e124a684e6ed1c3aef1843cc5405287be5523a9b6bc29ccdcf9236c	minivm	internal/vigil/analyzer.go:40 collectGraph	TP	
+cb4b2833310e6db220fd46c82e7ea814b2eb22aaf8599e0fd2cc83ff5650e9c9	minivm	internal/vigil/clones.go:60 candidates	TP	
+7fba9ac37c31fc52d5166de07850538c5a1615bfa7bbc83832a738c4563d7f77	minivm	program/parse.go:103 parseSection	TP	
+db44308babadf32857d3a3e74dd67f114310a4814cf3830309d050feb36a2205	minivm	transform/fact.go:238 holds	TP	

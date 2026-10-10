@@ -1,0 +1,25 @@
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run
+fingerprint	repo	location	verdict	reason
+a7648c8ac53fe0a93a0f9616dfe9ffb0cb4b9290701eac1c19267a0c554c7ef9	cel	interpreter/attributes.go:951 qualifyInternal	TP	43 decision paths over the limit of its role
+af48ce261deb4feb8916f38865994342de1f8d213ded5f9f6acc2d197842cc60	minivm	internal/ssa/verify.go:125 operation	TP	44 decision paths over the limit of its role
+4d391f77dc6649179c06663b63d990d4e70843cdd4919f606153abc38904b59a	minivm	transform/hoist.go:27 Run	TP	46 decision paths over the limit of its role
+420ce48fb0d74d270a9035f98378be40b7e6715d1b536f44f29961ce06fcbe09	minivm	internal/asm/arm64/encoder.go:204 Encode	TP	199 decision paths over the limit of its role
+7398db40de6b0a7996546baa2e1cd498002ea7f0db5823fcde7aabf5f623c982	cel	parser/unescape.go:104 unescapeChar	TP	34 decision paths over the limit of its role
+62474bbb733f6c07c8ef8a9ac02a7052c5f51850da7c44b29e1ab759b668c542	qlbridge	vm/vm.go:299 evalBinary	TP	158 decision paths over the limit of its role
+245875deb69be9b7e9c9974d765b3ceb155753863849c4e39197751a74a4051c	minivm	transform/walk.go:119 instruction	TP	84 decision paths over the limit of its role
+ff81f17ee8f05620c70ed216dc1049c166d2e053cc5d5d8d9901fa9b373d348f	minivm	transform/bound.go:122 induction	TP	40 decision paths over the limit of its role
+7c7ccd74a790188ab669499bb74832696ef9351757021188c5b8704a3aeb77e1	cel	interpreter/prune.go:271 prune	TP	42 decision paths over the limit of its role
+e35694104d1346cbf68bee7bafbf5274b1a2e6973f67e96edd4c05510dbf7a1c	minivm	program/verify.go:450 step	TP	38 decision paths over the limit of its role
+3c9f58ac69606e62c9d2c328f5d4bc51e57360deb7713745a78fc5c2d58f51c8	qlbridge	value/value.go:288 Value	TP	60 decision paths over the limit of its role
+668d7b197f8352eb1c146b3dfa21c202b360adf80853d2b02b5a504eb35a983f	minivm	internal/codegen/names.go:27 normalizeLocalNames	TP	48 decision paths over the limit of its role
+5439d471f79134939b64901d7881ad922ca76190079167661ab3b970005a7228	qlbridge	exec/projection.go:113 projectionEvaluator	TP	37 decision paths over the limit of its role
+25e22a71ae93272fb4e115a27b740bbb0f9570363c70eae508646a39cc66b9e5	cel	cel/env.go:181 ToConfig	TP	32 decision paths over the limit of its role
+2315a9ba4be4acc7c1216790504a10b9ba9a0233cecf919dfa159d6b2ceb273c	qlbridge	lex/lexer.go:834 LexStatement	TP	32 decision paths over the limit of its role
+28927d0fc7455d06160826f6b6588ebf591e1557b59ad8d2a98d3f452b4e5edd	qlbridge	lex/lexer.go:2331 LexExpression	TP	63 decision paths over the limit of its role
+11ff4308b8c0adb4565eccc912efb89f91c781b85cadd0d5f316aba6ad27338a	cel	common/types/provider.go:497 nativeToValue	TP	88 decision paths over the limit of its role
+aed0aaed1789fed544d888aa0ddc9049814fccd893fd745bd90b6b4a3c65d331	minivm	internal/codegen/numeric.go:188 compute	TP	79 decision paths over the limit of its role
+1d2d4a983e2db6ff6a2f7300d2c0df902887a297aae468ba0502a765c80efb8b	cel	checker/cost.go:731 functionCost	TP	39 decision paths over the limit of its role
+40c47f4664eb0bce9f2343a258829ef15bfe94dc12b98bd2a445d7a4756fbac3	cel	cel/folding.go:577 constantCallMatcher	TP	31 decision paths over the limit of its role
+cb2ae56d1c284b462ee7de4f2eca789d44b0075cf206e612cf416c2f036bf2fc	qlbridge	rel/sql.go:1002 Equal	TP	36 decision paths over the limit of its role
+be11ff287a58da7cb5c30c4cecde27f74bff45c3b9e4147946a875e01e79d146	cel	ext/formatting_v2.go:45 format	TP	37 decision paths over the limit of its role
+6bb793a0d4c512382b5e299254e657de90f90d4ee60d4efce0fade1dabdbcd17	qlbridge	lex/lexer.go:1408 lexIdentifierOfTypeNoWs	TP	32 decision paths over the limit of its role

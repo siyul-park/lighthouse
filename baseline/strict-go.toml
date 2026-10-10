@@ -1,0 +1,10 @@
+# The configuration the baseline runs a Go module with: the strict preset of
+# the design decisions. scripts/baseline.sh fills in @PLUGINS@.
+apiVersion = "lighthouse/v1alpha1"
+kind = "Project"
+[metadata]
+name = "go-strict"
+[spec]
+plugins = ["core","design","testing",
+  { id = "lang-go", path = "@PLUGINS@/lang-go" }]
+extends = ["core/recommended","design/strict","testing/recommended"]

@@ -1,0 +1,22 @@
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run
+fingerprint	repo	location	verdict	reason
+fdafff7cd1af920532c8b16ae79a4fe59a6cf75e54f4acd574e2e01f1bb03eaf	minivm	internal/vigil/declarations.go:531 privateType	TP	41 cognitive complexity points over the limit of its role
+a640310e8437d0e8f90a120638934599324d2e68ff4465834bb39aa516c0371e	minivm	internal/asm/arm64/encoder.go:204 Encode	TP	251 cognitive complexity points over the limit of its role
+07430d3a5f44e373b03d0085b3e6d989fa4f1cb09a89015d0d2046400f613691	minivm	internal/vigil/ownership.go:12 boundary	TP	36 cognitive complexity points over the limit of its role
+44b787ff1489f8008bceaa2528cf3c3663b933ac3e29fac352a1cf65b6fbbb35	minivm	internal/jit/compile/compile.go:350 function	TP	33 cognitive complexity points over the limit of its role
+a7234f4d57622124fca0695bf7e3422cf4d065cc9705e5cead0300619f3259c1	cel	interpreter/attribute_patterns.go:250 matchesUnknownPatterns	TP	48 cognitive complexity points over the limit of its role
+28b5fd3959a61481022de3bb6a0b1dfc692323b5e575d4f11130e3b2d8fa4805	qlbridge	lex/lexer.go:1408 lexIdentifierOfTypeNoWs	TP	60 cognitive complexity points over the limit of its role
+c605871c0ee722b70289d74b6f972ded04c6821547f7ce57686fbb40264bf810	qlbridge	rel/sql_rewrite.go:222 joinNodesForFrom	TP	47 cognitive complexity points over the limit of its role
+8b6b7a3a6688a62bc6f98e0ee4df064c9b28745a760e3e5af03048e54cbbcd30	cel	cel/folding.go:434 adaptLiteral	TP	52 cognitive complexity points over the limit of its role
+a37b5b83bad95fa00f1123ac9571f46a00261c85813adee645b58efc811626a7	cel	cel/env.go:181 ToConfig	TP	56 cognitive complexity points over the limit of its role
+0ed93e8a7e9efe9a2636442b39521877e2178c9a5956b76f78db891d030016e8	qlbridge	plan/planner_select.go:27 WalkSelect	TP	35 cognitive complexity points over the limit of its role
+2b64b86d7316a561539b874d744e6df78d00daee79851ae080dd90402a994d9e	cel	parser/unescape.go:104 unescapeChar	TP	32 cognitive complexity points over the limit of its role
+3f7bd927bd58ba882521868484aea3c8062c5abcfff9c551358aac3909997cc2	qlbridge	exec/groupby.go:180 Run	TP	45 cognitive complexity points over the limit of its role
+351a5d4fdf079ea466d696c36a1234277c82db215283cabd9548792aca9adc1f	qlbridge	expr/builtins/filter.go:212 FilterMatchEval	TP	71 cognitive complexity points over the limit of its role
+072de2889abbfc95c6148d691b7bd592aa7b1bbe38cd6415b1f1e0698f3f2d16	qlbridge	plan/projection.go:90 loadFinal	TP	53 cognitive complexity points over the limit of its role
+d94500052934464d71e33ec8cfba35cbeadf218dcecb3b07c60558e5c8879c0d	minivm	analysis/blocks.go:30 Blocks	TP	58 cognitive complexity points over the limit of its role
+a5312c053ae7ba02331eebe3857d7d8b42605c9f802df32ab19a17acf6fc12bc	minivm	internal/codegen/lower.go:323 resolve	TP	32 cognitive complexity points over the limit of its role
+29352ddfe1eea85da941a4e96f8d1d38aa7db5867defa22658469b047bf6f106	qlbridge	lex/lexer.go:834 LexStatement	TP	97 cognitive complexity points over the limit of its role
+10837a83d6d5e3eafc53a9f7c9d71887a46a75e73eca7bc6420581f280c0a345	minivm	internal/vigil/declarations.go:14 docs	TP	41 cognitive complexity points over the limit of its role
+ac0e832e566d72d4f1f03b5b9b192ad3efc968e07dc2b4e76f00db176d87ae0d	qlbridge	exec/join.go:145 Run	TP	48 cognitive complexity points over the limit of its role
+0ec600ed92d70c98ab84827b63d922ca07a628218b331816961fb2818776d8eb	cel	common/stdlib/standard.go:40 init	TP	36 cognitive complexity points over the limit of its role

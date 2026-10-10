@@ -1,0 +1,22 @@
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run
+fingerprint	repo	location	verdict	reason
+7f8e5e9f1804a11b68b7f4e33d5a2dee31933461e6a4a8135bb114b3e3e0af2d	qlbridge	expr/builtins/filter.go:212 FilterMatchEval	TP	57 statements over the limit of its role
+db49fe62ced7d49937538c2541a1f7dea4db3a301421fef1894fbf6c75b33f90	qlbridge	value/value.go:76 String	TP	43 statements over the limit of its role
+cd88a71e02a55b9fe116ba0531503a7326222ae2f576e9befdc94c03ca1be067	cel	cel/env.go:518 Extend	TP	48 statements over the limit of its role
+fdbff396baf9b66514cdfbccb5e5374407991e0425675c61451a21be2ae6cbcb	qlbridge	datasource/introspect.go:34 IntrospectTable	TP	70 statements over the limit of its role
+a7e5f962dd40e96b472816ee661f5014dfb015aa0bdb09d5d14649a2b497a858	qlbridge	expr/node.go:2150 NodeFromExpr	TP	46 statements over the limit of its role
+e5798e7f146355d0c0f8f1a123490fd7b4049fce096670ffdb458d8d1891989c	minivm	transform/bound.go:122 induction	TP	67 statements over the limit of its role
+7593685459ff45ace10d9ec52d41d93f10806b2389a6180a602394b9000eaf80	cel	cel/io.go:204 ValueAsProto	TP	48 statements over the limit of its role
+2161f9241ea3593d5b502cc1a6a893869884be1a1cebcef461abfc38ec0c58cf	cel	interpreter/attributes.go:1368 refQualify	TP	42 statements over the limit of its role
+e5e24735a435549364bf81dcecc3d0ffc4500aafbd57e27f7200c58d7166e644	minivm	internal/codegen/lower.go:323 resolve	TP	59 statements over the limit of its role
+38d5ef251b65819d0fc4813b8ef5a2c985f5be3039595a88f33588b84c9d4ed2	minivm	internal/codegen/names.go:27 normalizeLocalNames	TP	110 statements over the limit of its role
+26a5a63a561126d2fc114934a6f237202471de227d8d2694782262adbaaa0206	cel	common/env/env.go:881 AsCELType	TP	68 statements over the limit of its role
+1ccde55d12f92209bac3af551e6421b50f24d1ce2622257e65ea0edbef696727	minivm	internal/jit/compile/compile.go:350 function	TP	57 statements over the limit of its role
+267c69e84cfc12ec6cef1bfcc769c2addbdd42af45c0f1305b8fff2d42613aec	cel	internal/minivm/differential/runner/main.go:92 evaluate	TP	65 statements over the limit of its role
+c98907429e0519d72507ccb5970918879762e04a787695eea60ead4ba1280025	cel	ext/formatting.go:119 formatMap	TP	49 statements over the limit of its role
+a8bb68800480a7765c40a84ec35b6c1040298e4455bf4e65b4a65956b0f4cc0c	minivm	interp/encode.go:592 mapWriter	TP	52 statements over the limit of its role
+d49f1312b20cae513e7772a9afe5c119c94912909da65fd682bf947a1cf95a02	minivm	transform/walk.go:492 emit	TP	41 statements over the limit of its role
+20eb364ce8cd0527c97d9e85c0a0b6c34361087df3d74d2bae2a221be753dc10	minivm	benchmarks/fixtures/sieve.go:35 sieveWasm	FP	straight-line benchmark fixture that emits a byte program; not a responsibility smell
+76ae82410b8b622b9ae0b6c43101145778a4f57c6aae94d69d22ca0ac804e869	qlbridge	lex/lexer.go:1813 LexTableReferenceFirst	TP	50 statements over the limit of its role
+2429155b70fd9ba958df35aa15f1c2f56e1ccabc1a83a89422a1aadd93956fb5	cel	ext/formatting_v2.go:45 format	TP	114 statements over the limit of its role
+495339a3927c4a11c86f2dbee4a4e0614797461a35be6fffdec6a1b5dc663a79	qlbridge	vm/vm.go:299 evalBinary	TP	348 statements over the limit of its role

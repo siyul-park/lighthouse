@@ -1,0 +1,53 @@
+{
+  "commit": "81b286d29932dc9c116a522972df9ac540aeb40c",
+  "config": "strict-root",
+  "exitCode": 0,
+  "findings": {
+    "core/decision-naming": 29,
+    "core/max-lines": 10,
+    "design/feature-envy": 8,
+    "design/max-name-words": 6,
+    "design/max-params": 6,
+    "design/misplaced-symbol": 11,
+    "design/no-panic": 41,
+    "design/owner-file": 8,
+    "design/private-helper-callers": 573,
+    "design/tiny-modules": 21,
+    "design/unique-type-names": 54
+  },
+  "findingsTotal": 767,
+  "incomplete": 0,
+  "repo": "strict-root",
+  "sources": {
+    "go": {
+      "files": 51,
+      "lines": 3627
+    },
+    "rust": {
+      "files": 244,
+      "lines": 50897
+    }
+  },
+  "timingsMs": {
+    "median": {
+      "analyzer metrics/cognitive": 1.0,
+      "analyzer metrics/cyclomatic": 0.9,
+      "analyzer metrics/fan": 2.6,
+      "analyzer metrics/nesting": 0.9,
+      "analyzer metrics/size": 1.1,
+      "identity": 5.8,
+      "index go": 143.0,
+      "index rust": 359.9,
+      "index text": 0.0,
+      "merge": 25.2,
+      "read": 16.1,
+      "report": 0.7,
+      "rules": 264.4,
+      "setup": 10.1,
+      "store": 0.0,
+      "total": 734.0
+    },
+    "runs": 3
+  },
+  "uncommittedFiles": null
+}

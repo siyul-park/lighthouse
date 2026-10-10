@@ -1,0 +1,65 @@
+{
+  "commit": "dbc85609ca044c8f4b7144503bf31ac79b087ed2",
+  "config": "strict-go",
+  "exitCode": 1,
+  "findings": {
+    "core/max-lines": 12,
+    "design/callers-before-callees": 42,
+    "design/cognitive-complexity": 38,
+    "design/complexity": 7,
+    "design/contiguity": 19,
+    "design/coupling": 5,
+    "design/declaration-groups": 709,
+    "design/error-identity": 17,
+    "design/exported-doc": 971,
+    "design/feature-envy": 5,
+    "design/max-depth": 29,
+    "design/max-lines-per-function": 71,
+    "design/max-name-words": 176,
+    "design/max-statements": 64,
+    "design/misplaced-symbol": 5,
+    "design/no-mutable-globals": 86,
+    "design/no-panic": 25,
+    "design/no-private-types": 6,
+    "design/no-redundant-qualifiers": 135,
+    "design/owner-file": 4,
+    "design/prefer-method": 3,
+    "design/private-helper-callers": 180,
+    "design/tiny-modules": 3,
+    "design/unique-type-names": 45,
+    "testing/external-package": 3,
+    "testing/file-layout": 93,
+    "testing/owner": 537,
+    "testing/standard-assertions": 17
+  },
+  "findingsTotal": 3307,
+  "incomplete": 0,
+  "repo": "qlbridge",
+  "sources": {
+    "go": {
+      "files": 182,
+      "lines": 60506
+    }
+  },
+  "timingsMs": {
+    "median": {
+      "analyzer metrics/cognitive": 1.0,
+      "analyzer metrics/cyclomatic": 0.8,
+      "analyzer metrics/fan": 2.3,
+      "analyzer metrics/nesting": 0.8,
+      "analyzer metrics/size": 1.0,
+      "identity": 18.5,
+      "index go": 383.8,
+      "index text": 0.0,
+      "merge": 30.4,
+      "read": 17.5,
+      "report": 2.3,
+      "rules": 338.2,
+      "setup": 8.4,
+      "store": 0.0,
+      "total": 832.5
+    },
+    "runs": 3
+  },
+  "uncommittedFiles": 1
+}

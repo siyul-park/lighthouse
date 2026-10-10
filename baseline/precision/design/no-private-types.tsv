@@ -1,0 +1,10 @@
+# R3b review: every finding of the final run (8)
+fingerprint	repo	location	verdict	reason
+40945d9d7650174fc131b2255a6fa16d677356abe5b9679a704ebaa71d9c85b1	cel	interpreter/interpreter.go:85	TP	exported function returns an unexported type
+ed0ba019d60af34f0515c44708305a52607225d6680b9c2babcee41d59bc9667	cel	interpreter/runtimecost.go:42	TP	exported function returns an unexported type
+8c76076efb488acc3c712183730f13f9a05fdae26de9b465812575050085a045	qlbridge	generators/elasticsearch/es2gen/estypes.go:93	TP	exported function returns an unexported type
+04691a18244654de25c2a47dfe9fc83e069409d77f10749ad404fbc3d13e3d4d	qlbridge	generators/elasticsearch/es2gen/estypes.go:132	TP	exported function returns an unexported type
+b1c1401be84fc623ae73159acc23a2a78a5ba0531963ce6f161c5422d8abb9af	qlbridge	generators/elasticsearch/es2gen/estypes.go:182	TP	exported function returns an unexported type
+8f0dc91dbb8d844e4a4d1379ba2cbee02cd32b262ffb7815e71634b380d73ead	qlbridge	generators/elasticsearch/esgen/estypes.go:119	TP	exported function returns an unexported type
+559b04470f81412e47b3090294daae74412f3d20700ec51d9c9ef14dd7d9dfa1	qlbridge	generators/elasticsearch/esgen/estypes.go:161	TP	exported function returns an unexported type
+84bf8d9d8dcbfa9a73bcafb1c13d3b5fe765a2d9a61951296425ec2a1fdac050	qlbridge	generators/elasticsearch/esgen/estypes.go:207	TP	exported function returns an unexported type

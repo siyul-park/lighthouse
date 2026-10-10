@@ -1,0 +1,17 @@
+# R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -
+fingerprint	repo	location	verdict	reason
+81eaa385c460c761c046b2128fa0049c42b3555d6b77fd77d4a56b64a63711d6	cel	common/decls/decls.go:1158 collectParamNames	TP	
+fa7e0812a1fd166d93f86b0c7451c7444fd90d4c3280a32ad00b2f7027b41948	cel	ext/costs.go:52 estimateSize	TP	
+97682a5dd8603d9133b60209042b48e53c760ef32ae8a017ebea7b4332717533	cel	ext/protos.go:142 validateIdentifier	TP	
+79d85d7aab226e1f1566844704a1622a3e71bbc91693ad93100e33b6196c255c	cel	parser/parser.go:1024 unnest	FP	walks the generated parser tree
+a42e37d5dab699aeabd7b659cfa01e327dc373995dda35489977897ba5120ff1	cel	parser/unparser.go:503 isComplexOperator	TP	
+024c0af944acea17b6c481d10b6febd79b5bde57c1be01d90fb03027afd1e553	qlbridge	expr/builtins/json.go:49 jsonPathEval	FP	a factory called from Func
+cf5a106aabbc7d4de2919e093883eb348381368b407f20018b18e7b672692c31	qlbridge	expr/node.go:2022 tokenFromInt	TP	first of two
+cf5a106aabbc7d4de2919e093883eb348381368b407f20018b18e7b672692c31	qlbridge	expr/node.go:2022 tokenFromInt	TP	second of two
+760928f1fd9490e5ef2ca06448366fd5977ebac4e0a84f9b357965bdbc64c591	qlbridge	plan/planner_select.go:12 needsFinalProjection	TP	
+4f11feff664277bd9eaac2f375963474f4805d81aa35bea5ba7e00c6921a1f8f	qlbridge	rel/parse_sql.go:1965 convertIdentityToValue	TP	
+bd3015634cee42e4fcdf4addf2b0340cb076af6b1c940b0f8e4cd2ab815dce87	minivm	interp/codec.go:672 bitsOf	TP	
+a90019e87649b741255a2bb955d8d3921563ccf283ae5878133867f8b89282e8	minivm	interp/decode.go:418 fieldIndex	TP	
+5f5d851b26efbc9b40fa45daed4b463bf9afad91c8d43ff3c2fd13d4dd68df7f	minivm	interp/native.go:1678 slots	TP	
+6c5f0c58790e8b1a4c1a0740acaf878e49b959acab6ccd221ba4bd7655a2a701	minivm	transform/promote.go:217 promoted	TP	
+fb365fb3b4f8dd186d05899f946a641063e9c295840b8e67d450d71c2d25e1e7	minivm	transform/ssa.go:145 box	TP	

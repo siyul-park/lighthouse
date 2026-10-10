@@ -1,0 +1,68 @@
+{
+  "commit": "de276b3895e7e62fe2dadbe5ceb2d1897a120c84",
+  "config": "strict-go",
+  "exitCode": 1,
+  "findings": {
+    "core/max-lines": 14,
+    "design/callers-before-callees": 19,
+    "design/cognitive-complexity": 32,
+    "design/complexity": 8,
+    "design/contiguity": 64,
+    "design/coupling": 10,
+    "design/declaration-groups": 45,
+    "design/error-identity": 3,
+    "design/exported-doc": 206,
+    "design/feature-envy": 21,
+    "design/max-depth": 12,
+    "design/max-lines-per-function": 50,
+    "design/max-name-words": 63,
+    "design/max-params": 2,
+    "design/max-results": 11,
+    "design/max-statements": 52,
+    "design/misplaced-symbol": 8,
+    "design/no-banners": 1,
+    "design/no-mutable-globals": 154,
+    "design/no-panic": 61,
+    "design/no-redundant-qualifiers": 2,
+    "design/no-stored-context": 1,
+    "design/owner-file": 8,
+    "design/prefer-method": 2,
+    "design/private-helper-callers": 586,
+    "design/tiny-modules": 1,
+    "design/unique-type-names": 8,
+    "testing/file-layout": 59,
+    "testing/owner": 1,
+    "testing/standard-assertions": 3,
+    "testing/unique-owner": 1
+  },
+  "findingsTotal": 1508,
+  "incomplete": 0,
+  "repo": "minivm",
+  "sources": {
+    "go": {
+      "files": 274,
+      "lines": 188892
+    }
+  },
+  "timingsMs": {
+    "median": {
+      "analyzer metrics/cognitive": 1.2,
+      "analyzer metrics/cyclomatic": 1.0,
+      "analyzer metrics/fan": 3.1,
+      "analyzer metrics/nesting": 1.0,
+      "analyzer metrics/size": 1.1,
+      "identity": 10.0,
+      "index go": 1143.3,
+      "index text": 0.0,
+      "merge": 117.1,
+      "read": 17.6,
+      "report": 1.1,
+      "rules": 361.4,
+      "setup": 8.4,
+      "store": 0.0,
+      "total": 1699.4
+    },
+    "runs": 3
+  },
+  "uncommittedFiles": 1
+}

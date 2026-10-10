@@ -1,0 +1,70 @@
+{
+  "commit": "a492a702877fee0079ad2863d58b53e5ac79d1da",
+  "config": "strict-go",
+  "exitCode": 3,
+  "findings": {
+    "core/max-lines": 60,
+    "design/callers-before-callees": 68,
+    "design/cognitive-complexity": 27,
+    "design/complexity": 8,
+    "design/contiguity": 32,
+    "design/coupling": 20,
+    "design/declaration-groups": 970,
+    "design/error-identity": 15,
+    "design/exported-doc": 1,
+    "design/feature-envy": 17,
+    "design/max-depth": 6,
+    "design/max-lines-per-function": 60,
+    "design/max-name-words": 616,
+    "design/max-results": 2,
+    "design/max-statements": 53,
+    "design/misplaced-symbol": 15,
+    "design/no-banners": 2,
+    "design/no-mutable-globals": 96,
+    "design/no-panic": 18,
+    "design/no-private-types": 2,
+    "design/no-redundant-qualifiers": 7,
+    "design/no-stored-context": 1,
+    "design/owner-file": 2,
+    "design/prefer-method": 6,
+    "design/private-helper-callers": 520,
+    "design/tiny-modules": 1,
+    "design/unique-type-names": 33,
+    "testing/external-package": 48,
+    "testing/file-layout": 118,
+    "testing/no-hidden-target": 7,
+    "testing/owner": 139,
+    "testing/standard-assertions": 995,
+    "testing/unique-owner": 11
+  },
+  "findingsTotal": 3976,
+  "incomplete": 40,
+  "repo": "cel",
+  "sources": {
+    "go": {
+      "files": 473,
+      "lines": 267726
+    }
+  },
+  "timingsMs": {
+    "median": {
+      "analyzer metrics/cognitive": 2.1,
+      "analyzer metrics/cyclomatic": 1.8,
+      "analyzer metrics/fan": 5.1,
+      "analyzer metrics/nesting": 1.9,
+      "analyzer metrics/size": 2.2,
+      "identity": 24.5,
+      "index go": 619.3,
+      "index text": 0.0,
+      "merge": 59.7,
+      "read": 36.6,
+      "report": 2.8,
+      "rules": 608.2,
+      "setup": 8.1,
+      "store": 0.0,
+      "total": 1421.3
+    },
+    "runs": 3
+  },
+  "uncommittedFiles": 22
+}

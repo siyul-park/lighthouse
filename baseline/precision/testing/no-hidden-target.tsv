@@ -1,0 +1,7 @@
+# R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -; 5 of 7 cel findings reviewed
+fingerprint	repo	location	verdict	reason
+f809a8742cd7c0f205d2db576841e5a500cddc8d6e69d5387e7c11362340256b	cel	ext/math_test.go:196 TestMath	FP	helper builds an env with the extension passed as an argument
+81173f7df152c8e6406eb4b8bd2d45ad212a654c2e87990aee27499871b8c313	cel	ext/native_test.go:283 TestNativeTypes	FP	same
+7db8673ef2187ebb6ad980a22663e0c9ef25918c7d0c1e64224244779341fd93	cel	ext/protos_test.go:62 TestProtos	FP	same
+f6c95ab2cddfa0b6d9e4d76d6678bfc22b1716cfcbc32a5648f3869831fb3a5f	cel	ext/regex_test.go:94 TestRegex	FP	same
+62131c98944677d028ebd3577b5b710346081e282bf43baffcf465a9e30098fe	cel	ext/sets_test.go:282 TestSets	FP	same

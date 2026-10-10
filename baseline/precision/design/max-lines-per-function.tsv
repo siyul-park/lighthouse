@@ -1,0 +1,22 @@
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run
+fingerprint	repo	location	verdict	reason
+a4f8771123d4156203cf6b9882abafd3f3657c681f47586c8b352bc52ba86633	qlbridge	exec/projection.go:113 projectionEvaluator	TP	200 lines over the limit of its role
+a3a2ed9927cae16956c73bc209c08f2d04a1c293a77f45e940d033e55d1bfb1f	cel	common/ast/factory.go:236 CopyExpr	TP	62 lines over the limit of its role
+56fe28fdda395e0661255de98dce2948faaa58140d2d2ee7326d974e2f864905	cel	common/types/pb/type.go:524 unwrapDynamic	TP	87 lines over the limit of its role
+2fb213e687b8db30321a5f0da2641119fa3b8d5d3b580b211838b2e9dcbbe295	qlbridge	rel/parse_sql.go:1656 parseCreateCols	TP	76 lines over the limit of its role
+4a0423dbd71c4a2b44473ab53d89c7e8d5e6866a70eb75e7fe2ce3aa1a611538	cel	interpreter/attribute_patterns.go:250 matchesUnknownPatterns	TP	91 lines over the limit of its role
+ae6dd44f0327c57b3315d0d98cc8ea22877376ad06d72878632b052386b8a98c	qlbridge	generators/elasticsearch/es2gen/esgenerator.go:189 binaryExpr	TP	84 lines over the limit of its role
+ee05ef3c7c6d07cb53ef67835f5bbb52d55323e6c5e306955a82d5059507794c	minivm	internal/codegen/call.go:462 retire	TP	63 lines over the limit of its role
+114439ff45c4988619a1b54fd5b18de1704c63f7a6860f45b2a0c31cffbf73aa	cel	cel/fieldpaths.go:67 expandFieldPaths	TP	79 lines over the limit of its role
+3263c56e85f761a736546eeebe11a7f531db1103ee0a11a3241d1e7655ea71e9	cel	interpreter/runtimecost.go:97 Observe	TP	79 lines over the limit of its role
+0ab0eca1f619be576045288d39d5f8dfdfed7ab30e955c58fd0fb2690d521200	qlbridge	value/value.go:288 Value	TP	160 lines over the limit of its role
+544f575480bd5cc00c4c38d6437b55aa4095cb9d47e311bfef3fa03d40165869	qlbridge	rel/parse_sql.go:1540 parseOrderBy	TP	65 lines over the limit of its role
+78c64ce1832db542a84f3ebd60807e879f4d394f96451c5ad3a0dcb2195441c7	qlbridge	datasource/sqlite/sqlrewrite.go:267 walkFilterBinary	TP	61 lines over the limit of its role
+da270d5e42a0577fad4abef8a31fe2381a782e6bd971e1a786f184e35b4be585	cel	interpreter/attributes.go:643 Qualifier	TP	158 lines over the limit of its role
+0fa9eb15d0beb9c9dca0bad28c2f4818a4d07a2de82e65623ea355aefba8cc18	cel	interpreter/prune.go:271 prune	TP	196 lines over the limit of its role
+d4c9ea5fef5765031248f961301abaa07a143534602eb7111cb5ffda533f2cc4	cel	cel/folding.go:577 constantCallMatcher	TP	64 lines over the limit of its role
+98aa71b41699f4519bf5ec86fdb4cddd534ac663b7377e8bff36b92839b3eb21	qlbridge	vm/vm.go:1132 operateIntVals	TP	73 lines over the limit of its role
+ec2ac03def53a0f1eb803c3f6cbe920907d54ceb94f753015150f5fc94a3feab	minivm	internal/jit/compile/compile.go:350 function	TP	79 lines over the limit of its role
+bc5a2a087b963a35669df7c768f752c2412d812d91adbd913785469f98d559bd	qlbridge	vm/vm.go:840 walkTernary	TP	76 lines over the limit of its role
+de828db063cf68a244d52e2f491f806f51424b7c6514909f7c46c7300a450c0b	cel	cel/env.go:518 Extend	TP	103 lines over the limit of its role
+dbecf389d4001ab474ef54a3c65406fe38eec43e4920f8d4ae253934de018b16	minivm	cli/repl.go:139 command	TP	62 lines over the limit of its role
