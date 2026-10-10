@@ -8,6 +8,12 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
+// interfaceSet is the interfaces the code of a package names, by method name.
+type interfaceSet struct {
+	once     sync.Once
+	byMethod map[string][]*types.Interface
+}
+
 // roles: what a function is for, as far as the types say. A method whose
 // signature an interface dictates is an implementation; a function without a
 // receiver that returns a type of its package builds it.
@@ -74,12 +80,6 @@ func receiverNamed(t types.Type) (*types.Named, bool) {
 	}
 	named, ok := t.(*types.Named)
 	return named, ok
-}
-
-// interfaceSet is the interfaces the code of a package names, by method name.
-type interfaceSet struct {
-	once     sync.Once
-	byMethod map[string][]*types.Interface
 }
 
 // interfacesOf returns the candidate interfaces of a package, computed once:

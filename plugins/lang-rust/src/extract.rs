@@ -4,8 +4,8 @@
 use std::collections::HashSet;
 
 use lighthouse_protocol::{
-    Edge, EdgeKind, FileInfo, Fragment, FunctionSummary, Module, Node, Resolution, Span, Symbol,
-    SymbolKind, TestCase, Visibility,
+    Edge, EdgeKind, FileInfo, Fragment, FunctionSummary, Module, Node, Position, Resolution, Span,
+    Symbol, SymbolKind, TestCase, Visibility,
 };
 use quote::ToTokens;
 use syn::{Attribute, Block, Item};
@@ -169,15 +169,16 @@ impl Extractor<'_> {
         let id = symbol_id(&module, &[&name], kind);
         let visibility = self.idx.visibility(vis(&f.vis), m, &id);
         self.declare(
-            Decl {
+            Symbol {
                 id: id.clone(),
                 kind,
                 visibility,
                 owner: None,
                 span: span_of(self.src, f),
-                extent: extent_of(self.src, f),
+                extent: Some(extent_of(self.src, f)),
                 doc: doc_of(&f.attrs),
                 name: name.clone(),
+                ..self.blank()
             },
             Node::Module(module.clone()),
         );
@@ -201,21 +202,29 @@ impl Extractor<'_> {
         );
     }
 
-    fn declare(&mut self, d: Decl, container: Node) {
-        self.edge(EdgeKind::Contains, container, d.id.clone());
-        self.frag.symbols.push(Symbol {
-            id: d.id,
-            kind: d.kind,
-            visibility: d.visibility,
-            owner: d.owner,
+    /// Records a declared symbol and the `contains` edge from its container.
+    fn declare(&mut self, symbol: Symbol, container: Node) {
+        self.edge(EdgeKind::Contains, container, symbol.id.clone());
+        self.frag.symbols.push(symbol);
+    }
+
+    /// The symbol a declaration starts from: everything a declaration of this
+    /// file shares, and placeholders for what each one says itself.
+    fn blank(&self) -> Symbol {
+        let at = Position { line: 1, col: 1 };
+        Symbol {
+            id: String::new(),
+            kind: SymbolKind::Function,
+            visibility: Visibility::Private,
+            owner: None,
             file: self.src.rel.clone(),
-            span: d.span,
-            extent: Some(d.extent),
-            doc: d.doc,
-            name: d.name,
+            span: Span { start: at, end: at },
+            extent: None,
+            doc: None,
+            name: String::new(),
             role: None,
             optional: false,
-        });
+        }
     }
 
     /// Records the summary, the edges and, for tests, the test case of one
@@ -287,15 +296,16 @@ impl Extractor<'_> {
         let ids: Vec<&str> = parts.iter().map(String::as_str).collect();
         let id = symbol_id(&home.module_path, &ids, SymbolKind::Function);
         self.declare(
-            Decl {
+            Symbol {
                 id: id.clone(),
                 kind: SymbolKind::Function,
                 visibility: Visibility::Private,
                 owner: Some(outer.to_owned()),
                 span: span_of(self.src, f),
-                extent: extent_of(self.src, f),
+                extent: Some(extent_of(self.src, f)),
                 doc: doc_of(&f.attrs),
                 name,
+                ..self.blank()
             },
             Node::Symbol(outer.to_owned()),
         );
@@ -326,15 +336,16 @@ impl Extractor<'_> {
         let id = symbol_id(&module, &[&name], SymbolKind::Type);
         let visibility = self.idx.visibility(vis(v), m, &id);
         self.declare(
-            Decl {
+            Symbol {
                 id: id.clone(),
                 kind: SymbolKind::Type,
                 visibility,
                 owner: None,
                 span: span_of(self.src, item),
-                extent: extent_of(self.src, item),
+                extent: Some(extent_of(self.src, item)),
                 doc: doc_of(attrs),
                 name: name.clone(),
+                ..self.blank()
             },
             Node::Module(module.clone()),
         );
@@ -364,15 +375,16 @@ impl Extractor<'_> {
             let visibility = cap(declared(vis(&field.vis)), owner.visibility);
             let optional = optional_field(field, container_default);
             self.declare(
-                Decl {
+                Symbol {
                     id,
                     kind: SymbolKind::Field,
                     visibility,
                     owner: Some(owner.id.clone()),
                     span: span_of(self.src, field),
-                    extent: extent_of(self.src, field),
+                    extent: Some(extent_of(self.src, field)),
                     doc: doc_of(&field.attrs),
                     name,
+                    ..self.blank()
                 },
                 Node::Symbol(owner.id.clone()),
             );
@@ -387,15 +399,16 @@ impl Extractor<'_> {
             let name = variant.ident.to_string();
             let id = symbol_id(&owner.module, &[&owner.name, &name], SymbolKind::Variant);
             self.declare(
-                Decl {
+                Symbol {
                     id,
                     kind: SymbolKind::Variant,
                     visibility: owner.visibility,
                     owner: Some(owner.id.clone()),
                     span: span_of(self.src, variant),
-                    extent: extent_of(self.src, variant),
+                    extent: Some(extent_of(self.src, variant)),
                     doc: doc_of(&variant.attrs),
                     name,
+                    ..self.blank()
                 },
                 Node::Symbol(owner.id.clone()),
             );
@@ -446,15 +459,16 @@ impl Extractor<'_> {
         let id = symbol_id(&module, &[&name], kind);
         let visibility = self.idx.visibility(vis(v), m, &id);
         self.declare(
-            Decl {
+            Symbol {
                 id,
                 kind,
                 visibility,
                 owner: None,
                 span: span_of(self.src, item),
-                extent: extent_of(self.src, item),
+                extent: Some(extent_of(self.src, item)),
                 doc: doc_of(attrs),
                 name,
+                ..self.blank()
             },
             Node::Module(module),
         );
@@ -466,15 +480,16 @@ impl Extractor<'_> {
         let id = symbol_id(&module, &[&name], SymbolKind::Interface);
         let visibility = self.idx.visibility(vis(&t.vis), m, &id);
         self.declare(
-            Decl {
+            Symbol {
                 id: id.clone(),
                 kind: SymbolKind::Interface,
                 visibility,
                 owner: None,
                 span: span_of(self.src, t),
-                extent: extent_of(self.src, t),
+                extent: Some(extent_of(self.src, t)),
                 doc: doc_of(&t.attrs),
                 name: name.clone(),
+                ..self.blank()
             },
             Node::Module(module.clone()),
         );
@@ -490,15 +505,16 @@ impl Extractor<'_> {
             let method = f.sig.ident.to_string();
             let method_id = symbol_id(&module, &[&name, &method], SymbolKind::Method);
             self.declare(
-                Decl {
+                Symbol {
                     id: method_id.clone(),
                     kind: SymbolKind::Method,
                     visibility,
                     owner: Some(id.clone()),
                     span: span_of(self.src, f),
-                    extent: extent_of(self.src, f),
+                    extent: Some(extent_of(self.src, f)),
                     doc: doc_of(&f.attrs),
                     name: method.clone(),
+                    ..self.blank()
                 },
                 Node::Symbol(id.clone()),
             );
@@ -589,15 +605,16 @@ impl Extractor<'_> {
                 let id = symbol_id(&ctx.module, &ids, SymbolKind::Const);
                 let visibility = self.member_visibility(ctx, vis(&c.vis));
                 self.declare(
-                    Decl {
+                    Symbol {
                         id,
                         kind: SymbolKind::Const,
                         visibility,
                         owner: ctx.owner.as_ref().map(|o| o.id.clone()),
                         span: span_of(self.src, c),
-                        extent: extent_of(self.src, c),
+                        extent: Some(extent_of(self.src, c)),
                         doc: doc_of(&c.attrs),
                         name,
+                        ..self.blank()
                     },
                     ctx.container.clone(),
                 );
@@ -616,15 +633,16 @@ impl Extractor<'_> {
         let doc = doc_of(&f.attrs).or_else(|| self.inherited_doc(ctx, &name));
         let visibility = self.member_visibility(ctx, vis(&f.vis));
         self.declare(
-            Decl {
+            Symbol {
                 id: id.clone(),
                 kind: SymbolKind::Method,
                 visibility,
                 owner: ctx.owner.as_ref().map(|o| o.id.clone()),
                 span: span_of(self.src, f),
-                extent: extent_of(self.src, f),
+                extent: Some(extent_of(self.src, f)),
                 doc,
                 name,
+                ..self.blank()
             },
             ctx.container.clone(),
         );
@@ -687,18 +705,6 @@ impl Extractor<'_> {
 struct Role {
     implementation: bool,
     constructs: bool,
-}
-
-/// A symbol to report.
-struct Decl {
-    id: String,
-    kind: SymbolKind,
-    visibility: Visibility,
-    owner: Option<String>,
-    span: Span,
-    extent: Span,
-    doc: Option<String>,
-    name: String,
 }
 
 enum Shape<'a> {

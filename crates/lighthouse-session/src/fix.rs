@@ -15,14 +15,20 @@ use serde::Serialize;
 
 use crate::{Result, Session, findings, git};
 
-/// What to fix. At least one of `paths`, `fingerprints` and `rules` narrows a
-/// run from the whole project.
+/// Which findings to fix. At least one of `paths`, `fingerprints` and `rules`
+/// narrows a run from the whole project.
 #[derive(Default)]
-pub struct FixSelection {
+pub struct FixTargets {
     pub paths: Vec<PathBuf>,
     /// Fingerprints or unambiguous prefixes.
     pub fingerprints: Vec<String>,
     pub rules: Vec<String>,
+}
+
+/// What to fix, and how.
+#[derive(Default)]
+pub struct FixSelection {
+    pub targets: FixTargets,
     /// Do everything but leave the files as they were.
     pub dry_run: bool,
     /// Also apply suggested fixes.
@@ -97,9 +103,9 @@ pub fn fix(session: Session, request: &FixSelection) -> Result<Fixed> {
     let mut messages = plugins.notices.clone();
     let skip = suppressed(&engine, &root, &catalog, request.store)?;
     let run = FixRun {
-        paths: request.paths.clone(),
-        rules: request.rules.clone(),
-        fingerprints: request.fingerprints.clone(),
+        paths: request.targets.paths.clone(),
+        rules: request.targets.rules.clone(),
+        fingerprints: request.targets.fingerprints.clone(),
         skip,
         dry_run: request.dry_run,
         unsafe_fixes: request.unsafe_fixes,
@@ -197,7 +203,6 @@ fn record(
                 description: fix.description.clone(),
                 files: fix.files.iter().map(|f| slashed(f)).collect(),
                 commit: git::head(root),
-                lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
             })?;
         }
         Ok(())

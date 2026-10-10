@@ -301,6 +301,24 @@ func (u *unit) fields(t *ast.StructType, owner, ownerID string) {
 	}
 }
 
+// optional reports whether a caller may leave the field out: its zero value is
+// nil (a pointer, slice, map, function, channel or interface). A field typed
+// by a type parameter is not: its constraint says nothing about the value.
+func (u *unit) optional(field *ast.Field) bool {
+	t := u.info().TypeOf(field.Type)
+	if t == nil {
+		return false
+	}
+	if _, generic := types.Unalias(t).(*types.TypeParam); generic {
+		return false
+	}
+	switch t.Underlying().(type) {
+	case *types.Pointer, *types.Slice, *types.Map, *types.Signature, *types.Chan, *types.Interface:
+		return true
+	}
+	return false
+}
+
 func (u *unit) interfaceMethods(t *ast.InterfaceType, owner, ownerID string) {
 	for _, method := range t.Methods.List {
 		for _, name := range method.Names {
@@ -424,22 +442,4 @@ func initializersOf(s *ast.ValueSpec, i int) []ast.Expr {
 		return s.Values
 	}
 	return nil
-}
-
-// optional reports whether a caller may leave the field out: its zero value is
-// nil (a pointer, slice, map, function, channel or interface). A field typed
-// by a type parameter is not: its constraint says nothing about the value.
-func (u *unit) optional(field *ast.Field) bool {
-	t := u.info().TypeOf(field.Type)
-	if t == nil {
-		return false
-	}
-	if _, generic := types.Unalias(t).(*types.TypeParam); generic {
-		return false
-	}
-	switch t.Underlying().(type) {
-	case *types.Pointer, *types.Slice, *types.Map, *types.Signature, *types.Chan, *types.Interface:
-		return true
-	}
-	return false
 }

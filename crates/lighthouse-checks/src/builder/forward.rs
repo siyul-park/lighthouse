@@ -33,11 +33,13 @@ pub(super) fn forwarded<'p>(project: &'p Project, wrapper: &Symbol) -> Option<&'
     eligible.then_some(target)
 }
 
-fn reaches(project: &Project, from: &SymbolId, goal: &SymbolId) -> bool {
+/// Whether the callee reaches one of its callers: recursion through others.
+pub(super) fn cyclic(project: &Project, callee: &Symbol, callers: &[&Symbol]) -> bool {
+    let goals: BTreeSet<&SymbolId> = callers.iter().map(|s| &s.id).collect();
     let mut seen = BTreeSet::new();
-    let mut stack = vec![from];
+    let mut stack: Vec<&SymbolId> = project.callees(&callee.id).iter().collect();
     while let Some(current) = stack.pop() {
-        if current == goal {
+        if goals.contains(current) {
             return true;
         }
         if seen.insert(current) {
@@ -47,13 +49,11 @@ fn reaches(project: &Project, from: &SymbolId, goal: &SymbolId) -> bool {
     false
 }
 
-/// Whether the callee reaches one of its callers: recursion through others.
-pub(super) fn cyclic(project: &Project, callee: &Symbol, callers: &[&Symbol]) -> bool {
-    let goals: BTreeSet<&SymbolId> = callers.iter().map(|s| &s.id).collect();
+fn reaches(project: &Project, from: &SymbolId, goal: &SymbolId) -> bool {
     let mut seen = BTreeSet::new();
-    let mut stack: Vec<&SymbolId> = project.callees(&callee.id).iter().collect();
+    let mut stack = vec![from];
     while let Some(current) = stack.pop() {
-        if goals.contains(current) {
+        if current == goal {
             return true;
         }
         if seen.insert(current) {

@@ -49,7 +49,25 @@ impl Engine {
         let found = self.suppress(found, &scene, &mut progress)?;
         self.identify(found, &scene, &mut progress)?;
         progress.timings.identity = started.elapsed();
-        Ok(progress.finish(loaded.project, &self.active))
+        Ok(self.finish(progress, loaded.project))
+    }
+
+    /// The outcome of the run over `project`.
+    fn finish(&self, progress: Progress, project: Project) -> Outcome {
+        let Progress {
+            mut outcome,
+            timings,
+            mut incomplete,
+            scopes,
+        } = progress;
+        outcome.timings = timings;
+        outcome.reported = scopes;
+        outcome.project = project;
+        outcome.configured = self.active.iter().cloned().collect();
+        incomplete.sort();
+        incomplete.dedup();
+        outcome.incomplete = incomplete;
+        outcome
     }
 
     /// Rejects a rule that is unknown or not enabled.
@@ -276,24 +294,4 @@ impl Engine {
 /// The ids of the rules a run applied.
 fn ran_rules(selected: &[&dyn Rule]) -> BTreeSet<String> {
     selected.iter().map(|r| r.manifest().id.clone()).collect()
-}
-
-impl Progress {
-    /// The outcome of the run over `project`.
-    fn finish(self, project: Project, active: &BTreeSet<String>) -> Outcome {
-        let Self {
-            mut outcome,
-            timings,
-            mut incomplete,
-            scopes,
-        } = self;
-        outcome.timings = timings;
-        outcome.reported = scopes;
-        outcome.project = project;
-        outcome.configured = active.iter().cloned().collect();
-        incomplete.sort();
-        incomplete.dedup();
-        outcome.incomplete = incomplete;
-        outcome
-    }
 }

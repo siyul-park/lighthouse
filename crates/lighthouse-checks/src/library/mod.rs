@@ -117,6 +117,38 @@ pub(crate) fn context() -> Context<'static> {
     context
 }
 
+/// The `N` arguments of a call.
+pub(super) fn arguments<'a, const N: usize>(
+    ftx: &'a FunctionContext,
+) -> Result<[&'a dyn Val; N], ExecutionError> {
+    let args: Vec<&dyn Val> = ftx.args.iter().map(AsRef::as_ref).collect();
+    <[&dyn Val; N]>::try_from(args)
+        .map_err(|args| ExecutionError::invalid_argument_count(N, args.len()))
+}
+
+/// The field `field` of `node`; `None` when the node has no such field and
+/// an error when it is no node.
+pub(super) fn member<'a>(
+    node: &'a dyn Val,
+    field: &str,
+    function: &str,
+) -> Result<Option<&'a dyn Val>, ExecutionError> {
+    let map = node
+        .downcast_ref::<CelMap>()
+        .ok_or_else(|| ExecutionError::function_error(function, "needs a node"))?;
+    Ok(map
+        .inner()
+        .get(&CelMapKey::String(CelString::from(field)))
+        .map(AsRef::as_ref))
+}
+
+pub(super) fn text(value: &Value) -> String {
+    match value {
+        Value::String(s) => s.to_string(),
+        _ => String::new(),
+    }
+}
+
 /// `layerOf(module, layers)`: the index of the first of the layers, each a
 /// list of module globs, that holds a glob matching the module; -1 when none.
 fn layer_of(module: Arc<String>, layers: Arc<Vec<Value>>) -> i64 {
@@ -188,31 +220,6 @@ fn exposed() -> Builtin {
             visibility == "public" || (internal && visibility == "internal"),
         ))
     })
-}
-
-/// The `N` arguments of a call.
-pub(super) fn arguments<'a, const N: usize>(
-    ftx: &'a FunctionContext,
-) -> Result<[&'a dyn Val; N], ExecutionError> {
-    let args: Vec<&dyn Val> = ftx.args.iter().map(AsRef::as_ref).collect();
-    <[&dyn Val; N]>::try_from(args)
-        .map_err(|args| ExecutionError::invalid_argument_count(N, args.len()))
-}
-
-/// The field `field` of `node`; `None` when the node has no such field and
-/// an error when it is no node.
-pub(super) fn member<'a>(
-    node: &'a dyn Val,
-    field: &str,
-    function: &str,
-) -> Result<Option<&'a dyn Val>, ExecutionError> {
-    let map = node
-        .downcast_ref::<CelMap>()
-        .ok_or_else(|| ExecutionError::function_error(function, "needs a node"))?;
-    Ok(map
-        .inner()
-        .get(&CelMapKey::String(CelString::from(field)))
-        .map(AsRef::as_ref))
 }
 
 /// Whether `source` contains `word` not as part of a longer identifier.
@@ -315,11 +322,4 @@ fn unranked() -> Value {
 
 fn empty() -> Value {
     Value::Map(Map::from(HashMap::<String, Value>::new()))
-}
-
-pub(super) fn text(value: &Value) -> String {
-    match value {
-        Value::String(s) => s.to_string(),
-        _ => String::new(),
-    }
 }

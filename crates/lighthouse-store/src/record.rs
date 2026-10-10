@@ -407,7 +407,6 @@ pub struct NewFix {
     /// Project-relative paths of the files the fix changed.
     pub files: Vec<String>,
     pub commit: Option<String>,
-    pub lighthouse_version: String,
 }
 
 /// A recorded fix; `fixed by` the fixer named, when.

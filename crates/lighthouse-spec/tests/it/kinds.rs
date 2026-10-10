@@ -174,3 +174,34 @@ fn option_schema_check() {
     assert!(option.check(&json!(4), "x").is_ok());
     assert!(option.check(&json!("4"), "x").is_err());
 }
+
+#[test]
+fn shape_target() {
+    let by_ref = lighthouse_spec::Shape {
+        reference: Some("#/$defs/limit".to_owned()),
+        ..lighthouse_spec::Shape::default()
+    };
+    assert_eq!(by_ref.target(), lighthouse_spec::definitions().get("limit"));
+    let unknown = lighthouse_spec::Shape {
+        reference: Some("#/$defs/nope".to_owned()),
+        ..lighthouse_spec::Shape::default()
+    };
+    assert!(unknown.target().is_none());
+    assert!(
+        lighthouse_spec::Shape::of(OptionType::Boolean)
+            .target()
+            .is_none()
+    );
+}
+
+#[test]
+fn shape_describe() {
+    assert_eq!(
+        lighthouse_spec::definitions()["limit"].describe(),
+        "an integer or an object"
+    );
+    assert_eq!(
+        lighthouse_spec::Shape::of(OptionType::Array).describe(),
+        "a list"
+    );
+}

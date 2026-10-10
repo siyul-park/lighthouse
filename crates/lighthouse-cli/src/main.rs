@@ -1,17 +1,15 @@
 use std::{
-    collections::BTreeMap,
     env, fs,
-    io::{self, Write},
     path::{Path, PathBuf},
     process::ExitCode,
-    time::Instant,
 };
 
 use clap::{Parser, Subcommand, ValueEnum};
-use lighthouse_report::{Briefing, Detail, Format, render_with};
-use lighthouse_session::{CheckRequest, DEFAULT_CONFIG, FILE_NAME, FailOn, FixSelection, Session};
+use lighthouse_report::{Detail, Format};
+use lighthouse_session::{DEFAULT_CONFIG, FILE_NAME, FailOn, Session};
 use review::ReviewCommand;
 
+mod check;
 mod decisions;
 mod docs;
 mod hook;
@@ -287,29 +285,6 @@ enum DocsCommand {
 
 type Result<T> = lighthouse_session::Result<T>;
 
-struct Options {
-    format: Format,
-    limit: Option<usize>,
-    detail: Detail,
-    store: bool,
-    fail_on: FailOn,
-    allow_incomplete: bool,
-    timings: bool,
-}
-
-/// What `check --fix` is asked to do.
-struct FixOptions {
-    dry_run: bool,
-    unsafe_fixes: bool,
-    fixer: Option<String>,
-}
-
-/// A report filter taken from git instead of paths.
-struct Reported<'a> {
-    changed: bool,
-    diff: Option<&'a str>,
-}
-
 fn main() -> ExitCode {
     match run(Cli::parse()) {
         Ok(code) => ExitCode::from(code),
@@ -340,17 +315,21 @@ fn run(cli: Cli) -> Result<u8> {
             unsafe_fixes,
             fixer,
             config,
-        } => check(
-            &paths,
-            Reported {
-                changed,
-                diff: diff.as_deref(),
+        } => check::run(
+            &check::Scope {
+                paths,
+                reported: check::Reported {
+                    changed,
+                    diff: diff.as_deref(),
+                },
+                only: &rules,
+                config: config.as_deref(),
+                store: !no_store,
             },
-            Options {
+            &check::Output {
                 format,
                 limit,
                 detail,
-                store: !no_store,
                 fail_on: FailOn {
                     strict,
                     max_warnings,
@@ -358,9 +337,7 @@ fn run(cli: Cli) -> Result<u8> {
                 allow_incomplete,
                 timings,
             },
-            &rules,
-            config.as_deref(),
-            fix.then_some(FixOptions {
+            fix.then_some(check::FixOptions {
                 dry_run,
                 unsafe_fixes,
                 fixer,
@@ -401,77 +378,6 @@ fn run(cli: Cli) -> Result<u8> {
                 },
         } => Ok(hook::run(event, allow_incomplete)),
     }
-}
-
-fn check(
-    paths: &[PathBuf],
-    reported: Reported,
-    options: Options,
-    only: &[String],
-    config: Option<&Path>,
-    fix: Option<FixOptions>,
-) -> Result<u8> {
-    let started = Instant::now();
-    let agent = matches!(options.format, Format::Agent | Format::AgentJson);
-    if options.limit.is_some() && !agent {
-        return Err("--limit applies to the agent formats only".into());
-    }
-    if options.detail != Detail::default() && !agent {
-        return Err("--detail applies to the agent formats only".into());
-    }
-    if let Some(fix) = fix {
-        let dry_run = fix.dry_run;
-        fixing(paths, only, config, options.store, fix)?;
-        if dry_run {
-            return Ok(0);
-        }
-    }
-    let request = CheckRequest {
-        paths: paths.to_vec(),
-        changed: reported.changed,
-        diff: reported.diff.map(str::to_owned),
-        rules: only.to_vec(),
-        store: options.store,
-    };
-    let checked = lighthouse_session::check(Session::load(config)?, &request)?;
-    for message in &checked.messages {
-        eprintln!("lighthouse: {message}");
-    }
-    let outcome = &checked.outcome;
-    let fixes = match options.format {
-        Format::Agent | Format::AgentJson => checked.shown_fixes(options.limit, options.detail),
-        Format::Sarif => {
-            let all: Vec<_> = outcome.diagnostics.iter().take(SARIF_FIXES).collect();
-            checked.fixes(&all)
-        }
-        Format::Text | Format::Json => BTreeMap::new(),
-    };
-    let reporting = Instant::now();
-    let sources = if options.format == Format::Sarif {
-        checked.sources()
-    } else {
-        BTreeMap::new()
-    };
-    print!(
-        "{}",
-        render_with(
-            options.format,
-            &outcome.diagnostics,
-            &outcome.incomplete,
-            &Briefing {
-                detail: options.detail,
-                fixes: Some(&fixes),
-                sources: Some(&sources),
-                ..checked.briefing(options.limit)
-            }
-        )
-    );
-    if options.timings {
-        for line in timings::lines(&outcome.timings, reporting.elapsed(), started.elapsed()) {
-            writeln!(io::stderr(), "{line}").ok();
-        }
-    }
-    Ok(outcome.exit_code(options.fail_on, options.allow_incomplete))
 }
 
 fn trust(revoke: bool, yes: bool) -> Result<u8> {
@@ -562,55 +468,4 @@ fn ensure_line(path: &Path, line: &str) -> Result<bool> {
     text.push('\n');
     fs::write(path, text)?;
     Ok(true)
-}
-
-/// Fixes the selected findings and says what happened: the diff of a dry run
-/// on stdout, everything else on stderr.
-fn fixing(
-    paths: &[PathBuf],
-    only: &[String],
-    config: Option<&Path>,
-    store: bool,
-    fix: FixOptions,
-) -> Result<()> {
-    let request = FixSelection {
-        paths: paths.to_vec(),
-        rules: only.to_vec(),
-        dry_run: fix.dry_run,
-        unsafe_fixes: fix.unsafe_fixes,
-        fixer: fix.fixer,
-        store,
-        ..FixSelection::default()
-    };
-    let fixed = lighthouse_session::fix(Session::load(config)?, &request)?;
-    for message in &fixed.messages {
-        eprintln!("lighthouse: {message}");
-    }
-    if fixed.dry_run {
-        print!("{}", fixed.diff);
-    }
-    let verb = if fixed.dry_run { "would fix" } else { "fixed" };
-    for fix in fixed.applied() {
-        eprintln!(
-            "{verb} {} [{}] {} ({}): {}",
-            fix.rule,
-            fix.safety,
-            fix.files.join(", "),
-            fix.fixer,
-            fix.description
-        );
-    }
-    for fix in fixed.declined() {
-        eprintln!(
-            "not fixed {}:{} {}: {}",
-            fix.path, fix.line, fix.rule, fix.reason
-        );
-    }
-    eprintln!(
-        "lighthouse: {} fix(es) {}, {} left alone",
-        fixed.applied().len(),
-        if fixed.dry_run { "proposed" } else { "applied" },
-        fixed.declined().len()
-    );
-    Ok(())
 }

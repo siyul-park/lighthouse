@@ -12,7 +12,6 @@ fn a_recorded_fix_is_kept_locally_and_never_enters_the_decision_log() {
         description: "Declarations follow ownership groups".to_owned(),
         files: vec!["a.go".to_owned()],
         commit: Some("abc".to_owned()),
-        lighthouse_version: "0.1.0".to_owned(),
     };
 
     let recorded = store.record_fix(&fix).unwrap();

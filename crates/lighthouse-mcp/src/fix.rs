@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use lighthouse_session::{FixSelection, Session};
+use lighthouse_session::{FixSelection, FixTargets, Session};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -32,9 +32,11 @@ pub fn fix(args: FixArgs) -> Outcome {
     }
     let session = Session::load(None).map_err(fail)?;
     let request = FixSelection {
-        paths: inside(&session.root, args.paths)?,
-        fingerprints: args.fingerprints,
-        rules: args.rules,
+        targets: FixTargets {
+            paths: inside(&session.root, args.paths)?,
+            fingerprints: args.fingerprints,
+            rules: args.rules,
+        },
         dry_run: args.dry_run,
         unsafe_fixes: args.unsafe_fixes,
         fixer: None,

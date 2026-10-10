@@ -29,7 +29,7 @@ pub use decisions::{
 };
 pub use docs::bundled_docs;
 pub use findings::Remembered;
-pub use fix::{AppliedRow, DeclinedRow, FixSelection, Fixed, fix, fix_plan};
+pub use fix::{AppliedRow, DeclinedRow, FixSelection, FixTargets, Fixed, fix, fix_plan};
 pub use git::head;
 pub use lighthouse_engine::{FailOn, Timings};
 pub use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};

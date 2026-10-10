@@ -54,36 +54,6 @@ pub struct Shape {
     pub required: Vec<String>,
 }
 
-/// The named shapes of the spec, by name.
-pub fn definitions() -> &'static BTreeMap<String, Shape> {
-    static DEFS_BY_NAME: OnceLock<BTreeMap<String, Shape>> = OnceLock::new();
-    DEFS_BY_NAME.get_or_init(|| BTreeMap::from([("limit".to_owned(), limit())]))
-}
-
-/// The `limit` shape every limit option shares: an integer for every role of
-/// a function, or an object that gives `default` and one per role. `-1` is no
-/// limit; a role left out takes `default`, and a `default` left out is no
-/// limit.
-fn limit() -> Shape {
-    let bound = Shape {
-        minimum: Some(NO_LIMIT),
-        ..Shape::of(OptionType::Integer)
-    };
-    let roles = std::iter::once("default")
-        .chain(LIMIT_ROLES)
-        .map(|role| (role.to_owned(), bound.clone()));
-    Shape {
-        one_of: vec![
-            bound.clone(),
-            Shape {
-                properties: roles.collect(),
-                ..Shape::of(OptionType::Object)
-            },
-        ],
-        ..Shape::default()
-    }
-}
-
 impl Shape {
     /// A shape of one type.
     pub fn of(kind: OptionType) -> Self {
@@ -180,6 +150,12 @@ impl Shape {
     }
 }
 
+/// The named shapes of the spec, by name.
+pub fn definitions() -> &'static BTreeMap<String, Shape> {
+    static DEFS_BY_NAME: OnceLock<BTreeMap<String, Shape>> = OnceLock::new();
+    DEFS_BY_NAME.get_or_init(|| BTreeMap::from([("limit".to_owned(), limit())]))
+}
+
 /// `over` laid on `base`: two objects merge per key, anything else is `over`.
 /// An object-valued option (a limit per role) is thus refined, not replaced,
 /// by each layer that sets it.
@@ -192,4 +168,28 @@ pub fn merge(base: &Value, over: &Value) -> Value {
         merged.insert(key.clone(), value.clone());
     }
     Value::Object(merged)
+}
+
+/// The `limit` shape every limit option shares: an integer for every role of
+/// a function, or an object that gives `default` and one per role. `-1` is no
+/// limit; a role left out takes `default`, and a `default` left out is no
+/// limit.
+fn limit() -> Shape {
+    let bound = Shape {
+        minimum: Some(NO_LIMIT),
+        ..Shape::of(OptionType::Integer)
+    };
+    let roles = std::iter::once("default")
+        .chain(LIMIT_ROLES)
+        .map(|role| (role.to_owned(), bound.clone()));
+    Shape {
+        one_of: vec![
+            bound.clone(),
+            Shape {
+                properties: roles.collect(),
+                ..Shape::of(OptionType::Object)
+            },
+        ],
+        ..Shape::default()
+    }
 }

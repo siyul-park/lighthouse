@@ -128,7 +128,11 @@ impl Store {
         let now = timestamp(&tx)?;
         let mut summary = RunSummary::default();
         for observed in &run.observed {
-            upsert(&tx, observed, run, &now, &mut summary)?;
+            match upsert(&tx, observed, run, &now)? {
+                Seen::New => summary.opened += 1,
+                Seen::Reopened => summary.reopened += 1,
+                Seen::Open => {}
+            }
         }
         summary.resolved = resolve_absent(&tx, run, &now)?;
         summary.deactivated = reconcile_inactive(&tx, run, &now)?;
@@ -267,7 +271,7 @@ impl Store {
                 fix.description,
                 files,
                 fix.commit,
-                fix.lighthouse_version,
+                env!("CARGO_PKG_VERSION"),
                 timestamp
             ],
         )?;
@@ -394,6 +398,13 @@ pub struct Store {
     notices: Vec<String>,
 }
 
+/// What the store knew of a finding before a run saw it again.
+enum Seen {
+    New,
+    Reopened,
+    Open,
+}
+
 fn retry_busy<T>(mut attempt: impl FnMut() -> Result<T, Error>) -> Result<T, Error> {
     let mut tries = 0;
     loop {
@@ -434,22 +445,16 @@ fn timestamp(conn: &Connection) -> Result<String, Error> {
     Ok(conn.query_row(&format!("SELECT {NOW}"), [], |row| row.get(0))?)
 }
 
-fn upsert(
-    tx: &Transaction,
-    observed: &Observed,
-    run: &Run,
-    now: &str,
-    summary: &mut RunSummary,
-) -> Result<(), Error> {
+fn upsert(tx: &Transaction, observed: &Observed, run: &Run, now: &str) -> Result<Seen, Error> {
     let was_resolved: Option<bool> = tx
         .prepare_cached("SELECT resolved_at IS NOT NULL FROM findings WHERE fingerprint = ?1")?
         .query_row(params![observed.fingerprint], |row| row.get(0))
         .optional()?;
-    match was_resolved {
-        None => summary.opened += 1,
-        Some(true) => summary.reopened += 1,
-        Some(false) => {}
-    }
+    let seen = match was_resolved {
+        None => Seen::New,
+        Some(true) => Seen::Reopened,
+        Some(false) => Seen::Open,
+    };
     tx.prepare_cached(
         "INSERT INTO findings (fingerprint, rule_id, decision_uid, severity, authored_severity, path, locator, symbol, \
              first_seen, last_seen, last_message, last_evidence, last_facts, last_options, \
@@ -498,7 +503,7 @@ fn upsert(
             ":digest": observed.evidence_digest(),
         },
     )?;
-    Ok(())
+    Ok(seen)
 }
 
 fn resolve_absent(tx: &Transaction, run: &Run, now: &str) -> Result<usize, Error> {

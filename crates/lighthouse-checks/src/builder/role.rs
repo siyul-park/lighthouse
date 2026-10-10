@@ -6,6 +6,16 @@ use serde_json::{Map, Value, json};
 use super::Builder;
 use crate::layout;
 
+/// What a function is, as the providers and the project's conventions say.
+#[derive(Clone, Copy, Default)]
+pub(super) struct Flags {
+    pub test: bool,
+    pub implementation: bool,
+    pub constructor: bool,
+    pub entrypoint: bool,
+    pub method: bool,
+}
+
 impl Builder<'_> {
     /// `constructor_named`, `role` and `built`, for the expressions that
     /// mention them (`limit` and `counted` read `role` and `built`).
@@ -110,16 +120,6 @@ impl Builder<'_> {
 pub(super) fn satisfies_interface(project: &Project, wrapper: &Symbol) -> bool {
     wrapper.kind == SymbolKind::Method
         && project.declared_by_interface(wrapper.id.module(), &wrapper.name)
-}
-
-/// What a function is, as the providers and the project's conventions say.
-#[derive(Clone, Copy, Default)]
-pub(super) struct Flags {
-    pub test: bool,
-    pub implementation: bool,
-    pub constructor: bool,
-    pub entrypoint: bool,
-    pub method: bool,
 }
 
 /// The role of a function: `test`, `implementation` (an interface or trait
