@@ -11,13 +11,46 @@ spec:
   title: Public APIs do not expose private types
   context: >-
     Callers must be able to use an API without naming private types.
+
+    Go: An exported function, or an exported method of an exported type, whose
+    parameters or results name a project type that is not exported is reported
+    (revive `unexported-return` for results, golint's "exported func returns
+    unexported type"; parameters follow the same reasoning). An alias that
+    exports the type (`type Option = option`) is the remedy and passes; the
+    type behind pointers is what counts, a slice or map of it is not looked
+    into. Whether callers could use the API without the type, say through an
+    interface it satisfies, stays with review.
+
+    Rust: the compiler already rejects a private type in a public interface
+    (`private_interfaces`, `private_bounds`), so no check is needed.
   scope:
     domain: code
     subject: symbol
   requirement: Public APIs MUST be usable without callers naming private types.
   severity: warn
   check:
-    type: model
+    type: cel
+    select: function
+    with:
+      - name: reachable
+        expr: >-
+          func.visibility != 'private'
+          && (func.kind == 'function'
+              || (func.kind == 'method' && owner(func).visibility != 'private'))
+      - name: hidden
+        expr: >-
+          (func.signature.params + func.signature.results)
+            .filter(t, t.symbol != '' && !t.exported)
+    where: "func.lang == 'go' && reachable && hidden.size() > 0"
+    message: "exported {{ func.name }} exposes unexported type {{ hidden[0].text }}"
+    evidence:
+      types: hidden.map(t, t.text)
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+      - "revive unexported-return: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-return"
+      - "rustc private_interfaces: https://doc.rust-lang.org/rustc/lints/listing/warn-by-default.html#private-interfaces"
   examples:
     - name: invalid
       language: go
@@ -25,15 +58,103 @@ spec:
       files:
         - path: example.go
           body: |-
+            package sample
+
             type config struct{}
 
             func New() config { return config{} }
+      expect:
+        - line: 5
     - name: valid
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Config struct{}
+
+            func New() Config { return Config{} }
+    - name: unexported-parameter
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type options struct{ verbose bool }
+
+            func Run(o *options) error { return nil }
+      expect:
+        - line: 5
+    - name: exported-alias
       language: go
       kind: valid
       files:
         - path: example.go
           body: |-
-            type Config struct{}
+            package sample
 
-            func New() Config { return Config{} }
+            type option struct{}
+
+            type Option = option
+
+            func New() Option { return option{} }
+    - name: private-function
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type config struct{}
+
+            func newConfig() config { return config{} }
+    - name: method-of-an-unexported-type
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type config struct{}
+
+            type server struct{}
+
+            func (s *server) Config() config { return config{} }
+    - name: exported-method
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type config struct{}
+
+            type Server struct{}
+
+            func (s *Server) Config() config { return config{} }
+      expect:
+        - line: 7
+    - name: rust-is-checked-by-the-compiler
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            struct Config;
+
+            fn new() -> Config {
+                Config
+            }
+
+            pub fn run() {
+                let _ = new();
+            }

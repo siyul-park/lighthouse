@@ -26,6 +26,7 @@ use crate::{
     table::Table,
 };
 
+mod api;
 mod effective;
 mod forward;
 mod hidden;
@@ -267,6 +268,7 @@ impl<'a> Builder<'a> {
             );
         }
         self.placement_facts(map, symbol);
+        self.api_facts(map, symbol, summary);
         self.role_facts(map, symbol, summary);
         if needs.mentions("local_callers") {
             map.insert("local_callers".to_owned(), self.local_callers(symbol));

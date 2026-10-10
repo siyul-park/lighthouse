@@ -337,6 +337,10 @@ pub enum Select {
     Test,
     /// A comment of a file, with its text and position.
     Comment,
+    /// A body event of a function (a panic, an `unwrap`, an error compared
+    /// with `==`, ...): one finding per event, at the event. The event has
+    /// its `kind`, `detail`, `line` and the function it is in (`event.func`).
+    Event,
     /// A decision document of the project: its name, pack, labels and kind,
     /// and where it is written.
     Decision,
@@ -384,6 +388,7 @@ impl Select {
             Self::File => "file",
             Self::Test => "test",
             Self::Comment => "comment",
+            Self::Event => "event",
             Self::Decision => "decision",
         }
     }
@@ -391,7 +396,8 @@ impl Select {
 
 /// A rule written as data: a `where` expression that is true for a violation
 /// of the selected values, and a message. The expressions see the selected
-/// value (`symbol`, `func`, `edge`, `module`, `file`, `test` or `comment`),
+/// value (`symbol`, `func`, `edge`, `module`, `file`, `test`, `comment` or
+/// `event`),
 /// the decision's resolved `options`, and the standard function library over
 /// the code model: `metrics(n)`, `callers(n)`, `callees(n)`, `edges(n, kind)`,
 /// `owner(n)`, `tests(n)`, `annotations(n)`.
@@ -475,7 +481,7 @@ impl CelCheck {
         };
         for binding in &self.bindings {
             let reserved = [
-                "options", "symbol", "func", "edge", "module", "file", "test", "comment",
+                "options", "symbol", "func", "edge", "module", "file", "test", "comment", "event",
                 "decision",
             ];
             let valid = !binding.name.is_empty()

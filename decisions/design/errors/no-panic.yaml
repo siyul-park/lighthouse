@@ -11,6 +11,18 @@ spec:
   title: "Return errors, do not panic"
   context: >-
     Panics bypass the caller's control flow.
+
+    Every place production code can panic is reported, one finding each
+    (forbidigo `^panic$`; clippy's restriction lints `panic`, `unwrap_used`,
+    `expect_used`, `todo`, `unimplemented`, `unreachable`):
+    Go reports a call of `panic`; Rust reports the `panic!`, `unreachable!`,
+    `todo!` and `unimplemented!` macros and any `.unwrap()` or `.expect(..)`
+    call (syntactically, on any receiver, as clippy does). The findings are
+    candidates, not violations: impossible programmer errors, `Must*`-style
+    APIs and documented hot-path invariants are allowed by the requirement
+    and stay with review. Test code, entrypoints (`main`, `init`) and
+    functions whose name starts with one of `allowPrefixes` are not reported.
+    Clippy's restriction lints are opt-in for the same reason.
   scope:
     domain: code
     subject: symbol
@@ -19,5 +31,220 @@ spec:
     or documented hot-path invariants with one recovery boundary; normal runtime
     failures MUST return errors.
   severity: info
+  options:
+    type: object
+    properties:
+      allowPrefixes:
+        type: array
+        default: [Must, must]
+        description: Name prefixes of functions that may panic.
+      kinds:
+        type: array
+        default: [panic, unwrap, expect, todo, unimplemented, unreachable]
+        description: >-
+          What to report: a Go call of `panic`, a Rust macro (`panic`, `todo`,
+          `unimplemented`, `unreachable`) or method (`unwrap`, `expect`).
+    additionalProperties: false
   check:
-    type: model
+    type: cel
+    select: event
+    with:
+      - name: what
+        expr: "event.detail != '' ? event.detail : event.kind"
+    where: >-
+      (event.kind == 'panic' || event.kind == 'unwrap')
+      && what in options.kinds
+      && event.func.role != 'test' && event.func.role != 'entrypoint'
+      && !options.allowPrefixes.exists(p, event.func.name.startsWith(p))
+    message: >-
+      {{ event.kind == 'unwrap' ? '.' + what + '() can panic' : what + ' can panic' }}
+      in {{ event.func.name }}: return an error instead
+    evidence:
+      kind: what
+      function: event.func.name
+  provenance:
+    wasDerivedFrom:
+      - "forbidigo patterns: https://github.com/ashanbrown/forbidigo#readme"
+      - "clippy panic: https://rust-lang.github.io/rust-clippy/master/index.html#panic"
+      - "clippy unwrap_used: https://rust-lang.github.io/rust-clippy/master/index.html#unwrap_used"
+      - "clippy expect_used: https://rust-lang.github.io/rust-clippy/master/index.html#expect_used"
+      - "clippy todo, unimplemented, unreachable: https://rust-lang.github.io/rust-clippy/master/index.html#todo"
+  examples:
+    - name: go-panic
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            func Read(n int) int {
+                if n < 0 {
+                    panic("negative")
+                }
+                return n
+            }
+      expect:
+        - line: 5
+    - name: go-error
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import "errors"
+
+            func Read(n int) (int, error) {
+                if n < 0 {
+                    return 0, errors.New("negative")
+                }
+                return n, nil
+            }
+    - name: go-must
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            func MustRead(n int) int {
+                if n < 0 {
+                    panic("negative")
+                }
+                return n
+            }
+    - name: go-main
+      language: go
+      kind: valid
+      files:
+        - path: main.go
+          body: |-
+            package main
+
+            func main() {
+                panic("not implemented")
+            }
+    - name: go-test
+      language: go
+      kind: valid
+      files:
+        - path: example_test.go
+          body: |-
+            package sample
+
+            import "testing"
+
+            func TestRead(t *testing.T) {
+                if false {
+                    panic("never")
+                }
+            }
+    - name: go-kinds-narrowed
+      language: go
+      kind: valid
+      options:
+        kinds: [unwrap]
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            func Read(n int) int {
+                if n < 0 {
+                    panic("negative")
+                }
+                return n
+            }
+    - name: rust-unwrap
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn first(items: &[u32]) -> u32 {
+                items.first().copied().unwrap()
+            }
+      expect:
+        - line: 2
+          message: ".unwrap() can panic in first: return an error instead"
+    - name: rust-expect
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn parse(text: &str) -> u32 {
+                text.parse().expect("a number")
+            }
+      expect:
+        - line: 2
+    - name: rust-macros
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn check(code: u32) {
+                if code > 3 {
+                    panic!("too big");
+                }
+                if code == 2 {
+                    todo!();
+                }
+            }
+      expect:
+        - line: 3
+          message: "panic can panic in check: return an error instead"
+        - line: 6
+    - name: rust-result
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn parse(text: &str) -> Result<u32, std::num::ParseIntError> {
+                text.parse()
+            }
+    - name: rust-main
+      language: rust
+      kind: valid
+      files:
+        - path: src/main.rs
+          body: |-
+            fn main() {
+                let n: u32 = "3".parse().unwrap();
+                println!("{n}");
+            }
+    - name: rust-in-tests
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn double(n: u32) -> u32 {
+                n * 2
+            }
+
+            #[cfg(test)]
+            mod tests {
+                use super::*;
+
+                #[test]
+                fn doubles() {
+                    assert_eq!(Some(double(2)).unwrap(), 4);
+                }
+            }
+    - name: rust-must-prefix
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn must_parse(text: &str) -> u32 {
+                text.parse().unwrap()
+            }

@@ -12,7 +12,20 @@ spec:
   context: >-
     Adding context must not hide the cause callers depend on.
 
-    Go: Wrap with `%w` when adding context.
+    Go: Wrap with `%w` when adding context. The three ways code stops
+    working once an error is wrapped are reported, one finding each at the
+    place (go-errorlint): an error compared with `==` or `!=`, or switched
+    on (`comparison`); a type assertion or type switch on an error
+    (`asserts`); a `fmt.Errorf` that formats an error without `%w`
+    (`errorf`). Comparing with `nil`, `io.EOF` or `sql.ErrNoRows`, and the
+    body of an `Is(error) bool` method are not reported. go-errorlint lets
+    these and a longer list of standard library sentinels through only when
+    the error comes straight from the function that documents returning it;
+    this check does not follow that flow, and reports the other sentinels.
+    Whether callers depend on the cause, and whether a cause is to be hidden
+    on purpose, stays with review.
+
+    Rust has no such convention and is judged by review only.
   scope:
     domain: code
     subject: symbol
@@ -20,18 +33,244 @@ spec:
     Dependency identity MUST be preserved when callers depend on it; context
     added to an error MUST keep the cause reachable.
   severity: warn
+  options:
+    type: object
+    properties:
+      comparison:
+        type: boolean
+        default: true
+        description: Report errors compared with `==`, `!=` or a `switch`.
+      asserts:
+        type: boolean
+        default: true
+        description: Report type assertions and type switches on errors.
+      errorf:
+        type: boolean
+        default: true
+        description: Report `fmt.Errorf` formatting an error without `%w`.
+    additionalProperties: false
   check:
-    type: model
+    type: cel
+    select: event
+    where: >-
+      event.func.lang == 'go' && (
+        (event.kind == 'error-compare' && options.comparison)
+        || (event.kind == 'error-assert' && options.asserts)
+        || (event.kind == 'errorf-unwrapped' && options.errorf))
+    message: >-
+      {{ event.kind == 'error-compare'
+      ? 'comparing with == will fail on wrapped errors. Use errors.Is to check for a specific error'
+      : event.kind == 'error-assert'
+      ? 'type assertion on error will fail on wrapped errors. Use errors.As to check for specific errors'
+      : 'non-wrapping format verb for fmt.Errorf. Use `%w` to format errors' }}
+    evidence:
+      kind: event.kind
+      detail: event.detail
+      function: event.func.name
+  provenance:
+    wasDerivedFrom:
+      - "go-errorlint comparison, asserts, errorf: https://github.com/polyfloyd/go-errorlint#readme"
+      - "golangci-lint errorlint: https://golangci-lint.run/usage/linters/#errorlint"
   examples:
-    - name: invalid
+    - name: unwrapped-errorf
       language: go
       kind: invalid
       files:
-        - path: error-identity-invalid.go
-          source: testdata/error-identity-invalid.go
-    - name: valid
+        - path: example.go
+          source: testdata/unwrapped-errorf.go
+      expect:
+        - line: 6
+          message: "non-wrapping format verb for fmt.Errorf. Use `%w` to format errors"
+    - name: wrapped-errorf
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import "fmt"
+
+            func Load(name string, err error) error {
+                return fmt.Errorf("load %s: %w", name, err)
+            }
+    - name: comparison
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import "errors"
+
+            var ErrNotFound = errors.New("not found")
+
+            func Missing(err error) bool {
+                return err == ErrNotFound
+            }
+      expect:
+        - line: 8
+          message: "comparing with == will fail on wrapped errors. Use errors.Is to check for a specific error"
+    - name: switch-on-an-error
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import "errors"
+
+            var ErrNotFound = errors.New("not found")
+
+            func Code(err error) int {
+                switch err {
+                case ErrNotFound:
+                    return 404
+                }
+                return 500
+            }
+      expect:
+        - line: 8
+    - name: errors-is
       language: go
       kind: valid
       files:
-        - path: error-identity-valid.go
-          source: testdata/error-identity-valid.go
+        - path: example.go
+          body: |-
+            package sample
+
+            import "errors"
+
+            var ErrNotFound = errors.New("not found")
+
+            func Missing(err error) bool {
+                return errors.Is(err, ErrNotFound)
+            }
+    - name: nil-and-eof-are-fine
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import (
+                "database/sql"
+                "io"
+            )
+
+            func Done(err error) bool { return err == io.EOF }
+
+            func Empty(err error) bool { return err == sql.ErrNoRows }
+
+            func Failed(err error) bool { return err != nil }
+    - name: assertion
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Timeout struct{}
+
+            func (*Timeout) Error() string { return "timeout" }
+
+            func IsTimeout(err error) bool {
+                _, ok := err.(*Timeout)
+                return ok
+            }
+      expect:
+        - line: 8
+          message: "type assertion on error will fail on wrapped errors. Use errors.As to check for specific errors"
+    - name: type-switch
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Timeout struct{}
+
+            func (*Timeout) Error() string { return "timeout" }
+
+            func Kind(err error) int {
+                switch err.(type) {
+                case *Timeout:
+                    return 1
+                }
+                return 0
+            }
+      expect:
+        - line: 8
+    - name: errors-as
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import "errors"
+
+            type Timeout struct{}
+
+            func (*Timeout) Error() string { return "timeout" }
+
+            func IsTimeout(err error) bool {
+                var t *Timeout
+                return errors.As(err, &t)
+            }
+    - name: inside-an-is-method
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import "errors"
+
+            var ErrNotFound = errors.New("not found")
+
+            type Missing struct{}
+
+            func (*Missing) Error() string { return "missing" }
+
+            func (*Missing) Is(target error) bool { return target == ErrNotFound }
+    - name: comparison-switched-off
+      language: go
+      kind: valid
+      options:
+        comparison: false
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import "errors"
+
+            var ErrNotFound = errors.New("not found")
+
+            func Missing(err error) bool {
+                return err == ErrNotFound
+            }
+    - name: rust-is-judged-by-review
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            #[derive(PartialEq)]
+            pub enum Failure {
+                Missing,
+            }
+
+            pub fn is_missing(err: &Failure) -> bool {
+                *err == Failure::Missing
+            }

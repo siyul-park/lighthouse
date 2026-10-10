@@ -405,5 +405,5 @@ fn first_code_line(project: &Project, file: &Path, text: &str) -> u32 {
 
 /// A line count as the `u32` positions are in; a comment is never that long.
 fn count(n: usize) -> u32 {
-    u32::try_from(n).expect("a comment has fewer lines than a u32 position can number")
+    u32::try_from(n).unwrap_or(u32::MAX)
 }

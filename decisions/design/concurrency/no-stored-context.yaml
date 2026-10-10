@@ -11,10 +11,87 @@ spec:
   title: Request contexts are not stored
   context: >-
     A request context outliving its request carries stale cancellation.
+
+    Go: A struct field of type `context.Context` is reported (containedctx).
+    Whether the struct is long-lived, and whether the context is a request
+    context at all, stays with review: a struct that is itself the request
+    is the usual exception.
+
+    Rust has no request context type and is judged by review only.
   scope:
     domain: code
     subject: symbol
   requirement: Request contexts MUST NOT be stored in long-lived objects.
   severity: warn
   check:
-    type: model
+    type: cel
+    select: symbol
+    where: >-
+      symbol.kind == 'field' && symbol.lang == 'go'
+      && symbol.type_ref.text == 'context.Context'
+    message: "found a struct that contains a context.Context field: {{ symbol.name }}"
+    identity:
+      subject: symbol.id
+  provenance:
+    wasDerivedFrom:
+      - "containedctx: https://github.com/sivchari/containedctx"
+  examples:
+    - name: invalid
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import "context"
+
+            type Worker struct {
+              ctx  context.Context
+              name string
+            }
+      expect:
+        - line: 6
+    - name: valid
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import "context"
+
+            type Worker struct{ name string }
+
+            func (w *Worker) Run(ctx context.Context) error { return ctx.Err() }
+    - name: a-cancel-function
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import "context"
+
+            type Holder struct{ cancel context.CancelFunc }
+    - name: rust-is-judged-by-review
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Ctx;
+
+            pub struct Worker {
+                ctx: Ctx,
+            }
+
+            impl Worker {
+                pub fn new(ctx: Ctx) -> Self {
+                    Self { ctx }
+                }
+            }

@@ -1406,6 +1406,11 @@
           "type": "string"
         },
         {
+          "const": "event",
+          "description": "A body event of a function (a panic, an `unwrap`, an error compared\nwith `==`, ...): one finding per event, at the event. The event has\nits `kind`, `detail`, `line` and the function it is in (`event.func`).",
+          "type": "string"
+        },
+        {
           "const": "decision",
           "description": "A decision document of the project: its name, pack, labels and kind,\nand where it is written.",
           "type": "string"

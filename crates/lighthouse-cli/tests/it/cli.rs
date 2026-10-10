@@ -261,7 +261,7 @@ fn decision_list_all_shows_status_of_every_decision() {
     let text = String::from_utf8(out.stdout).unwrap();
     for line in [
         "core/max-lines\timplemented\twarn\tFiles stay below a line limit",
-        "design/error-identity\tjudged\twarn\tPreserve error identity",
+        "design/plural-collections\tjudged\tinfo\tSingular capabilities, plural collections",
         "design/advisory-signals\tdoc\t-\tSignals stay advisory",
     ] {
         assert!(text.lines().any(|l| l == line), "{line}");
@@ -272,12 +272,11 @@ fn decision_list_all_shows_status_of_every_decision() {
 fn explain_describes_judged_decisions() {
     let dir = tempfile::tempdir().unwrap();
     let out = lighthouse(dir.path())
-        .args(["explain", "design/error-identity"])
+        .args(["explain", "design/plural-collections"])
         .output()
         .unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
-    assert!(text.contains("**Requirement**\n\nDependency identity MUST be preserved"));
-    assert!(text.contains("%w"));
+    assert!(text.contains("**Requirement**\n\nCapability names MUST be singular"));
     assert!(text.contains("Status: judged"));
 }
 

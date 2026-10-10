@@ -71,7 +71,7 @@ fn a_rule_exists_for_a_decision_a_program_checks() {
     assert_eq!(meta.id, "core/max-lines");
     assert_eq!(meta.severity, Severity::Warn);
     assert_eq!(meta.scope, RunScope::File);
-    for judged in ["design/no-private-types", "design/advisory-signals"] {
+    for judged in ["design/plural-collections", "design/advisory-signals"] {
         assert!(registry.rule(judged).is_none(), "{judged}");
     }
     for annotation in ["core/allow-reason", "core/no-unused-allow"] {
@@ -267,9 +267,11 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
             "design/callers-before-callees",
             "design/cognitive-complexity",
             "design/complexity",
+            "design/context-first",
             "design/contiguity",
             "design/coupling",
             "design/declaration-groups",
+            "design/error-identity",
             "design/exported-doc",
             "design/feature-envy",
             "design/layers",
@@ -282,8 +284,11 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
             "design/misplaced-symbol",
             "design/no-banners",
             "design/no-mutable-globals",
+            "design/no-panic",
+            "design/no-private-types",
             "design/no-redundant-qualifiers",
             "design/no-single-use-wrapper",
+            "design/no-stored-context",
             "design/owner-file",
             "design/prefer-method",
             "design/private-helper-callers",

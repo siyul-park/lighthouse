@@ -166,7 +166,9 @@ impl Run<'_> {
                     .into_iter()
                     .collect())
             }
-            Select::Symbol | Select::Function | Select::Test => self.check_symbols(ctx, file),
+            Select::Symbol | Select::Function | Select::Test | Select::Event => {
+                self.check_symbols(ctx, file)
+            }
             Select::Comment => self.check_comments(ctx, file, text),
             Select::File | Select::Edge | Select::Module | Select::Decision => Ok(Vec::new()),
         }
@@ -180,6 +182,10 @@ impl Run<'_> {
             .symbols_in(&file.path)
             .filter(|s| ctx.applies.admits_symbol(project, s))
         {
+            if self.rule.select == Select::Event {
+                found.extend(self.judge_events(symbol)?);
+                continue;
+            }
             let value = match self.rule.select {
                 Select::Function => self.builder.function_fact(symbol),
                 Select::Test => self.builder.test_fact(symbol),
@@ -188,6 +194,20 @@ impl Run<'_> {
             if let Some(value) = value {
                 found.extend(self.judge_symbol(symbol, value)?);
             }
+        }
+        Ok(found)
+    }
+
+    /// One finding per event of the function, at the event.
+    fn judge_events(&self, function: &Symbol) -> Result<Vec<Diagnostic>, PluginError> {
+        let mut found = Vec::new();
+        for event in self.builder.event_facts(function) {
+            let place = Place {
+                file: function.file.clone(),
+                span: event.span,
+                symbol: Some(function.id.clone()),
+            };
+            found.extend(self.judge(event.fact, place, &event.key)?);
         }
         Ok(found)
     }

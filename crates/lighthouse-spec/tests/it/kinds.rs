@@ -30,6 +30,7 @@ fn what_a_cel_check_selects_decides_its_scope_and_its_variable() {
         (Select::Function, RunScope::File, "func"),
         (Select::File, RunScope::File, "file"),
         (Select::Test, RunScope::File, "test"),
+        (Select::Event, RunScope::File, "event"),
         (Select::Edge, RunScope::Project, "edge"),
         (Select::Module, RunScope::Project, "module"),
     ] {

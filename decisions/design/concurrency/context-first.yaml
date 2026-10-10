@@ -12,7 +12,14 @@ spec:
   context: >-
     A uniform position makes cancellation visible and checkable.
 
-    Go: `ctx context.Context` is the first parameter.
+    Go: `ctx context.Context` is the first parameter. The position is checked
+    (revive `context-as-argument`): a function with a body that takes a
+    `context.Context` after another parameter is reported, unless every
+    parameter before it is one of `allowTypesBefore`. Whether the operation
+    is blocking, does I/O or crosses a process boundary, and so needs a
+    context at all, stays with review.
+
+    Rust has no such convention and is judged by review only.
   scope:
     domain: code
     subject: symbol
@@ -20,18 +27,118 @@ spec:
     Blocking, I/O, and process-boundary operations MUST take the cancellation
     context as their first parameter.
   severity: warn
+  options:
+    type: object
+    properties:
+      allowTypesBefore:
+        type: array
+        default: []
+        description: >-
+          Types, as written with their full package path (`*testing.T`), that
+          may come before the context.
+    additionalProperties: false
   check:
-    type: model
+    type: cel
+    select: function
+    with:
+      - name: params
+        expr: func.signature.params
+    where: >-
+      func.lang == 'go' && params.exists(c, c.text == 'context.Context' && c.index > 0
+        && params.exists(b, b.index < c.index && !(b.text in options.allowTypesBefore)))
+    message: "context.Context should be the first parameter of {{ func.name }}"
+    evidence:
+      params: func.signature.params.map(p, p.text)
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+      - "revive context-as-argument, option allow-types-before: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#context-as-argument"
   examples:
     - name: invalid
       language: go
       kind: invalid
       files:
         - path: example.go
-          body: "func Fetch(url string, ctx context.Context) ([]byte, error)"
+          body: |-
+            package sample
+
+            import "context"
+
+            func Fetch(url string, ctx context.Context) ([]byte, error) { return nil, ctx.Err() }
+      expect:
+        - line: 5
     - name: valid
       language: go
       kind: valid
+      canonical: true
       files:
         - path: example.go
-          body: "func Fetch(ctx context.Context, url string) ([]byte, error)"
+          body: |-
+            package sample
+
+            import "context"
+
+            func Fetch(ctx context.Context, url string) ([]byte, error) { return nil, ctx.Err() }
+    - name: allowed-type-before
+      language: go
+      kind: valid
+      options:
+        allowTypesBefore: ["*testing.T"]
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import (
+              "context"
+              "testing"
+            )
+
+            func Setup(t *testing.T, ctx context.Context) { _ = ctx.Err() }
+    - name: type-not-allowed
+      language: go
+      kind: invalid
+      options:
+        allowTypesBefore: ["*testing.T"]
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import (
+              "context"
+              "testing"
+            )
+
+            func Setup(t *testing.T, name string, ctx context.Context) { _ = ctx.Err() }
+      expect:
+        - line: 8
+    - name: a-method
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            import "context"
+
+            type Client struct{}
+
+            func (c *Client) Get(url string, ctx context.Context) error { return ctx.Err() }
+      expect:
+        - line: 7
+    - name: rust-is-judged-by-review
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Ctx;
+
+            pub fn fetch(url: &str, ctx: &Ctx) -> usize {
+                let _ = ctx;
+                url.len()
+            }

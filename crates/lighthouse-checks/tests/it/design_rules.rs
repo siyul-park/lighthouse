@@ -1,6 +1,8 @@
 use crate::support::World;
+use crate::support::at;
 use lighthouse_model::{
-    EdgeKind, Flow, FlowKind, Node, Symbol, SymbolId, SymbolKind, Target, Visibility,
+    EdgeKind, Event, EventKind, Flow, FlowKind, Node, Symbol, SymbolId, SymbolKind, Target,
+    Visibility,
 };
 use serde_json::{Value, json};
 
@@ -554,10 +556,51 @@ fn a_struct_counts_once_per_parameter_that_takes_it() {
         .find(|s| s.symbol == build.id)
         .unwrap();
     summary.params = 5;
-    summary.param_types = vec!["m::Request".to_owned(), "m::Request".to_owned()];
+    summary.signature.params = vec![type_ref("m::Request"), type_ref("m::Request")];
     assert_eq!(
         w.names(&w.check(PARAMS, json!({}))),
         ["build"],
         "3 + 2 * 3 = 9"
     );
+}
+
+fn with_events(w: &mut World, function: &Symbol, events: &[(EventKind, u32, &str)]) {
+    let summary = w
+        .summaries
+        .iter_mut()
+        .find(|s| s.symbol == function.id)
+        .unwrap();
+    summary.events = events
+        .iter()
+        .map(|(kind, line, detail)| Event {
+            kind: *kind,
+            span: at(*line),
+            detail: Some((*detail).to_owned()),
+        })
+        .collect();
+}
+
+#[test]
+fn no_panic_reports_each_event_at_its_place() {
+    let mut w = World::default();
+    let run = w.func("m", "run", "m/a.ucm");
+    with_events(
+        &mut w,
+        &run,
+        &[
+            (EventKind::Unwrap, 7, "unwrap"),
+            (EventKind::Panic, 9, "todo"),
+        ],
+    );
+    let must = w.func("m", "must_run", "m/a.ucm");
+    with_events(&mut w, &must, &[(EventKind::Panic, 20, "panic")]);
+    let found = w.check("design/no-panic", json!({}));
+    assert_eq!(
+        found,
+        [("m/a.ucm".to_owned(), 7), ("m/a.ucm".to_owned(), 9)]
+    );
+    let found = w.check("design/no-panic", json!({ "kinds": ["todo"] }));
+    assert_eq!(found, [("m/a.ucm".to_owned(), 9)]);
+    let found = w.check("design/no-panic", json!({ "allowPrefixes": [] }));
+    assert_eq!(found.len(), 3, "the prefix is what exempts must_run");
 }
