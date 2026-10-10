@@ -42,6 +42,7 @@ languages and editors are added.
 | Autofix | one canonical fix per decision (`ops`, `command`), in-memory verification, rollback, atomic writes, user-level trust |
 | Resource model | `apiVersion`/`kind`/`metadata`/`spec` for every spec, JSON Schema per kind, `spec validate`, SARIF, `pattern` renamed to `decision`, severity `error`/`warn`/`info` |
 | Check providers | `check:` as `builtin` (standard ops `order`, `proximity`, `cycle`), `cel` with a standard library, `command`, `rpc` (reserved) or `model` (served by agent review tasks); every bundled decision re-expressed with identical findings; `severity` replaces `enforcement`; meaning version separate from check revision; ADR `status`, `supersedes`, `consequences` |
+| Fewer concepts | `spec::project` replaces config (projects replace presets and overrides); fields cut to requirement/scope/severity/options + context/consequences/status/supersedes + check/fix/examples/provenance; generated and test code handled by each decision's scope; camelCase options; UUID identity; decision ids in the ESLint convention, checked by `core/decision-naming`; ESLint-style `lighthouse-disable` directives; judgments (`pass`/`fail`/`notApplicable`) and SARIF suppressions replace verdicts; `decisions.jsonl` is the only source of truth |
 
 ## Next
 
@@ -59,21 +60,18 @@ languages and editors are added.
   - `lighthouse/index`, `lighthouse/check` and `lighthouse/fix` methods, which make
     `rpc` checks real.
 
-### 2d-3: fewer concepts
-- Decision fields shrink to:
-  - meaning: `requirement`, `scope`, `severity`, `options`;
-  - record: `title`, `context`, `consequences`, `status`, `supersedes`;
-  - `check`, `fix`, `examples` and `provenance`.
-- Merged away:
-  - `intent` and `rationale` become `context`;
-  - `exceptions` moves into the requirement;
-  - `citation` moves into provenance;
-  - declared `evidence` comes from the check;
-  - `strict` becomes a label;
-  - per-language `tuning` is replaced by examples.
-- Kinds: `Preset` becomes a shareable `Project`, `DecisionOverride` folds into project rules, and `SourceMap` moves into provenance.
-- Judgments (`pass`, `fail`, `notApplicable`) and suppressions replace verdicts (done). Signals and fix records become evidence.
-- Names follow standards (MADR, SARIF, W3C PROV-O).
+### Rule completion
+Rule-based checking is finished before any retrieval or learning work.
+- **Self-check and placement:** `layers` (import-linter contracts), `unique-type-names`,
+  `tiny-modules`, `feature-envy`, `misplaced-symbol`, a deterministic `owner-file`, and
+  `no-hidden-target`.
+- **Alignment with established tools:**
+  - `complexity` splits into independent standard limits;
+  - `max-params` and `max-results`, which count fields of single-use parameter structs
+    and set limits per role (constructor, implementation, entrypoint, test);
+  - model checks become deterministic where a tool proves it possible;
+  - missing common rules are added.
+- **Incremental checking:** content-addressed caches with early cutoff.
 
 ### 3: decision graph and evaluation
 - Queries over the decision graph: decision, finding, judgment with reason and actor,
@@ -92,6 +90,17 @@ languages and editors are added.
 - Baseline and ratchet; cycle, clone and stability analyzers.
 - `lighthouse log compact` folds expired and superseded events in `decisions.jsonl`;
   the full history stays in git.
+- Decision retrieval for decisions that rules cannot capture precisely:
+  - Retrieval first filters decisions by scope, language, status and target files, then
+    ranks them, lexically (SQLite FTS5) or with a local embedding model (EmbeddingGemma 2
+    via the `Model` kind) once that beats the lexical ranking.
+  - `decisions_relevant` over MCP and CLI takes a short task frame: task, targets, intent
+    and approach.
+  - Hooks call it when a task starts and before a file's first edit, in shadow mode at
+    first.
+  - The evaluation set comes from history: a finding or judgment of a decision on a file
+    marks that decision as relevant to edits of that file.
+  - Retrieval never creates findings or blocks; the index is a rebuildable cache.
 
 ### 4: decision evolution
 - Signals are captured from judgments, directives, fix outcomes and decision edits.
@@ -101,6 +110,11 @@ languages and editors are added.
   dominant shape counts as conforming. Changes are grouped by their structural change
   first and refined with a local embedding model.
 - Proposals narrow, widen or demote a decision, with generated examples.
+- Retrieval feedback:
+  - Agents mark surfaced decisions as applied (`pass`), irrelevant (`notApplicable`) or
+    knowingly not followed (`fail`, with a reason), as judgments on the task.
+  - A decision often surfaced as irrelevant gets a narrowing proposal.
+  - Surfacing is on by default once its measured precision passes.
 - Check revisions (attach a learned model, add a deterministic part, demote) go through
   the evaluation gate. They are routing by cost and confidence, not a maturity state, and
   nothing is enabled automatically.
