@@ -13,7 +13,7 @@ use lighthouse_protocol::{
 };
 use tempfile::TempDir;
 
-fn project(files: &[(&str, &str)]) -> TempDir {
+pub(crate) fn project(files: &[(&str, &str)]) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     for (path, text) in files {
         let full = dir.path().join(path);
@@ -24,6 +24,15 @@ fn project(files: &[(&str, &str)]) -> TempDir {
 }
 
 fn index(dir: &Path, options: serde_json::Value) -> IndexResult {
+    index_with(dir, options, None)
+}
+
+/// Like `index`, with a cache directory when one is given.
+pub(crate) fn index_with(
+    dir: &Path,
+    options: serde_json::Value,
+    cache: Option<&Path>,
+) -> IndexResult {
     let root = dir.canonicalize().unwrap();
     let mut paths = Vec::new();
     collect(&root, &root, &mut paths);
@@ -51,7 +60,9 @@ fn index(dir: &Path, options: serde_json::Value) -> IndexResult {
         context: wire::Context {
             options: serde_json::from_value(options).unwrap(),
             overlays: None,
-            cache: None,
+            cache: cache.map(|dir| wire::CacheRef {
+                dir: dir.to_string_lossy().into_owned(),
+            }),
         },
     };
     let request = Message::request(1, wire::INDEX, params).unwrap();

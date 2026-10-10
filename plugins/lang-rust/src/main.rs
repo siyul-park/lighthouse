@@ -3,6 +3,7 @@
 //! and stdout.
 
 mod body;
+mod cache;
 mod cargo;
 mod comments;
 mod events;
