@@ -58,6 +58,12 @@ spec:
       intro: "Structural metrics are review signals, not proof of a design violation."
       decisions:
         - complexity
+        - cognitive-complexity
+        - max-statements
+        - max-lines-per-function
+        - max-depth
+        - max-params
+        - max-results
         - coupling
         - clones
         - adjacent-siblings

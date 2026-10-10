@@ -1,0 +1,135 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/max-lines-per-function
+  uid: 2e533cbd-85ba-43ed-835e-4b7321d29e4f
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: structural-signals
+spec:
+  title: Functions have a bounded length
+  context: >-
+    A function that spans many lines is hard to hold in mind. The default is
+    funlen's `lines` (60) for Go and clippy's `too_many_lines` (100) for
+    Rust; ESLint `max-lines-per-function` (50) is lower. The length is the
+    span of the declaration, from its first to its last line.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    A function SHOULD NOT span more lines than the limit of its role. The
+    remedy is to split it by responsibility, not to compress it.
+  severity: warn
+  options:
+    type: object
+    properties:
+      max:
+        $ref: '#/$defs/limit'
+        default: 60
+        description: >-
+          Most lines a function may have: an integer for every role, or an
+          object with `default` and one entry per role (`function`,
+          `method`, `constructor`, `implementation`, `entrypoint`, `test`);
+          a role left out takes `default`, and null is no limit.
+    additionalProperties: false
+  languages:
+    rust:
+      options:
+        max: 100
+  check:
+    type: cel
+    select: function
+    with:
+      - name: m
+        expr: metrics(func)
+      - name: cap
+        expr: limit(func, options.max)
+    where: >-
+      (func.kind == 'function' || func.kind == 'method')
+      && m.measured && cap != null && m.lines > cap
+    message: >-
+      {{ counted(func, m.lines, 'lines') }} (max {{ cap }}):
+      split by responsibility
+    evidence:
+      value: m.lines
+      max: cap
+      role: func.role
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+      - "funlen lines 60: https://golangci-lint.run/usage/linters/#funlen"
+      - "clippy too_many_lines 100: https://doc.rust-lang.org/clippy/lint_configuration.html"
+      - "ESLint max-lines-per-function: https://eslint.org/docs/latest/rules/max-lines-per-function"
+  examples:
+    - name: long-function
+      language: go
+      kind: invalid
+      options:
+        max: 6
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func total(a, b int) int {
+                sum := a
+
+                sum += b
+
+                return sum
+            }
+      expect:
+        - line: 3
+    - name: within-the-limit
+      language: go
+      kind: valid
+      canonical: true
+      options:
+        max: 7
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func total(a, b int) int {
+                sum := a
+
+                sum += b
+
+                return sum
+            }
+    - name: rust-long-function
+      language: rust
+      kind: invalid
+      options:
+        max: 6
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn total(a: i32, b: i32) -> i32 {
+                let mut sum = a;
+
+                sum += b;
+
+                sum
+            }
+      expect:
+        - line: 1
+    - name: rust-within-the-limit
+      language: rust
+      kind: valid
+      canonical: true
+      options:
+        max: 7
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn total(a: i32, b: i32) -> i32 {
+                let mut sum = a;
+
+                sum += b;
+
+                sum
+            }

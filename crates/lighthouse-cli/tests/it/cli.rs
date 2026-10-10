@@ -224,7 +224,7 @@ fn decision_list_and_explain() {
     let list = String::from_utf8(list.stdout).unwrap();
     for line in [
         "core/max-lines\twarn\tFiles stay below a line limit",
-        "design/complexity\twarn\tComplexity is a review signal",
+        "design/complexity\twarn\tCyclomatic complexity is a review signal",
         "design/declaration-groups\terror\t",
         "design/no-mutable-globals\twarn\t",
         "design/private-helper-callers\tinfo\t",

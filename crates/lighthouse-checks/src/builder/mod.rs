@@ -22,7 +22,7 @@ use serde_json::{Map, Value, json};
 
 use crate::{
     eval::{Fact, cel_fact, with_entries},
-    facts, layout,
+    facts,
     library::Needs,
     naming::{Naming, Tests},
     table::Table,
@@ -31,6 +31,9 @@ use crate::{
 mod hidden;
 mod homonyms;
 mod ownership;
+mod role;
+
+use role::satisfies_interface;
 
 /// The analyzers a check needs when its expressions call `metrics`.
 pub(crate) const METRIC_ANALYZERS: [&str; 5] = [SIZE, CYCLOMATIC, COGNITIVE, NESTING, FAN];
@@ -267,6 +270,7 @@ impl<'a> Builder<'a> {
             );
         }
         self.placement_facts(map, symbol);
+        self.role_facts(map, symbol, summary);
         if needs.mentions("local_callers") {
             map.insert("local_callers".to_owned(), self.local_callers(symbol));
         }
@@ -285,15 +289,6 @@ impl<'a> Builder<'a> {
                 json!(module_tested(project, symbol.id.module())),
             );
         }
-        if needs.mentions("constructor_named") {
-            map.insert(
-                "constructor_named".to_owned(),
-                json!(self.constructor_named(symbol)),
-            );
-        }
-        if needs.mentions("role") {
-            map.insert("role".to_owned(), json!(self.role(symbol, summary)));
-        }
         if needs.mentions("file_first_test") {
             map.insert(
                 "file_first_test".to_owned(),
@@ -302,70 +297,6 @@ impl<'a> Builder<'a> {
         }
         if needs.mentions("helper_user") {
             map.insert("helper_user".to_owned(), self.helper_user(symbol));
-        }
-    }
-
-    /// Whether the name is one of the language's constructor prefixes, or one
-    /// followed by a new word.
-    fn constructor_named(&self, symbol: &Symbol) -> bool {
-        let language = self.language_of(symbol);
-        self.ws
-            .constructor_prefixes(language)
-            .iter()
-            .any(|p| layout::has_word_prefix(&symbol.name, p))
-    }
-
-    fn language_of(&self, symbol: &Symbol) -> &str {
-        self.project
-            .file(&symbol.file)
-            .map_or(self.language.as_str(), |f| f.lang.as_str())
-    }
-
-    /// What a function is for, the first that fits: `test`, `implementation`
-    /// (it satisfies an interface or trait, so its signature is not its own),
-    /// `constructor`, `entrypoint`, then `method` or `function`. Empty for
-    /// anything that is not a function.
-    fn role(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> &'static str {
-        if !matches!(
-            symbol.kind,
-            SymbolKind::Function | SymbolKind::Method | SymbolKind::Test
-        ) {
-            return "";
-        }
-        if symbol.kind == SymbolKind::Test || self.project.in_test(&symbol.id) {
-            return "test";
-        }
-        if summary.is_some_and(|s| s.implementation) || satisfies_interface(self.project, symbol) {
-            return "implementation";
-        }
-        if self.constructor_named(symbol) || summary.is_some_and(|s| s.constructs) {
-            return "constructor";
-        }
-        if self.entrypoint(symbol) {
-            return "entrypoint";
-        }
-        if symbol.kind == SymbolKind::Method {
-            "method"
-        } else {
-            "function"
-        }
-    }
-
-    /// Go `main` and `init` in `package main` (`init` in any package), Rust
-    /// `main` at the root of a binary target.
-    fn entrypoint(&self, symbol: &Symbol) -> bool {
-        if symbol.owner.is_some() {
-            return false;
-        }
-        let module = symbol.id.module();
-        match (self.language_of(symbol), symbol.name.as_str()) {
-            ("go", "init") => true,
-            ("go", "main") => self
-                .project
-                .module(module)
-                .is_some_and(|m| m.name.as_deref() == Some("main")),
-            ("rust", "main") => module.contains("[bin:") && !module.contains('/'),
-            _ => false,
         }
     }
 
@@ -675,13 +606,6 @@ fn measures(ctx: &Ctx) -> Result<Measures, Error> {
         nesting: read(ctx, NESTING)?,
         fans: read(ctx, FAN)?,
     })
-}
-
-/// Whether a method named like one an interface of its module declares may be
-/// reached through that interface.
-fn satisfies_interface(project: &Project, wrapper: &Symbol) -> bool {
-    wrapper.kind == SymbolKind::Method
-        && project.declared_by_interface(wrapper.id.module(), &wrapper.name)
 }
 
 /// The private target a private undocumented wrapper only forwards to. The

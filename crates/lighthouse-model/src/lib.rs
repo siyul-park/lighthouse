@@ -3,6 +3,7 @@ mod diagnostic;
 mod document;
 mod fix;
 pub mod hash;
+mod relations;
 mod review;
 mod scope;
 mod text;

@@ -298,46 +298,47 @@ Structural metrics are review signals, not proof of a design violation.
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/complexity`](#complexity-is-a-review-signal) | Complexity is a review signal | warn · cel |  |  |
+| [`design/complexity`](#cyclomatic-complexity-is-a-review-signal) | Cyclomatic complexity is a review signal | warn · cel |  |  |
+| [`design/cognitive-complexity`](#cognitive-complexity-is-a-review-signal) | Cognitive complexity is a review signal | warn · cel |  |  |
+| [`design/max-statements`](#functions-have-a-bounded-number-of-statements) | Functions have a bounded number of statements | warn · cel |  |  |
+| [`design/max-lines-per-function`](#functions-have-a-bounded-length) | Functions have a bounded length | warn · cel |  |  |
+| [`design/max-depth`](#control-flow-is-nested-a-bounded-number-of-levels) | Control flow is nested a bounded number of levels | warn · cel |  |  |
+| [`design/max-params`](#functions-take-a-bounded-number-of-parameters) | Functions take a bounded number of parameters | warn · cel |  |  |
+| [`design/max-results`](#functions-return-a-bounded-number-of-results) | Functions return a bounded number of results | warn · cel |  |  |
 | [`design/coupling`](#coupling-is-a-review-signal) | Coupling is a review signal | warn · cel |  |  |
 | [`design/clones`](#near-clones-are-a-review-signal) | Near-clones are a review signal | warn · model |  |  |
 | `design/adjacent-siblings` | Similar siblings are adjacent | warn · model |  | Similar or symmetric siblings SHOULD be adjacent when they share an owner and implementation shape. |
 | `design/advisory-signals` | Signals stay advisory | doc |  | Metrics MUST NOT define universal declaration order, justify automatic reordering, or prove single responsibility. Mechanical checks SHOULD be preferred for directly expressible rules; heuristic signals SHOULD remain advisory and use deliberately high thresholds. |
 
-### Complexity is a review signal
+### Cyclomatic complexity is a review signal
 
 `design/complexity` · symbol · warn · cel
 
-*High complexity often marks a symbol doing too much. Rust: `if`, `else if`, `if let`, `let ... else`, `while`, `for` and `loop` count as in other languages; a `match` counts its arms other than a wildcard or binding arm; `?` adds nothing; closures and `async` blocks nest what they contain. A function that is one `match` whose arms are single values (in return position) or `return`s is a table in code form and is not reported.*
+*High cyclomatic complexity often marks a symbol doing too much. The default is gocyclo's `min-complexity` (30) for Go and Rust, where clippy's cyclomatic lint was removed. ESLint `complexity` (20), Sonar S1541 (10) and cyclop `max-complexity` (10) are lower, which fits a review signal less well than a deliberately high limit. Rust: `if`, `else if`, `if let`, `let ... else`, `while`, `for` and `loop` count as in other languages; a `match` counts its arms other than a wildcard or binding arm; `?` adds nothing; closures and `async` blocks nest what they contain. A function that is one `match` whose arms are single values (in return position) or `return`s is a table in code form, and a body whose only top-level branching is one switch of any arms, nested at most two levels, is a flat dispatch: its many paths do not make it hard to follow. `ignoreDispatch` (on by default) leaves both out, because counting them reports tables and visitors that read linearly; cognitive complexity still judges a flat dispatch.*
 
-Complexity SHOULD be judged from cyclomatic complexity together with statement count and nesting depth, against deliberately high thresholds. Cyclomatic complexity is one path plus each `if`, `else if`, loop, error handler clause, non-default switch arm and boolean operator (`&&`, `||`); nesting counts the deepest level of nested constructs, a flat body being 0, and nested functions count as a level. A body that is one switch whose every arm is a single return is a table in code form and is not reported. A body whose only top-level branching is one switch of any arms, nested at most two levels, is a flat dispatch: its many paths do not make it hard to follow, so only cognitive complexity can report it.
+A function SHOULD NOT have more cyclomatic complexity than the limit of its role. Cyclomatic complexity is one path plus each `if`, `else if`, loop, error handler clause, non-default switch arm and boolean operator (`&&`, `||`). The split is by responsibility: the remedy is smaller functions, never moving the same body elsewhere.
 
-Derived from: McCabe 1976; Campbell, Cognitive Complexity (SonarSource 2018)
+Derived from: McCabe 1976, A Complexity Measure; gocyclo min-complexity 30: https://golangci-lint.run/usage/linters/#gocyclo; ESLint complexity: https://eslint.org/docs/latest/rules/complexity; Sonar S1541, cyclop
 
 | option | default | meaning |
 | --- | --- | --- |
-| `cognitive` | `30` | Cognitive complexity that, with `cognitiveStatements`, marks a hard-to-follow body. |
-| `cognitiveStatements` | `30` | Statement count of the cognitive signal. |
-| `cyclomatic` | `15` | Cyclomatic complexity that, with `statements`, marks high complexity. |
-| `statements` | `30` | Statement count that, with `cyclomatic`, marks high complexity. |
-| `structuralCyclomatic` | `10` | Cyclomatic complexity of the structural signal. |
-| `structuralNesting` | `5` | Nesting depth of the structural signal; a flat body is 0. |
-| `structuralStatements` | `25` | Statement count of the structural signal. |
+| `ignoreDispatch` | `true` | Leave out a function that is a table in code form or a flat dispatch (see the context); `false` counts them like any other function. |
+| `max` | `30` | Most cyclomatic complexity (paths) a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
 
 ```go invalid
 package sample
 
 func classify(n int) string {
-	if n < 0 {
-		return "negative"
-	}
-	if n == 0 {
-		return "zero"
-	}
-	if n < 10 {
-		return "small"
-	}
-	return "large"
+    if n < 0 {
+        return "negative"
+    }
+    if n == 0 {
+        return "zero"
+    }
+    if n < 10 {
+        return "small"
+    }
+    return "large"
 }
 ```
 
@@ -345,13 +346,250 @@ func classify(n int) string {
 package sample
 
 func classify(n int) string {
-	if n < 0 {
-		return "negative"
-	}
-	if n == 0 {
-		return "zero"
-	}
-	return "positive"
+    if n < 0 {
+        return "negative"
+    }
+    if n == 0 {
+        return "zero"
+    }
+    return "positive"
+}
+```
+
+Also: rust
+
+### Cognitive complexity is a review signal
+
+`design/cognitive-complexity` · symbol · warn · cel
+
+*Cognitive complexity (Campbell, SonarSource 2018) grows with nesting, so it marks the bodies that are hard to follow even when they have few paths. The default is gocognit's `min-complexity` (30) for Go and clippy's `cognitive-complexity-threshold` (25) for Rust; Sonar S3776 (15) is lower. A function that is one `match` or `switch` whose arms are single values is a table in code form; `ignoreDispatch` (on by default) leaves it out. A flat dispatch is still judged here.*
+
+A function SHOULD NOT have more cognitive complexity than the limit of its role. The remedy is to flatten the control flow or split the function by responsibility.
+
+Derived from: Campbell 2018, Cognitive Complexity (SonarSource); gocognit min-complexity 30: https://golangci-lint.run/usage/linters/#gocognit; clippy cognitive_complexity 25: https://doc.rust-lang.org/clippy/lint_configuration.html; Sonar S3776
+
+| option | default | meaning |
+| --- | --- | --- |
+| `ignoreDispatch` | `true` | Leave out a function that is a table in code form (one switch or match whose arms are single values); `false` counts it. |
+| `max` | `30`; rust: `25` | Most cognitive complexity a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
+
+```go invalid
+package sample
+
+func scan(rows [][]int) int {
+    total := 0
+    for _, row := range rows {
+        for _, v := range row {
+            if v > 0 {
+                total += v
+            }
+        }
+    }
+    return total
+}
+```
+
+```go valid
+package sample
+
+func scan(rows [][]int) int {
+    total := 0
+    for _, row := range rows {
+        for _, v := range row {
+            if v > 0 {
+                total += v
+            }
+        }
+    }
+    return total
+}
+```
+
+Also: rust
+
+### Functions have a bounded number of statements
+
+`design/max-statements` · symbol · warn · cel
+
+*A long run of statements usually covers several responsibilities. The default (40) is funlen's `statements`; ESLint `max-statements` (10) is far stricter and does not fit a deliberately high limit. Statements are the provider's count: every statement of the body, nested blocks and case clauses included.*
+
+A function SHOULD NOT have more statements than the limit of its role. The remedy is to split it by responsibility.
+
+Derived from: funlen statements 40: https://golangci-lint.run/usage/linters/#funlen; ESLint max-statements: https://eslint.org/docs/latest/rules/max-statements
+
+| option | default | meaning |
+| --- | --- | --- |
+| `max` | `40` | Most statements a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
+
+```go invalid
+package sample
+
+func total(a, b int) int {
+    sum := a
+    sum += b
+    return sum
+}
+```
+
+```go valid
+package sample
+
+func total(a, b int) int {
+    sum := a
+    sum += b
+    return sum
+}
+```
+
+Also: rust
+
+### Functions have a bounded length
+
+`design/max-lines-per-function` · symbol · warn · cel
+
+*A function that spans many lines is hard to hold in mind. The default is funlen's `lines` (60) for Go and clippy's `too_many_lines` (100) for Rust; ESLint `max-lines-per-function` (50) is lower. The length is the span of the declaration, from its first to its last line.*
+
+A function SHOULD NOT span more lines than the limit of its role. The remedy is to split it by responsibility, not to compress it.
+
+Derived from: funlen lines 60: https://golangci-lint.run/usage/linters/#funlen; clippy too_many_lines 100: https://doc.rust-lang.org/clippy/lint_configuration.html; ESLint max-lines-per-function: https://eslint.org/docs/latest/rules/max-lines-per-function
+
+| option | default | meaning |
+| --- | --- | --- |
+| `max` | `60`; rust: `100` | Most lines a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
+
+```go invalid
+package sample
+
+func total(a, b int) int {
+    sum := a
+
+    sum += b
+
+    return sum
+}
+```
+
+```go valid
+package sample
+
+func total(a, b int) int {
+    sum := a
+
+    sum += b
+
+    return sum
+}
+```
+
+Also: rust
+
+### Control flow is nested a bounded number of levels
+
+`design/max-depth` · symbol · warn · cel
+
+*Deeply nested blocks hide the path a reader follows. The default (4) is ESLint's `max-depth`; Sonar S134 (3) is lower, and Go's nestif measures the complexity of nested `if`s, not their depth. The depth is the deepest level of nested constructs (`if`, loops, `switch`, `match`, `try`) in the body: a flat body is 0, and a nested function counts as a level. ESLint counts the same blocks, so an ESLint `max` of 4 is a `max` of 4 here.*
+
+A function SHOULD NOT nest control flow deeper than the limit of its role. The remedy is to extract the nested block or return early.
+
+Derived from: ESLint max-depth 4: https://eslint.org/docs/latest/rules/max-depth; Sonar S134
+
+| option | default | meaning |
+| --- | --- | --- |
+| `max` | `4` | Deepest nesting a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
+
+```go invalid
+package sample
+
+func scan(rows [][]int) int {
+    total := 0
+    for _, row := range rows {
+        for _, v := range row {
+            if v > 0 {
+                total += v
+            }
+        }
+    }
+    return total
+}
+```
+
+```go valid
+package sample
+
+func scan(rows [][]int) int {
+    total := 0
+    for _, row := range rows {
+        for _, v := range row {
+            if v > 0 {
+                total += v
+            }
+        }
+    }
+    return total
+}
+```
+
+Also: rust
+
+### Functions take a bounded number of parameters
+
+`design/max-params` · symbol · warn · cel
+
+*A long parameter list usually hides a missing type, or a function that does several things. The default limit is 6 for a function and 7 for a constructor: Sonar S107 and clippy `too_many_arguments` allow 7, revive `argument-limit` allows 8, detekt `LongParameterList` allows 5 for a function and 6 for a constructor, and ESLint `max-params` allows 3; this is a deliberately high limit between them. A constructor may take one more because it assembles a type. A function that implements an interface or trait method, an entrypoint and a test do not choose their signature, so they have no limit. The receiver is not counted.*
+
+A function SHOULD NOT take more parameters than the limit of its role. The remedy is to split the function by responsibility; a constructor that is over its limit builds a type that should be split.
+
+Derived from: revive argument-limit 8: https://revive.run/r#argument-limit; clippy too_many_arguments 7: https://doc.rust-lang.org/clippy/lint_configuration.html; Sonar S107 7; detekt LongParameterList 5 and 6; ESLint max-params 3
+
+| option | default | meaning |
+| --- | --- | --- |
+| `max` | `{"constructor":7,"default":6,"entrypoint":null,"implementation":null,"test":null}` | Most parameters a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
+
+```go invalid
+package sample
+
+func build(a, b, c, d, e, f, g int) int {
+    return a
+}
+```
+
+```go valid
+package sample
+
+func build(a, b, c, d, e, f int) int {
+    return a
+}
+```
+
+Also: rust
+
+### Functions return a bounded number of results
+
+`design/max-results` · symbol · warn · cel
+
+*Many results usually mean the function returns a record that was never named. The default (3) is revive's `function-result-limit`; gocritic's `tooManyResultsChecker` allows 5. Go counts every result, a trailing `error` included. Rust counts the arity of the returned tuple (1 for a single value, 0 for `()`), and looks inside a `Result<T, E>` at `T`. A constructor that returns its type with a result or an error is not counted, nor is a function that implements an interface or trait method, or a test.*
+
+A function SHOULD NOT return more results than the limit of its role. The remedy is to split the function by responsibility, or to name what it returns.
+
+Derived from: revive function-result-limit 3: https://revive.run/r#function-result-limit; gocritic tooManyResultsChecker 5: https://go-critic.com/overview.html#toomanyresultschecker
+
+| option | default | meaning |
+| --- | --- | --- |
+| `max` | `{"constructor":null,"default":3,"implementation":null,"test":null}` | Most results a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
+
+```go invalid
+package sample
+
+func split() (int, int, int, int) {
+    return 0, 0, 0, 0
+}
+```
+
+```go valid
+package sample
+
+func split() (int, int, int) {
+    return 0, 0, 0
 }
 ```
 

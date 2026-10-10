@@ -8,65 +8,53 @@ metadata:
     lighthouse/pack: design
     lighthouse/section: structural-signals
 spec:
-  title: Complexity is a review signal
+  title: Cyclomatic complexity is a review signal
   context: >-
-    High complexity often marks a symbol doing too much.
+    High cyclomatic complexity often marks a symbol doing too much. The
+    default is gocyclo's `min-complexity` (30) for Go and Rust, where
+    clippy's cyclomatic lint was removed. ESLint `complexity` (20), Sonar
+    S1541 (10) and cyclop `max-complexity` (10) are lower, which fits a
+    review signal less well than a deliberately high limit.
 
     Rust: `if`, `else if`, `if let`, `let ... else`, `while`, `for` and
-    `loop` count as in other languages; a `match` counts its arms other
-    than a wildcard or binding arm; `?` adds nothing; closures and `async`
-    blocks nest what they contain. A function that is one `match` whose
-    arms are single values (in return position) or `return`s is a table in
-    code form and is not reported.
+    `loop` count as in other languages; a `match` counts its arms other than
+    a wildcard or binding arm; `?` adds nothing; closures and `async` blocks
+    nest what they contain.
+
+    A function that is one `match` whose arms are single values (in return
+    position) or `return`s is a table in code form, and a body whose only
+    top-level branching is one switch of any arms, nested at most two
+    levels, is a flat dispatch: its many paths do not make it hard to
+    follow. `ignoreDispatch` (on by default) leaves both out, because
+    counting them reports tables and visitors that read linearly; cognitive
+    complexity still judges a flat dispatch.
   scope:
     domain: code
     subject: symbol
   requirement: >-
-    Complexity SHOULD be judged from cyclomatic complexity together with
-    statement count and nesting depth, against deliberately high
-    thresholds. Cyclomatic complexity is one path plus each `if`, `else
-    if`, loop, error handler clause, non-default switch arm and boolean
-    operator (`&&`, `||`); nesting counts the deepest level of nested
-    constructs, a flat body being 0, and nested functions count as a
-    level. A body that is one switch whose every arm is a single return is
-    a table in code form and is not reported. A body whose only top-level
-    branching is one switch of any arms, nested at most two levels, is a
-    flat dispatch: its many paths do not make it hard to follow, so only
-    cognitive complexity can report it.
+    A function SHOULD NOT have more cyclomatic complexity than the limit of
+    its role. Cyclomatic complexity is one path plus each `if`, `else if`,
+    loop, error handler clause, non-default switch arm and boolean operator
+    (`&&`, `||`). The split is by responsibility: the remedy is smaller
+    functions, never moving the same body elsewhere.
   severity: warn
   options:
     type: object
     properties:
-      cyclomatic:
-        type: integer
-        default: 15
-        description: "Cyclomatic complexity that, with `statements`, marks high complexity."
-      statements:
-        type: integer
-        default: 30
-        description: "Statement count that, with `cyclomatic`, marks high complexity."
-      structuralCyclomatic:
-        type: integer
-        default: 10
-        description: Cyclomatic complexity of the structural signal.
-      structuralStatements:
-        type: integer
-        default: 25
-        description: Statement count of the structural signal.
-      structuralNesting:
-        type: integer
-        default: 5
-        description: "Nesting depth of the structural signal; a flat body is 0."
-      cognitive:
-        type: integer
+      max:
+        $ref: '#/$defs/limit'
         default: 30
         description: >-
-          Cognitive complexity that, with `cognitiveStatements`, marks a
-          hard-to-follow body.
-      cognitiveStatements:
-        type: integer
-        default: 30
-        description: Statement count of the cognitive signal.
+          Most cyclomatic complexity (paths) a function may have: an integer
+          for every role, or an object with `default` and one entry per role
+          (`function`, `method`, `constructor`, `implementation`,
+          `entrypoint`, `test`); a role left out takes `default`, and null
+          is no limit.
+      ignoreDispatch:
+        type: boolean
+        default: true
+        description: >-
+          Leave out a function that is a table in code form or a flat dispatch (see the context); `false` counts them like any other function.
     additionalProperties: false
   check:
     type: cel
@@ -74,80 +62,250 @@ spec:
     with:
       - name: m
         expr: metrics(func)
-      - name: cognitive
-        expr: m.cognitive >= options.cognitive && m.statements >= options.cognitiveStatements
-      - name: verdict
-        expr: >-
-          m.flat_dispatch
-          ? (cognitive ? 'high cognitive complexity' : '')
-          : (m.cyclomatic >= options.cyclomatic && m.statements >= options.statements)
-          ? 'high complexity'
-          : (m.cyclomatic >= options.structuralCyclomatic
-             && m.statements >= options.structuralStatements
-             && m.nesting >= options.structuralNesting)
-          ? 'high structural complexity'
-          : cognitive ? 'high cognitive complexity' : ''
+      - name: cap
+        expr: limit(func, options.max)
     where: >-
       (func.kind == 'function' || func.kind == 'method')
-      && m.measured && !m.dispatcher && verdict != ''
+      && m.measured && cap != null && m.cyclomatic > cap
+      && !(options.ignoreDispatch && (m.dispatcher || m.flat_dispatch))
     message: >-
-      function {{ func.name }} has {{ verdict }}: cyclomatic={{ m.cyclomatic }}
-      cognitive={{ m.cognitive }} statements={{ m.statements }} nesting={{ m.nesting }}
+      {{ counted(func, m.cyclomatic, 'decision paths') }} (max {{ cap }}):
+      split decisions into smaller functions
     evidence:
-      cyclomatic: m.cyclomatic
-      cognitive: m.cognitive
-      statements: m.statements
-      nesting: m.nesting
+      value: m.cyclomatic
+      max: cap
+      role: func.role
     identity:
       subject: func.id
   provenance:
     wasDerivedFrom:
-      - "McCabe 1976; Campbell, Cognitive Complexity (SonarSource 2018)"
+      - "McCabe 1976, A Complexity Measure"
+      - "gocyclo min-complexity 30: https://golangci-lint.run/usage/linters/#gocyclo"
+      - "ESLint complexity: https://eslint.org/docs/latest/rules/complexity"
+      - "Sonar S1541, cyclop"
   examples:
     - name: many-branches
       language: go
       kind: invalid
       options:
-        cyclomatic: 4
-        statements: 7
+        max: 3
       files:
         - path: sample.go
-          body: "package sample\n\nfunc classify(n int) string {\n\tif n < 0 {\n\t\treturn \"negative\"\n\t}\n\tif n == 0 {\n\t\treturn \"zero\"\n\t}\n\tif n < 10 {\n\t\treturn \"small\"\n\t}\n\treturn \"large\"\n}"
+          body: |-
+            package sample
+
+            func classify(n int) string {
+                if n < 0 {
+                    return "negative"
+                }
+                if n == 0 {
+                    return "zero"
+                }
+                if n < 10 {
+                    return "small"
+                }
+                return "large"
+            }
       expect:
         - line: 3
-    - name: deep-loops
-      language: go
-      kind: invalid
-      options:
-        cognitive: 6
-        cognitiveStatements: 6
-      files:
-        - path: sample.go
-          body: "package sample\n\nfunc scan(rows [][]int) int {\n\ttotal := 0\n\tfor _, row := range rows {\n\t\tfor _, v := range row {\n\t\t\tif v > 0 {\n\t\t\t\ttotal += v\n\t\t\t}\n\t\t}\n\t}\n\treturn total\n}"
-      expect:
-        - line: 3
-    - name: below-thresholds
+    - name: below-the-limit
       language: go
       kind: valid
       canonical: true
+      options:
+        max: 3
       files:
         - path: sample.go
-          body: "package sample\n\nfunc classify(n int) string {\n\tif n < 0 {\n\t\treturn \"negative\"\n\t}\n\tif n == 0 {\n\t\treturn \"zero\"\n\t}\n\treturn \"positive\"\n}"
+          body: |-
+            package sample
+
+            func classify(n int) string {
+                if n < 0 {
+                    return "negative"
+                }
+                if n == 0 {
+                    return "zero"
+                }
+                return "positive"
+            }
+    - name: default-limit-is-high
+      language: go
+      kind: valid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func classify(n int) string {
+                if n < 0 {
+                    return "negative"
+                }
+                if n == 0 {
+                    return "zero"
+                }
+                if n < 10 {
+                    return "small"
+                }
+                return "large"
+            }
+    - name: role-limit
+      language: go
+      kind: invalid
+      options:
+        max: {default: 9, function: 3}
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func classify(n int) string {
+                if n < 0 {
+                    return "negative"
+                }
+                if n == 0 {
+                    return "zero"
+                }
+                if n < 10 {
+                    return "small"
+                }
+                return "large"
+            }
+      expect:
+        - line: 3
+    - name: role-without-default-is-unlimited
+      language: go
+      kind: valid
+      options:
+        max: {constructor: 3}
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func classify(n int) string {
+                if n < 0 {
+                    return "negative"
+                }
+                if n == 0 {
+                    return "zero"
+                }
+                if n < 10 {
+                    return "small"
+                }
+                return "large"
+            }
     - name: dispatcher
       language: go
       kind: valid
       options:
-        cyclomatic: 1
-        statements: 1
+        max: 1
       files:
         - path: sample.go
-          body: "package sample\n\nfunc name(k int) string {\n\tswitch k {\n\tcase 0:\n\t\treturn \"zero\"\n\tcase 1:\n\t\treturn \"one\"\n\tdefault:\n\t\treturn \"many\"\n\t}\n}"
+          body: |-
+            package sample
+
+            func name(k int) string {
+                switch k {
+                case 0:
+                    return "zero"
+                case 1:
+                    return "one"
+                default:
+                    return "many"
+                }
+            }
+    - name: dispatcher-counted
+      language: go
+      kind: invalid
+      options:
+        max: 1
+        ignoreDispatch: false
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func name(k int) string {
+                switch k {
+                case 0:
+                    return "zero"
+                case 1:
+                    return "one"
+                default:
+                    return "many"
+                }
+            }
+      expect:
+        - line: 3
+    - name: flat-dispatch
+      language: go
+      kind: valid
+      options:
+        max: 3
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type visitor struct{ ifs, elses, loops, calls int }
+
+            func (v *visitor) visit(n any) *visitor {
+                switch n := n.(type) {
+                case *ifStmt:
+                    v.ifs++
+                    if n.hasElse {
+                        v.elses++
+                    }
+                case *forStmt:
+                    v.loops++
+                case *callExpr:
+                    v.calls++
+                }
+                return v
+            }
+
+            type ifStmt struct{ hasElse bool }
+            type forStmt struct{}
+            type callExpr struct{}
+    - name: dispatch-among-other-statements
+      language: go
+      kind: invalid
+      options:
+        max: 3
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type visitor struct{ ifs, elses, loops, calls, seen int }
+
+            func (v *visitor) visit(n any) {
+                if n == nil {
+                    return
+                }
+                switch n := n.(type) {
+                case *ifStmt:
+                    v.ifs++
+                    if n.hasElse {
+                        v.elses++
+                    }
+                case *forStmt:
+                    v.loops++
+                case *callExpr:
+                    v.calls++
+                }
+            }
+
+            type ifStmt struct{ hasElse bool }
+            type forStmt struct{}
+            type callExpr struct{}
+      expect:
+        - line: 5
     - name: rust-many-branches
       language: rust
       kind: invalid
       options:
-        cyclomatic: 4
-        statements: 7
+        max: 3
       files:
         - path: src/lib.rs
           body: |-
@@ -165,31 +323,12 @@ spec:
             }
       expect:
         - line: 1
-    - name: rust-deep-loops
-      language: rust
-      kind: invalid
-      options:
-        cognitive: 6
-        cognitiveStatements: 6
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub fn scan(rows: &[Vec<i32>]) -> i32 {
-                let mut total = 0;
-                for row in rows {
-                    for v in row {
-                        if *v > 0 {
-                            total += *v;
-                        }
-                    }
-                }
-                total
-            }
-      expect:
-        - line: 1
-    - name: rust-below-thresholds
+    - name: rust-below-the-limit
       language: rust
       kind: valid
+      canonical: true
+      options:
+        max: 3
       files:
         - path: src/lib.rs
           body: |-
@@ -205,10 +344,8 @@ spec:
     - name: rust-dispatcher
       language: rust
       kind: valid
-      canonical: true
       options:
-        cyclomatic: 1
-        statements: 1
+        max: 1
       files:
         - path: src/lib.rs
           body: |-
@@ -219,73 +356,11 @@ spec:
                     _ => "many",
                 }
             }
-    - name: rust-closure-and-question-mark
-      language: rust
-      kind: valid
-      options:
-        cyclomatic: 3
-        statements: 4
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub fn parse_all(items: &[&str]) -> Result<Vec<u32>, std::num::ParseIntError> {
-                let mut out = Vec::new();
-                for item in items {
-                    out.push(item.parse::<u32>()?);
-                }
-                Ok(out)
-            }
-    - name: rust-inline-test-module
-      language: rust
-      kind: valid
-      options:
-        cyclomatic: 2
-        statements: 2
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub fn add(a: i32, b: i32) -> i32 {
-                a + b
-            }
-
-            #[cfg(test)]
-            mod tests {
-                fn helper(n: i32) -> i32 {
-                    if n > 0 {
-                        return n;
-                    }
-                    if n < 0 {
-                        return -n;
-                    }
-                    0
-                }
-            }
-    - name: flat-dispatch
-      language: go
-      kind: valid
-      options:
-        cyclomatic: 4
-        statements: 1
-      files:
-        - path: sample.go
-          body: "package sample\n\ntype visitor struct{ ifs, elses, loops, calls int }\n\nfunc (v *visitor) visit(n any) *visitor {\n\tswitch n := n.(type) {\n\tcase *ifStmt:\n\t\tv.ifs++\n\t\tif n.hasElse {\n\t\t\tv.elses++\n\t\t}\n\tcase *forStmt:\n\t\tv.loops++\n\tcase *callExpr:\n\t\tv.calls++\n\t}\n\treturn v\n}\n\ntype ifStmt struct{ hasElse bool }\ntype forStmt struct{}\ntype callExpr struct{}"
-    - name: dispatch-among-other-statements
-      language: go
-      kind: invalid
-      options:
-        cyclomatic: 4
-        statements: 1
-      files:
-        - path: sample.go
-          body: "package sample\n\ntype visitor struct{ ifs, elses, loops, calls, seen int }\n\nfunc (v *visitor) visit(n any) {\n\tif n == nil {\n\t\treturn\n\t}\n\tswitch n := n.(type) {\n\tcase *ifStmt:\n\t\tv.ifs++\n\t\tif n.hasElse {\n\t\t\tv.elses++\n\t\t}\n\tcase *forStmt:\n\t\tv.loops++\n\tcase *callExpr:\n\t\tv.calls++\n\t}\n}\n\ntype ifStmt struct{ hasElse bool }\ntype forStmt struct{}\ntype callExpr struct{}"
-      expect:
-        - line: 5
     - name: rust-flat-dispatch
       language: rust
       kind: valid
       options:
-        cyclomatic: 4
-        statements: 1
+        max: 3
       files:
         - path: src/lib.rs
           body: |-
@@ -317,5 +392,29 @@ spec:
                         Node::Call => self.calls += 1,
                         Node::Other => {}
                     }
+                }
+            }
+    - name: rust-inline-test-module
+      language: rust
+      kind: valid
+      options:
+        max: 2
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn add(a: i32, b: i32) -> i32 {
+                a + b
+            }
+
+            #[cfg(test)]
+            mod tests {
+                fn helper(n: i32) -> i32 {
+                    if n > 0 {
+                        return n;
+                    }
+                    if n < 0 {
+                        return -n;
+                    }
+                    0
                 }
             }

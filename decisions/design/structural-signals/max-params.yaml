@@ -1,0 +1,223 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/max-params
+  uid: a8c094cf-597d-4bfa-bc8d-a1fc1b9f03f9
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: structural-signals
+spec:
+  title: Functions take a bounded number of parameters
+  context: >-
+    A long parameter list usually hides a missing type, or a function that
+    does several things. The default limit is 6 for a function and 7 for a
+    constructor: Sonar S107 and clippy `too_many_arguments` allow 7, revive
+    `argument-limit` allows 8, detekt `LongParameterList` allows 5 for a
+    function and 6 for a constructor, and ESLint `max-params` allows 3; this
+    is a deliberately high limit between them. A constructor may take one
+    more because it assembles a type. A function that implements an
+    interface or trait method, an entrypoint and a test do not choose their
+    signature, so they have no limit. The receiver is not counted.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    A function SHOULD NOT take more parameters than the limit of its role.
+    The remedy is to split the function by responsibility; a constructor
+    that is over its limit builds a type that should be split.
+  severity: warn
+  options:
+    type: object
+    properties:
+      max:
+        $ref: '#/$defs/limit'
+        default: {default: 6, constructor: 7, implementation: null, entrypoint: null, test: null}
+        description: >-
+          Most parameters a function may have: an integer for every role, or
+          an object with `default` and one entry per role (`function`,
+          `method`, `constructor`, `implementation`, `entrypoint`, `test`);
+          a role left out takes `default`, and null is no limit.
+    additionalProperties: false
+  check:
+    type: cel
+    select: function
+    with:
+      - name: m
+        expr: metrics(func)
+      - name: cap
+        expr: limit(func, options.max)
+    where: >-
+      (func.kind == 'function' || func.kind == 'method')
+      && m.measured && cap != null && func.params > cap
+    message: >-
+      {{ counted(func, func.params, 'parameters') }} (max {{ cap }}):
+      {{ func.role == 'constructor' ? 'split ' + func.built : 'split by responsibility' }}
+    evidence:
+      value: func.params
+      max: cap
+      role: func.role
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+      - "revive argument-limit 8: https://revive.run/r#argument-limit"
+      - "clippy too_many_arguments 7: https://doc.rust-lang.org/clippy/lint_configuration.html"
+      - "Sonar S107 7; detekt LongParameterList 5 and 6; ESLint max-params 3"
+  examples:
+    - name: too-many-parameters
+      language: go
+      kind: invalid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func build(a, b, c, d, e, f, g int) int {
+                return a
+            }
+      expect:
+        - line: 3
+    - name: within-the-limit
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func build(a, b, c, d, e, f int) int {
+                return a
+            }
+    - name: constructor-at-its-limit
+      language: go
+      kind: valid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type Server struct{}
+
+            func NewServer(a, b, c, d, e, f, g int) *Server {
+                return &Server{}
+            }
+    - name: constructor-over-its-limit
+      language: go
+      kind: invalid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type Server struct{}
+
+            func NewServer(a, b, c, d, e, f, g, h int) *Server {
+                return &Server{}
+            }
+      expect:
+        - line: 5
+    - name: interface-implementation
+      language: go
+      kind: valid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type Writer interface {
+                Write(a, b, c, d, e, f, g int)
+            }
+
+            type file struct{}
+
+            func (file) Write(a, b, c, d, e, f, g int) {}
+    - name: rust-too-many-parameters
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) -> i32 {
+                a
+            }
+      expect:
+        - line: 1
+    - name: rust-within-the-limit
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) -> i32 {
+                a
+            }
+    - name: rust-constructor-at-its-limit
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Server;
+
+            impl Server {
+                pub fn new(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) -> Self {
+                    Server
+                }
+            }
+    - name: rust-constructor-over-its-limit
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Server;
+
+            impl Server {
+                pub fn new(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32) -> Self {
+                    Server
+                }
+            }
+      expect:
+        - line: 4
+    - name: rust-trait-implementation
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub trait Sink {
+                fn write(&mut self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32);
+            }
+
+            pub struct File;
+
+            impl Sink for File {
+                fn write(&mut self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) {}
+            }
+    - name: rust-the-receiver-is-not-counted
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Server;
+
+            impl Server {
+                pub fn handle(&self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) {}
+            }
+    - name: rust-method-over-the-limit
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Server;
+
+            impl Server {
+                pub fn handle(&self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) {}
+            }
+      expect:
+        - line: 4

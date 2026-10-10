@@ -8,6 +8,16 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+/// The roles a limit may name, besides `default`.
+pub const LIMIT_ROLES: [&str; 6] = [
+    "function",
+    "method",
+    "constructor",
+    "implementation",
+    "entrypoint",
+    "test",
+];
+
 /// The JSON type the values of an option must have; `number` accepts any
 /// number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -82,16 +92,6 @@ pub enum ShapeRef {
     Limit,
 }
 
-/// The roles a limit may name, besides `default`.
-pub const LIMIT_ROLES: [&str; 6] = [
-    "function",
-    "method",
-    "constructor",
-    "implementation",
-    "entrypoint",
-    "test",
-];
-
 /// The shape of a value inside an option: its type and, for a list, the shape
 /// of its items, for an object, its properties and which of them are required.
 /// With `oneOf`, a value is accepted when exactly one of the shapes accepts it;
@@ -130,21 +130,6 @@ impl Shape {
         }
     }
 
-    fn natural() -> Self {
-        Self {
-            minimum: Some(0),
-            ..Self::of(OptionType::Integer)
-        }
-    }
-
-    /// A non-negative integer, or null: no limit.
-    fn bound() -> Self {
-        Self {
-            one_of: vec![Self::natural(), Self::of(OptionType::Null)],
-            ..Self::default()
-        }
-    }
-
     /// The `limit` shape every limit option shares: a non-negative integer for
     /// every function, or an object that gives `default` and one per role.
     /// Null is no limit; a role left out falls back to `default`, and a
@@ -165,15 +150,23 @@ impl Shape {
         }
     }
 
-    fn resolved(&self) -> std::borrow::Cow<'_, Shape> {
-        match self.reference {
-            Some(ShapeRef::Limit) => std::borrow::Cow::Owned(Self::limit()),
-            None => std::borrow::Cow::Borrowed(self),
+    /// A non-negative integer, or null: no limit.
+    fn bound() -> Self {
+        Self {
+            one_of: vec![Self::natural(), Self::of(OptionType::Null)],
+            ..Self::default()
+        }
+    }
+
+    fn natural() -> Self {
+        Self {
+            minimum: Some(0),
+            ..Self::of(OptionType::Integer)
         }
     }
 
     /// Whether `value` has this shape; otherwise what is wrong, naming `at`.
-    pub(crate) fn check(&self, value: &Value, at: &str) -> Result<(), String> {
+    pub fn check(&self, value: &Value, at: &str) -> Result<(), String> {
         let shape = self.resolved();
         if !shape.one_of.is_empty() {
             return shape.check_one_of(value, at);
@@ -201,6 +194,13 @@ impl Shape {
             _ => {}
         }
         Ok(())
+    }
+
+    fn resolved(&self) -> std::borrow::Cow<'_, Shape> {
+        match self.reference {
+            Some(ShapeRef::Limit) => std::borrow::Cow::Owned(Self::limit()),
+            None => std::borrow::Cow::Borrowed(self),
+        }
     }
 
     fn check_object(&self, map: &serde_json::Map<String, Value>, at: &str) -> Result<(), String> {
@@ -311,7 +311,7 @@ impl OptionSchema {
     }
 
     /// Whether `value` has this shape; otherwise what is wrong, naming `at`.
-    pub(crate) fn check(&self, value: &Value, at: &str) -> Result<(), String> {
+    pub fn check(&self, value: &Value, at: &str) -> Result<(), String> {
         self.shape().check(value, at)
     }
 

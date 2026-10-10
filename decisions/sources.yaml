@@ -94,7 +94,14 @@ spec:
       decisions: [design/prefer-reuse]
     - ref: "coding-patterns#structural-signals-a6200267"
       text: Consider cyclomatic complexity with statement count and nesting depth.
-      decisions: [design/complexity]
+      decisions:
+        - design/complexity
+        - design/cognitive-complexity
+        - design/max-statements
+        - design/max-lines-per-function
+        - design/max-depth
+        - design/max-params
+        - design/max-results
     - ref: "coding-patterns#structural-signals-01978ee3"
       text: "Consider coupling with direct fan-in, fan-out, and dependency depth."
       decisions: [design/coupling]

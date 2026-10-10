@@ -3,3 +3,5 @@
 mod memo;
 
 mod registry;
+
+mod workspace;

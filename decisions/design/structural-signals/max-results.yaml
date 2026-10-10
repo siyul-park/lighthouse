@@ -1,0 +1,174 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/max-results
+  uid: 6d0c2b5a-cf52-4582-8af0-c9625832b24b
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: structural-signals
+spec:
+  title: Functions return a bounded number of results
+  context: >-
+    Many results usually mean the function returns a record that was never
+    named. The default (3) is revive's `function-result-limit`; gocritic's
+    `tooManyResultsChecker` allows 5. Go counts every result, a trailing
+    `error` included. Rust counts the arity of the returned tuple (1 for a
+    single value, 0 for `()`), and looks inside a `Result<T, E>` at `T`. A
+    constructor that returns its type with a result or an error is not
+    counted, nor is a function that implements an interface or trait method,
+    or a test.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    A function SHOULD NOT return more results than the limit of its role.
+    The remedy is to split the function by responsibility, or to name what
+    it returns.
+  severity: warn
+  options:
+    type: object
+    properties:
+      max:
+        $ref: '#/$defs/limit'
+        default: {default: 3, constructor: null, implementation: null, test: null}
+        description: >-
+          Most results a function may have: an integer for every role, or an
+          object with `default` and one entry per role (`function`,
+          `method`, `constructor`, `implementation`, `entrypoint`, `test`);
+          a role left out takes `default`, and null is no limit.
+    additionalProperties: false
+  check:
+    type: cel
+    select: function
+    with:
+      - name: m
+        expr: metrics(func)
+      - name: cap
+        expr: limit(func, options.max)
+    where: >-
+      (func.kind == 'function' || func.kind == 'method')
+      && m.measured && cap != null && func.returns > cap
+    message: >-
+      {{ counted(func, func.returns, 'results') }} (max {{ cap }}):
+      split by responsibility
+    evidence:
+      value: func.returns
+      max: cap
+      role: func.role
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+      - "revive function-result-limit 3: https://revive.run/r#function-result-limit"
+      - "gocritic tooManyResultsChecker 5: https://go-critic.com/overview.html#toomanyresultschecker"
+  examples:
+    - name: too-many-results
+      language: go
+      kind: invalid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func split() (int, int, int, int) {
+                return 0, 0, 0, 0
+            }
+      expect:
+        - line: 3
+    - name: within-the-limit
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func split() (int, int, int) {
+                return 0, 0, 0
+            }
+    - name: constructor-is-not-limited
+      language: go
+      kind: valid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type Parser struct{}
+
+            func NewParser() (*Parser, int, int, error) {
+                return &Parser{}, 0, 0, nil
+            }
+    - name: interface-implementation
+      language: go
+      kind: valid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type Reader interface {
+                Read() (int, int, int, error)
+            }
+
+            type file struct{}
+
+            func (file) Read() (int, int, int, error) {
+                return 0, 0, 0, nil
+            }
+    - name: rust-too-many-results
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn split() -> (i32, i32, i32, i32) {
+                (0, 0, 0, 0)
+            }
+      expect:
+        - line: 1
+    - name: rust-within-the-limit
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn split() -> (i32, i32, i32) {
+                (0, 0, 0)
+            }
+    - name: rust-result-counts-its-ok-value
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn split() -> Result<(i32, i32, i32, i32), String> {
+                Ok((0, 0, 0, 0))
+            }
+      expect:
+        - line: 1
+    - name: rust-result-with-a-pair
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn split() -> Result<(i32, i32), String> {
+                Ok((0, 0))
+            }
+    - name: rust-constructor-is-not-limited
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Parser;
+
+            impl Parser {
+                pub fn new() -> Result<(Self, i32, i32, i32), String> {
+                    Ok((Parser, 0, 0, 0))
+                }
+            }

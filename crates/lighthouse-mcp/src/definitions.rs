@@ -82,6 +82,15 @@ pub fn all() -> Vec<Tool> {
             json!({ "fingerprint": { "type": "string" } }),
             &["fingerprint"],
         ),
+    ]
+    .into_iter()
+    .chain(decision_tools())
+    .collect()
+}
+
+/// The tools that author and test decisions.
+fn decision_tools() -> [Tool; 3] {
+    [
         tool(
             "decision_create",
             "Add a project-local decision under .lighthouse/decisions. `id` is `local/<name>`; `spec` is the spec of a Decision (title, intent, scope {subject}, requirement with MUST/SHOULD, severity, evidence, and a `check` of `type: cel` with select, where as a CEL expression that is true for a violation, message and evidence); it may be an object or a YAML/JSON string. Nothing is written unless the candidate validates, compiles and every example passes the whole engine; a rejection leaves the project untouched. The decision also needs the `local` plugin in lighthouse.toml to run in `check`.",
@@ -108,7 +117,6 @@ pub fn all() -> Vec<Tool> {
             &[],
         ),
     ]
-    .into()
 }
 
 fn tool(

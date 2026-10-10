@@ -290,10 +290,8 @@ impl ProximityRule {
                         &base,
                         meta,
                         options,
-                        &values[between],
-                        &values[at],
-                        key,
-                        &keys[between],
+                        (&values[between], &keys[between]),
+                        (&values[at], key),
                     )? {
                         separators.push(between);
                     }
@@ -322,16 +320,15 @@ impl ProximityRule {
         Ok(found)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    /// Whether `between` separates `member` from the member before it; each is
+    /// a value with its key.
     fn separates(
         &self,
         base: &cel::Context<'static>,
         meta: &RuleManifest,
         options: &Map<String, Value>,
-        between: &Value,
-        member: &Value,
-        key: &str,
-        between_key: &str,
+        (between, between_key): (&Value, &str),
+        (member, key): (&Value, &str),
     ) -> Result<bool, PluginError> {
         let Some(separator) = &self.separator else {
             return Ok(between_key != key);

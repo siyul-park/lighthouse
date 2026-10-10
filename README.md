@@ -152,7 +152,7 @@ plugins = [{ id = "lang-go", path = "target/plugins/lang-go" }, "design"]
 extends = ["design/recommended"]
 
 [spec.rules]
-"design/complexity" = { level = "warn", options = { cognitive = 30 } }
+"design/max-params" = { level = "warn", options = { max = { default = 6, constructor = 8 } } }
 ```
 
 Exit codes: `0` clean, `1` an error (a warning too with `--strict` or `--max-warnings N`), `2` usage or configuration error, `3` analysis

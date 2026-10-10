@@ -539,3 +539,14 @@ fn a_rule_can_say_whether_it_checks_generated_code() {
     assert_eq!(rules["core/a"].generated, Some(true));
     assert_eq!(rules["core/b"].generated, None);
 }
+
+#[test]
+fn config_constructor_prefixes() {
+    let config = Config::parse_inline(
+        "[languages.go]\nconstructorPrefixes = [\"Make\"]\n[languages.rust]\ntags = 1\n",
+    )
+    .unwrap();
+    assert_eq!(config.constructor_prefixes()["go"], ["Make"]);
+    assert!(!config.constructor_prefixes().contains_key("rust"));
+    assert!(!config.languages()["go"].contains_key("constructorPrefixes"));
+}

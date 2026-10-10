@@ -298,6 +298,10 @@ impl DecisionSpec {
     }
 }
 
+pub(crate) fn squash(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 /// What an option contributes to the meaning: its type and default, and the
 /// alternatives or named shape a plain type does not say.
 fn option_content(property: &crate::OptionSchema) -> Value {
@@ -306,8 +310,4 @@ fn option_content(property: &crate::OptionSchema) -> Value {
         content["shape"] = json!(property.shape());
     }
     content
-}
-
-pub(crate) fn squash(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }

@@ -123,3 +123,54 @@ fn cel_check_selects() {
     );
     assert_eq!(check(None).selects(Subject::Project), None);
 }
+
+#[test]
+fn shape_of() {
+    let shape = lighthouse_spec::Shape::of(OptionType::Boolean);
+    assert!(shape.check(&json!(true), "x").is_ok());
+    assert_eq!(
+        shape.check(&json!(1), "x").unwrap_err(),
+        "x must be a boolean"
+    );
+}
+
+#[test]
+fn shape_limit() {
+    let limit = lighthouse_spec::Shape::limit();
+    assert_eq!(limit.one_of.len(), 2);
+    let object = &limit.one_of[1];
+    for role in lighthouse_spec::LIMIT_ROLES.into_iter().chain(["default"]) {
+        assert!(object.properties.contains_key(role), "{role}");
+    }
+    assert!(
+        limit
+            .check(&json!({ "test": null, "default": 1 }), "x")
+            .is_ok()
+    );
+}
+
+#[test]
+fn option_schema_shape() {
+    let option = OptionSchema::new(OptionType::Integer, json!(3), "Limit.");
+    assert_eq!(option.shape().kind, Some(OptionType::Integer));
+    assert!(option.shape().one_of.is_empty());
+}
+
+#[test]
+fn shape_check() {
+    let limit = lighthouse_spec::Shape::limit();
+    assert!(limit.check(&json!(3), "x").is_ok());
+    assert!(
+        limit
+            .check(&json!(-1), "x")
+            .unwrap_err()
+            .contains("at least 0")
+    );
+}
+
+#[test]
+fn option_schema_check() {
+    let option = OptionSchema::new(OptionType::Integer, json!(3), "Limit.");
+    assert!(option.check(&json!(4), "x").is_ok());
+    assert!(option.check(&json!("4"), "x").is_err());
+}

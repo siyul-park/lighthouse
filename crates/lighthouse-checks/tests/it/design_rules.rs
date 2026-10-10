@@ -187,49 +187,129 @@ fn branches(n: usize) -> Vec<Flow> {
     vec![Flow::new(FlowKind::If, 0); n]
 }
 
+const COGNITIVE: &str = "design/cognitive-complexity";
+const STATEMENTS: &str = "design/max-statements";
+const DEPTH: &str = "design/max-depth";
+const PARAMS: &str = "design/max-params";
+const RESULTS: &str = "design/max-results";
+
 #[test]
-fn complexity_needs_both_cyclomatic_and_statements() {
+fn complexity_is_one_independent_limit() {
     let mut w = World::default();
-    let big = w.func("m", "big", "m/a.ucm");
-    w.summarize(&big, 30, &branches(14));
-    let short = w.func("m", "short", "m/a.ucm");
-    w.summarize(&short, 29, &branches(14));
-    let flat = w.func("m", "flat", "m/a.ucm");
-    w.summarize(&flat, 80, &branches(13));
-    let found = w.check(COMPLEX, json!({}));
-    assert_eq!(w.names(&found), ["big"]);
+    let wide = w.func("m", "wide", "m/a.ucm");
+    w.summarize(&wide, 1, &branches(14));
+    let narrow = w.func("m", "narrow", "m/a.ucm");
+    w.summarize(&narrow, 99, &branches(13));
+    let found = w.check(COMPLEX, json!({ "max": 14 }));
+    assert_eq!(w.names(&found), ["wide"]);
 }
 
 #[test]
-fn complexity_reports_nesting_and_cognitive_signals_with_their_own_thresholds() {
+fn cognitive_complexity_and_depth_have_their_own_limits() {
     let mut w = World::default();
-    let deep = w.func("m", "deep", "m/a.ucm");
-    let mut flow = branches(9);
-    flow.push(Flow::new(FlowKind::If, 4));
-    w.summarize(&deep, 25, &flow);
     let tangled = w.func("m", "tangled", "m/a.ucm");
     let nested: Vec<Flow> = (0..5).map(|n| Flow::new(FlowKind::Loop, n)).collect();
-    w.summarize(&tangled, 30, &nested);
-    let found = w.check(COMPLEX, json!({ "cognitive": 15 }));
-    assert_eq!(w.names(&found), ["deep", "tangled"]);
-    let quiet = w.check(COMPLEX, json!({}));
-    assert_eq!(w.names(&quiet), ["deep"]);
+    w.summarize(&tangled, 5, &nested);
+    assert_eq!(
+        w.names(&w.check(COGNITIVE, json!({ "max": 14 }))),
+        ["tangled"]
+    );
+    assert!(w.check(COGNITIVE, json!({ "max": 15 })).is_empty());
+    assert_eq!(w.names(&w.check(DEPTH, json!({ "max": 4 }))), ["tangled"]);
+    assert!(w.check(DEPTH, json!({ "max": 5 })).is_empty());
 }
 
 #[test]
-fn complexity_skips_dispatchers_and_tests() {
+fn statements_are_limited_per_role() {
+    let mut w = World::default();
+    let long = w.func("m", "long", "m/a.ucm");
+    w.summarize(&long, 12, &[]);
+    assert_eq!(
+        w.names(&w.check(STATEMENTS, json!({ "max": 10 }))),
+        ["long"]
+    );
+    let by_role = json!({ "max": { "default": 10, "function": 20 } });
+    assert!(w.check(STATEMENTS, by_role).is_empty());
+    let falls_back = json!({ "max": { "default": 10, "method": 1 } });
+    assert_eq!(w.names(&w.check(STATEMENTS, falls_back)), ["long"]);
+    let no_default = json!({ "max": { "method": 1 } });
+    assert!(
+        w.check(STATEMENTS, no_default).is_empty(),
+        "no default, no limit"
+    );
+}
+
+#[test]
+fn complexity_skips_dispatchers_unless_asked() {
     let mut w = World::default();
     let table = w.func("m", "table", "m/a.ucm");
-    let mut flow = vec![Flow {
+    let flow = vec![Flow {
         arms: 40,
         returning: true,
         ..Flow::new(FlowKind::Switch, 0)
     }];
-    flow.extend(branches(0));
     w.summarize(&table, 90, &flow);
-    let test = w.func("m", "TestBig", "m/a_test.ucm");
-    w.summarize(&test, 99, &branches(30));
-    assert!(w.check(COMPLEX, json!({})).is_empty());
+    assert!(w.check(COMPLEX, json!({ "max": 5 })).is_empty());
+    let counted = json!({ "max": 5, "ignoreDispatch": false });
+    assert_eq!(w.names(&w.check(COMPLEX, counted)), ["table"]);
+}
+
+fn params(w: &mut World, symbol: &lighthouse_model::Symbol, n: u32) {
+    w.summaries
+        .iter_mut()
+        .find(|s| s.symbol == symbol.id)
+        .unwrap()
+        .params = n;
+}
+
+#[test]
+fn a_constructor_may_take_one_more_parameter_and_an_implementation_any() {
+    let mut w = World::default();
+    let plain = w.func("m", "build", "m/a.ucm");
+    params(&mut w, &plain, 7);
+    let ctor = w.func("m", "NewServer", "m/a.ucm");
+    params(&mut w, &ctor, 8);
+    let fine = w.func("m", "NewClient", "m/a.ucm");
+    params(&mut w, &fine, 7);
+    let object = w.symbol("m", "Object", SymbolKind::Type, "m/a.ucm");
+    let hook = w.member(&object, "fmt", SymbolKind::Method, "m/a.ucm");
+    params(&mut w, &hook, 9);
+    w.summaries
+        .iter_mut()
+        .find(|s| s.symbol == hook.id)
+        .unwrap()
+        .implementation = true;
+    let found = w.check(PARAMS, json!({}));
+    assert_eq!(w.names(&found), ["build", "NewServer"]);
+}
+
+#[test]
+fn results_are_counted_except_for_a_constructor() {
+    let mut w = World::default();
+    let many = w.func("m", "split", "m/a.ucm");
+    let ctor = w.func("m", "NewParser", "m/a.ucm");
+    for symbol in [&many, &ctor] {
+        w.summaries
+            .iter_mut()
+            .find(|s| s.symbol == symbol.id)
+            .unwrap()
+            .returns = 4;
+    }
+    assert_eq!(w.names(&w.check(RESULTS, json!({}))), ["split"]);
+}
+
+#[test]
+fn a_limit_refuses_what_is_not_a_limit() {
+    let w = World::default();
+    for bad in [
+        json!(-1),
+        json!("3"),
+        json!({ "closure": 3 }),
+        json!({ "default": -1 }),
+    ] {
+        let result = std::panic::catch_unwind(|| w.check(PARAMS, json!({ "max": bad })));
+        assert!(result.is_err(), "{bad}");
+    }
 }
 
 const COUPLE: &str = "design/coupling";

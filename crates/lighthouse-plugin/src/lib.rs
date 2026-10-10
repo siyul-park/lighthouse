@@ -74,11 +74,6 @@ pub struct Workspace {
 pub type Facts = BTreeMap<(String, String), Value>;
 
 impl Workspace {
-    /// The constructor prefixes of `language`; none for an unknown language.
-    pub fn constructor_prefixes(&self, language: &str) -> &[String] {
-        self.constructors.get(language).map_or(&[], Vec::as_slice)
-    }
-
     /// A workspace at `root` with no language options.
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
@@ -87,6 +82,11 @@ impl Workspace {
             constructors: BTreeMap::new(),
             overlays: BTreeMap::new(),
         }
+    }
+
+    /// The constructor prefixes of `language`; none for an unknown language.
+    pub fn constructor_prefixes(&self, language: &str) -> &[String] {
+        self.constructors.get(language).map_or(&[], Vec::as_slice)
     }
 }
 

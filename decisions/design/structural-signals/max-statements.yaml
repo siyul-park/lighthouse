@@ -1,0 +1,123 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/max-statements
+  uid: 130c7aca-2948-494f-8013-28fbb3a41c8a
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: structural-signals
+spec:
+  title: Functions have a bounded number of statements
+  context: >-
+    A long run of statements usually covers several responsibilities. The
+    default (40) is funlen's `statements`; ESLint `max-statements` (10) is
+    far stricter and does not fit a deliberately high limit. Statements are
+    the provider's count: every statement of the body, nested blocks and
+    case clauses included.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    A function SHOULD NOT have more statements than the limit of its role.
+    The remedy is to split it by responsibility.
+  severity: warn
+  options:
+    type: object
+    properties:
+      max:
+        $ref: '#/$defs/limit'
+        default: 40
+        description: >-
+          Most statements a function may have: an integer for every role, or
+          an object with `default` and one entry per role (`function`,
+          `method`, `constructor`, `implementation`, `entrypoint`, `test`);
+          a role left out takes `default`, and null is no limit.
+    additionalProperties: false
+  check:
+    type: cel
+    select: function
+    with:
+      - name: m
+        expr: metrics(func)
+      - name: cap
+        expr: limit(func, options.max)
+    where: >-
+      (func.kind == 'function' || func.kind == 'method')
+      && m.measured && cap != null && m.statements > cap
+    message: >-
+      {{ counted(func, m.statements, 'statements') }} (max {{ cap }}):
+      split by responsibility
+    evidence:
+      value: m.statements
+      max: cap
+      role: func.role
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+      - "funlen statements 40: https://golangci-lint.run/usage/linters/#funlen"
+      - "ESLint max-statements: https://eslint.org/docs/latest/rules/max-statements"
+  examples:
+    - name: many-statements
+      language: go
+      kind: invalid
+      options:
+        max: 2
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func total(a, b int) int {
+                sum := a
+                sum += b
+                return sum
+            }
+      expect:
+        - line: 3
+    - name: within-the-limit
+      language: go
+      kind: valid
+      canonical: true
+      options:
+        max: 3
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func total(a, b int) int {
+                sum := a
+                sum += b
+                return sum
+            }
+    - name: rust-many-statements
+      language: rust
+      kind: invalid
+      options:
+        max: 2
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn total(a: i32, b: i32) -> i32 {
+                let mut sum = a;
+                sum += b;
+                sum
+            }
+      expect:
+        - line: 1
+    - name: rust-within-the-limit
+      language: rust
+      kind: valid
+      canonical: true
+      options:
+        max: 3
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn total(a: i32, b: i32) -> i32 {
+                let mut sum = a;
+                sum += b;
+                sum
+            }

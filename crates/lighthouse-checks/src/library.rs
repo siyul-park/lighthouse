@@ -38,6 +38,9 @@ pub(crate) const FUNCTIONS: [(&str, &str); 8] = [
     ("rank", "__ranks"),
 ];
 
+/// The key of a limit map that covers every role it does not name.
+const FALLBACK_ROLE: &str = "default";
+
 /// What the expressions of a check ask for, found from their source text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Needs {
@@ -169,9 +172,6 @@ fn keyed_reader(name: &'static str, field: &'static str, absent: fn() -> Value) 
     })
 }
 
-/// The key of a limit map that covers every role it does not name.
-const FALLBACK_ROLE: &str = "default";
-
 /// `limit(node, max)`: the integer a limit option gives the node's role, else
 /// null for no limit. `max` is an integer (every role), or a map from a role
 /// or `default` to an integer or null; a role the map leaves out falls back to
@@ -227,7 +227,7 @@ fn counted() -> Builtin {
         };
         let what = text(&Value::try_from(what)?);
         let (subject, verb) = if field("role")? == "constructor" {
-            (constructed(&field("owner")?, &field("name")?), "needs")
+            (field("built")?, "needs")
         } else {
             (field("name")?, "has")
         };
@@ -235,12 +235,6 @@ fn counted() -> Builtin {
             "{subject} {verb} {n} {what}"
         ))))
     })
-}
-
-/// The type a constructor builds: its owner, else its own name.
-fn constructed(owner: &str, name: &str) -> String {
-    let owner = owner.rsplit("::").next().and_then(|t| t.split('#').next());
-    owner.filter(|o| !o.is_empty()).unwrap_or(name).to_owned()
 }
 
 /// `exposed(node, internal)`: whether the node is public, or internal as well

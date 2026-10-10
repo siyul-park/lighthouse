@@ -73,7 +73,7 @@ Do not memorize decision text; ask for it when a finding names a rule.
 - `lighthouse://config` is the effective configuration.
 - `review_history` shows every judgment recorded on a finding.
 
-## Active decisions (28)
+## Active decisions (34)
 
 A decision declares the severity of its findings: `error` is definitive, so it needs no review and only a directive in the code suppresses it; `warn` and `info` are review tasks, and a judgment can hide them whatever level the configuration reports them at. `fixable: safe|suggested` marks a decision with a fixer.
 
@@ -91,7 +91,13 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 - `design/misplaced-symbol` (info) A function lives with what it uses
 - `design/tiny-modules` (info) A module earns its boundary
 - `design/contiguity` (warn, fixable: suggested) Collaborators stay close
-- `design/complexity` (warn) Complexity is a review signal
+- `design/complexity` (warn) Cyclomatic complexity is a review signal
+- `design/cognitive-complexity` (warn) Cognitive complexity is a review signal
+- `design/max-statements` (warn) Functions have a bounded number of statements
+- `design/max-lines-per-function` (warn) Functions have a bounded length
+- `design/max-depth` (warn) Control flow is nested a bounded number of levels
+- `design/max-params` (warn) Functions take a bounded number of parameters
+- `design/max-results` (warn) Functions return a bounded number of results
 - `design/coupling` (warn) Coupling is a review signal
 - `design/no-single-use-wrapper` (warn) Inline single-use wrappers
 - `design/prefer-method` (warn) Behavior lives with its owner
