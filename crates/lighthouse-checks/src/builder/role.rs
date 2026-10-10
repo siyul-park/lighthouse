@@ -44,20 +44,22 @@ impl Builder<'_> {
             .any(|p| layout::has_word_prefix(&symbol.name, p))
     }
 
-    /// The type a function builds when it is a constructor: its owner, else
-    /// its name without the constructor prefix (`NewServer` builds `Server`).
+    /// What a constructor builds: the name without its prefix (`NewServer`
+    /// builds `Server`), else its owner (`Server::new`), else its own name.
     pub(super) fn built(&self, symbol: &Symbol) -> String {
-        if let Some(owner) = symbol.owner.as_ref().and_then(|o| self.project.symbol(o)) {
-            return owner.name.clone();
-        }
-        self.ws
+        let named = self
+            .ws
             .constructor_prefixes(self.language_of(symbol))
             .iter()
             .filter(|p| layout::has_word_prefix(&symbol.name, p))
             .filter_map(|p| symbol.name.strip_prefix(p.as_str()))
-            .find(|rest| !rest.is_empty())
-            .unwrap_or(&symbol.name)
-            .to_owned()
+            .find(|rest| !rest.is_empty());
+        let owner = symbol
+            .owner
+            .as_ref()
+            .and_then(|o| self.project.symbol(o))
+            .map(|o| o.name.as_str());
+        named.or(owner).unwrap_or(&symbol.name).to_owned()
     }
 
     pub(super) fn language_of(&self, symbol: &Symbol) -> &str {

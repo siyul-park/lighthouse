@@ -52,7 +52,7 @@ func newUnit(rel string, file *ast.File, pkg *packages.Package, src []byte, res 
 		fset:     pkg.Fset,
 		src:      src,
 		res:      res,
-		frag:     emptyFragment(sdk.FileInfo{Path: rel, Generated: ast.IsGenerated(file)}),
+		frag:     emptyFragment(sdk.FileInfo{Path: rel, Generated: isGenerated(file)}),
 		module:   dir,
 		main:     file.Name.Name == "main",
 		internal: hasComponent(dir, "internal"),
