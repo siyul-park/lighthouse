@@ -3,6 +3,7 @@
 mod annotation;
 mod fingerprint;
 mod fix;
+mod hash;
 mod project;
 mod review;
 mod sites;

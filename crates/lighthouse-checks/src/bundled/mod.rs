@@ -17,28 +17,6 @@ const CORE: &str = "core";
 /// Pack whose plugin provides the order keys.
 const DESIGN: &str = "design";
 
-/// Registry holding every bundled plugin.
-pub fn registry() -> Registry {
-    let catalog = Catalog::bundled();
-    let mut registry = Registry::default();
-    for pack in &catalog.packs {
-        register(&mut registry, &Pack::of(&pack.id, catalog));
-        if pack.id == CORE {
-            register(&mut registry, &Metrics);
-        }
-    }
-    registry
-        .validate()
-        .expect("bundled analyzers form a valid DAG");
-    registry
-}
-
-fn register(registry: &mut Registry, plugin: &dyn Plugin) {
-    registry
-        .register(plugin)
-        .unwrap_or_else(|e| panic!("bundled plugin `{}` is valid: {e}", plugin.manifest().id));
-}
-
 /// A bundled pack: its declarative decisions and the code that goes with them.
 pub struct Pack {
     decisions: Declarative,
@@ -83,10 +61,12 @@ impl Pack {
 }
 
 impl Plugin for Pack {
+    /// The pack's id and version.
     fn manifest(&self) -> &PluginManifest {
         self.decisions.manifest()
     }
 
+    /// The language providers only code provides.
     fn languages(&self) -> Vec<Box<dyn LanguageProvider>> {
         (self.code.languages)()
     }
@@ -98,10 +78,12 @@ impl Plugin for Pack {
         rules
     }
 
+    /// One fixer per decision of the pack that has a `fix`.
     fn fixers(&self) -> Vec<Box<dyn lighthouse_plugin::Fixer>> {
         self.decisions.fixers()
     }
 
+    /// The keys fixes of the pack sort by.
     fn order_keys(&self) -> Vec<Box<dyn OrderKey>> {
         (self.code.order_keys)()
     }
@@ -114,4 +96,26 @@ impl Plugin for Pack {
             rules.iter().map(|rule| rule.manifest()),
         )
     }
+}
+
+/// Registry holding every bundled plugin.
+pub fn registry() -> Registry {
+    let catalog = Catalog::bundled();
+    let mut registry = Registry::default();
+    for pack in &catalog.packs {
+        register(&mut registry, &Pack::of(&pack.id, catalog));
+        if pack.id == CORE {
+            register(&mut registry, &Metrics);
+        }
+    }
+    registry
+        .validate()
+        .expect("bundled analyzers form a valid DAG");
+    registry
+}
+
+fn register(registry: &mut Registry, plugin: &dyn Plugin) {
+    registry
+        .register(plugin)
+        .unwrap_or_else(|e| panic!("bundled plugin `{}` is valid: {e}", plugin.manifest().id));
 }

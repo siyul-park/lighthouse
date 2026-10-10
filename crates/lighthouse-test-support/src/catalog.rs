@@ -15,6 +15,9 @@ pub const CHECKED_SPEC: &str = "  severity: error
   evidence: [x]
 ";
 
+/// Catalog files keyed by `/`-separated path.
+pub type Files = BTreeMap<String, String>;
+
 /// A `Decision` document for `id` listed in `section`, with `spec` under
 /// `spec:` (already indented by two spaces).
 pub fn decision(id: &str, section: &str, spec: &str) -> String {
@@ -48,8 +51,7 @@ pub fn override_of(name: &str, spec: &str) -> String {
     )
 }
 
-pub type Files = BTreeMap<String, String>;
-
+/// `entries` as catalog files.
 pub fn files(entries: &[(&str, String)]) -> Files {
     entries
         .iter()

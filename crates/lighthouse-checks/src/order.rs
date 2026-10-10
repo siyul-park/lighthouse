@@ -19,11 +19,6 @@ struct Options {
     hook_names: Vec<String>,
 }
 
-/// The order keys of the pack.
-pub(crate) fn keys() -> Vec<Box<dyn OrderKey>> {
-    vec![Box::new(GroupKey), Box::new(ConstructorKey)]
-}
-
 /// Orders declarations the way the `declaration-groups` rule does: by the
 /// index of their group in the rule's order. A declaration the order does not
 /// mention, test code and generated code have no rank and stay where they are.
@@ -96,6 +91,11 @@ impl OrderKey for ConstructorKey {
             exposed(symbol) && is_constructor(&symbol.name, &options.constructor_prefixes);
         Ok(Some(u64::from(!constructor)))
     }
+}
+
+/// The order keys of the pack.
+pub(crate) fn keys() -> Vec<Box<dyn OrderKey>> {
+    vec![Box::new(GroupKey), Box::new(ConstructorKey)]
 }
 
 /// The group index of a symbol under the default order of `language`, for the

@@ -11,19 +11,6 @@ use lighthouse_plugin::{
 use lighthouse_spec::DecisionRule;
 use serde::Deserialize;
 
-/// The language providers of the pack: the fallback text one.
-pub(super) fn languages() -> Vec<Box<dyn LanguageProvider>> {
-    vec![Box::new(Text::new())]
-}
-
-/// The rules about allow annotations.
-pub(super) fn annotation_rules() -> Vec<Box<dyn Rule>> {
-    vec![
-        annotation_rule(ANNOTATION_REASON),
-        annotation_rule(UNUSED_ALLOW),
-    ]
-}
-
 /// Fallback provider: every file is plain text.
 struct Text {
     manifest: ProviderManifest,
@@ -63,6 +50,19 @@ impl LanguageProvider for Text {
 
 #[derive(Deserialize)]
 struct Unconfigured {}
+
+/// The language providers of the pack: the fallback text one.
+pub(super) fn languages() -> Vec<Box<dyn LanguageProvider>> {
+    vec![Box::new(Text::new())]
+}
+
+/// The rules about allow annotations.
+pub(super) fn annotation_rules() -> Vec<Box<dyn Rule>> {
+    vec![
+        annotation_rule(ANNOTATION_REASON),
+        annotation_rule(UNUSED_ALLOW),
+    ]
+}
 
 /// A rule about allow annotations. The engine reads the annotations of the
 /// whole project and reports these findings itself, because whether an

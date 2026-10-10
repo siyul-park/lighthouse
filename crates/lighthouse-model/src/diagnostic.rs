@@ -23,15 +23,6 @@ pub enum Severity {
     Info,
 }
 
-impl Severity {
-    /// Whether findings of a decision with this authored severity ask for a
-    /// verdict. An `error` is definitive: only an annotation in the code waives
-    /// it. A `warn` or `info` is a review task: a reviewer confirms or rejects it.
-    pub fn needs_verdict(self) -> bool {
-        self != Self::Error
-    }
-}
-
 /// The text given to [`Severity::from_str`] names no severity.
 #[derive(Debug, Error)]
 #[error("unknown severity `{0}` (expected error, warn or info)")]
@@ -57,6 +48,15 @@ impl fmt::Display for Severity {
             Self::Warn => "warn",
             Self::Info => "info",
         })
+    }
+}
+
+impl Severity {
+    /// Whether findings of a decision with this authored severity ask for a
+    /// verdict. An `error` is definitive: only an annotation in the code waives
+    /// it. A `warn` or `info` is a review task: a reviewer confirms or rejects it.
+    pub fn needs_verdict(self) -> bool {
+        self != Self::Error
     }
 }
 

@@ -322,3 +322,12 @@ fn a_cel_decision_that_was_never_a_rule_file_has_no_legacy_version() {
         None
     );
 }
+
+#[test]
+fn from_legacy_type_names_the_option_types_of_the_pattern_format() {
+    use lighthouse_spec::{OptionType, from_legacy_type};
+
+    assert_eq!(from_legacy_type("int"), Some(OptionType::Integer));
+    assert_eq!(from_legacy_type("list"), Some(OptionType::Array));
+    assert_eq!(from_legacy_type("integer"), None);
+}

@@ -102,12 +102,6 @@ pub fn review_prune(root: &Path, older_than: Option<u32>) -> Result<usize> {
     Ok(existing_store(root)?.prune(older_than)?)
 }
 
-/// The store, which must already exist: nothing is remembered before a check.
-fn existing_store(root: &Path) -> Result<Store> {
-    Store::open_existing(root)?
-        .ok_or_else(|| "no findings recorded yet (run `lighthouse check`)".into())
-}
-
 /// Records the verdict, stamping it with the versions of the finding's rule
 /// when the catalog can be read; a broken catalog is reported, not fatal.
 pub fn record_verdict(root: &Path, review: &NewReview) -> Result<Recorded> {
@@ -129,6 +123,12 @@ pub fn record_verdict(root: &Path, review: &NewReview) -> Result<Recorded> {
         standing,
         catalog_error,
     })
+}
+
+/// The store, which must already exist: nothing is remembered before a check.
+fn existing_store(root: &Path) -> Result<Store> {
+    Store::open_existing(root)?
+        .ok_or_else(|| "no findings recorded yet (run `lighthouse check`)".into())
 }
 
 fn stamp(catalog: Option<&Catalog>, finding: &FindingRecord) -> Stamp {

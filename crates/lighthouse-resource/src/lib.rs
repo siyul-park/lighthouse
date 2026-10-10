@@ -24,12 +24,6 @@ pub use error::Error;
 pub use schema::{Descriptor, SCHEMA_URL_BASE, header, schema, schema_file};
 pub use yaml::to_yaml;
 
-/// The first of `names` that is a file in `dir`: how a project's config and a
-/// plugin's manifest are found, in the order the names are tried.
-pub fn file_in(dir: &Path, names: &[&str]) -> Option<PathBuf> {
-    names.iter().map(|n| dir.join(n)).find(|p| p.is_file())
-}
-
 /// The version every document of this model declares.
 pub const API_VERSION: &str = "lighthouse/v1alpha1";
 
@@ -153,6 +147,12 @@ struct In<S> {
     kind: String,
     metadata: Metadata,
     spec: S,
+}
+
+/// The first of `names` that is a file in `dir`: how a project's config and a
+/// plugin's manifest are found, in the order the names are tried.
+pub fn file_in(dir: &Path, names: &[&str]) -> Option<PathBuf> {
+    names.iter().map(|n| dir.join(n)).find(|p| p.is_file())
 }
 
 /// A document in YAML, with the comment that makes editors validate it
