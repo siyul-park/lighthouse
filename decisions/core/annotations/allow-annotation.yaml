@@ -20,7 +20,15 @@ spec:
     requirement's `lighthouse:allow` is its alias), `lighthouse-disable-line
     <id> -- <reason>` its own line, and `lighthouse-disable <id> -- <reason>`
     everything from the comment to a matching `lighthouse-enable <id>` or to
-    the end of the file (the whole file at its top).
+    the end of the file (the whole file above the first line that is neither
+    blank nor a comment; imports are code).
+
+
+    ` -- ` separates the ids from the reason, as in ESLint, and ids are
+    separated by commas: `lighthouse-disable a/b, c/d -- why`. A documentation
+    comment (`///`, `//!`, `/** */`) never holds a directive. A directive
+    still written with an id a decision was renamed from works, with a
+    notice, until `spec migrate` rewrites it.
   scope:
     domain: code
     subject: symbol

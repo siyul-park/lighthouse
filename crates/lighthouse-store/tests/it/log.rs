@@ -110,7 +110,7 @@ fn log_lines_are_canonical_and_unchanged_by_reading() {
         ),
         "{line}"
     );
-    assert_eq!(value["spec"]["decisionName"], "design/a");
+    assert_eq!(value["spec"]["ruleId"], "design/a");
     assert!(
         !line.contains(": ") && !line.contains(", "),
         "compact: {line}"
@@ -316,7 +316,7 @@ fn a_verdict_record_converts_to_the_event_it_was_written_from() {
     let spec = lighthouse_store::VerdictSpec::from(&event);
     let back = lighthouse_store::ReviewEvent::from(spec.clone());
 
-    assert_eq!(spec.decision_name, "design/a");
+    assert_eq!(spec.rule_id, "design/a");
     assert_eq!(spec.decision_hash.as_deref(), Some("full1"));
     assert_eq!(back.fingerprint, event.fingerprint);
     assert_eq!(back.snapshot, event.snapshot);

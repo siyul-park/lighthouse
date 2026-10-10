@@ -135,12 +135,8 @@
             "null"
           ]
         },
-        "decisionName": {
-          "description": "The name the decision had when the verdict was given, kept to be read;\n`decision_uid` is what identifies it. Read as `ruleId` in records\nwritten before the uid existed.",
-          "type": "string"
-        },
         "decisionUid": {
-          "description": "The uid of the decision: its identity across renames.",
+          "description": "The uid of the decision: its identity across renames. Additive: a\nrecord without it is the record older builds wrote.",
           "type": [
             "string",
             "null"
@@ -191,6 +187,10 @@
         "reviewerKind": {
           "$ref": "#/$defs/ReviewerKind"
         },
+        "ruleId": {
+          "description": "The name the decision had when the verdict was given, kept to be read;\n`decision_uid` is what identifies it. The key stays `ruleId`, as every\nbuild before the uid wrote it, so older builds read the line, and\n`decisionName` is accepted too.",
+          "type": "string"
+        },
         "ruleVersion": {
           "type": [
             "string",
@@ -215,7 +215,7 @@
       },
       "required": [
         "fingerprint",
-        "decisionName",
+        "ruleId",
         "verdict",
         "reason",
         "reviewerKind",

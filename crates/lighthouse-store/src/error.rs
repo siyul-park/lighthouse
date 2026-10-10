@@ -29,6 +29,14 @@ pub enum Error {
         line: usize,
         reason: String,
     },
+    #[error(
+        "the verdicts of {legacy} already belong to {existing}; moving them to {refused} was refused"
+    )]
+    RewriteConflict {
+        legacy: String,
+        existing: String,
+        refused: String,
+    },
     #[error("no recorded finding matches `{0}`")]
     UnknownFinding(String),
     #[error(

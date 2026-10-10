@@ -123,6 +123,15 @@ impl Store {
         let mut summary = RunSummary::default();
         for observed in &run.observed {
             for legacy in &observed.legacy_fingerprints {
+                if let Some(existing) = rewrite_target(&tx, legacy)?
+                    && existing != observed.fingerprint
+                {
+                    self.notices.push(format!(
+                        "the old fingerprint {legacy} already belongs to {existing}, so {} was not given its verdicts; two decisions answered to one old id",
+                        observed.fingerprint
+                    ));
+                    continue;
+                }
                 let rewrite = adopt(&tx, legacy, observed, &mut summary)?;
                 if let (Some(rewrite), Some(path)) = (rewrite, &self.log) {
                     log::append_rewrite(path, &rewrite)?;
@@ -381,7 +390,16 @@ impl Store {
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         for rewrite in &read.rewrites {
-            apply_rewrite(&tx, rewrite)?;
+            if let Err(Error::RewriteConflict {
+                legacy,
+                existing,
+                refused,
+            }) = apply_rewrite(&tx, rewrite)
+            {
+                self.notices.push(format!(
+                    "the decision log moves the verdicts of {legacy} to {refused}, but they already belong to {existing}; the later rewrite was refused"
+                ));
+            }
         }
         for event in &logged {
             insert_event(&tx, event)?;
@@ -565,12 +583,34 @@ fn adopt(
     Ok(Some(rewrite))
 }
 
+/// Where the verdicts recorded under the fingerprint `legacy` were moved to.
+fn rewrite_target(tx: &Transaction, legacy: &str) -> Result<Option<String>, Error> {
+    Ok(tx
+        .query_row(
+            "SELECT current FROM fingerprint_rewrites WHERE legacy = ?1",
+            params![legacy],
+            |row| row.get(0),
+        )
+        .optional()?)
+}
+
 /// Reads the verdicts recorded under `rewrite.legacy` as belonging to
-/// `rewrite.current`. The first rewrite of a fingerprint wins.
+/// `rewrite.current`. The first rewrite of a fingerprint wins; a later one that
+/// says another target is a conflict and is refused.
 fn apply_rewrite(tx: &Transaction, rewrite: &RewriteSpec) -> Result<(), Error> {
+    match rewrite_target(tx, &rewrite.legacy)? {
+        Some(current) if current != rewrite.current => {
+            return Err(Error::RewriteConflict {
+                legacy: rewrite.legacy.clone(),
+                existing: current,
+                refused: rewrite.current.clone(),
+            });
+        }
+        Some(_) => return Ok(()),
+        None => {}
+    }
     tx.execute(
-        "INSERT OR IGNORE INTO fingerprint_rewrites (legacy, current, decision_uid) \
-         VALUES (?1, ?2, ?3)",
+        "INSERT INTO fingerprint_rewrites (legacy, current, decision_uid) VALUES (?1, ?2, ?3)",
         params![rewrite.legacy, rewrite.current, rewrite.decision_uid],
     )?;
     tx.execute(

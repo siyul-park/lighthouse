@@ -342,7 +342,7 @@ in `lighthouse/was-names`) and the current one, and the store moves what it kept
   (`review_events.subject`; the append-only rows are not edited) and the first run to see
   both appends a `Rewrite` record (`legacy`, `current`, `decisionUid`) to
   `decisions.jsonl`. Every other clone reads the same rewrite when it pulls the log, and
-  `log compact` folds the pair;
+  `log compact` (planned, not built yet) is to fold the pair;
 - a verdict never matched again keeps its legacy fingerprint and stays readable through
   `decisionUid`, which store migration V7 fills from the catalog's name-to-uid table (renamed-from
   names included);
@@ -465,6 +465,17 @@ the marker (the description follows ESLint's ` -- `):
 | `lighthouse-disable-line <id>[, <id>] -- <reason>` | its own line |
 | `lighthouse-disable <id>[, <id>] -- <reason>` | from the comment to a matching `lighthouse-enable`, or to the end of the file; above the first symbol of a file, the whole file |
 | `lighthouse-enable <id>[, <id>]` | ends the ranges of the named ids |
+
+Ids are separated by commas and the reason follows ` -- `, as in ESLint
+(`lighthouse-disable-next-line design/a, design/b -- why`). "The top of a file"
+is above the first line that is neither blank nor a comment, so a header
+comment may precede the directive and an import may not. A documentation
+comment (`///`, `//!`, `/** */`) never holds a directive. `-next-line` counts
+from the directive's own line; stacked directives each look at the line below
+themselves, and only one on the last line of its comment reaches the symbol
+declared there. An id a decision was renamed from still works, with a notice.
+The findings the engine reports about a directive keep their identity when its
+marker or ids are rewritten.
 
 There is no form without ids, and `lighthouse:allow` stays as an alias of
 `lighthouse-disable-next-line` (`spec migrate` rewrites it in source files). A directive

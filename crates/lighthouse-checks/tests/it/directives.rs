@@ -197,14 +197,125 @@ fn there_is_no_form_without_ids() {
 }
 
 #[test]
-fn two_directives_in_one_comment_each_count() {
+fn two_directives_in_one_comment_each_count_and_only_the_last_reaches_the_symbol_below() {
     let outcome = check(
         "// lighthouse-disable-next-line design/exported-doc -- one\n// lighthouse-disable-next-line design/no-banners -- two\npub fn open() {}\n",
         &format!("{DOC_RULE}{BANNERS}"),
     );
 
-    assert_eq!(rules_of(&outcome), ["core/no-unused-allow"]);
-    assert!(message_of(&outcome, "core/no-unused-allow").contains("design/no-banners"));
-    assert_eq!(outcome.diagnostics[0].span.start.line, 2);
+    // Like ESLint's, the first one is about the line after it: a comment.
+    assert_eq!(
+        rules_of(&outcome),
+        [
+            "core/no-unused-allow",
+            "core/no-unused-allow",
+            "design/exported-doc"
+        ]
+    );
+    assert!(outcome.allowed.is_empty());
+}
+
+#[test]
+fn a_directive_that_names_an_old_id_still_suppresses() {
+    let source = "// lighthouse-disable design/section-banners -- old id\nfn a() {\n    // ======== helpers ========\n    let _ = 1;\n}\n";
+    let outcome = check(source, "\"design/no-banners\" = \"warn\"\n");
+
+    assert!(outcome.diagnostics.is_empty(), "{:?}", outcome.diagnostics);
     assert_eq!(outcome.allowed.len(), 1);
+    assert!(
+        outcome
+            .notices
+            .iter()
+            .any(|n| n.contains("`design/section-banners` is now `design/no-banners`")),
+        "{:?}",
+        outcome.notices
+    );
+}
+
+#[test]
+fn a_disable_after_code_is_not_the_top_of_the_file() {
+    let outcome = check(
+        "use std::fmt;\npub fn early() {}\n// lighthouse-disable design/exported-doc -- from here\npub fn late() {}\n",
+        DOC_RULE,
+    );
+
+    assert_eq!(lines_of(&outcome, "design/exported-doc"), [2]);
+    assert_eq!(outcome.allowed.len(), 1);
+}
+
+#[test]
+fn a_disable_below_a_header_and_blank_lines_waives_the_whole_file() {
+    let outcome = check(
+        "// Copyright.\n\n// lighthouse-disable design/exported-doc -- generated\nuse std::fmt;\npub fn a() {}\npub fn b() {}\n",
+        DOC_RULE,
+    );
+
+    assert!(outcome.diagnostics.is_empty(), "{:?}", outcome.diagnostics);
+    assert_eq!(outcome.allowed.len(), 2);
+}
+
+#[test]
+fn a_file_without_symbols_has_no_special_top() {
+    let outcome = check(
+        "use std::fmt;\n// lighthouse-disable design/exported-doc -- nothing below\n",
+        DOC_RULE,
+    );
+
+    assert_eq!(rules_of(&outcome), ["core/no-unused-allow"]);
+}
+
+#[test]
+fn a_documentation_comment_holds_no_directive() {
+    let outcome = check(
+        "/// lighthouse-disable design/exported-doc\npub fn open() {}\n",
+        DOC_RULE,
+    );
+
+    assert!(
+        !rules_of(&outcome).contains(&"core/allow-reason"),
+        "{:?}",
+        outcome.diagnostics
+    );
+    assert!(outcome.allowed.is_empty());
+}
+
+#[test]
+fn next_line_is_counted_from_its_own_line_not_from_the_end_of_the_comment() {
+    let outcome = check(
+        "// lighthouse-disable-next-line design/exported-doc -- the next line is a comment\n// not the declaration\npub fn open() {}\n",
+        DOC_RULE,
+    );
+
+    assert_eq!(
+        rules_of(&outcome),
+        ["core/no-unused-allow", "design/exported-doc"]
+    );
+    assert!(outcome.allowed.is_empty());
+}
+
+#[test]
+fn a_finding_about_a_directive_keeps_its_identity_when_the_directive_is_rewritten() {
+    let before = check(
+        "// lighthouse:allow design/exported-doc\npub fn open() {}\n",
+        DOC_RULE,
+    );
+    let after = check(
+        "// lighthouse-disable-next-line design/exported-doc\npub fn open() {}\n",
+        DOC_RULE,
+    );
+    let fingerprint = |o: &Outcome| {
+        o.diagnostics
+            .iter()
+            .find(|d| d.rule_id == "core/allow-reason")
+            .map(|d| d.fingerprint.clone())
+            .unwrap()
+    };
+
+    assert_eq!(fingerprint(&before), fingerprint(&after));
+    let legacy = before
+        .diagnostics
+        .iter()
+        .find(|d| d.rule_id == "core/allow-reason")
+        .unwrap();
+    assert!(!legacy.legacy_fingerprints.is_empty());
 }

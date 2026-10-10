@@ -328,26 +328,38 @@ impl Catalog {
     }
 
     /// Each id a decision was renamed from, with the id it has now.
+    /// An id some decision has now is never an alias, whatever another
+    /// decision lists as renamed from it.
     pub fn aliases(&self) -> BTreeMap<String, String> {
+        let live = self.live_ids();
         self.decisions()
-            .flat_map(|d| d.was_names().map(|old| (old.to_owned(), d.id().to_owned())))
+            .flat_map(|d| {
+                d.was_names()
+                    .filter(|old| !live.contains(old))
+                    .map(|old| (old.to_owned(), d.id().to_owned()))
+            })
             .collect()
     }
 
     /// The uid of every decision by each id it answers to: its own and the ids
     /// it had before it was renamed. Decisions without a uid are left out.
     pub fn identities(&self) -> BTreeMap<String, String> {
+        let live = self.live_ids();
         self.decisions()
             .filter_map(|d| {
                 let uid = d.uid()?;
                 Some(
                     std::iter::once(d.id())
-                        .chain(d.was_names())
+                        .chain(d.was_names().filter(|n| !live.contains(n)))
                         .map(|name| (name.to_owned(), uid.to_owned())),
                 )
             })
             .flatten()
             .collect()
+    }
+
+    fn live_ids(&self) -> BTreeSet<&str> {
+        self.decisions().map(Decision::id).collect()
     }
 
     /// Identifies this set of decisions: the hash of every decision's id and

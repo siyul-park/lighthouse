@@ -132,6 +132,15 @@ impl Override {
     }
 }
 
+/// A rule id a configuration sets under the name a decision had.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Renamed {
+    pub old: String,
+    pub new: String,
+    /// The configuration set the new id too, and that setting was kept.
+    pub both: bool,
+}
+
 /// What a project says about rules: the projects it extends, its own `rules`
 /// and its `overrides`. An extended project is one of these and nothing more.
 #[derive(Debug, Clone, Default)]
@@ -173,10 +182,10 @@ impl Layer {
     }
 
     /// Renames the rules this layer sets (in `rules` and in every override)
-    /// by `names`, old id to new; returns the `(old, new)` pairs it renamed.
-    /// A rule already set under the new id keeps its own setting.
-    pub fn rename_rules(&mut self, names: &BTreeMap<String, String>) -> Vec<(String, String)> {
-        let mut renamed = Vec::new();
+    /// by `names`, old id to new; returns what it renamed. A rule already set
+    /// under the new id keeps its own setting, and the rename says so.
+    pub fn rename_rules(&mut self, names: &BTreeMap<String, String>) -> Vec<Renamed> {
+        let mut renamed: Vec<Renamed> = Vec::new();
         let sets =
             std::iter::once(&mut self.rules).chain(self.overrides.iter_mut().map(|o| &mut o.rules));
         for rules in sets {
@@ -184,9 +193,15 @@ impl Layer {
                 let Some(config) = rules.remove(old) else {
                     continue;
                 };
+                let both = rules.contains_key(new);
                 rules.entry(new.clone()).or_insert(config);
-                if !renamed.iter().any(|(o, _)| o == old) {
-                    renamed.push((old.clone(), new.clone()));
+                match renamed.iter_mut().find(|r| r.old == *old) {
+                    Some(seen) => seen.both |= both,
+                    None => renamed.push(Renamed {
+                        old: old.clone(),
+                        new: new.clone(),
+                        both,
+                    }),
                 }
             }
         }
@@ -286,6 +301,21 @@ impl Projects {
             }
         }
         Ok(Self { by_name })
+    }
+
+    /// Renames the rules every project sets by `names`; see
+    /// [`Layer::rename_rules`].
+    pub fn rename_rules(&mut self, names: &BTreeMap<String, String>) -> Vec<Renamed> {
+        let mut renamed: Vec<Renamed> = Vec::new();
+        for layer in self.by_name.values_mut() {
+            for r in layer.rename_rules(names) {
+                match renamed.iter_mut().find(|seen| seen.old == r.old) {
+                    Some(seen) => seen.both |= r.both,
+                    None => renamed.push(r),
+                }
+            }
+        }
+        renamed
     }
 
     /// The names, sorted.
@@ -464,7 +494,7 @@ impl Config {
 
     /// Renames the rules the project sets by `names`, old id to new; see
     /// [`Layer::rename_rules`].
-    pub fn rename_rules(&mut self, names: &BTreeMap<String, String>) -> Vec<(String, String)> {
+    pub fn rename_rules(&mut self, names: &BTreeMap<String, String>) -> Vec<Renamed> {
         self.layer.rename_rules(names)
     }
 

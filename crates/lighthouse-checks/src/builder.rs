@@ -351,13 +351,19 @@ impl<'a> Builder<'a> {
                 .comments_in(&symbol.file)
                 .iter()
                 .filter(|c| c.attached_to.as_ref() == Some(&symbol.id))
-                .filter_map(|c| {
-                    let allow = annotation::parse(&c.text)?;
-                    Some(json!({
-                        "rules": allow.rules,
-                        "reason": allow.reason.unwrap_or_default(),
-                        "line": c.span.start.line,
-                    }))
+                .flat_map(|c| {
+                    annotation::directives(&c.text)
+                        .into_iter()
+                        .filter(|(_, d)| d.form.needs_reason())
+                        .map(|(_, d)| {
+                            json!({
+                                "form": d.form.name(),
+                                "rules": d.rules,
+                                "reason": d.reason.unwrap_or_default(),
+                                "line": c.span.start.line,
+                            })
+                        })
+                        .collect::<Vec<_>>()
                 })
                 .collect(),
         )

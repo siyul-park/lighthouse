@@ -7,5 +7,6 @@ mod fixes;
 mod kinds;
 mod local;
 mod project;
+mod renames;
 mod sources;
 mod versions;

@@ -23,6 +23,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
+    aliases,
     annotations::{self, Allowed},
     documents,
     generated::Attributes,
@@ -242,14 +243,8 @@ impl Engine {
     ) -> Result<Self, Error> {
         let aliases = catalog.aliases();
         let mut config = config;
-        let mut notices: Vec<String> = config
-            .rename_rules(&aliases)
-            .into_iter()
-            .map(|(old, new)| {
-                format!("decision `{old}` is now `{new}`; the old id still works (`lighthouse spec migrate` rewrites it)")
-            })
-            .collect();
-        let projects = catalog.projects()?;
+        let mut projects = catalog.projects()?;
+        let mut notices = aliases::apply(&mut config, &mut projects, &aliases);
         validate_config(&registry, &config, &projects)?;
         let (providers, languages) = load_languages(&registry, &config)?;
         let root = root.canonicalize().map_err(io_error(root))?;
@@ -332,11 +327,20 @@ impl Engine {
         only: &[String],
         overlays: &Overlays,
     ) -> Result<Outcome, Error> {
+        let only_before = only;
         let only: Vec<String> = only
             .iter()
             .map(|id| self.aliases.get(id).unwrap_or(id).clone())
             .collect();
         let only = &only[..];
+        let mut asked_by_old_id: Vec<String> = Vec::new();
+        for (asked, now) in only_before.iter().zip(only) {
+            if asked != now {
+                asked_by_old_id.push(format!(
+                    "decision `{asked}` is now `{now}`; the old id still works"
+                ));
+            }
+        }
         for id in only {
             if self.registry.rule(id).is_none() {
                 return Err(Error::UnknownRule(id.clone()));
@@ -358,6 +362,7 @@ impl Engine {
 
         let mut outcome = Outcome::default();
         outcome.notices.extend(self.notices.iter().cloned());
+        outcome.notices.extend(asked_by_old_id);
         let mut timings = Timings::default();
         let mut incomplete = self.startup.clone();
         let scopes = match reported {
@@ -377,7 +382,9 @@ impl Engine {
             .iter()
             .any(|rule| self.documented.contains(&rule.manifest().id))
         {
-            project.with_documents(documents::find(&self.ws.root, overlays))
+            let found = documents::find(&self.ws.root, overlays);
+            outcome.notices.extend(found.notices);
+            project.with_documents(found.documents)
         } else {
             project
         };
@@ -406,13 +413,22 @@ impl Engine {
             .iter()
             .map(|r| (r.manifest().id.clone(), r.manifest()))
             .collect();
+        let texts: BTreeMap<&Path, &str> = inputs
+            .iter()
+            .map(|i| (i.file.path.as_path(), i.text.as_str()))
+            .collect();
+        let text = |path: &Path| texts.get(path).copied();
         let gate = annotations::Gate {
             level: &level,
             active: &self.active,
             selected: &ran,
             manifests: &manifests,
+            aliases: &self.aliases,
+            text: &text,
         };
-        let (mut found, allowed) = annotations::apply(found, &project, &gate)?;
+        let applied = annotations::apply(found, &project, &gate)?;
+        outcome.notices.extend(applied.notices);
+        let (mut found, allowed) = (applied.kept, applied.allowed);
         found.retain(|d| scopes.iter().any(|s| d.file.starts_with(s)));
         outcome.allowed = allowed
             .into_iter()

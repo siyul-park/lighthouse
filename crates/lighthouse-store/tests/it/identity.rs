@@ -140,9 +140,117 @@ fn a_verdict_records_the_uid_of_its_decision() {
     let line = log_of(dir.path());
 
     assert!(line.contains("\"decisionUid\":\"uid-a\""), "{line}");
-    assert!(line.contains("\"decisionName\":\"design/a\""), "{line}");
+    assert!(line.contains("\"ruleId\":\"design/a\""), "{line}");
+    assert!(!line.contains("decisionName"), "{line}");
 }
 
 fn rewrites_in(dir: &std::path::Path) -> usize {
     log_of(dir).matches("\"kind\":\"Rewrite\"").count()
+}
+
+#[test]
+fn a_cache_event_that_learned_its_uid_is_exported_as_it_was_written() {
+    let dir = tempfile::tempdir().unwrap();
+    {
+        let mut store = Store::open(dir.path()).unwrap();
+        store
+            .record(&run(vec![observed("f1", "design/a", "a.go")]))
+            .unwrap();
+        judge(&mut store, "f1", Verdict::Confirmed, Reason::Fixed);
+    }
+    // The line is lost; only the cache has the event. It then learns the uid.
+    fs::remove_file(Store::log_path_in(dir.path())).unwrap();
+    {
+        let mut store = Store::open(dir.path()).unwrap();
+        store
+            .identify(&[("design/a".to_owned(), "uid-a".to_owned())].into())
+            .unwrap();
+    }
+
+    // Opening re-exports the event; the id still matches what is written.
+    let store = Store::open(dir.path()).unwrap();
+    assert_eq!(store.history("f1").unwrap().len(), 1);
+    let line = log_of(dir.path());
+    assert!(line.contains("\"ruleId\":\"design/a\""), "{line}");
+    assert!(!line.contains("decisionUid"), "written as it was: {line}");
+    drop(store);
+    let again = Store::open(dir.path()).unwrap();
+    assert_eq!(again.history("f1").unwrap().len(), 1);
+    assert_eq!(
+        again.history("f1").unwrap()[0].decision_uid.as_deref(),
+        Some("uid-a")
+    );
+}
+
+#[test]
+fn two_decisions_that_answer_to_one_old_fingerprint_do_not_share_its_verdicts() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::open(dir.path()).unwrap();
+    store
+        .record(&run(vec![observed("legacy1", "design/a", "a.go")]))
+        .unwrap();
+    judge(
+        &mut store,
+        "legacy1",
+        Verdict::Rejected,
+        Reason::FalsePositive,
+    );
+    store
+        .record(&run(vec![adopted("new1", "legacy1", "uid-a")]))
+        .unwrap();
+
+    let second = store
+        .record(&run(vec![
+            adopted("new1", "legacy1", "uid-a"),
+            adopted("new2", "legacy1", "uid-b"),
+        ]))
+        .unwrap();
+
+    assert_eq!(second.rewritten, 0);
+    assert_eq!(standing_of(&store, "new1"), Some(Standing::Suppressed));
+    assert_eq!(
+        standing_of(&store, "new2"),
+        None,
+        "the verdict stays with the first"
+    );
+    assert_eq!(rewrites_in(dir.path()), 1);
+}
+
+#[test]
+fn a_log_that_moves_one_old_fingerprint_two_ways_is_refused_with_a_notice() {
+    let dir = tempfile::tempdir().unwrap();
+    {
+        let mut store = Store::open(dir.path()).unwrap();
+        store
+            .record(&run(vec![observed("legacy1", "design/a", "a.go")]))
+            .unwrap();
+        judge(
+            &mut store,
+            "legacy1",
+            Verdict::Rejected,
+            Reason::FalsePositive,
+        );
+        store
+            .record(&run(vec![adopted("new1", "legacy1", "uid-a")]))
+            .unwrap();
+    }
+    let log = log_of(dir.path());
+    let rewrite = log
+        .lines()
+        .find(|l| l.contains("\"kind\":\"Rewrite\""))
+        .unwrap();
+    let other = rewrite.replace("new1", "new2");
+    fs::write(Store::log_path_in(dir.path()), format!("{log}{other}\n")).unwrap();
+    fs::remove_file(Store::path_in(dir.path())).unwrap();
+
+    let store = Store::open(dir.path()).unwrap();
+
+    assert!(
+        store
+            .notices()
+            .iter()
+            .any(|n| n.contains("already belong to new1")),
+        "{:?}",
+        store.notices()
+    );
 }

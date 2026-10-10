@@ -44,8 +44,8 @@ pub use pack::{Pack, PackSpec, Section, SectionSpec};
 pub use project::{
     Config, FILE_NAME, FILE_NAMES, Formatter, FormatterOutput, FormatterSpec, FormatterStdin,
     GeneratedCheck, GeneratedSpec, GlobSet, Layer, Level, OverrideSpec, PluginEntry, PluginRef,
-    PluginRefSpec, ProjectError, ProjectLanguage, ProjectSpec, Projects, RuleConfig, RuleDetail,
-    RuleSetting, Rules, glob_set,
+    PluginRefSpec, ProjectError, ProjectLanguage, ProjectSpec, Projects, Renamed, RuleConfig,
+    RuleDetail, RuleSetting, Rules, glob_set,
 };
 pub use render::{DOCS_DIR, decision_markdown, docs, help_path};
 pub use sources::{SourceLine, SourceMapSpec};

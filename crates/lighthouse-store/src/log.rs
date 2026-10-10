@@ -40,11 +40,13 @@ pub(crate) const LEGACY_PREFIX: &str = "legacy-";
 pub struct VerdictSpec {
     pub fingerprint: String,
     /// The name the decision had when the verdict was given, kept to be read;
-    /// `decision_uid` is what identifies it. Read as `ruleId` in records
-    /// written before the uid existed.
-    #[serde(alias = "ruleId")]
-    pub decision_name: String,
-    /// The uid of the decision: its identity across renames.
+    /// `decision_uid` is what identifies it. The key stays `ruleId`, as every
+    /// build before the uid wrote it, so older builds read the line, and
+    /// `decisionName` is accepted too.
+    #[serde(alias = "decisionName")]
+    pub rule_id: String,
+    /// The uid of the decision: its identity across renames. Additive: a
+    /// record without it is the record older builds wrote.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decision_uid: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -88,7 +90,7 @@ impl Spec for VerdictSpec {
 /// The spec of the `Rewrite` record: verdicts recorded under the fingerprint
 /// `legacy`, which the decision's name seeded, belong to `current`, which its
 /// uid seeds. Appended by the first run that finds a finding under both; the
-/// verdicts it moves are not edited, and `log compact` folds the pair.
+/// verdicts it moves are not edited, and the planned `log compact` is to fold the pair.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RewriteSpec {
@@ -108,7 +110,7 @@ impl From<VerdictSpec> for ReviewEvent {
         Self {
             id: String::new(),
             fingerprint: spec.fingerprint,
-            rule_id: spec.decision_name,
+            rule_id: spec.rule_id,
             decision_uid: spec.decision_uid,
             rule_version: spec.rule_version,
             check_revision: spec.check_revision,
@@ -133,14 +135,10 @@ impl From<VerdictSpec> for ReviewEvent {
 
 impl ReviewEvent {
     /// The event as reports show it: the keys of a `Verdict` record in
-    /// lowerCamelCase, with the event's `id` and its `label`, and the decision
-    /// name as `ruleId`.
+    /// lowerCamelCase, with the event's `id` and its `label`.
     pub fn to_json(&self) -> Value {
         let mut value =
             serde_json::to_value(VerdictSpec::from(self)).expect("a verdict serializes");
-        if let Some(name) = value.as_object_mut().and_then(|m| m.remove("decisionName")) {
-            value["ruleId"] = name;
-        }
         value["id"] = Value::String(self.id.clone());
         value["label"] = serde_json::json!(self.label());
         value
@@ -151,7 +149,7 @@ impl From<&ReviewEvent> for VerdictSpec {
     fn from(event: &ReviewEvent) -> Self {
         Self {
             fingerprint: event.fingerprint.clone(),
-            decision_name: event.rule_id.clone(),
+            rule_id: event.rule_id.clone(),
             decision_uid: event.decision_uid.clone(),
             rule_version: event.rule_version.clone(),
             check_revision: event.check_revision.clone(),
@@ -197,9 +195,19 @@ pub(crate) fn seal(event: &mut ReviewEvent) -> Result<(), Error> {
 }
 
 /// The line of an event: a canonical `Verdict` record with keys in sorted
-/// order, so that the same event is always the same bytes.
+/// order, so that the same event is always the same bytes. The id is the hash
+/// of the spec as it was written, so an event whose cache row learned its
+/// decision's uid after it was written (store migration, `identify`) is written
+/// without the uid again: the id must keep matching what the line says.
 pub(crate) fn line(event: &ReviewEvent) -> Result<String, Error> {
-    let record = Resource::new(Metadata::named(&event.id), VerdictSpec::from(event));
+    let mut spec = VerdictSpec::from(event);
+    if spec.decision_uid.is_some()
+        && !event.id.starts_with(LEGACY_PREFIX)
+        && id_of(event)? != event.id
+    {
+        spec.decision_uid = None;
+    }
+    let record = Resource::new(Metadata::named(&event.id), spec);
     Ok(digest::canonical(&serde_json::to_value(record)?))
 }
 

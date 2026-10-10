@@ -7,7 +7,8 @@ const REASON_SEPARATOR: &str = "--";
 
 /// The markers a directive starts with, longest first so that
 /// `lighthouse-disable-next-line` is not read as `lighthouse-disable`.
-const MARKERS: [(&str, Form); 5] = [
+/// Every marker a directive can start with, longest first, with its form.
+pub const MARKERS: [(&str, Form); 5] = [
     ("lighthouse-disable-next-line", Form::NextLine),
     ("lighthouse-disable-line", Form::Line),
     ("lighthouse-disable", Form::Disable),
@@ -36,6 +37,17 @@ pub enum Form {
 }
 
 impl Form {
+    /// The spelling in facts and messages: `disable`, `enable`,
+    /// `disable-next-line` or `disable-line`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Disable => "disable",
+            Self::Enable => "enable",
+            Self::NextLine => "disable-next-line",
+            Self::Line => "disable-line",
+        }
+    }
+
     /// Whether the form needs a reason: every form that disables.
     pub fn needs_reason(self) -> bool {
         self != Self::Enable
@@ -57,14 +69,18 @@ pub struct Directive {
 }
 
 /// The first directive in a comment's text, if a line of it is one. Prose that
-/// merely mentions a marker mid-line is not a directive.
+/// merely mentions a marker mid-line is not a directive, and a documentation
+/// comment (`///`, `//!`, `/** */`, `/*! */`) never holds one.
 pub fn parse(comment: &str) -> Option<Directive> {
-    comment.lines().find_map(parse_line)
+    directives(comment).into_iter().next().map(|(_, d)| d)
 }
 
 /// Every directive of a comment's text with the index of its line in the text:
 /// adjacent line comments form one comment, and each line may hold one.
 pub fn directives(comment: &str) -> Vec<(usize, Directive)> {
+    if documents(comment) {
+        return Vec::new();
+    }
     comment
         .lines()
         .enumerate()
@@ -72,12 +88,38 @@ pub fn directives(comment: &str) -> Vec<(usize, Directive)> {
         .collect()
 }
 
-/// The index of the line of a comment's text that holds the first directive.
-pub fn line_of(comment: &str) -> Option<usize> {
-    comment.lines().position(|line| parse_line(line).is_some())
+/// The comment text with every directive line written in one form: the old
+/// marker, the ids by the names `ids` gives them, and the reason. Two
+/// spellings of the same directives give the same text, so a finding about it
+/// keeps its identity when the marker or an id is rewritten.
+pub fn canonical(comment: &str, ids: &dyn Fn(&str) -> String) -> String {
+    let doc = documents(comment);
+    let lines: Vec<String> = comment
+        .lines()
+        .map(|line| match parse_line(line).filter(|_| !doc) {
+            Some(d) => {
+                let rules: Vec<String> = d.rules.iter().map(|r| ids(r)).collect();
+                match d.reason {
+                    Some(reason) => format!("lighthouse:allow {} -- {reason}", rules.join(", ")),
+                    None => format!("lighthouse:allow {}", rules.join(", ")),
+                }
+            }
+            None => line.to_owned(),
+        })
+        .collect();
+    lines.join("\n")
+}
+
+/// Whether the comment documents an item rather than annotates code.
+fn documents(comment: &str) -> bool {
+    (comment.starts_with("/**") && !comment.starts_with("/**/")) || comment.starts_with("/*!")
 }
 
 fn parse_line(line: &str) -> Option<Directive> {
+    let start = line.trim_start();
+    if (start.starts_with("///") && !start.starts_with("////")) || start.starts_with("//!") {
+        return None;
+    }
     let line = line.trim_start_matches(|c: char| c.is_whitespace() || "/*#!".contains(c));
     let (marker, form, rest) = MARKERS.iter().find_map(|&(marker, form)| {
         let rest = line.strip_prefix(marker)?;

@@ -37,6 +37,20 @@ pub(crate) struct Gate<'a> {
     /// The manifest of each rule that ran: its uid and former names seed the
     /// fingerprints of the findings the engine reports itself.
     pub manifests: &'a BTreeMap<String, &'a RuleManifest>,
+    /// Ids decisions were renamed from, with their current ids: a directive
+    /// that names an old id still means the decision.
+    pub aliases: &'a BTreeMap<String, String>,
+    /// The text of a file of the run.
+    pub text: &'a dyn Fn(&Path) -> Option<&'a str>,
+}
+
+/// What applying the directives came to.
+pub(crate) struct Applied {
+    /// The findings that remain, and the findings about directives.
+    pub kept: Vec<Diagnostic>,
+    pub allowed: Vec<Allowed>,
+    /// What the user should know: old ids a directive still uses.
+    pub notices: BTreeSet<String>,
 }
 
 /// A directive on a line of a comment of the file being read.
@@ -52,8 +66,9 @@ struct Located<'a> {
 /// Which findings a claim reaches.
 #[derive(Clone, Copy)]
 enum Reach {
-    /// The symbol the comment documents, the line after it, its own line.
-    Comment,
+    /// The line after the directive and its own line; and the symbol the
+    /// comment documents, when the directive is the last line of the comment.
+    NextLine(u32),
     /// The directive's own line.
     Line(u32),
     /// From a line to the matching `lighthouse-enable` (exclusive), or to the
@@ -64,25 +79,27 @@ enum Reach {
 /// One rule named by one directive that disables it.
 struct Claim<'a> {
     at: &'a Located<'a>,
-    rule: &'a str,
+    /// The decision's current id.
+    rule: String,
     reach: Reach,
 }
 
 /// The directives of one file read in source order: what each disables, which
 /// ranges are open, and the findings about directives that are wrong.
-struct Reader<'a> {
-    gate: &'a Gate<'a>,
+struct Reader<'a, 'g> {
+    gate: &'g Gate<'g>,
     lang: &'a str,
-    /// The line of the file's first symbol; a `lighthouse-disable` above it
-    /// is at the top of the file.
-    first_symbol: u32,
+    /// The line of the file's first code; a `lighthouse-disable` above it is
+    /// at the top of the file.
+    first_code: u32,
     claims: Vec<Claim<'a>>,
     /// The claims of the ranges still open, by rule.
-    open: BTreeMap<&'a str, Vec<usize>>,
+    open: BTreeMap<String, Vec<usize>>,
     extra: Vec<Diagnostic>,
+    notices: BTreeSet<String>,
 }
 
-impl<'a> Reader<'a> {
+impl<'a> Reader<'a, '_> {
     fn read(&mut self, at: &'a Located<'a>) -> Result<(), ProjectError> {
         let directive = &at.directive;
         if directive.rules.is_empty() {
@@ -102,22 +119,25 @@ impl<'a> Reader<'a> {
             );
             return self.note(at, ANNOTATION_REASON, message);
         }
-        for rule in &directive.rules {
-            let reach = match directive.form {
-                Form::Line => Reach::Line(at.line),
-                Form::Disable => Reach::Range {
-                    from: if at.line < self.first_symbol {
+        for id in &directive.rules {
+            let rule = self.canonical(id);
+            let reach = if directive.form == Form::Line {
+                Reach::Line(at.line)
+            } else if directive.form == Form::Disable {
+                Reach::Range {
+                    from: if at.line < self.first_code {
                         1
                     } else {
                         at.line
                     },
                     to: None,
-                },
-                Form::NextLine | Form::Enable => Reach::Comment,
+                }
+            } else {
+                Reach::NextLine(at.line)
             };
             if matches!(reach, Reach::Range { .. }) {
                 self.open
-                    .entry(rule.as_str())
+                    .entry(rule.clone())
                     .or_default()
                     .push(self.claims.len());
             }
@@ -129,8 +149,9 @@ impl<'a> Reader<'a> {
     /// `lighthouse-enable` ends the open ranges of the rules it names; one
     /// that closes nothing is reported.
     fn enable(&mut self, at: &'a Located<'a>) -> Result<(), ProjectError> {
-        for rule in &at.directive.rules {
-            let Some(ranges) = self.open.remove(rule.as_str()) else {
+        for id in &at.directive.rules {
+            let rule = self.canonical(id);
+            let Some(ranges) = self.open.remove(&rule) else {
                 let message = format!(
                     "`{} {rule}` has no matching `lighthouse-disable`; remove it",
                     at.directive.marker
@@ -147,6 +168,19 @@ impl<'a> Reader<'a> {
         Ok(())
     }
 
+    /// The decision's current id for an id a directive names.
+    fn canonical(&mut self, id: &str) -> String {
+        match self.gate.aliases.get(id) {
+            Some(new) => {
+                self.notices.insert(format!(
+                    "decision `{id}` is now `{new}`; a directive still names the old id (`lighthouse spec migrate` rewrites it)"
+                ));
+                new.clone()
+            }
+            None => id.to_owned(),
+        }
+    }
+
     fn note(&mut self, at: &Located, rule: &str, message: String) -> Result<(), ProjectError> {
         self.extra
             .extend(finding(self.gate, at, self.lang, rule, message)?);
@@ -160,31 +194,30 @@ impl<'a> Reader<'a> {
 /// ignored and reported, and so is one that suppresses nothing, an
 /// unmatched `lighthouse-enable` and one that names no rule, when the rules
 /// for them are enabled.
-pub(crate) fn apply(
+pub(crate) fn apply<'g>(
     found: Vec<Diagnostic>,
     project: &Project,
-    gate: &Gate,
-) -> Result<(Vec<Diagnostic>, Vec<Allowed>), ProjectError> {
+    gate: &'g Gate<'g>,
+) -> Result<Applied, ProjectError> {
     let mut found: Vec<Option<Diagnostic>> = found.into_iter().map(Some).collect();
     let mut allowed = Vec::new();
     let mut extra = Vec::new();
+    let mut notices = BTreeSet::new();
     for file in &project.files {
         let located = locate(project, &file.path);
         if located.is_empty() {
             continue;
         }
-        let first_symbol = project
-            .symbols_in(&file.path)
-            .map(|s| s.span.start.line)
-            .min()
-            .unwrap_or(u32::MAX);
+        let first_code = (gate.text)(&file.path)
+            .map_or(u32::MAX, |text| first_code_line(project, &file.path, text));
         let mut reader = Reader {
             gate,
             lang: &file.lang,
-            first_symbol,
+            first_code,
             claims: Vec::new(),
             open: BTreeMap::new(),
             extra: Vec::new(),
+            notices: BTreeSet::new(),
         };
         for at in &located {
             reader.read(at)?;
@@ -192,9 +225,11 @@ pub(crate) fn apply(
         let Reader {
             claims,
             extra: noted,
+            notices: renamed,
             ..
         } = reader;
         extra.extend(noted);
+        notices.extend(renamed);
         for claim in &claims {
             let taken = take(&mut found, &file.path, claim);
             extra.extend(unused_note(gate, &file.lang, claim, taken.is_empty())?);
@@ -207,30 +242,11 @@ pub(crate) fn apply(
     }
     let mut kept: Vec<Diagnostic> = found.into_iter().flatten().collect();
     kept.extend(extra);
-    Ok((kept, allowed))
-}
-
-/// The finding about a claim that suppressed nothing, when its rule could
-/// have fired.
-fn unused_note(
-    gate: &Gate,
-    lang: &str,
-    claim: &Claim,
-    nothing: bool,
-) -> Result<Option<Diagnostic>, ProjectError> {
-    if !nothing || !unused(gate, claim.rule) {
-        return Ok(None);
-    }
-    let marker = claim.at.directive.marker;
-    let place = match claim.reach {
-        Reach::Range { .. } => "in its range",
-        Reach::Comment | Reach::Line(_) => "here",
-    };
-    let message = format!(
-        "`{marker} {}` suppresses nothing {place}; remove it",
-        claim.rule
-    );
-    finding(gate, claim.at, lang, UNUSED_ALLOW, message)
+    Ok(Applied {
+        kept,
+        allowed,
+        notices,
+    })
 }
 
 /// The directives of the comments of `file`, in source order.
@@ -244,11 +260,34 @@ fn locate<'a>(project: &'a Project, file: &Path) -> Vec<Located<'a>> {
                 .map(move |(index, directive)| Located {
                     comment,
                     index,
-                    line: comment.span.start.line + u32::try_from(index).unwrap_or(0),
+                    line: comment.span.start.line + count(index),
                     directive,
                 })
         })
         .collect()
+}
+
+/// The finding about a claim that suppressed nothing, when its rule could
+/// have fired.
+fn unused_note(
+    gate: &Gate,
+    lang: &str,
+    claim: &Claim,
+    nothing: bool,
+) -> Result<Option<Diagnostic>, ProjectError> {
+    if !nothing || !unused(gate, &claim.rule) {
+        return Ok(None);
+    }
+    let marker = claim.at.directive.marker;
+    let place = match claim.reach {
+        Reach::Range { .. } => "in its range",
+        Reach::NextLine(_) | Reach::Line(_) => "here",
+    };
+    let message = format!(
+        "`{marker} {}` suppresses nothing {place}; remove it",
+        claim.rule
+    );
+    finding(gate, claim.at, lang, UNUSED_ALLOW, message)
 }
 
 /// Removes and returns the findings of the claim's rule that it reaches.
@@ -268,24 +307,23 @@ fn take(found: &mut [Option<Diagnostic>], file: &Path, claim: &Claim) -> Vec<Dia
 fn reaches(claim: &Claim, d: &Diagnostic) -> bool {
     let line = d.span.start.line;
     match claim.reach {
-        Reach::Comment => covers(claim.at.comment, d),
+        Reach::NextLine(at) => line == at || line == at + 1 || documents(claim, d),
         Reach::Line(at) => line == at,
         Reach::Range { from, to } => line >= from && to.is_none_or(|to| line < to),
     }
 }
 
-/// Whether the comment documents the finding's symbol or sits on the finding's
-/// line or the line before it.
-fn covers(comment: &Comment, d: &Diagnostic) -> bool {
-    if comment.file != d.file {
-        return false;
-    }
-    let attached = comment
-        .attached_to
-        .as_ref()
-        .is_some_and(|id| d.symbol.as_deref() == Some(id.as_str()));
-    let line = d.span.start.line;
-    attached || comment.span.start.line == line || comment.span.end.line + 1 == line
+/// Whether the finding is about the symbol the claim's comment documents: a
+/// directive on the last line of its comment reaches the symbol declared
+/// below it, doc comments and attributes in between included.
+fn documents(claim: &Claim, d: &Diagnostic) -> bool {
+    let comment = claim.at.comment;
+    claim.at.line == comment.span.end.line
+        && comment.file == d.file
+        && comment
+            .attached_to
+            .as_ref()
+            .is_some_and(|id| d.symbol.as_deref() == Some(id.as_str()))
 }
 
 /// A directive for `rule` is unused when the rule could have fired: it ran,
@@ -308,18 +346,21 @@ fn finding(
     let Some(severity) = (gate.level)(rule, &comment.file, lang)? else {
         return Ok(None);
     };
-    let mut text: String = comment
-        .text
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ");
+    let words = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+    // The identity does not depend on how a directive is spelled: its marker
+    // and the ids it names (old or new) are written one way.
+    let canonical = annotation::canonical(&comment.text, &|id| {
+        gate.aliases.get(id).map_or(id, String::as_str).to_owned()
+    });
+    let mut current = words(&canonical);
     if at.index > 0 {
-        text.push_str(&format!(" #{}", at.index));
+        current.push_str(&format!(" #{}", at.index));
     }
+    let raw = words(&comment.text);
     let path = comment.file.to_string_lossy();
     let (fingerprint, legacy) = match gate.manifests.get(rule) {
-        Some(meta) => meta.fingerprints(&path, &text),
-        None => (Fingerprint::of(rule, &path, &text), Vec::new()),
+        Some(meta) => meta.fingerprints_for(&path, &current, &raw),
+        None => (Fingerprint::of(rule, &path, &current), Vec::new()),
     };
     let mut d = Diagnostic::new(
         rule,
@@ -345,7 +386,7 @@ fn place(at: &Located) -> Span {
         return at.comment.span;
     }
     let line = at.comment.text.lines().nth(at.index).unwrap_or_default();
-    let width = u32::try_from(line.trim_end().len()).unwrap_or(0);
+    let width = count(line.trim_end().len());
     Span {
         start: Position {
             line: at.line,
@@ -377,7 +418,7 @@ fn annotation_span(at: &Located) -> Span {
         };
     }
     let first = comment.text.lines().next().unwrap_or_default();
-    let width = u32::try_from(first.trim_end_matches('\r').len()).unwrap_or(0);
+    let width = count(first.trim_end_matches('\r').len());
     Span {
         start: comment.span.start,
         end: Position {
@@ -385,4 +426,28 @@ fn annotation_span(at: &Located) -> Span {
             col: comment.span.start.col + width,
         },
     }
+}
+
+/// The line of the first thing in a file that is neither blank nor comment: a
+/// `lighthouse-disable` above it is at the top of the file. Imports are code.
+fn first_code_line(project: &Project, file: &Path, text: &str) -> u32 {
+    let comments = project.comments_in(file);
+    let covered = |line: u32, content: &str| {
+        comments.iter().any(|c| {
+            let (start, end) = (c.span.start, c.span.end);
+            let before = (content.len()).min(start.col.saturating_sub(1) as usize);
+            let standalone = start.line < line || content[..before].trim().is_empty();
+            line >= start.line && line <= end.line && standalone
+        })
+    };
+    text.lines()
+        .enumerate()
+        .map(|(at, content)| (count(at) + 1, content))
+        .find(|(line, content)| !content.trim().is_empty() && !covered(*line, content))
+        .map_or(u32::MAX, |(line, _)| line)
+}
+
+/// A line count as the `u32` positions are in; a comment is never that long.
+fn count(n: usize) -> u32 {
+    u32::try_from(n).expect("a comment has fewer lines than a u32 position can number")
 }

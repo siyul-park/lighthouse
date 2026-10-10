@@ -262,3 +262,33 @@ fn rule_manifest_fingerprints_are_seeded_by_the_uid_and_keep_the_names_that_seed
         "a rename moves no fingerprint"
     );
 }
+
+#[test]
+fn rule_manifest_fingerprints_for_hashes_the_legacy_names_over_the_legacy_snippet() {
+    let meta = lighthouse_plugin::RuleManifest {
+        id: "design/new".to_owned(),
+        uid: Some("5d6b1c1e-2b0e-4a43-9a3e-0f1b6f5d2a11".to_owned()),
+        was: vec!["design/old".to_owned()],
+        severity: lighthouse_model::Severity::Warn,
+        scope: RunScope::File,
+        description: String::new(),
+        docs: String::new(),
+        analyzers: Vec::new(),
+        capabilities: Vec::new(),
+        applicability: lighthouse_model::Applicability::default(),
+    };
+
+    let (current, legacy) = meta.fingerprints_for("a.rs", "now", "then");
+
+    assert_eq!(
+        current,
+        lighthouse_model::Fingerprint::of(meta.uid.as_deref().unwrap(), "a.rs", "now")
+    );
+    assert_eq!(
+        legacy,
+        [
+            lighthouse_model::Fingerprint::of("design/new", "a.rs", "then"),
+            lighthouse_model::Fingerprint::of("design/old", "a.rs", "then"),
+        ]
+    );
+}

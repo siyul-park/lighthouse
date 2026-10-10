@@ -236,12 +236,23 @@ impl RuleManifest {
         symbol_path: &str,
         snippet: &str,
     ) -> (Fingerprint, Vec<Fingerprint>) {
+        self.fingerprints_for(symbol_path, snippet, snippet)
+    }
+
+    /// Like [`RuleManifest::fingerprints`], for a finding whose identity is
+    /// now `snippet` but was `legacy_snippet` when the names seeded it.
+    pub fn fingerprints_for(
+        &self,
+        symbol_path: &str,
+        snippet: &str,
+        legacy_snippet: &str,
+    ) -> (Fingerprint, Vec<Fingerprint>) {
         match &self.uid {
             Some(uid) => (
                 Fingerprint::of(uid, symbol_path, snippet),
                 std::iter::once(&self.id)
                     .chain(&self.was)
-                    .map(|name| Fingerprint::of(name, symbol_path, snippet))
+                    .map(|name| Fingerprint::of(name, symbol_path, legacy_snippet))
                     .collect(),
             ),
             None => (Fingerprint::of(&self.id, symbol_path, snippet), Vec::new()),

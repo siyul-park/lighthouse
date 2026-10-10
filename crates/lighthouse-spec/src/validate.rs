@@ -26,6 +26,7 @@ pub(crate) fn decisions(catalog: &Catalog) -> Result<(), Error> {
     }
     let mut ids = BTreeSet::new();
     let mut uids = BTreeMap::new();
+    renamed_from(catalog)?;
     for decision in catalog.decisions() {
         if !ids.insert(decision.id()) {
             return Err(Error::invalid(decision.id(), "defined twice"));
@@ -516,6 +517,35 @@ fn sources(catalog: &Catalog) -> Result<(), Error> {
                 &source.reference,
                 format!("maps to unknown decision `{id}`"),
             ));
+        }
+    }
+    Ok(())
+}
+
+/// The ids a decision was renamed from (`lighthouse/was-names`) are its own:
+/// none is its current id, the id of another decision, or listed by another
+/// decision. Otherwise two decisions would answer to one id, and the
+/// fingerprints recorded under it would belong to both.
+fn renamed_from(catalog: &Catalog) -> Result<(), Error> {
+    let live: BTreeSet<&str> = catalog.decisions().map(|d| d.id()).collect();
+    let mut owners: BTreeMap<&str, &str> = BTreeMap::new();
+    for decision in catalog.decisions() {
+        for old in decision.was_names() {
+            let fail = |reason: String| {
+                Error::invalid(
+                    decision.id(),
+                    format!("`lighthouse/was-names` lists `{old}`, which {reason}"),
+                )
+            };
+            if old == decision.id() {
+                return Err(fail("is its own id".to_owned()));
+            }
+            if live.contains(old) {
+                return Err(fail("is the id of a decision that exists".to_owned()));
+            }
+            if let Some(other) = owners.insert(old, decision.id()) {
+                return Err(fail(format!("`{other}` lists too")));
+            }
         }
     }
     Ok(())

@@ -36,7 +36,7 @@
       "type": "object"
     },
     "RewriteSpec": {
-      "description": "The spec of the `Rewrite` record: verdicts recorded under the fingerprint\n`legacy`, which the decision's name seeded, belong to `current`, which its\nuid seeds. Appended by the first run that finds a finding under both; the\nverdicts it moves are not edited, and `log compact` folds the pair.",
+      "description": "The spec of the `Rewrite` record: verdicts recorded under the fingerprint\n`legacy`, which the decision's name seeded, belong to `current`, which its\nuid seeds. Appended by the first run that finds a finding under both; the\nverdicts it moves are not edited, and the planned `log compact` is to fold the pair.",
       "properties": {
         "current": {
           "type": "string"
