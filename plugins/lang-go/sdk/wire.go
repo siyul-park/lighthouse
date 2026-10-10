@@ -61,10 +61,17 @@ type Overlay struct {
 	Text string `json:"text"`
 }
 
+// CacheRef is the directory a provider may keep derived results in.
+type CacheRef struct {
+	Dir string `json:"dir"`
+}
+
 // Context carries the per-language options of lighthouse.toml.
 type Context struct {
 	Options  map[string]json.RawMessage `json:"options"`
 	Overlays []Overlay                  `json:"overlays,omitempty"`
+	// Cache is absent when the host runs without a cache.
+	Cache *CacheRef `json:"cache,omitempty"`
 }
 
 // IndexParams is the request of the `index` method.

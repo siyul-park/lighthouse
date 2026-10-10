@@ -304,7 +304,8 @@ func (r *run) claim(pkgs []*packages.Package, res *resolver) []*unit {
 // declared interface it satisfies, by value or by pointer.
 func (r *run) implements(units []*unit) {
 	interfaces, concrete := r.declaredTypes(units)
-	sort.Slice(concrete, func(i, j int) bool { return concrete[i].obj.Pos() < concrete[j].obj.Pos() })
+	sort.Slice(concrete, func(i, j int) bool { return declaredBefore(concrete[i], concrete[j]) })
+	sort.Slice(interfaces, func(i, j int) bool { return declaredBefore(interfaces[i], interfaces[j]) })
 	for _, t := range concrete {
 		for _, i := range interfaces {
 			iface := i.obj.Type().Underlying().(*types.Interface)
@@ -320,6 +321,19 @@ func (r *run) implements(units []*unit) {
 			})
 		}
 	}
+}
+
+// declaredBefore orders types by where they are declared, which does not
+// depend on the order in which the go command's packages were parsed.
+func declaredBefore(a, b declaredType) bool {
+	pa, pb := a.unit.fset.PositionFor(a.obj.Pos(), false), b.unit.fset.PositionFor(b.obj.Pos(), false)
+	if pa.Filename != pb.Filename {
+		return pa.Filename < pb.Filename
+	}
+	if pa.Offset != pb.Offset {
+		return pa.Offset < pb.Offset
+	}
+	return a.obj.Id() < b.obj.Id()
 }
 
 // declaredTypes splits the types the units declare into interfaces worth
