@@ -9,10 +9,10 @@ use lighthouse_session::{Session, skill_for};
 #[test]
 fn skill_for_lists_every_rule_the_engines_registry_enables() {
     let dir = tempfile::tempdir().unwrap();
-    let plugin = lighthouse_testkit::lang_rust();
+    let plugin = lighthouse_test_support::lang_rust();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_testkit::project(&format!(
+        lighthouse_test_support::project(&format!(
             "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"core\", \"design\", \"testing\"]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"]\n",
             plugin.to_str().unwrap()
         )),

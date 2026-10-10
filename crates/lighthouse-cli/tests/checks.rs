@@ -37,7 +37,7 @@ fn project(rule: &str) -> TempDir {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project(
+        &lighthouse_test_support::project(
             "plugins = [\"core\", \"local\"]\n[rules]\n\"local/probe\" = \"error\"\n",
         ),
     );

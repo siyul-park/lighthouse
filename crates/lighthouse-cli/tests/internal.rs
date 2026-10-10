@@ -53,12 +53,12 @@ fn messages<'a>(found: &'a [(String, String)], rule: &str) -> Vec<&'a str> {
 }
 
 fn go_project() -> Option<TempDir> {
-    let plugin = lighthouse_testkit::lang_go()?;
+    let plugin = lighthouse_test_support::lang_go()?;
     let dir = tempfile::tempdir().unwrap();
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project(&format!(
+        &lighthouse_test_support::project(&format!(
             "plugins = [{PACKS}, {{ id = \"lang-go\", path = {:?} }}]\nextends = {PRESETS}\n",
             plugin.to_str().unwrap()
         )),
@@ -103,11 +103,11 @@ fn go_judges_the_exported_symbols_of_an_internal_package() {
 #[test]
 fn rust_does_not_judge_crate_visible_items() {
     let dir = tempfile::tempdir().unwrap();
-    let plugin = lighthouse_testkit::lang_rust();
+    let plugin = lighthouse_test_support::lang_rust();
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project(&format!(
+        &lighthouse_test_support::project(&format!(
             "plugins = [{PACKS}, {{ id = \"lang-rust\", path = {:?} }}]\nextends = {PRESETS}\n",
             plugin.to_str().unwrap()
         )),

@@ -25,7 +25,7 @@ pub fn test(ids: &[String], language: Option<&str>, config: Option<&Path>) -> Re
 }
 
 pub fn list(all: bool) -> Result<u8> {
-    let registry = lighthouse_builtin::registry();
+    let registry = lighthouse_checks::registry();
     for DecisionRow {
         id,
         status,
@@ -43,7 +43,7 @@ pub fn list(all: bool) -> Result<u8> {
 }
 
 pub fn explain(id: &str) -> Result<u8> {
-    let registry = lighthouse_builtin::registry();
+    let registry = lighthouse_checks::registry();
     print!(
         "{}",
         lighthouse_session::explain(Catalog::bundled(), &registry, id)?

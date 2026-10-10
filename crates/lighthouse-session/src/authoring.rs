@@ -10,9 +10,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_declarative::{local_dir, local_files};
 use lighthouse_resource::{API_VERSION, SCHEMA_URL_BASE, resource, to_document};
-use lighthouse_spec::{Catalog, DecisionOverrideSpec};
+use lighthouse_spec::{Catalog, DecisionOverrideSpec, local_dir, local_files};
 use serde_json::{Map, Value, json};
 
 use crate::{DecisionTest, Result, Session, test_decisions};

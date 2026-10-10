@@ -246,7 +246,7 @@ fn a_project_that_still_has_legacy_rules_must_migrate_before_it_runs() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project("plugins = [\"core\"]\n"),
+        &lighthouse_test_support::project("plugins = [\"core\"]\n"),
     );
     write(dir.path(), ".lighthouse/rules/long.yaml", OLD_RULE);
     write(dir.path(), "a.txt", "1\n");
@@ -281,7 +281,7 @@ fn validate_names_what_is_wrong_across_documents() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project(
+        &lighthouse_test_support::project(
             "plugins = [\"core\"]\nextends = [\"core/nope\"]\n[rules]\n\"core/nonesuch\" = \"warn\"\n",
         ),
     );
@@ -391,7 +391,7 @@ fn max_warnings_fails_a_run_with_more_warnings_than_allowed() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project(
+        &lighthouse_test_support::project(
             "plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"warn\", options = { max = 2 } }\n",
         ),
     );
@@ -417,7 +417,7 @@ fn sarif_links_a_rule_to_its_decision_page() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project(
+        &lighthouse_test_support::project(
             "plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"warn\", options = { max = 2 } }\n",
         ),
     );

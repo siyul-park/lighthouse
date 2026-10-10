@@ -7,11 +7,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lighthouse_checks::Declarative;
 use lighthouse_config::{Config, FILE_NAME, Format};
-use lighthouse_declarative::{Declarative, load_local, local_files};
 use lighthouse_plugin::Registry;
 use lighthouse_rpc::Registered;
-use lighthouse_spec::{Catalog, CheckKind, FixKind};
+use lighthouse_spec::{Catalog, CheckKind, FixKind, load_local, local_files};
 
 use crate::{
     Result,
@@ -139,7 +139,7 @@ impl Session {
     /// decisions. Nothing is started, so it is cheap and cannot fail on a
     /// language plugin.
     pub fn in_process_registry(&self) -> Result<Registry> {
-        let mut registry = lighthouse_builtin::registry();
+        let mut registry = lighthouse_checks::registry();
         if let Some(local) = &self.local {
             let plugin = Declarative::from_catalog("local", local)?;
             if !plugin.is_empty() {

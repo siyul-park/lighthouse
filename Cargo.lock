@@ -712,23 +712,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "lighthouse-builtin"
+name = "lighthouse-checks"
 version = "0.1.0"
 dependencies = [
+ "cel",
  "lighthouse-config",
- "lighthouse-declarative",
- "lighthouse-design",
  "lighthouse-engine",
- "lighthouse-metrics",
  "lighthouse-model",
  "lighthouse-plugin",
+ "lighthouse-process",
+ "lighthouse-resource",
  "lighthouse-rpc",
  "lighthouse-spec",
- "lighthouse-testing",
- "lighthouse-testkit",
+ "lighthouse-test-support",
  "serde",
  "serde_json",
+ "serde_norway",
  "tempfile",
+ "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -737,7 +739,7 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "clap",
- "lighthouse-builtin",
+ "lighthouse-checks",
  "lighthouse-config",
  "lighthouse-engine",
  "lighthouse-mcp",
@@ -747,7 +749,7 @@ dependencies = [
  "lighthouse-session",
  "lighthouse-spec",
  "lighthouse-store",
- "lighthouse-testkit",
+ "lighthouse-test-support",
  "predicates",
  "serde_json",
  "tempfile",
@@ -765,45 +767,6 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror",
- "toml",
-]
-
-[[package]]
-name = "lighthouse-declarative"
-version = "0.1.0"
-dependencies = [
- "cel",
- "lighthouse-config",
- "lighthouse-design",
- "lighthouse-engine",
- "lighthouse-metrics",
- "lighthouse-model",
- "lighthouse-plugin",
- "lighthouse-process",
- "lighthouse-resource",
- "lighthouse-spec",
- "serde",
- "serde_json",
- "serde_norway",
- "tempfile",
- "thiserror",
- "toml",
-]
-
-[[package]]
-name = "lighthouse-design"
-version = "0.1.0"
-dependencies = [
- "lighthouse-config",
- "lighthouse-declarative",
- "lighthouse-engine",
- "lighthouse-metrics",
- "lighthouse-model",
- "lighthouse-plugin",
- "lighthouse-spec",
- "serde",
- "serde_json",
- "tempfile",
  "toml",
 ]
 
@@ -841,16 +804,6 @@ dependencies = [
  "serde_json",
  "serde_norway",
  "tokio",
-]
-
-[[package]]
-name = "lighthouse-metrics"
-version = "0.1.0"
-dependencies = [
- "lighthouse-model",
- "lighthouse-plugin",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -930,7 +883,7 @@ dependencies = [
  "lighthouse-process",
  "lighthouse-protocol",
  "lighthouse-resource",
- "lighthouse-testkit",
+ "lighthouse-test-support",
  "schemars",
  "serde",
  "serde_json",
@@ -942,9 +895,8 @@ dependencies = [
 name = "lighthouse-session"
 version = "0.1.0"
 dependencies = [
- "lighthouse-builtin",
+ "lighthouse-checks",
  "lighthouse-config",
- "lighthouse-declarative",
  "lighthouse-engine",
  "lighthouse-model",
  "lighthouse-plugin",
@@ -994,25 +946,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "lighthouse-testing"
-version = "0.1.0"
-dependencies = [
- "lighthouse-config",
- "lighthouse-declarative",
- "lighthouse-design",
- "lighthouse-engine",
- "lighthouse-metrics",
- "lighthouse-model",
- "lighthouse-plugin",
- "lighthouse-spec",
- "serde",
- "serde_json",
- "tempfile",
- "toml",
-]
-
-[[package]]
-name = "lighthouse-testkit"
+name = "lighthouse-test-support"
 version = "0.1.0"
 dependencies = [
  "toml",

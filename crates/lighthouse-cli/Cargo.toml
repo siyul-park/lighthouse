@@ -11,7 +11,7 @@ lighthouse-engine.workspace = true
 lighthouse-resource.workspace = true
 lighthouse-mcp.workspace = true
 lighthouse-model.workspace = true
-lighthouse-builtin.workspace = true
+lighthouse-checks.workspace = true
 lighthouse-report.workspace = true
 lighthouse-session.workspace = true
 lighthouse-spec.workspace = true
@@ -28,4 +28,4 @@ lighthouse-session.workspace = true
 assert_cmd.workspace = true
 predicates = "3"
 tempfile.workspace = true
-lighthouse-testkit = { path = "../lighthouse-testkit" }
+lighthouse-test-support = { path = "../lighthouse-test-support" }

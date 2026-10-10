@@ -150,7 +150,7 @@ pub(crate) fn test_catalog(
                 .map(|(registry, _)| registry)
                 .unwrap_or_else(|e| {
                     restart_error.borrow_mut().get_or_insert(e.to_string());
-                    lighthouse_builtin::registry()
+                    lighthouse_checks::registry()
                 })
         };
         let tester = RuleTester::new(fresh, &catalog)

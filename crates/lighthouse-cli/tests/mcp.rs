@@ -102,10 +102,10 @@ impl Drop for Client {
 
 fn rust_project() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
-    let plugin = lighthouse_testkit::lang_rust();
+    let plugin = lighthouse_test_support::lang_rust();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_testkit::project(&format!(
+        lighthouse_test_support::project(&format!(
             "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n",
             plugin.to_str().unwrap()
         )),
@@ -125,7 +125,9 @@ fn text_project() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_testkit::project("plugins = [\"core\"]\nextends = [\"core/recommended\"]\n"),
+        lighthouse_test_support::project(
+            "plugins = [\"core\"]\nextends = [\"core/recommended\"]\n",
+        ),
     )
     .unwrap();
     dir

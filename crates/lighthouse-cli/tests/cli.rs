@@ -14,7 +14,7 @@ fn project(max: usize) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_testkit::project(&format!("plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = {{ level = \"warn\", options = {{ max = {max} }} }}\n")),
+        lighthouse_test_support::project(&format!("plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = {{ level = \"warn\", options = {{ max = {max} }} }}\n")),
     )
     .unwrap();
     fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\ne\nf\ng\nh\n").unwrap();
@@ -159,7 +159,7 @@ fn override_can_turn_a_rule_off_for_a_file() {
     let config = dir.path().join("lighthouse.toml");
     fs::write(
         &config,
-        lighthouse_testkit::project(
+        lighthouse_test_support::project(
             "plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"warn\", options = { max = 6 } }\n[[overrides]]\nfiles = [\"big.txt\"]\nrules = { \"core/max-file-lines\" = \"off\" }\n",
         ),
     )
@@ -353,14 +353,14 @@ fn docs_check_reports_unreadable_output_as_an_error() {
 /// A Go project and a config listing the Go plugin built from source; `None`
 /// after a skip message when no Go toolchain is available.
 fn go_project(source: &str) -> Option<(TempDir, std::path::PathBuf)> {
-    let plugin = lighthouse_testkit::lang_go()?;
+    let plugin = lighthouse_test_support::lang_go()?;
     let project = tempfile::tempdir().unwrap();
     fs::write(project.path().join("go.mod"), "module example.com/app\n").unwrap();
     fs::write(project.path().join("api.go"), source).unwrap();
     let config = project.path().join("lighthouse.toml");
     fs::write(
         &config,
-        lighthouse_testkit::project(&format!(
+        lighthouse_test_support::project(&format!(
             "plugins = [{{ id = \"lang-go\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n",
             plugin.to_str().unwrap()
         )),
@@ -432,7 +432,7 @@ fn a_plugin_listed_but_missing_is_a_usage_error() {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_testkit::project("plugins = [\"nowhere\"]\n"),
+        lighthouse_test_support::project("plugins = [\"nowhere\"]\n"),
     )
     .unwrap();
     lighthouse(dir.path()).arg("check").assert().code(2);
@@ -443,12 +443,12 @@ fn config_flag_checks_the_current_directory_with_another_config_file() {
     let Some((project, _)) = go_project("package app\n\nfunc Open() {}\n") else {
         return;
     };
-    let plugin = lighthouse_testkit::lang_go().unwrap();
+    let plugin = lighthouse_test_support::lang_go().unwrap();
     let elsewhere = tempfile::tempdir().unwrap();
     let config = elsewhere.path().join("lh.toml");
     fs::write(
         &config,
-        lighthouse_testkit::project(&format!(
+        lighthouse_test_support::project(&format!(
             "plugins = [{{ id = \"lang-go\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\"]\n",
             plugin.to_str().unwrap()
         )),
@@ -592,7 +592,7 @@ fn local_project(rule: &str) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_testkit::project(
+        lighthouse_test_support::project(
             "plugins = [\"core\", \"local\"]\n[rules]\n\"local/long-file\" = \"error\"\n",
         ),
     )

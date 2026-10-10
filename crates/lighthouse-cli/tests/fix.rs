@@ -35,7 +35,7 @@ fn read(dir: &TempDir, name: &str) -> String {
 /// A Go project with the design and testing rules; `None` after a skip
 /// message when there is no Go toolchain.
 fn go_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> {
-    let plugin = lighthouse_testkit::lang_go()?;
+    let plugin = lighthouse_test_support::lang_go()?;
     let dir = tempfile::tempdir().unwrap();
     let local = if files
         .iter()
@@ -48,7 +48,7 @@ fn go_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project(&format!(
+        &lighthouse_test_support::project(&format!(
             "plugins = [\"core\", \"design\", \"testing\", {local}{{ id = \"lang-go\", path = {:?} }}]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"]\n{extra}",
             plugin.to_str().unwrap()
         )),
@@ -62,7 +62,7 @@ fn go_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> {
 
 fn rust_project(source: &str, extra: &str) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
-    let plugin = lighthouse_testkit::lang_rust();
+    let plugin = lighthouse_test_support::lang_rust();
     let local = if extra.contains("local/") {
         "\"local\", "
     } else {
@@ -71,7 +71,7 @@ fn rust_project(source: &str, extra: &str) -> TempDir {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project(&format!(
+        &lighthouse_test_support::project(&format!(
             "plugins = [\"core\", \"design\", {local}{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\"]\n{extra}",
             plugin.to_str().unwrap()
         )),
@@ -223,7 +223,7 @@ fn flags_that_only_make_sense_with_fix_are_refused_without_it() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project("plugins = [\"core\"]\n"),
+        &lighthouse_test_support::project("plugins = [\"core\"]\n"),
     );
 
     for flag in ["--dry-run", "--unsafe-fixes"] {
@@ -394,7 +394,7 @@ fn text_project(rule: &str) -> TempDir {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project(
+        &lighthouse_test_support::project(
             "plugins = [\"core\", \"local\"]\n[rules]\n\"local/shout\" = \"error\"\n",
         ),
     );
@@ -483,7 +483,7 @@ fn a_fix_table_in_lighthouse_toml_cannot_grant_trust() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project(
+        &lighthouse_test_support::project(
             "plugins = [\"core\", \"local\"]\n[fix]\ncommands = \"allow\"\n[rules]\n\"local/shout\" = \"error\"\n",
         ),
     );
@@ -504,7 +504,7 @@ fn a_fixer_can_be_named_for_a_rule_that_has_none() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project(
+        &lighthouse_test_support::project(
             "plugins = [\"core\", \"local\"]\n[rules]\n\"local/plain\" = \"error\"\n",
         ),
     );
@@ -812,7 +812,7 @@ fn trust_lists_what_it_trusts_and_needs_a_terminal_or_yes() {
     write(
         dir.path(),
         "lighthouse.toml",
-        &lighthouse_testkit::project(
+        &lighthouse_test_support::project(
             "plugins = [\"core\", \"local\"]\n[rules]\n\"local/shout\" = \"error\"\n[languages.go]\nformatter = [\"gofmt\"]\n",
         ),
     );

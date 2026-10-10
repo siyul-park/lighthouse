@@ -6,6 +6,7 @@ mod fix;
 mod fix_docs;
 mod legacy;
 mod load;
+mod local;
 mod migrate;
 mod model;
 mod options;
@@ -34,6 +35,7 @@ pub use fix::{
     CommandOutput, CommandScope, CommandSpec, CommandStdin, Fix, FixKind, OpSpec, ReorderScope,
 };
 pub use fix_docs::{OPERATIONS, Operation, Param, fix_operations_markdown};
+pub use local::{load_local, local_dir, local_files};
 pub use migrate::{
     convert_enforcement, has_enforcement, is_override, is_resource, migrate_decision,
     migrate_override, migrate_pack, migrate_sources,

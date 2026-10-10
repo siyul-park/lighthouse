@@ -13,7 +13,7 @@ const DOC: &str = "pub fn undocumented() {}\n";
 
 fn project(source: &str) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
-    let plugin = lighthouse_testkit::lang_rust();
+    let plugin = lighthouse_test_support::lang_rust();
     let write = |name: &str, text: &str| {
         let path = dir.path().join(name);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -21,7 +21,7 @@ fn project(source: &str) -> TempDir {
     };
     write(
         "lighthouse.toml",
-        &lighthouse_testkit::project(&format!(
+        &lighthouse_test_support::project(&format!(
             "plugins = [\"core\", \"design\", {{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\"]\n",
             plugin.to_str().unwrap()
         )),
@@ -190,7 +190,7 @@ fn a_command_fix_is_not_previewed_and_only_names_how_to_apply_it() {
     };
     write(
         "lighthouse.toml",
-        &lighthouse_testkit::project(
+        &lighthouse_test_support::project(
             "plugins = [\"core\", \"local\"]\n[rules]\n\"local/shout\" = \"error\"\n",
         ),
     );

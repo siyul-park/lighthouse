@@ -37,7 +37,7 @@ pub fn generate(out: &Path, skill: &Path) -> Result<u8> {
 /// keys the bundled plugins register.
 fn generated() -> BTreeMap<String, String> {
     let mut docs = lighthouse_spec::docs(Catalog::bundled());
-    let keys: Vec<(String, String)> = lighthouse_builtin::registry()
+    let keys: Vec<(String, String)> = lighthouse_checks::registry()
         .order_keys()
         .map(|k| {
             let manifest = k.manifest();

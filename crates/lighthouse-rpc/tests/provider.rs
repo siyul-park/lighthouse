@@ -19,7 +19,7 @@ struct Fixture {
 impl Fixture {
     /// `None` after a skip message when no Go toolchain is available.
     fn new(files: &[(&str, &str)]) -> Option<Self> {
-        let plugin = lighthouse_testkit::lang_go()?;
+        let plugin = lighthouse_test_support::lang_go()?;
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().canonicalize().unwrap();
         fs::write(root.join("go.mod"), "module example.com/app\n\ngo 1.26\n").unwrap();

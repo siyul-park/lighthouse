@@ -1,8 +1,0 @@
-[package]
-name = "lighthouse-testkit"
-version.workspace = true
-edition.workspace = true
-publish.workspace = true
-
-[dependencies]
-toml.workspace = true
