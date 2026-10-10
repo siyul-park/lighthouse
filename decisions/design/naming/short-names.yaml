@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: naming
-  annotations:
-    lighthouse/was-names: design/short-names-limited
 spec:
   title: One-letter names stay small
   context: >-

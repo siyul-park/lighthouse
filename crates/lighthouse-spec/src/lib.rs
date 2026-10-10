@@ -4,7 +4,6 @@ mod decision;
 mod error;
 mod fix;
 mod fix_docs;
-mod legacy;
 mod load;
 mod local;
 mod model;
@@ -25,15 +24,14 @@ pub use check::{
     OrderClause, OrderReport, OrderScope, RpcCheck, Select, TemplatePart, parse_template,
 };
 pub use decision::{
-    Decision, DecisionSpec, LanguageSpec, MIGRATED_FROM, PACK_LABEL, PRESET_LABEL, Provenance,
-    SECTION_LABEL, STRICT, WAS_BUILTIN, WAS_ENFORCEMENT, WAS_EXCEPTIONS, WAS_OPTION_NAMES,
+    Decision, DecisionSpec, LanguageSpec, PACK_LABEL, PRESET_LABEL, Provenance, SECTION_LABEL,
+    STRICT,
 };
 pub use error::Error;
 pub use fix::{
     CommandOutput, CommandScope, CommandSpec, CommandStdin, Fix, FixKind, OpSpec, ReorderScope,
 };
 pub use fix_docs::{OPERATIONS, Operation, Param, fix_operations_markdown};
-pub use legacy::from_legacy_type;
 pub use local::{load_local, local_dir, local_files};
 pub use model::{
     Content, DecisionStatus, Domain, Example, ExampleFile, ExampleKind, Expect, Scope, Subject,
@@ -44,8 +42,8 @@ pub use pack::{Pack, PackSpec, Section, SectionSpec};
 pub use project::{
     Config, FILE_NAME, FILE_NAMES, Formatter, FormatterOutput, FormatterSpec, FormatterStdin,
     GeneratedCheck, GeneratedSpec, GlobSet, Layer, Level, OverrideSpec, PluginEntry, PluginRef,
-    PluginRefSpec, ProjectError, ProjectLanguage, ProjectSpec, Projects, Renamed, RuleConfig,
-    RuleDetail, RuleSetting, Rules, glob_set,
+    PluginRefSpec, ProjectError, ProjectLanguage, ProjectSpec, Projects, RuleConfig, RuleDetail,
+    RuleSetting, Rules, glob_set,
 };
 pub use render::{DOCS_DIR, decision_markdown, docs, help_path};
 pub use sources::{SourceLine, SourceMapSpec};

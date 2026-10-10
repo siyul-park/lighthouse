@@ -1438,7 +1438,7 @@
       ]
     },
     "Severity": {
-      "description": "How hard a finding fails a run; serialized and parsed as the lowercase\nvariant name. Whether a finding also asks for a verdict is not a level: it\nfollows from how its decision is enforced.",
+      "description": "How hard a finding fails a run; serialized and parsed as the lowercase\nvariant name. Whether a finding also asks for review is not a level: it\nfollows from the severity its decision authored.",
       "oneOf": [
         {
           "const": "error",

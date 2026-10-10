@@ -6,12 +6,9 @@ pub enum Error {
     /// The text is not valid YAML, TOML or JSON.
     #[error("{path}: {message}")]
     Parse { path: String, message: String },
-    /// The document has no `apiVersion`: it is in a format from before the
-    /// resource model.
-    #[error(
-        "{path}: not a `{api_version}` resource (no `apiVersion`); run `lighthouse spec migrate`"
-    )]
-    Legacy { path: String, api_version: String },
+    /// The document has no `apiVersion`.
+    #[error("{path}: not a `{api_version}` resource (no `apiVersion`)")]
+    Unversioned { path: String, api_version: String },
     /// The document is a resource of another version or kind than asked for.
     #[error("{path}: expected {expected}, found {found}")]
     Mismatch {

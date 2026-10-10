@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: readability
-  annotations:
-    lighthouse/was-builtin: testing/standard-assertions
 spec:
   title: Assertions use the standard library
   context: >-

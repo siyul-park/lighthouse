@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization
-  annotations:
-    lighthouse/was-names: testing/assertions-in-cases
 spec:
   title: Assertions belong to cases
   context: >-

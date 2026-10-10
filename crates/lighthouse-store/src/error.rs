@@ -1,4 +1,4 @@
-use lighthouse_model::MismatchedReason;
+use lighthouse_model::Judgment;
 use thiserror::Error;
 
 /// Why a store operation failed.
@@ -14,10 +14,6 @@ pub enum Error {
         source: std::io::Error,
     },
     #[error(
-        "the store was written by a newer lighthouse (schema {found}, this build knows {supported})"
-    )]
-    NewerSchema { found: usize, supported: usize },
-    #[error(
         "{path} is not a usable database; nothing was deleted. Move it aside \
          (for example `mv {path} {path}.bak`) and run the command again: the cache is rebuilt \
          from the decision log, and only the history of sightings is lost"
@@ -28,14 +24,6 @@ pub enum Error {
         path: String,
         line: usize,
         reason: String,
-    },
-    #[error(
-        "the verdicts of {legacy} already belong to {existing}; moving them to {refused} was refused"
-    )]
-    RewriteConflict {
-        legacy: String,
-        existing: String,
-        refused: String,
     },
     #[error("no recorded finding matches `{0}`")]
     UnknownFinding(String),
@@ -52,6 +40,6 @@ pub enum Error {
         "the finding was seen again at {actual}, after {expected}; read it again before judging"
     )]
     Changed { expected: String, actual: String },
-    #[error(transparent)]
-    Reason(#[from] MismatchedReason),
+    #[error("a suppression goes with a `fail`, not with `{0}`")]
+    SuppressionWithoutFail(Judgment),
 }

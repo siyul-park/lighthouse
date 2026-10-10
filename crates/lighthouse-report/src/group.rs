@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Safety, Severity, Verdict};
+use lighthouse_model::{Judgment, Safety, Severity};
 use lighthouse_spec::{Catalog, Decision, FixKind};
 use serde_json::{Map, Value, json};
 
@@ -21,7 +21,7 @@ const PREFIX_MIN: usize = 7;
 /// Longest a symbol's own name may be to count as mentioned by a message.
 const NAME_MIN: usize = 3;
 /// How a verdict is recorded, said once per report.
-const RESOLVE: &str = "review_resolve {fingerprint, verdict, reason}";
+const RESOLVE: &str = "review_resolve {fingerprint, judgment, suppress?, reason?}";
 
 /// One finding as the compact shape sees it, wherever it comes from: a fresh
 /// diagnostic or a remembered finding.
@@ -155,7 +155,7 @@ impl Grouped {
     }
 
     /// `groups`, then when they apply `omitted` (`groups` and `findings` left
-    /// out) and, once for all groups, the `resolve` hint and the `reasons`
+    /// out) and, once for all groups, the `resolve` hint and the `judgments`
     /// table.
     pub fn fields(&self) -> Map<String, Value> {
         let mut fields = Map::new();
@@ -169,7 +169,7 @@ impl Grouped {
         }
         if self.asks_review() {
             fields.insert("resolve".to_owned(), json!(RESOLVE));
-            fields.insert("reasons".to_owned(), reasons());
+            fields.insert("judgments".to_owned(), judgments());
         }
         fields
     }
@@ -390,23 +390,28 @@ impl Instance {
     }
 }
 
-/// The reasons each verdict accepts.
-pub(crate) fn reasons() -> Value {
-    let verdicts: BTreeMap<&str, Vec<&str>> =
-        [Verdict::Confirmed, Verdict::Rejected, Verdict::Deferred]
-            .into_iter()
-            .map(|v| (v.as_str(), v.reasons().iter().map(|r| r.as_str()).collect()))
-            .collect();
-    json!(verdicts)
+/// What each judgment says, and how to leave a finding that is right in place.
+const MEANINGS: [(Judgment, &str); 3] = [
+    (
+        Judgment::Fail,
+        "the finding is right; add `suppress` with a justification to leave it in place",
+    ),
+    (Judgment::Pass, "false positive: the code conforms"),
+    (
+        Judgment::NotApplicable,
+        "the decision does not apply here; a hint to narrow it",
+    ),
+];
+
+pub(crate) fn judgments() -> Value {
+    let meanings: BTreeMap<&str, &str> = MEANINGS.iter().map(|(j, m)| (j.as_str(), *m)).collect();
+    json!(meanings)
 }
 
-pub(crate) fn reasons_line() -> String {
-    [Verdict::Confirmed, Verdict::Rejected, Verdict::Deferred]
-        .into_iter()
-        .map(|v| {
-            let reasons: Vec<&str> = v.reasons().iter().map(|r| r.as_str()).collect();
-            format!("{v}={}", reasons.join("|"))
-        })
+pub(crate) fn judgments_line() -> String {
+    MEANINGS
+        .iter()
+        .map(|(j, m)| format!("{j}={m}"))
         .collect::<Vec<_>>()
         .join("; ")
 }

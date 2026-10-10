@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: functions
-  annotations:
-    lighthouse/was-names: design/justified-helper
 spec:
   title: Helpers are justified
   context: >-

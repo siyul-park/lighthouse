@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: functions
-  annotations:
-    lighthouse/was-names: design/receiver-owned-behavior
-    lighthouse/was-builtin: design/receiver-owned-behavior
 spec:
   title: Behavior lives with its owner
   context: >-

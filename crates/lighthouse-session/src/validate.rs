@@ -55,10 +55,7 @@ impl Sets {
     fn add(&mut self, file: &Path, doc: Value, problems: &mut Vec<Problem>) {
         let label = file.display().to_string();
         let Some(kind) = kind_of(&doc).map(str::to_owned) else {
-            problems.push(problem(
-                &label,
-                "no `kind`: not a resource (run `lighthouse spec migrate`)",
-            ));
+            problems.push(problem(&label, "no `kind`: not a resource"));
             return;
         };
         match kind.as_str() {
@@ -66,10 +63,9 @@ impl Sets {
                 Ok(r) => self.projects.push((label, r)),
                 Err(e) => problems.push(problem(&label, e)),
             },
-            "Preset" | "DecisionOverride" => problems.push(problem(
-                &label,
-                format!("`{kind}` is not a kind any more (run `lighthouse spec migrate`)"),
-            )),
+            "Preset" | "DecisionOverride" => {
+                problems.push(problem(&label, format!("`{kind}` is not a kind")))
+            }
             "Plugin" => {
                 if let Err(e) = resource::<PluginSpec>(&label, &doc) {
                     problems.push(problem(&label, e));
@@ -316,7 +312,7 @@ fn references(catalog: &Catalog, registry: &Registry, path: &str, problems: &mut
             problems.push(problem(
                 path,
                 format!(
-                    "{}: has no `metadata.uid`; run `lighthouse spec migrate` to assign one",
+                    "{}: has no `metadata.uid`; add a UUID v4 under `metadata`",
                     decision.id()
                 ),
             ));

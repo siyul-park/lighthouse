@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: tdd
-  annotations:
-    lighthouse/was-names: testing/no-structure-only-tests
 spec:
   title: No structure-only tests
   context: >-

@@ -1,13 +1,13 @@
-//! `lighthouse review`: the findings the store remembers and the verdicts on
+//! `lighthouse review`: the findings the store remembers and the judgments on
 //! them.
 
 use std::{fmt::Write, path::Path};
 
 use clap::{Subcommand, ValueEnum};
 use lighthouse_session::{
-    FindingRecord, NewReview, Reason, Recorded, ReviewEvent, Reviewer, ReviewerKind, Standing,
-    StatusFilter, TaskQuery, Verdict, head, project_root, record_verdict, review_finding,
-    review_history, review_prune, review_tasks,
+    AgentKind, FindingRecord, Judgment, JudgmentEvent, NewJudgment, Recorded, Reviewer, Standing,
+    StatusFilter, TaskQuery, head, project_root, record_judgment, review_finding, review_history,
+    review_prune, review_tasks,
 };
 use serde_json::Value;
 
@@ -19,19 +19,19 @@ const SHORT: usize = 12;
 
 #[derive(Subcommand)]
 pub enum ReviewCommand {
-    /// List the findings that ask for a verdict: those of heuristic and
-    /// judgment decisions, whatever their severity.
+    /// List the findings that ask for review: those of decisions that
+    /// authored `warn` or `info` and that no judgment stands for.
     List {
-        /// Also list findings that do not ask for a verdict (mechanical
-        /// decisions).
+        /// Also list findings that do not ask for review (errors, and judged
+        /// ones).
         #[arg(long)]
         all: bool,
         /// Only this fully qualified rule id.
         #[arg(long)]
         rule: Option<String>,
         /// `open`: still reported and not suppressed. `suppressed`: kept out
-        /// of reports by a rejected verdict. `narrowing`: suppressed because
-        /// the rule is too broad. `inactive`: of a rule the configuration no
+        /// of reports by a judgment. `narrowing`: judged `notApplicable`, so
+        /// the decision is too broad. `inactive`: of a rule the configuration no
         /// longer enables. `resolved`: no longer reported by a complete run.
         /// `all`: every remembered finding.
         #[arg(long, value_enum, default_value = "open")]
@@ -46,48 +46,51 @@ pub enum ReviewCommand {
         #[arg(long, value_enum, default_value = "text")]
         format: Format,
     },
-    /// Record a verdict on a finding.
+    /// Record a judgment on a finding.
     ///
-    /// confirmed (reasons: fixed, accepted-debt) means the finding is right.
-    /// rejected (false-positive, intentional-exception, scope-too-broad,
-    /// project-allowed, not-worth-fixing) keeps the finding out of later
-    /// reports while its rule and evidence stay as they are; mechanical
-    /// findings (decided by their check, at any severity) are recorded but never suppressed. deferred
-    /// (no reason) leaves it visible. Verdicts are appended to
+    /// `fail` means the finding is right; add --suppress with a justification
+    /// to leave it in place on purpose (a SARIF `external` suppression).
+    /// `pass` means the code conforms (a false positive); `notApplicable`
+    /// means the decision does not apply here, a hint to narrow it. A judgment
+    /// that is not `fail`, or a `fail` with a suppression, keeps the finding
+    /// out of later reports while its decision and evidence stay as they
+    /// are; an error is recorded but never hidden. Judgments are appended to
     /// .lighthouse/decisions.jsonl, which is meant to be committed, and never
     /// edited: a later one replaces the standing of the finding.
     ///
-    /// The reviewer is --reviewer-kind, else $LIGHTHOUSE_REVIEWER_KIND, else
-    /// human; the id is --reviewer-id, else $LIGHTHOUSE_REVIEWER, else $USER.
+    /// The reviewer is --reviewer-kind (Person or SoftwareAgent; `human` and
+    /// `agent` are read too), else $LIGHTHOUSE_REVIEWER_KIND, else a person;
+    /// the id is --reviewer-id, else $LIGHTHOUSE_REVIEWER, else $USER.
     Resolve {
         /// A fingerprint, or the start of one.
         fingerprint: String,
         #[arg(long)]
-        verdict: Verdict,
-        /// Required for rejected; confirmed may carry one; deferred takes none.
-        #[arg(long, default_value = "none")]
-        reason: Reason,
-        /// Free-text explanation, kept with the verdict.
+        judgment: Judgment,
+        /// With `fail`: why the finding stays, recorded as an external
+        /// suppression.
+        #[arg(long, value_name = "JUSTIFICATION")]
+        suppress: Option<String>,
+        /// Why, written for the next reader.
         #[arg(long)]
-        note: Option<String>,
+        reason: Option<String>,
         #[arg(long)]
-        reviewer_kind: Option<ReviewerKind>,
+        reviewer_kind: Option<AgentKind>,
         #[arg(long)]
         reviewer_id: Option<String>,
         /// The `last seen` time of the finding as you read it; refuses the
-        /// verdict if the finding has been seen again since.
+        /// judgment if the finding has been seen again since.
         #[arg(long, value_name = "LAST_SEEN")]
         seen: Option<String>,
     },
-    /// Show every verdict recorded on a finding, oldest first.
+    /// Show every judgment recorded on a finding, oldest first.
     History {
         /// A fingerprint, or the start of one.
         fingerprint: String,
         #[arg(long, value_enum, default_value = "text")]
         format: Format,
     },
-    /// Delete resolved and inactive findings that nobody reviewed. Findings
-    /// with verdicts stay, because the verdicts are labels.
+    /// Delete resolved and inactive findings that nobody judged. Findings
+    /// with judgments stay, because the judgments are labels.
     Prune {
         /// Only those resolved or inactive for at least this many days.
         #[arg(long, value_name = "DAYS")]
@@ -120,13 +123,7 @@ pub fn run(command: ReviewCommand) -> Result<u8> {
             status,
             format,
         } => match review_tasks(&root, &query(rule, status, all))? {
-            Some(tasks) => {
-                tasks
-                    .notices
-                    .iter()
-                    .for_each(|n| eprintln!("lighthouse: {n}"));
-                list(&tasks.findings, format)
-            }
+            Some(tasks) => list(&tasks.findings, format),
             None => {
                 eprintln!("lighthouse: no findings recorded yet (run `lighthouse check`)");
                 Ok(0)
@@ -143,21 +140,20 @@ pub fn run(command: ReviewCommand) -> Result<u8> {
         ReviewCommand::Prune { older_than } => prune(review_prune(&root, older_than)?),
         ReviewCommand::Resolve {
             fingerprint,
-            verdict,
+            judgment,
+            suppress,
             reason,
-            note,
             reviewer_kind,
             reviewer_id,
             seen,
         } => {
             let reviewer = Reviewer::from_env(reviewer_kind, reviewer_id)?;
-            let review = NewReview {
+            let review = NewJudgment {
                 fingerprint,
-                verdict,
+                judgment,
                 reason,
-                reason_text: note,
-                reviewer_kind: reviewer.kind,
-                reviewer_id: reviewer.id,
+                suppress,
+                attribution: reviewer.attribution(),
                 commit: head(&root),
                 expect_seen: seen,
                 lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
@@ -202,9 +198,9 @@ fn show(finding: &FindingRecord, format: Format) -> Result<u8> {
     Ok(0)
 }
 
-fn history(events: &[ReviewEvent], fingerprint: &str, format: Format) -> Result<u8> {
+fn history(events: &[JudgmentEvent], fingerprint: &str, format: Format) -> Result<u8> {
     if events.is_empty() {
-        eprintln!("lighthouse: no reviews recorded for {fingerprint}");
+        eprintln!("lighthouse: no judgments recorded for {fingerprint}");
     }
     for event in events {
         match format {
@@ -220,35 +216,39 @@ fn prune(removed: usize) -> Result<u8> {
     Ok(0)
 }
 
-fn resolve(root: &Path, review: &NewReview) -> Result<u8> {
+fn resolve(root: &Path, review: &NewJudgment) -> Result<u8> {
     let Recorded {
         event,
         warnings,
         standing,
         catalog_error,
         ..
-    } = record_verdict(root, review)?;
+    } = record_judgment(root, review)?;
     if let Some(e) = catalog_error {
         eprintln!(
-            "lighthouse: the catalog cannot be read ({e}); rule and catalog versions are not recorded"
+            "lighthouse: the catalog cannot be read ({e}); decision and catalog versions are not recorded"
         );
     }
+    let suppressed = event
+        .suppressions
+        .first()
+        .map(|s| format!(" and an {} suppression ({})", s.kind, s.justification))
+        .unwrap_or_default();
     println!(
-        "recorded {} ({}) for {} {}",
-        event.verdict,
-        event.reason,
+        "recorded {}{suppressed} for {} {}",
+        event.judgment,
         short(&event.fingerprint),
-        event.rule_id
+        event.decision_name
     );
     for warning in warnings {
         eprintln!("lighthouse: warning: {warning}");
     }
     match standing {
         Some(Standing::Suppressed) => println!(
-            "later checks keep this finding out of the report while its rule and evidence stay as they are; `lighthouse review list --status suppressed` lists it"
+            "later checks keep this finding out of the report while its decision and evidence stay as they are; `lighthouse review list --status suppressed` lists it"
         ),
         Some(Standing::Unsuppressible) => println!(
-            "this is a mechanical finding: the verdict is recorded but the finding stays reported; fix the rule"
+            "this is an error: the judgment is recorded but the finding stays reported; fix the code or suppress it in the code"
         ),
         _ => {}
     }
@@ -271,17 +271,20 @@ fn row(finding: &FindingRecord) -> String {
     )
 }
 
-/// The latest verdict and, when it no longer applies, why.
+/// The latest judgment and, when it no longer applies, why.
 fn review_text(finding: &FindingRecord) -> String {
-    let Some(review) = finding.review else {
+    let Some(judgment) = finding.judgment else {
         return "-".to_owned();
     };
-    let base = format!("{}:{}", review.verdict, review.reason);
+    let base = match &finding.justification {
+        Some(justification) => format!("{judgment}:{justification}"),
+        None => judgment.to_string(),
+    };
     match finding.standing {
-        Some(Standing::RuleChanged) => format!("{base} (expired: rule changed)"),
+        Some(Standing::RuleChanged) => format!("{base} (expired: decision changed)"),
         Some(Standing::EvidenceChanged) => format!("{base} (expired: evidence changed)"),
-        Some(Standing::Unsuppressible) => format!("{base} (mechanical: not suppressed)"),
-        _ if finding.narrowing => format!("{base} (narrow the rule)"),
+        Some(Standing::Unsuppressible) => format!("{base} (error: not suppressed)"),
+        _ if finding.narrowing => format!("{base} (narrow the decision)"),
         _ => base,
     }
 }
@@ -292,7 +295,7 @@ fn detail(finding: &FindingRecord) -> String {
         let _ = writeln!(out, "{label:<13}{value}");
     };
     field("fingerprint:", finding.fingerprint.clone());
-    let tier = finding.authored_severity.as_deref().unwrap_or("-");
+    let tier = finding.authored_severity;
     field(
         "rule:",
         format!("{} ({}, {tier})", finding.rule_id, finding.severity),
@@ -321,23 +324,26 @@ fn detail(finding: &FindingRecord) -> String {
         let pairs: Vec<String> = evidence.iter().map(|(k, v)| format!("{k}={v}")).collect();
         field("evidence:", pairs.join(" "));
     }
-    if finding.review.is_some() {
-        field("review:", review_text(finding));
+    if finding.judgment.is_some() {
+        field("judgment:", review_text(finding));
     }
     out
 }
 
-fn event_row(event: &ReviewEvent) -> String {
+fn event_row(event: &JudgmentEvent) -> String {
+    let suppression = event.suppressions.first().map_or("-".to_owned(), |s| {
+        format!("{}:{}", s.kind, s.justification)
+    });
     format!(
-        "{}\t{}\t{}:{}\t{}:{}\t{}\t{}",
+        "{}\t{}\t{}\t{}\t{}:{}\t{}\t{}",
         short(&event.id),
-        event.timestamp,
-        event.verdict,
-        event.reason,
-        event.reviewer_kind,
-        event.reviewer_id.as_deref().unwrap_or("-"),
+        event.generated_at_time,
+        event.judgment,
+        suppression,
+        event.was_attributed_to.kind,
+        event.was_attributed_to.id.as_deref().unwrap_or("-"),
         event.label(),
-        event.reason_text.as_deref().unwrap_or("")
+        event.reason.as_deref().unwrap_or("")
     )
 }
 

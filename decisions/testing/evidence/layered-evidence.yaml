@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: evidence
-  annotations:
-    lighthouse/was-names: testing/evidence-by-layer
 spec:
   title: Each layer proves its own facts
   context: >-

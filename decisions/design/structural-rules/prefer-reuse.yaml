@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-rules
-  annotations:
-    lighthouse/was-names: design/reuse-before-extension
 spec:
   title: Reuse before extension
   context: >-

@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: errors
-  annotations:
-    lighthouse/was-names: design/errors-not-panics
 spec:
   title: "Return errors, do not panic"
   context: >-

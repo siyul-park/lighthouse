@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: naming
-  annotations:
-    lighthouse/was-names: design/reserved-action-verbs
 spec:
   title: Action verbs are reserved
   context: >-

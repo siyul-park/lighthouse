@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: types-and-apis
-  annotations:
-    lighthouse/was-names: design/interface-at-consumer
 spec:
   title: Interfaces live at the consumer
   context: >-

@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: comments
-  annotations:
-    lighthouse/was-names: design/section-banners
-    lighthouse/was-builtin: design/section-banners
 spec:
   title: Comments do not label sections
   context: >-

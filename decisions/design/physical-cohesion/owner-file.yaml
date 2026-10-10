@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: physical-cohesion
-  annotations:
-    lighthouse/was-names: design/single-file-per-owner
-    lighthouse/was-enforcement: mechanical
 spec:
   title: "One owner, one file"
   context: >-

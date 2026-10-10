@@ -8,17 +8,12 @@ const REASON_SEPARATOR: &str = "--";
 /// The markers a directive starts with, longest first so that
 /// `lighthouse-disable-next-line` is not read as `lighthouse-disable`.
 /// Every marker a directive can start with, longest first, with its form.
-pub const MARKERS: [(&str, Form); 5] = [
+pub const MARKERS: [(&str, Form); 4] = [
     ("lighthouse-disable-next-line", Form::NextLine),
     ("lighthouse-disable-line", Form::Line),
     ("lighthouse-disable", Form::Disable),
     ("lighthouse-enable", Form::Enable),
-    (ALLOW, Form::NextLine),
 ];
-
-/// The marker of the first form of the directive, kept as an alias of
-/// `lighthouse-disable-next-line`.
-const ALLOW: &str = "lighthouse:allow";
 
 /// What a directive does, in the ESLint forms.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,7 +25,7 @@ pub enum Form {
     /// `lighthouse-enable <id>[, <id>]`: ends a range.
     Enable,
     /// `lighthouse-disable-next-line <id>[, <id>] -- <reason>`: the next line
-    /// and the symbol declared there; `lighthouse:allow` is its alias.
+    /// and the symbol declared there.
     NextLine,
     /// `lighthouse-disable-line <id>[, <id>] -- <reason>`: this line.
     Line,
@@ -86,28 +81,6 @@ pub fn directives(comment: &str) -> Vec<(usize, Directive)> {
         .enumerate()
         .filter_map(|(at, line)| Some((at, parse_line(line)?)))
         .collect()
-}
-
-/// The comment text with every directive line written in one form: the old
-/// marker, the ids by the names `ids` gives them, and the reason. Two
-/// spellings of the same directives give the same text, so a finding about it
-/// keeps its identity when the marker or an id is rewritten.
-pub fn canonical(comment: &str, ids: &dyn Fn(&str) -> String) -> String {
-    let doc = documents(comment);
-    let lines: Vec<String> = comment
-        .lines()
-        .map(|line| match parse_line(line).filter(|_| !doc) {
-            Some(d) => {
-                let rules: Vec<String> = d.rules.iter().map(|r| ids(r)).collect();
-                match d.reason {
-                    Some(reason) => format!("lighthouse:allow {} -- {reason}", rules.join(", ")),
-                    None => format!("lighthouse:allow {}", rules.join(", ")),
-                }
-            }
-            None => line.to_owned(),
-        })
-        .collect();
-    lines.join("\n")
 }
 
 /// Whether the comment documents an item rather than annotates code.

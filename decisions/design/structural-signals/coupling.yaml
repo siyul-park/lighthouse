@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-signals
-  annotations:
-    lighthouse/was-names: design/coupling-signal
-    lighthouse/was-builtin: design/coupling-signal
 spec:
   title: Coupling is a review signal
   context: >-

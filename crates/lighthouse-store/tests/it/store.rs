@@ -1,7 +1,7 @@
 use std::{fs, thread};
 
 use crate::support::*;
-use lighthouse_model::{Diagnostic, Fingerprint, Label, Position, Reason, Severity, Span, Verdict};
+use lighthouse_model::{Diagnostic, Fingerprint, Judgment, Label, Position, Severity, Span};
 use lighthouse_store::{
     Error, Filter, Observed, Run, RunSummary, Standing, State, StatusFilter, Store, Unchecked,
 };
@@ -29,31 +29,41 @@ fn fingerprints(store: &Store, filter: &Filter) -> Vec<String> {
 }
 
 #[test]
-fn store_opens_a_migrated_cache_and_refuses_a_newer_one() {
+fn store_opens_a_cache_and_builds_one_of_another_version_again_from_the_log() {
     let dir = tempfile::tempdir().unwrap();
     assert!(Store::path_in(dir.path()).ends_with(".lighthouse/lighthouse.db"));
     assert!(Store::log_path_in(dir.path()).ends_with(".lighthouse/decisions.jsonl"));
     assert!(Store::open_existing(dir.path()).unwrap().is_none());
 
-    let first = Store::open(dir.path()).unwrap();
-    assert_eq!(first.schema_version().unwrap(), 7);
+    let mut first = Store::open(dir.path()).unwrap();
+    assert_eq!(first.schema_version().unwrap(), 8);
+    first
+        .record(&run(vec![observed("f1", "design/a", "a.go")]))
+        .unwrap();
+    judge(&mut first, "f1", Judgment::Pass);
     drop(first);
     let again = Store::open_existing(dir.path()).unwrap().unwrap();
-    assert_eq!(again.schema_version().unwrap(), 7);
+    assert_eq!(again.schema_version().unwrap(), 8);
+    assert_eq!(again.finding("f1").unwrap().judgment, Some(Judgment::Pass));
     drop(again);
 
-    Connection::open(Store::path_in(dir.path()))
-        .unwrap()
-        .pragma_update(None, "user_version", 99)
-        .unwrap();
-    let error = Store::open(dir.path()).err().unwrap();
-    assert!(matches!(
-        error,
-        Error::NewerSchema {
-            found: 99,
-            supported: 7
-        }
-    ));
+    for version in [99, 3] {
+        Connection::open(Store::path_in(dir.path()))
+            .unwrap()
+            .pragma_update(None, "user_version", version)
+            .unwrap();
+        let rebuilt = Store::open(dir.path()).unwrap();
+        assert_eq!(rebuilt.schema_version().unwrap(), 8, "from {version}");
+        assert!(
+            matches!(rebuilt.finding("f1"), Err(Error::UnknownFinding(_))),
+            "the sightings of a cache of another version are gone"
+        );
+        assert_eq!(
+            rebuilt.history("f1").unwrap().len(),
+            1,
+            "the judgments come back from the log"
+        );
+    }
 }
 
 #[test]
@@ -85,7 +95,7 @@ fn processes_opening_a_fresh_cache_together_all_succeed() {
         })
         .collect();
     for handle in handles {
-        assert_eq!(handle.join().unwrap(), 7);
+        assert_eq!(handle.join().unwrap(), 8);
     }
 }
 
@@ -113,10 +123,7 @@ fn two_stores_on_one_cache_can_record_and_resolve_at_once() {
         let mut store = Store::open(&root).unwrap();
         for _ in 0..25 {
             store
-                .resolve(
-                    &review("f1", Verdict::Deferred, Reason::Unspecified),
-                    stamp("sem1"),
-                )
+                .resolve(&review("f1", Judgment::Fail), stamp("sem1"))
                 .unwrap();
         }
     });
@@ -137,8 +144,7 @@ fn record_inserts_refreshes_and_reopens_findings() {
             opened: 1,
             reopened: 0,
             resolved: 0,
-            deactivated: 0,
-            rewritten: 0
+            deactivated: 0
         }
     );
     let first = store.finding("f1").unwrap();
@@ -147,7 +153,7 @@ fn record_inserts_refreshes_and_reopens_findings() {
     assert_eq!(first.commit.as_deref(), Some("abc123"));
     assert_eq!(first.dirty, Some(true));
     assert_eq!(first.options["max"], 3);
-    assert_eq!(first.authored_severity.as_deref(), Some("info"));
+    assert_eq!(first.authored_severity, Severity::Info);
     assert_eq!(first.lighthouse_version.as_deref(), Some("0.1.0"));
     assert_eq!(first.catalog_version.as_deref(), Some("cat1"));
     assert_eq!(first.state(), State::Open);
@@ -289,20 +295,25 @@ fn finding_expands_unique_prefixes_and_rejects_the_rest() {
 #[test]
 fn resolve_freezes_the_finding_as_it_was_last_seen() {
     let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
-    let mut input = review("f1", Verdict::Rejected, Reason::IntentionalException);
-    input.reason_text = Some("hot path".to_owned());
+    let mut input = review("f1", Judgment::Fail);
+    input.reason = Some("hot path".to_owned());
+    input.suppress = Some("named policy".to_owned());
     let resolved = store.resolve(&input, stamp("sem1")).unwrap();
     let event = &resolved.event;
     assert_eq!(event.fingerprint, "f1");
-    assert_eq!(event.rule_id, "design/a");
-    assert_eq!(event.rule_version.as_deref(), Some("sem1"));
+    assert_eq!(event.decision_name, "design/a");
+    assert_eq!(event.judgment, Judgment::Fail);
+    assert_eq!(event.reason.as_deref(), Some("hot path"));
+    assert_eq!(event.suppressions.len(), 1);
+    assert_eq!(event.suppressions[0].justification, "named policy");
+    assert_eq!(event.meaning_version.as_deref(), Some("sem1"));
     assert_eq!(event.decision_hash.as_deref(), Some("full1"));
     assert_eq!(event.catalog_version.as_deref(), Some("cat1"));
     assert_eq!(event.lighthouse_version.as_deref(), Some("0.1.0"));
     assert_eq!(event.language.as_deref(), Some("go"));
     assert_eq!(event.scope.as_deref(), Some("symbol"));
     assert_eq!(event.commit.as_deref(), Some("def456"));
-    assert_eq!(event.reviewer_id.as_deref(), Some("claude"));
+    assert_eq!(event.was_attributed_to.id.as_deref(), Some("claude"));
     assert_eq!(event.label(), Label::Separate);
     assert_eq!(event.id.len(), 32);
     assert_eq!(resolved.finding.fingerprint, "f1");
@@ -319,12 +330,11 @@ fn resolve_freezes_the_finding_as_it_was_last_seen() {
     assert_eq!(snapshot["commit"], "abc123");
     assert_eq!(snapshot["dirty"], true);
     assert_eq!(snapshot["lighthouseVersion"], "0.1.0");
-    assert!(snapshot["patternFingerprint"].is_null());
 
     let mut changed = observed("f1", "design/a", "a.go");
     changed.facts = json!({ "language": "go", "callers": 50 });
     store.record(&run(vec![changed])).unwrap();
-    judge(&mut store, "f1", Verdict::Deferred, Reason::Unspecified);
+    judge(&mut store, "f1", Judgment::Pass);
     let history = store.history("f1").unwrap();
     assert_eq!(history.len(), 2);
     assert_eq!(history[0].snapshot["facts"]["callers"], 2);
@@ -332,131 +342,106 @@ fn resolve_freezes_the_finding_as_it_was_last_seen() {
 }
 
 #[test]
-fn resolve_validates_reasons_findings_and_the_sighting() {
+fn resolve_validates_suppressions_findings_and_the_sighting() {
     let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
-    for (verdict, reason) in [
-        (Verdict::Rejected, Reason::Unspecified),
-        (Verdict::Rejected, Reason::Fixed),
-        (Verdict::Confirmed, Reason::FalsePositive),
-        (Verdict::Deferred, Reason::AcceptedDebt),
-    ] {
-        let error = store
-            .resolve(&review("f1", verdict, reason), stamp("sem1"))
-            .unwrap_err();
-        assert!(matches!(error, Error::Reason(_)), "{verdict} {reason}");
+    for judgment in [Judgment::Pass, Judgment::NotApplicable] {
+        let mut input = review("f1", judgment);
+        input.suppress = Some("why".to_owned());
+        let error = store.resolve(&input, stamp("sem1")).unwrap_err();
+        assert!(
+            matches!(error, Error::SuppressionWithoutFail(j) if j == judgment),
+            "{judgment}"
+        );
     }
     assert!(store.history("f1").unwrap().is_empty());
-    let unknown = store.resolve(
-        &review("zz", Verdict::Confirmed, Reason::Fixed),
-        stamp("sem1"),
-    );
+    let unknown = store.resolve(&review("zz", Judgment::Fail), stamp("sem1"));
     assert!(matches!(unknown, Err(Error::UnknownFinding(_))));
 
     let seen = store.finding("f1").unwrap().last_seen;
-    let mut stale = review("f1", Verdict::Confirmed, Reason::Fixed);
+    let mut stale = review("f1", Judgment::Fail);
     stale.expect_seen = Some("2000-01-01T00:00:00.000Z".to_owned());
     assert!(matches!(
         store.resolve(&stale, stamp("sem1")),
         Err(Error::Changed { .. })
     ));
-    let mut current = review("f1", Verdict::Confirmed, Reason::Fixed);
+    let mut current = review("f1", Judgment::Fail);
     current.expect_seen = Some(seen);
     store.resolve(&current, stamp("sem1")).unwrap();
 }
 
 #[test]
-fn review_log_is_append_only() {
+fn judgments_and_suppressions_are_append_only() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = Store::open(dir.path()).unwrap();
     store
         .record(&run(vec![observed("f1", "design/a", "a.go")]))
         .unwrap();
-    judge(&mut store, "f1", Verdict::Confirmed, Reason::Fixed);
+    judge_suppressed(&mut store, "f1", "named policy");
 
     let raw = Connection::open(Store::path_in(dir.path())).unwrap();
-    let update = raw.execute("UPDATE review_events SET verdict = 'rejected'", []);
-    assert!(update.unwrap_err().to_string().contains("append-only"));
-    let delete = raw.execute("DELETE FROM review_events", []);
-    assert!(delete.unwrap_err().to_string().contains("append-only"));
+    for table in ["judgments", "suppressions"] {
+        let update = raw.execute(&format!("UPDATE {table} SET fingerprint = 'x'"), []);
+        assert!(update.unwrap_err().to_string().contains("append-only"));
+        let delete = raw.execute(&format!("DELETE FROM {table}"), []);
+        assert!(delete.unwrap_err().to_string().contains("append-only"));
+    }
     assert_eq!(store.history("f1").unwrap().len(), 1);
 }
 
 #[test]
-fn standings_follow_the_latest_verdict() {
+fn standings_follow_the_latest_judgment() {
     let mut store = memory_with(&[
-        observed("rejected", "design/a", "a.go"),
-        observed("confirmed", "design/a", "b.go"),
-        observed("reconsidered", "design/a", "c.go"),
+        observed("pass", "design/a", "a.go"),
+        observed("fail", "design/a", "b.go"),
+        observed("left", "design/a", "c.go"),
         observed("broad", "design/a", "d.go"),
-        observed("unreviewed", "design/a", "e.go"),
+        observed("reconsidered", "design/a", "e.go"),
+        observed("unjudged", "design/a", "f.go"),
     ]);
-    judge(
-        &mut store,
-        "rejected",
-        Verdict::Rejected,
-        Reason::FalsePositive,
-    );
-    judge(
-        &mut store,
-        "confirmed",
-        Verdict::Confirmed,
-        Reason::AcceptedDebt,
-    );
-    judge(
-        &mut store,
-        "reconsidered",
-        Verdict::Rejected,
-        Reason::ProjectAllowed,
-    );
-    judge(
-        &mut store,
-        "broad",
-        Verdict::Rejected,
-        Reason::ScopeTooBroad,
-    );
+    judge(&mut store, "pass", Judgment::Pass);
+    judge(&mut store, "fail", Judgment::Fail);
+    judge_suppressed(&mut store, "left", "project-allowed");
+    judge(&mut store, "broad", Judgment::NotApplicable);
+    judge_suppressed(&mut store, "reconsidered", "named policy");
     let standings = store.standings().unwrap();
     let keys: Vec<_> = standings.keys().map(String::as_str).collect();
-    assert_eq!(keys, ["broad", "reconsidered", "rejected"]);
-    assert!(
-        standings
-            .values()
-            .all(|j| j.standing == Standing::Suppressed)
-    );
-    assert_eq!(standings["rejected"].reason, Reason::FalsePositive);
-
-    judge(
-        &mut store,
-        "reconsidered",
-        Verdict::Deferred,
-        Reason::Unspecified,
-    );
-    assert_eq!(standing_of(&store, "reconsidered"), None);
-    assert_eq!(store.finding("reconsidered").unwrap().state(), State::Open);
     assert_eq!(
-        store.finding("rejected").unwrap().state(),
-        State::Suppressed
+        keys,
+        ["broad", "fail", "left", "pass", "reconsidered"],
+        "a finding nobody judged has no standing"
     );
+    assert_eq!(standings["pass"].standing, Standing::Suppressed);
+    assert_eq!(standings["broad"].standing, Standing::Suppressed);
+    assert_eq!(standings["left"].standing, Standing::Suppressed);
+    assert_eq!(
+        standings["left"].justification.as_deref(),
+        Some("project-allowed")
+    );
+    assert_eq!(standings["fail"].standing, Standing::Judged);
+    assert_eq!(standings["fail"].judgment, Judgment::Fail);
+    assert!(standings["fail"].justification.is_none());
+
+    judge(&mut store, "reconsidered", Judgment::Fail);
+    assert_eq!(standing_of(&store, "reconsidered"), Some(Standing::Judged));
+    assert_eq!(store.finding("reconsidered").unwrap().state(), State::Open);
+    assert_eq!(store.finding("pass").unwrap().state(), State::Suppressed);
+    assert_eq!(store.finding("fail").unwrap().state(), State::Open);
 }
 
 #[test]
-fn a_verdict_expires_when_the_rule_or_the_evidence_changes() {
+fn a_judgment_expires_when_the_decision_or_the_evidence_changes() {
     let mut store = memory_with(&[
         observed("rule", "design/a", "a.go"),
         observed("evidence", "design/a", "b.go"),
         observed("same", "design/a", "c.go"),
     ]);
     for fingerprint in ["rule", "evidence", "same"] {
-        judge(
-            &mut store,
-            fingerprint,
-            Verdict::Rejected,
-            Reason::IntentionalException,
-        );
+        judge_suppressed(&mut store, fingerprint, "intentional-exception");
     }
     assert_eq!(standing_of(&store, "same"), Some(Standing::Suppressed));
 
     let mut rule = observed("rule", "design/a", "a.go");
-    rule.rule_version = Some("sem2".to_owned());
+    rule.meaning_version = Some("sem2".to_owned());
     let mut evidence = observed("evidence", "design/a", "b.go");
     evidence.evidence = json!({ "fan_out": 20 });
     let same = observed("same", "design/a", "c.go");
@@ -479,11 +464,11 @@ fn a_verdict_expires_when_the_rule_or_the_evidence_changes() {
 }
 
 #[test]
-fn evidence_that_only_reflows_does_not_expire_a_verdict() {
+fn evidence_that_only_reflows_does_not_expire_a_judgment() {
     let mut first = observed("f1", "design/a", "a.go");
     first.evidence = json!({ "callee": "a  b\n c", "n": 1 });
     let mut store = memory_with(&[first]);
-    judge(&mut store, "f1", Verdict::Rejected, Reason::FalsePositive);
+    judge(&mut store, "f1", Judgment::Pass);
     let mut reflowed = observed("f1", "design/a", "a.go");
     reflowed.evidence = json!({ "n": 1, "callee": "a b c" });
     store.record(&run(vec![reflowed])).unwrap();
@@ -491,56 +476,44 @@ fn evidence_that_only_reflows_does_not_expire_a_verdict() {
 }
 
 #[test]
-fn a_verdict_suppresses_by_the_authored_severity_of_the_finding_not_by_its_reported_one() {
+fn a_judgment_hides_by_the_authored_severity_of_the_finding_not_by_its_reported_one() {
     let mut error = observed("f1", "design/a", "a.go");
     error.severity = Severity::Error;
-    error.authored_severity = "warn".to_owned();
+    error.authored_severity = Severity::Warn;
     let mut store = memory_with(&[error]);
-    judge(&mut store, "f1", Verdict::Rejected, Reason::FalsePositive);
+    judge(&mut store, "f1", Judgment::Pass);
     assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
-    assert!(store.finding("f1").unwrap().needs_verdict());
+    assert!(
+        !store.finding("f1").unwrap().needs_review(),
+        "judged findings do not ask for review"
+    );
 }
 
 #[test]
-fn definitive_findings_are_never_suppressed_by_a_verdict() {
+fn errors_are_never_hidden_by_a_judgment() {
     let mut error = observed("f1", "design/a", "a.go");
     error.severity = Severity::Warn;
-    error.authored_severity = "error".to_owned();
+    error.authored_severity = Severity::Error;
     let mut store = memory_with(&[error]);
-    judge(
-        &mut store,
-        "f1",
-        Verdict::Rejected,
-        Reason::IntentionalException,
-    );
+    judge_suppressed(&mut store, "f1", "intentional-exception");
     assert_eq!(standing_of(&store, "f1"), Some(Standing::Unsuppressible));
     assert_eq!(
         store.history("f1").unwrap().len(),
         1,
-        "the verdict is still recorded"
+        "the judgment is still recorded"
     );
     assert_eq!(fingerprints(&store, &status(StatusFilter::Open)), ["f1"]);
     assert!(fingerprints(&store, &status(StatusFilter::Suppressed)).is_empty());
 }
 
 #[test]
-fn narrowing_lists_the_findings_rejected_as_too_broad() {
+fn narrowing_lists_the_findings_judged_not_applicable() {
     let mut store = memory_with(&[
         observed("broad", "design/a", "a.go"),
         observed("wrong", "design/a", "b.go"),
     ]);
-    judge(
-        &mut store,
-        "broad",
-        Verdict::Rejected,
-        Reason::ScopeTooBroad,
-    );
-    judge(
-        &mut store,
-        "wrong",
-        Verdict::Rejected,
-        Reason::FalsePositive,
-    );
+    judge(&mut store, "broad", Judgment::NotApplicable);
+    judge(&mut store, "wrong", Judgment::Pass);
     assert_eq!(
         fingerprints(&store, &status(StatusFilter::Narrowing)),
         ["broad"]
@@ -561,7 +534,7 @@ fn list_filters_by_rule_and_status() {
         observed("b1", "design/b", "c.go"),
         observed("gone", "design/b", "d.go"),
     ]);
-    judge(&mut store, "a2", Verdict::Rejected, Reason::NotWorthFixing);
+    judge_suppressed(&mut store, "a2", "won't-fix");
     let again = run(vec![
         observed("a1", "design/a", "a.go"),
         observed("a2", "design/a", "b.go"),
@@ -588,20 +561,19 @@ fn list_filters_by_rule_and_status() {
     };
     assert_eq!(fingerprints(&store, &rule), ["b1", "gone"]);
     let listed = store.list(&status(StatusFilter::Suppressed)).unwrap();
-    let latest = listed[0].review.unwrap();
-    assert_eq!(latest.verdict, Verdict::Rejected);
-    assert_eq!(latest.reason, Reason::NotWorthFixing);
+    assert_eq!(listed[0].judgment, Some(Judgment::Fail));
+    assert_eq!(listed[0].justification.as_deref(), Some("won't-fix"));
     assert_eq!(listed[0].standing, Some(Standing::Suppressed));
 }
 
 #[test]
-fn prune_removes_only_unreviewed_findings_that_are_resolved_or_inactive() {
+fn prune_removes_only_unjudged_findings_that_are_resolved_or_inactive() {
     let mut store = memory_with(&[
         observed("open", "design/a", "a.go"),
         observed("resolved", "design/a", "b.go"),
         observed("reviewed", "design/a", "c.go"),
     ]);
-    judge(&mut store, "reviewed", Verdict::Confirmed, Reason::Fixed);
+    judge(&mut store, "reviewed", Judgment::Fail);
     store
         .record(&run(vec![observed("open", "design/a", "a.go")]))
         .unwrap();
@@ -641,111 +613,11 @@ fn observed_records_a_diagnostic_and_digests_its_evidence() {
     assert_ne!(spaced.evidence_digest(), record.evidence_digest());
 }
 
-/// The schema of version 1, as the first release wrote it.
-const V1_SCHEMA: &str = "
-CREATE TABLE findings (
-    fingerprint TEXT PRIMARY KEY, rule_id TEXT NOT NULL, severity TEXT NOT NULL,
-    path TEXT NOT NULL, locator TEXT NOT NULL, symbol TEXT, first_seen TEXT NOT NULL,
-    last_seen TEXT NOT NULL, resolved_at TEXT, reopened INTEGER NOT NULL DEFAULT 0,
-    last_message TEXT NOT NULL, last_evidence TEXT NOT NULL, last_facts TEXT NOT NULL
-);
-CREATE TABLE review_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    fingerprint TEXT NOT NULL REFERENCES findings (fingerprint),
-    rule_id TEXT NOT NULL, rule_version TEXT, catalog_version TEXT, pattern_fingerprint TEXT,
-    verdict TEXT NOT NULL CHECK (verdict IN ('confirmed', 'rejected', 'deferred')),
-    reason_code TEXT NOT NULL, reason_text TEXT,
-    reviewer_kind TEXT NOT NULL CHECK (reviewer_kind IN ('agent', 'human')),
-    reviewer_id TEXT, language TEXT, scope TEXT, evidence TEXT NOT NULL,
-    feature_snapshot TEXT NOT NULL, git_commit TEXT, timestamp TEXT NOT NULL
-);
-CREATE TRIGGER review_events_append_only_update BEFORE UPDATE ON review_events
-BEGIN SELECT RAISE(ABORT, 'review_events is append-only'); END;
-CREATE TRIGGER review_events_append_only_delete BEFORE DELETE ON review_events
-BEGIN SELECT RAISE(ABORT, 'review_events is append-only'); END;
-CREATE VIEW latest_verdicts AS
-SELECT fingerprint, id AS event_id, verdict, reason_code FROM review_events e
-WHERE id = (SELECT MAX(id) FROM review_events WHERE fingerprint = e.fingerprint);
-CREATE VIEW suppressions AS
-SELECT fingerprint, event_id, reason_code, (reason_code = 'scope-too-broad') AS narrowing
-FROM latest_verdicts WHERE verdict = 'rejected';
-CREATE VIEW finding_states AS
-SELECT f.*, l.verdict, l.reason_code,
-       EXISTS (SELECT 1 FROM suppressions s WHERE s.fingerprint = f.fingerprint) AS suppressed
-FROM findings f LEFT JOIN latest_verdicts l ON l.fingerprint = f.fingerprint;
-";
-
-#[test]
-fn migration_rewrites_the_append_only_table_and_exports_old_verdicts_to_the_log() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = Store::path_in(dir.path());
-    fs::create_dir_all(path.parent().unwrap()).unwrap();
-    {
-        let old = Connection::open(&path).unwrap();
-        old.execute_batch(V1_SCHEMA).unwrap();
-        old.execute(
-            "INSERT INTO findings VALUES ('f1', 'design/a', 'review', 'a.go', '{}', NULL, \
-             '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL, 0, 'm', '{\"n\":1}', '{}')",
-            [],
-        )
-        .unwrap();
-        old.execute(
-            "INSERT INTO review_events (fingerprint, rule_id, rule_version, verdict, reason_code, \
-             reviewer_kind, evidence, feature_snapshot, timestamp) VALUES ('f1', 'design/a', 'pattern-hash', \
-             'rejected', 'false-positive', 'human', '{\"n\":1}', '{\"evidence\":{\"n\":1}}', '2026-01-02T00:00:00.000Z')",
-            [],
-        )
-        .unwrap();
-        old.pragma_update(None, "user_version", 1).unwrap();
-    }
-
-    let mut store = Store::open(dir.path()).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 7);
-    let history = store.history("f1").unwrap();
-    assert_eq!(history.len(), 1);
-    assert!(history[0].id.starts_with("legacy-"));
-    assert_eq!(history[0].decision_hash.as_deref(), Some("pattern-hash"));
-    assert_eq!(history[0].rule_version, None);
-    assert_eq!(history[0].evidence()["n"], 1);
-    assert_eq!(log_of(dir.path()).lines().count(), 1, "exported once");
-
-    let migrated = store.finding("f1").unwrap();
-    assert_eq!(migrated.severity, "review");
-    store
-        .record(&run(vec![observed("f1", "design/a", "a.go")]))
-        .unwrap();
-    assert_eq!(
-        standing_of(&store, "f1"),
-        Some(Standing::Suppressed),
-        "an old verdict matches any version"
-    );
-    drop(store);
-    assert_eq!(
-        Store::open(dir.path())
-            .unwrap()
-            .history("f1")
-            .unwrap()
-            .len(),
-        1
-    );
-    assert_eq!(
-        log_of(dir.path()).lines().count(),
-        1,
-        "and is not exported again"
-    );
-
-    let raw = Connection::open(&path).unwrap();
-    let update = raw.execute("UPDATE review_events SET verdict = 'confirmed'", []);
-    assert!(
-        update.unwrap_err().to_string().contains("append-only"),
-        "triggers are back"
-    );
-}
-
 #[test]
 fn as_str_names_each_standing() {
     let names = [
         (Standing::Suppressed, "suppressed"),
+        (Standing::Judged, "judged"),
         (Standing::RuleChanged, "rule-changed"),
         (Standing::EvidenceChanged, "evidence-changed"),
         (Standing::Unsuppressible, "unsuppressible"),
@@ -756,58 +628,39 @@ fn as_str_names_each_standing() {
 }
 
 #[test]
-fn a_verdict_recorded_under_the_semantic_version_of_before_still_applies_while_the_decision_is_unchanged()
- {
-    let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
-    judge(
-        &mut store,
-        "f1",
-        Verdict::Rejected,
-        Reason::IntentionalException,
-    );
-    assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
-
-    // The decision is now identified by a new hash, and remembers the old one.
-    let mut migrated = observed("f1", "design/a", "a.go");
-    migrated.rule_version = Some("sem-new".to_owned());
-    migrated.legacy_rule_version = Some("sem1".to_owned());
-    store.record(&run(vec![migrated])).unwrap();
-    assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
-
-    // Once the decision changes, the old verdict goes with its old hash.
-    let mut edited = observed("f1", "design/a", "a.go");
-    edited.rule_version = Some("sem-newer".to_owned());
-    edited.legacy_rule_version = Some("sem-edited".to_owned());
-    store.record(&run(vec![edited])).unwrap();
-    assert_eq!(standing_of(&store, "f1"), Some(Standing::RuleChanged));
-}
-
-#[test]
-fn a_finding_asks_for_a_verdict_when_its_decision_did_not_author_an_error() {
+fn a_finding_asks_for_review_when_its_decision_did_not_author_an_error_and_nobody_judged_it() {
     let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
     let finding = |store: &Store| store.finding("f1").unwrap();
-    assert!(finding(&store).needs_verdict(), "authored info");
+    assert!(finding(&store).needs_review(), "authored info");
 
     let mut definitive = observed("f1", "design/a", "a.go");
-    definitive.authored_severity = "error".to_owned();
+    definitive.authored_severity = Severity::Error;
     store.record(&run(vec![definitive])).unwrap();
-    assert!(!finding(&store).needs_verdict());
+    assert!(!finding(&store).needs_review());
 
     let mut review = observed("f1", "design/a", "a.go");
-    review.authored_severity = "warn".to_owned();
+    review.authored_severity = Severity::Warn;
     review.severity = Severity::Error;
     store.record(&run(vec![review])).unwrap();
     assert!(
-        finding(&store).needs_verdict(),
+        finding(&store).needs_review(),
         "whatever the reported level"
     );
+
+    judge(&mut store, "f1", Judgment::Fail);
+    assert!(!finding(&store).needs_review(), "judged");
+
+    let mut moved = observed("f1", "design/a", "a.go");
+    moved.meaning_version = Some("sem2".to_owned());
+    store.record(&run(vec![moved])).unwrap();
+    assert!(finding(&store).needs_review(), "the judgment expired");
 }
 
 #[test]
-fn changing_only_how_a_decision_is_checked_keeps_its_verdicts_and_changing_what_it_means_expires_them()
+fn changing_only_how_a_decision_is_checked_keeps_its_judgments_and_changing_what_it_means_expires_them()
  {
     let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
-    judge(&mut store, "f1", Verdict::Rejected, Reason::FalsePositive);
+    judge(&mut store, "f1", Judgment::Pass);
 
     // Same meaning, another check: the verdict stands.
     let mut rechecked = observed("f1", "design/a", "a.go");
@@ -817,68 +670,7 @@ fn changing_only_how_a_decision_is_checked_keeps_its_verdicts_and_changing_what_
 
     // Another meaning: the verdict is asked again.
     let mut reworded = observed("f1", "design/a", "a.go");
-    reworded.rule_version = Some("sem2".to_owned());
+    reworded.meaning_version = Some("sem2".to_owned());
     store.record(&run(vec![reworded])).unwrap();
     assert_eq!(standing_of(&store, "f1"), Some(Standing::RuleChanged));
-}
-
-#[test]
-fn every_earlier_version_a_decision_lists_honors_the_verdicts_recorded_under_it() {
-    let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
-    judge(&mut store, "f1", Verdict::Rejected, Reason::FalsePositive);
-    let mut moved = observed("f1", "design/a", "a.go");
-    moved.rule_version = Some("meaning".to_owned());
-    moved.legacy_rule_version = Some("previous,sem1,oldest".to_owned());
-    store.record(&run(vec![moved])).unwrap();
-    assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
-}
-
-#[test]
-fn the_migration_turns_recorded_tiers_into_authored_severities() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = Store::path_in(dir.path());
-    fs::create_dir_all(path.parent().unwrap()).unwrap();
-    {
-        let mut store = Store::open(dir.path()).unwrap();
-        store
-            .record(&run(vec![
-                observed("m", "design/a", "a.go"),
-                observed("h", "design/a", "b.go"),
-                observed("j", "design/a", "c.go"),
-            ]))
-            .unwrap();
-    }
-    let raw = Connection::open(&path).unwrap();
-    // Put the database back where V5 left it, with tiers.
-    raw.execute_batch(
-        "DROP VIEW finding_states;
-         DROP VIEW standings;
-         DROP VIEW latest_verdicts;
-         DROP INDEX review_events_subject;
-         DROP TRIGGER review_events_append_only_update;
-         DROP TABLE decision_uids;
-         DROP TABLE fingerprint_rewrites;
-         ALTER TABLE findings DROP COLUMN decision_uid;
-         ALTER TABLE review_events DROP COLUMN decision_uid;
-         ALTER TABLE review_events DROP COLUMN subject;
-         CREATE TRIGGER review_events_append_only_update BEFORE UPDATE ON review_events
-         BEGIN SELECT RAISE(ABORT, 'review_events is append-only'); END;
-         CREATE VIEW latest_verdicts AS
-         SELECT e.fingerprint, e.event_id, e.verdict, e.reason_code, e.rule_version, e.evidence_digest
-         FROM review_events e;
-         CREATE VIEW standings AS SELECT f.fingerprint FROM findings f;
-         CREATE VIEW finding_states AS SELECT f.* FROM findings f;
-         ALTER TABLE findings DROP COLUMN check_revision;
-         ALTER TABLE review_events DROP COLUMN check_revision;
-         ALTER TABLE findings RENAME COLUMN authored_severity TO tier;
-         UPDATE findings SET tier = CASE fingerprint WHEN 'm' THEN 'mechanical' WHEN 'h' THEN 'heuristic' ELSE 'judgment' END;
-         PRAGMA user_version = 5;",
-    )
-    .unwrap();
-    drop(raw);
-    let store = Store::open(dir.path()).unwrap();
-    let authored = |fingerprint: &str| store.finding(fingerprint).unwrap().authored_severity;
-    assert_eq!(authored("m").as_deref(), Some("error"));
-    assert_eq!(authored("h").as_deref(), Some("warn"));
-    assert_eq!(authored("j").as_deref(), Some("info"));
 }

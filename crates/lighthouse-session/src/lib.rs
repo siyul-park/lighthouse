@@ -1,5 +1,5 @@
 //! The operations every Lighthouse frontend shares: loading a project, running
-//! a check and remembering it, recording review verdicts, testing and
+//! a check and remembering it, recording judgments, testing and
 //! authoring decisions, migrating and validating spec documents, and writing
 //! the agent skill. The CLI, the MCP server and
 //! the agent hooks only parse their own input and print the results of these.
@@ -11,7 +11,6 @@ mod docs;
 mod findings;
 mod fix;
 mod git;
-pub mod migrate;
 mod project;
 mod reviewing;
 mod schema;
@@ -33,14 +32,15 @@ pub use findings::Remembered;
 pub use fix::{AppliedRow, DeclinedRow, FixSelection, Fixed, fix, fix_plan};
 pub use git::head;
 pub use lighthouse_engine::{FailOn, Timings};
-pub use lighthouse_model::{Reason, ReviewerKind, Severity, Verdict};
+pub use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};
 pub use lighthouse_resource::schema_file;
 pub use lighthouse_spec::{DOCS_DIR, FILE_NAME, write_atomic};
-pub use lighthouse_store::{FindingRecord, NewReview, ReviewEvent, Standing, StatusFilter};
-pub use migrate::{Migrated, migrate_paths, migrate_sources};
+pub use lighthouse_store::{
+    FindingRecord, JudgmentEvent, NewJudgment, Standing, StatusFilter, SuppressionEvent,
+};
 pub use project::{DEFAULT_CONFIG, Session, catalog_at, config_file, project_root};
 pub use reviewing::{
-    Recorded, Reviewer, TaskQuery, Tasks, record_verdict, review_finding, review_history,
+    Recorded, Reviewer, TaskQuery, Tasks, record_judgment, review_finding, review_history,
     review_prune, review_tasks,
 };
 pub use schema::{schema_of, schemas};

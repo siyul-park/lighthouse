@@ -32,22 +32,3 @@ fn local_files_and_local_dir() {
     assert_eq!(files.keys().collect::<Vec<_>>(), ["a.yaml"]);
     assert_eq!(files["a.yaml"], "id: local/a\n");
 }
-
-#[test]
-fn a_project_with_legacy_rules_is_refused_instead_of_ignored() {
-    let root = tempfile::tempdir().unwrap();
-    std::fs::create_dir_all(root.path().join(".lighthouse/rules")).unwrap();
-    std::fs::create_dir_all(root.path().join(".lighthouse/decisions")).unwrap();
-
-    for error in [
-        lighthouse_spec::local_files(root.path())
-            .unwrap_err()
-            .to_string(),
-        lighthouse_spec::load_local(root.path())
-            .unwrap_err()
-            .to_string(),
-    ] {
-        assert!(error.contains(".lighthouse/rules"), "{error}");
-        assert!(error.contains("lighthouse spec migrate"), "{error}");
-    }
-}

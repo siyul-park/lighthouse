@@ -1,0 +1,221 @@
+{
+  "$defs": {
+    "AgentKind": {
+      "description": "What kind of agent a record is attributed to, a W3C PROV class.",
+      "oneOf": [
+        {
+          "const": "Person",
+          "description": "A human.",
+          "type": "string"
+        },
+        {
+          "const": "SoftwareAgent",
+          "description": "A program, such as a coding agent or a model.",
+          "type": "string"
+        }
+      ]
+    },
+    "Attribution": {
+      "description": "`prov:wasAttributedTo`: who a record is attributed to.",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "$ref": "#/$defs/AgentKind"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    "Judgment": {
+      "description": "A recorded label on one subject, as SARIF's `result.kind` says it: not\nground truth. `pass` and `fail` label the check's conformance part;\n`notApplicable` labels its applicability part (the decision should not\napply here).",
+      "oneOf": [
+        {
+          "const": "pass",
+          "description": "The subject conforms: a finding about it was a false positive.",
+          "type": "string"
+        },
+        {
+          "const": "fail",
+          "description": "The subject violates the decision: a finding about it is right.",
+          "type": "string"
+        },
+        {
+          "const": "notApplicable",
+          "description": "The decision does not apply to the subject.",
+          "type": "string"
+        }
+      ]
+    },
+    "JudgmentSpec": {
+      "description": "The spec of the `Judgment` record: a label on one subject (here a finding),\nwith the finding frozen as it was seen. It is a recorded label, not ground\ntruth, and it belongs to the decision's `meaningVersion`: it expires when\nthat moves.",
+      "properties": {
+        "catalogVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checkRevision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decisionHash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decisionName": {
+          "description": "The name the decision had when the judgment was given, kept to be read;\n`decisionUid` is what identifies it.",
+          "type": "string"
+        },
+        "decisionUid": {
+          "description": "The uid of the decision: its identity across renames.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidenceDigest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fingerprint": {
+          "description": "The finding the judgment is about.",
+          "type": "string"
+        },
+        "generatedAtTime": {
+          "description": "`prov:generatedAtTime`.",
+          "type": "string"
+        },
+        "judgment": {
+          "$ref": "#/$defs/Judgment"
+        },
+        "language": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lighthouseVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "meaningVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "description": "Why, written for the next reader.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scope": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "snapshot": {
+          "description": "The finding frozen at judgment time: evidence, facts, options,\nseverities, when and where it was seen."
+        },
+        "wasAttributedTo": {
+          "$ref": "#/$defs/Attribution",
+          "description": "`prov:wasAttributedTo`: a `Person` or a `SoftwareAgent`."
+        }
+      },
+      "required": [
+        "fingerprint",
+        "decisionName",
+        "judgment",
+        "wasAttributedTo",
+        "generatedAtTime",
+        "snapshot"
+      ],
+      "type": "object"
+    },
+    "Metadata": {
+      "additionalProperties": false,
+      "description": "Who a resource is. Identity is `name`; grouping is by label, never by\nwhere the document is stored.",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Free notes; never used to select.",
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Selectable facts, keyed `lighthouse/<name>`.",
+          "type": "object"
+        },
+        "name": {
+          "description": "Fully qualified name, such as `design/minimal-names`.",
+          "type": "string"
+        },
+        "uid": {
+          "description": "Identity that outlives the name: a UUID v4 assigned once, never derived\nfrom the name (Kubernetes `metadata.uid`). Renaming a resource keeps it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/judgment.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "lighthouse/v1alpha1"
+    },
+    "kind": {
+      "const": "Judgment"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "spec": {
+      "$ref": "#/$defs/JudgmentSpec"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "title": "Judgment",
+  "type": "object"
+}

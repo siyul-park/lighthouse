@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: tdd
-  annotations:
-    lighthouse/was-names: testing/cover-contract-dimensions
 spec:
   title: Cover every contract dimension
   context: >-

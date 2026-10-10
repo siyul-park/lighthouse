@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: ownership
-  annotations:
-    lighthouse/was-names: design/borrow-within-boundary
 spec:
   title: Borrowed values stay within their boundary
   context: >-

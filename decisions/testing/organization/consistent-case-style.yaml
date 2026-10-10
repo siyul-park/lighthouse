@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization
-  annotations:
-    lighthouse/was-names: testing/single-case-style
 spec:
   title: One case style and one writing style
   context: >-

@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: naming
-  annotations:
-    lighthouse/was-names: design/singular-capability-plural-collection
 spec:
   title: "Singular capabilities, plural collections"
   context: >-

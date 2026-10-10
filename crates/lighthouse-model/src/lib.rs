@@ -8,10 +8,15 @@ mod scope;
 mod text;
 mod ucm;
 
-pub use diagnostic::{Diagnostic, Fingerprint, Incomplete, Severity, UnknownSeverity};
+pub use diagnostic::{
+    Diagnostic, Fingerprint, Incomplete, Severity, UnknownSeverity, needs_review,
+};
 pub use document::Document;
 pub use fix::{Anchor, EditOp, FixOutcome, Owner, Safety, UnknownSafety};
-pub use review::{Label, MismatchedReason, Reason, ReviewerKind, UnknownTerm, Verdict};
+pub use review::{
+    AgentKind, Attribution, Judgment, Label, Suppressed, Suppression, SuppressionKind,
+    SuppressionStatus, UnknownTerm,
+};
 pub use scope::{Applicability, RunScope, TestScope};
 pub use text::LineIndex;
 pub use ucm::{

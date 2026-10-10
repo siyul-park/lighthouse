@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: core
     lighthouse/section: annotations
-  annotations:
-    lighthouse/was-builtin: core/annotation-reason
-    lighthouse/was-names: core/annotation-reason
 spec:
   title: An allow annotation states its reason
   context: >-
@@ -35,7 +32,7 @@ spec:
           body: |-
             package sample
 
-            // lighthouse:allow design/exported-doc
+            // lighthouse-disable-next-line design/exported-doc
             func Open() {}
       expect:
         - line: 3
@@ -48,7 +45,7 @@ spec:
           body: |-
             package sample
 
-            // lighthouse:allow design/exported-doc -- generated shim
+            // lighthouse-disable-next-line design/exported-doc -- generated shim
             func Open() {}
     - name: rust-missing-reason
       language: rust
@@ -56,7 +53,7 @@ spec:
       files:
         - path: src/lib.rs
           body: |-
-            // lighthouse:allow design/exported-doc
+            // lighthouse-disable-next-line design/exported-doc
             pub fn open() {}
       expect:
         - line: 1
@@ -67,7 +64,7 @@ spec:
       files:
         - path: src/lib.rs
           body: |-
-            // lighthouse:allow design/exported-doc -- re-exported shim
+            // lighthouse-disable-next-line design/exported-doc -- re-exported shim
             pub fn open() {}
     - name: rust-disable-missing-reason
       language: rust

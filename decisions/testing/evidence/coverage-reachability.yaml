@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: evidence
-  annotations:
-    lighthouse/was-names: testing/coverage-is-reachability
 spec:
   title: Coverage proves reachability
   context: >-

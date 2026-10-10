@@ -64,13 +64,13 @@ pub fn kind_of(document: &Value) -> Option<&str> {
 }
 
 /// Reads `document` as the resource of spec `S`. A document without an
-/// `apiVersion` is a legacy one and says so.
+/// `apiVersion` is refused.
 pub fn resource<S: Spec + DeserializeOwned>(
     path: &str,
     document: &Value,
 ) -> Result<Resource<S>, Error> {
     let Some(version) = document.get("apiVersion").and_then(Value::as_str) else {
-        return Err(Error::Legacy {
+        return Err(Error::Unversioned {
             path: path.to_owned(),
             api_version: API_VERSION.to_owned(),
         });

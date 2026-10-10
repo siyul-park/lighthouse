@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: naming
-  annotations:
-    lighthouse/was-names: design/single-term-per-concept
 spec:
   title: "One term, one concept"
   context: >-

@@ -643,15 +643,3 @@ fn decision_test_rejects_unknown_ids() {
         .assert()
         .code(2);
 }
-
-#[test]
-fn the_old_rule_command_names_the_decision_command() {
-    let dir = project(6);
-    lighthouse(dir.path())
-        .args(["rule", "list", "--all"])
-        .assert()
-        .code(2)
-        .stderr(predicate::str::contains(
-            "run `lighthouse decision list --all`",
-        ));
-}

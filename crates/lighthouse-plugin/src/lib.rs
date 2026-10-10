@@ -211,10 +211,6 @@ pub struct RuleManifest {
     /// fingerprints are seeded with, so that renaming the decision moves none
     /// of them. `None` for a rule no decision describes.
     pub uid: Option<String>,
-    /// The ids the decision had before it was renamed. Fingerprints recorded
-    /// under them (or under `id`, before the decision had a uid) are the
-    /// legacy ones of its findings.
-    pub was: Vec<String>,
     pub severity: Severity,
     pub scope: RunScope,
     pub description: String,
@@ -227,36 +223,14 @@ pub struct RuleManifest {
 
 impl RuleManifest {
     /// The fingerprint of a finding of this rule about `symbol_path` with
-    /// `snippet`, seeded by the decision's uid, and, for one release, the
-    /// fingerprints the same finding had when the decision's names seeded it
-    /// (its id, then the ids it was renamed from). A rule without a uid is
-    /// seeded by its id and has none.
-    pub fn fingerprints(
-        &self,
-        symbol_path: &str,
-        snippet: &str,
-    ) -> (Fingerprint, Vec<Fingerprint>) {
-        self.fingerprints_for(symbol_path, snippet, snippet)
-    }
-
-    /// Like [`RuleManifest::fingerprints`], for a finding whose identity is
-    /// now `snippet` but was `legacy_snippet` when the names seeded it.
-    pub fn fingerprints_for(
-        &self,
-        symbol_path: &str,
-        snippet: &str,
-        legacy_snippet: &str,
-    ) -> (Fingerprint, Vec<Fingerprint>) {
-        match &self.uid {
-            Some(uid) => (
-                Fingerprint::of(uid, symbol_path, snippet),
-                std::iter::once(&self.id)
-                    .chain(&self.was)
-                    .map(|name| Fingerprint::of(name, symbol_path, legacy_snippet))
-                    .collect(),
-            ),
-            None => (Fingerprint::of(&self.id, symbol_path, snippet), Vec::new()),
-        }
+    /// `snippet`, seeded by the decision's uid; a rule without a uid is
+    /// seeded by its id.
+    pub fn fingerprint(&self, symbol_path: &str, snippet: &str) -> Fingerprint {
+        Fingerprint::of(
+            self.uid.as_deref().unwrap_or(&self.id),
+            symbol_path,
+            snippet,
+        )
     }
 }
 

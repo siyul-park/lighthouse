@@ -1,20 +1,16 @@
-//! `lighthouse spec validate`, `lighthouse spec migrate` and `lighthouse
-//! schema`: the commands that work on spec documents themselves.
+//! `lighthouse spec validate` and `lighthouse schema`: the commands that work on spec documents themselves.
 
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 
-use lighthouse_session::{
-    Session, config_file, migrate_sources, schema_file, schema_of, schemas, validate_paths,
-};
+use lighthouse_session::{Session, config_file, schema_file, schema_of, schemas, validate_paths};
 
 use crate::Result;
 
 /// Where a project keeps its own decisions, for the default of both commands.
 const LOCAL_DECISIONS: &str = ".lighthouse/decisions";
-const LOCAL_RULES: &str = ".lighthouse/rules";
 
 /// Validates the documents under `paths`; the project's configuration and
 /// local decisions when there are none. Returns 1 when anything is wrong.
@@ -41,36 +37,6 @@ pub fn validate(paths: &[PathBuf], examples: bool) -> Result<u8> {
         report.problems.len()
     );
     Ok(u8::from(!report.problems.is_empty()))
-}
-
-/// Migrates the documents under `paths`; the project's configuration and
-/// `.lighthouse/rules` when there are none.
-pub fn migrate(paths: &[PathBuf], dry_run: bool) -> Result<u8> {
-    let root = lighthouse_session::project_root()?;
-    let (paths, sources) = if paths.is_empty() {
-        (defaults(&root, &[LOCAL_RULES, LOCAL_DECISIONS]), vec![root])
-    } else {
-        (paths.to_vec(), paths.to_vec())
-    };
-    let migrated = migrate_sources(&paths, &sources, dry_run)?;
-    let verb = if dry_run { "would write" } else { "wrote" };
-    for path in &migrated.written {
-        println!("{verb} {}", path.display());
-    }
-    let verb = if dry_run { "would remove" } else { "removed" };
-    for path in &migrated.removed {
-        println!("{verb} {}", path.display());
-    }
-    for warning in &migrated.warnings {
-        eprintln!("warning: {warning}");
-    }
-    println!(
-        "{} file(s) written, {} removed, {} document(s) already migrated",
-        migrated.written.len(),
-        migrated.removed.len(),
-        migrated.unchanged
-    );
-    Ok(0)
 }
 
 /// Prints one schema, lists the kinds, or with `write` writes every schema

@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: comments
-  annotations:
-    lighthouse/was-builtin: design/exported-doc
 spec:
   title: Exported symbols are documented
   context: >-

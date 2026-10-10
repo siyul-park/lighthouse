@@ -29,7 +29,7 @@ pub struct FixSelection {
     pub unsafe_fixes: bool,
     /// Use this registered fixer instead of the catalog's.
     pub fixer: Option<String>,
-    /// Record the run and its fixes, and leave out what verdicts suppress.
+    /// Record the run and its fixes, and leave out what judgments hide.
     pub store: bool,
 }
 
@@ -151,7 +151,7 @@ fn slashed(path: &std::path::Path) -> String {
 
 /// Reads the project as it is before any fix, recording it when the run uses
 /// the store, and returns the
-/// findings that verdicts keep out of reports: a fixer leaves those alone.
+/// findings that judgments keep out of reports: a fixer leaves those alone.
 fn suppressed(
     engine: &Engine,
     root: &std::path::Path,
@@ -167,7 +167,7 @@ fn suppressed(
     if store {
         findings::remember(root, catalog, &mut outcome);
     } else {
-        findings::apply_verdicts(root, &mut outcome);
+        findings::apply_judgments(root, &mut outcome);
     }
     let kept: BTreeSet<Fingerprint> = outcome
         .diagnostics

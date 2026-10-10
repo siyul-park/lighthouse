@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: principles
-  annotations:
-    lighthouse/was-names: design/single-owner
 spec:
   title: "One implementation, one owner"
   context: >-

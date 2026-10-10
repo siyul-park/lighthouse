@@ -77,6 +77,7 @@ pub fn render_with(
             incomplete,
             briefing.catalog,
             briefing.fixes,
+            briefing.suppressions.unwrap_or_default(),
             briefing.sources,
         ),
         Format::Agent => agent::text(diagnostics, incomplete, briefing),

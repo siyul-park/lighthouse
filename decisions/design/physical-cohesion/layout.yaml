@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: physical-cohesion
-  annotations:
-    lighthouse/was-names: design/readable-layout
 spec:
   title: Layout shows ownership
   context: >-

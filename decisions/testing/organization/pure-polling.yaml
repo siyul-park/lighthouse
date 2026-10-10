@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization
-  annotations:
-    lighthouse/was-names: testing/polling-conditions-are-pure
 spec:
   title: Polling conditions only observe
   context: >-

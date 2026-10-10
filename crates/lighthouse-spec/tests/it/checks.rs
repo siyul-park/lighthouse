@@ -1,6 +1,5 @@
 //! The providers a `check:` block can name, and what the types around them say.
 
-use lighthouse_model::Severity;
 use lighthouse_spec::{
     Batch, BuiltinCheck, Catalog, Check, CheckKind, CommandCheck, Decision, DecisionStatus,
     ExitCodes, ModelCheck, NamedRule,
@@ -118,28 +117,6 @@ fn status_enforced_is_true_only_for_accepted() {
 fn status_is_default_only_for_accepted() {
     assert!(DecisionStatus::Accepted.is_default());
     assert!(!DecisionStatus::Rejected.is_default());
-}
-
-#[test]
-fn decision_previous_semantic_version_hashes_what_the_enforcement_build_hashed() {
-    let decision = bundled("design/coupling");
-    let rewired = decision.clone().map_spec(|mut s| {
-        s.severity = Some(Severity::Info);
-        s
-    });
-    assert_eq!(decision.previous_semantic_version().len(), 16);
-    assert_ne!(
-        decision.previous_semantic_version(),
-        rewired.previous_semantic_version()
-    );
-}
-
-#[test]
-fn decision_earlier_versions_lists_every_version_older_builds_recorded() {
-    let decision = bundled("core/max-lines");
-    let versions = decision.earlier_versions();
-    assert!(versions.contains(&decision.previous_semantic_version()));
-    assert!(versions.contains(&decision.legacy_semantic_version().unwrap()));
 }
 
 #[test]

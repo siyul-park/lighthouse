@@ -9,7 +9,7 @@ use ignore::WalkBuilder;
 use lighthouse_model::RunScope;
 use lighthouse_model::{
     Applicability, Diagnostic, File, Fingerprint, Fragment, Incomplete, Options, Project, Severity,
-    hash,
+    Suppressed, hash,
 };
 use lighthouse_plugin::{
     Ctx, Facts, Indexed, LanguageProvider, Memo, Registry, Rule, RuleManifest, Source, Workspace,
@@ -23,9 +23,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
-    aliases,
-    annotations::{self, Allowed},
-    documents,
+    annotations, documents,
     generated::Attributes,
     identity,
     subject::Subjects,
@@ -96,9 +94,9 @@ pub struct Outcome {
     /// Every rule the configuration enables for some file, whether or not it
     /// ran: a remembered finding of any other rule is no longer configured.
     pub configured: Vec<String>,
-    /// Findings that source annotations allow, within the report scope. They
-    /// are not in `diagnostics` and never fail the run.
-    pub allowed: Vec<Allowed>,
+    /// Findings that source directives suppress, within the report scope.
+    /// They are not in `diagnostics` and never fail the run.
+    pub suppressed: Vec<Suppressed>,
     /// The analysis the findings came from; fixes read it.
     pub project: Project,
     /// Where the time of the run went.
@@ -214,8 +212,6 @@ pub struct Engine {
     /// Rules whose decision is about the project's own documents (the `spec`
     /// domain): a run that selects one finds those documents first.
     documented: BTreeSet<String>,
-    /// Ids decisions were renamed from, with their current ids.
-    aliases: BTreeMap<String, String>,
     /// The `linguist-generated` attributes of the project.
     attributes: Attributes,
     /// What assembling the engine found worth telling; every run reports it.
@@ -241,10 +237,8 @@ impl Engine {
         catalog: &Catalog,
         root: &Path,
     ) -> Result<Self, Error> {
-        let aliases = catalog.aliases();
-        let mut config = config;
-        let mut projects = catalog.projects()?;
-        let mut notices = aliases::apply(&mut config, &mut projects, &aliases);
+        let projects = catalog.projects()?;
+        let mut notices = Vec::new();
         validate_config(&registry, &config, &projects)?;
         let (providers, languages) = load_languages(&registry, &config)?;
         let root = root.canonicalize().map_err(io_error(root))?;
@@ -269,7 +263,6 @@ impl Engine {
                 .filter(|d| d.scope.domain == Domain::Spec)
                 .map(|d| d.id().to_owned())
                 .collect(),
-            aliases,
             attributes,
             notices,
             ws,
@@ -327,20 +320,6 @@ impl Engine {
         only: &[String],
         overlays: &Overlays,
     ) -> Result<Outcome, Error> {
-        let only_before = only;
-        let only: Vec<String> = only
-            .iter()
-            .map(|id| self.aliases.get(id).unwrap_or(id).clone())
-            .collect();
-        let only = &only[..];
-        let mut asked_by_old_id: Vec<String> = Vec::new();
-        for (asked, now) in only_before.iter().zip(only) {
-            if asked != now {
-                asked_by_old_id.push(format!(
-                    "decision `{asked}` is now `{now}`; the old id still works"
-                ));
-            }
-        }
         for id in only {
             if self.registry.rule(id).is_none() {
                 return Err(Error::UnknownRule(id.clone()));
@@ -362,7 +341,6 @@ impl Engine {
 
         let mut outcome = Outcome::default();
         outcome.notices.extend(self.notices.iter().cloned());
-        outcome.notices.extend(asked_by_old_id);
         let mut timings = Timings::default();
         let mut incomplete = self.startup.clone();
         let scopes = match reported {
@@ -423,14 +401,12 @@ impl Engine {
             active: &self.active,
             selected: &ran,
             manifests: &manifests,
-            aliases: &self.aliases,
             text: &text,
         };
         let applied = annotations::apply(found, &project, &gate)?;
-        outcome.notices.extend(applied.notices);
         let (mut found, allowed) = (applied.kept, applied.allowed);
         found.retain(|d| scopes.iter().any(|s| d.file.starts_with(s)));
-        outcome.allowed = allowed
+        outcome.suppressed = allowed
             .into_iter()
             .filter(|a| scopes.iter().any(|s| a.diagnostic.file.starts_with(s)))
             .collect();

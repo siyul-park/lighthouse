@@ -2,19 +2,24 @@ use lighthouse_model::annotation::{self, ANNOTATION_REASON, Form, UNUSED_ALLOW};
 
 #[test]
 fn parse_reads_rules_and_reason_from_a_comment() {
-    let allow = annotation::parse("// lighthouse:allow design/a -- because").unwrap();
+    let allow = annotation::parse("// lighthouse-disable-next-line design/a -- because").unwrap();
     assert_eq!(allow.rules, ["design/a"]);
     assert_eq!(allow.reason.as_deref(), Some("because"));
     assert_eq!(allow.form, Form::NextLine);
-    assert_eq!(allow.marker, "lighthouse:allow");
+    assert_eq!(allow.marker, "lighthouse-disable-next-line");
 
-    let many = annotation::parse("// lighthouse:allow design/a,  testing/b -- two rules").unwrap();
+    let many =
+        annotation::parse("// lighthouse-disable-next-line design/a,  testing/b -- two rules")
+            .unwrap();
     assert_eq!(many.rules, ["design/a", "testing/b"]);
 
-    let block = annotation::parse("/* lighthouse:allow design/a -- in a block */").unwrap();
+    let block =
+        annotation::parse("/* lighthouse-disable-next-line design/a -- in a block */").unwrap();
     assert_eq!(block.reason.as_deref(), Some("in a block"));
 
-    let later = annotation::parse("// Why:\n// lighthouse:allow design/a -- second line").unwrap();
+    let later =
+        annotation::parse("// Why:\n// lighthouse-disable-next-line design/a -- second line")
+            .unwrap();
     assert_eq!(later.rules, ["design/a"]);
 }
 
@@ -55,7 +60,7 @@ fn a_directive_names_rules_there_is_no_form_without_ids() {
             .is_empty()
     );
     assert!(
-        annotation::parse("// lighthouse:allow")
+        annotation::parse("// lighthouse-disable-next-line")
             .unwrap()
             .rules
             .is_empty()
@@ -65,18 +70,18 @@ fn a_directive_names_rules_there_is_no_form_without_ids() {
 #[test]
 fn parse_reports_a_missing_reason_and_ignores_prose() {
     assert_eq!(
-        annotation::parse("// lighthouse:allow design/a")
+        annotation::parse("// lighthouse-disable-next-line design/a")
             .unwrap()
             .reason,
         None
     );
     assert_eq!(
-        annotation::parse("// lighthouse:allow design/a --  ")
+        annotation::parse("// lighthouse-disable-next-line design/a --  ")
             .unwrap()
             .reason,
         None
     );
-    assert!(annotation::parse("// see lighthouse:allow design/a -- no").is_none());
+    assert!(annotation::parse("// see lighthouse-disable-next-line design/a -- no").is_none());
     assert!(annotation::parse("// see lighthouse-disable design/a -- no").is_none());
     assert!(annotation::parse("// lighthouse-disables design/a -- no").is_none());
     assert!(annotation::parse("// lighthouse-disable-next-liner design/a -- no").is_none());
@@ -117,32 +122,6 @@ fn a_documentation_comment_never_holds_a_directive() {
 }
 
 #[test]
-fn canonical_writes_every_spelling_of_a_directive_one_way() {
-    let rename = |id: &str| {
-        if id == "old/id" {
-            "new/id".to_owned()
-        } else {
-            id.to_owned()
-        }
-    };
-    let old = annotation::canonical(
-        "// Why:\n// lighthouse:allow old/id, design/a -- because",
-        &rename,
-    );
-    let new = annotation::canonical(
-        "// Why:\n// lighthouse-disable-next-line new/id, design/a -- because",
-        &rename,
-    );
-
-    assert_eq!(old, new);
-    assert_eq!(old, "// Why:\nlighthouse:allow new/id, design/a -- because");
-    assert_eq!(
-        annotation::canonical("// no directive", &rename),
-        "// no directive"
-    );
-}
-
-#[test]
 fn form_names_are_the_eslint_spellings() {
     let names: Vec<_> = [Form::Disable, Form::Enable, Form::NextLine, Form::Line]
         .iter()
@@ -152,5 +131,5 @@ fn form_names_are_the_eslint_spellings() {
         names,
         ["disable", "enable", "disable-next-line", "disable-line"]
     );
-    assert_eq!(annotation::MARKERS.len(), 5);
+    assert_eq!(annotation::MARKERS.len(), 4);
 }

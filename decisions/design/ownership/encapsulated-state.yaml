@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: ownership
-  annotations:
-    lighthouse/was-names: design/private-state-behind-owner
-    lighthouse/was-enforcement: mechanical
 spec:
   title: Private state stays behind its owner
   context: >-

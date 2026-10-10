@@ -328,16 +328,16 @@ impl Run<'_> {
         let message = frame.text(&rule.message)?;
         let evidence = frame.evidence(&rule.evidence)?;
         let place = self.place(&frame, place)?;
-        let (fingerprint, legacy) = match &rule.identity {
+        let fingerprint = match &rule.identity {
             Some(identity) => {
                 let subject = frame.string(&identity.subject, "identity.subject")?;
                 let snippet = match &identity.snippet {
                     Some(program) => frame.string(program, "identity.snippet")?,
                     None => String::new(),
                 };
-                self.meta.fingerprints(&subject, &snippet)
+                self.meta.fingerprint(&subject, &snippet)
             }
-            None => self.meta.fingerprints(&place.file.to_string_lossy(), key),
+            None => self.meta.fingerprint(&place.file.to_string_lossy(), key),
         };
         let mut diagnostic = Diagnostic::new(
             &self.meta.id,
@@ -346,8 +346,7 @@ impl Run<'_> {
             place.file,
             place.span,
             fingerprint,
-        )
-        .with_legacy(legacy);
+        );
         diagnostic.symbol = place.symbol.map(|id| id.as_str().to_owned());
         diagnostic.evidence = evidence;
         Ok(Some(diagnostic))

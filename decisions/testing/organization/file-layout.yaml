@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization
-  annotations:
-    lighthouse/was-names: testing/test-file-layout
-    lighthouse/was-builtin: testing/test-file-layout
 spec:
   title: "A test file reads fixtures, tests, helpers"
   context: >-

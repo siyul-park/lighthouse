@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: generated-and-platform
-  annotations:
-    lighthouse/was-names: design/generated-via-generator
 spec:
   title: Generated files change only through their generator
   context: >-

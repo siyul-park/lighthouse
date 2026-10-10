@@ -84,7 +84,6 @@ fn meta(
     RuleManifest {
         id: id.to_owned(),
         uid: None,
-        was: Vec::new(),
         severity: Severity::Warn,
         scope,
         description: String::new(),

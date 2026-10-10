@@ -17,9 +17,6 @@ pub enum Error {
     /// Files that do not form a catalog: ordering, naming, missing files.
     #[error("{path}: {message}")]
     Layout { path: String, message: String },
-    /// A project directory in a format from before the resource model.
-    #[error("{path}: a format from before the resource model; run `lighthouse spec migrate`")]
-    Legacy { path: String },
     /// A project that cannot be built from the catalog.
     #[error(transparent)]
     Project(#[from] crate::ProjectError),

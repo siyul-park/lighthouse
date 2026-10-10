@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: completeness
-  annotations:
-    lighthouse/was-names: testing/architecture-specific-evidence
 spec:
   title: Architecture-specific contracts need specific evidence
   context: >-

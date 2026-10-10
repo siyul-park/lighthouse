@@ -189,8 +189,6 @@ fn the_server_lists_its_tools_and_resources() {
     );
     let reserved = client.tool("decision_similar", json!({}));
     assert!(reserved.unwrap_err().contains("reserved"));
-    let renamed = client.tool("rule_list", json!({}));
-    assert!(renamed.unwrap_err().contains("decision_list"));
 
     let resources = client.request("resources/list", json!({}));
     let uris: Vec<&str> = resources["result"]["resources"]
@@ -202,7 +200,7 @@ fn the_server_lists_its_tools_and_resources() {
     assert_eq!(uris, ["lighthouse://catalog", "lighthouse://config"]);
     let pattern = client.request(
         "resources/read",
-        json!({ "uri": "lighthouse://decisions/core/max-file-lines" }),
+        json!({ "uri": "lighthouse://decisions/core/max-lines" }),
     );
     let text = pattern["result"]["contents"][0]["text"].as_str().unwrap();
     assert!(text.contains("core/max-lines"), "{text}");
@@ -275,7 +273,7 @@ fn check_reports_findings_and_never_calls_an_incomplete_run_clean() {
 }
 
 #[test]
-fn a_verdict_recorded_through_mcp_is_an_agent_review_that_later_checks_honor() {
+fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_honor_it() {
     let dir = rust_project();
     let mut client = Client::start(dir.path());
     client.tool("check", json!({})).unwrap();
@@ -294,7 +292,7 @@ fn a_verdict_recorded_through_mcp_is_an_agent_review_that_later_checks_honor() {
         .as_str()
         .or_else(|| instance[3]["evidence"]["seen"].as_str())
         .unwrap();
-    assert!(tasks["resolve"].is_string() && tasks["reasons"].is_object());
+    assert!(tasks["resolve"].is_string() && tasks["judgments"].is_object());
 
     let full = client
         .tool("review_tasks", json!({ "detail": "full" }))
@@ -312,30 +310,40 @@ fn a_verdict_recorded_through_mcp_is_an_agent_review_that_later_checks_honor() {
     let ambiguous = client
         .tool(
             "review_resolve",
-            json!({ "fingerprint": "", "verdict": "deferred" }),
+            json!({ "fingerprint": "", "judgment": "fail" }),
         )
         .unwrap_err();
     assert!(ambiguous.contains("matches several"), "{ambiguous}");
     let stale = client.tool(
         "review_resolve",
-        json!({ "fingerprint": prefix, "verdict": "rejected", "reason": "intentional-exception",
+        json!({ "fingerprint": prefix, "judgment": "fail",
+                "suppress": { "justification": "intentional-exception" },
                 "seen": "1999-01-01T00:00:00Z" }),
     );
     assert!(stale.is_err());
-    let no_reason = client.tool(
+    let misplaced = client.tool(
+        "review_resolve",
+        json!({ "fingerprint": prefix, "judgment": "pass",
+                "suppress": { "justification": "why" } }),
+    );
+    assert!(misplaced.unwrap_err().contains("goes with a `fail`"));
+    let old_words = client.tool(
         "review_resolve",
         json!({ "fingerprint": prefix, "verdict": "rejected" }),
     );
-    assert!(no_reason.is_err());
+    assert!(old_words.is_err(), "the old arguments are gone");
 
     let done = client
         .tool(
             "review_resolve",
-            json!({ "fingerprint": prefix, "verdict": "rejected",
-                    "reason": "intentional-exception", "note": "named policy", "seen": seen }),
+            json!({ "fingerprint": prefix, "judgment": "fail",
+                    "suppress": { "justification": "intentional-exception" },
+                    "reason": "named policy", "seen": seen }),
         )
         .unwrap();
-    assert_eq!(done["recorded"]["reviewer"], "agent:test-agent");
+    assert_eq!(done["recorded"]["wasAttributedTo"]["type"], "SoftwareAgent");
+    assert_eq!(done["recorded"]["wasAttributedTo"]["id"], "test-agent");
+    assert_eq!(done["recorded"]["suppression"]["kind"], "external");
     assert_eq!(done["recorded"]["fingerprint"], fingerprint);
     assert_eq!(done["standing"], "suppressed");
 
@@ -343,8 +351,12 @@ fn a_verdict_recorded_through_mcp_is_an_agent_review_that_later_checks_honor() {
         .tool("review_history", json!({ "fingerprint": prefix }))
         .unwrap();
     let event = &history["events"][0];
-    assert_eq!(event["reviewerKind"], "agent");
-    assert_eq!(event["reasonText"], "named policy");
+    assert_eq!(event["wasAttributedTo"]["type"], "SoftwareAgent");
+    assert_eq!(event["reason"], "named policy");
+    assert_eq!(
+        event["suppressions"][0]["justification"],
+        "intentional-exception"
+    );
 
     let after = client.tool("check", json!({})).unwrap();
     let still = rules_of(&after);

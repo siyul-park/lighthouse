@@ -1,0 +1,171 @@
+{
+  "$defs": {
+    "AgentKind": {
+      "description": "What kind of agent a record is attributed to, a W3C PROV class.",
+      "oneOf": [
+        {
+          "const": "Person",
+          "description": "A human.",
+          "type": "string"
+        },
+        {
+          "const": "SoftwareAgent",
+          "description": "A program, such as a coding agent or a model.",
+          "type": "string"
+        }
+      ]
+    },
+    "Attribution": {
+      "description": "`prov:wasAttributedTo`: who a record is attributed to.",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "$ref": "#/$defs/AgentKind"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    "Metadata": {
+      "additionalProperties": false,
+      "description": "Who a resource is. Identity is `name`; grouping is by label, never by\nwhere the document is stored.",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Free notes; never used to select.",
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Selectable facts, keyed `lighthouse/<name>`.",
+          "type": "object"
+        },
+        "name": {
+          "description": "Fully qualified name, such as `design/minimal-names`.",
+          "type": "string"
+        },
+        "uid": {
+          "description": "Identity that outlives the name: a UUID v4 assigned once, never derived\nfrom the name (Kubernetes `metadata.uid`). Renaming a resource keeps it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "SuppressionKind": {
+      "description": "How a suppression was declared, in the words of SARIF.",
+      "oneOf": [
+        {
+          "const": "inSource",
+          "description": "By a directive in the code.",
+          "type": "string"
+        },
+        {
+          "const": "external",
+          "description": "Outside the code: a recorded decision to leave the finding in place.",
+          "type": "string"
+        }
+      ]
+    },
+    "SuppressionSpec": {
+      "description": "The spec of the `Suppression` record: the `fail` judgment `judgment` is\nright and is left in place on purpose, in the words of SARIF.",
+      "properties": {
+        "fingerprint": {
+          "description": "The finding the judgment is about.",
+          "type": "string"
+        },
+        "generatedAtTime": {
+          "type": "string"
+        },
+        "judgment": {
+          "description": "The id of the judgment it goes with.",
+          "type": "string"
+        },
+        "justification": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SuppressionKind"
+        },
+        "status": {
+          "$ref": "#/$defs/SuppressionStatus",
+          "default": "accepted",
+          "description": "`accepted` unless said otherwise."
+        },
+        "wasAttributedTo": {
+          "$ref": "#/$defs/Attribution"
+        }
+      },
+      "required": [
+        "judgment",
+        "fingerprint",
+        "kind",
+        "justification",
+        "wasAttributedTo",
+        "generatedAtTime"
+      ],
+      "type": "object"
+    },
+    "SuppressionStatus": {
+      "description": "Whether a suppression is in force, in the words of SARIF.",
+      "oneOf": [
+        {
+          "const": "accepted",
+          "description": "In force.",
+          "type": "string"
+        },
+        {
+          "const": "underReview",
+          "description": "Proposed, not yet in force.",
+          "type": "string"
+        },
+        {
+          "const": "rejected",
+          "description": "Refused.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/suppression.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "const": "lighthouse/v1alpha1"
+    },
+    "kind": {
+      "const": "Suppression"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "spec": {
+      "$ref": "#/$defs/SuppressionSpec"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "title": "Suppression",
+  "type": "object"
+}

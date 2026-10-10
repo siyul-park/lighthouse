@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: functions
-  annotations:
-    lighthouse/was-builtin: design/callers-before-callees
 spec:
   title: Callers before callees
   context: >-

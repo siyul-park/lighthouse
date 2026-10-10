@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: core
     lighthouse/section: limits
-  annotations:
-    lighthouse/was-names: core/split-by-cohesion
 spec:
   title: Split files by cohesion
   context: >-

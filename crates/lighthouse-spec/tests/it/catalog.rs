@@ -1,5 +1,5 @@
-use lighthouse_model::{RunScope, Severity};
-use lighthouse_spec::{Catalog, Content, Decision, Error, ExampleFile, Subject, authored_severity};
+use lighthouse_model::{RunScope, Severity, needs_review};
+use lighthouse_spec::{Catalog, Content, Decision, ExampleFile, Subject, authored_severity};
 use lighthouse_test_support::catalog::*;
 use serde_json::{Map, json};
 
@@ -16,18 +16,25 @@ fn bundled_catalog_has_core_design_and_testing_packs() {
 }
 
 #[test]
-fn a_finding_asks_for_a_verdict_unless_its_decision_authored_an_error() {
+fn a_finding_asks_for_review_unless_its_decision_authored_an_error_or_a_judgment_stands() {
     for (authored, asks) in [
         (Severity::Error, false),
         (Severity::Warn, true),
         (Severity::Info, true),
     ] {
-        assert_eq!(authored.needs_verdict(), asks, "{authored}");
+        assert_eq!(needs_review(authored, false), asks, "{authored}");
+        assert!(!needs_review(authored, true), "{authored} judged");
     }
     let warn = bundled("design/private-helper-callers");
-    assert!(authored_severity(Severity::Error, Some(warn)).needs_verdict());
+    assert!(needs_review(
+        authored_severity(Severity::Error, Some(warn)),
+        false
+    ));
     let definitive = bundled("design/declaration-groups");
-    assert!(!authored_severity(Severity::Warn, Some(definitive)).needs_verdict());
+    assert!(!needs_review(
+        authored_severity(Severity::Warn, Some(definitive)),
+        false
+    ));
 }
 
 #[test]
@@ -180,25 +187,6 @@ fn every_bundled_decision_has_its_own_uid() {
             .unwrap_or_else(|| panic!("{} has no uid", decision.id()));
         assert!(lighthouse_resource::is_uid(uid), "{}: {uid}", decision.id());
         assert!(seen.insert(uid), "{} repeats a uid", decision.id());
-    }
-}
-
-#[test]
-fn identities_map_every_name_a_decision_answers_to_its_uid() {
-    let uid = "5d6b1c1e-2b0e-4a43-9a3e-0f1b6f5d2a11";
-    let text = decision("p/a", "s", SPEC).replace(
-        "  name: p/a\n",
-        &format!(
-            "  name: p/a\n  uid: {uid}\n  annotations:\n    lighthouse/was-names: p/old, p/older\n"
-        ),
-    );
-    let catalog = Catalog::from_files(with("p/s/a.yaml", &text)).unwrap();
-
-    let identities = catalog.identities();
-
-    assert_eq!(identities.len(), 3);
-    for name in ["p/a", "p/old", "p/older"] {
-        assert_eq!(identities[name], uid, "{name}");
     }
 }
 
@@ -546,23 +534,6 @@ mod validation {
     }
 
     #[test]
-    fn a_document_from_before_the_resource_model_says_how_to_migrate() {
-        let legacy = "id: p/a\ntitle: A\nintent: i\nscope: file\nrequirement: A MUST b.\nenforcement: mechanical\nevidence: [x]\n";
-        let error = Catalog::from_files(with("p/s/a.yaml", legacy)).unwrap_err();
-        assert!(
-            error.to_string().contains("lighthouse spec migrate"),
-            "{error}"
-        );
-        rejected(
-            with(
-                "p/s/a.yaml",
-                "apiVersion: lighthouse/v1alpha1\nkind: Surprise\nmetadata:\n  name: x\nspec: {}\n",
-            ),
-            "unsupported kind `Surprise`",
-        );
-    }
-
-    #[test]
     fn the_same_catalog_reads_from_json_and_toml() {
         let json = r#"{"apiVersion":"lighthouse/v1alpha1","kind":"Pack","metadata":{"name":"p"},"spec":{"title":"P","intro":"x","sections":[{"name":"s","title":"S","intro":"x","decisions":["a"]}]}}"#;
         let toml = "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Decision\"\n[metadata]\nname = \"p/a\"\n[metadata.labels]\n\"lighthouse/pack\" = \"p\"\n\"lighthouse/section\" = \"s\"\n[spec]\ntitle = \"A\"\ncontext = \"i\"\nrequirement = \"A MUST b.\"\n[spec.scope]\nsubject = \"file\"\n";
@@ -702,19 +673,6 @@ mod overlay {
         .unwrap();
         let err = Catalog::overlay(&base_catalog(), &circle).unwrap_err();
         assert!(err.to_string().contains("extends itself"), "{err}");
-    }
-
-    #[test]
-    fn the_retired_override_kind_says_where_its_content_goes() {
-        let spec = "  extends: p/a\n  severity: warn\n";
-        let old = format!(
-            "apiVersion: lighthouse/v1alpha1\nkind: DecisionOverride\nmetadata:\n  name: tweak\nspec:\n{spec}"
-        );
-
-        let err = Catalog::from_local(files(&[("tweak.yaml", old)])).unwrap_err();
-
-        assert!(matches!(err, Error::Layout { .. }));
-        assert!(err.to_string().contains("`rules` of the project"), "{err}");
     }
 
     #[test]
@@ -871,24 +829,4 @@ fn scope_applicability() {
     let all = bundled("core/max-lines").scope.applicability();
     assert!(all.generated);
     assert_eq!(all.tests, lighthouse_model::TestScope::Include);
-}
-
-#[test]
-fn decision_was_names_lists_the_ids_before_a_rename_and_with_uid_assigns_one() {
-    let renamed = bundled("core/allow-annotation").clone();
-    assert_eq!(renamed.was_names().count(), 0);
-
-    let mut metadata = renamed.metadata().clone();
-    metadata.annotations.insert(
-        "lighthouse/was-names".to_owned(),
-        "core/old, core/older ,".to_owned(),
-    );
-    let with_names = Decision::new(metadata, renamed.spec().clone());
-    assert_eq!(
-        with_names.was_names().collect::<Vec<_>>(),
-        ["core/old", "core/older"]
-    );
-
-    let uid = "5d6b1c1e-2b0e-4a43-9a3e-0f1b6f5d2a11";
-    assert_eq!(with_names.with_uid(uid).uid(), Some(uid));
 }

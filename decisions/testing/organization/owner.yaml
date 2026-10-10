@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization
-  annotations:
-    lighthouse/was-names: testing/owner-test
-    lighthouse/was-builtin: testing/owner-test
 spec:
   title: Every public symbol has an owner test
   context: >-

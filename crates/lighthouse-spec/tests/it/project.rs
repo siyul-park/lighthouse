@@ -237,14 +237,6 @@ fn the_same_project_reads_from_yaml_toml_and_json() {
 }
 
 #[test]
-fn a_config_without_an_envelope_says_how_to_migrate() {
-    let error = Config::parse("plugins = [\"core\"]")
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("lighthouse spec migrate"), "{error}");
-}
-
-#[test]
 fn config_plugins() {
     let config = Config::parse_inline(
         "plugins = [\"core\", { id = \"lang-go\", path = \"tools/go\", timeout = \"30s\" }]",

@@ -1,6 +1,10 @@
-use std::{collections::BTreeMap, fmt::Write, str::FromStr};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Write,
+    str::FromStr,
+};
 
-use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Severity};
+use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Severity, Suppressed, needs_review};
 use lighthouse_spec::{Catalog, authored_severity};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
@@ -10,7 +14,7 @@ use crate::{
     evidence::{evidence, evidence_line},
     expected::{Expected, Subject, expected, one_line},
     fix::{ProposedFix, Shown},
-    group::{Entry, GroupOptions, Grouped, reasons, reasons_line},
+    group::{Entry, GroupOptions, Grouped, judgments, judgments_line},
 };
 
 /// Shortest fingerprint prefix the full shape shows; longer when needed to
@@ -19,23 +23,30 @@ const PREFIX_MIN: usize = 12;
 
 /// What the agent formats add to a bare diagnostic: the catalog the rules
 /// come from, what the analysis knew about each finding, how many findings
-/// verdicts and source annotations kept out of the report, and how many to
+/// judgments and source directives kept out of the report, and how many to
 /// print.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Briefing<'a> {
-    /// The decisions findings cite. Whether a finding asks for a verdict is
-    /// the authored severity of its decision; without the catalog a finding is judged by
-    /// its severity alone, so every frontend that counts reviews passes it.
+    /// The decisions findings cite. Whether a finding asks for review is
+    /// the authored severity of its decision; without the catalog a finding is
+    /// told by its severity alone, so every frontend that counts reviews
+    /// passes it.
     pub catalog: Option<&'a Catalog>,
     /// Subject facts by fingerprint; the `language`, `kind` and `visibility`
     /// entries pick the expected structure.
     pub facts: Option<&'a BTreeMap<Fingerprint, Value>>,
-    /// Why a finding is reported although a verdict was recorded on it, by
+    /// Why a finding is reported although a judgment was recorded on it, by
     /// fingerprint.
     pub notes: Option<&'a BTreeMap<Fingerprint, String>>,
+    /// The findings a judgment stands for and that are reported: they do not
+    /// ask for review.
+    pub judged: Option<&'a BTreeSet<Fingerprint>>,
+    /// Findings judgments kept out of the report.
     pub suppressed: usize,
-    /// Findings allowed by source annotations.
+    /// Findings source directives suppress.
     pub allowed: usize,
+    /// Every suppressed finding with its suppression: SARIF lists them.
+    pub suppressions: Option<&'a [Suppressed]>,
     /// Print at most this many findings, errors first, and say how many were
     /// left out.
     pub limit: Option<usize>,
@@ -90,14 +101,17 @@ impl Briefing<'_> {
     }
 
     /// Whether the finding is a review task: its decision authored `warn` or
-    /// `info`, whatever severity the configuration reports it at. An authored
-    /// `error` is definitive and needs no verdict. A rule without a decision
-    /// is judged by its severity.
-    pub fn needs_verdict(&self, diagnostic: &Diagnostic) -> bool {
+    /// `info`, whatever severity the configuration reports it at, and no
+    /// judgment stands for it. An authored `error` is definitive. A rule
+    /// without a decision is told by its severity.
+    pub fn needs_review(&self, diagnostic: &Diagnostic) -> bool {
         let decision = self
             .catalog
             .and_then(|catalog| catalog.decision(&diagnostic.rule_id));
-        authored_severity(diagnostic.severity, decision).needs_verdict()
+        let judged = self
+            .judged
+            .is_some_and(|judged| judged.contains(&diagnostic.fingerprint));
+        needs_review(authored_severity(diagnostic.severity, decision), judged)
     }
 }
 
@@ -105,22 +119,22 @@ impl Briefing<'_> {
 /// prints or wraps.
 ///
 /// Compact: `status`, `counts`, `groups`, then when they apply `incomplete`
-/// (`[path, reason]` pairs), `omitted`, and the `resolve` hint and `reasons`
+/// (`[path, reason]` pairs), `omitted`, and the `resolve` hint and `judgments`
 /// table once for all shown findings that ask for a verdict. Full: `findings`,
-/// `incomplete` and `reasons` as records, `omitted` as a count.
+/// `incomplete` and `judgments` as records, `omitted` as a count.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentReport {
     pub fields: Map<String, Value>,
 }
 
 /// The full shape: the findings that fit `briefing.limit`, the gaps, how many
-/// findings were left out, and the reasons table when a shown finding asks
-/// for a verdict.
+/// findings were left out, and the judgments table when a shown finding asks
+/// for review.
 struct FullReport {
     findings: Vec<Value>,
     incomplete: Vec<Value>,
     omitted: usize,
-    reasons: Option<Value>,
+    judgments: Option<Value>,
 }
 
 #[derive(Serialize)]
@@ -200,8 +214,8 @@ pub fn agent_report(
             fields.insert("findings".to_owned(), Value::Array(full.findings));
             fields.insert("incomplete".to_owned(), Value::Array(full.incomplete));
             fields.insert("omitted".to_owned(), json!(full.omitted));
-            if let Some(reasons) = full.reasons {
-                fields.insert("reasons".to_owned(), reasons);
+            if let Some(judgments) = full.judgments {
+                fields.insert("judgments".to_owned(), judgments);
             }
             fields
         }
@@ -226,8 +240,8 @@ pub(crate) fn json_lines(
 }
 
 /// One header per decision with its requirement and expected structure, one
-/// line per finding under it, then the gaps, how to record a verdict and the
-/// reasons it accepts when a shown finding asks for review, and the summary.
+/// line per finding under it, then the gaps, how to record a judgment and the
+/// judgments it accepts when a shown finding asks for review, and the summary.
 fn compact_text(
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
@@ -241,9 +255,9 @@ fn compact_text(
     if grouped.asks_review() {
         let _ = writeln!(
             out,
-            "resolve: lighthouse review resolve <fingerprint> --verdict <verdict> --reason <reason> --reviewer-kind agent"
+            "resolve: lighthouse review resolve <fingerprint> --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent"
         );
-        let _ = writeln!(out, "reasons: {}", reasons_line());
+        let _ = writeln!(out, "judgments: {}", judgments_line());
     }
     let _ = writeln!(out, "{}", summary_line(diagnostics, incomplete, briefing));
     out
@@ -259,7 +273,7 @@ fn entries<'a>(diagnostics: &[Diagnostic], briefing: &Briefing<'a>) -> Vec<Entry
                 rule: d.rule_id.clone(),
                 severity: d.severity,
                 authored: authored_severity(d.severity, decision),
-                review: briefing.needs_verdict(d),
+                review: briefing.needs_review(d),
                 path: d.file.display().to_string(),
                 line: d.span.start.line,
                 col: d.span.start.col,
@@ -276,8 +290,8 @@ fn entries<'a>(diagnostics: &[Diagnostic], briefing: &Briefing<'a>) -> Vec<Entry
         .collect()
 }
 
-/// One block per finding, then the gaps, a footer naming the reasons review
-/// verdicts accept when a finding asks for review, and the summary.
+/// One block per finding, then the gaps, a footer naming the judgments review
+/// accepts when a finding asks for review, and the summary.
 fn full_text(diagnostics: &[Diagnostic], incomplete: &[Incomplete], briefing: &Briefing) -> String {
     let (shown, omitted) = select(diagnostics, briefing.limit);
     let width = prefix_len(&shown);
@@ -295,8 +309,8 @@ fn full_text(diagnostics: &[Diagnostic], incomplete: &[Incomplete], briefing: &B
     for item in incomplete {
         let _ = writeln!(out, "{}", incomplete_line(item));
     }
-    if shown.iter().any(|d| briefing.needs_verdict(d)) {
-        let _ = writeln!(out, "reasons: {}", reasons_line());
+    if shown.iter().any(|d| briefing.needs_review(d)) {
+        let _ = writeln!(out, "judgments: {}", judgments_line());
     }
     let _ = writeln!(out, "{}", summary_line(diagnostics, incomplete, briefing));
     out
@@ -336,7 +350,7 @@ fn counts(diagnostics: &[Diagnostic], briefing: &Briefing) -> Value {
     let count = |s: Severity| diagnostics.iter().filter(|d| d.severity == s).count();
     let reviews = diagnostics
         .iter()
-        .filter(|d| briefing.needs_verdict(d))
+        .filter(|d| briefing.needs_review(d))
         .count();
     let mut counts = Map::new();
     counts.insert("error".to_owned(), json!(count(Severity::Error)));
@@ -373,16 +387,16 @@ fn full_report(
         findings,
         incomplete,
         omitted,
-        reasons: shown
+        judgments: shown
             .iter()
-            .any(|d| briefing.needs_verdict(d))
-            .then(reasons),
+            .any(|d| briefing.needs_review(d))
+            .then(judgments),
     }
 }
 
 /// One JSON object per line: findings, incomplete entries, a `truncated`
 /// record when `limit` left findings out, then the summary, each tagged with
-/// `type`. The summary carries the reasons table once, when a shown finding
+/// `type`. The summary carries the judgments table once, when a shown finding
 /// asks for review.
 fn full_json_lines(
     diagnostics: &[Diagnostic],
@@ -405,13 +419,13 @@ fn full_json_lines(
         "errors": count(Severity::Error),
         "warnings": count(Severity::Warn),
         "infos": count(Severity::Info),
-        "reviews": diagnostics.iter().filter(|d| briefing.needs_verdict(d)).count(),
+        "reviews": diagnostics.iter().filter(|d| briefing.needs_review(d)).count(),
         "incomplete": incomplete.len(),
         "suppressed": briefing.suppressed,
         "allowed": briefing.allowed,
     });
-    if let Some(reasons) = report.reasons {
-        summary["reasons"] = reasons;
+    if let Some(judgments) = report.judgments {
+        summary["judgments"] = judgments;
     }
     lines.push(summary.to_string());
     lines.iter().map(|line| format!("{line}\n")).collect()
@@ -481,7 +495,7 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
             .and_then(|f| f.get(diagnostic.fingerprint.as_str()))
             .map(|fix| Shown::of(fix, &diagnostic.file.display().to_string()).json()),
         resolve: briefing
-            .needs_verdict(diagnostic)
+            .needs_review(diagnostic)
             .then(|| resolve(diagnostic, width)),
     }
 }
@@ -489,7 +503,7 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
 fn resolve(diagnostic: &Diagnostic, width: usize) -> Value {
     json!({
         "command": format!(
-            "lighthouse review resolve {} --verdict <verdict> --reason <reason> --reviewer-kind agent",
+            "lighthouse review resolve {} --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent",
             prefix(diagnostic.fingerprint.as_str(), width)
         ),
     })
@@ -586,7 +600,7 @@ fn summary_line(
     let count = |s: Severity| diagnostics.iter().filter(|d| d.severity == s).count();
     let reviews = diagnostics
         .iter()
-        .filter(|d| briefing.needs_verdict(d))
+        .filter(|d| briefing.needs_review(d))
         .count();
     format!(
         "summary: {} error, {} warn, {} info, {} review, {} incomplete, {} suppressed, {} allowed",

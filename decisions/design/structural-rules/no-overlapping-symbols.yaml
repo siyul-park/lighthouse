@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-rules
-  annotations:
-    lighthouse/was-names: design/merge-overlapping-symbols
 spec:
   title: Merge overlapping symbols
   context: >-

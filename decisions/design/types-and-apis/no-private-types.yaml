@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: types-and-apis
-  annotations:
-    lighthouse/was-names: design/no-private-types-in-public-api
-    lighthouse/was-enforcement: mechanical
 spec:
   title: Public APIs do not expose private types
   context: >-

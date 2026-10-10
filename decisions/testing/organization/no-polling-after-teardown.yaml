@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization
-  annotations:
-    lighthouse/was-names: testing/polling-outlives-teardown
-    lighthouse/was-enforcement: mechanical
 spec:
   title: Polling does not outlive teardown
   context: >-

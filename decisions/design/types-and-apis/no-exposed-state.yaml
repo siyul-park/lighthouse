@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: types-and-apis
-  annotations:
-    lighthouse/was-names: design/contract-not-state
 spec:
   title: "Exported types expose contract, not state"
   context: >-

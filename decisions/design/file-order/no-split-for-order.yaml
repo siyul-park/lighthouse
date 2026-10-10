@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: file-order
-  annotations:
-    lighthouse/was-names: design/order-is-not-a-reason-to-split
 spec:
   title: Ordering never justifies splits
   context: >-

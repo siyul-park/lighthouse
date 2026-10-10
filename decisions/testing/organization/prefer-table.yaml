@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization
-  annotations:
-    lighthouse/was-names: testing/table-for-same-behavior
 spec:
   title: Tables for one behavior over many inputs
   context: >-

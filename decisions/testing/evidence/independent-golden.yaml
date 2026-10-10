@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: evidence
-  annotations:
-    lighthouse/was-names: testing/independent-golden-output
 spec:
   title: Golden output is independent
   context: >-

@@ -735,11 +735,11 @@ fn a_run_without_the_store_still_honors_the_committed_decisions() {
             "review",
             "resolve",
             fingerprint,
-            "--verdict",
-            "rejected",
-            "--reason",
+            "--judgment",
+            "fail",
+            "--suppress",
             "intentional-exception",
-            "--note",
+            "--reason",
             "the banner is a map for readers",
         ])
         .assert()

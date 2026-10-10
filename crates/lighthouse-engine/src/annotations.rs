@@ -4,22 +4,12 @@ use std::{
 };
 
 use lighthouse_model::{
-    Comment, Diagnostic, Fingerprint, Position, Project, Severity, Span,
+    Comment, Diagnostic, Fingerprint, Position, Project, Severity, Span, Suppressed, Suppression,
     annotation::{self, ANNOTATION_REASON, Directive, Form, UNUSED_ALLOW},
 };
 use lighthouse_plugin::RuleManifest;
 use lighthouse_spec::ProjectError;
 use serde_json::json;
-
-/// A finding that a source directive allows: it is not reported and does not
-/// fail the run, but the run still states how many there were. In SARIF terms
-/// the directive is a suppression of kind `inSource`.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Allowed {
-    pub diagnostic: Diagnostic,
-    /// The reason the directive gives.
-    pub reason: String,
-}
 
 /// The level the configuration gives a rule at a file of a language.
 pub(crate) type LevelAt<'a> =
@@ -37,9 +27,6 @@ pub(crate) struct Gate<'a> {
     /// The manifest of each rule that ran: its uid and former names seed the
     /// fingerprints of the findings the engine reports itself.
     pub manifests: &'a BTreeMap<String, &'a RuleManifest>,
-    /// Ids decisions were renamed from, with their current ids: a directive
-    /// that names an old id still means the decision.
-    pub aliases: &'a BTreeMap<String, String>,
     /// The text of a file of the run.
     pub text: &'a dyn Fn(&Path) -> Option<&'a str>,
 }
@@ -48,9 +35,7 @@ pub(crate) struct Gate<'a> {
 pub(crate) struct Applied {
     /// The findings that remain, and the findings about directives.
     pub kept: Vec<Diagnostic>,
-    pub allowed: Vec<Allowed>,
-    /// What the user should know: old ids a directive still uses.
-    pub notices: BTreeSet<String>,
+    pub allowed: Vec<Suppressed>,
 }
 
 /// A directive on a line of a comment of the file being read.
@@ -96,7 +81,6 @@ struct Reader<'a, 'g> {
     /// The claims of the ranges still open, by rule.
     open: BTreeMap<String, Vec<usize>>,
     extra: Vec<Diagnostic>,
-    notices: BTreeSet<String>,
 }
 
 impl<'a> Reader<'a, '_> {
@@ -120,7 +104,7 @@ impl<'a> Reader<'a, '_> {
             return self.note(at, ANNOTATION_REASON, message);
         }
         for id in &directive.rules {
-            let rule = self.canonical(id);
+            let rule = id.clone();
             let reach = if directive.form == Form::Line {
                 Reach::Line(at.line)
             } else if directive.form == Form::Disable {
@@ -150,7 +134,7 @@ impl<'a> Reader<'a, '_> {
     /// that closes nothing is reported.
     fn enable(&mut self, at: &'a Located<'a>) -> Result<(), ProjectError> {
         for id in &at.directive.rules {
-            let rule = self.canonical(id);
+            let rule = id.clone();
             let Some(ranges) = self.open.remove(&rule) else {
                 let message = format!(
                     "`{} {rule}` has no matching `lighthouse-disable`; remove it",
@@ -166,19 +150,6 @@ impl<'a> Reader<'a, '_> {
             }
         }
         Ok(())
-    }
-
-    /// The decision's current id for an id a directive names.
-    fn canonical(&mut self, id: &str) -> String {
-        match self.gate.aliases.get(id) {
-            Some(new) => {
-                self.notices.insert(format!(
-                    "decision `{id}` is now `{new}`; a directive still names the old id (`lighthouse spec migrate` rewrites it)"
-                ));
-                new.clone()
-            }
-            None => id.to_owned(),
-        }
     }
 
     fn note(&mut self, at: &Located, rule: &str, message: String) -> Result<(), ProjectError> {
@@ -202,7 +173,6 @@ pub(crate) fn apply<'g>(
     let mut found: Vec<Option<Diagnostic>> = found.into_iter().map(Some).collect();
     let mut allowed = Vec::new();
     let mut extra = Vec::new();
-    let mut notices = BTreeSet::new();
     for file in &project.files {
         let located = locate(project, &file.path);
         if located.is_empty() {
@@ -217,7 +187,6 @@ pub(crate) fn apply<'g>(
             claims: Vec::new(),
             open: BTreeMap::new(),
             extra: Vec::new(),
-            notices: BTreeSet::new(),
         };
         for at in &located {
             reader.read(at)?;
@@ -225,28 +194,22 @@ pub(crate) fn apply<'g>(
         let Reader {
             claims,
             extra: noted,
-            notices: renamed,
             ..
         } = reader;
         extra.extend(noted);
-        notices.extend(renamed);
         for claim in &claims {
             let taken = take(&mut found, &file.path, claim);
             extra.extend(unused_note(gate, &file.lang, claim, taken.is_empty())?);
             let reason = claim.at.directive.reason.clone().unwrap_or_default();
-            allowed.extend(taken.into_iter().map(|diagnostic| Allowed {
+            allowed.extend(taken.into_iter().map(|diagnostic| Suppressed {
                 diagnostic,
-                reason: reason.clone(),
+                suppression: Suppression::in_source(reason.clone()),
             }));
         }
     }
     let mut kept: Vec<Diagnostic> = found.into_iter().flatten().collect();
     kept.extend(extra);
-    Ok(Applied {
-        kept,
-        allowed,
-        notices,
-    })
+    Ok(Applied { kept, allowed })
 }
 
 /// The directives of the comments of `file`, in source order.
@@ -347,20 +310,14 @@ fn finding(
         return Ok(None);
     };
     let words = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
-    // The identity does not depend on how a directive is spelled: its marker
-    // and the ids it names (old or new) are written one way.
-    let canonical = annotation::canonical(&comment.text, &|id| {
-        gate.aliases.get(id).map_or(id, String::as_str).to_owned()
-    });
-    let mut current = words(&canonical);
+    let mut snippet = words(&comment.text);
     if at.index > 0 {
-        current.push_str(&format!(" #{}", at.index));
+        snippet.push_str(&format!(" #{}", at.index));
     }
-    let raw = words(&comment.text);
     let path = comment.file.to_string_lossy();
-    let (fingerprint, legacy) = match gate.manifests.get(rule) {
-        Some(meta) => meta.fingerprints_for(&path, &current, &raw),
-        None => (Fingerprint::of(rule, &path, &current), Vec::new()),
+    let fingerprint = match gate.manifests.get(rule) {
+        Some(meta) => meta.fingerprint(&path, &snippet),
+        None => Fingerprint::of(rule, &path, &snippet),
     };
     let mut d = Diagnostic::new(
         rule,
@@ -369,8 +326,7 @@ fn finding(
         &comment.file,
         place(at),
         fingerprint,
-    )
-    .with_legacy(legacy);
+    );
     d.evidence = json!({
         "rules": at.directive.rules,
         "reason": at.directive.reason,

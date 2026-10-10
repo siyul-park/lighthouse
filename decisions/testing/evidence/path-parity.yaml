@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: evidence
-  annotations:
-    lighthouse/was-names: testing/parity-across-paths
 spec:
   title: Test parity across execution paths
   context: >-

@@ -1,33 +1,35 @@
 //! The quality store: findings with their history in a local SQLite cache,
-//! and the verdicts on them in a committed, append-only decision log
-//! (`.lighthouse/decisions.jsonl`) that the cache is synchronized from.
+//! and the judgments and suppressions on them in a committed, append-only
+//! decision log (`.lighthouse/decisions.jsonl`) that the cache is synchronized
+//! from. The cache has one schema and no migrations: a database of another
+//! version is emptied and filled again from the log.
 //!
-//! Labels for later learning follow [`lighthouse_model::Label`]: confirmed is
-//! positive, rejected as a false positive or too broad is negative, the other
-//! rejections are separate targets, deferred is unlabeled, and a finding
-//! nobody reviewed has no label.
+//! Labels for later learning follow [`lighthouse_model::Label`]: `fail` is
+//! positive, `pass` and `notApplicable` are negative, a `fail` left in place by
+//! a suppression is a target of its own, and a finding nobody judged has no
+//! label.
 
 mod digest;
 mod error;
 mod log;
-mod migrations;
 mod record;
+mod schema;
 mod store;
 
 use lighthouse_resource::Descriptor;
 
 pub use error::Error;
-pub use log::{RewriteSpec, VerdictSpec};
+pub use log::{JudgmentSpec, SuppressionSpec};
 pub use record::{
-    Filter, FindingRecord, FixEvent, LatestReview, NewFix, NewReview, Observed, Rejection,
-    Resolved, ReviewEvent, Run, RunSummary, Stamp, Standing, State, StatusFilter, Unchecked,
+    Filter, FindingRecord, FixEvent, JudgmentEvent, NewFix, NewJudgment, Observed, Resolved,
+    Ruling, Run, RunSummary, Stamp, Standing, State, StatusFilter, SuppressionEvent, Unchecked,
 };
 pub use store::Store;
 
 /// The JSON Schema of every record kind the decision log holds.
 pub fn descriptors() -> Vec<Descriptor> {
     vec![
-        Descriptor::of::<VerdictSpec>(),
-        Descriptor::of::<RewriteSpec>(),
+        Descriptor::of::<JudgmentSpec>(),
+        Descriptor::of::<SuppressionSpec>(),
     ]
 }

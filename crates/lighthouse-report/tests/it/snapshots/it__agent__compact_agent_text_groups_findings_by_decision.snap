@@ -10,7 +10,7 @@ design/exported-doc warn [review] — Exported symbols SHOULD have doc comments 
 
     func Helper() {}
   bar/bar.go:4:1 exported function Func1 must have a doc comment adc7d1d
-  bar/bar.go:7:1 exported function Func2 must have a doc comment ab2cb8c {receiver=T} (note: verdict expired: rule changed)
+  bar/bar.go:7:1 exported function Func2 must have a doc comment ab2cb8c {receiver=T} (note: judgment expired: decision changed)
 design/coupling warn [review] — Coupling SHOULD be judged from direct intra-package fan-in and fan-out, that is the functions and methods of the same package that call a symbol or are called by it, against deliberately high thresholds. Calls from other packages and from tests do not count: a widely used public function is a service, not a hub.
   expected:
     package sample
@@ -42,6 +42,6 @@ design/private-helper-callers info [review] — A private helper SHOULD have at 
     }
   src/lib.rs:7:1 private helper has one caller d3d6fba
 broken.go: incomplete: type error
-resolve: lighthouse review resolve <fingerprint> --verdict <verdict> --reason <reason> --reviewer-kind agent
-reasons: confirmed=fixed|accepted-debt|none; rejected=false-positive|intentional-exception|scope-too-broad|project-allowed|not-worth-fixing; deferred=none
+resolve: lighthouse review resolve <fingerprint> --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent
+judgments: fail=the finding is right; add `suppress` with a justification to leave it in place; pass=false positive: the code conforms; notApplicable=the decision does not apply here; a hint to narrow it
 summary: 1 error, 3 warn, 1 info, 4 review, 1 incomplete, 2 suppressed, 1 allowed

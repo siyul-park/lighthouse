@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: file-order
-  annotations:
-    lighthouse/was-builtin: design/declaration-groups
 spec:
   title: Declarations follow ownership groups
   context: >-

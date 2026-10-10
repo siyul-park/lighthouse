@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: concurrency
-  annotations:
-    lighthouse/was-names: design/no-stored-request-context
 spec:
   title: Request contexts are not stored
   context: >-

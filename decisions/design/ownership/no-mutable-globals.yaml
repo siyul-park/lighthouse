@@ -7,10 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: ownership
-  annotations:
-    lighthouse/was-names: design/no-exported-mutable-global
-    lighthouse/migrated-from: design/ownership/rules/no-exported-mutable-global.yaml
-    lighthouse/was-exceptions: " Sentinel errors, by the `Err` name prefix, are exported variables by convention and are not reported."
 spec:
   title: No exported mutable global
   context: >-

@@ -8,8 +8,8 @@ use thiserror::Error;
 use crate::{Span, hash::Hasher};
 
 /// How hard a finding fails a run; serialized and parsed as the lowercase
-/// variant name. Whether a finding also asks for a verdict is not a level: it
-/// follows from how its decision is enforced.
+/// variant name. Whether a finding also asks for review is not a level: it
+/// follows from the severity its decision authored.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -51,13 +51,11 @@ impl fmt::Display for Severity {
     }
 }
 
-impl Severity {
-    /// Whether findings of a decision with this authored severity ask for a
-    /// verdict. An `error` is definitive: only an annotation in the code waives
-    /// it. A `warn` or `info` is a review task: a reviewer confirms or rejects it.
-    pub fn needs_verdict(self) -> bool {
-        self != Self::Error
-    }
+/// Whether a finding of a decision that authored `authored` asks for review:
+/// the check is not deterministic (an `error` is definitive: only a
+/// suppression waives it) and nobody has judged the finding yet.
+pub fn needs_review(authored: Severity, judged: bool) -> bool {
+    authored != Severity::Error && !judged
 }
 
 /// Stable identity of a finding across runs and line shifts.
@@ -122,12 +120,6 @@ pub struct Diagnostic {
     pub file: PathBuf,
     pub span: Span,
     pub fingerprint: Fingerprint,
-    /// The fingerprints this finding had while the decision's name seeded
-    /// them instead of its uid, one per name the decision answered to: what a
-    /// verdict recorded then is keyed by. Only the engine and the store read
-    /// them, for one release; they are not part of any output.
-    #[serde(skip)]
-    pub legacy_fingerprints: Vec<Fingerprint>,
     /// Id of the symbol the finding is about, when it is about one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub symbol: Option<String>,
@@ -154,17 +146,10 @@ impl Diagnostic {
             file: file.into(),
             span,
             fingerprint,
-            legacy_fingerprints: Vec::new(),
             symbol: None,
             evidence: Value::Null,
             fix: None,
         }
-    }
-
-    /// The same finding with the fingerprints it had under the decision's names.
-    pub fn with_legacy(mut self, legacy: Vec<Fingerprint>) -> Self {
-        self.legacy_fingerprints = legacy;
-        self
     }
 }
 

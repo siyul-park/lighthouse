@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-rules
-  annotations:
-    lighthouse/was-names: design/split-real-boundaries
 spec:
   title: Split real boundaries
   context: >-

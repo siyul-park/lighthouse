@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: dependency-direction
-  annotations:
-    lighthouse/was-names: design/general-lower-level
 spec:
   title: Lower-level code is general
   context: >-

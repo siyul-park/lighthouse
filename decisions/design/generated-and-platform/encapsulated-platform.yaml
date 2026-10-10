@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: generated-and-platform
-  annotations:
-    lighthouse/was-names: design/platform-behind-owner
 spec:
   title: Platform mechanics stay behind their owner
   context: >-

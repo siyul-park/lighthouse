@@ -192,7 +192,7 @@ fn full_agent_json_is_one_tagged_record_per_line() {
     assert!(coupling["requirement"].as_str().unwrap().contains("fan"));
     assert!(
         coupling["resolve"].is_object(),
-        "a heuristic finding asks for a verdict whatever its severity"
+        "a heuristic finding asks for review whatever its severity"
     );
     assert_eq!(coupling["expected"]["language"], "go");
 
@@ -223,8 +223,9 @@ fn full_agent_json_is_one_tagged_record_per_line() {
     assert_eq!(summary["reviews"], 2);
     assert_eq!(summary["suppressed"], 2);
     assert_eq!(summary["allowed"], 1);
-    assert_eq!(summary["reasons"]["deferred"], json!(["none"]));
-    assert_eq!(summary["reasons"]["rejected"][0], "false-positive");
+    assert!(summary["judgments"]["fail"].is_string());
+    assert!(summary["judgments"]["pass"].is_string());
+    assert!(summary["judgments"]["notApplicable"].is_string());
 }
 
 #[test]
@@ -309,8 +310,8 @@ fn full_limit_keeps_the_most_severe_findings_and_counts_the_rest() {
         "{text}"
     );
     assert!(
-        text.contains("reasons:"),
-        "a shown heuristic finding asks for a verdict: {text}"
+        text.contains("judgments:"),
+        "a shown heuristic finding asks for review: {text}"
     );
 
     let json = records_of(&render_with(Format::AgentJson, &findings, &[], &briefing));
@@ -318,7 +319,7 @@ fn full_limit_keeps_the_most_severe_findings_and_counts_the_rest() {
     assert_eq!(kinds, ["finding", "finding", "truncated", "summary"]);
     assert_eq!(json[2]["omitted"], 1);
     assert_eq!(json[0]["rule"], "design/coupling", "original order is kept");
-    assert!(json[3]["reasons"].is_object());
+    assert!(json[3]["judgments"].is_object());
 }
 
 #[test]
@@ -341,7 +342,7 @@ fn limit_counts_findings_and_keeps_errors_then_the_larger_groups() {
         text.contains("summary: 1 error, 1 warn, 1 info, 2 review"),
         "{text}"
     );
-    assert!(text.contains("reasons:"), "{text}");
+    assert!(text.contains("judgments:"), "{text}");
 
     let json = records_of(&render_with(Format::AgentJson, &findings, &[], &briefing));
     assert_eq!(json.len(), 1, "the compact JSON is one object");
@@ -354,7 +355,7 @@ fn limit_counts_findings_and_keeps_errors_then_the_larger_groups() {
     assert_eq!(rules, ["acme/custom", "design/coupling"]);
     assert_eq!(json[0]["omitted"], json!({ "groups": 1, "findings": 1 }));
     assert_eq!(json[0]["counts"]["info"], 1, "counts cover the whole run");
-    assert!(json[0]["reasons"].is_object());
+    assert!(json[0]["judgments"].is_object());
 }
 
 #[test]
@@ -382,7 +383,7 @@ fn notes_say_why_a_finding_is_reported() {
     let facts = facts(&findings);
     let notes = BTreeMap::from([(
         findings[0].fingerprint.clone(),
-        "verdict expired: rule changed".to_owned(),
+        "judgment expired: decision changed".to_owned(),
     )]);
     let briefing = briefed(&facts, |b| Briefing {
         notes: Some(&notes),
@@ -390,19 +391,19 @@ fn notes_say_why_a_finding_is_reported() {
     });
     let text = render_with(Format::Agent, &findings, &[], &briefing);
     assert!(
-        text.contains("(note: verdict expired: rule changed)"),
+        text.contains("(note: judgment expired: decision changed)"),
         "{text}"
     );
     let json = records_of(&render_with(Format::AgentJson, &findings, &[], &briefing));
     let instance = &json[0]["groups"][0]["files"]["a.txt"][0];
-    assert_eq!(instance[3]["note"], "verdict expired: rule changed");
+    assert_eq!(instance[3]["note"], "judgment expired: decision changed");
 
     let full = Briefing {
         detail: Detail::Full,
         ..briefing
     };
     let json = records_of(&render_with(Format::AgentJson, &findings, &[], &full));
-    assert_eq!(json[0]["note"], "verdict expired: rule changed");
+    assert_eq!(json[0]["note"], "judgment expired: decision changed");
 }
 
 #[test]
@@ -578,8 +579,8 @@ fn agent_report_has_the_fields_the_json_prints() {
     assert_eq!(fields["incomplete"], json!([[null, "plugin crashed"]]));
     assert_eq!(fields["counts"]["review"], 1, "counts cover the whole run");
     assert!(
-        fields.get("reasons").is_none() && fields.get("resolve").is_none(),
-        "the finding that asks for a verdict was left out"
+        fields.get("judgments").is_none() && fields.get("resolve").is_none(),
+        "the finding that asks for review was left out"
     );
 
     let all = lighthouse_report::agent_report(
@@ -593,7 +594,7 @@ fn agent_report_has_the_fields_the_json_prints() {
     assert_eq!(all.fields["status"], "findings");
     assert_eq!(all.fields["groups"].as_array().unwrap().len(), 2);
     assert!(all.fields.get("omitted").is_none());
-    assert!(all.fields["reasons"].is_object());
+    assert!(all.fields["judgments"].is_object());
     assert!(all.fields["resolve"].is_string());
 
     let full = lighthouse_report::agent_report(
@@ -612,14 +613,17 @@ fn agent_report_has_the_fields_the_json_prints() {
 }
 
 #[test]
-fn needs_verdict_follows_the_tier_of_the_decision_and_not_the_severity() {
+fn needs_review_follows_the_authored_severity_of_the_decision_and_the_judgments_that_stand() {
     let briefing = Briefing {
         catalog: Some(Catalog::bundled()),
         ..Briefing::default()
     };
     let mut heuristic = coupling();
     heuristic.severity = Severity::Error;
-    assert!(briefing.needs_verdict(&heuristic), "heuristic at error");
+    assert!(
+        briefing.needs_review(&heuristic),
+        "a warn decision at error"
+    );
     let mechanical = Diagnostic::new(
         "core/allow-reason",
         Severity::Warn,
@@ -628,7 +632,10 @@ fn needs_verdict_follows_the_tier_of_the_decision_and_not_the_severity() {
         span(1),
         Fingerprint::of("core/allow-reason", "m", ""),
     );
-    assert!(!briefing.needs_verdict(&mechanical), "mechanical at warn");
+    assert!(
+        !briefing.needs_review(&mechanical),
+        "an error decision at warn"
+    );
 }
 
 #[test]
@@ -640,7 +647,7 @@ fn compact_agent_text_groups_findings_by_decision() {
     facts.extend(self::facts(&findings[..3]));
     let notes = BTreeMap::from([(
         findings[4].fingerprint.clone(),
-        "verdict expired: rule changed".to_owned(),
+        "judgment expired: decision changed".to_owned(),
     )]);
     let briefing = Briefing {
         catalog: Some(Catalog::bundled()),
@@ -662,7 +669,7 @@ fn compact_agent_json_groups_findings_by_decision() {
     facts.extend(self::facts(&findings[..3]));
     let notes = BTreeMap::from([(
         findings[4].fingerprint.clone(),
-        "verdict expired: rule changed".to_owned(),
+        "judgment expired: decision changed".to_owned(),
     )]);
     let briefing = Briefing {
         catalog: Some(Catalog::bundled()),

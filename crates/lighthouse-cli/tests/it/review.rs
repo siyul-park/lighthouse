@@ -1,5 +1,5 @@
 //! The remembering loop through the binary: `check` records findings, `review`
-//! judges them, and later checks honor the verdicts.
+//! judges them, and later checks honor the judgments.
 
 use std::{fs, path::Path};
 
@@ -114,16 +114,16 @@ fn check_remembers_findings_and_marks_fixed_ones_resolved() {
 }
 
 #[test]
-fn a_rejected_verdict_keeps_the_finding_out_of_later_reports() {
+fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
     let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
 
     lighthouse(dir.path())
         .args(["review", "resolve", &fingerprint[..12]])
-        .args(["--verdict", "rejected", "--reason", "intentional-exception"])
+        .args(["--judgment", "fail", "--suppress", "intentional-exception"])
         .args([
-            "--note",
+            "--reason",
             "named policy",
             "--reviewer-kind",
             "agent",
@@ -139,7 +139,7 @@ fn a_rejected_verdict_keeps_the_finding_out_of_later_reports() {
     assert!(text.contains("design/exported-doc"), "{text}");
     let notice = String::from_utf8(out.stderr).unwrap();
     assert!(
-        notice.contains("1 finding(s) suppressed by review verdicts"),
+        notice.contains("1 finding(s) kept out of the report by judgments"),
         "{notice}"
     );
     let agent = stdout(lighthouse(dir.path()).args(["check", "--format", "agent"]));
@@ -160,11 +160,17 @@ fn a_rejected_verdict_keeps_the_finding_out_of_later_reports() {
     ])));
     assert_eq!(history.len(), 1);
     let event = &history[0];
-    assert_eq!(event["verdict"], "rejected");
-    assert_eq!(event["reason"], "intentional-exception");
-    assert_eq!(event["reasonText"], "named policy");
-    assert_eq!(event["reviewerKind"], "agent");
-    assert_eq!(event["reviewerId"], "claude");
+    assert_eq!(event["judgment"], "fail");
+    assert_eq!(event["reason"], "named policy");
+    assert_eq!(event["suppressions"][0]["kind"], "external");
+    assert_eq!(event["suppressions"][0]["status"], "accepted");
+    assert_eq!(
+        event["suppressions"][0]["justification"],
+        "intentional-exception"
+    );
+    assert_eq!(event["wasAttributedTo"]["type"], "SoftwareAgent");
+    assert_eq!(event["wasAttributedTo"]["id"], "claude");
+    assert!(event["generatedAtTime"].is_string());
     assert_eq!(event["language"], "rust");
     assert_eq!(event["scope"], "symbol");
     assert_eq!(event["label"], "separate");
@@ -172,11 +178,11 @@ fn a_rejected_verdict_keeps_the_finding_out_of_later_reports() {
     assert_eq!(event["snapshot"]["evidence"]["callers"], 1);
     assert_eq!(event["snapshot"]["v"], 2);
     assert_eq!(event["snapshot"]["dirty"], false);
-    assert_eq!(event["ruleVersion"].as_str().unwrap().len(), 16);
+    assert_eq!(event["meaningVersion"].as_str().unwrap().len(), 16);
     assert_eq!(event["catalogVersion"].as_str().unwrap().len(), 16);
 
     lighthouse(dir.path())
-        .args(["review", "resolve", &fingerprint, "--verdict", "deferred"])
+        .args(["review", "resolve", &fingerprint, "--judgment", "fail"])
         .assert()
         .success();
     let again = stdout(lighthouse(dir.path()).arg("check"));
@@ -192,17 +198,17 @@ fn a_suppressed_error_no_longer_fails_the_run() {
     let fingerprint = fingerprint_of(&dir, "design/exported-doc");
     lighthouse(dir.path())
         .args(["review", "resolve", &fingerprint])
-        .args(["--verdict", "rejected", "--reason", "project-allowed"])
+        .args(["--judgment", "fail", "--suppress", "project-allowed"])
         .assert()
         .success();
     strict(&dir).success();
 }
 
 #[test]
-fn resolve_rejects_inconsistent_verdicts_and_unknown_findings() {
+fn resolve_rejects_inconsistent_judgments_and_unknown_findings() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path())
-        .args(["review", "resolve", "abc", "--verdict", "deferred"])
+        .args(["review", "resolve", "abc", "--judgment", "fail"])
         .assert()
         .code(2)
         .stderr("lighthouse: no findings recorded yet (run `lighthouse check`)\n");
@@ -220,24 +226,16 @@ fn resolve_rejects_inconsistent_verdicts_and_unknown_findings() {
         assert!(stderr.contains(message), "{stderr}");
     };
     fails(
-        &["--verdict", "rejected"],
-        "does not fit verdict `rejected`",
+        &["--judgment", "pass", "--suppress", "why"],
+        "a suppression goes with a `fail`, not with `pass`",
     );
+    fails(&["--judgment", "maybe"], "unknown judgment");
     fails(
-        &["--verdict", "confirmed", "--reason", "false-positive"],
-        "does not fit verdict",
-    );
-    fails(
-        &["--verdict", "deferred", "--reason", "fixed"],
-        "does not fit verdict",
-    );
-    fails(&["--verdict", "maybe"], "unknown verdict");
-    fails(
-        &["--verdict", "confirmed", "--reviewer-kind", "robot"],
+        &["--judgment", "fail", "--reviewer-kind", "robot"],
         "unknown reviewer kind",
     );
     lighthouse(dir.path())
-        .args(["review", "resolve", "ffffffff", "--verdict", "deferred"])
+        .args(["review", "resolve", "ffffffff", "--judgment", "fail"])
         .assert()
         .code(2);
     assert!(
@@ -307,7 +305,7 @@ fn a_run_resolves_only_findings_inside_its_report_scope() {
 }
 
 #[test]
-fn no_store_neither_records_nor_applies_verdicts() {
+fn no_store_neither_records_nor_applies_judgments() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path())
         .args(["check", "--no-store"])
@@ -318,15 +316,7 @@ fn no_store_neither_records_nor_applies_verdicts() {
     lighthouse(dir.path()).arg("check").assert().success();
     let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
     lighthouse(dir.path())
-        .args([
-            "review",
-            "resolve",
-            &fingerprint,
-            "--verdict",
-            "rejected",
-            "--reason",
-            "false-positive",
-        ])
+        .args(["review", "resolve", &fingerprint, "--judgment", "pass"])
         .assert()
         .success();
     let out = stdout(lighthouse(dir.path()).args(["check", "--no-store"]));
@@ -432,16 +422,17 @@ fn the_resolve_command_of_an_agent_finding_runs_as_given() {
         .skip(1)
         .map(|a| match a {
             "<fingerprint>" => prefix,
-            "<verdict>" => "confirmed",
-            "<reason>" => "fixed",
+            "<pass|fail|notApplicable>" => "fail",
             other => other,
         })
+        .filter(|a| !["[--suppress", "<justification>]", "[--reason", "<text>]"].contains(a))
         .collect();
     lighthouse(dir.path()).args(args).assert().success();
     let history = records(&stdout(
         lighthouse(dir.path()).args(["review", "history", prefix, "--format", "json"]),
     ));
-    assert_eq!(history[0]["reviewerKind"], "agent");
+    assert_eq!(history[0]["wasAttributedTo"]["type"], "SoftwareAgent");
+    assert_eq!(history[0]["judgment"], "fail");
     assert_eq!(history[0]["label"], "positive");
     assert_eq!(history[0]["fingerprint"].as_str().unwrap().len(), 64);
 }
@@ -451,7 +442,7 @@ fn an_ambiguous_fingerprint_prefix_is_refused_and_a_unique_one_is_enough() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
     let out = lighthouse(dir.path())
-        .args(["review", "resolve", "", "--verdict", "deferred"])
+        .args(["review", "resolve", "", "--judgment", "fail"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
@@ -462,13 +453,7 @@ fn an_ambiguous_fingerprint_prefix_is_refused_and_a_unique_one_is_enough() {
     );
     let fingerprint = fingerprint_of(&dir, "design/exported-doc");
     lighthouse(dir.path())
-        .args([
-            "review",
-            "resolve",
-            &fingerprint[..7],
-            "--verdict",
-            "deferred",
-        ])
+        .args(["review", "resolve", &fingerprint[..7], "--judgment", "fail"])
         .assert()
         .success();
 }
@@ -596,8 +581,8 @@ fn every(dir: &TempDir, status: &str) -> Vec<Value> {
 }
 
 #[test]
-fn a_mechanical_finding_stays_reported_whatever_the_verdict() {
-    let source = "// lighthouse:allow design/exported-doc\npub fn run() {}\n";
+fn an_error_stays_reported_whatever_the_judgment() {
+    let source = "// lighthouse-disable-next-line design/exported-doc\npub fn run() {}\n";
     let dir = rust_project(&[("src/lib.rs", source)]);
     let plugin = lighthouse_test_support::lang_rust();
     fs::write(
@@ -619,9 +604,9 @@ fn a_mechanical_finding_stays_reported_whatever_the_verdict() {
             "review",
             "resolve",
             &fingerprint,
-            "--verdict",
-            "rejected",
-            "--reason",
+            "--judgment",
+            "fail",
+            "--suppress",
             "intentional-exception",
         ])
         .output()
@@ -630,7 +615,7 @@ fn a_mechanical_finding_stays_reported_whatever_the_verdict() {
     assert!(
         String::from_utf8(out.stdout)
             .unwrap()
-            .contains("mechanical finding")
+            .contains("this is an error")
     );
     let check = lighthouse(dir.path())
         .args(["check", "--format", "agent"])
@@ -639,12 +624,12 @@ fn a_mechanical_finding_stays_reported_whatever_the_verdict() {
     assert_eq!(check.status.code(), Some(1));
     let text = String::from_utf8(check.stdout).unwrap();
     assert!(
-        text.contains("(note: rejected as intentional-exception \u{2014} mechanical findings are not suppressible; fix the rule)"),
+        text.contains("(note: judged fail \u{2014} errors are definitive and no judgment hides them; fix the code or suppress it in the code)"),
         "{text}"
     );
     let notice = String::from_utf8(check.stderr).unwrap();
     assert!(
-        notice.contains("mechanical findings are not suppressible"),
+        notice.contains("errors are definitive and no judgment hides them"),
         "{notice}"
     );
     assert!(every(&dir, "suppressed").is_empty());
@@ -656,14 +641,14 @@ fn a_mechanical_finding_stays_reported_whatever_the_verdict() {
 }
 
 #[test]
-fn a_heuristic_finding_configured_as_error_is_suppressed_by_a_verdict() {
+fn a_warn_decision_configured_as_error_is_hidden_by_a_judgment() {
     let dir = rust_project(&[("src/lib.rs", "pub fn run() {}\n")]);
     error_level(&dir);
     lighthouse(dir.path()).arg("check").assert().code(1);
     let fingerprint = fingerprint_of(&dir, "design/exported-doc");
     lighthouse(dir.path())
         .args(["review", "resolve", &fingerprint])
-        .args(["--verdict", "rejected", "--reason", "false-positive"])
+        .args(["--judgment", "pass"])
         .assert()
         .success();
     lighthouse(dir.path()).arg("check").assert().success();
@@ -671,20 +656,12 @@ fn a_heuristic_finding_configured_as_error_is_suppressed_by_a_verdict() {
 }
 
 #[test]
-fn a_verdict_expires_when_the_evidence_it_judged_changes() {
+fn a_judgment_expires_when_the_evidence_it_judged_changes() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
     let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
     lighthouse(dir.path())
-        .args([
-            "review",
-            "resolve",
-            &fingerprint,
-            "--verdict",
-            "rejected",
-            "--reason",
-            "false-positive",
-        ])
+        .args(["review", "resolve", &fingerprint, "--judgment", "pass"])
         .assert()
         .success();
     let quiet = stdout(lighthouse(dir.path()).arg("check"));
@@ -702,12 +679,12 @@ fn a_verdict_expires_when_the_evidence_it_judged_changes() {
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(text.contains("private-helper-callers"), "{text}");
     assert!(
-        text.contains("(note: verdict expired: evidence changed)"),
+        text.contains("(note: judgment expired: evidence changed)"),
         "{text}"
     );
     let notice = String::from_utf8(out.stderr).unwrap();
     assert!(
-        notice.contains("verdict expired: evidence changed"),
+        notice.contains("judgment expired: evidence changed"),
         "{notice}"
     );
 }
@@ -725,7 +702,7 @@ fn the_reviewer_comes_from_flags_then_the_environment_then_a_human() {
         for (key, value) in envs {
             cmd.env(key, value);
         }
-        cmd.args(["review", "resolve", &fingerprint, "--verdict", "deferred"])
+        cmd.args(["review", "resolve", &fingerprint, "--judgment", "fail"])
             .args(flags)
             .assert()
             .success();
@@ -756,25 +733,25 @@ fn the_reviewer_comes_from_flags_then_the_environment_then_a_human() {
         .iter()
         .map(|e| {
             (
-                e["reviewerKind"].as_str().unwrap(),
-                e["reviewerId"].as_str().unwrap(),
+                e["wasAttributedTo"]["type"].as_str().unwrap(),
+                e["wasAttributedTo"]["id"].as_str().unwrap(),
             )
         })
         .collect();
     assert_eq!(who.len(), 3);
-    assert!(who.contains(&("human", "dana")), "{who:?}");
-    assert!(who.contains(&("agent", "hook")), "{who:?}");
-    assert!(who.contains(&("human", "ana")), "{who:?}");
+    assert!(who.contains(&("Person", "dana")), "{who:?}");
+    assert!(who.contains(&("SoftwareAgent", "hook")), "{who:?}");
+    assert!(who.contains(&("Person", "ana")), "{who:?}");
 
     lighthouse(dir.path())
         .env("LIGHTHOUSE_REVIEWER_KIND", "robot")
-        .args(["review", "resolve", &fingerprint, "--verdict", "deferred"])
+        .args(["review", "resolve", &fingerprint, "--judgment", "fail"])
         .assert()
         .code(2);
 }
 
 #[test]
-fn the_decision_log_carries_a_verdict_to_a_clone_without_the_cache() {
+fn the_decision_log_carries_a_judgment_to_a_clone_without_the_cache() {
     let author = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(author.path()).arg("check").assert().success();
     let fingerprint = fingerprint_of(&author, "design/private-helper-callers");
@@ -783,15 +760,15 @@ fn the_decision_log_carries_a_verdict_to_a_clone_without_the_cache() {
             "review",
             "resolve",
             &fingerprint,
-            "--verdict",
-            "rejected",
-            "--reason",
+            "--judgment",
+            "fail",
+            "--suppress",
             "project-allowed",
         ])
         .assert()
         .success();
     let log = fs::read_to_string(author.path().join(".lighthouse/decisions.jsonl")).unwrap();
-    assert_eq!(log.lines().count(), 1);
+    assert_eq!(log.lines().count(), 2, "a judgment and its suppression");
 
     let clone = rust_project(&[("src/lib.rs", HELPER)]);
     fs::create_dir_all(clone.path().join(".lighthouse")).unwrap();
@@ -802,7 +779,7 @@ fn the_decision_log_carries_a_verdict_to_a_clone_without_the_cache() {
     assert!(
         String::from_utf8(out.stderr)
             .unwrap()
-            .contains("1 finding(s) suppressed")
+            .contains("1 finding(s) kept out of the report")
     );
     let history = records(&stdout(lighthouse(clone.path()).args([
         "review",
@@ -811,7 +788,10 @@ fn the_decision_log_carries_a_verdict_to_a_clone_without_the_cache() {
         "--format",
         "json",
     ])));
-    assert_eq!(history[0]["reason"], "project-allowed");
+    assert_eq!(
+        history[0]["suppressions"][0]["justification"],
+        "project-allowed"
+    );
 }
 
 #[test]
@@ -824,8 +804,8 @@ fn resolve_refuses_a_finding_that_was_seen_again_and_warns_about_a_resolved_one(
             "review",
             "resolve",
             &fingerprint,
-            "--verdict",
-            "deferred",
+            "--judgment",
+            "fail",
             "--seen",
             "2000-01-01T00:00:00.000Z",
         ])
@@ -836,15 +816,7 @@ fn resolve_refuses_a_finding_that_was_seen_again_and_warns_about_a_resolved_one(
     write(&dir, "src/lib.rs", DOCUMENTED);
     lighthouse(dir.path()).arg("check").assert().success();
     let out = lighthouse(dir.path())
-        .args([
-            "review",
-            "resolve",
-            &fingerprint,
-            "--verdict",
-            "confirmed",
-            "--reason",
-            "fixed",
-        ])
+        .args(["review", "resolve", &fingerprint, "--judgment", "fail"])
         .output()
         .unwrap();
     assert!(out.status.success());
@@ -865,7 +837,7 @@ fn history_says_when_nothing_was_reviewed_and_resolve_survives_a_broken_catalog(
         .assert()
         .success()
         .stdout("")
-        .stderr(predicates::str::contains("no reviews recorded"));
+        .stderr(predicates::str::contains("no judgments recorded"));
 
     fs::create_dir_all(dir.path().join(".lighthouse/decisions")).unwrap();
     fs::write(
@@ -874,7 +846,7 @@ fn history_says_when_nothing_was_reviewed_and_resolve_survives_a_broken_catalog(
     )
     .unwrap();
     let out = lighthouse(dir.path())
-        .args(["review", "resolve", &fingerprint, "--verdict", "deferred"])
+        .args(["review", "resolve", &fingerprint, "--judgment", "fail"])
         .output()
         .unwrap();
     assert!(
@@ -894,7 +866,7 @@ fn history_says_when_nothing_was_reviewed_and_resolve_survives_a_broken_catalog(
         "--format",
         "json",
     ])));
-    assert!(history[0].get("ruleVersion").is_none());
+    assert!(history[0].get("meaningVersion").is_none());
 }
 
 #[test]
@@ -952,8 +924,7 @@ fn changed_resolves_the_findings_of_a_deleted_file() {
 
 #[test]
 fn source_annotations_allow_findings_and_are_counted() {
-    let allowed =
-        "// lighthouse:allow design/exported-doc -- documented at its origin\npub fn run() {}\n";
+    let allowed = "// lighthouse-disable-next-line design/exported-doc -- documented at its origin\npub fn run() {}\n";
     let dir = rust_project(&[("src/lib.rs", allowed)]);
     let out = lighthouse(dir.path())
         .args(["check", "--strict"])
@@ -978,7 +949,7 @@ fn source_annotations_allow_findings_and_are_counted() {
         )),
     )
     .unwrap();
-    let stale = "// lighthouse:allow design/exported-doc -- stale\n/// Runs.\npub fn run() {}\n";
+    let stale = "// lighthouse-disable-next-line design/exported-doc -- stale\n/// Runs.\npub fn run() {}\n";
     write(&dir, "src/lib.rs", stale);
     let text = stdout(lighthouse(dir.path()).arg("check"));
     assert!(text.contains("warn core/no-unused-allow"), "{text}");

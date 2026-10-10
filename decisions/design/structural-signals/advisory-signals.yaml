@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-signals
-  annotations:
-    lighthouse/was-names: design/signals-are-advisory
 spec:
   title: Signals stay advisory
   context: >-

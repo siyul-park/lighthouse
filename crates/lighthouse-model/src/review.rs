@@ -4,7 +4,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// The text given to a review term's `from_str` names no such term.
+use crate::Diagnostic;
+
+/// The text given to a term's `from_str` names no such term.
 #[derive(Debug, Error)]
 #[error("unknown {what} `{text}` (expected {expected})")]
 pub struct UnknownTerm {
@@ -13,13 +15,14 @@ pub struct UnknownTerm {
     expected: String,
 }
 
-/// A verdict and a reason that do not belong together.
-#[derive(Debug, Error)]
-#[error("reason `{reason}` does not fit verdict `{verdict}` (expected {expected})")]
-pub struct MismatchedReason {
-    verdict: Verdict,
-    reason: Reason,
-    expected: String,
+impl UnknownTerm {
+    pub(crate) fn new(what: &'static str, text: &str, expected: String) -> Self {
+        Self {
+            what,
+            text: text.to_owned(),
+            expected,
+        }
+    }
 }
 
 macro_rules! vocabulary {
@@ -50,152 +53,212 @@ macro_rules! vocabulary {
                     .iter()
                     .copied()
                     .find(|v| v.as_str() == s)
-                    .ok_or_else(|| UnknownTerm {
-                        what: $what,
-                        text: s.to_owned(),
-                        expected: names(Self::ALL.iter().map(|v| v.as_str())),
-                    })
+                    .ok_or_else(|| UnknownTerm::new(
+                        $what,
+                        s,
+                        names(Self::ALL.iter().map(|v| v.as_str())),
+                    ))
             }
         }
     };
 }
 
-/// What a reviewer decided about a finding.
+/// A recorded label on one subject, as SARIF's `result.kind` says it: not
+/// ground truth. `pass` and `fail` label the check's conformance part;
+/// `notApplicable` labels its applicability part (the decision should not
+/// apply here).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Verdict {
-    /// The finding is right.
-    Confirmed,
-    /// The finding is wrong or not wanted; it is suppressed from then on.
+pub enum Judgment {
+    /// The subject conforms: a finding about it was a false positive.
+    #[serde(rename = "pass")]
+    Pass,
+    /// The subject violates the decision: a finding about it is right.
+    #[serde(rename = "fail")]
+    Fail,
+    /// The decision does not apply to the subject.
+    #[serde(rename = "notApplicable")]
+    NotApplicable,
+}
+
+vocabulary!(Judgment, "judgment" {
+    Pass => "pass",
+    Fail => "fail",
+    NotApplicable => "notApplicable",
+});
+
+/// How a suppression was declared, in the words of SARIF.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum SuppressionKind {
+    /// By a directive in the code.
+    #[serde(rename = "inSource")]
+    InSource,
+    /// Outside the code: a recorded decision to leave the finding in place.
+    #[serde(rename = "external")]
+    External,
+}
+
+vocabulary!(SuppressionKind, "suppression kind" {
+    InSource => "inSource",
+    External => "external",
+});
+
+/// Whether a suppression is in force, in the words of SARIF.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum SuppressionStatus {
+    /// In force.
+    #[default]
+    #[serde(rename = "accepted")]
+    Accepted,
+    /// Proposed, not yet in force.
+    #[serde(rename = "underReview")]
+    UnderReview,
+    /// Refused.
+    #[serde(rename = "rejected")]
     Rejected,
-    /// Not decided yet; the finding stays visible.
-    Deferred,
 }
 
-vocabulary!(Verdict, "verdict" {
-    Confirmed => "confirmed",
+vocabulary!(SuppressionStatus, "suppression status" {
+    Accepted => "accepted",
+    UnderReview => "underReview",
     Rejected => "rejected",
-    Deferred => "deferred",
 });
 
-impl Verdict {
-    /// The reasons a verdict may carry; `Reason::Unspecified` is allowed
-    /// where listed, and required of `Deferred`.
-    pub fn reasons(self) -> &'static [Reason] {
+impl SuppressionStatus {
+    fn is_default(&self) -> bool {
+        *self == Self::Accepted
+    }
+}
+
+/// A finding that is right but is left in place on purpose: SARIF's
+/// `suppression`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Suppression {
+    pub kind: SuppressionKind,
+    /// `accepted` unless said otherwise.
+    #[serde(default, skip_serializing_if = "SuppressionStatus::is_default")]
+    pub status: SuppressionStatus,
+    /// Why the finding stays.
+    pub justification: String,
+}
+
+impl Suppression {
+    /// An accepted suppression of the given kind.
+    pub fn new(kind: SuppressionKind, justification: impl Into<String>) -> Self {
+        Self {
+            kind,
+            status: SuppressionStatus::Accepted,
+            justification: justification.into(),
+        }
+    }
+
+    /// An accepted suppression a directive in the code declares.
+    pub fn in_source(justification: impl Into<String>) -> Self {
+        Self::new(SuppressionKind::InSource, justification)
+    }
+
+    /// An accepted suppression recorded outside the code.
+    pub fn external(justification: impl Into<String>) -> Self {
+        Self::new(SuppressionKind::External, justification)
+    }
+
+    /// Whether the suppression is in force.
+    pub fn in_force(&self) -> bool {
+        self.status == SuppressionStatus::Accepted
+    }
+}
+
+/// A finding a suppression keeps out of the report. A run states how many
+/// there were, and SARIF keeps them with their suppression.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Suppressed {
+    pub diagnostic: Diagnostic,
+    pub suppression: Suppression,
+}
+
+/// What kind of agent a record is attributed to, a W3C PROV class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum AgentKind {
+    /// A human.
+    Person,
+    /// A program, such as a coding agent or a model.
+    SoftwareAgent,
+}
+
+impl AgentKind {
+    /// The PROV class: `Person` or `SoftwareAgent`.
+    pub fn as_str(self) -> &'static str {
         match self {
-            Self::Confirmed => &[Reason::Fixed, Reason::AcceptedDebt, Reason::Unspecified],
-            Self::Rejected => &[
-                Reason::FalsePositive,
-                Reason::IntentionalException,
-                Reason::ScopeTooBroad,
-                Reason::ProjectAllowed,
-                Reason::NotWorthFixing,
-            ],
-            Self::Deferred => &[Reason::Unspecified],
+            Self::Person => "Person",
+            Self::SoftwareAgent => "SoftwareAgent",
         }
     }
+}
 
-    /// Checks that `reason` belongs to this verdict.
-    pub fn validate(self, reason: Reason) -> Result<(), MismatchedReason> {
-        if self.reasons().contains(&reason) {
-            return Ok(());
-        }
-        Err(MismatchedReason {
-            verdict: self,
-            reason,
-            expected: names(self.reasons().iter().map(|r| r.as_str())),
-        })
+impl fmt::Display for AgentKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
-/// Why a reviewer reached a verdict.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-pub enum Reason {
-    /// Confirmed and the code was changed.
-    #[serde(rename = "fixed")]
-    Fixed,
-    /// Confirmed and left as known debt.
-    #[serde(rename = "accepted-debt")]
-    AcceptedDebt,
-    /// The rule misjudged this code.
-    #[serde(rename = "false-positive")]
-    FalsePositive,
-    /// The code is right to break the rule here.
-    #[serde(rename = "intentional-exception")]
-    IntentionalException,
-    /// The rule matches more than it should; a hint to narrow the rule.
-    #[serde(rename = "scope-too-broad")]
-    ScopeTooBroad,
-    /// The project's conventions allow it.
-    #[serde(rename = "project-allowed")]
-    ProjectAllowed,
-    /// True but not worth the change.
-    #[serde(rename = "not-worth-fixing")]
-    NotWorthFixing,
-    /// No reason given: what a deferred verdict carries.
-    #[serde(rename = "none")]
-    Unspecified,
+/// Reads the PROV class, or the words `human` and `agent`, which the command
+/// line and the environment take.
+impl FromStr for AgentKind {
+    type Err = UnknownTerm;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        match text {
+            "Person" | "person" | "human" => Ok(Self::Person),
+            "SoftwareAgent" | "softwareAgent" | "agent" => Ok(Self::SoftwareAgent),
+            _ => Err(UnknownTerm::new(
+                "reviewer kind",
+                text,
+                "agent, human, Person or SoftwareAgent".to_owned(),
+            )),
+        }
+    }
 }
 
-vocabulary!(Reason, "reason" {
-    Fixed => "fixed",
-    AcceptedDebt => "accepted-debt",
-    FalsePositive => "false-positive",
-    IntentionalException => "intentional-exception",
-    ScopeTooBroad => "scope-too-broad",
-    ProjectAllowed => "project-allowed",
-    NotWorthFixing => "not-worth-fixing",
-    Unspecified => "none",
-});
-
-/// Who reviewed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum ReviewerKind {
-    Agent,
-    Human,
+/// `prov:wasAttributedTo`: who a record is attributed to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Attribution {
+    #[serde(rename = "type")]
+    pub kind: AgentKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
-vocabulary!(ReviewerKind, "reviewer kind" {
-    Agent => "agent",
-    Human => "human",
-});
-
-/// What a verdict teaches a model about the rule that raised the finding.
-/// An unreviewed finding has no label: it is not a negative.
+/// What a judgment teaches a model about the decision that raised the
+/// finding. An unjudged finding has no label: it is not a negative.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Label {
-    /// Confirmed: the rule was right.
+    /// `fail`: the check was right.
     Positive,
-    /// Rejected as a false positive or as too broad: the rule was wrong.
+    /// `pass` or `notApplicable`: the check was wrong.
     Negative,
-    /// Rejected for a reason that says nothing about precision (an exception,
-    /// a project convention, not worth fixing): a target of its own.
+    /// `fail` that is left in place on purpose (an external suppression): says
+    /// nothing about precision, a target of its own.
     Separate,
-    /// Deferred: undecided.
-    Unlabeled,
 }
 
 vocabulary!(Label, "label" {
     Positive => "positive",
     Negative => "negative",
     Separate => "separate",
-    Unlabeled => "unlabeled",
 });
 
 impl Label {
-    /// The label of a verdict with its reason.
-    pub fn of(verdict: Verdict, reason: Reason) -> Self {
-        match (verdict, reason) {
-            (Verdict::Confirmed, _) => Self::Positive,
-            (Verdict::Rejected, Reason::FalsePositive | Reason::ScopeTooBroad) => Self::Negative,
-            (Verdict::Rejected, _) => Self::Separate,
-            (Verdict::Deferred, _) => Self::Unlabeled,
+    /// The label of a judgment, whether an external suppression went with it.
+    pub fn of(judgment: Judgment, suppressed: bool) -> Self {
+        match (judgment, suppressed) {
+            (Judgment::Fail, false) => Self::Positive,
+            (Judgment::Fail, true) => Self::Separate,
+            (Judgment::Pass | Judgment::NotApplicable, _) => Self::Negative,
         }
     }
 }
 
-fn names<'a>(terms: impl Iterator<Item = &'a str>) -> String {
+pub(crate) fn names<'a>(terms: impl Iterator<Item = &'a str>) -> String {
     terms.collect::<Vec<_>>().join(", ")
 }

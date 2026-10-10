@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: dependency-direction
-  annotations:
-    lighthouse/was-names: design/no-dependency-on-callers
 spec:
   title: Lower-level code does not depend on its callers
   context: >-

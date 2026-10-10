@@ -382,7 +382,7 @@ impl CycleRule {
                 self.edge.as_str(),
                 component.join(" -> ")
             );
-            let (fingerprint, legacy) = meta.fingerprints(&component.join(","), "");
+            let fingerprint = meta.fingerprint(&component.join(","), "");
             let mut diagnostic = Diagnostic::new(
                 &meta.id,
                 meta.severity,
@@ -390,8 +390,7 @@ impl CycleRule {
                 &anchor.file,
                 anchor.span,
                 fingerprint,
-            )
-            .with_legacy(legacy);
+            );
             diagnostic.symbol = Some(anchor.id.as_str().to_owned());
             diagnostic.evidence = json!({ "members": component });
             found.push(diagnostic);
@@ -608,7 +607,7 @@ fn finding(
     evidence: Value,
     snippet: &str,
 ) -> Diagnostic {
-    let (fingerprint, legacy) = meta.fingerprints(symbol.id.as_str(), snippet);
+    let fingerprint = meta.fingerprint(symbol.id.as_str(), snippet);
     let mut diagnostic = Diagnostic::new(
         &meta.id,
         meta.severity,
@@ -616,8 +615,7 @@ fn finding(
         &symbol.file,
         symbol.span,
         fingerprint,
-    )
-    .with_legacy(legacy);
+    );
     diagnostic.symbol = Some(symbol.id.as_str().to_owned());
     diagnostic.evidence = evidence;
     diagnostic

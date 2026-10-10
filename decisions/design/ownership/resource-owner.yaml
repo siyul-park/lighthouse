@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: ownership
-  annotations:
-    lighthouse/was-names: design/single-resource-owner
 spec:
   title: One owner per resource transition
   context: >-

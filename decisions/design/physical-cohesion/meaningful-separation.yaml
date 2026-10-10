@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: physical-cohesion
-  annotations:
-    lighthouse/was-names: design/separation-is-a-boundary
 spec:
   title: Separation marks a boundary
   context: >-

@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: dependency-direction
-  annotations:
-    lighthouse/was-names: design/generalize-when-extracting
 spec:
   title: Generalize when extracting
   context: >-

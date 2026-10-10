@@ -1,12 +1,15 @@
 //! The quality store as `check` uses it: record what a run saw, then keep out
-//! of the report the findings that review verdicts rejected.
+//! of the report the findings that judgments hide.
 
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 use lighthouse_engine::Outcome;
-use lighthouse_model::{Diagnostic, Fingerprint, Incomplete};
+use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Suppressed, Suppression};
 use lighthouse_spec::{Catalog, Decision, authored_severity};
-use lighthouse_store::{Observed, Rejection, Run, Standing, Store, Unchecked};
+use lighthouse_store::{Observed, Ruling, Run, Standing, Store, Unchecked};
 use serde_json::{Value, json};
 
 use crate::git;
@@ -14,9 +17,15 @@ use crate::git;
 /// What the store decided about a run's findings.
 #[derive(Default)]
 pub struct Remembered {
-    /// Findings left out of the report by a rejected verdict.
+    /// Findings left out of the report by their latest judgment.
     pub suppressed: usize,
-    /// Why a finding is reported although a verdict was recorded on it.
+    /// The ones among them that a `fail` with an external suppression keeps in
+    /// place: a report that lists suppressions lists these.
+    pub suppressions: Vec<Suppressed>,
+    /// Findings a judgment stands for and that stay in the report: they no
+    /// longer ask for review.
+    pub judged: BTreeSet<Fingerprint>,
+    /// Why a finding is reported although a judgment was recorded on it.
     pub notes: BTreeMap<Fingerprint, String>,
     /// What the user should know about how the store was used.
     pub messages: Vec<String>,
@@ -26,7 +35,6 @@ pub struct Remembered {
 /// however many findings it has.
 struct Versions {
     meaning: String,
-    legacy: String,
     check: String,
     wording: String,
 }
@@ -41,26 +49,22 @@ impl Seen {
             .entry(decision.id().to_owned())
             .or_insert_with(|| Versions {
                 meaning: decision.meaning_version(),
-                legacy: decision.earlier_versions().join(","),
                 check: decision.check_revision(),
                 wording: decision.version(),
             })
     }
 }
 
-/// Records the run in the project's store and removes the findings whose
-/// latest verdict keeps them out of reports from `outcome`. A verdict whose
-/// rule or evidence changed no longer applies, and a mechanical finding is
-/// never suppressed; both stay in the report with a note. A store that cannot
-/// be used never fails the check: it is reported, and verdicts already
-/// recorded are still applied read-only.
+/// Records the run in the project's store and removes from `outcome` the
+/// findings that their latest judgment hides. A judgment whose decision or
+/// evidence changed no longer applies, and an error is never hidden; both stay
+/// in the report with a note. A store that cannot be used never fails the
+/// check: it is reported, and judgments already recorded are still applied
+/// read-only.
 pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut Outcome) -> Remembered {
     let mut remembered = Remembered::default();
-    let judged = match record(root, catalog, outcome) {
-        Ok((judged, notices)) => {
-            remembered.messages.extend(notices);
-            judged
-        }
+    let rulings = match record(root, catalog, outcome) {
+        Ok(rulings) => rulings,
         Err(e) => {
             remembered
                 .messages
@@ -68,60 +72,62 @@ pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut Outcome) -> Rememb
             read_only(root)
         }
     };
-    outcome.diagnostics.retain(|d| {
-        let Some(judgment) = judgment_of(&judged, d) else {
-            return true;
+    let mut kept = Vec::with_capacity(outcome.diagnostics.len());
+    for d in std::mem::take(&mut outcome.diagnostics) {
+        let Some(ruling) = rulings.get(d.fingerprint.as_str()) else {
+            kept.push(d);
+            continue;
         };
-        match note(judgment) {
-            Some(note) => {
-                remembered.notes.insert(d.fingerprint.clone(), note);
-                true
-            }
-            None => {
+        match ruling.standing {
+            Standing::Suppressed => {
                 remembered.suppressed += 1;
-                false
+                if let Some(justification) = &ruling.justification {
+                    remembered.suppressions.push(Suppressed {
+                        diagnostic: d,
+                        suppression: Suppression::external(justification.clone()),
+                    });
+                }
+            }
+            Standing::Judged => {
+                remembered.judged.insert(d.fingerprint.clone());
+                kept.push(d);
+            }
+            _ => {
+                if let Some(note) = note(ruling) {
+                    remembered.notes.insert(d.fingerprint.clone(), note);
+                }
+                kept.push(d);
             }
         }
-    });
+    }
+    outcome.diagnostics = kept;
     announce(&mut remembered);
     remembered
 }
 
-/// Removes from `outcome` the findings that the committed decision log keeps
-/// out of reports, without recording anything: for runs that do not use the
-/// store but still honor what the team decided.
-pub fn apply_verdicts(root: &Path, outcome: &mut Outcome) -> usize {
-    let judged = read_only(root);
+/// Removes from `outcome` the findings that the committed decision log hides,
+/// without recording anything: for runs that do not use the store but still
+/// honor what the team decided.
+pub fn apply_judgments(root: &Path, outcome: &mut Outcome) -> usize {
+    let rulings = read_only(root);
     let before = outcome.diagnostics.len();
-    outcome
-        .diagnostics
-        .retain(|d| judgment_of(&judged, d).is_none_or(|j| note(j).is_some()));
+    outcome.diagnostics.retain(|d| {
+        rulings
+            .get(d.fingerprint.as_str())
+            .is_none_or(|r| r.standing != Standing::Suppressed)
+    });
     before - outcome.diagnostics.len()
 }
 
-/// The standing of the finding's latest rejection. A verdict recorded under
-/// the fingerprint the decision's name seeded still applies in a run that has
-/// not yet moved it to the one its uid seeds.
-fn judgment_of<'j>(
-    judged: &'j BTreeMap<String, Rejection>,
-    d: &Diagnostic,
-) -> Option<&'j Rejection> {
-    judged.get(d.fingerprint.as_str()).or_else(|| {
-        d.legacy_fingerprints
-            .iter()
-            .find_map(|legacy| judged.get(legacy.as_str()))
-    })
-}
-
-/// Why a judged finding is reported anyway; `None` when it is suppressed.
-fn note(rejection: &Rejection) -> Option<String> {
-    match rejection.standing {
-        Standing::Suppressed => None,
-        Standing::RuleChanged => Some("verdict expired: rule changed".to_owned()),
-        Standing::EvidenceChanged => Some("verdict expired: evidence changed".to_owned()),
+/// Why a judged finding is reported anyway; `None` when nothing needs saying.
+fn note(ruling: &Ruling) -> Option<String> {
+    match ruling.standing {
+        Standing::Suppressed | Standing::Judged => None,
+        Standing::RuleChanged => Some("judgment expired: decision changed".to_owned()),
+        Standing::EvidenceChanged => Some("judgment expired: evidence changed".to_owned()),
         Standing::Unsuppressible => Some(format!(
-            "rejected as {} \u{2014} mechanical findings are not suppressible; fix the rule",
-            rejection.reason
+            "judged {} \u{2014} errors are definitive and no judgment hides them; fix the code or suppress it in the code",
+            ruling.judgment
         )),
     }
 }
@@ -129,7 +135,7 @@ fn note(rejection: &Rejection) -> Option<String> {
 fn announce(remembered: &mut Remembered) {
     if remembered.suppressed > 0 {
         remembered.messages.push(format!(
-            "{} finding(s) suppressed by review verdicts (`lighthouse review list --status suppressed`)",
+            "{} finding(s) kept out of the report by judgments (`lighthouse review list --status suppressed`)",
             remembered.suppressed
         ));
     }
@@ -142,11 +148,11 @@ fn announce(remembered: &mut Remembered) {
     };
     let mut messages = Vec::new();
     for (text, what) in [
-        ("rule changed", "verdict expired: rule changed"),
-        ("evidence changed", "verdict expired: evidence changed"),
+        ("decision changed", "judgment expired: decision changed"),
+        ("evidence changed", "judgment expired: evidence changed"),
         (
-            "not suppressible",
-            "rejected mechanical finding(s) stay reported: mechanical findings are not suppressible; fix the rule",
+            "definitive",
+            "judged error(s) stay reported: errors are definitive and no judgment hides them; fix the code",
         ),
     ] {
         let found = count(text);
@@ -161,15 +167,14 @@ fn record(
     root: &Path,
     catalog: &Catalog,
     outcome: &Outcome,
-) -> Result<(BTreeMap<String, Rejection>, Vec<String>), lighthouse_store::Error> {
+) -> Result<BTreeMap<String, Ruling>, lighthouse_store::Error> {
     let mut store = Store::open(root)?;
-    store.identify(&catalog.identities())?;
     store.record(&run_of(root, catalog, outcome))?;
-    Ok((store.standings()?, store.notices().to_vec()))
+    store.standings()
 }
 
-/// The verdicts already recorded, when recording this run was not possible.
-fn read_only(root: &Path) -> BTreeMap<String, Rejection> {
+/// The judgments already recorded, when recording this run was not possible.
+fn read_only(root: &Path) -> BTreeMap<String, Ruling> {
     Store::open_existing(root)
         .ok()
         .flatten()
@@ -210,11 +215,10 @@ fn observed(d: &Diagnostic, catalog: &Catalog, outcome: &Outcome, seen: &mut See
     let decision = catalog.decision(&d.rule_id);
     let mut record = Observed::from_diagnostic(d, facts.cloned().unwrap_or_else(|| json!({})));
     record.decision_uid = decision.and_then(|d| d.uid()).map(str::to_owned);
-    record.authored_severity = authored_severity(d.severity, decision).to_string();
+    record.authored_severity = authored_severity(d.severity, decision);
     record.options = options(decision, d, facts, outcome);
     let versions = decision.map(|d| seen.of(d));
-    record.rule_version = versions.map(|v| v.meaning.clone());
-    record.legacy_rule_version = versions.map(|v| v.legacy.clone());
+    record.meaning_version = versions.map(|v| v.meaning.clone());
     record.check_revision = versions.map(|v| v.check.clone());
     record.decision_hash = versions.map(|v| v.wording.clone());
     record

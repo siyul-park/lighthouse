@@ -48,11 +48,11 @@ pub fn all() -> Vec<Tool> {
         ),
         tool(
             "review_tasks",
-            "List remembered findings that ask for a verdict (by default the open findings of heuristic and judgment decisions, whatever their severity), grouped by decision, then by file, each as `[line:col, message, fingerprintPrefix, {evidence}?]`. The finding's `last_seen` is its `seen` evidence, which `review_resolve` takes.",
+            "List remembered findings that ask for review (by default the open findings of decisions that authored `warn` or `info` and that no judgment stands for), grouped by decision, then by file, each as `[line:col, message, fingerprintPrefix, {evidence}?]`. The finding's `last_seen` is its `seen` evidence, which `review_resolve` takes.",
             json!({
                 "status": { "type": "string", "enum": ["open", "suppressed", "narrowing", "inactive", "resolved", "all"], "description": "Default `open`." },
                 "rule": { "type": "string", "description": "Only this rule." },
-                "tier": { "type": "string", "enum": ["review", "all"], "description": "Default `review`: findings that ask for a verdict because their decision is a heuristic or a judgment. `all` lists every remembered finding." },
+                "tier": { "type": "string", "enum": ["review", "all"], "description": "Default `review`: findings that ask for review. `all` lists every remembered finding." },
                 "limit": { "type": "integer", "minimum": 1, "description": "Default 50." },
                 "detail": { "type": "string", "enum": ["compact", "full"], "description": "Default `compact`. `full` returns one record per task with the full fingerprint and `lastSeen`." }
             }),
@@ -60,19 +60,25 @@ pub fn all() -> Vec<Tool> {
         ),
         tool(
             "review_resolve",
-            "Record a verdict on a finding, as an agent review. confirmed (reason fixed or accepted-debt) means the finding is right; rejected (false-positive, intentional-exception, scope-too-broad, project-allowed, not-worth-fixing) needs a reason and keeps a non-mechanical finding out of later reports while its rule and evidence stay as they are; deferred takes no reason. Mechanical findings are recorded but never suppressed. Verdicts are appended to the committed decision log.",
+            "Record a judgment on a finding, as an agent. `fail` means the finding is right; add `suppress` with a justification to leave it in place on purpose (a SARIF external suppression). `pass` means the code conforms (a false positive). `notApplicable` means the decision does not apply here, a hint to narrow it. A judgment that is not `fail`, or a `fail` with a suppression, keeps the finding out of later reports while its decision and evidence stay as they are; an error is recorded but never hidden. Judgments are appended to the committed decision log.",
             json!({
                 "fingerprint": { "type": "string", "description": "A fingerprint or an unambiguous prefix." },
-                "verdict": { "type": "string", "enum": ["confirmed", "rejected", "deferred"] },
-                "reason": { "type": "string", "enum": ["fixed", "accepted-debt", "false-positive", "intentional-exception", "scope-too-broad", "project-allowed", "not-worth-fixing"] },
-                "note": { "type": "string", "description": "Why, written for the next reader." },
-                "seen": { "type": "string", "description": "The finding's `last_seen` as you read it; the verdict is refused if it was seen again since." }
+                "judgment": { "type": "string", "enum": ["pass", "fail", "notApplicable"] },
+                "suppress": {
+                    "type": "object",
+                    "properties": { "justification": { "type": "string", "description": "Why the finding stays." } },
+                    "required": ["justification"],
+                    "additionalProperties": false,
+                    "description": "Only with `fail`: an external suppression."
+                },
+                "reason": { "type": "string", "description": "Why, written for the next reader." },
+                "seen": { "type": "string", "description": "The finding's `last_seen` as you read it; the judgment is refused if it was seen again since." }
             }),
-            &["fingerprint", "verdict"],
+            &["fingerprint", "judgment"],
         ),
         tool(
             "review_history",
-            "Every verdict recorded on a finding, oldest first.",
+            "Every judgment recorded on a finding, oldest first.",
             json!({ "fingerprint": { "type": "string" } }),
             &["fingerprint"],
         ),

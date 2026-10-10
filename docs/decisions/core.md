@@ -50,9 +50,9 @@ A finding that is right to leave in place can be allowed where it happens, in a 
 
 `core/allow-annotation` · symbol · doc
 
-*A decision to accept a finding belongs next to the code it is about, where a reviewer sees it change. The forms are ESLint's directives, with ESLint's `--` before the description, which is required here on every form that disables, and there is no form without ids. `lighthouse-disable-next-line <id>[, <id>] -- <reason>` covers the next line and the symbol declared there (the requirement's `lighthouse:allow` is its alias), `lighthouse-disable-line <id> -- <reason>` its own line, and `lighthouse-disable <id> -- <reason>` everything from the comment to a matching `lighthouse-enable <id>` or to the end of the file (the whole file above the first line that is neither blank nor a comment; imports are code). ` -- ` separates the ids from the reason, as in ESLint, and ids are separated by commas: `lighthouse-disable a/b, c/d -- why`. A documentation comment (`///`, `//!`, `/** */`) never holds a directive. A directive still written with an id a decision was renamed from works, with a notice, until `spec migrate` rewrites it.*
+*A decision to accept a finding belongs next to the code it is about, where a reviewer sees it change. The forms are ESLint's directives, with ESLint's `--` before the description, which is required here on every form that disables, and there is no form without ids. `lighthouse-disable-next-line <id>[, <id>] -- <reason>` covers the next line and the symbol declared there, `lighthouse-disable-line <id> -- <reason>` its own line, and `lighthouse-disable <id> -- <reason>` everything from the comment to a matching `lighthouse-enable <id>` or to the end of the file (the whole file above the first line that is neither blank nor a comment; imports are code). ` -- ` separates the ids from the reason, as in ESLint, and ids are separated by commas: `lighthouse-disable a/b, c/d -- why`. A documentation comment (`///`, `//!`, `/** */`) never holds a directive.*
 
-A finding that is right to leave in place MAY be allowed by a comment on the symbol, the line before it or the same line, written `lighthouse:allow <rule>[, <rule>] -- <reason>`. The comment suppresses the named rules there, whatever their severity, and the reason is required. Allowed findings are counted in the report.
+A finding that is right to leave in place MAY be allowed by a comment on the symbol, the line before it or the same line, written `lighthouse-disable-next-line <rule>[, <rule>] -- <reason>`. The comment suppresses the named rules there, whatever their severity, and the reason is required. Allowed findings are counted in the report.
 
 ### An allow annotation states its reason
 
@@ -65,14 +65,14 @@ An allow annotation MUST give a reason after `--`; an annotation without one is 
 ```go invalid
 package sample
 
-// lighthouse:allow design/exported-doc
+// lighthouse-disable-next-line design/exported-doc
 func Open() {}
 ```
 
 ```go valid
 package sample
 
-// lighthouse:allow design/exported-doc -- generated shim
+// lighthouse-disable-next-line design/exported-doc -- generated shim
 func Open() {}
 ```
 
@@ -92,7 +92,7 @@ An allow annotation SHOULD suppress a finding; one whose rule no longer fires th
 @@ -1,4 +1,3 @@
  package sample
  
--// lighthouse:allow design/exported-doc -- stale
+-// lighthouse-disable-next-line design/exported-doc -- stale
  func open() {}
 ```
 

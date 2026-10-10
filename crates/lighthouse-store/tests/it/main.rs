@@ -1,7 +1,6 @@
 //! The review store and the decision log, one binary.
 
 mod fixes;
-mod identity;
 mod log;
 mod store;
 mod support;

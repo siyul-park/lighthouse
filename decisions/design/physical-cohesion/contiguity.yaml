@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: physical-cohesion
-  annotations:
-    lighthouse/was-names: design/related-symbols-close
-    lighthouse/was-builtin: design/related-symbols-close
 spec:
   title: Collaborators stay close
   context: >-

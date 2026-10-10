@@ -8,9 +8,6 @@ metadata:
     lighthouse/pack: design
     lighthouse/section: functions
     lighthouse/preset: strict
-  annotations:
-    lighthouse/was-builtin: design/private-helper-callers
-    lighthouse/was-enforcement: heuristic
 spec:
   title: Private helpers have two callers
   context: >-

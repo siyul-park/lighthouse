@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: errors
-  annotations:
-    lighthouse/was-names: design/errors-hide-private-state
 spec:
   title: Errors do not leak state
   context: >-

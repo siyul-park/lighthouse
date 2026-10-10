@@ -1,7 +1,10 @@
 use std::fmt;
 
-use lighthouse_model::{Diagnostic, Label, Reason, ReviewerKind, Severity, Verdict};
-use serde::{Deserialize, Serialize};
+use lighthouse_model::{
+    Attribution, Diagnostic, Judgment, Label, Severity, SuppressionKind, SuppressionStatus,
+    needs_review,
+};
+use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::digest;
@@ -11,18 +14,14 @@ use crate::digest;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Observed {
     pub fingerprint: String,
-    /// The fingerprints the finding had while the decision's names seeded
-    /// it, during the one release both are computed: records kept under any
-    /// of them move to `fingerprint`.
-    pub legacy_fingerprints: Vec<String>,
     pub rule_id: String,
-    /// The uid of the finding's decision, which survives a rename.
+    /// The uid of the finding's decision.
     pub decision_uid: Option<String>,
     pub severity: Severity,
-    /// The severity its decision authored (`error`, `warn`, `info`): what
-    /// decides whether a verdict may hide the finding. For a rule without a
-    /// decision, the severity it reported.
-    pub authored_severity: String,
+    /// The severity its decision authored: what decides whether a judgment may
+    /// hide the finding. For a rule without a decision, the severity it
+    /// reported.
+    pub authored_severity: Severity,
     /// The artifact, project-relative with `/` separators.
     pub path: String,
     /// Where in the artifact: `{"span": {"start": {"line", "col"}, "end": ...}}`
@@ -32,18 +31,14 @@ pub struct Observed {
     pub message: String,
     pub evidence: Value,
     /// What the analysis knew about the subject: language, symbol shape,
-    /// measures. Frozen into a review's feature snapshot.
+    /// measures. Frozen into a judgment's feature snapshot.
     pub facts: Value,
     /// The options the rule ran with, defaults included.
     pub options: Value,
-    /// Hash of what the rule's decision means; verdicts expire when it moves.
-    pub rule_version: Option<String>,
-    /// The versions earlier builds recorded verdicts under (comma separated),
-    /// for as long as the decision still means the same: a verdict recorded
-    /// then does not expire for a change of format or of how it is checked.
-    pub legacy_rule_version: Option<String>,
+    /// Hash of what the rule's decision means; judgments expire when it moves.
+    pub meaning_version: Option<String>,
     /// Hash of how the decision is checked. Recorded, never compared to
-    /// expire a verdict.
+    /// expire a judgment.
     pub check_revision: Option<String>,
     /// Hash of the whole decision definition, wording and examples included.
     pub decision_hash: Option<String>,
@@ -51,19 +46,15 @@ pub struct Observed {
 
 impl Observed {
     /// The record of a diagnostic, with the facts the analysis gathered for
-    /// it. Authored severity, options and rule versions start unknown; set them directly.
+    /// it. The decision's uid, options and versions start unknown; set them
+    /// directly.
     pub fn from_diagnostic(diagnostic: &Diagnostic, facts: Value) -> Self {
         Self {
             fingerprint: diagnostic.fingerprint.as_str().to_owned(),
-            legacy_fingerprints: diagnostic
-                .legacy_fingerprints
-                .iter()
-                .map(|f| f.as_str().to_owned())
-                .collect(),
             rule_id: diagnostic.rule_id.clone(),
             decision_uid: None,
             severity: diagnostic.severity,
-            authored_severity: String::new(),
+            authored_severity: diagnostic.severity,
             path: diagnostic.file.to_string_lossy().replace('\\', "/"),
             locator: json!({ "span": diagnostic.span }),
             symbol: diagnostic.symbol.clone(),
@@ -71,8 +62,7 @@ impl Observed {
             evidence: diagnostic.evidence.clone(),
             facts,
             options: json!({}),
-            rule_version: None,
-            legacy_rule_version: None,
+            meaning_version: None,
             check_revision: None,
             decision_hash: None,
         }
@@ -126,19 +116,16 @@ pub struct RunSummary {
     pub reopened: usize,
     pub resolved: usize,
     pub deactivated: usize,
-    /// Findings and verdicts that moved from their legacy fingerprint to the
-    /// one seeded by the decision's uid.
-    pub rewritten: usize,
 }
 
 /// Which findings a listing includes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StatusFilter {
-    /// Still reported: not resolved, inactive or suppressed.
+    /// Still reported: not resolved, inactive or kept out by a judgment.
     Open,
-    /// Kept out of reports by their latest verdict.
+    /// Kept out of reports by their latest judgment.
     Suppressed,
-    /// Suppressed with `scope-too-broad`: the rule should be narrowed.
+    /// Judged `notApplicable`: the decision should be narrowed.
     Narrowing,
     /// Of a rule the configuration no longer enables.
     Inactive,
@@ -154,33 +141,38 @@ pub struct Filter {
     pub status: StatusFilter,
 }
 
-/// The most recent verdict on a finding.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub struct LatestReview {
-    pub verdict: Verdict,
-    pub reason: Reason,
-}
-
-/// What the latest rejection does to a finding now.
+/// What the latest judgment does to a finding now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Standing {
     /// The finding stays out of reports.
     Suppressed,
-    /// The rule's requirement changed since the verdict: ask again.
+    /// The finding is judged and stays in the report (`fail` with no
+    /// suppression).
+    Judged,
+    /// The decision's meaning changed since the judgment: ask again.
     RuleChanged,
-    /// The finding's evidence changed since the verdict: ask again.
+    /// The finding's evidence changed since the judgment: ask again.
     EvidenceChanged,
-    /// Mechanical findings are fixed, never suppressed by a verdict, whatever
-    /// severity they are configured at.
+    /// Errors are definitive: no judgment hides them, whatever level they
+    /// are configured at.
     Unsuppressible,
 }
 
 impl Standing {
+    const ALL: [Self; 5] = [
+        Self::Suppressed,
+        Self::Judged,
+        Self::RuleChanged,
+        Self::EvidenceChanged,
+        Self::Unsuppressible,
+    ];
+
     /// The text the standing is stored as.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Suppressed => "suppressed",
+            Self::Judged => "judged",
             Self::RuleChanged => "rule-changed",
             Self::EvidenceChanged => "evidence-changed",
             Self::Unsuppressible => "unsuppressible",
@@ -188,22 +180,23 @@ impl Standing {
     }
 
     pub(crate) fn parse(text: &str) -> Option<Self> {
-        [
-            Self::Suppressed,
-            Self::RuleChanged,
-            Self::EvidenceChanged,
-            Self::Unsuppressible,
-        ]
-        .into_iter()
-        .find(|s| s.as_str() == text)
+        Self::ALL.into_iter().find(|s| s.as_str() == text)
+    }
+
+    /// Whether the judgment still stands for the finding: it neither expired
+    /// nor was refused.
+    pub fn stands(self) -> bool {
+        matches!(self, Self::Suppressed | Self::Judged)
     }
 }
 
-/// The standing of a rejected finding with the reason it was rejected for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Rejection {
+/// The standing of a judged finding with the judgment behind it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ruling {
     pub standing: Standing,
-    pub reason: Reason,
+    pub judgment: Judgment,
+    /// The justification of the suppression that goes with it, if any.
+    pub justification: Option<String>,
 }
 
 /// Where a finding is in its life.
@@ -235,8 +228,8 @@ pub struct FindingRecord {
     /// The uid of the finding's decision, when the catalog gave it one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decision_uid: Option<String>,
-    pub severity: String,
-    pub authored_severity: Option<String>,
+    pub severity: Severity,
+    pub authored_severity: Severity,
     pub path: String,
     pub locator: Value,
     pub symbol: Option<String>,
@@ -257,26 +250,30 @@ pub struct FindingRecord {
     pub dirty: Option<bool>,
     pub lighthouse_version: Option<String>,
     pub catalog_version: Option<String>,
-    pub rule_version: Option<String>,
-    /// The latest verdict, if the finding was reviewed.
-    pub review: Option<LatestReview>,
-    /// What that verdict does to the finding now, if it was a rejection.
+    pub meaning_version: Option<String>,
+    /// The latest judgment, if the finding was judged.
+    pub judgment: Option<Judgment>,
+    /// What that judgment does to the finding now.
     pub standing: Option<Standing>,
-    /// The rejection said the rule is too broad.
+    /// The justification of the suppression that goes with the judgment.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub justification: Option<String>,
+    /// The judgment said the decision does not apply here.
     pub narrowing: bool,
 }
 
 impl FindingRecord {
-    /// Whether the finding asks for a verdict: its decision authored `warn` or
-    /// `info`, whatever level it is reported at.
-    pub fn needs_verdict(&self) -> bool {
-        self.authored_severity
-            .as_deref()
-            .and_then(|authored| authored.parse::<Severity>().ok())
-            .is_some_and(Severity::needs_verdict)
+    /// Whether the finding asks for review: its decision authored `warn` or
+    /// `info`, and no judgment stands for it.
+    pub fn needs_review(&self) -> bool {
+        needs_review(
+            self.authored_severity,
+            self.standing.is_some_and(Standing::stands),
+        )
     }
 
-    /// Where the finding is in its life; a suppression wins over the rest.
+    /// Where the finding is in its life; a judgment that hides it wins over
+    /// the rest.
     pub fn state(&self) -> State {
         if self.standing == Some(Standing::Suppressed) {
             State::Suppressed
@@ -290,32 +287,33 @@ impl FindingRecord {
     }
 }
 
-/// A verdict to record. `fingerprint` may be an unambiguous prefix.
+/// A judgment to record. `fingerprint` may be an unambiguous prefix.
 #[derive(Debug, Clone, PartialEq)]
-pub struct NewReview {
+pub struct NewJudgment {
     pub fingerprint: String,
-    pub verdict: Verdict,
-    pub reason: Reason,
-    pub reason_text: Option<String>,
-    pub reviewer_kind: ReviewerKind,
-    pub reviewer_id: Option<String>,
-    /// The commit the reviewed code was at, when known.
+    pub judgment: Judgment,
+    /// Why, written for the next reader.
+    pub reason: Option<String>,
+    /// The justification of an external suppression recorded with a `fail`.
+    pub suppress: Option<String>,
+    pub attribution: Attribution,
+    /// The commit the judged code was at, when known.
     pub commit: Option<String>,
-    /// Refuse the verdict unless the finding's last sighting is this one.
+    /// Refuse the judgment unless the finding's last sighting is this one.
     pub expect_seen: Option<String>,
     pub lighthouse_version: String,
 }
 
-/// What a review records about the rule beyond the finding: the versions of
-/// the decision it judged and its scope.
+/// What a judgment records about the decision beyond the finding: the versions
+/// of the decision it judged and its scope.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Stamp {
     /// The uid of the finding's decision, when it differs from what the
     /// finding was recorded with.
     pub decision_uid: Option<String>,
-    /// Meaning version of the decision, which decides when the verdict expires.
-    pub rule_version: Option<String>,
-    /// How the decision was checked; recorded, never expires the verdict.
+    /// Meaning version of the decision, which decides when the judgment expires.
+    pub meaning_version: Option<String>,
+    /// How the decision was checked; recorded, never expires the judgment.
     pub check_revision: Option<String>,
     /// Hash of the whole decision definition.
     pub decision_hash: Option<String>,
@@ -324,75 +322,69 @@ pub struct Stamp {
     pub scope: Option<String>,
 }
 
-/// A recorded verdict with the finding as the verdict saw it.
+/// A recorded judgment with the finding as the judgment saw it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Resolved {
-    pub event: ReviewEvent,
+    pub event: JudgmentEvent,
     pub finding: FindingRecord,
 }
 
-/// One entry of the decision log and of the review table: a verdict on a
-/// finding with everything needed to learn from it later. `id` is the hash of
-/// the rest, so the same entry read from two copies of the log is one entry.
-/// This is the shape of the entries written before the resource model; the
-/// log now writes them as `Verdict` records.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ReviewEvent {
+/// A suppression that went with a judgment.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SuppressionEvent {
     pub id: String,
-    pub fingerprint: String,
-    pub rule_id: String,
-    /// The uid of the decision the verdict is about: its identity across
-    /// renames. `rule_id` is the name it had then, kept to be read.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub decision_uid: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rule_version: Option<String>,
-    /// How the decision was checked when the verdict was given; recorded for
-    /// evaluation, never compared to expire the verdict.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub check_revision: Option<String>,
-    /// Read as `pattern_hash` in entries written before the rename.
-    #[serde(
-        default,
-        rename = "pattern_hash",
-        alias = "decision_hash",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub decision_hash: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub catalog_version: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub lighthouse_version: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pattern_fingerprint: Option<String>,
-    pub verdict: Verdict,
-    pub reason: Reason,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reason_text: Option<String>,
-    pub reviewer_kind: ReviewerKind,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reviewer_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub language: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub scope: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub evidence_digest: Option<String>,
-    /// The finding frozen at review time: evidence, facts, options, severity,
-    /// authored severity, when and where it was seen.
-    pub snapshot: Value,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub commit: Option<String>,
-    pub timestamp: String,
+    pub kind: SuppressionKind,
+    pub status: SuppressionStatus,
+    pub justification: String,
+    pub was_attributed_to: Attribution,
+    pub generated_at_time: String,
 }
 
-impl ReviewEvent {
-    /// What the event teaches a model about its rule.
+/// One entry of the decision log and of the judgments table: a judgment on a
+/// finding with everything needed to learn from it later. `id` is the hash of
+/// the record's spec, so the same entry read from two copies of the log is one
+/// entry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JudgmentEvent {
+    pub id: String,
+    pub fingerprint: String,
+    /// The name the decision had when the judgment was given; `decision_uid`
+    /// is what identifies it.
+    pub decision_name: String,
+    pub decision_uid: Option<String>,
+    pub meaning_version: Option<String>,
+    /// How the decision was checked; recorded for evaluation, never compared
+    /// to expire the judgment.
+    pub check_revision: Option<String>,
+    pub decision_hash: Option<String>,
+    pub catalog_version: Option<String>,
+    pub lighthouse_version: Option<String>,
+    pub judgment: Judgment,
+    pub reason: Option<String>,
+    pub was_attributed_to: Attribution,
+    pub generated_at_time: String,
+    pub language: Option<String>,
+    pub scope: Option<String>,
+    pub evidence_digest: Option<String>,
+    /// The finding frozen at judgment time: evidence, facts, options,
+    /// severities, when and where it was seen.
+    pub snapshot: Value,
+    pub commit: Option<String>,
+    pub suppressions: Vec<SuppressionEvent>,
+}
+
+impl JudgmentEvent {
+    /// What the judgment teaches a model about its decision.
     pub fn label(&self) -> Label {
-        Label::of(self.verdict, self.reason)
+        Label::of(
+            self.judgment,
+            self.suppressions
+                .iter()
+                .any(|s| s.status == SuppressionStatus::Accepted),
+        )
     }
 
-    /// The finding's evidence when it was reviewed.
+    /// The finding's evidence when it was judged.
     pub fn evidence(&self) -> &Value {
         &self.snapshot["evidence"]
     }

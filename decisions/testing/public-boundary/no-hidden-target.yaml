@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: public-boundary
-  annotations:
-    lighthouse/was-names: testing/no-hiding-wrappers
-    lighthouse/was-enforcement: mechanical
 spec:
   title: Helpers do not hide the target call
   context: >-

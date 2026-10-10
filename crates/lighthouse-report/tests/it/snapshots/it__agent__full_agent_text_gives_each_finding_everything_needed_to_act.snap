@@ -22,7 +22,7 @@ design/coupling  warn  internal/jit/compile.go:350:1
                  func a() { hub() }
                  func b() { hub() }
   fingerprint: 5da1c26cc609
-  resolve:     lighthouse review resolve 5da1c26cc609 --verdict <verdict> --reason <reason> --reviewer-kind agent
+  resolve:     lighthouse review resolve 5da1c26cc609 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent
 
 design/private-helper-callers  info  src/lib.rs:7:1
   owner:       m::helper#function
@@ -42,12 +42,12 @@ design/private-helper-callers  info  src/lib.rs:7:1
                      if x > 10 { 10 } else { x }
                  }
   fingerprint: d3d6fba8ce7c
-  resolve:     lighthouse review resolve d3d6fba8ce7c --verdict <verdict> --reason <reason> --reviewer-kind agent
+  resolve:     lighthouse review resolve d3d6fba8ce7c --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent
 
 acme/custom  error  a.txt:1:1
   message:     custom finding
   fingerprint: c8dfae349df1
 
 broken.go: incomplete: type error
-reasons: confirmed=fixed|accepted-debt|none; rejected=false-positive|intentional-exception|scope-too-broad|project-allowed|not-worth-fixing; deferred=none
+judgments: fail=the finding is right; add `suppress` with a justification to leave it in place; pass=false positive: the code conforms; notApplicable=the decision does not apply here; a hint to narrow it
 summary: 1 error, 1 warn, 1 info, 2 review, 1 incomplete, 2 suppressed, 1 allowed

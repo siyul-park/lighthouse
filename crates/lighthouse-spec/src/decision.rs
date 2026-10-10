@@ -13,28 +13,6 @@ use lighthouse_model::hash;
 pub const PACK_LABEL: &str = "lighthouse/pack";
 /// Label that says which section of its pack a decision is listed in.
 pub const SECTION_LABEL: &str = "lighthouse/section";
-/// Annotation a migrated decision keeps: the rule file its CEL check came from.
-pub const MIGRATED_FROM: &str = "lighthouse/migrated-from";
-/// Annotation of a decision that was a bespoke builtin rule before it became
-/// a spec over standard operations: the id that rule had. Verdicts recorded
-/// under the old rule keep applying while the decision means the same.
-pub const WAS_BUILTIN: &str = "lighthouse/was-builtin";
-/// Annotation of a decision whose `enforcement` (since replaced by `severity`)
-/// cannot be told from its severity: `mechanical`, `heuristic`, `judgment` or
-/// `doc`. It keeps the versions older verdicts were recorded under.
-pub const WAS_ENFORCEMENT: &str = "lighthouse/was-enforcement";
-/// Annotation of a decision whose `exceptions` were appended to its
-/// requirement: the text that was appended. Verdicts recorded under the
-/// requirement without it keep applying while the rest is unchanged.
-pub const WAS_EXCEPTIONS: &str = "lighthouse/was-exceptions";
-/// Annotation of a decision whose option names were renamed to camelCase: a
-/// JSON map from each new name to the name it had. Verdicts recorded under
-/// the old names keep applying while the meaning is unchanged.
-pub const WAS_OPTION_NAMES: &str = "lighthouse/was-option-names";
-/// Annotation of a decision that was renamed: the ids it had before, comma
-/// separated. They keep resolving to it, with a notice, and verdicts recorded
-/// under them keep applying.
-pub const WAS_NAMES: &str = "lighthouse/was-names";
 /// Label that says which preset a decision joins beyond `recommended`; the
 /// only value is `strict`.
 pub const PRESET_LABEL: &str = "lighthouse/preset";
@@ -145,22 +123,9 @@ impl Decision {
     }
 
     /// The identity that outlives the id: a UUID v4 assigned once. `None` for
-    /// a decision no `lighthouse spec migrate` has given one yet.
+    /// a decision that was written without one.
     pub fn uid(&self) -> Option<&str> {
         self.0.metadata.uid.as_deref()
-    }
-
-    /// The ids the decision had before it was renamed.
-    pub fn was_names(&self) -> impl Iterator<Item = &str> {
-        self.0
-            .metadata
-            .annotations
-            .get(WAS_NAMES)
-            .map(String::as_str)
-            .unwrap_or_default()
-            .split(',')
-            .map(str::trim)
-            .filter(|name| !name.is_empty())
     }
 
     /// The same decision with this uid.
@@ -258,91 +223,6 @@ impl Decision {
     }
 }
 
-impl Decision {
-    /// The requirement as it was before the decision's `exceptions` were
-    /// appended to it, as the annotation of a migrated decision recorded them.
-    pub(crate) fn earlier_requirement(&self) -> String {
-        let requirement = squash(&self.requirement);
-        let appended = self.metadata().annotations.get(WAS_EXCEPTIONS);
-        let rest = appended.and_then(|text| requirement.strip_suffix(squash(text).as_str()));
-        rest.map_or(requirement.clone(), |rest| rest.trim_end().to_owned())
-    }
-
-    /// What [`DecisionSpec::meaning_version`] hashed before a decision's
-    /// exceptions were part of its requirement, its scope said which code it
-    /// applies to (`generated`, `tests`), and its option names were camelCase:
-    /// the same meaning, so the verdicts recorded under it keep applying.
-    pub fn earlier_meaning_version(&self) -> String {
-        let content = json!({
-            "requirement": squash(&self.earlier_requirement()),
-            "severity": self.severity,
-            "scope": { "domain": self.scope.domain, "subject": self.scope.subject },
-            "options": self.options_content(&|n| self.earlier_option_name(n)),
-        });
-        hash::short(&content.to_string(), 8)
-    }
-
-    /// The name an option had before the options were camelCase: what the
-    /// annotation `lighthouse/was-option-names` recorded when the decision was
-    /// migrated (a map from the new name to the old), else the snake_case of
-    /// the name, which is what every bundled decision had.
-    pub(crate) fn earlier_option_name(&self, name: &str) -> String {
-        self.metadata()
-            .annotations
-            .get(WAS_OPTION_NAMES)
-            .and_then(|text| serde_json::from_str::<BTreeMap<String, String>>(text).ok())
-            .and_then(|recorded| recorded.get(name).cloned())
-            .unwrap_or_else(|| snake_case(name))
-    }
-
-    /// The `enforcement` this decision had before severities replaced it:
-    /// what its annotation recorded, else what its severity implies.
-    pub(crate) fn was_enforcement(&self) -> &str {
-        if let Some(recorded) = self.metadata().annotations.get(WAS_ENFORCEMENT) {
-            return recorded;
-        }
-        match self.severity {
-            None => "doc",
-            Some(Severity::Error) => "mechanical",
-            Some(Severity::Warn) => "heuristic",
-            Some(Severity::Info) => "judgment",
-        }
-    }
-
-    /// The semantic version a build between the resource model and severities
-    /// computed for this decision: it hashed the `check` and the enforcement.
-    /// Verdicts recorded then keep applying while the meaning is unchanged.
-    ///
-    /// That build never shipped outside development, so nothing real was
-    /// recorded under this version; it is kept so that a store written while
-    /// developing keeps working, and it is cheap.
-    pub fn previous_semantic_version(&self) -> String {
-        let check = match (self.metadata().annotations.get(WAS_BUILTIN), &self.check) {
-            (Some(id), _) => json!({ "type": "builtin", "id": id }),
-            (None, Some(check)) if check.is_automated() => json!(check),
-            (None, _) => Value::Null,
-        };
-        let content = json!({
-            "requirement": squash(&self.earlier_requirement()),
-            "enforcement": self.was_enforcement(),
-            "scope": { "domain": self.scope.domain, "subject": self.scope.subject },
-            "check": check,
-            "options": self.options_content(&|n| self.earlier_option_name(n)),
-        });
-        hash::short(&content.to_string(), 8)
-    }
-
-    /// Every version older builds recorded verdicts under that still apply
-    /// to this decision while its meaning is unchanged.
-    pub fn earlier_versions(&self) -> Vec<String> {
-        let mut versions = vec![self.previous_semantic_version()];
-        versions.extend(self.legacy_semantic_version());
-        versions.push(self.earlier_meaning_version());
-        versions.dedup();
-        versions
-    }
-}
-
 impl Deref for Decision {
     type Target = DecisionSpec;
 
@@ -419,20 +299,6 @@ impl DecisionSpec {
             .collect();
         json!({ "properties": properties, "languages": languages })
     }
-}
-
-/// `hubFanIn` as `hub_fan_in`: the names options had before they were camelCase.
-pub(crate) fn snake_case(name: &str) -> String {
-    let mut out = String::new();
-    for c in name.chars() {
-        if c.is_ascii_uppercase() {
-            out.push('_');
-            out.push(c.to_ascii_lowercase());
-        } else {
-            out.push(c);
-        }
-    }
-    out
 }
 
 pub(crate) fn squash(text: &str) -> String {

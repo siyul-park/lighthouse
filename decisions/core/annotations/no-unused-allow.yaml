@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: core
     lighthouse/section: annotations
-  annotations:
-    lighthouse/was-builtin: core/unused-allow
-    lighthouse/was-names: core/unused-allow
 spec:
   title: Allow annotations suppress something
   context: >-
@@ -51,7 +48,7 @@ spec:
           body: |-
             package sample
 
-            // lighthouse:allow design/exported-doc -- stale
+            // lighthouse-disable-next-line design/exported-doc -- stale
             func open() {}
       expect:
         - line: 3
@@ -75,7 +72,7 @@ spec:
       files:
         - path: src/lib.rs
           body: |-
-            // lighthouse:allow design/exported-doc -- stale
+            // lighthouse-disable-next-line design/exported-doc -- stale
             fn open() {}
       expect:
         - line: 1

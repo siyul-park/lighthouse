@@ -1,9 +1,9 @@
-//! The review tools: what waits for a judgment, recording verdicts, history.
+//! The review tools: what waits for review, recording judgments, history.
 
 use lighthouse_report::{Detail, Entry, GroupOptions, Grouped};
 use lighthouse_session::{
-    FindingRecord, NewReview, Reason, ReviewEvent, ReviewerKind, Severity, StatusFilter, TaskQuery,
-    Verdict, catalog_at, head, project_root, record_verdict, review_history, review_tasks,
+    AgentKind, Attribution, FindingRecord, Judgment, JudgmentEvent, NewJudgment, StatusFilter,
+    TaskQuery, catalog_at, head, project_root, record_judgment, review_history, review_tasks,
 };
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -26,10 +26,17 @@ pub struct TasksArgs {
 #[serde(deny_unknown_fields)]
 pub struct ResolveArgs {
     fingerprint: String,
-    verdict: String,
+    judgment: String,
+    suppress: Option<Suppress>,
     reason: Option<String>,
-    note: Option<String>,
     seen: Option<String>,
+}
+
+/// Leaves a `fail` in place on purpose: a SARIF `external` suppression.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Suppress {
+    justification: String,
 }
 
 #[derive(Deserialize)]
@@ -88,32 +95,32 @@ pub fn tasks(args: TasksArgs) -> Outcome {
 }
 
 pub fn resolve(args: ResolveArgs, reviewer: &str) -> Outcome {
-    let verdict: Verdict = args.verdict.parse().map_err(fail)?;
-    let reason: Reason = match args.reason {
-        Some(text) => text.parse().map_err(fail)?,
-        None => Reason::Unspecified,
-    };
+    let judgment: Judgment = args.judgment.parse().map_err(fail)?;
     let root = project_root().map_err(fail)?;
-    let review = NewReview {
+    let review = NewJudgment {
         fingerprint: args.fingerprint,
-        verdict,
-        reason,
-        reason_text: args.note,
-        reviewer_kind: ReviewerKind::Agent,
-        reviewer_id: Some(reviewer.to_owned()),
+        judgment,
+        reason: args.reason,
+        suppress: args.suppress.map(|s| s.justification),
+        attribution: Attribution {
+            kind: AgentKind::SoftwareAgent,
+            id: Some(reviewer.to_owned()),
+        },
         commit: head(&root),
         expect_seen: args.seen,
         lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
     };
-    let recorded = record_verdict(&root, &review).map_err(fail)?;
+    let recorded = record_judgment(&root, &review).map_err(fail)?;
     let event = &recorded.event;
     Ok(json!({
         "recorded": {
             "fingerprint": event.fingerprint,
-            "rule": event.rule_id,
-            "verdict": event.verdict.to_string(),
-            "reason": event.reason.to_string(),
-            "reviewer": format!("{}:{}", event.reviewer_kind, reviewer),
+            "decision": event.decision_name,
+            "judgment": event.judgment.to_string(),
+            "suppression": event.suppressions.first().map(|s| json!({
+                "kind": s.kind, "status": s.status, "justification": s.justification,
+            })),
+            "wasAttributedTo": event.was_attributed_to,
         },
         "standing": recorded.standing,
         "warnings": recorded.warnings,
@@ -124,20 +131,16 @@ pub fn resolve(args: ResolveArgs, reviewer: &str) -> Outcome {
 pub fn history(args: HistoryArgs) -> Outcome {
     let root = project_root().map_err(fail)?;
     let events = review_history(&root, &args.fingerprint).map_err(fail)?;
-    let events: Vec<Value> = events.iter().map(ReviewEvent::to_json).collect();
+    let events: Vec<Value> = events.iter().map(JudgmentEvent::to_json).collect();
     Ok(json!({ "fingerprint": args.fingerprint, "events": events }))
 }
 
 /// A remembered finding as a compact entry: where the finding is in its life
-/// (`state` unless open, the latest `verdict`) and its `seen` time, which
+/// (`state` unless open, the latest `judgment`) and its `seen` time, which
 /// `review_resolve` takes, ride along as evidence.
 fn entry(f: &FindingRecord) -> Entry<'_> {
-    let severity: Severity = f.severity.parse().unwrap_or(Severity::Warn);
-    let authored = f
-        .authored_severity
-        .as_deref()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(severity);
+    let severity = f.severity;
+    let authored = f.authored_severity;
     let start = &f.locator["span"]["start"];
     let position = |key: &str| start[key].as_u64().map_or(0, |n| n as u32);
     let mut attributes = Map::new();
@@ -146,17 +149,14 @@ fn entry(f: &FindingRecord) -> Entry<'_> {
     if state != "open" {
         attributes.insert("state".to_owned(), json!(state));
     }
-    if let Some(review) = f.review {
-        attributes.insert(
-            "verdict".to_owned(),
-            json!(format!("{}/{}", review.verdict, review.reason)),
-        );
+    if let Some(judgment) = f.judgment {
+        attributes.insert("judgment".to_owned(), json!(judgment));
     }
     Entry {
         rule: f.rule_id.clone(),
         severity,
         authored,
-        review: f.needs_verdict(),
+        review: f.needs_review(),
         path: f.path.clone(),
         line: position("line"),
         col: position("col"),
@@ -183,6 +183,8 @@ fn task(f: &FindingRecord) -> Value {
         "message": f.message,
         "evidence": f.evidence,
         "lastSeen": f.last_seen,
-        "review": f.review.map(|r| json!({ "verdict": r.verdict.to_string(), "reason": r.reason.to_string() })),
+        "judgment": f.judgment,
+        "standing": f.standing,
+        "justification": f.justification,
     })
 }

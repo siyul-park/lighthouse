@@ -1,82 +1,78 @@
-use lighthouse_model::{Label, Reason, ReviewerKind, Verdict};
+use lighthouse_model::{
+    AgentKind, Attribution, Judgment, Label, Severity, Suppression, SuppressionKind,
+    SuppressionStatus, needs_review,
+};
 
 #[test]
-fn verdict_accepts_only_its_own_reasons() {
-    assert!(Verdict::Confirmed.validate(Reason::Fixed).is_ok());
-    assert!(Verdict::Confirmed.validate(Reason::Unspecified).is_ok());
-    assert!(Verdict::Rejected.validate(Reason::FalsePositive).is_ok());
-    assert!(Verdict::Deferred.validate(Reason::Unspecified).is_ok());
-
-    assert!(Verdict::Rejected.validate(Reason::Unspecified).is_err());
-    assert!(Verdict::Rejected.validate(Reason::Fixed).is_err());
-    assert!(Verdict::Confirmed.validate(Reason::FalsePositive).is_err());
-    let error = Verdict::Deferred.validate(Reason::Fixed).unwrap_err();
+fn judgment_round_trips_through_text_and_serde() {
+    for judgment in Judgment::ALL {
+        assert_eq!(judgment.to_string().parse::<Judgment>().unwrap(), *judgment);
+        let json = serde_json::to_string(judgment).unwrap();
+        assert_eq!(json, format!("\"{judgment}\""));
+    }
+    assert_eq!(Judgment::NotApplicable.as_str(), "notApplicable");
+    let error = "nope".parse::<Judgment>().unwrap_err();
     assert_eq!(
         error.to_string(),
-        "reason `fixed` does not fit verdict `deferred` (expected none)"
+        "unknown judgment `nope` (expected pass, fail, notApplicable)"
     );
 }
 
 #[test]
-fn reason_round_trips_through_text_and_serde() {
-    for reason in Reason::ALL {
-        assert_eq!(reason.to_string().parse::<Reason>().unwrap(), *reason);
-        let json = serde_json::to_string(reason).unwrap();
-        assert_eq!(json, format!("\"{reason}\""));
+fn a_suppression_is_accepted_unless_it_says_otherwise() {
+    let suppression = Suppression::external("accepted-debt");
+    assert_eq!(suppression.kind, SuppressionKind::External);
+    assert_eq!(suppression.status, SuppressionStatus::Accepted);
+    assert!(suppression.in_force());
+    let json = serde_json::to_value(&suppression).unwrap();
+    assert_eq!(
+        json,
+        serde_json::json!({ "kind": "external", "justification": "accepted-debt" })
+    );
+    let back: Suppression =
+        serde_json::from_value(serde_json::json!({ "kind": "inSource", "justification": "why" }))
+            .unwrap();
+    assert_eq!(back, Suppression::in_source("why"));
+    let proposed: Suppression = serde_json::from_value(serde_json::json!({
+        "kind": "external", "status": "underReview", "justification": "later"
+    }))
+    .unwrap();
+    assert!(!proposed.in_force());
+}
+
+#[test]
+fn agent_kind_reads_the_prov_classes_and_the_old_words() {
+    for (text, kind) in [
+        ("Person", AgentKind::Person),
+        ("human", AgentKind::Person),
+        ("SoftwareAgent", AgentKind::SoftwareAgent),
+        ("agent", AgentKind::SoftwareAgent),
+    ] {
+        assert_eq!(text.parse::<AgentKind>().unwrap(), kind, "{text}");
     }
-    let error = "nope".parse::<Reason>().unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .starts_with("unknown reason `nope` (expected fixed, ")
-    );
-}
-
-#[test]
-fn reviewer_kind_parses_agent_and_human() {
+    assert!("robot".parse::<AgentKind>().is_err());
+    let attribution = Attribution {
+        kind: AgentKind::SoftwareAgent,
+        id: Some("claude".to_owned()),
+    };
     assert_eq!(
-        "agent".parse::<ReviewerKind>().unwrap(),
-        ReviewerKind::Agent
+        serde_json::to_value(&attribution).unwrap(),
+        serde_json::json!({ "type": "SoftwareAgent", "id": "claude" })
     );
-    assert_eq!(
-        "human".parse::<ReviewerKind>().unwrap(),
-        ReviewerKind::Human
-    );
-    assert!("robot".parse::<ReviewerKind>().is_err());
 }
 
 #[test]
 fn label_follows_the_documented_semantics() {
-    let label = |verdict, reason| Label::of(verdict, reason);
-    assert_eq!(label(Verdict::Confirmed, Reason::Fixed), Label::Positive);
-    assert_eq!(
-        label(Verdict::Confirmed, Reason::AcceptedDebt),
-        Label::Positive
-    );
-    assert_eq!(
-        label(Verdict::Rejected, Reason::FalsePositive),
-        Label::Negative
-    );
-    assert_eq!(
-        label(Verdict::Rejected, Reason::ScopeTooBroad),
-        Label::Negative
-    );
-    for reason in [
-        Reason::IntentionalException,
-        Reason::ProjectAllowed,
-        Reason::NotWorthFixing,
-    ] {
-        assert_eq!(label(Verdict::Rejected, reason), Label::Separate);
-    }
-    assert_eq!(
-        label(Verdict::Deferred, Reason::Unspecified),
-        Label::Unlabeled
-    );
+    assert_eq!(Label::of(Judgment::Fail, false), Label::Positive);
+    assert_eq!(Label::of(Judgment::Fail, true), Label::Separate);
+    assert_eq!(Label::of(Judgment::Pass, false), Label::Negative);
+    assert_eq!(Label::of(Judgment::NotApplicable, false), Label::Negative);
 }
 
 #[test]
-fn reasons_lists_what_each_verdict_may_carry() {
-    assert_eq!(Verdict::Deferred.reasons(), [Reason::Unspecified]);
-    assert!(Verdict::Rejected.reasons().len() == 5);
-    assert!(!Verdict::Rejected.reasons().contains(&Reason::Unspecified));
+fn only_a_non_error_finding_nobody_judged_needs_review() {
+    assert!(needs_review(Severity::Warn, false));
+    assert!(needs_review(Severity::Info, false));
+    assert!(!needs_review(Severity::Error, false));
+    assert!(!needs_review(Severity::Warn, true));
 }

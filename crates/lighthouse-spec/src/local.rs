@@ -13,8 +13,6 @@ use crate::{Catalog, Error};
 
 /// Where a project keeps its own decisions, relative to the project root.
 const LOCAL_DIR: &str = ".lighthouse/decisions";
-/// Where the project's own rules lived before the resource model.
-const LEGACY_DIR: &str = ".lighthouse/rules";
 
 /// Where a project keeps its own decisions: `<root>/.lighthouse/decisions`.
 pub fn local_dir(root: &Path) -> PathBuf {
@@ -31,15 +29,8 @@ pub fn load_local(root: &Path) -> Result<Option<Catalog>, Error> {
 }
 
 /// The texts of `<root>/.lighthouse/decisions/*` (YAML, TOML or JSON) by file name; `None` when
-/// the directory does not exist. A project that still has `.lighthouse/rules`
-/// is refused: its rules would otherwise be ignored without a word.
+/// the directory does not exist.
 pub fn local_files(root: &Path) -> Result<Option<BTreeMap<String, String>>, Error> {
-    let legacy = root.join(LEGACY_DIR);
-    if legacy.exists() {
-        return Err(Error::Legacy {
-            path: legacy.display().to_string(),
-        });
-    }
     let dir = local_dir(root);
     if !dir.is_dir() {
         return Ok(None);

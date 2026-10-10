@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: validation
-  annotations:
-    lighthouse/was-names: testing/expand-validation-to-contract
 spec:
   title: Expand validation to the contract
   context: >-

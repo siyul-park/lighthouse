@@ -7,10 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-signals
-  annotations:
-    lighthouse/was-names: design/complexity-signal
-    lighthouse/was-builtin: design/complexity-signal
-    lighthouse/was-exceptions: " A body that is one switch whose every arm is a single return is a table in code form and is not reported. A body whose only top-level branching is one switch of any arms, nested at most two levels, is a flat dispatch: its many paths do not make it hard to follow, so only cognitive complexity can report it."
 spec:
   title: Complexity is a review signal
   context: >-

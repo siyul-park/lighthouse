@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: public-boundary
-  annotations:
-    lighthouse/was-names: testing/external-test-package
-    lighthouse/was-builtin: testing/external-test-package
 spec:
   title: Contract tests live outside the target
   context: >-

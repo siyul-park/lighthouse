@@ -52,11 +52,11 @@ fn yaml_may_hold_several_documents_and_skips_empty_ones() {
 }
 
 #[test]
-fn a_document_without_api_version_is_called_legacy() {
+fn a_document_without_api_version_is_refused() {
     let docs = documents(Format::Yaml, "old.yaml", "id: core/x\n").unwrap();
     let err = resource::<Toy>("old.yaml", &docs[0]).unwrap_err();
-    assert!(matches!(err, Error::Legacy { .. }));
-    assert!(err.to_string().contains("lighthouse spec migrate"));
+    assert!(matches!(err, Error::Unversioned { .. }));
+    assert!(err.to_string().contains("no `apiVersion`"));
 }
 
 #[test]

@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: contract
-  annotations:
-    lighthouse/was-names: testing/case-is-behavior
 spec:
   title: A case is a behavior
   context: >-

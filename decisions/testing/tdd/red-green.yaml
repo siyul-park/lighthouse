@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: tdd
-  annotations:
-    lighthouse/was-names: testing/red-green-cycle
 spec:
   title: Smallest failing contract first
   context: >-

@@ -64,10 +64,6 @@ pub fn call(name: &str, args: Value, caller: &Caller) -> Outcome {
         "decision_similar" | "decision_proposals" => Err(format!(
             "`{name}` is reserved for a later version and not available yet"
         )),
-        old if old.starts_with("rule_") => Err(format!(
-            "`{old}` was renamed: call `decision_{}`",
-            &old["rule_".len()..]
-        )),
         _ => Err(format!("unknown tool `{name}`")),
     }
 }

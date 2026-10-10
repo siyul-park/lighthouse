@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: principles
-  annotations:
-    lighthouse/was-names: design/symbol-earns-existence
 spec:
   title: Every symbol earns its existence
   context: >-

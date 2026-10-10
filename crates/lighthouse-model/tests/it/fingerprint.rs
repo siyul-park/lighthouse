@@ -1,4 +1,4 @@
-use lighthouse_model::{Diagnostic, Fingerprint, Position, Severity, Span};
+use lighthouse_model::{Fingerprint, Severity};
 
 #[test]
 fn fingerprint_is_deterministic() {
@@ -70,25 +70,4 @@ fn discriminate_separates_findings_by_a_stable_marker() {
     assert_eq!(one, base.discriminate("m::f#function"));
     assert_ne!(one, base.discriminate("m::g#function"));
     assert_ne!(one.occurrence(1), one);
-}
-
-#[test]
-fn diagnostic_with_legacy_keeps_the_fingerprints_a_name_seeded_out_of_every_output() {
-    let at = Position { line: 1, col: 1 };
-    let legacy = vec![Fingerprint::of("design/old", "pkg::f", "")];
-    let found = Diagnostic::new(
-        "design/new",
-        Severity::Warn,
-        "message",
-        "a.rs",
-        Span { start: at, end: at },
-        Fingerprint::of("uid", "pkg::f", ""),
-    )
-    .with_legacy(legacy.clone());
-
-    assert_eq!(found.legacy_fingerprints, legacy);
-    let json = serde_json::to_value(&found).unwrap();
-    assert!(json.get("legacyFingerprints").is_none(), "{json}");
-    let back: Diagnostic = serde_json::from_value(json).unwrap();
-    assert!(back.legacy_fingerprints.is_empty());
 }

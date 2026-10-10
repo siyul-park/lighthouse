@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: types-and-apis
-  annotations:
-    lighthouse/was-names: design/required-args-optional-options
 spec:
   title: "Required arguments, optional options"
   context: >-

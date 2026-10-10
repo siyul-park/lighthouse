@@ -100,7 +100,7 @@ fn grouped_of_orders_errors_first_and_cuts_at_the_limit() {
 fn grouped_fields_say_how_to_resolve_once_when_a_finding_asks_for_review() {
     let grouped = Grouped::of(grouped_entries(), &GroupOptions::default());
     let fields = grouped.fields();
-    assert!(fields["resolve"].is_string() && fields["reasons"].is_object());
+    assert!(fields["resolve"].is_string() && fields["judgments"].is_object());
     let errors_only = Grouped::of(
         vec![entry("acme/b", Severity::Error, "y.go", 9, &spread(3))],
         &GroupOptions::default(),

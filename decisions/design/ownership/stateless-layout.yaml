@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: ownership
-  annotations:
-    lighthouse/was-names: design/layout-declarations-hold-no-state
 spec:
   title: Layout declarations hold no runtime state
   context: >-

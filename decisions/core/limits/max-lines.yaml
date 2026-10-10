@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: core
     lighthouse/section: limits
-  annotations:
-    lighthouse/was-names: core/max-file-lines
-    lighthouse/was-builtin: core/max-file-lines
 spec:
   title: Files stay below a line limit
   context: >-

@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: errors
-  annotations:
-    lighthouse/was-names: design/translate-errors-at-boundary
 spec:
   title: Translate errors at their boundary
   context: >-

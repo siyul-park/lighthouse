@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: naming
-  annotations:
-    lighthouse/was-builtin: design/no-redundant-qualifiers
-    lighthouse/was-exceptions: " A name equal to its package or module name (`provider.Provider`, `list.List`, `time.Time`) is the package's primary concept; repeating it has meaning and is never reported."
 spec:
   title: No redundant qualifiers
   context: >-

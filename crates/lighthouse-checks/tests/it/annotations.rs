@@ -48,28 +48,31 @@ pub(crate) fn rules_of(outcome: &Outcome) -> Vec<&str> {
 #[test]
 fn an_allow_annotation_suppresses_the_finding_it_is_attached_to() {
     let outcome = check(
-        "// lighthouse:allow design/exported-doc -- documented at its origin\npub fn open() {}\n",
+        "// lighthouse-disable-next-line design/exported-doc -- documented at its origin\npub fn open() {}\n",
         DOC_RULE,
     );
     assert!(outcome.diagnostics.is_empty(), "{:?}", outcome.diagnostics);
-    assert_eq!(outcome.allowed.len(), 1);
-    let allowed = &outcome.allowed[0];
+    assert_eq!(outcome.suppressed.len(), 1);
+    let allowed = &outcome.suppressed[0];
     assert_eq!(allowed.diagnostic.rule_id, "design/exported-doc");
-    assert_eq!(allowed.reason, "documented at its origin");
+    assert_eq!(
+        allowed.suppression.justification,
+        "documented at its origin"
+    );
 
     let elsewhere = check(
-        "// lighthouse:allow design/exported-doc -- only the next one\npub fn open() {}\n\npub fn close() {}\n",
+        "// lighthouse-disable-next-line design/exported-doc -- only the next one\npub fn open() {}\n\npub fn close() {}\n",
         DOC_RULE,
     );
     assert_eq!(rules_of(&elsewhere), ["design/exported-doc"]);
     assert_eq!(elsewhere.diagnostics[0].span.start.line, 4);
-    assert_eq!(elsewhere.allowed.len(), 1);
+    assert_eq!(elsewhere.suppressed.len(), 1);
 }
 
 #[test]
 fn an_allow_annotation_covers_every_severity_and_names_the_rules_it_does_not_use() {
     let outcome = check(
-        "// lighthouse:allow design/exported-doc, design/no-mutable-globals -- generated\npub fn open() {}\n",
+        "// lighthouse-disable-next-line design/exported-doc, design/no-mutable-globals -- generated\npub fn open() {}\n",
         "\"design/exported-doc\" = \"error\"\n\"design/no-mutable-globals\" = \"warn\"\n",
     );
     assert_eq!(rules_of(&outcome), ["core/no-unused-allow"]);
@@ -78,22 +81,22 @@ fn an_allow_annotation_covers_every_severity_and_names_the_rules_it_does_not_use
             .message
             .contains("no-mutable-globals")
     );
-    assert_eq!(outcome.allowed.len(), 1);
-    assert_eq!(outcome.allowed[0].diagnostic.severity, Severity::Error);
+    assert_eq!(outcome.suppressed.len(), 1);
+    assert_eq!(outcome.suppressed[0].diagnostic.severity, Severity::Error);
     assert_eq!(outcome.exit_code(false, false), 0);
 }
 
 #[test]
 fn an_annotation_without_a_reason_is_ignored_and_reported() {
     let outcome = check(
-        "// lighthouse:allow design/exported-doc\npub fn open() {}\n",
+        "// lighthouse-disable-next-line design/exported-doc\npub fn open() {}\n",
         DOC_RULE,
     );
     assert_eq!(
         rules_of(&outcome),
         ["core/allow-reason", "design/exported-doc"]
     );
-    assert!(outcome.allowed.is_empty());
+    assert!(outcome.suppressed.is_empty());
     assert_eq!(outcome.diagnostics[0].severity, Severity::Error);
     assert_eq!(outcome.diagnostics[0].span.start.line, 1);
 }
@@ -101,7 +104,7 @@ fn an_annotation_without_a_reason_is_ignored_and_reported() {
 #[test]
 fn an_annotation_that_suppresses_nothing_is_reported_as_unused() {
     let outcome = check(
-        "// lighthouse:allow design/exported-doc -- stale\n/// Documented.\npub fn open() {}\n",
+        "// lighthouse-disable-next-line design/exported-doc -- stale\n/// Documented.\npub fn open() {}\n",
         DOC_RULE,
     );
     assert_eq!(rules_of(&outcome), ["core/no-unused-allow"]);
@@ -113,7 +116,7 @@ fn an_annotation_that_suppresses_nothing_is_reported_as_unused() {
     );
 
     let disabled = check(
-        "// lighthouse:allow design/exported-doc -- the rule is off\npub fn open() {}\n",
+        "// lighthouse-disable-next-line design/exported-doc -- the rule is off\npub fn open() {}\n",
         "",
     );
     assert_eq!(rules_of(&disabled), ["core/no-unused-allow"]);
@@ -122,11 +125,11 @@ fn an_annotation_that_suppresses_nothing_is_reported_as_unused() {
 #[test]
 fn prose_mentioning_the_marker_is_not_an_annotation() {
     let outcome = check(
-        "// Write lighthouse:allow design/exported-doc -- why, to allow a finding.\npub fn open() {}\n",
+        "// Write lighthouse-disable-next-line design/exported-doc -- why, to allow a finding.\npub fn open() {}\n",
         DOC_RULE,
     );
     assert_eq!(rules_of(&outcome), ["design/exported-doc"]);
-    assert!(outcome.allowed.is_empty());
+    assert!(outcome.suppressed.is_empty());
 }
 
 fn banner_in(name: &str) -> String {

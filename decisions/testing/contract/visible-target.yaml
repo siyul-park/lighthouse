@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: contract
-  annotations:
-    lighthouse/was-names: testing/case-exposes-target
 spec:
   title: A case exposes its target
   context: >-

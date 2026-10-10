@@ -34,8 +34,11 @@ fn disable_next_line_covers_the_next_line_and_the_symbol_declared_there() {
 
     assert_eq!(rules_of(&outcome), ["design/exported-doc"]);
     assert_eq!(lines_of(&outcome, "design/exported-doc"), [4]);
-    assert_eq!(outcome.allowed.len(), 1);
-    assert_eq!(outcome.allowed[0].reason, "documented at its origin");
+    assert_eq!(outcome.suppressed.len(), 1);
+    assert_eq!(
+        outcome.suppressed[0].suppression.justification,
+        "documented at its origin"
+    );
 }
 
 #[test]
@@ -46,7 +49,7 @@ fn disable_line_covers_its_own_line_only() {
     );
 
     assert_eq!(lines_of(&outcome, "design/exported-doc"), [2]);
-    assert_eq!(outcome.allowed.len(), 1);
+    assert_eq!(outcome.suppressed.len(), 1);
     assert!(!rules_of(&outcome).contains(&"core/no-unused-allow"));
 }
 
@@ -58,7 +61,7 @@ fn disable_runs_to_the_matching_enable() {
     );
 
     assert_eq!(lines_of(&outcome, "design/exported-doc"), [1, 7]);
-    assert_eq!(outcome.allowed.len(), 2);
+    assert_eq!(outcome.suppressed.len(), 2);
     assert_eq!(
         rules_of(&outcome),
         ["design/exported-doc", "design/exported-doc"]
@@ -73,7 +76,7 @@ fn disable_without_an_enable_runs_to_the_end_of_the_file() {
     );
 
     assert_eq!(lines_of(&outcome, "design/exported-doc"), [1]);
-    assert_eq!(outcome.allowed.len(), 2);
+    assert_eq!(outcome.suppressed.len(), 2);
 }
 
 #[test]
@@ -84,7 +87,7 @@ fn disable_at_the_top_of_a_file_waives_the_whole_file() {
     );
 
     assert!(outcome.diagnostics.is_empty(), "{:?}", outcome.diagnostics);
-    assert_eq!(outcome.allowed.len(), 2);
+    assert_eq!(outcome.suppressed.len(), 2);
 }
 
 #[test]
@@ -108,7 +111,7 @@ fn ranges_of_different_rules_nest() {
     assert_eq!(lines_of(&outcome, "design/exported-doc"), [1, 14]);
     assert_eq!(lines_of(&outcome, "design/no-banners"), [10]);
     assert_eq!(outcome.diagnostics.len(), 3, "{:?}", outcome.diagnostics);
-    assert_eq!(outcome.allowed.len(), 2);
+    assert_eq!(outcome.suppressed.len(), 2);
 }
 
 #[test]
@@ -142,7 +145,7 @@ fn a_range_that_suppresses_nothing_is_reported_as_unused() {
         "{:?}",
         outcome.diagnostics
     );
-    assert!(outcome.allowed.is_empty());
+    assert!(outcome.suppressed.is_empty());
 }
 
 #[test]
@@ -154,7 +157,7 @@ fn a_second_disable_inside_an_open_range_is_unused() {
 
     assert_eq!(rules_of(&outcome), ["core/no-unused-allow"]);
     assert_eq!(outcome.diagnostics[0].span.start.line, 2, "the second one");
-    assert_eq!(outcome.allowed.len(), 1);
+    assert_eq!(outcome.suppressed.len(), 1);
 }
 
 #[test]
@@ -174,7 +177,7 @@ fn every_disable_form_needs_a_reason() {
             ["core/allow-reason", "design/exported-doc"],
             "{form}"
         );
-        assert!(outcome.allowed.is_empty(), "{form}");
+        assert!(outcome.suppressed.is_empty(), "{form}");
         assert!(
             message_of(&outcome, "core/allow-reason").contains(form),
             "{form}"
@@ -212,24 +215,7 @@ fn two_directives_in_one_comment_each_count_and_only_the_last_reaches_the_symbol
             "design/exported-doc"
         ]
     );
-    assert!(outcome.allowed.is_empty());
-}
-
-#[test]
-fn a_directive_that_names_an_old_id_still_suppresses() {
-    let source = "// lighthouse-disable design/section-banners -- old id\nfn a() {\n    // ======== helpers ========\n    let _ = 1;\n}\n";
-    let outcome = check(source, "\"design/no-banners\" = \"warn\"\n");
-
-    assert!(outcome.diagnostics.is_empty(), "{:?}", outcome.diagnostics);
-    assert_eq!(outcome.allowed.len(), 1);
-    assert!(
-        outcome
-            .notices
-            .iter()
-            .any(|n| n.contains("`design/section-banners` is now `design/no-banners`")),
-        "{:?}",
-        outcome.notices
-    );
+    assert!(outcome.suppressed.is_empty());
 }
 
 #[test]
@@ -240,7 +226,7 @@ fn a_disable_after_code_is_not_the_top_of_the_file() {
     );
 
     assert_eq!(lines_of(&outcome, "design/exported-doc"), [2]);
-    assert_eq!(outcome.allowed.len(), 1);
+    assert_eq!(outcome.suppressed.len(), 1);
 }
 
 #[test]
@@ -251,7 +237,7 @@ fn a_disable_below_a_header_and_blank_lines_waives_the_whole_file() {
     );
 
     assert!(outcome.diagnostics.is_empty(), "{:?}", outcome.diagnostics);
-    assert_eq!(outcome.allowed.len(), 2);
+    assert_eq!(outcome.suppressed.len(), 2);
 }
 
 #[test]
@@ -276,7 +262,7 @@ fn a_documentation_comment_holds_no_directive() {
         "{:?}",
         outcome.diagnostics
     );
-    assert!(outcome.allowed.is_empty());
+    assert!(outcome.suppressed.is_empty());
 }
 
 #[test]
@@ -290,32 +276,5 @@ fn next_line_is_counted_from_its_own_line_not_from_the_end_of_the_comment() {
         rules_of(&outcome),
         ["core/no-unused-allow", "design/exported-doc"]
     );
-    assert!(outcome.allowed.is_empty());
-}
-
-#[test]
-fn a_finding_about_a_directive_keeps_its_identity_when_the_directive_is_rewritten() {
-    let before = check(
-        "// lighthouse:allow design/exported-doc\npub fn open() {}\n",
-        DOC_RULE,
-    );
-    let after = check(
-        "// lighthouse-disable-next-line design/exported-doc\npub fn open() {}\n",
-        DOC_RULE,
-    );
-    let fingerprint = |o: &Outcome| {
-        o.diagnostics
-            .iter()
-            .find(|d| d.rule_id == "core/allow-reason")
-            .map(|d| d.fingerprint.clone())
-            .unwrap()
-    };
-
-    assert_eq!(fingerprint(&before), fingerprint(&after));
-    let legacy = before
-        .diagnostics
-        .iter()
-        .find(|d| d.rule_id == "core/allow-reason")
-        .unwrap();
-    assert!(!legacy.legacy_fingerprints.is_empty());
+    assert!(outcome.suppressed.is_empty());
 }

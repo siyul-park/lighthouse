@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: contract
-  annotations:
-    lighthouse/was-names: testing/structure-serves-contract
 spec:
   title: Structure serves the contract
   context: >-

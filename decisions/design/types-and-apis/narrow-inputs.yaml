@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: types-and-apis
-  annotations:
-    lighthouse/was-names: design/narrow-inputs-concrete-outputs
 spec:
   title: "Narrow inputs, concrete outputs"
   context: >-

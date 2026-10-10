@@ -7,9 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: public-boundary
-  annotations:
-    lighthouse/was-names: testing/no-private-symbol-access
-    lighthouse/was-enforcement: mechanical
 spec:
   title: Tests do not reach private symbols
   context: >-

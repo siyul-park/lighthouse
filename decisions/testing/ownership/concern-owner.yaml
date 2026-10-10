@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: ownership
-  annotations:
-    lighthouse/was-names: testing/single-owner-per-concern
 spec:
   title: One owner per concern
   context: >-

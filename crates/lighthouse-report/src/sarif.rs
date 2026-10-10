@@ -3,7 +3,7 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Diagnostic, Incomplete, Position, Severity};
+use lighthouse_model::{Diagnostic, Incomplete, Position, Severity, Suppressed, Suppression};
 use lighthouse_spec::{Catalog, Decision, help_path};
 
 use crate::fix::{FixEdit, ProposedFix, utf16_position};
@@ -113,6 +113,17 @@ struct SarifResult<'a> {
     partial_fingerprints: BTreeMap<&'static str, &'a str>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     fixes: Vec<SarifFix<'a>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    suppressions: Vec<SarifSuppression<'a>>,
+}
+
+/// A SARIF `suppression`: `inSource` for a directive in the code, `external`
+/// for a recorded decision to leave the finding in place.
+#[derive(Serialize)]
+struct SarifSuppression<'a> {
+    kind: &'static str,
+    status: &'static str,
+    justification: &'a str,
 }
 
 /// A SARIF `fix`: what to change, as replacements of regions per artifact.
@@ -181,7 +192,8 @@ struct Region {
     end_column: u32,
 }
 
-/// Renders a SARIF 2.1.0 log with one result per diagnostic and a tool
+/// Renders a SARIF 2.1.0 log with one result per diagnostic, one per
+/// suppressed finding (carrying its `suppressions`), and a tool
 /// notification per incomplete entry; an incomplete analysis marks the
 /// invocation unsuccessful. A finding's rule is the decision it cites: with
 /// the `catalog` the rule carries the decision's title, requirement, default
@@ -193,45 +205,54 @@ pub fn render(
     incomplete: &[Incomplete],
     catalog: Option<&Catalog>,
     fixes: Option<&BTreeMap<String, ProposedFix>>,
+    suppressed: &[Suppressed],
     sources: Option<&BTreeMap<String, String>>,
 ) -> String {
-    let ids: BTreeSet<&str> = diagnostics.iter().map(|d| d.rule_id.as_str()).collect();
+    let ids: BTreeSet<&str> = diagnostics
+        .iter()
+        .chain(suppressed.iter().map(|s| &s.diagnostic))
+        .map(|d| d.rule_id.as_str())
+        .collect();
     let rules: Vec<&str> = ids.into_iter().collect();
-    let log = Log {
-        schema: SCHEMA,
-        version: "2.1.0",
-        runs: [Run {
-            original_uri_base_ids: BTreeMap::from([(
-                SRCROOT,
-                BaseId {
-                    description: Message {
-                        text: "the project root, where Lighthouse was run",
+    let log =
+        Log {
+            schema: SCHEMA,
+            version: "2.1.0",
+            runs: [Run {
+                original_uri_base_ids: BTreeMap::from([(
+                    SRCROOT,
+                    BaseId {
+                        description: Message {
+                            text: "the project root, where Lighthouse was run",
+                        },
+                    },
+                )]),
+                invocations: [Invocation {
+                    execution_successful: incomplete.is_empty(),
+                    tool_execution_notifications: incomplete.iter().map(notification).collect(),
+                }],
+                tool: Tool {
+                    driver: Driver {
+                        name: "lighthouse",
+                        version: env!("CARGO_PKG_VERSION"),
+                        rules: rules
+                            .iter()
+                            .map(|id| rule_ref(id, catalog.and_then(|c| c.decision(id))))
+                            .collect(),
                     },
                 },
-            )]),
-            invocations: [Invocation {
-                execution_successful: incomplete.is_empty(),
-                tool_execution_notifications: incomplete.iter().map(notification).collect(),
+                results: diagnostics
+                    .iter()
+                    .map(|d| {
+                        let fix = fixes.and_then(|f| f.get(d.fingerprint.as_str()));
+                        result(d, &rules, fix, None, sources)
+                    })
+                    .chain(suppressed.iter().map(|s| {
+                        result(&s.diagnostic, &rules, None, Some(&s.suppression), sources)
+                    }))
+                    .collect(),
             }],
-            tool: Tool {
-                driver: Driver {
-                    name: "lighthouse",
-                    version: env!("CARGO_PKG_VERSION"),
-                    rules: rules
-                        .iter()
-                        .map(|id| rule_ref(id, catalog.and_then(|c| c.decision(id))))
-                        .collect(),
-                },
-            },
-            results: diagnostics
-                .iter()
-                .map(|d| {
-                    let fix = fixes.and_then(|f| f.get(d.fingerprint.as_str()));
-                    result(d, &rules, fix, sources)
-                })
-                .collect(),
-        }],
-    };
+        };
     let mut out = serde_json::to_string_pretty(&log).expect("sarif serializes");
     out.push('\n');
     out
@@ -289,6 +310,7 @@ fn result<'a>(
     d: &'a Diagnostic,
     rules: &[&str],
     fix: Option<&'a ProposedFix>,
+    suppression: Option<&'a Suppression>,
     sources: Option<&BTreeMap<String, String>>,
 ) -> SarifResult<'a> {
     SarifResult {
@@ -307,6 +329,14 @@ fn result<'a>(
         }],
         partial_fingerprints: BTreeMap::from([(FINGERPRINT_KEY, d.fingerprint.as_str())]),
         fixes: fix.map(sarif_fix).into_iter().collect(),
+        suppressions: suppression
+            .map(|s| SarifSuppression {
+                kind: s.kind.as_str(),
+                status: s.status.as_str(),
+                justification: &s.justification,
+            })
+            .into_iter()
+            .collect(),
     }
 }
 

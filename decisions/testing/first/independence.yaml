@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: first
-  annotations:
-    lighthouse/was-names: testing/independent-tests
 spec:
   title: Tests do not depend on hidden state
   context: >-

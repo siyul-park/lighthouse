@@ -7,8 +7,6 @@ metadata:
   labels:
     lighthouse/pack: testing
     lighthouse/section: readability
-  annotations:
-    lighthouse/was-names: testing/simple-table-data
 spec:
   title: Table data stays simple
   context: >-

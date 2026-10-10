@@ -7,7 +7,7 @@ use std::{
 };
 
 use lighthouse_engine::{Engine, FixPlan, Outcome};
-use lighthouse_model::{Diagnostic, Severity};
+use lighthouse_model::{Diagnostic, Severity, Suppressed};
 use lighthouse_report::{Briefing, Detail, FixFile, ProposedFix};
 use lighthouse_spec::Catalog;
 use serde::Serialize;
@@ -46,13 +46,13 @@ pub struct Summary {
     pub errors: usize,
     pub warnings: usize,
     pub infos: usize,
-    /// Findings of heuristic and judgment decisions, whatever their severity:
-    /// the ones that ask for a verdict.
+    /// Findings of decisions that authored `warn` or `info` and that no
+    /// judgment stands for: the ones that ask for review.
     pub reviews: usize,
     pub incomplete: usize,
-    /// Findings that verdicts kept out of the report.
+    /// Findings that judgments kept out of the report.
     pub suppressed: usize,
-    /// Findings that source annotations allow.
+    /// Findings that directives in the code suppress.
     pub allowed: usize,
 }
 
@@ -61,6 +61,9 @@ pub struct Checked {
     pub outcome: Outcome,
     pub catalog: Catalog,
     pub remembered: Remembered,
+    /// Every suppressed finding with its suppression, the ones a directive in
+    /// the code declares and the ones recorded outside it.
+    pub suppressions: Vec<Suppressed>,
     /// What the user should know, in the order it happened.
     pub messages: Vec<String>,
     /// The engine that ran. A report asks for fix previews after the check,
@@ -100,12 +103,12 @@ impl Checked {
                 outcome
                     .diagnostics
                     .iter()
-                    .filter(|d| briefing.needs_verdict(d))
+                    .filter(|d| briefing.needs_review(d))
                     .count()
             },
             incomplete,
             suppressed: self.remembered.suppressed,
-            allowed: outcome.allowed.len(),
+            allowed: outcome.suppressed.len(),
         }
     }
 
@@ -150,6 +153,7 @@ impl Checked {
             .outcome
             .diagnostics
             .iter()
+            .chain(self.suppressions.iter().map(|s| &s.diagnostic))
             .map(|d| d.file.as_path())
             .collect();
         files
@@ -186,8 +190,10 @@ impl Checked {
             catalog: Some(&self.catalog),
             facts: Some(&self.outcome.facts),
             notes: Some(&self.remembered.notes),
+            judged: Some(&self.remembered.judged),
             suppressed: self.remembered.suppressed,
-            allowed: self.outcome.allowed.len(),
+            allowed: self.outcome.suppressed.len(),
+            suppressions: Some(&self.suppressions),
             limit,
             detail: Detail::default(),
             fixes: None,
@@ -221,16 +227,23 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     };
     outcome.timings.store = started.elapsed();
     messages.extend(remembered.messages.iter().cloned());
-    if !outcome.allowed.is_empty() {
+    if !outcome.suppressed.is_empty() {
         messages.push(format!(
             "{} finding(s) allowed by source annotations",
-            outcome.allowed.len()
+            outcome.suppressed.len()
         ));
     }
+    let suppressions = outcome
+        .suppressed
+        .iter()
+        .chain(&remembered.suppressions)
+        .cloned()
+        .collect();
     Ok(Checked {
         outcome,
         catalog,
         remembered,
+        suppressions,
         messages,
         engine,
         root,

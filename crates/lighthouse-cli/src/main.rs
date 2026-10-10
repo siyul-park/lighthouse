@@ -146,15 +146,9 @@ enum Command {
         #[command(subcommand)]
         command: DecisionCommand,
     },
-    /// Renamed to `decision`; kept so the old command says what to run.
-    #[command(hide = true)]
-    Rule {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
     /// Show a decision or rule: context, requirement, examples and status.
     Explain { id: String },
-    /// Validate and migrate spec documents.
+    /// Validate spec documents.
     Spec {
         #[command(subcommand)]
         command: SpecCommand,
@@ -270,18 +264,6 @@ enum SpecCommand {
         #[arg(long)]
         examples: bool,
     },
-    /// Rewrite documents in the formats from before the resource model
-    /// (`lighthouse.toml`, `lighthouse-plugin.toml`, a catalog of decision files of the earlier format,
-    /// `.lighthouse/rules`) as `lighthouse/v1alpha1` resources. A document that
-    /// already is one is left alone, so running it again changes nothing.
-    Migrate {
-        /// Files or directories (default: the project's configuration and
-        /// `.lighthouse/rules`).
-        paths: Vec<PathBuf>,
-        /// Say what would change and change nothing.
-        #[arg(long)]
-        dry_run: bool,
-    },
 }
 
 #[derive(Subcommand)]
@@ -396,17 +378,9 @@ fn run(cli: Cli) -> Result<u8> {
                     config,
                 },
         } => decisions::test(&ids, language.as_deref(), config.as_deref()),
-        Command::Rule { args } => Err(format!(
-            "`lighthouse rule` is now `lighthouse decision`: run `lighthouse decision {}`",
-            args.join(" ")
-        )
-        .trim_end()
-        .to_owned()
-        .into()),
         Command::Explain { id } => decisions::explain(&id),
         Command::Spec { command } => match command {
             SpecCommand::Validate { paths, examples } => spec::validate(&paths, examples),
-            SpecCommand::Migrate { paths, dry_run } => spec::migrate(&paths, dry_run),
         },
         Command::Schema { kind, write } => spec::schema(kind.as_deref(), write.as_deref()),
         Command::Docs { command } => match command {

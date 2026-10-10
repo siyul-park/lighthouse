@@ -16,8 +16,7 @@ spec:
     The forms are ESLint's directives, with ESLint's `--` before the
     description, which is required here on every form that disables, and
     there is no form without ids. `lighthouse-disable-next-line <id>[, <id>]
-    -- <reason>` covers the next line and the symbol declared there (the
-    requirement's `lighthouse:allow` is its alias), `lighthouse-disable-line
+    -- <reason>` covers the next line and the symbol declared there, `lighthouse-disable-line
     <id> -- <reason>` its own line, and `lighthouse-disable <id> -- <reason>`
     everything from the comment to a matching `lighthouse-enable <id>` or to
     the end of the file (the whole file above the first line that is neither
@@ -26,15 +25,13 @@ spec:
 
     ` -- ` separates the ids from the reason, as in ESLint, and ids are
     separated by commas: `lighthouse-disable a/b, c/d -- why`. A documentation
-    comment (`///`, `//!`, `/** */`) never holds a directive. A directive
-    still written with an id a decision was renamed from works, with a
-    notice, until `spec migrate` rewrites it.
+    comment (`///`, `//!`, `/** */`) never holds a directive.
   scope:
     domain: code
     subject: symbol
   requirement: >-
     A finding that is right to leave in place MAY be allowed by a comment on the
-    symbol, the line before it or the same line, written `lighthouse:allow
+    symbol, the line before it or the same line, written `lighthouse-disable-next-line
     <rule>[, <rule>] -- <reason>`. The comment suppresses the named rules there,
     whatever their severity, and the reason is required. Allowed findings are
     counted in the report.
@@ -47,7 +44,7 @@ spec:
           body: |-
             package sample
 
-            // lighthouse:allow design/exported-doc -- generated shim, documented in the generator
+            // lighthouse-disable-next-line design/exported-doc -- generated shim, documented in the generator
             func Open() {}
     - name: rust-allow
       language: rust
@@ -55,7 +52,7 @@ spec:
       files:
         - path: src/lib.rs
           body: |-
-            // lighthouse:allow design/exported-doc -- re-exported and documented at its origin
+            // lighthouse-disable-next-line design/exported-doc -- re-exported and documented at its origin
             pub fn open() {}
     - name: go-disable-range
       language: go

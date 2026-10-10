@@ -245,7 +245,7 @@ impl Run<'_> {
                 // Where the line is does not identify the finding: moving
                 // code must not make it a new one. The engine tells
                 // repeats of the same text apart.
-                let (fingerprint, legacy) = self.meta.fingerprints(&slashed(&path), &snippet);
+                let fingerprint = self.meta.fingerprint(&slashed(&path), &snippet);
                 Diagnostic::new(
                     &self.meta.id,
                     self.meta.severity,
@@ -254,7 +254,6 @@ impl Run<'_> {
                     Span { start: at, end: at },
                     fingerprint,
                 )
-                .with_legacy(legacy)
             })
             .collect()
     }
