@@ -7,7 +7,9 @@
 //! `section.yaml` files, pattern files, declarative rule files, `sources.yaml`)
 //! and a project's `.lighthouse/rules`, which becomes `.lighthouse/decisions`.
 //! A `Preset` becomes a `Project`, and a `DecisionOverride` of the project
-//! becomes an entry of its `rules`. Every decision gets a `metadata.uid`.
+//! becomes an entry of its `rules`. Every decision gets a `metadata.uid`, and
+//! `lighthouse:allow` comments in source files become
+//! `lighthouse-disable-next-line`.
 //!
 //! Only shapes it recognizes are touched: a pattern has an `id` and a
 //! `requirement`, an override an `extends` and an override key, a
@@ -28,6 +30,7 @@ use serde_json::Value as Json;
 use serde_norway::{Mapping, Value};
 
 pub mod catalog;
+mod directives;
 mod fold;
 mod modern;
 pub mod plugin;
@@ -176,6 +179,13 @@ impl Plan {
 /// Migrates every legacy document under `paths` (files or directories). With
 /// `dry_run` nothing is written or removed; the result says what would be.
 pub fn migrate_paths(paths: &[PathBuf], dry_run: bool) -> Result<Migrated> {
+    migrate_sources(paths, paths, dry_run)
+}
+
+/// Like [`migrate_paths`], with the source files under `sources` (files or
+/// directories) searched for `lighthouse:allow` comments to migrate; the
+/// documents are those under `paths`.
+pub fn migrate_sources(paths: &[PathBuf], sources: &[PathBuf], dry_run: bool) -> Result<Migrated> {
     let files = scan(paths)?;
     let mut plan = Plan::default();
     let mut migrated = Migrated::default();
@@ -193,6 +203,7 @@ pub fn migrate_paths(paths: &[PathBuf], dry_run: bool) -> Result<Migrated> {
     migrated.unchanged += catalog(&catalog_files, &mut plan)?;
     fold::apply(&mut plan)?;
     uids::assign(&files, &mut plan)?;
+    directives::rewrite(sources, &mut plan)?;
     migrated.warnings = plan.settle();
     migrated.warnings.append(&mut plan.kept);
     for (path, action) in &plan.actions {
@@ -232,6 +243,9 @@ fn apply(actions: &BTreeMap<PathBuf, Action>) -> Result<()> {
                 std::process::id()
             ));
             fs::write(&temp, text)?;
+            if let Ok(meta) = fs::metadata(path) {
+                fs::set_permissions(&temp, meta.permissions())?;
+            }
             Ok(temp)
         };
         match stage() {

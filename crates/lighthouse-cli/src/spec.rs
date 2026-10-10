@@ -7,7 +7,7 @@ use std::{
 };
 
 use lighthouse_session::{
-    Session, config_file, migrate_paths, schema_file, schema_of, schemas, validate_paths,
+    Session, config_file, migrate_sources, schema_file, schema_of, schemas, validate_paths,
 };
 
 use crate::Result;
@@ -46,15 +46,13 @@ pub fn validate(paths: &[PathBuf], examples: bool) -> Result<u8> {
 /// Migrates the documents under `paths`; the project's configuration and
 /// `.lighthouse/rules` when there are none.
 pub fn migrate(paths: &[PathBuf], dry_run: bool) -> Result<u8> {
-    let paths = if paths.is_empty() {
-        defaults(
-            &lighthouse_session::project_root()?,
-            &[LOCAL_RULES, LOCAL_DECISIONS],
-        )
+    let root = lighthouse_session::project_root()?;
+    let (paths, sources) = if paths.is_empty() {
+        (defaults(&root, &[LOCAL_RULES, LOCAL_DECISIONS]), vec![root])
     } else {
-        paths.to_vec()
+        (paths.to_vec(), paths.to_vec())
     };
-    let migrated = migrate_paths(&paths, dry_run)?;
+    let migrated = migrate_sources(&paths, &sources, dry_run)?;
     let verb = if dry_run { "would write" } else { "wrote" };
     for path in &migrated.written {
         println!("{verb} {}", path.display());

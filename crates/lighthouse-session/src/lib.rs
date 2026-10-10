@@ -37,7 +37,7 @@ pub use lighthouse_model::{Reason, ReviewerKind, Severity, Verdict};
 pub use lighthouse_resource::schema_file;
 pub use lighthouse_spec::{DOCS_DIR, FILE_NAME, write_atomic};
 pub use lighthouse_store::{FindingRecord, NewReview, ReviewEvent, Standing, StatusFilter};
-pub use migrate::{Migrated, migrate_paths};
+pub use migrate::{Migrated, migrate_paths, migrate_sources};
 pub use project::{DEFAULT_CONFIG, Session, catalog_at, config_file, project_root};
 pub use reviewing::{
     Recorded, Reviewer, TaskQuery, Tasks, record_verdict, review_finding, review_history,

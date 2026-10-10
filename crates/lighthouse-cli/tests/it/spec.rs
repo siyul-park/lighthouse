@@ -697,6 +697,60 @@ fn migrate_gives_every_decision_a_uid_once_and_keeps_the_rest_of_the_file() {
 }
 
 #[test]
+fn migrate_rewrites_allow_comments_in_source_files_and_nothing_else() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        "src/lib.rs",
+        "// lighthouse:allow design/exported-doc -- shim\npub fn open() {}\n\n/* lighthouse:allow a, b -- two */\nfn quoted() -> &'static str {\n    \"// lighthouse:allow x -- in a string\"\n}\n// Write lighthouse:allow x -- in prose\n",
+    );
+    write(
+        dir.path(),
+        "main.go",
+        "package main\n\n\t// lighthouse:allow design/exported-doc\nfunc Open() {}\n",
+    );
+    write(dir.path(), "NOTES.md", "lighthouse:allow design/a -- doc\n");
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate", "."])
+        .assert()
+        .success();
+
+    let rust = fs::read_to_string(dir.path().join("src/lib.rs")).unwrap();
+    assert!(
+        rust.starts_with("// lighthouse-disable-next-line design/exported-doc -- shim\n"),
+        "{rust}"
+    );
+    assert!(
+        rust.contains("/* lighthouse-disable-next-line a, b -- two */"),
+        "{rust}"
+    );
+    assert!(
+        rust.contains("\"// lighthouse:allow x -- in a string\""),
+        "{rust}"
+    );
+    assert!(
+        rust.contains("// Write lighthouse:allow x -- in prose"),
+        "{rust}"
+    );
+    let go = fs::read_to_string(dir.path().join("main.go")).unwrap();
+    assert!(
+        go.contains("\t// lighthouse-disable-next-line design/exported-doc\n"),
+        "{go}"
+    );
+    assert_eq!(
+        fs::read_to_string(dir.path().join("NOTES.md")).unwrap(),
+        "lighthouse:allow design/a -- doc\n"
+    );
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate", "."])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("0 file(s) written"));
+}
+
+#[test]
 fn validate_asks_a_decision_without_a_uid_to_be_migrated() {
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), ".lighthouse/decisions/plain.yaml", UNIDENTIFIED);

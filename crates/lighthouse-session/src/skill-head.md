@@ -48,8 +48,10 @@ judged intentional is remembered with its reason and is not raised again.
 ## Rules of conduct
 
 - Never suppress a mechanical finding to make it go away. Fix the code.
-  The only exception is an inline annotation `lighthouse:allow <rule> -- <reason>`
-  with a real reason; it is reviewed in the diff.
+  The only exception is an inline directive
+  `lighthouse-disable-next-line <rule> -- <reason>` (or `-line`, or a
+  `lighthouse-disable` ... `lighthouse-enable` range) with a real reason; it
+  is reviewed in the diff.
 - A rejected verdict never hides a mechanical finding; if the rule is wrong,
   narrow it with `decision_update` (it is tested before it is written).
 - When the same decision comes up twice, write it down: `decision_create` writes

@@ -36,7 +36,8 @@ lighthouse review resolve 395d1985afe8 --verdict rejected --reason intentional-e
   CI see the same decisions.
 - **At the code, when it belongs there.** A decision about one place can be written
   where it happens and reviewed in the diff:
-  `// lighthouse:allow design/coupling-signal -- composition root wires every service`.
+  `// lighthouse-disable-next-line design/coupling-signal -- composition root wires every service`
+  (ESLint's directive forms; `-line`, and `lighthouse-disable` / `lighthouse-enable` ranges too).
   Annotations that stop matching anything are reported, so they cannot rot.
 - **Valid while it still applies.** A verdict holds while the rule's meaning and the
   finding's evidence stay the same. Change the code materially or redefine the rule, and

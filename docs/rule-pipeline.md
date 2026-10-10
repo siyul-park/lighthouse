@@ -178,7 +178,7 @@ finding is right but will not be acted on:
 | the decision should not apply here (scope too broad) | `notApplicable` | — |
 | intentional exception, project allows it | `fail` | `external`, with a justification |
 | won't fix | `fail` | `external`, justification `wont-fix` |
-| `lighthouse:allow <decision> -- <reason>` in code | — | `inSource`, with the reason |
+| `lighthouse-disable-next-line <decision> -- <reason>` (or `-line`, or a `lighthouse-disable` range) in code | — | `inSource`, with the reason |
 | not sure yet | — (stays `review`) | — |
 
 What a run **reports** uses SARIF results with their standard meaning:

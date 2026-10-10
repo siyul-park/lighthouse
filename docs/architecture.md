@@ -67,7 +67,7 @@ in `.gitignore` syntax; unlike a report filter, that removes them from analysis.
 | **decision** | What was decided and why: the catalog entry (`Decision`), with its severity, check, options, examples and fix. The one authored concept. |
 | **rule** | The executable form the engine compiles from a decision's `check`: the `Rule` trait, the rule ids that findings carry (a rule id is the id of its decision). |
 | **verdict** | A judgment about one finding (confirmed, rejected, deferred, with a reason), appended to the decision log. |
-| **annotation** | A verdict written at the code: `lighthouse:allow <rule> -- <reason>`. |
+| **annotation** | A verdict written at the code: `lighthouse-disable-next-line <rule> -- <reason>` (or another directive form). |
 
 ## Resource model
 
@@ -456,17 +456,32 @@ existed is exported to the log once. Verdicts are never edited or deleted; a lat
 verdict replaces the standing of the finding.
 
 **Source annotations** put the decision next to the code it is about, where a reviewer
-sees it change. A comment line that starts with `lighthouse:allow <rule>[, <rule>] --
-<reason>` allows the named rules on the symbol it documents, on the line after it and on
-its own line. It applies at every severity, mechanical errors included, because it is
-reviewed in the diff, and the report counts what was allowed (`N allowed`). The reason is
-required: an annotation without one is ignored and reported by the mechanical rule
-`core/annotation-reason`. An annotation whose rule no longer fires there, or is not
-enabled, is reported by `core/unused-allow` so annotations do not rot (when
-`--rules` leaves the annotated rule out of the run, nothing is said). Both rules belong to
+sees it change. They are directives in ESLint's forms, in a comment line that starts with
+the marker (the description follows ESLint's ` -- `):
+
+| Directive | Reaches |
+| --- | --- |
+| `lighthouse-disable-next-line <id>[, <id>] -- <reason>` | the symbol it documents, the line after it and its own line |
+| `lighthouse-disable-line <id>[, <id>] -- <reason>` | its own line |
+| `lighthouse-disable <id>[, <id>] -- <reason>` | from the comment to a matching `lighthouse-enable`, or to the end of the file; above the first symbol of a file, the whole file |
+| `lighthouse-enable <id>[, <id>]` | ends the ranges of the named ids |
+
+There is no form without ids, and `lighthouse:allow` stays as an alias of
+`lighthouse-disable-next-line` (`spec migrate` rewrites it in source files). A directive
+applies at every severity, mechanical errors included, because it is reviewed in the
+diff, and the report counts what was allowed (`N allowed`); in SARIF terms it is a
+suppression of kind `inSource`. The reason is required on every form that disables: a
+directive without one is ignored and reported by the mechanical rule
+`core/annotation-reason`. A directive or range whose rule no longer fires there, or is not
+enabled, an `lighthouse-enable` that closes nothing and a directive that names no id are
+reported by `core/unused-allow` so annotations do not rot (when `--rules` leaves the
+annotated rule out of the run, nothing is said). A second `lighthouse-disable` of an id
+inside its open range is redundant and reported the same way. Both rules belong to
 the `core` pack, so `core/recommended` enables them; the engine evaluates them because
-whether an annotation is used depends on every other rule's findings. Prose that merely
-mentions the marker mid-line is not an annotation.
+whether a directive is used depends on every other rule's findings. Prose that merely
+mentions a marker mid-line is not a directive. The comments come from the language
+providers, which report them with their text and the symbol they document; a comment
+of several adjacent line comments may hold several directives, one per line.
 
 ### Agent output
 

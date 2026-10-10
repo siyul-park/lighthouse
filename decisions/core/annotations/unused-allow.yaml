@@ -11,7 +11,9 @@ spec:
   title: Allow annotations suppress something
   context: >-
     An exception that no longer applies is noise that hides the next real
-    one.
+    one. A `lighthouse-disable` range that covers no finding is as stale as a
+    single directive, and so is a `lighthouse-enable` that closes no range, or
+    a directive that names no decision (there is no form without ids).
   scope:
     domain: code
     subject: file
@@ -83,3 +85,32 @@ spec:
           body: |-
             // open is not exported.
             fn open() {}
+    - name: rust-stale-range
+      language: rust
+      kind: invalid
+      fixed:
+        - path: src/lib.rs
+          body: |-
+            /// Documented.
+            pub fn open() {}
+      files:
+        - path: src/lib.rs
+          body: |-
+            // lighthouse-disable design/exported-doc -- stale
+            /// Documented.
+            pub fn open() {}
+      expect:
+        - line: 1
+    - name: rust-unmatched-enable
+      language: rust
+      kind: invalid
+      fixed:
+        - path: src/lib.rs
+          body: "fn open() {}"
+      files:
+        - path: src/lib.rs
+          body: |-
+            // lighthouse-enable design/exported-doc
+            fn open() {}
+      expect:
+        - line: 1

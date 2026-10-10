@@ -66,3 +66,30 @@ spec:
           body: |-
             // lighthouse:allow design/exported-doc -- re-exported shim
             pub fn open() {}
+    - name: rust-disable-missing-reason
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            // lighthouse-disable design/exported-doc
+            pub fn open() {}
+      expect:
+        - line: 1
+    - name: rust-disable-line-missing-reason
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn open() {} // lighthouse-disable-line design/exported-doc
+      expect:
+        - line: 1
+    - name: rust-disable-next-line-with-reason
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            // lighthouse-disable-next-line design/exported-doc -- re-exported shim
+            pub fn open() {}

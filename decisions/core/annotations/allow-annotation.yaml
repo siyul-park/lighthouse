@@ -12,6 +12,15 @@ spec:
   context: >-
     A decision to accept a finding belongs next to the code it is about,
     where a reviewer sees it change.
+
+    The forms are ESLint's directives, with ESLint's `--` before the
+    description, which is required here on every form that disables, and
+    there is no form without ids. `lighthouse-disable-next-line <id>[, <id>]
+    -- <reason>` covers the next line and the symbol declared there (the
+    requirement's `lighthouse:allow` is its alias), `lighthouse-disable-line
+    <id> -- <reason>` its own line, and `lighthouse-disable <id> -- <reason>`
+    everything from the comment to a matching `lighthouse-enable <id>` or to
+    the end of the file (the whole file at its top).
   scope:
     domain: code
     subject: symbol
@@ -40,3 +49,23 @@ spec:
           body: |-
             // lighthouse:allow design/exported-doc -- re-exported and documented at its origin
             pub fn open() {}
+    - name: go-disable-range
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // lighthouse-disable design/exported-doc -- generated shims, documented in the generator
+            func Open() {}
+
+            func Close() {}
+            // lighthouse-enable design/exported-doc
+    - name: rust-disable-line
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn open() {} // lighthouse-disable-line design/exported-doc -- re-exported and documented at its origin

@@ -9,6 +9,7 @@ mod core_pack;
 mod cycle;
 mod design_layout;
 mod design_rules;
+mod directives;
 mod fixes;
 mod go;
 mod layout;

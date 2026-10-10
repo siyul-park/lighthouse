@@ -9,7 +9,7 @@ use lighthouse_model::Severity;
 use lighthouse_spec::Config;
 
 /// Checks a one-file crate with the design and core rules plus `rules`.
-fn check(source: &str, rules: &str) -> Outcome {
+pub(crate) fn check(source: &str, rules: &str) -> Outcome {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("Cargo.toml"),
@@ -35,9 +35,9 @@ fn check(source: &str, rules: &str) -> Outcome {
     outcome
 }
 
-const DOC_RULE: &str = "\"design/exported-doc\" = \"warn\"\n";
+pub(crate) const DOC_RULE: &str = "\"design/exported-doc\" = \"warn\"\n";
 
-fn rules_of(outcome: &Outcome) -> Vec<&str> {
+pub(crate) fn rules_of(outcome: &Outcome) -> Vec<&str> {
     outcome
         .diagnostics
         .iter()
