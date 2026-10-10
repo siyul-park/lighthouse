@@ -32,6 +32,7 @@ struct Lang {
     manifest_id: &'static str,
     globs: &'static [&'static str],
     test_globs: &'static [&'static str],
+    constructor_prefixes: &'static [&'static str],
     capabilities: &'static [&'static str],
 }
 
@@ -44,6 +45,7 @@ const GO: Lang = Lang {
     manifest_id: "lang-go",
     globs: &["**/*.go"],
     test_globs: &["**/*_test.go"],
+    constructor_prefixes: &["New", "new"],
     capabilities: &[
         wire::SEMANTIC_EDGES,
         wire::EXTENT,
@@ -61,6 +63,7 @@ const RUST: Lang = Lang {
     manifest_id: "lang-rust",
     globs: &["**/*.rs"],
     test_globs: &["**/tests/**/*.rs", "**/tests.rs", "**/benches/**/*.rs"],
+    constructor_prefixes: &["new"],
     capabilities: &[wire::EXTENT, wire::REFERENCE_SITES, wire::OVERLAYS],
 };
 
@@ -228,6 +231,10 @@ fn initialize_declares_the_language_and_checks_the_protocol_version() {
         assert_eq!(declared.id, lang.id);
         assert_eq!(declared.globs, lang.globs);
         assert_eq!(declared.conventions.test_globs, lang.test_globs);
+        assert_eq!(
+            declared.conventions.constructor_prefixes,
+            lang.constructor_prefixes
+        );
         assert_eq!(declared.capabilities, lang.capabilities);
         assert!(!declared.fallback);
 

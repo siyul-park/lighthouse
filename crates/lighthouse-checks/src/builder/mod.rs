@@ -10,9 +10,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::metrics::{
-    COGNITIVE, CYCLOMATIC, FAN, Fan, NESTING, SIZE, Size, is_dispatcher, is_flat_dispatch, read,
-};
+use crate::metrics::{COGNITIVE, CYCLOMATIC, FAN, NESTING, SIZE, is_dispatcher, is_flat_dispatch};
 use lighthouse_model::{
     Comment, Edge, FunctionSummary, Node, Project, Symbol, SymbolId, SymbolKind, Target,
     Visibility, annotation,
@@ -29,25 +27,19 @@ use crate::{
 };
 
 mod effective;
+mod forward;
 mod hidden;
 mod homonyms;
+mod measures;
 mod ownership;
 mod role;
 
+use forward::{cyclic, forwarded};
+use measures::{Measures, measures};
 use role::satisfies_interface;
 
 /// The analyzers a check needs when its expressions call `metrics`.
 pub(crate) const METRIC_ANALYZERS: [&str; 5] = [SIZE, CYCLOMATIC, COGNITIVE, NESTING, FAN];
-
-/// What was measured for the functions of one file.
-#[derive(Default)]
-struct Measures {
-    sizes: BTreeMap<SymbolId, Size>,
-    cyclomatic: BTreeMap<SymbolId, u32>,
-    cognitive: BTreeMap<SymbolId, u32>,
-    nesting: BTreeMap<SymbolId, u32>,
-    fans: BTreeMap<SymbolId, Fan>,
-}
 
 /// Builds the values of one run of a check over one file (or the project).
 pub(crate) struct Builder<'a> {
@@ -611,72 +603,6 @@ fn strings(option: Option<&Value>) -> Vec<String> {
         .flatten()
         .filter_map(|v| v.as_str().map(str::to_owned))
         .collect()
-}
-
-fn measures(ctx: &Ctx) -> Result<Measures, Error> {
-    Ok(Measures {
-        sizes: read(ctx, SIZE)?,
-        cyclomatic: read(ctx, CYCLOMATIC)?,
-        cognitive: read(ctx, COGNITIVE)?,
-        nesting: read(ctx, NESTING)?,
-        fans: read(ctx, FAN)?,
-    })
-}
-
-/// The private target a private undocumented wrapper only forwards to. The
-/// wrapper must have exactly one caller, test callers included, and no use as
-/// a value; a method named like an interface method may be reached through
-/// that interface, so it is left alone.
-fn forwarded<'p>(project: &'p Project, wrapper: &Symbol) -> Option<&'p SymbolId> {
-    if wrapper.visibility != Visibility::Private
-        || wrapper.doc.is_some()
-        || project.callers(&wrapper.id).len() != 1
-        || !project.references(&wrapper.id).is_empty()
-        || satisfies_interface(project, wrapper)
-    {
-        return None;
-    }
-    let summary = project.function(&wrapper.id)?;
-    let Some(Target::Resolved(Node::Symbol(target))) = &summary.forwards_to else {
-        return None;
-    };
-    let callee = project.symbol(target)?;
-    let eligible = callee.visibility == Visibility::Private
-        && target.module() == wrapper.id.module()
-        && callee.kind == wrapper.kind
-        && project.callers(target).len() == 1
-        && !reaches(project, target, &wrapper.id);
-    eligible.then_some(target)
-}
-
-fn reaches(project: &Project, from: &SymbolId, goal: &SymbolId) -> bool {
-    let mut seen = BTreeSet::new();
-    let mut stack = vec![from];
-    while let Some(current) = stack.pop() {
-        if current == goal {
-            return true;
-        }
-        if seen.insert(current) {
-            stack.extend(project.callees(current));
-        }
-    }
-    false
-}
-
-/// Whether the callee reaches one of its callers: recursion through others.
-fn cyclic(project: &Project, callee: &Symbol, callers: &[&Symbol]) -> bool {
-    let goals: BTreeSet<&SymbolId> = callers.iter().map(|s| &s.id).collect();
-    let mut seen = BTreeSet::new();
-    let mut stack: Vec<&SymbolId> = project.callees(&callee.id).iter().collect();
-    while let Some(current) = stack.pop() {
-        if goals.contains(current) {
-            return true;
-        }
-        if seen.insert(current) {
-            stack.extend(project.callees(current));
-        }
-    }
-    false
 }
 
 /// Whether test code uses the symbol, or a member of it. Heuristic references
