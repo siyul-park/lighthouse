@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/test-file-layout
+  uid: 3991db6f-6ce4-4590-83ad-22b7b7d0daf0
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/case-depth
+  uid: ca1f03ef-1ecd-4376-805a-db7775328e2a
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization

@@ -12,7 +12,7 @@ use std::{
 };
 
 use lighthouse_model::RunScope;
-use lighthouse_model::{Diagnostic, Fingerprint, Position, Project, Span};
+use lighthouse_model::{Diagnostic, Position, Project, Span};
 use lighthouse_plugin::{Ctx, Error as PluginError, RuleManifest};
 use lighthouse_process::Spec;
 use lighthouse_spec::{Batch, Check, CheckStdin, CommandCheck};
@@ -242,17 +242,19 @@ impl Run<'_> {
                     col: position.1,
                 };
                 let snippet: String = message.split_whitespace().collect::<Vec<_>>().join(" ");
+                // Where the line is does not identify the finding: moving
+                // code must not make it a new one. The engine tells
+                // repeats of the same text apart.
+                let (fingerprint, legacy) = self.meta.fingerprints(&slashed(&path), &snippet);
                 Diagnostic::new(
                     &self.meta.id,
                     self.meta.severity,
                     message,
                     &path,
                     Span { start: at, end: at },
-                    // Where the line is does not identify the finding: moving
-                    // code must not make it a new one. The engine tells
-                    // repeats of the same text apart.
-                    Fingerprint::of(&self.meta.id, &slashed(&path), &snippet),
+                    fingerprint,
                 )
+                .with_legacy(legacy)
             })
             .collect()
     }

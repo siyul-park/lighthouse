@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/coupling-signal
+  uid: 1ae7149a-00cf-402a-acba-6fd404e91fde
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-signals

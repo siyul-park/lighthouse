@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/coverage-is-reachability
+  uid: dad65379-55d5-456c-91fb-f787f1d0a607
   labels:
     lighthouse/pack: testing
     lighthouse/section: evidence

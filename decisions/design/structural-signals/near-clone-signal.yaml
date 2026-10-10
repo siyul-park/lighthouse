@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/near-clone-signal
+  uid: 5f5b355e-e1ad-4e8e-a0c6-6623a7d5054e
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-signals

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/no-forced-reuse
+  uid: cb3de862-e500-43c5-9428-62c8f7f6092a
   labels:
     lighthouse/pack: design
     lighthouse/section: principles

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/minimal-names
+  uid: 918c026a-b384-4867-9e2a-098555c9a85f
   labels:
     lighthouse/pack: design
     lighthouse/section: naming

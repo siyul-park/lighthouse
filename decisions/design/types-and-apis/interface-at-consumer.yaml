@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/interface-at-consumer
+  uid: fa92f6a4-faf0-4d39-9d90-6339604a33f8
   labels:
     lighthouse/pack: design
     lighthouse/section: types-and-apis

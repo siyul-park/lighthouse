@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/singular-capability-plural-collection
+  uid: 7154cf43-5a21-4070-a65e-67517c9114fb
   labels:
     lighthouse/pack: design
     lighthouse/section: naming

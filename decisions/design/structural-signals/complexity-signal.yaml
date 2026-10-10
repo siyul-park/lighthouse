@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/complexity-signal
+  uid: 374c95b6-7892-4e6b-a8db-d25efe157aab
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-signals

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/architecture-specific-evidence
+  uid: 1aa766fe-5324-4560-a28c-5647eb8c1d3c
   labels:
     lighthouse/pack: testing
     lighthouse/section: completeness

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/coherent-responsibility
+  uid: 064e4160-8da3-4079-9674-aaeab16151ee
   labels:
     lighthouse/pack: design
     lighthouse/section: principles

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/no-upward-dependency
+  uid: a028d3cb-ae85-4a7c-9cc3-1946ddab7cb5
   labels:
     lighthouse/pack: design
     lighthouse/section: dependency-direction

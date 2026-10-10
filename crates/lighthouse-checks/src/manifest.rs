@@ -12,6 +12,8 @@ pub(crate) fn rule_manifest(decision: &Decision) -> Option<RuleManifest> {
     decision.check.as_ref().filter(|c| c.is_automated())?;
     Some(RuleManifest {
         id: decision.id().to_owned(),
+        uid: decision.uid().map(str::to_owned),
+        was: decision.was_names().map(str::to_owned).collect(),
         severity: decision.severity()?,
         scope: decision.scope.subject.run_scope(),
         description: decision.title.clone(),

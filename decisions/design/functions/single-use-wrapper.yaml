@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/single-use-wrapper
+  uid: 6fd6c0ba-61a7-4bc8-80b2-671c6fe78fe6
   labels:
     lighthouse/pack: design
     lighthouse/section: functions

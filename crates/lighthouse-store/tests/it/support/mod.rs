@@ -9,7 +9,9 @@ use serde_json::json;
 pub fn observed(fingerprint: &str, rule: &str, path: &str) -> Observed {
     Observed {
         fingerprint: fingerprint.to_owned(),
+        legacy_fingerprints: Vec::new(),
         rule_id: rule.to_owned(),
+        decision_uid: None,
         severity: Severity::Info,
         authored_severity: "info".to_owned(),
         path: path.to_owned(),
@@ -56,6 +58,7 @@ pub fn review(fingerprint: &str, verdict: Verdict, reason: Reason) -> NewReview 
 
 pub fn stamp(version: &str) -> impl Fn(&lighthouse_store::FindingRecord) -> Stamp + '_ {
     move |_| Stamp {
+        decision_uid: None,
         rule_version: Some(version.to_owned()),
         check_revision: Some("chk1".to_owned()),
         decision_hash: Some("full1".to_owned()),

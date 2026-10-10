@@ -21,6 +21,13 @@
         "name": {
           "description": "Fully qualified name, such as `design/minimal-names`.",
           "type": "string"
+        },
+        "uid": {
+          "description": "Identity that outlives the name: a UUID v4 assigned once, never derived\nfrom the name (Kubernetes `metadata.uid`). Renaming a resource keeps it.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [

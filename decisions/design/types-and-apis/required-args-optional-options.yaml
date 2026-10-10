@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/required-args-optional-options
+  uid: 75a5242a-4761-4055-a5f5-8f8856a2ab51
   labels:
     lighthouse/pack: design
     lighthouse/section: types-and-apis

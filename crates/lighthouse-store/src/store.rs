@@ -17,7 +17,7 @@ use serde_json::{Value, json};
 use crate::{
     Error, Filter, FindingRecord, FixEvent, LatestReview, NewFix, NewReview, Observed, Rejection,
     Resolved, ReviewEvent, Run, RunSummary, Stamp, Standing, StatusFilter, Unchecked, digest, log,
-    migrations,
+    log::RewriteSpec, migrations,
 };
 
 /// File name of the database inside the store directory.
@@ -35,7 +35,7 @@ const NOW: &str = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 /// Format version of the feature snapshot of a review: 2 has camelCase keys.
 const SNAPSHOT_VERSION: u32 = 2;
 
-const EVENT_COLUMNS: &str = "event_id, fingerprint, rule_id, rule_version, check_revision, decision_hash, \
+const EVENT_COLUMNS: &str = "event_id, fingerprint, rule_id, decision_uid, rule_version, check_revision, decision_hash, \
      catalog_version, lighthouse_version, pattern_fingerprint, verdict, reason_code, reason_text, \
      reviewer_kind, reviewer_id, language, scope, evidence_digest, feature_snapshot, git_commit, \
      timestamp";
@@ -122,6 +122,12 @@ impl Store {
         let now = timestamp(&tx)?;
         let mut summary = RunSummary::default();
         for observed in &run.observed {
+            for legacy in &observed.legacy_fingerprints {
+                let rewrite = adopt(&tx, legacy, observed, &mut summary)?;
+                if let (Some(rewrite), Some(path)) = (rewrite, &self.log) {
+                    log::append_rewrite(path, &rewrite)?;
+                }
+            }
             upsert(&tx, observed, run, &now, &mut summary)?;
         }
         summary.resolved = resolve_absent(&tx, run, &now)?;
@@ -188,7 +194,8 @@ impl Store {
     pub fn history(&self, fingerprint: &str) -> Result<Vec<ReviewEvent>, Error> {
         let full = expand(&self.conn, fingerprint)?;
         let sql = format!(
-            "SELECT {EVENT_COLUMNS} FROM review_events WHERE fingerprint = ?1 \
+            "SELECT {EVENT_COLUMNS} FROM review_events \
+             WHERE subject = COALESCE((SELECT current FROM fingerprint_rewrites WHERE legacy = ?1), ?1) \
              ORDER BY timestamp, event_id"
         );
         let mut stmt = self.conn.prepare(&sql)?;
@@ -317,10 +324,41 @@ impl Store {
         };
         let sql = format!(
             "DELETE FROM findings WHERE (resolved_at IS NOT NULL OR inactive_at IS NOT NULL) \
-             AND NOT EXISTS (SELECT 1 FROM review_events e WHERE e.fingerprint = findings.fingerprint) \
+             AND NOT EXISTS (SELECT 1 FROM review_events e WHERE e.subject = findings.fingerprint) \
              {age}"
         );
         Ok(self.conn.execute(&sql, [])?)
+    }
+
+    /// Teaches the store which uid each decision name belongs to (the names a
+    /// decision had before it was renamed included), and gives the findings
+    /// and verdicts that have none the uid of their decision. A row whose
+    /// name no decision answers to keeps no uid and stays readable by name.
+    pub fn identify(&mut self, names: &BTreeMap<String, String>) -> Result<(), Error> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        {
+            let mut put = tx.prepare_cached(
+                "INSERT INTO decision_uids (name, uid) VALUES (?1, ?2) \
+                 ON CONFLICT (name) DO UPDATE SET uid = excluded.uid",
+            )?;
+            for (name, uid) in names {
+                put.execute(params![name, uid])?;
+            }
+        }
+        for table in ["findings", "review_events"] {
+            tx.execute(
+                &format!(
+                    "UPDATE {table} SET decision_uid = (SELECT uid FROM decision_uids WHERE name = {table}.rule_id) \
+                     WHERE decision_uid IS NULL \
+                       AND EXISTS (SELECT 1 FROM decision_uids WHERE name = {table}.rule_id)"
+                ),
+                [],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
     }
 
     /// Imports the events of the decision log the cache does not have, and
@@ -342,6 +380,9 @@ impl Store {
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        for rewrite in &read.rewrites {
+            apply_rewrite(&tx, rewrite)?;
+        }
         for event in &logged {
             insert_event(&tx, event)?;
         }
@@ -425,15 +466,17 @@ fn upsert(
         Some(false) => {}
     }
     tx.prepare_cached(
-        "INSERT INTO findings (fingerprint, rule_id, last_severity, authored_severity, path, locator, symbol, \
+        "INSERT INTO findings (fingerprint, rule_id, decision_uid, last_severity, authored_severity, path, locator, symbol, \
              first_seen, last_seen, last_message, last_evidence, last_facts, last_options, \
              last_commit, last_dirty, lighthouse_version, catalog_version, rule_version, \
              legacy_rule_version, check_revision, decision_hash, evidence_digest) \
-         VALUES (:fingerprint, :rule_id, :severity, :authored, :path, :locator, :symbol, :now, :now, \
+         VALUES (:fingerprint, :rule_id, :decision_uid, :severity, :authored, :path, :locator, :symbol, :now, :now, \
              :message, :evidence, :facts, :options, :commit, :dirty, :version, :catalog, \
              :rule_version, :legacy_rule_version, :check_revision, :decision_hash, :digest) \
          ON CONFLICT (fingerprint) DO UPDATE SET \
-             rule_id = excluded.rule_id, last_severity = excluded.last_severity, \
+             rule_id = excluded.rule_id, \
+             decision_uid = COALESCE(excluded.decision_uid, decision_uid), \
+             last_severity = excluded.last_severity, \
              authored_severity = excluded.authored_severity, path = excluded.path, locator = excluded.locator, \
              symbol = excluded.symbol, last_seen = excluded.last_seen, \
              reopened = reopened + (resolved_at IS NOT NULL), resolved_at = NULL, \
@@ -450,6 +493,7 @@ fn upsert(
         named_params! {
             ":fingerprint": observed.fingerprint,
             ":rule_id": observed.rule_id,
+            ":decision_uid": observed.decision_uid,
             ":severity": observed.severity.to_string(),
             ":authored": observed.authored_severity,
             ":path": observed.path,
@@ -470,6 +514,70 @@ fn upsert(
             ":decision_hash": observed.decision_hash,
             ":digest": observed.evidence_digest(),
         },
+    )?;
+    Ok(())
+}
+
+/// Moves what is kept under the fingerprint `legacy` to the one `observed`
+/// has now: the finding's row in place (its history stays), its fix records,
+/// and the verdicts, which are read as belonging to the new fingerprint from
+/// here on. Returns the rewrite record to append to the decision log when
+/// verdicts moved. Does nothing when nothing is kept under `legacy`, or when
+/// the finding already has a row of its own.
+fn adopt(
+    tx: &Transaction,
+    legacy: &str,
+    observed: &Observed,
+    summary: &mut RunSummary,
+) -> Result<Option<RewriteSpec>, Error> {
+    let current = observed.fingerprint.as_str();
+    if legacy == current {
+        return Ok(None);
+    }
+    let moved = tx.execute(
+        "UPDATE findings SET fingerprint = ?2 WHERE fingerprint = ?1 \
+         AND NOT EXISTS (SELECT 1 FROM findings WHERE fingerprint = ?2)",
+        params![legacy, current],
+    )?;
+    if moved > 0 {
+        tx.execute(
+            "UPDATE fix_events SET fingerprint = ?2 WHERE fingerprint = ?1",
+            params![legacy, current],
+        )?;
+        summary.rewritten += 1;
+    }
+    let verdicts: bool = tx.query_row(
+        "SELECT EXISTS (SELECT 1 FROM review_events WHERE fingerprint = ?1) \
+         AND NOT EXISTS (SELECT 1 FROM fingerprint_rewrites WHERE legacy = ?1)",
+        params![legacy],
+        |row| row.get(0),
+    )?;
+    if !verdicts {
+        return Ok(None);
+    }
+    let rewrite = RewriteSpec {
+        legacy: legacy.to_owned(),
+        current: current.to_owned(),
+        decision_uid: observed.decision_uid.clone(),
+    };
+    apply_rewrite(tx, &rewrite)?;
+    summary.rewritten += 1;
+    Ok(Some(rewrite))
+}
+
+/// Reads the verdicts recorded under `rewrite.legacy` as belonging to
+/// `rewrite.current`. The first rewrite of a fingerprint wins.
+fn apply_rewrite(tx: &Transaction, rewrite: &RewriteSpec) -> Result<(), Error> {
+    tx.execute(
+        "INSERT OR IGNORE INTO fingerprint_rewrites (legacy, current, decision_uid) \
+         VALUES (?1, ?2, ?3)",
+        params![rewrite.legacy, rewrite.current, rewrite.decision_uid],
+    )?;
+    tx.execute(
+        "UPDATE review_events SET subject = \
+             (SELECT current FROM fingerprint_rewrites WHERE legacy = ?1) \
+         WHERE fingerprint = ?1",
+        params![rewrite.legacy],
     )?;
     Ok(())
 }
@@ -554,7 +662,7 @@ fn reconcile_inactive(tx: &Transaction, run: &Run, now: &str) -> Result<usize, E
 fn expand(conn: &Connection, prefix: &str) -> Result<String, Error> {
     let mut stmt = conn.prepare(
         "SELECT fingerprint FROM findings WHERE substr(fingerprint, 1, length(?1)) = ?1 \
-         UNION SELECT fingerprint FROM review_events WHERE substr(fingerprint, 1, length(?1)) = ?1 \
+         UNION SELECT subject FROM review_events WHERE substr(subject, 1, length(?1)) = ?1 \
          ORDER BY 1 LIMIT 6",
     )?;
     let mut found: Vec<String> = stmt
@@ -620,6 +728,7 @@ fn event_of(
         id: String::new(),
         fingerprint: finding.fingerprint.clone(),
         rule_id: finding.rule_id.clone(),
+        decision_uid: stamp.decision_uid.or_else(|| finding.decision_uid.clone()),
         rule_version: stamp.rule_version,
         check_revision: stamp.check_revision,
         decision_hash: stamp.decision_hash,
@@ -648,17 +757,19 @@ fn event_of(
 
 fn insert_event(tx: &Transaction, event: &ReviewEvent) -> Result<(), Error> {
     tx.execute(
-        "INSERT OR IGNORE INTO review_events (event_id, fingerprint, rule_id, rule_version, check_revision, \
+        "INSERT OR IGNORE INTO review_events (event_id, fingerprint, rule_id, decision_uid, rule_version, check_revision, \
              decision_hash, catalog_version, lighthouse_version, pattern_fingerprint, verdict, \
              reason_code, reason_text, reviewer_kind, reviewer_id, language, scope, \
-             evidence_digest, feature_snapshot, git_commit, timestamp) \
-         VALUES (:id, :fingerprint, :rule_id, :rule_version, :check_revision, :decision_hash, :catalog, :version, \
+             evidence_digest, feature_snapshot, git_commit, timestamp, subject) \
+         VALUES (:id, :fingerprint, :rule_id, :decision_uid, :rule_version, :check_revision, :decision_hash, :catalog, :version, \
              :pattern_fingerprint, :verdict, :reason, :reason_text, :kind, :reviewer, :language, \
-             :scope, :digest, :snapshot, :commit, :timestamp)",
+             :scope, :digest, :snapshot, :commit, :timestamp, \
+             COALESCE((SELECT current FROM fingerprint_rewrites WHERE legacy = :fingerprint), :fingerprint))",
         named_params! {
             ":id": event.id,
             ":fingerprint": event.fingerprint,
             ":rule_id": event.rule_id,
+            ":decision_uid": event.decision_uid,
             ":rule_version": event.rule_version,
             ":check_revision": event.check_revision,
             ":decision_hash": event.decision_hash,
@@ -695,6 +806,7 @@ fn finding_record(row: &Row) -> rusqlite::Result<FindingRecord> {
     Ok(FindingRecord {
         fingerprint: row.get("fingerprint")?,
         rule_id: row.get("rule_id")?,
+        decision_uid: row.get("decision_uid")?,
         severity: row.get("last_severity")?,
         authored_severity: row.get("authored_severity")?,
         path: row.get("path")?,
@@ -725,6 +837,7 @@ fn review_event(row: &Row) -> rusqlite::Result<ReviewEvent> {
         id: row.get("event_id")?,
         fingerprint: row.get("fingerprint")?,
         rule_id: row.get("rule_id")?,
+        decision_uid: row.get("decision_uid")?,
         rule_version: row.get("rule_version")?,
         check_revision: row.get("check_revision")?,
         decision_hash: row.get("decision_hash")?,

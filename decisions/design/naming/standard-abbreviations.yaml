@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/standard-abbreviations
+  uid: 5227fdc6-aeb5-4ac3-bd08-b79f5dfcf8ed
   labels:
     lighthouse/pack: design
     lighthouse/section: naming

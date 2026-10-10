@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/red-green-cycle
+  uid: 03849464-a542-4bd3-941e-f292e9b84e3d
   labels:
     lighthouse/pack: testing
     lighthouse/section: tdd

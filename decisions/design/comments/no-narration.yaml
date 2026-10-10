@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/no-narration
+  uid: 00489dd2-fa61-4467-982d-fa675388e9b4
   labels:
     lighthouse/pack: design
     lighthouse/section: comments

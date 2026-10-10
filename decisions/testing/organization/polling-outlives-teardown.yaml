@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/polling-outlives-teardown
+  uid: 3c265c99-698b-4c8c-b71c-10e4d5f68336
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization

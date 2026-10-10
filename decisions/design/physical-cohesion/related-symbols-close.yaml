@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/related-symbols-close
+  uid: ac301679-ff07-4e28-a306-fd940ecf4a3c
   labels:
     lighthouse/pack: design
     lighthouse/section: physical-cohesion

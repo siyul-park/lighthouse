@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/expand-validation-to-contract
+  uid: 46322209-9c95-4eb9-a67e-18f9c6dc48ce
   labels:
     lighthouse/pack: testing
     lighthouse/section: validation

@@ -155,8 +155,72 @@ fn a_cel_check_lives_in_its_decision() {
     assert_eq!(decision.section(), "rules");
 }
 
+#[test]
+fn every_bundled_decision_has_its_own_uid() {
+    let mut seen = std::collections::BTreeSet::new();
+    for decision in Catalog::bundled().decisions() {
+        let uid = decision
+            .uid()
+            .unwrap_or_else(|| panic!("{} has no uid", decision.id()));
+        assert!(lighthouse_resource::is_uid(uid), "{}: {uid}", decision.id());
+        assert!(seen.insert(uid), "{} repeats a uid", decision.id());
+    }
+}
+
+#[test]
+fn identities_map_every_name_a_decision_answers_to_its_uid() {
+    let uid = "5d6b1c1e-2b0e-4a43-9a3e-0f1b6f5d2a11";
+    let text = decision("p/a", "s", SPEC).replace(
+        "  name: p/a\n",
+        &format!(
+            "  name: p/a\n  uid: {uid}\n  annotations:\n    lighthouse/was-names: p/old, p/older\n"
+        ),
+    );
+    let catalog = Catalog::from_files(with("p/s/a.yaml", &text)).unwrap();
+
+    let identities = catalog.identities();
+
+    assert_eq!(identities.len(), 3);
+    for name in ["p/a", "p/old", "p/older"] {
+        assert_eq!(identities[name], uid, "{name}");
+    }
+}
+
 mod validation {
     use super::*;
+
+    #[test]
+    fn a_uid_is_a_uuid_v4_and_belongs_to_one_decision() {
+        let with_uid = |id: &str, uid: &str| {
+            decision(id, "s", SPEC).replace(
+                &format!("  name: {id}\n"),
+                &format!("  name: {id}\n  uid: {uid}\n"),
+            )
+        };
+        let uid = "5d6b1c1e-2b0e-4a43-9a3e-0f1b6f5d2a11";
+        rejected(
+            with("p/s/a.yaml", &with_uid("p/a", "not-a-uuid")),
+            "not a lowercase UUID v4",
+        );
+        rejected(
+            with(
+                "p/s/a.yaml",
+                &with_uid("p/a", "5D6B1C1E-2B0E-4A43-9A3E-0F1B6F5D2A11"),
+            ),
+            "not a lowercase UUID v4",
+        );
+        let mut twice = files(&[
+            ("p/pack.yaml", pack("p", &[("s", &["a", "b"])])),
+            ("p/s/a.yaml", with_uid("p/a", uid)),
+            ("p/s/b.yaml", with_uid("p/b", uid)),
+        ]);
+        rejected(twice.clone(), "is also the uid of `p/a`");
+        twice.insert(
+            "p/s/b.yaml".to_owned(),
+            with_uid("p/b", "0b0c5d8e-77d1-4f0f-8b61-6a4d2e9c3f10"),
+        );
+        assert!(Catalog::from_files(twice).is_ok());
+    }
 
     const EXAMPLE_PAIR: &str = "  examples:
     - name: bad
@@ -772,4 +836,24 @@ fn scope_applicability() {
     let all = bundled("core/max-file-lines").scope.applicability();
     assert!(all.generated);
     assert_eq!(all.tests, lighthouse_model::TestScope::Include);
+}
+
+#[test]
+fn decision_was_names_lists_the_ids_before_a_rename_and_with_uid_assigns_one() {
+    let renamed = bundled("core/max-file-lines").clone();
+    assert_eq!(renamed.was_names().count(), 0);
+
+    let mut metadata = renamed.metadata().clone();
+    metadata.annotations.insert(
+        "lighthouse/was-names".to_owned(),
+        "core/old, core/older ,".to_owned(),
+    );
+    let with_names = Decision::new(metadata, renamed.spec().clone());
+    assert_eq!(
+        with_names.was_names().collect::<Vec<_>>(),
+        ["core/old", "core/older"]
+    );
+
+    let uid = "5d6b1c1e-2b0e-4a43-9a3e-0f1b6f5d2a11";
+    assert_eq!(with_names.with_uid(uid).uid(), Some(uid));
 }

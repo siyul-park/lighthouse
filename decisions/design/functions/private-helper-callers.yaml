@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/private-helper-callers
+  uid: eeef32fa-0078-4d2c-8ae0-5c89899120b8
   labels:
     lighthouse/pack: design
     lighthouse/section: functions

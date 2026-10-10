@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/assertions-in-cases
+  uid: a06a6f46-86be-4a70-a6ab-62fba954b4e1
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization

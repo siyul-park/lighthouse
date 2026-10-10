@@ -148,3 +148,27 @@ fn the_schema_of_a_spec_is_the_schema_of_its_document() {
             .ends_with("/toy-kind.schema.json")
     );
 }
+
+#[test]
+fn new_uid_is_a_fresh_uuid_v4_each_time() {
+    let (first, second) = (
+        lighthouse_resource::new_uid(),
+        lighthouse_resource::new_uid(),
+    );
+
+    assert_ne!(first, second);
+    assert!(lighthouse_resource::is_uid(&first), "{first}");
+}
+
+#[test]
+fn is_uid_accepts_only_the_canonical_lowercase_v4_form() {
+    let uid = "5d6b1c1e-2b0e-4a43-9a3e-0f1b6f5d2a11";
+
+    assert!(lighthouse_resource::is_uid(uid));
+    assert!(!lighthouse_resource::is_uid(&uid.to_uppercase()));
+    assert!(!lighthouse_resource::is_uid(&uid.replace('-', "")));
+    assert!(!lighthouse_resource::is_uid(
+        "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+    ));
+    assert!(!lighthouse_resource::is_uid("core/max-lines"));
+}

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/single-term-per-concept
+  uid: c348ab03-6a31-4158-a81d-37e3a2f64b9e
   labels:
     lighthouse/pack: design
     lighthouse/section: naming

@@ -28,13 +28,19 @@ pub(crate) fn assign(found: &mut [Diagnostic], project: &Project) -> BTreeSet<Fi
         }
         for (discriminator, same) in by_discriminator {
             for (n, &index) in same.iter().enumerate() {
-                let base = &found[index].fingerprint;
-                let base = if discriminator.is_empty() {
-                    base.clone()
-                } else {
-                    base.discriminate(&discriminator)
+                let tell_apart = |base: &Fingerprint| {
+                    if discriminator.is_empty() {
+                        base.occurrence(n)
+                    } else {
+                        base.discriminate(&discriminator).occurrence(n)
+                    }
                 };
-                found[index].fingerprint = base.occurrence(n);
+                found[index].legacy_fingerprints = found[index]
+                    .legacy_fingerprints
+                    .iter()
+                    .map(tell_apart)
+                    .collect();
+                found[index].fingerprint = tell_apart(&found[index].fingerprint);
                 if same.len() > 1 {
                     ordinal.insert(found[index].fingerprint.clone());
                 }

@@ -1,9 +1,13 @@
-use std::{collections::BTreeSet, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 use lighthouse_model::{
     Comment, Diagnostic, Fingerprint, Position, Project, Severity, Span,
     annotation::{self, ANNOTATION_REASON, Allow, UNUSED_ALLOW},
 };
+use lighthouse_plugin::RuleManifest;
 use lighthouse_spec::ProjectError;
 use serde_json::json;
 
@@ -29,6 +33,9 @@ pub(crate) struct Gate<'a> {
     pub active: &'a BTreeSet<String>,
     /// Rules that ran in this run.
     pub selected: &'a BTreeSet<String>,
+    /// The manifest of each rule that ran: its uid and former names seed the
+    /// fingerprints of the findings the engine reports itself.
+    pub manifests: &'a BTreeMap<String, &'a RuleManifest>,
 }
 
 /// Applies the allow annotations of the project to `found`: a finding of a
@@ -134,14 +141,20 @@ fn finding(
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ");
+    let path = comment.file.to_string_lossy();
+    let (fingerprint, legacy) = match gate.manifests.get(rule) {
+        Some(meta) => meta.fingerprints(&path, &text),
+        None => (Fingerprint::of(rule, &path, &text), Vec::new()),
+    };
     let mut d = Diagnostic::new(
         rule,
         severity,
         message,
         &comment.file,
         comment.span,
-        Fingerprint::of(rule, &comment.file.to_string_lossy(), &text),
-    );
+        fingerprint,
+    )
+    .with_legacy(legacy);
     d.evidence = json!({
         "rules": allow.rules,
         "reason": allow.reason,

@@ -4,9 +4,11 @@
 //! twice is one event.
 //!
 //! A line is a resource: `apiVersion`, `kind` and `metadata.name` (the id of
-//! the record) around a `spec`. This build writes `Verdict` records and reads
-//! every kind it knows, skipping the ones it does not, so that a newer build
-//! can add kinds without breaking an older one. Lines written before the
+//! the record) around a `spec`. This build writes `Verdict` records, and
+//! `Rewrite` records that move the verdicts recorded under one fingerprint to
+//! another (see [`RewriteSpec`]); it reads every kind it knows, skipping the
+//! ones it does not, so that a newer build can add kinds without breaking an
+//! older one. Lines written before the
 //! resource model are one flat event with snake_case keys and no `kind`; they
 //! are read as the same event and never rewritten.
 
@@ -37,7 +39,14 @@ pub(crate) const LEGACY_PREFIX: &str = "legacy-";
 #[serde(rename_all = "camelCase")]
 pub struct VerdictSpec {
     pub fingerprint: String,
-    pub rule_id: String,
+    /// The name the decision had when the verdict was given, kept to be read;
+    /// `decision_uid` is what identifies it. Read as `ruleId` in records
+    /// written before the uid existed.
+    #[serde(alias = "ruleId")]
+    pub decision_name: String,
+    /// The uid of the decision: its identity across renames.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision_uid: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rule_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -76,12 +85,31 @@ impl Spec for VerdictSpec {
     const KIND: &'static str = "Verdict";
 }
 
+/// The spec of the `Rewrite` record: verdicts recorded under the fingerprint
+/// `legacy`, which the decision's name seeded, belong to `current`, which its
+/// uid seeds. Appended by the first run that finds a finding under both; the
+/// verdicts it moves are not edited, and `log compact` folds the pair.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RewriteSpec {
+    pub legacy: String,
+    pub current: String,
+    /// The uid of the decision both fingerprints are of.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision_uid: Option<String>,
+}
+
+impl Spec for RewriteSpec {
+    const KIND: &'static str = "Rewrite";
+}
+
 impl From<VerdictSpec> for ReviewEvent {
     fn from(spec: VerdictSpec) -> Self {
         Self {
             id: String::new(),
             fingerprint: spec.fingerprint,
-            rule_id: spec.rule_id,
+            rule_id: spec.decision_name,
+            decision_uid: spec.decision_uid,
             rule_version: spec.rule_version,
             check_revision: spec.check_revision,
             decision_hash: spec.decision_hash,
@@ -105,10 +133,14 @@ impl From<VerdictSpec> for ReviewEvent {
 
 impl ReviewEvent {
     /// The event as reports show it: the keys of a `Verdict` record in
-    /// lowerCamelCase, with the event's `id` and its `label`.
+    /// lowerCamelCase, with the event's `id` and its `label`, and the decision
+    /// name as `ruleId`.
     pub fn to_json(&self) -> Value {
         let mut value =
             serde_json::to_value(VerdictSpec::from(self)).expect("a verdict serializes");
+        if let Some(name) = value.as_object_mut().and_then(|m| m.remove("decisionName")) {
+            value["ruleId"] = name;
+        }
         value["id"] = Value::String(self.id.clone());
         value["label"] = serde_json::json!(self.label());
         value
@@ -119,7 +151,8 @@ impl From<&ReviewEvent> for VerdictSpec {
     fn from(event: &ReviewEvent) -> Self {
         Self {
             fingerprint: event.fingerprint.clone(),
-            rule_id: event.rule_id.clone(),
+            decision_name: event.rule_id.clone(),
+            decision_uid: event.decision_uid.clone(),
             rule_version: event.rule_version.clone(),
             check_revision: event.check_revision.clone(),
             decision_hash: event.decision_hash.clone(),
@@ -145,9 +178,16 @@ impl From<&ReviewEvent> for VerdictSpec {
 #[derive(Debug, Default)]
 pub(crate) struct Logged {
     pub events: Vec<ReviewEvent>,
+    pub rewrites: Vec<RewriteSpec>,
     /// Records of a kind or version this build does not know, which a newer
     /// build wrote.
     pub skipped: usize,
+}
+
+/// What a log line holds.
+enum Record {
+    Event(Box<ReviewEvent>),
+    Rewrite(RewriteSpec),
 }
 
 /// Gives the event the id its content determines.
@@ -188,9 +228,16 @@ pub(crate) fn read(path: &Path) -> Result<Logged, Error> {
             reason,
         };
         let value: Value = serde_json::from_str(text).map_err(|e| fail(e.to_string()))?;
-        let Some(event) = decode(value).map_err(fail)? else {
-            read.skipped += 1;
-            continue;
+        let event = match decode(value).map_err(fail)? {
+            Some(Record::Event(event)) => *event,
+            Some(Record::Rewrite(rewrite)) => {
+                read.rewrites.push(rewrite);
+                continue;
+            }
+            None => {
+                read.skipped += 1;
+                continue;
+            }
         };
         event
             .verdict
@@ -208,6 +255,20 @@ pub(crate) fn read(path: &Path) -> Result<Logged, Error> {
 /// Appends one event as a line, in a single write, and flushes it to disk
 /// before returning.
 pub(crate) fn append(path: &Path, event: &ReviewEvent) -> Result<(), Error> {
+    append_line(path, &line(event)?)
+}
+
+/// Appends a `Rewrite` record, as [`append`] does an event.
+pub(crate) fn append_rewrite(path: &Path, rewrite: &RewriteSpec) -> Result<(), Error> {
+    let id = hash::short(
+        &digest::canonical(&serde_json::to_value(rewrite)?),
+        ID_BYTES,
+    );
+    let record = Resource::new(Metadata::named(id), rewrite.clone());
+    append_line(path, &digest::canonical(&serde_json::to_value(record)?))
+}
+
+fn append_line(path: &Path, line: &str) -> Result<(), Error> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir).map_err(|source| io(dir, source))?;
     }
@@ -221,15 +282,15 @@ pub(crate) fn append(path: &Path, event: &ReviewEvent) -> Result<(), Error> {
     if ends_without_newline(&mut file).map_err(|source| io(path, source))? {
         text.push('\n');
     }
-    text.push_str(&line(event)?);
+    text.push_str(line);
     text.push('\n');
     file.write_all(text.as_bytes())
         .and_then(|()| file.sync_all())
         .map_err(|source| io(path, source))
 }
 
-/// The event a log line holds; `None` for a record this build skips.
-fn decode(value: Value) -> Result<Option<ReviewEvent>, String> {
+/// The record a log line holds; `None` for one this build skips.
+fn decode(value: Value) -> Result<Option<Record>, String> {
     if value.get("kind").is_none() {
         let event: ReviewEvent = serde_json::from_value(value).map_err(|e| e.to_string())?;
         if !event.id.starts_with(LEGACY_PREFIX)
@@ -237,11 +298,16 @@ fn decode(value: Value) -> Result<Option<ReviewEvent>, String> {
         {
             return Err("the id does not match the entry".to_owned());
         }
-        return Ok(Some(event));
+        return Ok(Some(Record::Event(Box::new(event))));
     }
-    let known = value.get("apiVersion").and_then(Value::as_str) == Some(API_VERSION)
-        && value.get("kind").and_then(Value::as_str) == Some(VerdictSpec::KIND);
-    if !known {
+    let current = value.get("apiVersion").and_then(Value::as_str) == Some(API_VERSION);
+    let kind = value.get("kind").and_then(Value::as_str);
+    if current && kind == Some(RewriteSpec::KIND) {
+        let record: Resource<RewriteSpec> =
+            serde_json::from_value(value).map_err(|e| e.to_string())?;
+        return Ok(Some(Record::Rewrite(record.spec)));
+    }
+    if !(current && kind == Some(VerdictSpec::KIND)) {
         return Ok(None);
     }
     // The id covers the spec as written, fields this build does not know
@@ -256,7 +322,7 @@ fn decode(value: Value) -> Result<Option<ReviewEvent>, String> {
     if !event.id.starts_with(LEGACY_PREFIX) && written != event.id {
         return Err("the id does not match the entry".to_owned());
     }
-    Ok(Some(event))
+    Ok(Some(Record::Event(Box::new(event))))
 }
 
 /// The id of a record: the hash of its spec.

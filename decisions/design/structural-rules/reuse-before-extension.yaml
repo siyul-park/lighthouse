@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/reuse-before-extension
+  uid: 30d5d27a-3c48-446a-bac6-9b83a724cf5d
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-rules

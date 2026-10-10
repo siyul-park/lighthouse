@@ -219,3 +219,46 @@ fn options_deserializes_rule_options_and_names_the_rule_on_failure() {
     let err = options::<Max>("p/a", &serde_json::from_str(r#"{"nope": 1}"#).unwrap()).unwrap_err();
     assert!(matches!(&err, Error::Options { rule, .. } if rule == "p/a"));
 }
+
+#[test]
+fn rule_manifest_fingerprints_are_seeded_by_the_uid_and_keep_the_names_that_seeded_them() {
+    let mut meta = lighthouse_plugin::RuleManifest {
+        id: "design/new".to_owned(),
+        uid: None,
+        was: vec!["design/old".to_owned()],
+        severity: lighthouse_model::Severity::Warn,
+        scope: RunScope::File,
+        description: String::new(),
+        docs: String::new(),
+        analyzers: Vec::new(),
+        capabilities: Vec::new(),
+        applicability: lighthouse_model::Applicability::default(),
+    };
+    let (by_name, legacy) = meta.fingerprints("pkg::f#function", "snippet");
+    assert_eq!(
+        by_name,
+        lighthouse_model::Fingerprint::of("design/new", "pkg::f#function", "snippet")
+    );
+    assert!(legacy.is_empty(), "no uid, nothing to move from");
+
+    meta.uid = Some("5d6b1c1e-2b0e-4a43-9a3e-0f1b6f5d2a11".to_owned());
+    let (current, legacy) = meta.fingerprints("pkg::f#function", "snippet");
+    assert_ne!(current, by_name);
+    assert_eq!(
+        legacy,
+        [
+            by_name,
+            lighthouse_model::Fingerprint::of("design/old", "pkg::f#function", "snippet")
+        ]
+    );
+    let renamed = lighthouse_plugin::RuleManifest {
+        id: "design/newer".to_owned(),
+        was: vec!["design/new".to_owned(), "design/old".to_owned()],
+        ..meta
+    };
+    assert_eq!(
+        renamed.fingerprints("pkg::f#function", "snippet").0,
+        current,
+        "a rename moves no fingerprint"
+    );
+}

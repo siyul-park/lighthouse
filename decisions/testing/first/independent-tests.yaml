@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/independent-tests
+  uid: cc6c495d-7112-4b74-918f-3ae0237ca7d4
   labels:
     lighthouse/pack: testing
     lighthouse/section: first

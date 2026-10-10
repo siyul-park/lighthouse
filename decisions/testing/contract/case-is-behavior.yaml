@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/case-is-behavior
+  uid: 53df6c6b-5123-4986-9f52-8d32f3dbc89b
   labels:
     lighthouse/pack: testing
     lighthouse/section: contract

@@ -94,6 +94,8 @@ impl Word {
         Self {
             manifest: RuleManifest {
                 id: id.to_owned(),
+                uid: None,
+                was: Vec::new(),
                 severity: Severity::Error,
                 scope: RunScope::File,
                 description: String::new(),

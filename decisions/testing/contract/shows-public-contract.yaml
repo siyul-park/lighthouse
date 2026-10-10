@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/shows-public-contract
+  uid: f9a61844-c997-4f4a-890d-013e8f59c994
   labels:
     lighthouse/pack: testing
     lighthouse/section: contract

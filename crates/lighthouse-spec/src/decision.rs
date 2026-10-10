@@ -31,6 +31,10 @@ pub const WAS_EXCEPTIONS: &str = "lighthouse/was-exceptions";
 /// JSON map from each new name to the name it had. Verdicts recorded under
 /// the old names keep applying while the meaning is unchanged.
 pub const WAS_OPTION_NAMES: &str = "lighthouse/was-option-names";
+/// Annotation of a decision that was renamed: the ids it had before, comma
+/// separated. They keep resolving to it, with a notice, and verdicts recorded
+/// under them keep applying.
+pub const WAS_NAMES: &str = "lighthouse/was-names";
 /// Label that says which preset a decision joins beyond `recommended`; the
 /// only value is `strict`.
 pub const PRESET_LABEL: &str = "lighthouse/preset";
@@ -138,6 +142,31 @@ impl Decision {
     /// The `<pack>/<name>` id.
     pub fn id(&self) -> &str {
         &self.0.metadata.name
+    }
+
+    /// The identity that outlives the id: a UUID v4 assigned once. `None` for
+    /// a decision no `lighthouse spec migrate` has given one yet.
+    pub fn uid(&self) -> Option<&str> {
+        self.0.metadata.uid.as_deref()
+    }
+
+    /// The ids the decision had before it was renamed.
+    pub fn was_names(&self) -> impl Iterator<Item = &str> {
+        self.0
+            .metadata
+            .annotations
+            .get(WAS_NAMES)
+            .map(String::as_str)
+            .unwrap_or_default()
+            .split(',')
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+    }
+
+    /// The same decision with this uid.
+    pub fn with_uid(mut self, uid: impl Into<String>) -> Self {
+        self.0.metadata.uid = Some(uid.into());
+        self
     }
 
     /// The identity and labels of the decision.

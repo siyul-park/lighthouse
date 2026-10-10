@@ -26,6 +26,7 @@ mod write {
     fn rich() -> Decision {
         let metadata = Metadata {
             name: "p/rich".to_owned(),
+            uid: None,
             labels: [
                 ("lighthouse/pack".to_owned(), "p".to_owned()),
                 ("lighthouse/section".to_owned(), "s".to_owned()),

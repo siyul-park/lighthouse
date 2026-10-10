@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/receiver-owned-behavior
+  uid: de49963a-a976-4135-8cf0-a9ec748353bc
   labels:
     lighthouse/pack: design
     lighthouse/section: functions

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/no-private-types-in-public-api
+  uid: 19d70240-68cd-4023-824b-07111c11744c
   labels:
     lighthouse/pack: design
     lighthouse/section: types-and-apis

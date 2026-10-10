@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/error-identity
+  uid: fa640989-a0e2-452f-8880-8fa2e92804e4
   labels:
     lighthouse/pack: design
     lighthouse/section: errors

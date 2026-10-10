@@ -17,7 +17,7 @@ mod store;
 use lighthouse_resource::Descriptor;
 
 pub use error::Error;
-pub use log::VerdictSpec;
+pub use log::{RewriteSpec, VerdictSpec};
 pub use record::{
     Filter, FindingRecord, FixEvent, LatestReview, NewFix, NewReview, Observed, Rejection,
     Resolved, ReviewEvent, Run, RunSummary, Stamp, Standing, State, StatusFilter, Unchecked,
@@ -26,5 +26,8 @@ pub use store::Store;
 
 /// The JSON Schema of every record kind the decision log holds.
 pub fn descriptors() -> Vec<Descriptor> {
-    vec![Descriptor::of::<VerdictSpec>()]
+    vec![
+        Descriptor::of::<VerdictSpec>(),
+        Descriptor::of::<RewriteSpec>(),
+    ]
 }

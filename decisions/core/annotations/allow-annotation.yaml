@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: core/allow-annotation
+  uid: 0adcde0d-4016-47d7-be24-2c9829955f43
   labels:
     lighthouse/pack: core
     lighthouse/section: annotations

@@ -40,6 +40,10 @@ pub trait Spec {
 pub struct Metadata {
     /// Fully qualified name, such as `design/minimal-names`.
     pub name: String,
+    /// Identity that outlives the name: a UUID v4 assigned once, never derived
+    /// from the name (Kubernetes `metadata.uid`). Renaming a resource keeps it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uid: Option<String>,
     /// Selectable facts, keyed `lighthouse/<name>`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub labels: BTreeMap<String, String>,
@@ -159,4 +163,15 @@ pub fn file_in(dir: &Path, names: &[&str]) -> Option<PathBuf> {
 /// against its schema; `schema_base` is the directory or URL holding them.
 pub fn to_document<S: Spec + Serialize>(resource: &Resource<S>, schema_base: &str) -> String {
     format!("{}{}", header(S::KIND, schema_base), to_yaml(resource))
+}
+
+/// A fresh uid: a random UUID v4 in its canonical lowercase form.
+pub fn new_uid() -> String {
+    uuid::Uuid::new_v4().to_string()
+}
+
+/// Whether `text` is a uid: a UUID v4 in its canonical lowercase form.
+pub fn is_uid(text: &str) -> bool {
+    uuid::Uuid::parse_str(text)
+        .is_ok_and(|u| u.get_version() == Some(uuid::Version::Random) && u.to_string() == text)
 }

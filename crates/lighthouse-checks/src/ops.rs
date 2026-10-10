@@ -7,9 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cel::Program;
-use lighthouse_model::{
-    Diagnostic, EdgeKind, Fingerprint, Node, Project, Symbol, SymbolId, Target,
-};
+use lighthouse_model::{Diagnostic, EdgeKind, Node, Project, Symbol, SymbolId, Target};
 use lighthouse_plugin::{Ctx, Error as PluginError, KeyCtx, OrderKey, RuleManifest};
 use lighthouse_spec::{BuiltinOp, CycleLevel, OrderReport, OrderScope};
 use serde_json::{Map, Value, json};
@@ -384,7 +382,7 @@ impl CycleRule {
                 self.edge.as_str(),
                 component.join(" -> ")
             );
-            let fingerprint = Fingerprint::of(&meta.id, &component.join(","), "");
+            let (fingerprint, legacy) = meta.fingerprints(&component.join(","), "");
             let mut diagnostic = Diagnostic::new(
                 &meta.id,
                 meta.severity,
@@ -392,7 +390,8 @@ impl CycleRule {
                 &anchor.file,
                 anchor.span,
                 fingerprint,
-            );
+            )
+            .with_legacy(legacy);
             diagnostic.symbol = Some(anchor.id.as_str().to_owned());
             diagnostic.evidence = json!({ "members": component });
             found.push(diagnostic);
@@ -609,7 +608,7 @@ fn finding(
     evidence: Value,
     snippet: &str,
 ) -> Diagnostic {
-    let fingerprint = Fingerprint::of(&meta.id, symbol.id.as_str(), snippet);
+    let (fingerprint, legacy) = meta.fingerprints(symbol.id.as_str(), snippet);
     let mut diagnostic = Diagnostic::new(
         &meta.id,
         meta.severity,
@@ -617,7 +616,8 @@ fn finding(
         &symbol.file,
         symbol.span,
         fingerprint,
-    );
+    )
+    .with_legacy(legacy);
     diagnostic.symbol = Some(symbol.id.as_str().to_owned());
     diagnostic.evidence = evidence;
     diagnostic

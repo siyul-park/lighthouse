@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/top-down-reading
+  uid: b7965b72-2e4f-473f-a067-2183802fa33a
   labels:
     lighthouse/pack: design
     lighthouse/section: file-order

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/general-lower-level
+  uid: 81ecae58-f11f-40c3-a80e-e1c88e744bde
   labels:
     lighthouse/pack: design
     lighthouse/section: dependency-direction

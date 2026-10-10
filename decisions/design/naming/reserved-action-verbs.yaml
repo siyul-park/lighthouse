@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/reserved-action-verbs
+  uid: 2eeeddc2-7944-4824-9caf-415ff2ea92bf
   labels:
     lighthouse/pack: design
     lighthouse/section: naming

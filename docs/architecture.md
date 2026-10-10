@@ -79,7 +79,8 @@ documents):
 apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
-  name: core/max-file-lines        # identity, `<namespace>/<kebab-name>`
+  name: core/max-file-lines        # the id, `<namespace>/<kebab-name>`
+  uid: 8a4f0a2c-6b57-4a8e-9a42-0d2f3b9f5c11   # identity, a UUID v4 assigned once
   labels: { lighthouse/pack: core, lighthouse/section: limits }
   annotations: {}
 spec: { ... }
@@ -93,6 +94,15 @@ spec: { ... }
 | `Project` | `lighthouse.toml`: `plugins extends languages rules overrides generated`; also a shareable configuration, which `extends` names like an ESLint shareable config. `<pack>/recommended` and `<pack>/strict` are Projects derived from the decisions (a decision joins `strict` by the label `lighthouse/preset: strict`); a catalog layer may hold more | project root, `.lighthouse/decisions/` |
 | `Plugin` | `lighthouse-plugin.toml`: `runtime {command, args}` and `provides` | plugin directory |
 | `Verdict` | a record of the decision log | `.lighthouse/decisions.jsonl` |
+
+A decision's `metadata.uid` (Kubernetes `metadata.uid`) is its identity; the name is
+only what people call it. It is a random UUID v4, assigned once and never derived from
+the name, so renaming a decision touches no record. `spec migrate` writes one into
+every decision that lacks it (a line after `name:`, the rest of the file as it was),
+`decision_create` assigns one, and `spec validate` asks for one and refuses two decisions
+with the same. The names a decision had before it was renamed are listed in the annotation
+`lighthouse/was-names` (comma separated); they resolve to it, and the store and the
+decision log read records made under them as the decision's.
 
 Conventions: keys are lowerCamelCase, option names included (`hubFanIn`; `spec migrate`
 converts the old snake_case), durations are strings (`30s`), enums are lowercase kebab,
@@ -311,7 +321,7 @@ reviewed; findings with verdicts stay, because the verdicts are labels.
 
 ### Fingerprints
 
-A fingerprint is the rule, the owner symbol's path (`module::owner::name#kind`) or the
+A fingerprint is the decision's uid (not its name), the owner symbol's path (`module::owner::name#kind`) or the
 file for file-level rules, and a whitespace-normalized snippet where the finding has
 one. Line numbers are not part of it, so edits above a finding do not change its
 identity. When findings of one rule in one file still share a fingerprint, the engine
@@ -320,6 +330,24 @@ and only the ones that still collide get an ordinal. Identities that rest on an 
 are marked in the facts (`ordinal`), and `review resolve` warns about them: the ordinal
 moves when an identical finding appears before it. A finding that stops colliding goes
 back to its undistinguished fingerprint.
+
+**Seeding by uid.** The decision's uid seeds the hash, so a rename moves no fingerprint.
+Builds before it seeded the hash with the name. For one release the engine computes both
+for a decision that has a uid: the legacy fingerprints (seeded by the id and by each name
+in `lighthouse/was-names`) and the current one, and the store moves what it kept:
+
+- a `findings` row found under a legacy fingerprint is rewritten in place to the current
+  one, history and fix records included;
+- the verdicts recorded under it are read as the current fingerprint's from then on
+  (`review_events.subject`; the append-only rows are not edited) and the first run to see
+  both appends a `Rewrite` record (`legacy`, `current`, `decisionUid`) to
+  `decisions.jsonl`. Every other clone reads the same rewrite when it pulls the log, and
+  `log compact` folds the pair;
+- a verdict never matched again keeps its legacy fingerprint and stays readable through
+  `decisionUid`, which store migration V7 fills from the catalog's name-to-uid table (renamed-from
+  names included);
+- a run that does not record (`fix`) still honors a verdict recorded under a legacy
+  fingerprint.
 
 ### Semantic version
 
@@ -346,7 +374,8 @@ since has no legacy version.
 
 ### Verdicts
 
-A verdict is a review event: the finding's fingerprint, rule id, `rule_version` (the
+A verdict is a review event: the finding's fingerprint, rule id (the name the decision had
+then, kept to be read) and `decisionUid` (what identifies it), `rule_version` (the
 *meaning* version of the decision: a hash of its requirement, severity, scope and options,
 not of its check, prose or examples), `check_revision` (a hash of the
 `check`, recorded for evaluation and never compared to expire a verdict), `decision_hash` (the whole
@@ -412,7 +441,8 @@ line per verdict, a `Verdict` record of the resource model (`apiVersion`, `kind`
 `metadata.name` = the record's id, `spec` with camelCase keys; canonical, compact, keys
 sorted, so diffs are one line) with a single write and `fsync`, then updates the cache.
 The `id` is a hash of the spec. The reader accepts both this and the flat snake_case
-line that earlier builds wrote (the log is append-only, history is never rewritten),
+line that earlier builds wrote (the log is append-only, history is never rewritten; the
+name is `decisionName` in a record of this build and was `ruleId`),
 and skips records of a kind or `apiVersion` it does not know, so new kinds never
 break an older reader. Opening the store imports the entries the cache does not have and
 ignores the ones it has, so the cache can always be deleted and rebuilt, a teammate's

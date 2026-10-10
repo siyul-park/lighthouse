@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/independent-golden-output
+  uid: 89c50f4a-21aa-40bb-9862-51454e662c33
   labels:
     lighthouse/pack: testing
     lighthouse/section: evidence

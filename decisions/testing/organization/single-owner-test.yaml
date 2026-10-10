@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/single-owner-test
+  uid: 1cd59008-48f7-4e35-b9e9-57a37d02bdf9
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization

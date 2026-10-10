@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/external-test-package
+  uid: 88a25428-d3d8-43c5-adf4-a2d99a45ffa6
   labels:
     lighthouse/pack: testing
     lighthouse/section: public-boundary

@@ -5,8 +5,8 @@ mod registry;
 use std::{collections::BTreeMap, path::PathBuf};
 
 use lighthouse_model::{
-    Applicability, Capability, Diagnostic, File, Fragment, Incomplete, Options, Project, RunScope,
-    Severity,
+    Applicability, Capability, Diagnostic, File, Fingerprint, Fragment, Incomplete, Options,
+    Project, RunScope, Severity,
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -207,6 +207,14 @@ pub struct AnalyzerManifest {
 pub struct RuleManifest {
     /// Fully qualified `plugin/name`.
     pub id: String,
+    /// The uid of the decision the rule enforces: what its findings'
+    /// fingerprints are seeded with, so that renaming the decision moves none
+    /// of them. `None` for a rule no decision describes.
+    pub uid: Option<String>,
+    /// The ids the decision had before it was renamed. Fingerprints recorded
+    /// under them (or under `id`, before the decision had a uid) are the
+    /// legacy ones of its findings.
+    pub was: Vec<String>,
     pub severity: Severity,
     pub scope: RunScope,
     pub description: String,
@@ -215,6 +223,30 @@ pub struct RuleManifest {
     pub capabilities: Vec<Capability>,
     /// What code the rule's subjects may be in, from its decision's scope.
     pub applicability: Applicability,
+}
+
+impl RuleManifest {
+    /// The fingerprint of a finding of this rule about `symbol_path` with
+    /// `snippet`, seeded by the decision's uid, and, for one release, the
+    /// fingerprints the same finding had when the decision's names seeded it
+    /// (its id, then the ids it was renamed from). A rule without a uid is
+    /// seeded by its id and has none.
+    pub fn fingerprints(
+        &self,
+        symbol_path: &str,
+        snippet: &str,
+    ) -> (Fingerprint, Vec<Fingerprint>) {
+        match &self.uid {
+            Some(uid) => (
+                Fingerprint::of(uid, symbol_path, snippet),
+                std::iter::once(&self.id)
+                    .chain(&self.was)
+                    .map(|name| Fingerprint::of(name, symbol_path, snippet))
+                    .collect(),
+            ),
+            None => (Fingerprint::of(&self.id, symbol_path, snippet), Vec::new()),
+        }
+    }
 }
 
 /// A check that turns facts into diagnostics. `validate` rejects bad options

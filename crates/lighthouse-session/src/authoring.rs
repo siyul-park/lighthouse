@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_resource::API_VERSION;
+use lighthouse_resource::{API_VERSION, new_uid};
 use lighthouse_spec::{Catalog, local_dir, local_files};
 use serde_json::{Map, Value, json};
 
@@ -65,7 +65,7 @@ pub fn create_decision(
     let doc = json!({
         "apiVersion": API_VERSION,
         "kind": "Decision",
-        "metadata": { "name": id },
+        "metadata": { "name": id, "uid": new_uid() },
         "spec": spec,
     });
     commit(session, id, &name, doc, true)
@@ -125,7 +125,14 @@ fn lock(root: &Path) -> Result<File> {
 }
 
 /// Validates and tests the candidate layer, then writes it.
-fn commit(session: Session, id: &str, name: &str, doc: Value, created: bool) -> Result<Authored> {
+fn commit(
+    session: Session,
+    id: &str,
+    name: &str,
+    mut doc: Value,
+    created: bool,
+) -> Result<Authored> {
+    ensure_uid(&mut doc);
     let root = session.root.clone();
     let plugin_listed = session.config.lists(LOCAL_PACK);
     let mut files: BTreeMap<String, String> = local_files(&root)?.unwrap_or_default();
@@ -164,6 +171,15 @@ fn commit(session: Session, id: &str, name: &str, doc: Value, created: bool) -> 
         test,
         plugin_listed,
     })
+}
+
+/// Gives a decision written before uids existed the one it keeps from now on.
+fn ensure_uid(doc: &mut Value) {
+    if let Some(metadata) = doc.get_mut("metadata").and_then(Value::as_object_mut) {
+        metadata
+            .entry("uid")
+            .or_insert_with(|| Value::String(new_uid()));
+    }
 }
 
 /// The text written to disk: the typed document, so that keys come in the

@@ -190,6 +190,9 @@ Judgments also exist where no finding does. **Sampling** re-judges a fixed fract
 subjects a check already decided, unflagged ones and confident ones alike, with a stronger
 attribution. This gives recall and drift, not only precision.
 
+A finding's identity (its fingerprint) is seeded by the decision's uid, so verdicts survive
+a rename; see [architecture](architecture.md#fingerprints).
+
 Judgments and suppressions are appended to `.lighthouse/decisions.jsonl` (shared through git)
 and cached in SQLite. `lighthouse log compact` folds expired and superseded records; the raw
 history stays in git.

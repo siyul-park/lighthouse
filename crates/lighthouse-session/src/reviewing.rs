@@ -111,6 +111,9 @@ pub fn record_verdict(root: &Path, review: &NewReview) -> Result<Recorded> {
         Ok(catalog) => (Some(catalog), None),
         Err(e) => (None, Some(e.to_string())),
     };
+    if let Some(catalog) = &catalog {
+        store.identify(&catalog.identities())?;
+    }
     let resolved = store.resolve(review, |finding| stamp(catalog.as_ref(), finding))?;
     let standing = store
         .standings()?
@@ -137,6 +140,7 @@ fn stamp(catalog: Option<&Catalog>, finding: &FindingRecord) -> Stamp {
     };
     let decision = catalog.decision(&finding.rule_id);
     Stamp {
+        decision_uid: decision.and_then(|d| d.uid()).map(str::to_owned),
         rule_version: decision.map(|d| d.meaning_version()),
         check_revision: decision.map(|d| d.check_revision()),
         decision_hash: decision.map(Decision::version),

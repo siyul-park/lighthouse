@@ -32,6 +32,7 @@ tempfile = "3"
 thiserror = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 toml = "0.9"
+uuid = { version = "1", features = ["v4"] }
 
 lighthouse-checks = { path = "crates/lighthouse-checks" }
 lighthouse-engine = { path = "crates/lighthouse-engine" }

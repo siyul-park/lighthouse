@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/declaration-groups
+  uid: 2ddd0282-b9b3-4537-8e54-b9c0fbfbc4ad
   labels:
     lighthouse/pack: design
     lighthouse/section: file-order

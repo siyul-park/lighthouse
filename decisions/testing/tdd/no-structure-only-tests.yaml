@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/no-structure-only-tests
+  uid: 5a9f8537-e613-4c34-8b1f-19325d1bd7cc
   labels:
     lighthouse/pack: testing
     lighthouse/section: tdd

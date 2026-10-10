@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/scenario-per-behavior
+  uid: 1a43d391-0e62-4701-85e6-c2cafa667f7a
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization

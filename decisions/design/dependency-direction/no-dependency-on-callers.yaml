@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/no-dependency-on-callers
+  uid: 4384074a-6dee-47ed-a882-4ecdcc932c58
   labels:
     lighthouse/pack: design
     lighthouse/section: dependency-direction

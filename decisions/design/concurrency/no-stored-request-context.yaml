@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/no-stored-request-context
+  uid: 93ef32fc-fd96-4ffe-94c4-0ca01341e71f
   labels:
     lighthouse/pack: design
     lighthouse/section: concurrency

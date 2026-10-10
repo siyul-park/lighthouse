@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/single-abstraction-level
+  uid: cacd87f6-09f2-4d81-94e8-7b8512b02aeb
   labels:
     lighthouse/pack: design
     lighthouse/section: functions

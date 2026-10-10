@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/layout-declarations-hold-no-state
+  uid: 517d7bf6-d31c-4f49-9fde-b3d73f8d4cbf
   labels:
     lighthouse/pack: design
     lighthouse/section: ownership

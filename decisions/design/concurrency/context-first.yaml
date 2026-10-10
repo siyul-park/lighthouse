@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/context-first
+  uid: bec19263-cf17-4684-9885-cb5eabdb378a
   labels:
     lighthouse/pack: design
     lighthouse/section: concurrency

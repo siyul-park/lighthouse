@@ -279,6 +279,15 @@ fn references(catalog: &Catalog, registry: &Registry, path: &str, problems: &mut
         .map(|k| k.manifest().id.as_str())
         .collect();
     for decision in catalog.decisions() {
+        if decision.uid().is_none() {
+            problems.push(problem(
+                path,
+                format!(
+                    "{}: has no `metadata.uid`; run `lighthouse spec migrate` to assign one",
+                    decision.id()
+                ),
+            ));
+        }
         order_keys(decision, &keys, path, problems);
         if let Some(CheckKind::Builtin(builtin)) = decision.check.as_ref().map(|c| &c.kind) {
             named_rule(decision, builtin, registry, path, problems);

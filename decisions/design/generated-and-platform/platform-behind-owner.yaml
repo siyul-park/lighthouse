@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/platform-behind-owner
+  uid: 3662b590-5e98-4aeb-bbc1-f2ccaec16b3a
   labels:
     lighthouse/pack: design
     lighthouse/section: generated-and-platform

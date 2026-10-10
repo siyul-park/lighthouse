@@ -21,6 +21,13 @@
         "name": {
           "description": "Fully qualified name, such as `design/minimal-names`.",
           "type": "string"
+        },
+        "uid": {
+          "description": "Identity that outlives the name: a UUID v4 assigned once, never derived\nfrom the name (Kubernetes `metadata.uid`). Renaming a resource keeps it.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [
@@ -128,6 +135,17 @@
             "null"
           ]
         },
+        "decisionName": {
+          "description": "The name the decision had when the verdict was given, kept to be read;\n`decision_uid` is what identifies it. Read as `ruleId` in records\nwritten before the uid existed.",
+          "type": "string"
+        },
+        "decisionUid": {
+          "description": "The uid of the decision: its identity across renames.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "evidenceDigest": {
           "type": [
             "string",
@@ -173,9 +191,6 @@
         "reviewerKind": {
           "$ref": "#/$defs/ReviewerKind"
         },
-        "ruleId": {
-          "type": "string"
-        },
         "ruleVersion": {
           "type": [
             "string",
@@ -200,7 +215,7 @@
       },
       "required": [
         "fingerprint",
-        "ruleId",
+        "decisionName",
         "verdict",
         "reason",
         "reviewerKind",

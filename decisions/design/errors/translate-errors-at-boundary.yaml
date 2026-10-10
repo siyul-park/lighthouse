@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/translate-errors-at-boundary
+  uid: 1d19d94c-af24-45de-81b4-805c6c073ccf
   labels:
     lighthouse/pack: design
     lighthouse/section: errors

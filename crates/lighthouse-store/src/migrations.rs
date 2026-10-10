@@ -11,7 +11,7 @@ use crate::Error;
 /// in, it drops the triggers and the views over the table, creates the new
 /// table, copies every row across, drops the old table, renames the new one,
 /// and recreates indexes, triggers and views. `V2` does exactly that.
-const MIGRATIONS: &[&str] = &[V1, V2, V3, V4, V5, V6];
+const MIGRATIONS: &[&str] = &[V1, V2, V3, V4, V5, V6, V7];
 
 /// Findings and the append-only review log. Locators, evidence and facts are
 /// JSON text, so nothing here assumes the artifact is code.
@@ -298,6 +298,78 @@ UPDATE findings SET authored_severity = CASE authored_severity
     ELSE authored_severity END;
 ALTER TABLE findings ADD COLUMN check_revision TEXT;
 ALTER TABLE review_events ADD COLUMN check_revision TEXT;
+
+CREATE VIEW standings AS
+SELECT f.fingerprint, l.reason_code, (l.reason_code = 'scope-too-broad') AS narrowing,
+    CASE
+        WHEN COALESCE(f.authored_severity, CASE WHEN f.last_severity = 'error' THEN 'error' ELSE 'warn' END)
+             = 'error' THEN 'unsuppressible'
+        WHEN l.rule_version IS NOT NULL AND f.rule_version IS NOT NULL
+             AND l.rule_version <> f.rule_version
+             AND instr(',' || COALESCE(f.legacy_rule_version, '') || ',', ',' || l.rule_version || ',') = 0
+             THEN 'rule-changed'
+        WHEN l.evidence_digest IS NOT NULL AND f.evidence_digest IS NOT NULL
+             AND l.evidence_digest <> f.evidence_digest THEN 'evidence-changed'
+        ELSE 'suppressed'
+    END AS standing
+FROM findings f
+JOIN latest_verdicts l ON l.fingerprint = f.fingerprint
+WHERE l.verdict = 'rejected';
+
+CREATE VIEW finding_states AS
+SELECT f.*, l.verdict AS review_verdict, l.reason_code AS review_reason,
+       s.standing AS standing, COALESCE(s.narrowing, 0) AS narrowing
+FROM findings f
+LEFT JOIN latest_verdicts l ON l.fingerprint = f.fingerprint
+LEFT JOIN standings s ON s.fingerprint = f.fingerprint;
+";
+
+/// Decisions are identified by a uid, not by their name. A finding and a
+/// verdict gain `decision_uid`, filled from the catalog after the migration
+/// (`decision_uids` holds the name-to-uid table, renamed-from names included,
+/// and filling touches no column that makes a verdict what it is). Fingerprints
+/// are seeded by the uid now; a verdict recorded under the fingerprint the name
+/// seeded stays as written and is read as its `subject`, the fingerprint it
+/// belongs to now, which `fingerprint_rewrites` records and a rewrite record of
+/// the decision log carries. The views join verdicts to findings by subject.
+/// The append-only guard stays on every column but the two that are filled in.
+const V7: &str = "
+ALTER TABLE findings ADD COLUMN decision_uid TEXT;
+ALTER TABLE review_events ADD COLUMN decision_uid TEXT;
+ALTER TABLE review_events ADD COLUMN subject TEXT;
+
+CREATE TABLE decision_uids (
+    name TEXT PRIMARY KEY,
+    uid  TEXT NOT NULL
+);
+CREATE TABLE fingerprint_rewrites (
+    legacy       TEXT PRIMARY KEY,
+    current      TEXT NOT NULL,
+    decision_uid TEXT
+);
+
+DROP VIEW finding_states;
+DROP VIEW standings;
+DROP VIEW latest_verdicts;
+DROP TRIGGER review_events_append_only_update;
+
+UPDATE review_events SET subject = fingerprint;
+
+CREATE TRIGGER review_events_append_only_update
+BEFORE UPDATE OF event_id, fingerprint, rule_id, rule_version, decision_hash, catalog_version,
+    lighthouse_version, pattern_fingerprint, verdict, reason_code, reason_text, reviewer_kind,
+    reviewer_id, language, scope, evidence_digest, feature_snapshot, git_commit, timestamp,
+    check_revision ON review_events
+BEGIN SELECT RAISE(ABORT, 'review_events is append-only'); END;
+CREATE INDEX review_events_subject ON review_events (subject, timestamp);
+
+CREATE VIEW latest_verdicts AS
+SELECT e.subject AS fingerprint, e.event_id, e.verdict, e.reason_code, e.rule_version, e.evidence_digest
+FROM review_events e
+WHERE e.event_id = (
+    SELECT x.event_id FROM review_events x WHERE x.subject = e.subject
+    ORDER BY x.timestamp DESC, x.event_id DESC LIMIT 1
+);
 
 CREATE VIEW standings AS
 SELECT f.fingerprint, l.reason_code, (l.reason_code = 'scope-too-broad') AS narrowing,

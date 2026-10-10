@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/abstract-semantic-duplication
+  uid: aeab463d-9e93-4f38-9851-ab5624b963ef
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-rules

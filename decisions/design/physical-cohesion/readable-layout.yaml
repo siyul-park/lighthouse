@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/readable-layout
+  uid: fdbcb262-8b5f-46cb-83cc-8b88ac542e3e
   labels:
     lighthouse/pack: design
     lighthouse/section: physical-cohesion

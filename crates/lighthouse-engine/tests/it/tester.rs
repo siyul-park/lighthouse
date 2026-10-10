@@ -137,6 +137,8 @@ impl Plugin for Fake {
         vec![Box::new(Marker {
             meta: RuleManifest {
                 id: "fake/marker".to_owned(),
+                uid: None,
+                was: Vec::new(),
                 severity: Severity::Warn,
                 scope: RunScope::File,
                 description: String::new(),

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/merge-overlapping-symbols
+  uid: 0c2241d7-4ce7-42f0-bd96-be6d46a9c40d
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-rules

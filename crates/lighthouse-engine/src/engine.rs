@@ -12,7 +12,7 @@ use lighthouse_model::{
     hash,
 };
 use lighthouse_plugin::{
-    Ctx, Facts, Indexed, LanguageProvider, Memo, Registry, Rule, Source, Workspace,
+    Ctx, Facts, Indexed, LanguageProvider, Memo, Registry, Rule, RuleManifest, Source, Workspace,
 };
 use lighthouse_spec::{
     Catalog, Config, GeneratedCheck, GlobSet, ProjectError, Projects, RuleConfig, Rules, glob_set,
@@ -366,10 +366,15 @@ impl Engine {
 
         let ran: BTreeSet<String> = selected.iter().map(|r| r.manifest().id.clone()).collect();
         let level = |rule: &str, file: &Path, lang: &str| self.level_at(rule, file, lang);
+        let manifests: BTreeMap<String, &RuleManifest> = selected
+            .iter()
+            .map(|r| (r.manifest().id.clone(), r.manifest()))
+            .collect();
         let gate = annotations::Gate {
             level: &level,
             active: &self.active,
             selected: &ran,
+            manifests: &manifests,
         };
         let (mut found, allowed) = annotations::apply(found, &project, &gate)?;
         found.retain(|d| scopes.iter().any(|s| d.file.starts_with(s)));

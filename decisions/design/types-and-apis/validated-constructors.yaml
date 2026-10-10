@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/validated-constructors
+  uid: f6846150-05e4-4842-b174-b80feffdc818
   labels:
     lighthouse/pack: design
     lighthouse/section: types-and-apis

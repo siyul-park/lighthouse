@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/symbol-earns-existence
+  uid: 09bee90e-1cc1-4238-a35b-795135355f5b
   labels:
     lighthouse/pack: design
     lighthouse/section: principles

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/case-exposes-target
+  uid: 169bd537-c4e4-4cc4-8e35-cdab75a3275a
   labels:
     lighthouse/pack: testing
     lighthouse/section: contract

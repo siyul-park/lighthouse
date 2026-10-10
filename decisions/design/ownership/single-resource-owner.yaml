@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/single-resource-owner
+  uid: 9ada8170-92b4-4a81-8bfe-b699b07303cc
   labels:
     lighthouse/pack: design
     lighthouse/section: ownership

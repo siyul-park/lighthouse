@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/cover-contract-dimensions
+  uid: 73b63cd4-d32a-4e62-9b41-9c5b72867db7
   labels:
     lighthouse/pack: testing
     lighthouse/section: tdd

@@ -4,6 +4,7 @@ mod agent;
 mod checks;
 mod cli;
 mod fix;
+mod identity;
 mod internal;
 mod mcp;
 mod migrate_catalog;

@@ -11,7 +11,13 @@ use crate::digest;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Observed {
     pub fingerprint: String,
+    /// The fingerprints the finding had while the decision's names seeded
+    /// it, during the one release both are computed: records kept under any
+    /// of them move to `fingerprint`.
+    pub legacy_fingerprints: Vec<String>,
     pub rule_id: String,
+    /// The uid of the finding's decision, which survives a rename.
+    pub decision_uid: Option<String>,
     pub severity: Severity,
     /// The severity its decision authored (`error`, `warn`, `info`): what
     /// decides whether a verdict may hide the finding. For a rule without a
@@ -49,7 +55,13 @@ impl Observed {
     pub fn from_diagnostic(diagnostic: &Diagnostic, facts: Value) -> Self {
         Self {
             fingerprint: diagnostic.fingerprint.as_str().to_owned(),
+            legacy_fingerprints: diagnostic
+                .legacy_fingerprints
+                .iter()
+                .map(|f| f.as_str().to_owned())
+                .collect(),
             rule_id: diagnostic.rule_id.clone(),
+            decision_uid: None,
             severity: diagnostic.severity,
             authored_severity: String::new(),
             path: diagnostic.file.to_string_lossy().replace('\\', "/"),
@@ -114,6 +126,9 @@ pub struct RunSummary {
     pub reopened: usize,
     pub resolved: usize,
     pub deactivated: usize,
+    /// Findings and verdicts that moved from their legacy fingerprint to the
+    /// one seeded by the decision's uid.
+    pub rewritten: usize,
 }
 
 /// Which findings a listing includes.
@@ -217,6 +232,9 @@ impl fmt::Display for State {
 pub struct FindingRecord {
     pub fingerprint: String,
     pub rule_id: String,
+    /// The uid of the finding's decision, when the catalog gave it one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decision_uid: Option<String>,
     pub severity: String,
     pub authored_severity: Option<String>,
     pub path: String,
@@ -292,6 +310,9 @@ pub struct NewReview {
 /// the decision it judged and its scope.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Stamp {
+    /// The uid of the finding's decision, when it differs from what the
+    /// finding was recorded with.
+    pub decision_uid: Option<String>,
     /// Meaning version of the decision, which decides when the verdict expires.
     pub rule_version: Option<String>,
     /// How the decision was checked; recorded, never expires the verdict.
@@ -320,6 +341,10 @@ pub struct ReviewEvent {
     pub id: String,
     pub fingerprint: String,
     pub rule_id: String,
+    /// The uid of the decision the verdict is about: its identity across
+    /// renames. `rule_id` is the name it had then, kept to be read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision_uid: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rule_version: Option<String>,
     /// How the decision was checked when the verdict was given; recorded for

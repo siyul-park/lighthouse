@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/standard-assertions
+  uid: 4428ab36-fed5-40eb-8ed3-6dcf7c1a1a15
   labels:
     lighthouse/pack: testing
     lighthouse/section: readability

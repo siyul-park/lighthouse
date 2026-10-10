@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/no-speculative-api
+  uid: 4b47c7ef-09fc-46a9-adcf-04611c282dce
   labels:
     lighthouse/pack: design
     lighthouse/section: types-and-apis

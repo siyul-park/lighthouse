@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/evidence-by-layer
+  uid: 6b129cdb-08e1-4ca1-802d-bb46f1bd4e62
   labels:
     lighthouse/pack: testing
     lighthouse/section: evidence

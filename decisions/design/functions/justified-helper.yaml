@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/justified-helper
+  uid: 1dd76f52-b754-4fce-ae96-f2f58971c5b8
   labels:
     lighthouse/pack: design
     lighthouse/section: functions

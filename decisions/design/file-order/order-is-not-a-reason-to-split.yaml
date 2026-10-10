@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/order-is-not-a-reason-to-split
+  uid: d3e01db9-4c27-40e2-9dfa-204e13d7e671
   labels:
     lighthouse/pack: design
     lighthouse/section: file-order

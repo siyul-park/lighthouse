@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/signals-are-advisory
+  uid: fe68cde0-4d76-4231-91cb-5698d7c44407
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-signals

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: core/split-by-cohesion
+  uid: 1db341e1-40d2-4fac-be08-fa258b346742
   labels:
     lighthouse/pack: core
     lighthouse/section: limits

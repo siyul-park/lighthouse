@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/errors-hide-private-state
+  uid: a2a8390b-b462-4f48-877b-b356d165b7ee
   labels:
     lighthouse/pack: design
     lighthouse/section: errors

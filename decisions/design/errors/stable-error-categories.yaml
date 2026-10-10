@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/stable-error-categories
+  uid: 52d96f97-4e56-4e1e-8d73-c9aa469a5af4
   labels:
     lighthouse/pack: design
     lighthouse/section: errors

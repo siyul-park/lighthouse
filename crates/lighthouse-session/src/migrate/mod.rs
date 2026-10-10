@@ -7,7 +7,7 @@
 //! `section.yaml` files, pattern files, declarative rule files, `sources.yaml`)
 //! and a project's `.lighthouse/rules`, which becomes `.lighthouse/decisions`.
 //! A `Preset` becomes a `Project`, and a `DecisionOverride` of the project
-//! becomes an entry of its `rules`.
+//! becomes an entry of its `rules`. Every decision gets a `metadata.uid`.
 //!
 //! Only shapes it recognizes are touched: a pattern has an `id` and a
 //! `requirement`, an override an `extends` and an override key, a
@@ -33,6 +33,7 @@ mod modern;
 pub mod plugin;
 pub mod project;
 pub mod retired;
+mod uids;
 
 use crate::{Result, SKIPPED_DIRS};
 
@@ -191,6 +192,7 @@ pub fn migrate_paths(paths: &[PathBuf], dry_run: bool) -> Result<Migrated> {
     }
     migrated.unchanged += catalog(&catalog_files, &mut plan)?;
     fold::apply(&mut plan)?;
+    uids::assign(&files, &mut plan)?;
     migrated.warnings = plan.settle();
     migrated.warnings.append(&mut plan.kept);
     for (path, action) in &plan.actions {

@@ -325,6 +325,22 @@ impl Catalog {
         self.decisions().find(|d| d.id() == id)
     }
 
+    /// The uid of every decision by each id it answers to: its own and the ids
+    /// it had before it was renamed. Decisions without a uid are left out.
+    pub fn identities(&self) -> BTreeMap<String, String> {
+        self.decisions()
+            .filter_map(|d| {
+                let uid = d.uid()?;
+                Some(
+                    std::iter::once(d.id())
+                        .chain(d.was_names())
+                        .map(|name| (name.to_owned(), uid.to_owned())),
+                )
+            })
+            .flatten()
+            .collect()
+    }
+
     /// Identifies this set of decisions: the hash of every decision's id and
     /// version, in catalog order.
     pub fn version(&self) -> String {

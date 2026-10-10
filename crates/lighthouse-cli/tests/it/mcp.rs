@@ -370,6 +370,14 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
         .unwrap();
     assert_eq!(created["id"], "local/short-notes");
     assert!(rules_dir.join("short-notes.yaml").is_file());
+    let written = fs::read_to_string(rules_dir.join("short-notes.yaml")).unwrap();
+    assert!(
+        written
+            .lines()
+            .filter_map(|l| l.trim().strip_prefix("uid: "))
+            .any(|uid| lighthouse_resource::is_uid(uid.trim_matches('"'))),
+        "a new decision gets a uid: {written}"
+    );
     assert_eq!(created["localPluginListed"], false);
 
     let tested = client

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/lowest-proving-layer
+  uid: 3da60893-0bd5-43b7-b2cc-dc633115a337
   labels:
     lighthouse/pack: testing
     lighthouse/section: tdd

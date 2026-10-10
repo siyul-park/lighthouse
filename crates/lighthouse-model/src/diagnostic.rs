@@ -122,6 +122,12 @@ pub struct Diagnostic {
     pub file: PathBuf,
     pub span: Span,
     pub fingerprint: Fingerprint,
+    /// The fingerprints this finding had while the decision's name seeded
+    /// them instead of its uid, one per name the decision answered to: what a
+    /// verdict recorded then is keyed by. Only the engine and the store read
+    /// them, for one release; they are not part of any output.
+    #[serde(skip)]
+    pub legacy_fingerprints: Vec<Fingerprint>,
     /// Id of the symbol the finding is about, when it is about one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub symbol: Option<String>,
@@ -148,10 +154,17 @@ impl Diagnostic {
             file: file.into(),
             span,
             fingerprint,
+            legacy_fingerprints: Vec::new(),
             symbol: None,
             evidence: Value::Null,
             fix: None,
         }
+    }
+
+    /// The same finding with the fingerprints it had under the decision's names.
+    pub fn with_legacy(mut self, legacy: Vec<Fingerprint>) -> Self {
+        self.legacy_fingerprints = legacy;
+        self
     }
 }
 

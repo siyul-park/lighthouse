@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: core/unused-allow
+  uid: e4844ffb-3e36-43c0-96fd-1c75662969bb
   labels:
     lighthouse/pack: core
     lighthouse/section: annotations

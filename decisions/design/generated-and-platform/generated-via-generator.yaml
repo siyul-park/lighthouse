@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/generated-via-generator
+  uid: ebf5aefa-0a2d-4df4-af84-1ec8f33358d6
   labels:
     lighthouse/pack: design
     lighthouse/section: generated-and-platform

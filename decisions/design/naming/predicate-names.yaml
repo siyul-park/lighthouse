@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/predicate-names
+  uid: 37603232-b918-4724-b255-41f3e5277972
   labels:
     lighthouse/pack: design
     lighthouse/section: naming

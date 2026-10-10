@@ -25,11 +25,22 @@ pub(crate) fn decisions(catalog: &Catalog) -> Result<(), Error> {
         }
     }
     let mut ids = BTreeSet::new();
+    let mut uids = BTreeMap::new();
     for decision in catalog.decisions() {
         if !ids.insert(decision.id()) {
             return Err(Error::invalid(decision.id(), "defined twice"));
         }
         self::decision(decision)?;
+        if let Some(uid) = decision.uid()
+            && let Some(other) = uids.insert(uid, decision.id())
+        {
+            return Err(Error::invalid(
+                decision.id(),
+                format!(
+                    "uid `{uid}` is also the uid of `{other}`; a uid is assigned once and never copied"
+                ),
+            ));
+        }
     }
     lifecycle(catalog)
 }
@@ -53,6 +64,14 @@ pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {
         .ok_or_else(|| Error::invalid(id, "an id is `<pack>/<name>`"))?;
     kebab(pack)?;
     kebab(name)?;
+    if let Some(uid) = decision.uid()
+        && !lighthouse_resource::is_uid(uid)
+    {
+        return Err(Error::invalid(
+            id,
+            format!("uid `{uid}` is not a lowercase UUID v4"),
+        ));
+    }
     if decision.title.trim().is_empty() || decision.context.trim().is_empty() {
         return Err(Error::invalid(id, "title and context must not be empty"));
     }

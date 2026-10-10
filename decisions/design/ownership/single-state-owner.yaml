@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/single-state-owner
+  uid: 890df494-cd0c-426b-9f87-dba11f43afac
   labels:
     lighthouse/pack: design
     lighthouse/section: ownership

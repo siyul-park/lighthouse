@@ -647,6 +647,78 @@ fn validate_names_what_is_wrong_across_documents() {
         .stdout(predicate::str::contains("lighthouse spec migrate"));
 }
 
+const UNIDENTIFIED: &str = "# yaml-language-server: $schema=../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/plain # keep this comment
+  labels: {}
+spec:
+  title: Plain
+  context: A plain decision.
+  scope: { subject: file }
+  requirement: A file MAY be plain.
+";
+
+fn uid_of(text: &str) -> String {
+    text.lines()
+        .find_map(|l| l.trim().strip_prefix("uid: "))
+        .unwrap_or_default()
+        .to_owned()
+}
+
+#[test]
+fn migrate_gives_every_decision_a_uid_once_and_keeps_the_rest_of_the_file() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), ".lighthouse/decisions/plain.yaml", UNIDENTIFIED);
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate", ".lighthouse"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("1 file(s) written"));
+
+    let path = dir.path().join(".lighthouse/decisions/plain.yaml");
+    let migrated = fs::read_to_string(&path).unwrap();
+    let uid = uid_of(&migrated);
+    assert!(lighthouse_resource::is_uid(&uid), "{migrated}");
+    assert_eq!(
+        migrated.replace(&format!("  uid: {uid}\n"), ""),
+        UNIDENTIFIED,
+        "only the uid line is new"
+    );
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate", ".lighthouse"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("0 file(s) written"));
+    assert_eq!(uid_of(&fs::read_to_string(&path).unwrap()), uid);
+}
+
+#[test]
+fn validate_asks_a_decision_without_a_uid_to_be_migrated() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), ".lighthouse/decisions/plain.yaml", UNIDENTIFIED);
+
+    lighthouse(dir.path())
+        .args(["spec", "validate", ".lighthouse/decisions"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains(
+            "local/plain: has no `metadata.uid`",
+        ));
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate", ".lighthouse"])
+        .assert()
+        .success();
+    lighthouse(dir.path())
+        .args(["spec", "validate", ".lighthouse/decisions"])
+        .assert()
+        .success();
+}
+
 #[test]
 fn schema_prints_a_kind_in_any_case_and_lists_them() {
     let dir = tempfile::tempdir().unwrap();
@@ -685,7 +757,7 @@ fn checked_in_schemas_match_the_types() {
             .success();
     }
     let schemas = lighthouse_session::schemas();
-    assert_eq!(schemas.len(), 6);
+    assert_eq!(schemas.len(), 7);
     let on_disk = fs::read_dir(&root)
         .unwrap()
         .filter(|e| {
@@ -693,7 +765,7 @@ fn checked_in_schemas_match_the_types() {
             name.to_string_lossy().ends_with(".schema.json")
         })
         .count();
-    assert_eq!(on_disk, 6, "a schema file nothing generates is stale");
+    assert_eq!(on_disk, 7, "a schema file nothing generates is stale");
     for descriptor in schemas.into_values() {
         let file = root.join(lighthouse_resource::schema_file(descriptor.kind));
         let mut want = serde_json::to_string_pretty(&descriptor.schema).unwrap();

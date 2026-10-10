@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/parity-across-paths
+  uid: fd428551-b604-4844-9525-94300ac8a44e
   labels:
     lighthouse/pack: testing
     lighthouse/section: evidence

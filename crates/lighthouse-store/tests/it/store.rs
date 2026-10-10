@@ -36,10 +36,10 @@ fn store_opens_a_migrated_cache_and_refuses_a_newer_one() {
     assert!(Store::open_existing(dir.path()).unwrap().is_none());
 
     let first = Store::open(dir.path()).unwrap();
-    assert_eq!(first.schema_version().unwrap(), 6);
+    assert_eq!(first.schema_version().unwrap(), 7);
     drop(first);
     let again = Store::open_existing(dir.path()).unwrap().unwrap();
-    assert_eq!(again.schema_version().unwrap(), 6);
+    assert_eq!(again.schema_version().unwrap(), 7);
     drop(again);
 
     Connection::open(Store::path_in(dir.path()))
@@ -51,7 +51,7 @@ fn store_opens_a_migrated_cache_and_refuses_a_newer_one() {
         error,
         Error::NewerSchema {
             found: 99,
-            supported: 6
+            supported: 7
         }
     ));
 }
@@ -85,7 +85,7 @@ fn processes_opening_a_fresh_cache_together_all_succeed() {
         })
         .collect();
     for handle in handles {
-        assert_eq!(handle.join().unwrap(), 6);
+        assert_eq!(handle.join().unwrap(), 7);
     }
 }
 
@@ -137,7 +137,8 @@ fn record_inserts_refreshes_and_reopens_findings() {
             opened: 1,
             reopened: 0,
             resolved: 0,
-            deactivated: 0
+            deactivated: 0,
+            rewritten: 0
         }
     );
     let first = store.finding("f1").unwrap();
@@ -699,7 +700,7 @@ fn migration_rewrites_the_append_only_table_and_exports_old_verdicts_to_the_log(
     }
 
     let mut store = Store::open(dir.path()).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 6);
+    assert_eq!(store.schema_version().unwrap(), 7);
     let history = store.history("f1").unwrap();
     assert_eq!(history.len(), 1);
     assert!(history[0].id.starts_with("legacy-"));
@@ -850,7 +851,24 @@ fn the_migration_turns_recorded_tiers_into_authored_severities() {
     let raw = Connection::open(&path).unwrap();
     // Put the database back where V5 left it, with tiers.
     raw.execute_batch(
-        "ALTER TABLE findings DROP COLUMN check_revision;
+        "DROP VIEW finding_states;
+         DROP VIEW standings;
+         DROP VIEW latest_verdicts;
+         DROP INDEX review_events_subject;
+         DROP TRIGGER review_events_append_only_update;
+         DROP TABLE decision_uids;
+         DROP TABLE fingerprint_rewrites;
+         ALTER TABLE findings DROP COLUMN decision_uid;
+         ALTER TABLE review_events DROP COLUMN decision_uid;
+         ALTER TABLE review_events DROP COLUMN subject;
+         CREATE TRIGGER review_events_append_only_update BEFORE UPDATE ON review_events
+         BEGIN SELECT RAISE(ABORT, 'review_events is append-only'); END;
+         CREATE VIEW latest_verdicts AS
+         SELECT e.fingerprint, e.event_id, e.verdict, e.reason_code, e.rule_version, e.evidence_digest
+         FROM review_events e;
+         CREATE VIEW standings AS SELECT f.fingerprint FROM findings f;
+         CREATE VIEW finding_states AS SELECT f.* FROM findings f;
+         ALTER TABLE findings DROP COLUMN check_revision;
          ALTER TABLE review_events DROP COLUMN check_revision;
          ALTER TABLE findings RENAME COLUMN authored_severity TO tier;
          UPDATE findings SET tier = CASE fingerprint WHEN 'm' THEN 'mechanical' WHEN 'h' THEN 'heuristic' ELSE 'judgment' END;

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/no-exported-mutable-global
+  uid: 61a20af8-1053-4e04-bfbe-8512d7595901
   labels:
     lighthouse/pack: design
     lighthouse/section: ownership

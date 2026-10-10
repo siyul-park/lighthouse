@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/narrow-inputs-concrete-outputs
+  uid: 9e7113b8-f9f7-4a1c-a9db-588048062c78
   labels:
     lighthouse/pack: design
     lighthouse/section: types-and-apis

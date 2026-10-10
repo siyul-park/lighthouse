@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/smallest-check-first
+  uid: dd393f89-1b31-4bdd-b45c-6e82e01f4b44
   labels:
     lighthouse/pack: testing
     lighthouse/section: validation

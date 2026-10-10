@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/borrow-within-boundary
+  uid: 9413a6c1-5b56-4668-b144-2598d69e1231
   labels:
     lighthouse/pack: design
     lighthouse/section: ownership

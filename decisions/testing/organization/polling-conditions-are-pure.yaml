@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/polling-conditions-are-pure
+  uid: dc655f5d-c6a2-4736-9016-c8a1be858b87
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization

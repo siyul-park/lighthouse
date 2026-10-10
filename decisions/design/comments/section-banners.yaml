@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/section-banners
+  uid: 38a41dfc-93d7-4634-ab1c-ccf00b3c242d
   labels:
     lighthouse/pack: design
     lighthouse/section: comments

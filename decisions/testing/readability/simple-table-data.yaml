@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/simple-table-data
+  uid: aa4aa4a4-ada6-487e-bddd-99a70bd0fc01
   labels:
     lighthouse/pack: testing
     lighthouse/section: readability

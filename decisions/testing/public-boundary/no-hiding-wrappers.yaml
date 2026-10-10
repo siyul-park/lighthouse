@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/no-hiding-wrappers
+  uid: bf1a4788-84da-43a4-98ff-8a2449c1dc71
   labels:
     lighthouse/pack: testing
     lighthouse/section: public-boundary

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: core/max-file-lines
+  uid: e6ca5b54-89c2-4528-b9a1-8db7d6de564b
   labels:
     lighthouse/pack: core
     lighthouse/section: limits

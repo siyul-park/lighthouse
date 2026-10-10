@@ -69,7 +69,7 @@ pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut Outcome) -> Rememb
         }
     };
     outcome.diagnostics.retain(|d| {
-        let Some(judgment) = judged.get(d.fingerprint.as_str()) else {
+        let Some(judgment) = judgment_of(&judged, d) else {
             return true;
         };
         match note(judgment) {
@@ -93,12 +93,24 @@ pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut Outcome) -> Rememb
 pub fn apply_verdicts(root: &Path, outcome: &mut Outcome) -> usize {
     let judged = read_only(root);
     let before = outcome.diagnostics.len();
-    outcome.diagnostics.retain(|d| {
-        judged
-            .get(d.fingerprint.as_str())
-            .is_none_or(|j| note(j).is_some())
-    });
+    outcome
+        .diagnostics
+        .retain(|d| judgment_of(&judged, d).is_none_or(|j| note(j).is_some()));
     before - outcome.diagnostics.len()
+}
+
+/// The standing of the finding's latest rejection. A verdict recorded under
+/// the fingerprint the decision's name seeded still applies in a run that has
+/// not yet moved it to the one its uid seeds.
+fn judgment_of<'j>(
+    judged: &'j BTreeMap<String, Rejection>,
+    d: &Diagnostic,
+) -> Option<&'j Rejection> {
+    judged.get(d.fingerprint.as_str()).or_else(|| {
+        d.legacy_fingerprints
+            .iter()
+            .find_map(|legacy| judged.get(legacy.as_str()))
+    })
 }
 
 /// Why a judged finding is reported anyway; `None` when it is suppressed.
@@ -151,6 +163,7 @@ fn record(
     outcome: &Outcome,
 ) -> Result<(BTreeMap<String, Rejection>, Vec<String>), lighthouse_store::Error> {
     let mut store = Store::open(root)?;
+    store.identify(&catalog.identities())?;
     store.record(&run_of(root, catalog, outcome))?;
     Ok((store.standings()?, store.notices().to_vec()))
 }
@@ -196,6 +209,7 @@ fn observed(d: &Diagnostic, catalog: &Catalog, outcome: &Outcome, seen: &mut See
     let facts = outcome.facts.get(&d.fingerprint);
     let decision = catalog.decision(&d.rule_id);
     let mut record = Observed::from_diagnostic(d, facts.cloned().unwrap_or_else(|| json!({})));
+    record.decision_uid = decision.and_then(|d| d.uid()).map(str::to_owned);
     record.authored_severity = authored_severity(d.severity, decision).to_string();
     record.options = options(decision, d, facts, outcome);
     let versions = decision.map(|d| seen.of(d));

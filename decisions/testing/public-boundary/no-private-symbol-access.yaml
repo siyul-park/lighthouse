@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/no-private-symbol-access
+  uid: 118361bd-02a1-425b-883b-2c60e1bc4c24
   labels:
     lighthouse/pack: testing
     lighthouse/section: public-boundary

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/split-real-boundaries
+  uid: 8205f8dc-0230-402b-8f15-b2c5741b32ee
   labels:
     lighthouse/pack: design
     lighthouse/section: structural-rules

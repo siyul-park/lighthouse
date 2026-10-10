@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/table-for-same-behavior
+  uid: 5a2b3d13-2426-4b44-b96c-ab7ea3c9b235
   labels:
     lighthouse/pack: testing
     lighthouse/section: organization

@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/generalize-when-extracting
+  uid: f7071eef-b5f1-4d8d-b529-072906dc5d75
   labels:
     lighthouse/pack: design
     lighthouse/section: dependency-direction

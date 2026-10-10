@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/private-state-behind-owner
+  uid: dca747a5-ae0c-4d88-91c7-414353562123
   labels:
     lighthouse/pack: design
     lighthouse/section: ownership

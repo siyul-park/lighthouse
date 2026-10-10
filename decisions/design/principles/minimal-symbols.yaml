@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/minimal-symbols
+  uid: a82c8f77-234b-4512-a75e-bef9bb89ffdd
   labels:
     lighthouse/pack: design
     lighthouse/section: principles

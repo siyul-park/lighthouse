@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: testing/structure-serves-contract
+  uid: 61a91dad-690e-48e0-9268-8cd98e41e58d
   labels:
     lighthouse/pack: testing
     lighthouse/section: contract

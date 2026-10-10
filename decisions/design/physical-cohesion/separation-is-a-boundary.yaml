@@ -3,6 +3,7 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/separation-is-a-boundary
+  uid: 35a77216-def7-496b-bb65-6fda5ca9d747
   labels:
     lighthouse/pack: design
     lighthouse/section: physical-cohesion
