@@ -92,8 +92,10 @@ func localReplaces(root, dir string, replaces []*modfile.Replace) string {
 func contents(root string) string {
 	var parts []string
 	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		name := d.Name()
-		if err != nil || d.IsDir() || !(strings.HasSuffix(name, ".go") || name == "go.mod") {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if name := d.Name(); !(strings.HasSuffix(name, ".go") || name == "go.mod") {
 			return nil
 		}
 		if data, err := os.ReadFile(path); err == nil {
