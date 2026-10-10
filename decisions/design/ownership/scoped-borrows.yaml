@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/scoped-borrows
+  uid: 9413a6c1-5b56-4668-b144-2598d69e1231
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: ownership
+  annotations:
+    lighthouse/was-names: design/borrow-within-boundary
+spec:
+  title: Borrowed values stay within their boundary
+  context: >-
+    A borrowed value that escapes its owner dangles or aliases.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: Borrowed values MUST NOT cross or outlive their ownership boundary.
+  severity: info
+  check:
+    type: model

@@ -17,44 +17,44 @@ spec:
         what the public contract promises, not how the implementation happens to
         work.
       decisions:
-        - shows-public-contract
-        - structure-serves-contract
-        - case-exposes-target
-        - case-is-behavior
+        - public-contract
+        - contract-structure
+        - visible-target
+        - behavior-cases
     - name: public-boundary
       title: Public Boundary
       intro: >-
         Contract tests should prove behavior through the same public boundary
         available to callers.
-      decisions: [external-test-package, no-private-symbol-access, no-hiding-wrappers]
+      decisions: [external-package, no-private-access, no-hidden-target]
     - name: readability
       title: Readability
       intro: >-
         A readable test is a small, direct specification whose behavior can be
         understood without following test infrastructure.
-      decisions: [simple-table-data, standard-assertions]
+      decisions: [simple-tables, standard-assertions]
     - name: organization
       title: Organization
       intro: >-
         Test structure should provide one obvious owner for each public contract
         and keep case structure shallow.
       decisions:
-        - owner-test
-        - single-owner-test
-        - test-file-layout
-        - case-depth
-        - table-for-same-behavior
-        - scenario-per-behavior
-        - single-case-style
-        - assertions-in-cases
-        - polling-outlives-teardown
-        - polling-conditions-are-pure
+        - owner
+        - unique-owner
+        - file-layout
+        - max-case-depth
+        - prefer-table
+        - scenarios
+        - consistent-case-style
+        - case-assertions
+        - no-polling-after-teardown
+        - pure-polling
     - name: first
       title: F.I.R.S.T.
       intro: >-
         F.I.R.S.T. keeps tests reliable evidence rather than intermittent
         diagnostics.
-      decisions: [first-properties, independent-tests]
+      decisions: [first-properties, independence]
     - name: tdd
       title: TDD
       intro: >-
@@ -62,35 +62,35 @@ spec:
         the smallest missing contract fail before the implementation is
         generalized.
       decisions:
-        - red-green-cycle
-        - cover-contract-dimensions
-        - lowest-proving-layer
-        - no-structure-only-tests
+        - red-green
+        - contract-coverage
+        - lowest-layer
+        - no-structural
     - name: evidence
       title: Evidence
       intro: >-
         Different test layers prove different facts; evidence is complete only
         when each required fact has an appropriate proof.
       decisions:
-        - coverage-is-reachability
-        - evidence-by-layer
-        - parity-across-paths
-        - independent-golden-output
+        - coverage-reachability
+        - layered-evidence
+        - path-parity
+        - independent-golden
     - name: validation
       title: Validation
       intro: >-
         Validation should start with the smallest useful falsification and
         expand only as far as the affected contract requires.
-      decisions: [smallest-check-first, expand-validation-to-contract]
+      decisions: [smallest-check-first, contract-validation]
     - name: completeness
       title: Completeness
       intro: >-
         A complete change has evidence for every contract that the change
         affects, including cross-layer and architecture-specific obligations.
-      decisions: [architecture-specific-evidence, freshness-gates-are-separate]
+      decisions: [specific-evidence, separate-freshness-gates]
     - name: ownership
       title: Ownership
       intro: >-
         Test contracts and structure have one owner and should remain
         independent of incidental implementation details.
-      decisions: [single-owner-per-concern]
+      decisions: [concern-owner]

@@ -11,7 +11,7 @@ design/exported-doc warn [review] — Exported symbols SHOULD have doc comments 
     func Helper() {}
   bar/bar.go:4:1 exported function Func1 must have a doc comment adc7d1d
   bar/bar.go:7:1 exported function Func2 must have a doc comment ab2cb8c {receiver=T} (note: verdict expired: rule changed)
-design/coupling-signal warn [review] — Coupling SHOULD be judged from direct intra-package fan-in and fan-out, that is the functions and methods of the same package that call a symbol or are called by it, against deliberately high thresholds. Calls from other packages and from tests do not count: a widely used public function is a service, not a hub.
+design/coupling warn [review] — Coupling SHOULD be judged from direct intra-package fan-in and fan-out, that is the functions and methods of the same package that call a symbol or are called by it, against deliberately high thresholds. Calls from other packages and from tests do not count: a widely used public function is a service, not a hub.
   expected:
     package sample
 
@@ -26,7 +26,7 @@ design/coupling-signal warn [review] — Coupling SHOULD be judged from direct i
     func a() { hub() }
     func b() { hub() }
   evidence: callees=["a","b c"] fan_in=2 fan_out=14 symbol=jit::compile#function
-  internal/jit/compile.go:350:1 function coordinates 14 collaborators in its package f5ed6fd
+  internal/jit/compile.go:350:1 function coordinates 14 collaborators in its package 5da1c26
 design/private-helper-callers info [review] — A private helper SHOULD have at least two callers.
   expected:
     pub fn run(x: u8) -> u8 {

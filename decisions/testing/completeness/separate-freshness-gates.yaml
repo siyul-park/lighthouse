@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/separate-freshness-gates
+  uid: 9fd38506-a503-4415-bc99-77468d447856
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: completeness
+  annotations:
+    lighthouse/was-names: testing/freshness-gates-are-separate
+spec:
+  title: Freshness is a repository gate
+  context: >-
+    Generated output and docs drift independent of test coverage.
+  scope:
+    domain: code
+    subject: project
+  requirement: >-
+    Generated output and documentation freshness MUST be enforced as repository
+    gates, not as test-completeness rules.

@@ -19,7 +19,7 @@ spec:
     Go: A review item, not an error: a helper with one caller may be
     justified by naming a policy or isolating an abstraction level. Test
     callers do not count. Forwarding wrappers are reported by
-    `design/single-use-wrapper`, and a function used as a value is not
+    `design/no-single-use-wrapper`, and a function used as a value is not
     judged.
 
     Rust: Private free functions and methods that have exactly one caller

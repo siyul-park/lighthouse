@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/case-assertions
+  uid: a06a6f46-86be-4a70-a6ab-62fba954b4e1
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: organization
+  annotations:
+    lighthouse/was-names: testing/assertions-in-cases
+spec:
+  title: Assertions belong to cases
+  context: >-
+    Assertions outside cases blur which behavior failed.
+  scope:
+    domain: code
+    subject: test
+    tests: only
+  requirement: >-
+    Assertions outside cases SHOULD describe setup, preconditions, or test-wide
+    invariants, not case behavior.
+  severity: info
+  check:
+    type: model

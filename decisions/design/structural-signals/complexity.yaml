@@ -1,0 +1,325 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/complexity
+  uid: 374c95b6-7892-4e6b-a8db-d25efe157aab
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: structural-signals
+  annotations:
+    lighthouse/was-names: design/complexity-signal
+    lighthouse/was-builtin: design/complexity-signal
+    lighthouse/was-exceptions: " A body that is one switch whose every arm is a single return is a table in code form and is not reported. A body whose only top-level branching is one switch of any arms, nested at most two levels, is a flat dispatch: its many paths do not make it hard to follow, so only cognitive complexity can report it."
+spec:
+  title: Complexity is a review signal
+  context: >-
+    High complexity often marks a symbol doing too much.
+
+    Rust: `if`, `else if`, `if let`, `let ... else`, `while`, `for` and
+    `loop` count as in other languages; a `match` counts its arms other
+    than a wildcard or binding arm; `?` adds nothing; closures and `async`
+    blocks nest what they contain. A function that is one `match` whose
+    arms are single values (in return position) or `return`s is a table in
+    code form and is not reported.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Complexity SHOULD be judged from cyclomatic complexity together with
+    statement count and nesting depth, against deliberately high
+    thresholds. Cyclomatic complexity is one path plus each `if`, `else
+    if`, loop, error handler clause, non-default switch arm and boolean
+    operator (`&&`, `||`); nesting counts the deepest level of nested
+    constructs, a flat body being 0, and nested functions count as a
+    level. A body that is one switch whose every arm is a single return is
+    a table in code form and is not reported. A body whose only top-level
+    branching is one switch of any arms, nested at most two levels, is a
+    flat dispatch: its many paths do not make it hard to follow, so only
+    cognitive complexity can report it.
+  severity: warn
+  options:
+    type: object
+    properties:
+      cyclomatic:
+        type: integer
+        default: 15
+        description: "Cyclomatic complexity that, with `statements`, marks high complexity."
+      statements:
+        type: integer
+        default: 30
+        description: "Statement count that, with `cyclomatic`, marks high complexity."
+      structuralCyclomatic:
+        type: integer
+        default: 10
+        description: Cyclomatic complexity of the structural signal.
+      structuralStatements:
+        type: integer
+        default: 25
+        description: Statement count of the structural signal.
+      structuralNesting:
+        type: integer
+        default: 5
+        description: "Nesting depth of the structural signal; a flat body is 0."
+      cognitive:
+        type: integer
+        default: 30
+        description: >-
+          Cognitive complexity that, with `cognitiveStatements`, marks a
+          hard-to-follow body.
+      cognitiveStatements:
+        type: integer
+        default: 30
+        description: Statement count of the cognitive signal.
+    additionalProperties: false
+  check:
+    type: cel
+    select: function
+    with:
+      - name: m
+        expr: metrics(func)
+      - name: cognitive
+        expr: m.cognitive >= options.cognitive && m.statements >= options.cognitiveStatements
+      - name: verdict
+        expr: >-
+          m.flat_dispatch
+          ? (cognitive ? 'high cognitive complexity' : '')
+          : (m.cyclomatic >= options.cyclomatic && m.statements >= options.statements)
+          ? 'high complexity'
+          : (m.cyclomatic >= options.structuralCyclomatic
+             && m.statements >= options.structuralStatements
+             && m.nesting >= options.structuralNesting)
+          ? 'high structural complexity'
+          : cognitive ? 'high cognitive complexity' : ''
+    where: >-
+      (func.kind == 'function' || func.kind == 'method')
+      && m.measured && !m.dispatcher && verdict != ''
+    message: >-
+      function {{ func.name }} has {{ verdict }}: cyclomatic={{ m.cyclomatic }}
+      cognitive={{ m.cognitive }} statements={{ m.statements }} nesting={{ m.nesting }}
+    evidence:
+      cyclomatic: m.cyclomatic
+      cognitive: m.cognitive
+      statements: m.statements
+      nesting: m.nesting
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+      - "McCabe 1976; Campbell, Cognitive Complexity (SonarSource 2018)"
+  examples:
+    - name: many-branches
+      language: go
+      kind: invalid
+      options:
+        cyclomatic: 4
+        statements: 7
+      files:
+        - path: sample.go
+          body: "package sample\n\nfunc classify(n int) string {\n\tif n < 0 {\n\t\treturn \"negative\"\n\t}\n\tif n == 0 {\n\t\treturn \"zero\"\n\t}\n\tif n < 10 {\n\t\treturn \"small\"\n\t}\n\treturn \"large\"\n}"
+      expect:
+        - line: 3
+    - name: deep-loops
+      language: go
+      kind: invalid
+      options:
+        cognitive: 6
+        cognitiveStatements: 6
+      files:
+        - path: sample.go
+          body: "package sample\n\nfunc scan(rows [][]int) int {\n\ttotal := 0\n\tfor _, row := range rows {\n\t\tfor _, v := range row {\n\t\t\tif v > 0 {\n\t\t\t\ttotal += v\n\t\t\t}\n\t\t}\n\t}\n\treturn total\n}"
+      expect:
+        - line: 3
+    - name: below-thresholds
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: sample.go
+          body: "package sample\n\nfunc classify(n int) string {\n\tif n < 0 {\n\t\treturn \"negative\"\n\t}\n\tif n == 0 {\n\t\treturn \"zero\"\n\t}\n\treturn \"positive\"\n}"
+    - name: dispatcher
+      language: go
+      kind: valid
+      options:
+        cyclomatic: 1
+        statements: 1
+      files:
+        - path: sample.go
+          body: "package sample\n\nfunc name(k int) string {\n\tswitch k {\n\tcase 0:\n\t\treturn \"zero\"\n\tcase 1:\n\t\treturn \"one\"\n\tdefault:\n\t\treturn \"many\"\n\t}\n}"
+    - name: rust-many-branches
+      language: rust
+      kind: invalid
+      options:
+        cyclomatic: 4
+        statements: 7
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn classify(n: i32) -> &'static str {
+                if n < 0 {
+                    return "negative";
+                }
+                if n == 0 {
+                    return "zero";
+                }
+                if n < 10 {
+                    return "small";
+                }
+                "large"
+            }
+      expect:
+        - line: 1
+    - name: rust-deep-loops
+      language: rust
+      kind: invalid
+      options:
+        cognitive: 6
+        cognitiveStatements: 6
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn scan(rows: &[Vec<i32>]) -> i32 {
+                let mut total = 0;
+                for row in rows {
+                    for v in row {
+                        if *v > 0 {
+                            total += *v;
+                        }
+                    }
+                }
+                total
+            }
+      expect:
+        - line: 1
+    - name: rust-below-thresholds
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn classify(n: i32) -> &'static str {
+                if n < 0 {
+                    return "negative";
+                }
+                if n == 0 {
+                    return "zero";
+                }
+                "positive"
+            }
+    - name: rust-dispatcher
+      language: rust
+      kind: valid
+      canonical: true
+      options:
+        cyclomatic: 1
+        statements: 1
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn name(k: u8) -> &'static str {
+                match k {
+                    0 => "zero",
+                    1 => "one",
+                    _ => "many",
+                }
+            }
+    - name: rust-closure-and-question-mark
+      language: rust
+      kind: valid
+      options:
+        cyclomatic: 3
+        statements: 4
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn parse_all(items: &[&str]) -> Result<Vec<u32>, std::num::ParseIntError> {
+                let mut out = Vec::new();
+                for item in items {
+                    out.push(item.parse::<u32>()?);
+                }
+                Ok(out)
+            }
+    - name: rust-inline-test-module
+      language: rust
+      kind: valid
+      options:
+        cyclomatic: 2
+        statements: 2
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn add(a: i32, b: i32) -> i32 {
+                a + b
+            }
+
+            #[cfg(test)]
+            mod tests {
+                fn helper(n: i32) -> i32 {
+                    if n > 0 {
+                        return n;
+                    }
+                    if n < 0 {
+                        return -n;
+                    }
+                    0
+                }
+            }
+    - name: flat-dispatch
+      language: go
+      kind: valid
+      options:
+        cyclomatic: 4
+        statements: 1
+      files:
+        - path: sample.go
+          body: "package sample\n\ntype visitor struct{ ifs, elses, loops, calls int }\n\nfunc (v *visitor) visit(n any) *visitor {\n\tswitch n := n.(type) {\n\tcase *ifStmt:\n\t\tv.ifs++\n\t\tif n.hasElse {\n\t\t\tv.elses++\n\t\t}\n\tcase *forStmt:\n\t\tv.loops++\n\tcase *callExpr:\n\t\tv.calls++\n\t}\n\treturn v\n}\n\ntype ifStmt struct{ hasElse bool }\ntype forStmt struct{}\ntype callExpr struct{}"
+    - name: dispatch-among-other-statements
+      language: go
+      kind: invalid
+      options:
+        cyclomatic: 4
+        statements: 1
+      files:
+        - path: sample.go
+          body: "package sample\n\ntype visitor struct{ ifs, elses, loops, calls, seen int }\n\nfunc (v *visitor) visit(n any) {\n\tif n == nil {\n\t\treturn\n\t}\n\tswitch n := n.(type) {\n\tcase *ifStmt:\n\t\tv.ifs++\n\t\tif n.hasElse {\n\t\t\tv.elses++\n\t\t}\n\tcase *forStmt:\n\t\tv.loops++\n\tcase *callExpr:\n\t\tv.calls++\n\t}\n}\n\ntype ifStmt struct{ hasElse bool }\ntype forStmt struct{}\ntype callExpr struct{}"
+      expect:
+        - line: 5
+    - name: rust-flat-dispatch
+      language: rust
+      kind: valid
+      options:
+        cyclomatic: 4
+        statements: 1
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub enum Node {
+                If { has_else: bool },
+                For,
+                Call,
+                Other,
+            }
+
+            #[derive(Default)]
+            pub struct Counts {
+                ifs: u32,
+                elses: u32,
+                loops: u32,
+                calls: u32,
+            }
+
+            impl Counts {
+                pub fn visit(&mut self, node: &Node) {
+                    match node {
+                        Node::If { has_else } => {
+                            self.ifs += 1;
+                            if *has_else {
+                                self.elses += 1;
+                            }
+                        }
+                        Node::For => self.loops += 1,
+                        Node::Call => self.calls += 1,
+                        Node::Other => {}
+                    }
+                }
+            }

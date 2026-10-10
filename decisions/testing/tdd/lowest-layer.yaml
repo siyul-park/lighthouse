@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/lowest-layer
+  uid: 3da60893-0bd5-43b7-b2cc-dc633115a337
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: tdd
+  annotations:
+    lighthouse/was-names: testing/lowest-proving-layer
+spec:
+  title: Use the lowest layer that proves it
+  context: >-
+    Higher layers are slower and fail for more reasons.
+  scope:
+    domain: code
+    subject: test
+    tests: only
+  requirement: The lowest test layer that proves the contract MUST be used.
+  severity: info
+  check:
+    type: model

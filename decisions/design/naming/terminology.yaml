@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/terminology
+  uid: c348ab03-6a31-4158-a81d-37e3a2f64b9e
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: naming
+  annotations:
+    lighthouse/was-names: design/single-term-per-concept
+spec:
+  title: "One term, one concept"
+  context: >-
+    Synonyms make readers suspect a difference that is not there.
+  scope:
+    domain: code
+    subject: project
+  requirement: One term MUST represent one concept across packages.
+  severity: info
+  check:
+    type: model

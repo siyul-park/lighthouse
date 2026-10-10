@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/behavior-cases
+  uid: 53df6c6b-5123-4986-9f52-8d32f3dbc89b
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: contract
+  annotations:
+    lighthouse/was-names: testing/case-is-behavior
+spec:
+  title: A case is a behavior
+  context: >-
+    Cases named after branches test the implementation, not the promise.
+  scope:
+    domain: code
+    subject: test
+    tests: only
+  requirement: >-
+    A case MUST represent behavior, not a branch or implementation path, and
+    MUST contain the behavior it claims to specify.
+  severity: info
+  check:
+    type: model

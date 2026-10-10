@@ -7,10 +7,10 @@ use lighthouse_model::{EdgeKind, SymbolKind};
 use serde_json::json;
 
 const GROUPS: &str = "design/declaration-groups";
-const CLOSE: &str = "design/related-symbols-close";
+const CLOSE: &str = "design/contiguity";
 const CALLERS: &str = "design/callers-before-callees";
 const HELPERS: &str = "design/private-helper-callers";
-const BANNERS: &str = "design/section-banners";
+const BANNERS: &str = "design/no-banners";
 const QUALIFIERS: &str = "design/no-redundant-qualifiers";
 
 #[test]

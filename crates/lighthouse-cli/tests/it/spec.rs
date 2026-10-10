@@ -18,7 +18,7 @@ fn write(dir: &Path, name: &str, text: &str) {
     fs::write(path, text).unwrap();
 }
 
-const OLD_CONFIG: &str = "plugins = [\"core\"]\nextends = [\"core/recommended\"]\n[rules]\n\"core/max-file-lines\" = { level = \"review\", max = 2 }\n";
+const OLD_CONFIG: &str = "plugins = [\"core\"]\nextends = [\"core/recommended\"]\n[rules]\n\"core/max-lines\" = { level = \"review\", max = 2 }\n";
 
 const OLD_RULE: &str = "id: local/long
 title: Long
@@ -108,7 +108,7 @@ fn migrate_applies_every_write_before_it_removes_anything() {
 
 const PROJECT: &str = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: demo\nspec:\n  plugins: [core]\n  extends: [core/recommended]\n";
 
-const PRESET: &str = "apiVersion: lighthouse/v1alpha1\nkind: Preset\nmetadata:\n  name: team/strict\nspec:\n  extends: [core/recommended]\n  rules:\n    core/max-file-lines: error\n";
+const PRESET: &str = "apiVersion: lighthouse/v1alpha1\nkind: Preset\nmetadata:\n  name: team/strict\nspec:\n  extends: [core/recommended]\n  rules:\n    core/max-lines: error\n";
 
 fn override_of(spec: &str) -> String {
     format!(
@@ -128,7 +128,7 @@ fn migrate_turns_a_preset_into_a_project() {
 
     let text = fs::read_to_string(dir.path().join("presets/strict.yaml")).unwrap();
     assert!(text.contains("kind: Project"), "{text}");
-    assert!(text.contains("core/max-file-lines: error"), "{text}");
+    assert!(text.contains("core/max-lines: error"), "{text}");
     lighthouse(dir.path())
         .args(["spec", "migrate", "presets/strict.yaml"])
         .assert()
@@ -143,9 +143,7 @@ fn migrate_folds_an_override_into_the_rules_of_the_project() {
     write(
         dir.path(),
         ".lighthouse/decisions/tweak.yaml",
-        &override_of(
-            "  extends: core/max-file-lines\n  severity: error\n  options: { max: 300 }\n",
-        ),
+        &override_of("  extends: core/max-lines\n  severity: error\n  options: { max: 300 }\n"),
     );
 
     lighthouse(dir.path())
@@ -155,7 +153,7 @@ fn migrate_folds_an_override_into_the_rules_of_the_project() {
 
     assert!(!dir.path().join(".lighthouse/decisions/tweak.yaml").exists());
     let project = fs::read_to_string(dir.path().join("lighthouse.yaml")).unwrap();
-    assert!(project.contains("core/max-file-lines"), "{project}");
+    assert!(project.contains("core/max-lines"), "{project}");
     assert!(project.contains("level: error"), "{project}");
     assert!(project.contains("max: 300"), "{project}");
     lighthouse(dir.path())
@@ -168,7 +166,7 @@ fn migrate_folds_an_override_into_the_rules_of_the_project() {
 fn migrate_keeps_an_override_that_needs_a_local_decision_and_says_so() {
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), "lighthouse.yaml", PROJECT);
-    let wording = override_of("  extends: core/max-file-lines\n  exceptions: Vendored code.\n");
+    let wording = override_of("  extends: core/max-lines\n  exceptions: Vendored code.\n");
     write(dir.path(), ".lighthouse/decisions/tweak.yaml", &wording);
 
     lighthouse(dir.path())
@@ -274,7 +272,7 @@ fn migrate_rewrites_the_fields_revision_28_removed_and_camel_cases_options() {
 #[test]
 fn migrate_renames_the_options_a_project_sets_to_camel_case() {
     let dir = tempfile::tempdir().unwrap();
-    let project = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: demo\nspec:\n  plugins: [core, design]\n  rules:\n    design/coupling-signal: { level: warn, options: { hub_fan_in: 9 } }\n";
+    let project = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: demo\nspec:\n  plugins: [core, design]\n  rules:\n    design/coupling: { level: warn, options: { hub_fan_in: 9 } }\n";
     write(dir.path(), "lighthouse.yaml", project);
 
     lighthouse(dir.path())
@@ -382,7 +380,7 @@ fn migrating_option_names_keeps_the_meaning_version_of_a_local_decision() {
 #[test]
 fn migrate_renames_the_options_a_project_sets_for_its_local_decisions() {
     let dir = tempfile::tempdir().unwrap();
-    let project = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: demo\nspec:\n  plugins: [core, local]\n  rules:\n    local/snaky: { level: warn, options: { p_95: 7, a_b_c: 4 } }\n    core/max-file-lines: { level: warn, options: { max: 9, mAx: 1 } }\n    design/coupling-signal: { level: warn, options: { hub_fan_in: 1, hubFanIn: 2 } }\n    other/unknown: { level: warn, options: { some_thing: 1 } }\n";
+    let project = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: demo\nspec:\n  plugins: [core, local]\n  rules:\n    local/snaky: { level: warn, options: { p_95: 7, a_b_c: 4 } }\n    core/max-lines: { level: warn, options: { max: 9, mAx: 1 } }\n    design/coupling: { level: warn, options: { hub_fan_in: 1, hubFanIn: 2 } }\n    other/unknown: { level: warn, options: { some_thing: 1 } }\n";
     write(dir.path(), "lighthouse.yaml", project);
     write(dir.path(), ".lighthouse/decisions/snaky.yaml", SNAKY);
 
@@ -407,7 +405,7 @@ fn migrate_renames_the_options_a_project_sets_for_its_local_decisions() {
 #[test]
 fn migrate_converts_the_options_of_a_preset() {
     let dir = tempfile::tempdir().unwrap();
-    let preset = "apiVersion: lighthouse/v1alpha1\nkind: Preset\nmetadata:\n  name: team/strict\nspec:\n  rules:\n    design/coupling-signal: { level: warn, options: { hub_fan_in: 3 } }\n";
+    let preset = "apiVersion: lighthouse/v1alpha1\nkind: Preset\nmetadata:\n  name: team/strict\nspec:\n  rules:\n    design/coupling: { level: warn, options: { hub_fan_in: 3 } }\n";
     write(dir.path(), "presets/strict.yaml", preset);
 
     lighthouse(dir.path())
@@ -425,17 +423,17 @@ fn migrate_converts_the_options_of_a_preset() {
 #[test]
 fn folding_an_override_keeps_what_the_rule_already_says_and_reports_disagreement() {
     let dir = tempfile::tempdir().unwrap();
-    let project = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: demo\nspec:\n  plugins: [core]\n  rules:\n    core/max-file-lines: { level: warn, generated: true }\n";
+    let project = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: demo\nspec:\n  plugins: [core]\n  rules:\n    core/max-lines: { level: warn, generated: true }\n";
     write(dir.path(), "lighthouse.yaml", project);
     write(
         dir.path(),
         ".lighthouse/decisions/one.yaml",
-        &override_of("  extends: core/max-file-lines\n  options: { max: 300 }\n"),
+        &override_of("  extends: core/max-lines\n  options: { max: 300 }\n"),
     );
     write(
         dir.path(),
         ".lighthouse/decisions/two.yaml",
-        &override_of("  extends: core/max-file-lines\n  options: { max: 400 }\n"),
+        &override_of("  extends: core/max-lines\n  options: { max: 400 }\n"),
     );
 
     lighthouse(dir.path())
@@ -918,7 +916,7 @@ fn max_warnings_fails_a_run_with_more_warnings_than_allowed() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(
-            "plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"warn\", options = { max = 2 } }\n",
+            "plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 2 } }\n",
         ),
     );
     write(dir.path(), "a.txt", "1\n2\n3\n");
@@ -944,7 +942,7 @@ fn sarif_links_a_rule_to_its_decision_page() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(
-            "plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"warn\", options = { max = 2 } }\n",
+            "plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 2 } }\n",
         ),
     );
     write(dir.path(), "a.txt", "1\n2\n3\n");

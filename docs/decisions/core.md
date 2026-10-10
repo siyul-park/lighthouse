@@ -10,12 +10,12 @@ Size limits that keep files reviewable.
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`core/max-file-lines`](#files-stay-below-a-line-limit) | Files stay below a line limit | warn · cel |  |  |
-| `core/split-by-cohesion` | Split files by cohesion | doc |  | A file MUST be split along cohesion boundaries, not by size alone. |
+| [`core/max-lines`](#files-stay-below-a-line-limit) | Files stay below a line limit | warn · cel |  |  |
+| `core/cohesion` | Split files by cohesion | doc |  | A file MUST be split along cohesion boundaries, not by size alone. |
 
 ### Files stay below a line limit
 
-`core/max-file-lines` · file · warn · cel
+`core/max-lines` · file · warn · cel
 
 *Large files tend to mix responsibilities.*
 
@@ -43,8 +43,8 @@ A finding that is right to leave in place can be allowed where it happens, in a 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | [`core/allow-annotation`](#allow-a-finding-in-source) | Allow a finding in source | doc |  |  |
-| [`core/annotation-reason`](#an-allow-annotation-states-its-reason) | An allow annotation states its reason | error · builtin |  |  |
-| [`core/unused-allow`](#allow-annotations-suppress-something) | Allow annotations suppress something | warn · builtin | suggested |  |
+| [`core/allow-reason`](#an-allow-annotation-states-its-reason) | An allow annotation states its reason | error · builtin |  |  |
+| [`core/no-unused-allow`](#allow-annotations-suppress-something) | Allow annotations suppress something | warn · builtin | suggested |  |
 
 ### Allow a finding in source
 
@@ -56,7 +56,7 @@ A finding that is right to leave in place MAY be allowed by a comment on the sym
 
 ### An allow annotation states its reason
 
-`core/annotation-reason` · file · error · builtin
+`core/allow-reason` · file · error · builtin
 
 *An exception without a reason cannot be reviewed or revisited.*
 
@@ -80,7 +80,7 @@ Also: rust
 
 ### Allow annotations suppress something
 
-`core/unused-allow` · file · warn · builtin · fix: suggested
+`core/no-unused-allow` · file · warn · builtin · fix: suggested
 
 *An exception that no longer applies is noise that hides the next real one. A `lighthouse-disable` range that covers no finding is as stale as a single directive, and so is a `lighthouse-enable` that closes no range, or a directive that names no decision (there is no form without ids).*
 

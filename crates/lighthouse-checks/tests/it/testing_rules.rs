@@ -6,9 +6,9 @@ use lighthouse_model::{EdgeKind, Resolution, Symbol, SymbolKind, Visibility};
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 
-const EXTERNAL: &str = "testing/external-test-package";
-const OWNER: &str = "testing/owner-test";
-const SINGLE: &str = "testing/single-owner-test";
+const EXTERNAL: &str = "testing/external-package";
+const OWNER: &str = "testing/owner";
+const SINGLE: &str = "testing/unique-owner";
 
 fn check(w: &World, rule: &str, options: Value) -> Vec<(String, u32)> {
     let testing = Pack::of("testing", Catalog::bundled());

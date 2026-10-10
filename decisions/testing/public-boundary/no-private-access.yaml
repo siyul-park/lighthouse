@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/no-private-access
+  uid: 118361bd-02a1-425b-883b-2c60e1bc4c24
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: public-boundary
+  annotations:
+    lighthouse/was-names: testing/no-private-symbol-access
+    lighthouse/was-enforcement: mechanical
+spec:
+  title: Tests do not reach private symbols
+  context: >-
+    Private-symbol tests freeze the implementation.
+  scope:
+    domain: code
+    subject: test
+    tests: only
+  requirement: >-
+    Tests MUST NOT reference private symbols of the target; private-symbol
+    testing MUST be resolved at the public boundary rather than by exposing
+    internals solely for tests.
+  severity: warn
+  check:
+    type: model

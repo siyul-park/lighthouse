@@ -46,7 +46,7 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
         applies: lighthouse_model::Applicability::default(),
     };
     registry
-        .rule("core/max-file-lines")
+        .rule("core/max-lines")
         .unwrap()
         .check(&ctx, options)
 }
@@ -56,7 +56,7 @@ fn registry_is_valid_and_exposes_core() {
     let registry = lighthouse_checks::registry();
     registry.validate().unwrap();
     assert!(registry.has_plugin("core"));
-    let meta = registry.rule("core/max-file-lines").unwrap().manifest();
+    let meta = registry.rule("core/max-lines").unwrap().manifest();
     assert_eq!(meta.scope, RunScope::File);
     assert!(
         meta.analyzers.is_empty(),
@@ -67,17 +67,14 @@ fn registry_is_valid_and_exposes_core() {
 #[test]
 fn a_rule_exists_for_a_decision_a_program_checks() {
     let registry = lighthouse_checks::registry();
-    let meta = registry.rule("core/max-file-lines").unwrap().manifest();
-    assert_eq!(meta.id, "core/max-file-lines");
+    let meta = registry.rule("core/max-lines").unwrap().manifest();
+    assert_eq!(meta.id, "core/max-lines");
     assert_eq!(meta.severity, Severity::Warn);
     assert_eq!(meta.scope, RunScope::File);
-    for judged in [
-        "design/no-private-types-in-public-api",
-        "design/signals-are-advisory",
-    ] {
+    for judged in ["design/no-private-types", "design/advisory-signals"] {
         assert!(registry.rule(judged).is_none(), "{judged}");
     }
-    for annotation in ["core/annotation-reason", "core/unused-allow"] {
+    for annotation in ["core/allow-reason", "core/no-unused-allow"] {
         assert!(registry.rule(annotation).is_some(), "{annotation}");
     }
 }
@@ -93,7 +90,7 @@ fn recommended_preset_derives_levels_from_rule_meta() {
         .collect();
     let got: BTreeMap<_, _> = preset.iter().map(|(id, c)| (id.clone(), c.level)).collect();
     assert_eq!(got, want);
-    assert_eq!(want["core/max-file-lines"], Some(Severity::Warn));
+    assert_eq!(want["core/max-lines"], Some(Severity::Warn));
 }
 
 #[test]
@@ -130,7 +127,7 @@ fn rule_reports_lines_beyond_the_limit() {
 #[test]
 fn rule_validates_options() {
     let registry = lighthouse_checks::registry();
-    let rule = registry.rule("core/max-file-lines").unwrap();
+    let rule = registry.rule("core/max-lines").unwrap();
     rule.validate(&Options::new()).unwrap();
     rule.validate(&options(5)).unwrap();
     let bad: Options = serde_json::from_value(json!({ "mx": 5 })).unwrap();
@@ -225,14 +222,14 @@ fn the_bundled_fixes_say_what_each_rule_needs_to_be_fixed() {
             .and_then(|d| d.fix.as_ref())
             .map(|f| f.safety.to_string())
     };
-    for id in ["design/declaration-groups", "testing/test-file-layout"] {
+    for id in ["design/declaration-groups", "testing/file-layout"] {
         assert_eq!(safety(id).as_deref(), Some("safe"), "{id}");
     }
     for id in [
-        "design/related-symbols-close",
+        "design/contiguity",
         "design/callers-before-callees",
-        "design/section-banners",
-        "core/unused-allow",
+        "design/no-banners",
+        "core/no-unused-allow",
     ] {
         assert_eq!(safety(id).as_deref(), Some("suggested"), "{id}");
     }
@@ -268,23 +265,24 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
         design,
         [
             "design/callers-before-callees",
-            "design/complexity-signal",
-            "design/coupling-signal",
+            "design/complexity",
+            "design/contiguity",
+            "design/coupling",
             "design/declaration-groups",
             "design/exported-doc",
             "design/max-name-words",
-            "design/no-exported-mutable-global",
+            "design/no-banners",
+            "design/no-mutable-globals",
             "design/no-redundant-qualifiers",
-            "design/private-helper-callers",
-            "design/receiver-owned-behavior",
-            "design/related-symbols-close",
-            "design/section-banners",
-            "design/single-use-wrapper"
+            "design/no-single-use-wrapper",
+            "design/prefer-method",
+            "design/private-helper-callers"
         ]
     );
     let recommended = preset("design/recommended");
-    assert_eq!(recommended.len(), design.len() - 1);
+    assert_eq!(recommended.len(), design.len() - 2);
     assert!(!recommended.contains_key("design/private-helper-callers"));
+    assert!(!recommended.contains_key("design/max-name-words"));
     assert_eq!(preset("design/strict").len(), design.len());
     assert_eq!(preset("testing/recommended").len(), 5);
 }

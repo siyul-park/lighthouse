@@ -1,6 +1,6 @@
 //! Rewrites the first form of the suppression directive, `lighthouse:allow`,
 //! as its ESLint-style successor `lighthouse-disable-next-line` in source
-//! files. Only a comment line that starts with the marker is touched, as
+//! files, and the ids of renamed decisions in every directive line. Only a comment line that starts with the marker is touched, as
 //! the engine reads it; prose that mentions the marker, strings, and the
 //! structured documents of Lighthouse (YAML, TOML, JSON) are left as they are.
 
@@ -13,6 +13,14 @@ use super::{Action, Plan, file_name, walk};
 use crate::Result;
 
 const OLD: &str = "lighthouse:allow";
+/// The markers of a directive, longest first.
+const MARKERS: [&str; 5] = [
+    "lighthouse-disable-next-line",
+    "lighthouse-disable-line",
+    "lighthouse-disable",
+    "lighthouse-enable",
+    OLD,
+];
 const NEW: &str = "lighthouse-disable-next-line";
 /// Files that hold prose or structured documents, not source code.
 const SKIPPED_EXTENSIONS: [&str; 10] = [
@@ -54,7 +62,7 @@ fn source(path: &Path) -> bool {
 
 /// `text` with every directive line migrated; `None` when none is.
 fn migrated(text: &str) -> Option<String> {
-    if !text.contains(OLD) {
+    if !text.contains(OLD) && !text.contains("lighthouse-") {
         return None;
     }
     let mut changed = false;
@@ -79,7 +87,34 @@ fn migrated_line(line: &str) -> Option<String> {
     if !prefix.contains(['/', '*', '#']) {
         return None;
     }
-    let after = body.strip_prefix(OLD)?;
-    (after.is_empty() || after.starts_with(char::is_whitespace))
-        .then(|| format!("{prefix}{NEW}{after}"))
+    let (marker, after) = MARKERS.iter().find_map(|marker| {
+        let after = body.strip_prefix(marker)?;
+        (after.is_empty() || after.starts_with(char::is_whitespace)).then_some((*marker, after))
+    })?;
+    let marker = if marker == OLD { NEW } else { marker };
+    let renamed = renamed_ids(after);
+    let migrated = format!("{prefix}{marker}{renamed}");
+    (migrated != line).then_some(migrated)
+}
+
+/// The ids of the directive, up to its ` -- ` reason, by the names they have now.
+fn renamed_ids(after: &str) -> String {
+    let aliases = lighthouse_spec::Catalog::bundled().aliases();
+    let (ids, reason) = after.split_once(" --").map_or((after, ""), |(i, r)| (i, r));
+    let ids: Vec<String> = ids
+        .split(',')
+        .map(|id| {
+            let name = id.trim();
+            match aliases.get(name) {
+                Some(new) => id.replacen(name, new, 1),
+                None => id.to_owned(),
+            }
+        })
+        .collect();
+    let rest = if reason.is_empty() && !after.contains(" --") {
+        String::new()
+    } else {
+        format!(" --{reason}")
+    };
+    format!("{}{rest}", ids.join(","))
 }

@@ -14,7 +14,7 @@ fn project(max: usize) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_test_support::project(&format!("plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = {{ level = \"warn\", options = {{ max = {max} }} }}\n")),
+        lighthouse_test_support::project(&format!("plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = {{ level = \"warn\", options = {{ max = {max} }} }}\n")),
     )
     .unwrap();
     fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\ne\nf\ng\nh\n").unwrap();
@@ -29,7 +29,7 @@ fn check_reports_warning_and_passes_without_strict() {
         .arg("check")
         .assert()
         .success()
-        .stdout("big.txt:7:1: warn core/max-file-lines: file has 8 lines, limit is 6\nsummary: 0 error, 1 warn, 0 info, 0 incomplete\n");
+        .stdout("big.txt:7:1: warn core/max-lines: file has 8 lines, limit is 6\nsummary: 0 error, 1 warn, 0 info, 0 incomplete\n");
 }
 
 #[test]
@@ -105,7 +105,7 @@ fn timings_go_to_stderr_and_leave_the_report_alone() {
         "index text",
         "merge",
         "rules",
-        "rule core/max-file-lines",
+        "rule core/max-lines",
         "identity",
         "store",
         "report",
@@ -123,7 +123,7 @@ fn json_and_sarif_formats() {
         .output()
         .unwrap();
     let line: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(line["ruleId"], "core/max-file-lines");
+    assert_eq!(line["ruleId"], "core/max-lines");
     assert_eq!(line["evidence"]["lines"], 8);
 
     let out = lighthouse(dir.path())
@@ -160,7 +160,7 @@ fn override_can_turn_a_rule_off_for_a_file() {
     fs::write(
         &config,
         lighthouse_test_support::project(
-            "plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"warn\", options = { max = 6 } }\n[[overrides]]\nfiles = [\"big.txt\"]\nrules = { \"core/max-file-lines\" = \"off\" }\n",
+            "plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 6 } }\n[[overrides]]\nfiles = [\"big.txt\"]\nrules = { \"core/max-lines\" = \"off\" }\n",
         ),
     )
     .unwrap();
@@ -223,13 +223,13 @@ fn decision_list_and_explain() {
         .unwrap();
     let list = String::from_utf8(list.stdout).unwrap();
     for line in [
-        "core/max-file-lines\twarn\tFiles stay below a line limit",
-        "design/complexity-signal\twarn\tComplexity is a review signal",
+        "core/max-lines\twarn\tFiles stay below a line limit",
+        "design/complexity\twarn\tComplexity is a review signal",
         "design/declaration-groups\terror\t",
-        "design/no-exported-mutable-global\twarn\t",
+        "design/no-mutable-globals\twarn\t",
         "design/private-helper-callers\tinfo\t",
-        "testing/owner-test\twarn\t",
-        "testing/single-owner-test\terror\t",
+        "testing/owner\twarn\t",
+        "testing/unique-owner\terror\t",
     ] {
         assert!(
             list.lines().any(|l| l.starts_with(line)),
@@ -237,7 +237,7 @@ fn decision_list_and_explain() {
         );
     }
     let out = lighthouse(dir.path())
-        .args(["explain", "design/coupling-signal"])
+        .args(["explain", "design/coupling"])
         .output()
         .unwrap();
     assert!(
@@ -260,9 +260,9 @@ fn decision_list_all_shows_status_of_every_decision() {
         .unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
     for line in [
-        "core/max-file-lines\timplemented\twarn\tFiles stay below a line limit",
+        "core/max-lines\timplemented\twarn\tFiles stay below a line limit",
         "design/error-identity\tjudged\twarn\tPreserve error identity",
-        "design/signals-are-advisory\tdoc\t-\tSignals stay advisory",
+        "design/advisory-signals\tdoc\t-\tSignals stay advisory",
     ] {
         assert!(text.lines().any(|l| l == line), "{line}");
     }
@@ -506,7 +506,7 @@ fn changed_reports_only_modified_and_untracked_files_but_analyzes_everything() {
         .args(["check", "--changed"])
         .assert()
         .success()
-        .stdout(predicates_contains("new.txt:7:1: warn core/max-file-lines"))
+        .stdout(predicates_contains("new.txt:7:1: warn core/max-lines"))
         .stdout(predicates_lacks("big.txt"));
     fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\ne\nf\ng\nh\ni\n").unwrap();
     let out = lighthouse(dir.path())

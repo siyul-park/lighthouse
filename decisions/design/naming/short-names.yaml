@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/short-names
+  uid: a14acbdf-1d97-4c44-8d6b-9eef6d0b8ef3
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: naming
+  annotations:
+    lighthouse/was-names: design/short-names-limited
+spec:
+  title: One-letter names stay small
+  context: >-
+    One-letter names are only readable where context is a few lines.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    One-letter names MUST be limited to conventional receivers, indexes, and
+    tiny scopes.
+  severity: warn
+  check:
+    type: model

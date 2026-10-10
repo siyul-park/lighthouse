@@ -1,0 +1,171 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/prefer-method
+  uid: de49963a-a976-4135-8cf0-a9ec748353bc
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: functions
+  annotations:
+    lighthouse/was-names: design/receiver-owned-behavior
+    lighthouse/was-builtin: design/receiver-owned-behavior
+spec:
+  title: Behavior lives with its owner
+  context: >-
+    Where a function lives tells readers who owns the behavior.
+
+    Go: A private package function with at least one production caller,
+    every caller being a method of one type, never used as a value and not
+    named like a constructor, is reported. Test callers do not count. A
+    function called by any other function, or by methods of two types, is
+    not judged.
+
+    Rust: The same for a private free function and the methods of one
+    `impl` target type. Parameter types are not resolved for Rust, so
+    `takes_owner_param` is always false there.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Methods SHOULD express receiver-owned behavior; free functions SHOULD
+    express construction or behavior with no natural receiver.
+  severity: warn
+  options:
+    type: object
+    properties:
+      constructorPrefixes:
+        type: array
+        default: [New, new]
+        description: >-
+          A function named like one of these, or one of these followed by a
+          word, is a constructor and has no receiver yet.
+      requireOwnerParam:
+        type: boolean
+        default: false
+        description: >-
+          Report only functions that take a value of the owner type as a
+          parameter, the strongest sign that the owner should be the receiver.
+          By default a function that takes one or calls or references the owner
+          or one of its members is reported; a function that does neither is a
+          helper with no more to do with the owner than with any other type.
+    additionalProperties: false
+  languages:
+    rust:
+      options:
+        constructorPrefixes: [new]
+  check:
+    type: cel
+    select: function
+    with:
+      - name: affinity
+        expr: func.receiver_affinity
+    where: >-
+      (func.kind == 'function' || func.kind == 'method')
+      && func.kind == 'function' && func.visibility == 'private'
+      && func.name != 'main' && func.name != 'init' && !func.constructor_named
+      && func.references == 0 && size(affinity) > 0
+      && (affinity.takes_owner_param || affinity.uses_owner)
+      && !(options.requireOwnerParam && !affinity.takes_owner_param)
+    message: >-
+      private function {{ func.name }} is called only by methods of
+      {{ affinity.owner_name }}; consider making it a method of {{ affinity.owner_name }}
+    evidence:
+      owner: affinity.owner
+      callers: affinity.callers
+      takes_owner_param: affinity.takes_owner_param
+      uses_owner: affinity.uses_owner
+    identity:
+      subject: func.id
+  examples:
+    - name: only-one-owner-calls
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: "package sample\n\ntype Store struct{ items []int }\n\nfunc (s *Store) Total() int { return sum(s) }\n\nfunc (s *Store) Count() int { return len(s.items) + sum(s) - sum(s) }\n\nfunc sum(s *Store) int {\n\ttotal := 0\n\tfor _, i := range s.items {\n\t\ttotal += i\n\t}\n\treturn total\n}"
+      expect:
+        - line: 9
+    - name: shared-by-a-free-function
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: "package sample\n\ntype Store struct{ items []int }\n\nfunc (s *Store) Total() int { return sum(s) }\n\nfunc Sum(s *Store) int { return sum(s) }\n\nfunc sum(s *Store) int {\n\ttotal := 0\n\tfor _, i := range s.items {\n\t\ttotal += i\n\t}\n\treturn total\n}"
+    - name: helper-unrelated-to-the-owner
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: "package sample\n\ntype Store struct{ items []int }\n\nfunc (s *Store) Total() int { return sum(s.items) }\n\nfunc sum(items []int) int {\n\ttotal := 0\n\tfor _, i := range items {\n\t\ttotal += i\n\t}\n\treturn total\n}"
+    - name: constructor-called-by-method
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Store struct{ items []int }
+
+            func (s *Store) Reset() *Store { return newStore() }
+
+            func newStore() *Store { return &Store{items: []int{}} }
+    - name: rust-only-one-owner-calls
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store {
+                items: Vec<i32>,
+            }
+
+            impl Store {
+                pub fn total(&self) -> i32 {
+                    sum(self)
+                }
+
+                pub fn count(&self) -> i32 {
+                    self.items.len() as i32 + sum(self)
+                }
+            }
+
+            fn sum(store: &Store) -> i32 {
+                let mut total = 0;
+                for i in &store.items {
+                    total += i;
+                }
+                total
+            }
+      expect:
+        - line: 15
+    - name: rust-shared-by-a-free-function
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store {
+                items: Vec<i32>,
+            }
+
+            impl Store {
+                pub fn total(&self) -> i32 {
+                    sum(self)
+                }
+            }
+
+            pub fn total_of(store: &Store) -> i32 {
+                sum(store)
+            }
+
+            fn sum(store: &Store) -> i32 {
+                let mut total = 0;
+                for i in &store.items {
+                    total += i;
+                }
+                total
+            }

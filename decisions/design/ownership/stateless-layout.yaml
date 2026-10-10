@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/stateless-layout
+  uid: 517d7bf6-d31c-4f49-9fde-b3d73f8d4cbf
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: ownership
+  annotations:
+    lighthouse/was-names: design/layout-declarations-hold-no-state
+spec:
+  title: Layout declarations hold no runtime state
+  context: >-
+    Pure layout can be shared without sharing ownership.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Layout-only declarations MAY name private members but MUST NOT access
+    runtime state.
+  severity: info
+  check:
+    type: model

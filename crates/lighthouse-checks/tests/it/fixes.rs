@@ -744,7 +744,7 @@ fn the_bundled_fixers_of_a_pack_are_those_of_its_decisions_with_a_fix() {
         .map(|f| f.manifest().id.clone())
         .collect();
 
-    assert_eq!(ids, ["testing/test-file-layout"]);
+    assert_eq!(ids, ["testing/file-layout"]);
 }
 
 #[test]

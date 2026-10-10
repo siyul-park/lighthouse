@@ -611,7 +611,7 @@ fn a_mechanical_finding_stays_reported_whatever_the_verdict() {
     lighthouse(dir.path()).arg("check").assert().code(1);
     let fingerprint = every(&dir, "all")
         .iter()
-        .find(|f| f["ruleId"] == "core/annotation-reason")
+        .find(|f| f["ruleId"] == "core/allow-reason")
         .map(|f| f["fingerprint"].as_str().unwrap().to_owned())
         .unwrap();
     let out = lighthouse(dir.path())
@@ -930,7 +930,7 @@ fn changed_resolves_the_findings_of_a_deleted_file() {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_test_support::project("plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"warn\", options = { max = 5 } }\n"),
+        lighthouse_test_support::project("plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 5 } }\n"),
     )
     .unwrap();
     fs::write(dir.path().join("big.txt"), "a\nb\nc\nd\ne\nf\n").unwrap();
@@ -981,5 +981,5 @@ fn source_annotations_allow_findings_and_are_counted() {
     let stale = "// lighthouse:allow design/exported-doc -- stale\n/// Runs.\npub fn run() {}\n";
     write(&dir, "src/lib.rs", stale);
     let text = stdout(lighthouse(dir.path()).arg("check"));
-    assert!(text.contains("warn core/unused-allow"), "{text}");
+    assert!(text.contains("warn core/no-unused-allow"), "{text}");
 }

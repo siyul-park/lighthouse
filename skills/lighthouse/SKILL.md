@@ -76,30 +76,30 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 
 ### core
 
-- `core/max-file-lines` (warn) Files stay below a line limit
-- `core/annotation-reason` (error) An allow annotation states its reason
-- `core/unused-allow` (warn, fixable: suggested) Allow annotations suppress something
+- `core/max-lines` (warn) Files stay below a line limit
+- `core/allow-reason` (error) An allow annotation states its reason
+- `core/no-unused-allow` (warn, fixable: suggested) Allow annotations suppress something
 - `core/decision-naming` (warn) Decision names follow the ESLint convention
 
 ### design
 
-- `design/related-symbols-close` (warn, fixable: suggested) Collaborators stay close
-- `design/complexity-signal` (warn) Complexity is a review signal
-- `design/coupling-signal` (warn) Coupling is a review signal
-- `design/single-use-wrapper` (warn) Inline single-use wrappers
-- `design/receiver-owned-behavior` (warn) Behavior lives with its owner
+- `design/contiguity` (warn, fixable: suggested) Collaborators stay close
+- `design/complexity` (warn) Complexity is a review signal
+- `design/coupling` (warn) Coupling is a review signal
+- `design/no-single-use-wrapper` (warn) Inline single-use wrappers
+- `design/prefer-method` (warn) Behavior lives with its owner
 - `design/callers-before-callees` (warn, fixable: suggested) Callers before callees
 - `design/max-name-words` (warn) Names have at most a few words
 - `design/no-redundant-qualifiers` (warn) No redundant qualifiers
-- `design/no-exported-mutable-global` (warn) No exported mutable global
+- `design/no-mutable-globals` (warn) No exported mutable global
 - `design/declaration-groups` (error, fixable: safe) Declarations follow ownership groups
-- `design/section-banners` (warn, fixable: suggested) Comments do not label sections
+- `design/no-banners` (warn, fixable: suggested) Comments do not label sections
 - `design/exported-doc` (warn) Exported symbols are documented
 
 ### testing
 
-- `testing/external-test-package` (error) Contract tests live outside the target
+- `testing/external-package` (error) Contract tests live outside the target
 - `testing/standard-assertions` (warn) Assertions use the standard library
-- `testing/owner-test` (warn) Every public symbol has an owner test
-- `testing/single-owner-test` (error) One owner test per public symbol
-- `testing/test-file-layout` (error, fixable: safe) A test file reads fixtures, tests, helpers
+- `testing/owner` (warn) Every public symbol has an owner test
+- `testing/unique-owner` (error) One owner test per public symbol
+- `testing/file-layout` (error, fixable: safe) A test file reads fixtures, tests, helpers

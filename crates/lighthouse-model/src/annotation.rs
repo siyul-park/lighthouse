@@ -1,7 +1,7 @@
 /// Rule id of the finding for a directive that gives no reason.
-pub const ANNOTATION_REASON: &str = "core/annotation-reason";
+pub const ANNOTATION_REASON: &str = "core/allow-reason";
 /// Rule id of the finding for a directive that suppresses nothing.
-pub const UNUSED_ALLOW: &str = "core/unused-allow";
+pub const UNUSED_ALLOW: &str = "core/no-unused-allow";
 
 const REASON_SEPARATOR: &str = "--";
 

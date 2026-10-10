@@ -22,7 +22,7 @@ formatter = { argv = ["gofmt"], stdin = "file", output = "text" }
 formatter = { argv = ["rustfmt", "--edition", "2024", "--emit", "stdout"], stdin = "file", output = "text" }
 
 [spec.rules]
-"core/max-file-lines" = { level = "warn", options = { max = 1000 } }
+"core/max-lines" = { level = "warn", options = { max = 1000 } }
 # Four words: the visitor methods of syn and the field names of SARIF are not ours to rename.
 "design/max-name-words" = { level = "warn", options = { max = 4 } }
 
@@ -30,12 +30,12 @@ formatter = { argv = ["rustfmt", "--edition", "2024", "--emit", "stdout"], stdin
 # project's own design.
 [[spec.overrides]]
 files = ["plugins/conformance/**"]
-rules = { "core/max-file-lines" = "off", "design/complexity-signal" = "off", "design/coupling-signal" = "off", "design/exported-doc" = "off", "design/single-use-wrapper" = "off", "design/declaration-groups" = "off", "design/related-symbols-close" = "off", "design/callers-before-callees" = "off", "design/private-helper-callers" = "off", "design/section-banners" = "off", "design/no-redundant-qualifiers" = "off", "design/no-exported-mutable-global" = "off", "testing/external-test-package" = "off", "testing/owner-test" = "off", "testing/single-owner-test" = "off" }
+rules = { "core/max-lines" = "off", "design/complexity" = "off", "design/coupling" = "off", "design/exported-doc" = "off", "design/no-single-use-wrapper" = "off", "design/declaration-groups" = "off", "design/contiguity" = "off", "design/callers-before-callees" = "off", "design/private-helper-callers" = "off", "design/no-banners" = "off", "design/no-redundant-qualifiers" = "off", "design/no-mutable-globals" = "off", "testing/external-package" = "off", "testing/owner" = "off", "testing/unique-owner" = "off" }
 
 [[spec.overrides]]
 files = ["docs/decisions/**", "schema/**"]
-rules = { "core/max-file-lines" = "off" }
+rules = { "core/max-lines" = "off" }
 
 [[spec.overrides]]
 files = ["**/*.lock"]
-rules = { "core/max-file-lines" = "off" }
+rules = { "core/max-lines" = "off" }

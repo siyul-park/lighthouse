@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-overlapping-symbols
+  uid: 0c2241d7-4ce7-42f0-bd96-be6d46a9c40d
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: structural-rules
+  annotations:
+    lighthouse/was-names: design/merge-overlapping-symbols
+spec:
+  title: Merge overlapping symbols
+  context: >-
+    Parallel variants multiply what readers must learn.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Symbols with substantially the same responsibility at the same abstraction
+    level MUST be consolidated; one general symbol SHOULD be preferred over
+    parallel variants, wrappers, aliases, or coordinators.
+  severity: info
+  check:
+    type: model

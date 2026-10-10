@@ -2,7 +2,7 @@
 source: crates/lighthouse-report/tests/it/agent.rs
 expression: "render_with(Format::Agent, &findings, &gap(), &briefing)"
 ---
-design/coupling-signal  warn  internal/jit/compile.go:350:1
+design/coupling  warn  internal/jit/compile.go:350:1
   owner:       jit::compile#function
   message:     function coordinates 14 collaborators in its package
   requirement: Coupling SHOULD be judged from direct intra-package fan-in and fan-out, that is the functions and methods of the same package that call a symbol or are called by it, against deliberately high thresholds. Calls from other packages and from tests do not count: a widely used public function is a service, not a hub.
@@ -21,14 +21,14 @@ design/coupling-signal  warn  internal/jit/compile.go:350:1
 
                  func a() { hub() }
                  func b() { hub() }
-  fingerprint: f5ed6fd96750
-  resolve:     lighthouse review resolve f5ed6fd96750 --verdict <verdict> --reason <reason> --reviewer-kind agent
+  fingerprint: 5da1c26cc609
+  resolve:     lighthouse review resolve 5da1c26cc609 --verdict <verdict> --reason <reason> --reviewer-kind agent
 
 design/private-helper-callers  info  src/lib.rs:7:1
   owner:       m::helper#function
   message:     private helper has one caller
   requirement: A private helper SHOULD have at least two callers.
-  context:     A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count. Forwarding wrappers are reported by `design/single-use-wrapper`, and a function used as a value is not judged. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.
+  context:     A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count. Forwarding wrappers are reported by `design/no-single-use-wrapper`, and a function used as a value is not judged. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.
   expected:    valid rust example `rust-valid` (src/lib.rs), canonical
                  pub fn run(x: u8) -> u8 {
                      clamp(x) + 1

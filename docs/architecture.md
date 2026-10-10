@@ -79,7 +79,7 @@ documents):
 apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
-  name: core/max-file-lines        # the id, `<namespace>/<kebab-name>`
+  name: core/max-lines        # the id, `<namespace>/<kebab-name>`
   uid: 8a4f0a2c-6b57-4a8e-9a42-0d2f3b9f5c11   # identity, a UUID v4 assigned once
   labels: { lighthouse/pack: core, lighthouse/section: limits }
   annotations: {}
@@ -179,7 +179,7 @@ authored severities: mechanical is `error`, heuristic `warn`, judgment `info`.)
 Every implemented rule belongs to a catalog decision whose `check` is
 one provider of the union `builtin | cel | command | rpc | model`, with the common fields `requires` and `timeout`:
 
-- `builtin` is a standard, decision-agnostic operation (`order`, `proximity`, `cycle`) or, for the two rules the engine reports itself (`core/annotation-reason`, `core/unused-allow`), a rule named by `id`.
+- `builtin` is a standard, decision-agnostic operation (`order`, `proximity`, `cycle`) or, for the two rules the engine reports itself (`core/allow-reason`, `core/no-unused-allow`), a rule named by `id`.
 - `cel` is an expression over the code model, written in the decision, with the standard function library `metrics callers callees edges owner tests annotations rank exposed` and the text helpers `lines trim trimPrefixes trimSuffixes trimLeft trimRight leadingRun drop`.
 - `command` runs a program under the process contract: argv without a shell, `{file}`/`{files}`/`{rule}` filling whole arguments, `batch: file|all`, exit `0` clean, `1` findings (stdout lines, an optional `path:line[:col]: ` prefix), anything else an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script. A command is not sandboxed: it runs with the user's privileges, in the project root, with an environment cleared to `PATH`, `LANG`, `TMPDIR` and the declared `env` (no `HOME`) plus `LIGHTHOUSE_*`. Trust is the only protection; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean.
 - `rpc` is reserved until plugin protocol 0.2 and refused at load.
@@ -472,9 +472,9 @@ applies at every severity, mechanical errors included, because it is reviewed in
 diff, and the report counts what was allowed (`N allowed`); in SARIF terms it is a
 suppression of kind `inSource`. The reason is required on every form that disables: a
 directive without one is ignored and reported by the mechanical rule
-`core/annotation-reason`. A directive or range whose rule no longer fires there, or is not
+`core/allow-reason`. A directive or range whose rule no longer fires there, or is not
 enabled, an `lighthouse-enable` that closes nothing and a directive that names no id are
-reported by `core/unused-allow` so annotations do not rot (when `--rules` leaves the
+reported by `core/no-unused-allow` so annotations do not rot (when `--rules` leaves the
 annotated rule out of the run, nothing is said). A second `lighthouse-disable` of an id
 inside its open range is redundant and reported the same way. Both rules belong to
 the `core` pack, so `core/recommended` enables them; the engine evaluates them because
@@ -642,10 +642,10 @@ shared decision log, because it records what happened to this checkout, not a de
 the run that ends the fixing resolves the findings the fixes removed.
 
 Bundled fixes: `design/declaration-groups` (a `reorder` by `design/group`, plus a `move`
-for constructors) and `testing/test-file-layout` (a `move` of a fixture above, or a helper
-below, the tests) are safe; `design/related-symbols-close` and
+for constructors) and `testing/file-layout` (a `move` of a fixture above, or a helper
+below, the tests) are safe; `design/contiguity` and
 `design/callers-before-callees` (a `move` next to the related symbol or the caller),
-`design/section-banners` and `core/unused-allow` (a `delete` of the comment or the
+`design/no-banners` and `core/no-unused-allow` (a `delete` of the comment or the
 annotation line) are suggested. An `impl` block is not a symbol, so
 reordering a Rust file cannot move one: such findings are declined and fixed by hand.
 `lighthouse check .` on this repository is clean, and `check --fix` brought it there.
@@ -805,5 +805,5 @@ The Rust plugin resolves names syntactically, so its edges are a lower bound
 that count callers therefore have to fail safe: a method called through a
 receiver whose type is not written in the code is recorded as a possible use of
 every non-`pub` method of that name (a `heuristic` edge that counting analyses
-ignore), which keeps `design/single-use-wrapper` from
+ignore), which keeps `design/no-single-use-wrapper` from
 reporting a method that has an unseen caller.

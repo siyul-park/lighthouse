@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/coverage-reachability
+  uid: dad65379-55d5-456c-91fb-f787f1d0a607
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: evidence
+  annotations:
+    lighthouse/was-names: testing/coverage-is-reachability
+spec:
+  title: Coverage proves reachability
+  context: >-
+    Coverage shows code ran, not that behavior is right.
+  scope:
+    domain: code
+    subject: project
+  requirement: >-
+    Coverage proves reachability, not quality or completeness. When no red phase
+    is available, coverage SHOULD prove execution without changing production
+    behavior to manufacture failure.

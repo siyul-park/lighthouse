@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/pure-polling
+  uid: dc655f5d-c6a2-4736-9016-c8a1be858b87
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: organization
+  annotations:
+    lighthouse/was-names: testing/polling-conditions-are-pure
+spec:
+  title: Polling conditions only observe
+  context: >-
+    Assertions inside a poll hide whether readiness or behavior failed.
+  scope:
+    domain: code
+    subject: test
+    tests: only
+  requirement: >-
+    Polling conditions MUST return readiness and observed results or errors
+    only; assertions belong after readiness is established.
+  severity: info
+  check:
+    type: model

@@ -213,6 +213,8 @@ pub struct Engine {
     /// Rules whose decision is about the project's own documents (the `spec`
     /// domain): a run that selects one finds those documents first.
     documented: BTreeSet<String>,
+    /// Ids decisions were renamed from, with their current ids.
+    aliases: BTreeMap<String, String>,
     /// The `linguist-generated` attributes of the project.
     attributes: Attributes,
     /// What assembling the engine found worth telling; every run reports it.
@@ -238,11 +240,21 @@ impl Engine {
         catalog: &Catalog,
         root: &Path,
     ) -> Result<Self, Error> {
+        let aliases = catalog.aliases();
+        let mut config = config;
+        let mut notices: Vec<String> = config
+            .rename_rules(&aliases)
+            .into_iter()
+            .map(|(old, new)| {
+                format!("decision `{old}` is now `{new}`; the old id still works (`lighthouse spec migrate` rewrites it)")
+            })
+            .collect();
         let projects = catalog.projects()?;
         validate_config(&registry, &config, &projects)?;
         let (providers, languages) = load_languages(&registry, &config)?;
         let root = root.canonicalize().map_err(io_error(root))?;
-        let (attributes, notices) = Attributes::of(&root);
+        let (attributes, found) = Attributes::of(&root);
+        notices.extend(found);
         let ws = Workspace {
             root,
             languages: config.languages().clone(),
@@ -262,6 +274,7 @@ impl Engine {
                 .filter(|d| d.scope.domain == Domain::Spec)
                 .map(|d| d.id().to_owned())
                 .collect(),
+            aliases,
             attributes,
             notices,
             ws,
@@ -319,6 +332,11 @@ impl Engine {
         only: &[String],
         overlays: &Overlays,
     ) -> Result<Outcome, Error> {
+        let only: Vec<String> = only
+            .iter()
+            .map(|id| self.aliases.get(id).unwrap_or(id).clone())
+            .collect();
+        let only = &only[..];
         for id in only {
             if self.registry.rule(id).is_none() {
                 return Err(Error::UnknownRule(id.clone()));

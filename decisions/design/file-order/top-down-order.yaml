@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/top-down-order
+  uid: b7965b72-2e4f-473f-a067-2183802fa33a
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: file-order
+  annotations:
+    lighthouse/was-names: design/top-down-reading
+spec:
+  title: Read from behavior to machinery
+  context: >-
+    The top of a cohesive implementation states what it does.
+  scope:
+    domain: code
+    subject: file
+  requirement: >-
+    A cohesive implementation MUST read from higher-level behavior toward shared
+    machinery.
+  severity: info
+  check:
+    type: model

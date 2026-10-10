@@ -73,7 +73,7 @@ fn subject_run_scope() {
 
 #[test]
 fn decision_resolve_options() {
-    let decision = bundled("core/max-file-lines").clone().map_spec(|mut spec| {
+    let decision = bundled("core/max-lines").clone().map_spec(|mut spec| {
         spec.languages
             .entry("go".to_owned())
             .or_default()
@@ -115,7 +115,7 @@ fn example_file_text() {
     let files = &bundled("design/error-identity").examples[0].files;
     assert!(matches!(files[0].content, Content::File(_)));
     assert!(files[0].text().contains("fmt.Errorf"));
-    let inline = &bundled("design/single-use-wrapper").examples[0].files[0];
+    let inline = &bundled("design/no-single-use-wrapper").examples[0].files[0];
     assert!(matches!(inline.content, Content::Inline(_)));
     assert_eq!(ExampleFile::inline("a.go", "package a").text(), "package a");
 }
@@ -862,20 +862,20 @@ fn decision_strict() {
 
 #[test]
 fn scope_applicability() {
-    let scope = bundled("testing/external-test-package").scope;
+    let scope = bundled("testing/external-package").scope;
     assert_eq!(
         scope.applicability().tests,
         lighthouse_model::TestScope::Only
     );
     assert!(!scope.applicability().generated);
-    let all = bundled("core/max-file-lines").scope.applicability();
+    let all = bundled("core/max-lines").scope.applicability();
     assert!(all.generated);
     assert_eq!(all.tests, lighthouse_model::TestScope::Include);
 }
 
 #[test]
 fn decision_was_names_lists_the_ids_before_a_rename_and_with_uid_assigns_one() {
-    let renamed = bundled("core/max-file-lines").clone();
+    let renamed = bundled("core/allow-annotation").clone();
     assert_eq!(renamed.was_names().count(), 0);
 
     let mut metadata = renamed.metadata().clone();
@@ -891,4 +891,42 @@ fn decision_was_names_lists_the_ids_before_a_rename_and_with_uid_assigns_one() {
 
     let uid = "5d6b1c1e-2b0e-4a43-9a3e-0f1b6f5d2a11";
     assert_eq!(with_names.with_uid(uid).uid(), Some(uid));
+}
+
+#[test]
+fn a_renamed_decision_still_answers_to_its_old_ids() {
+    let catalog = Catalog::bundled();
+
+    let now = catalog.decision("core/max-lines").unwrap();
+    assert_eq!(now.was_names().collect::<Vec<_>>(), ["core/max-file-lines"]);
+    assert_eq!(
+        catalog.decision("core/max-file-lines").unwrap().id(),
+        "core/max-lines"
+    );
+    assert_eq!(catalog.aliases()["core/max-file-lines"], "core/max-lines");
+    assert_eq!(
+        catalog.identities()["core/max-file-lines"],
+        now.uid().unwrap()
+    );
+    assert!(catalog.decision("core/nonesuch").is_none());
+}
+
+#[test]
+fn config_rename_rules_moves_the_settings_of_old_ids_to_the_new_ones() {
+    let mut config = lighthouse_spec::Config::parse_inline(
+        "plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"warn\", options = { max = 5 } }\n[[overrides]]\nfiles = [\"a/**\"]\nrules = { \"core/max-file-lines\" = \"off\" }\n",
+    )
+    .unwrap();
+
+    let renamed = config.rename_rules(&Catalog::bundled().aliases());
+
+    assert_eq!(
+        renamed,
+        [(
+            "core/max-file-lines".to_owned(),
+            "core/max-lines".to_owned()
+        )]
+    );
+    let ids: Vec<_> = config.configured().map(|(id, _)| id).collect();
+    assert_eq!(ids, ["core/max-lines", "core/max-lines"]);
 }

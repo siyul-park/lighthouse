@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/max-case-depth
+  uid: ca1f03ef-1ecd-4376-805a-db7775328e2a
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: organization
+  annotations:
+    lighthouse/was-names: testing/case-depth
+    lighthouse/was-enforcement: mechanical
+spec:
+  title: Cases are at most two levels deep
+  context: >-
+    Deep nesting hides which behavior a case specifies.
+
+    Go: Counts `t.Run` nesting.
+
+    Python: Counts class and function nesting.
+
+    TypeScript: Counts `describe` and `it` nesting.
+  scope:
+    domain: code
+    subject: test
+    tests: only
+  requirement: >-
+    Test structure MUST have at most two levels: the test function and its
+    direct cases.
+  severity: warn
+  check:
+    type: model

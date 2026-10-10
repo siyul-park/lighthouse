@@ -6,7 +6,7 @@ use lighthouse_engine::Outcome;
 
 use crate::annotations::{DOC_RULE, check, rules_of};
 
-const BANNERS: &str = "\"design/section-banners\" = \"warn\"\n";
+const BANNERS: &str = "\"design/no-banners\" = \"warn\"\n";
 
 fn lines_of(outcome: &Outcome, rule: &str) -> Vec<u32> {
     outcome
@@ -47,7 +47,7 @@ fn disable_line_covers_its_own_line_only() {
 
     assert_eq!(lines_of(&outcome, "design/exported-doc"), [2]);
     assert_eq!(outcome.allowed.len(), 1);
-    assert!(!rules_of(&outcome).contains(&"core/unused-allow"));
+    assert!(!rules_of(&outcome).contains(&"core/no-unused-allow"));
 }
 
 #[test]
@@ -92,11 +92,11 @@ fn ranges_of_different_rules_nest() {
     let source = "pub fn a() {}\n\
         // lighthouse-disable design/exported-doc -- outer\n\
         pub fn b() {\n    \
-            // lighthouse-disable design/section-banners -- inner\n    \
+            // lighthouse-disable design/no-banners -- inner\n    \
             let _ = 1;\n    \
             // ======== helpers ========\n    \
             let _ = 2;\n    \
-            // lighthouse-enable design/section-banners\n    \
+            // lighthouse-enable design/no-banners\n    \
             let _ = 3;\n    \
             // ======== after ========\n    \
             let _ = 4;\n\
@@ -106,7 +106,7 @@ fn ranges_of_different_rules_nest() {
     let outcome = check(source, &format!("{DOC_RULE}{BANNERS}"));
 
     assert_eq!(lines_of(&outcome, "design/exported-doc"), [1, 14]);
-    assert_eq!(lines_of(&outcome, "design/section-banners"), [10]);
+    assert_eq!(lines_of(&outcome, "design/no-banners"), [10]);
     assert_eq!(outcome.diagnostics.len(), 3, "{:?}", outcome.diagnostics);
     assert_eq!(outcome.allowed.len(), 2);
 }
@@ -118,9 +118,9 @@ fn an_enable_that_closes_nothing_is_reported() {
         DOC_RULE,
     );
 
-    assert_eq!(rules_of(&outcome), ["core/unused-allow"]);
+    assert_eq!(rules_of(&outcome), ["core/no-unused-allow"]);
     assert!(
-        message_of(&outcome, "core/unused-allow").contains("no matching `lighthouse-disable`"),
+        message_of(&outcome, "core/no-unused-allow").contains("no matching `lighthouse-disable`"),
         "{:?}",
         outcome.diagnostics
     );
@@ -135,10 +135,10 @@ fn a_range_that_suppresses_nothing_is_reported_as_unused() {
 
     assert_eq!(
         rules_of(&outcome),
-        ["design/exported-doc", "core/unused-allow"]
+        ["design/exported-doc", "core/no-unused-allow"]
     );
     assert!(
-        message_of(&outcome, "core/unused-allow").contains("in its range"),
+        message_of(&outcome, "core/no-unused-allow").contains("in its range"),
         "{:?}",
         outcome.diagnostics
     );
@@ -152,7 +152,7 @@ fn a_second_disable_inside_an_open_range_is_unused() {
         DOC_RULE,
     );
 
-    assert_eq!(rules_of(&outcome), ["core/unused-allow"]);
+    assert_eq!(rules_of(&outcome), ["core/no-unused-allow"]);
     assert_eq!(outcome.diagnostics[0].span.start.line, 2, "the second one");
     assert_eq!(outcome.allowed.len(), 1);
 }
@@ -171,12 +171,12 @@ fn every_disable_form_needs_a_reason() {
 
         assert_eq!(
             rules_of(&outcome),
-            ["core/annotation-reason", "design/exported-doc"],
+            ["core/allow-reason", "design/exported-doc"],
             "{form}"
         );
         assert!(outcome.allowed.is_empty(), "{form}");
         assert!(
-            message_of(&outcome, "core/annotation-reason").contains(form),
+            message_of(&outcome, "core/allow-reason").contains(form),
             "{form}"
         );
     }
@@ -191,20 +191,20 @@ fn there_is_no_form_without_ids() {
 
     assert_eq!(
         rules_of(&outcome),
-        ["core/unused-allow", "design/exported-doc"]
+        ["core/no-unused-allow", "design/exported-doc"]
     );
-    assert!(message_of(&outcome, "core/unused-allow").contains("names no decision"));
+    assert!(message_of(&outcome, "core/no-unused-allow").contains("names no decision"));
 }
 
 #[test]
 fn two_directives_in_one_comment_each_count() {
     let outcome = check(
-        "// lighthouse-disable-next-line design/exported-doc -- one\n// lighthouse-disable-next-line design/section-banners -- two\npub fn open() {}\n",
+        "// lighthouse-disable-next-line design/exported-doc -- one\n// lighthouse-disable-next-line design/no-banners -- two\npub fn open() {}\n",
         &format!("{DOC_RULE}{BANNERS}"),
     );
 
-    assert_eq!(rules_of(&outcome), ["core/unused-allow"]);
-    assert!(message_of(&outcome, "core/unused-allow").contains("design/section-banners"));
+    assert_eq!(rules_of(&outcome), ["core/no-unused-allow"]);
+    assert!(message_of(&outcome, "core/no-unused-allow").contains("design/no-banners"));
     assert_eq!(outcome.diagnostics[0].span.start.line, 2);
     assert_eq!(outcome.allowed.len(), 1);
 }

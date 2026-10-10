@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/encapsulated-state
+  uid: dca747a5-ae0c-4d88-91c7-414353562123
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: ownership
+  annotations:
+    lighthouse/was-names: design/private-state-behind-owner
+    lighthouse/was-enforcement: mechanical
+spec:
+  title: Private state stays behind its owner
+  context: >-
+    State reachable from anywhere cannot keep an invariant.
+
+    Go: An unexported implementation component may access its exported
+    owner's private fields; unrelated same-package code uses the owner's
+    methods.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Private state belongs to its owner. An implementation component of an owner
+    MAY access that owner's private state when it implements the owner's
+    responsibility; unrelated code in the same package MUST use the owner's
+    contract.
+  severity: warn
+  check:
+    type: model

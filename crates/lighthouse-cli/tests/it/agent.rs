@@ -21,7 +21,7 @@ fn text_project() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_test_support::project("plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"error\", options = { max = 3 } }\n"),
+        lighthouse_test_support::project("plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"error\", options = { max = 3 } }\n"),
     )
     .unwrap();
     fs::write(dir.path().join("big.txt"), BIG).unwrap();
@@ -104,7 +104,7 @@ fn an_edit_with_errors_is_fed_back_as_a_block() {
     let reply = reply.unwrap();
     assert_eq!(reply["decision"], "block");
     let reason = reply["reason"].as_str().unwrap();
-    assert!(reason.contains("core/max-file-lines"), "{reason}");
+    assert!(reason.contains("core/max-lines"), "{reason}");
     assert!(reason.contains("big.txt"), "{reason}");
     assert!(
         !reason.contains("other.txt"),

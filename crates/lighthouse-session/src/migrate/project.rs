@@ -70,6 +70,7 @@ pub(super) fn modernize_file(
     if let Some(spec) = doc.get_mut("spec") {
         let declared = super::modern::Declared::near(path);
         super::modern::rename_project_options(spec, &declared, &mut notes);
+        rename_rule_ids(spec, &lighthouse_spec::Catalog::bundled().aliases());
     }
     plan.kept
         .extend(notes.into_iter().map(|n| format!("{label}: {n}")));
@@ -80,6 +81,37 @@ pub(super) fn modernize_file(
     plan.actions
         .insert(path.to_owned(), super::Action::Write(text));
     Ok(true)
+}
+
+/// Renames the decisions a `Project` spec sets in `rules` and in the `rules`
+/// of its overrides by `names`, old id to new. A rule already set under the
+/// new id keeps its own setting.
+pub fn rename_rule_ids(
+    spec: &mut serde_json::Value,
+    names: &std::collections::BTreeMap<String, String>,
+) {
+    use serde_json::Value;
+    if let Some(Value::Object(rules)) = spec.get_mut("rules") {
+        rename_in(rules, names);
+    }
+    if let Some(Value::Array(overrides)) = spec.get_mut("overrides") {
+        for item in overrides {
+            if let Some(Value::Object(rules)) = item.get_mut("rules") {
+                rename_in(rules, names);
+            }
+        }
+    }
+}
+
+fn rename_in(
+    rules: &mut serde_json::Map<String, serde_json::Value>,
+    names: &std::collections::BTreeMap<String, String>,
+) {
+    for (old, new) in names {
+        if let Some(config) = rules.remove(old) {
+            rules.entry(new.clone()).or_insert(config);
+        }
+    }
 }
 
 fn migrate_plugins(value: &serde_json::Value) -> Result<serde_json::Value, String> {

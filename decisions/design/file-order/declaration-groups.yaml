@@ -16,7 +16,7 @@ spec:
 
     Go: Fixtures of a test file (its types, constants, variables and
     functions that take no testing handle) follow the same order; tests
-    and test helpers are placed by `testing/test-file-layout`. Order:
+    and test helpers are placed by `testing/file-layout`. Order:
     public types; private types; public constants; private constants;
     variables; all `init` functions; public options and functions; public
     constructors; public methods; clone, conversion and interface hooks;

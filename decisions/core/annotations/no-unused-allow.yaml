@@ -1,0 +1,119 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: core/no-unused-allow
+  uid: e4844ffb-3e36-43c0-96fd-1c75662969bb
+  labels:
+    lighthouse/pack: core
+    lighthouse/section: annotations
+  annotations:
+    lighthouse/was-builtin: core/unused-allow
+    lighthouse/was-names: core/unused-allow
+spec:
+  title: Allow annotations suppress something
+  context: >-
+    An exception that no longer applies is noise that hides the next real
+    one. A `lighthouse-disable` range that covers no finding is as stale as a
+    single directive, and so is a `lighthouse-enable` that closes no range, or
+    a directive that names no decision (there is no form without ids).
+  scope:
+    domain: code
+    subject: file
+    generated: true
+    tests: include
+  requirement: >-
+    An allow annotation SHOULD suppress a finding; one whose rule no longer
+    fires there, or is not enabled, SHOULD be removed.
+  severity: warn
+  check:
+    type: builtin
+    id: core/no-unused-allow
+  fix:
+    safety: suggested
+    type: ops
+    ops:
+      - op: delete
+        file: finding.file
+        span: finding.evidence.annotation
+  examples:
+    - name: go-stale-allow
+      language: go
+      kind: invalid
+      fixed:
+        - path: example.go
+          body: |-
+            package sample
+
+            func open() {}
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // lighthouse:allow design/exported-doc -- stale
+            func open() {}
+      expect:
+        - line: 3
+    - name: go-plain-comment
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            // open is not exported.
+            func open() {}
+    - name: rust-stale-allow
+      language: rust
+      kind: invalid
+      fixed:
+        - path: src/lib.rs
+          body: "fn open() {}"
+      files:
+        - path: src/lib.rs
+          body: |-
+            // lighthouse:allow design/exported-doc -- stale
+            fn open() {}
+      expect:
+        - line: 1
+    - name: rust-plain-comment
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            // open is not exported.
+            fn open() {}
+    - name: rust-stale-range
+      language: rust
+      kind: invalid
+      fixed:
+        - path: src/lib.rs
+          body: |-
+            /// Documented.
+            pub fn open() {}
+      files:
+        - path: src/lib.rs
+          body: |-
+            // lighthouse-disable design/exported-doc -- stale
+            /// Documented.
+            pub fn open() {}
+      expect:
+        - line: 1
+    - name: rust-unmatched-enable
+      language: rust
+      kind: invalid
+      fixed:
+        - path: src/lib.rs
+          body: "fn open() {}"
+      files:
+        - path: src/lib.rs
+          body: |-
+            // lighthouse-enable design/exported-doc
+            fn open() {}
+      expect:
+        - line: 1

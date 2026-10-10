@@ -143,7 +143,7 @@ fn suggested_fixes_wait_for_unsafe_fixes() {
         .assert()
         .success()
         .stderr(predicate::str::contains(
-            "not fixed a.go:3 design/section-banners",
+            "not fixed a.go:3 design/no-banners",
         ))
         .stderr(predicate::str::contains("--unsafe-fixes"));
     assert_eq!(read(&dir, "a.go"), banner);
@@ -153,7 +153,7 @@ fn suggested_fixes_wait_for_unsafe_fixes() {
         .assert()
         .success()
         .stderr(predicate::str::contains(
-            "fixed design/section-banners [suggested]",
+            "fixed design/no-banners [suggested]",
         ));
     assert_eq!(
         read(&dir, "a.go"),
@@ -724,13 +724,7 @@ fn a_run_without_the_store_still_honors_the_committed_decisions() {
         return;
     };
     let found = lighthouse(dir.path())
-        .args([
-            "check",
-            "--format",
-            "json",
-            "--rules",
-            "design/section-banners",
-        ])
+        .args(["check", "--format", "json", "--rules", "design/no-banners"])
         .output()
         .unwrap();
     let finding: serde_json::Value =

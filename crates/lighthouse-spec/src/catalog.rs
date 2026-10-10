@@ -320,9 +320,18 @@ impl Catalog {
             .flat_map(|s| &s.decisions)
     }
 
-    /// The decision with this `<pack>/<name>` id.
+    /// The decision with this `<pack>/<name>` id, or that was renamed from it.
     pub fn decision(&self, id: &str) -> Option<&Decision> {
-        self.decisions().find(|d| d.id() == id)
+        self.decisions()
+            .find(|d| d.id() == id)
+            .or_else(|| self.decisions().find(|d| d.was_names().any(|n| n == id)))
+    }
+
+    /// Each id a decision was renamed from, with the id it has now.
+    pub fn aliases(&self) -> BTreeMap<String, String> {
+        self.decisions()
+            .flat_map(|d| d.was_names().map(|old| (old.to_owned(), d.id().to_owned())))
+            .collect()
     }
 
     /// The uid of every decision by each id it answers to: its own and the ids

@@ -35,21 +35,18 @@ fn check_kind_deterministic_is_false_only_for_a_model() {
 fn check_kind_label_names_the_operation_of_a_standard_builtin() {
     let order = bundled("design/declaration-groups").check.as_ref().unwrap();
     assert_eq!(order.kind.label(), "order");
-    let proximity = bundled("design/related-symbols-close")
-        .check
-        .as_ref()
-        .unwrap();
+    let proximity = bundled("design/contiguity").check.as_ref().unwrap();
     assert_eq!(proximity.kind.label(), "proximity");
-    let cel = bundled("core/max-file-lines").check.as_ref().unwrap();
+    let cel = bundled("core/max-lines").check.as_ref().unwrap();
     assert_eq!(cel.kind.label(), "cel");
 }
 
 #[test]
 fn builtin_check_named_is_the_id_of_a_registered_rule_only() {
     let named = BuiltinCheck::Named(NamedRule {
-        id: "core/unused-allow".into(),
+        id: "core/no-unused-allow".into(),
     });
-    assert_eq!(named.named(), Some("core/unused-allow"));
+    assert_eq!(named.named(), Some("core/no-unused-allow"));
     let order = bundled("design/declaration-groups").check.as_ref().unwrap();
     let CheckKind::Builtin(op) = &order.kind else {
         panic!("builtin expected");
@@ -93,7 +90,7 @@ fn model_check() {
 
 #[test]
 fn decision_spec_enforced_needs_an_accepted_status_and_a_check() {
-    let decision = bundled("core/max-file-lines");
+    let decision = bundled("core/max-lines");
     assert!(decision.enforced());
     let proposed = decision.clone().map_spec(|mut s| {
         s.status = DecisionStatus::Proposed;
@@ -125,7 +122,7 @@ fn status_is_default_only_for_accepted() {
 
 #[test]
 fn decision_previous_semantic_version_hashes_what_the_enforcement_build_hashed() {
-    let decision = bundled("design/coupling-signal");
+    let decision = bundled("design/coupling");
     let rewired = decision.clone().map_spec(|mut s| {
         s.severity = Some(Severity::Info);
         s
@@ -139,7 +136,7 @@ fn decision_previous_semantic_version_hashes_what_the_enforcement_build_hashed()
 
 #[test]
 fn decision_earlier_versions_lists_every_version_older_builds_recorded() {
-    let decision = bundled("core/max-file-lines");
+    let decision = bundled("core/max-lines");
     let versions = decision.earlier_versions();
     assert!(versions.contains(&decision.previous_semantic_version()));
     assert!(versions.contains(&decision.legacy_semantic_version().unwrap()));

@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/no-hidden-target
+  uid: bf1a4788-84da-43a4-98ff-8a2449c1dc71
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: public-boundary
+  annotations:
+    lighthouse/was-names: testing/no-hiding-wrappers
+    lighthouse/was-enforcement: mechanical
+spec:
+  title: Helpers do not hide the target call
+  context: >-
+    A helper that wraps the call hides the very thing being specified.
+  scope:
+    domain: code
+    subject: test
+    tests: only
+  requirement: >-
+    Wrappers, builders, or helpers MUST NOT hide the target call or result being
+    specified, and MUST NOT be added merely for reuse. Setup helpers MAY exist
+    only when the specified behavior remains visible.
+  severity: warn
+  check:
+    type: model

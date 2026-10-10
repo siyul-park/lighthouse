@@ -11,8 +11,8 @@ Design minimizes conceptual surface while keeping responsibility and ownership b
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | `design/minimal-symbols` | Fewest necessary symbols | info · model |  | Required behavior MUST use the fewest necessary symbols and the least necessary code without weakening ownership or responsibility boundaries. |
-| `design/symbol-earns-existence` | Every symbol earns its existence | info · model |  | Every symbol MUST earn its existence through a distinct responsibility, invariant, ownership boundary, or reusable abstraction. |
-| `design/single-owner` | One implementation, one owner | info · model |  | Each behavior MUST have one implementation and each semantic rule MUST have one owner. |
+| `design/justified-symbols` | Every symbol earns its existence | info · model |  | Every symbol MUST earn its existence through a distinct responsibility, invariant, ownership boundary, or reusable abstraction. |
+| `design/single-implementation` | One implementation, one owner | info · model |  | Each behavior MUST have one implementation and each semantic rule MUST have one owner. |
 | `design/coherent-responsibility` | Coherent symbol responsibility | info · model |  | Each symbol MUST have one coherent responsibility, a narrow contract, and sufficient scope for every legitimate caller. |
 | `design/no-forced-reuse` | No reuse by merging unrelated roles | info · model |  | Unrelated roles MUST NOT be combined merely to force reuse. |
 
@@ -23,9 +23,9 @@ Dependency direction keeps stable, general code independent from specific policy
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | [`design/no-upward-dependency`](#depend-toward-the-stable-and-general) | Depend toward the stable and general | warn · model |  |  |
-| `design/general-lower-level` | Lower-level code is general | info · model |  | Lower-level or reusable symbols MUST express their responsibility in the most general form that fully fits it and MUST NOT depend on caller-specific policy, types, lifecycle, or semantics. |
-| [`design/no-dependency-on-callers`](#lower-level-code-does-not-depend-on-its-callers) | Lower-level code does not depend on its callers | warn · model |  |  |
-| `design/generalize-when-extracting` | Generalize when extracting | info · model |  | Shared functionality MUST be generalized when extracted; it MUST NOT be moved downward merely to relocate complexity. |
+| `design/general-lower-levels` | Lower-level code is general | info · model |  | Lower-level or reusable symbols MUST express their responsibility in the most general form that fully fits it and MUST NOT depend on caller-specific policy, types, lifecycle, or semantics. |
+| [`design/no-caller-dependency`](#lower-level-code-does-not-depend-on-its-callers) | Lower-level code does not depend on its callers | warn · model |  |  |
+| `design/general-extraction` | Generalize when extracting | info · model |  | Shared functionality MUST be generalized when extracted; it MUST NOT be moved downward merely to relocate complexity. |
 
 ### Depend toward the stable and general
 
@@ -39,7 +39,7 @@ Derived from: Martin, Stable Dependencies Principle
 
 ### Lower-level code does not depend on its callers
 
-`design/no-dependency-on-callers` · module · warn · model
+`design/no-caller-dependency` · module · warn · model
 
 *A dependency cycle makes both sides unusable alone.*
 
@@ -53,14 +53,14 @@ Physical layout should make ownership and collaboration visible while preserving
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/single-file-per-owner` | One owner, one file | warn · model |  | Symbols with one owner and cohesive responsibility MUST share a file. |
-| [`design/related-symbols-close`](#collaborators-stay-close) | Collaborators stay close | warn · proximity | suggested |  |
-| `design/readable-layout` | Layout shows ownership | info · model |  | Files and declaration order MUST make ownership, responsibility, and relationships easy to read. |
-| `design/separation-is-a-boundary` | Separation marks a boundary | info · model |  | Physical separation MUST represent a real responsibility, ownership, or abstraction boundary. |
+| `design/owner-file` | One owner, one file | warn · model |  | Symbols with one owner and cohesive responsibility MUST share a file. |
+| [`design/contiguity`](#collaborators-stay-close) | Collaborators stay close | warn · proximity | suggested |  |
+| `design/layout` | Layout shows ownership | info · model |  | Files and declaration order MUST make ownership, responsibility, and relationships easy to read. |
+| `design/meaningful-separation` | Separation marks a boundary | info · model |  | Physical separation MUST represent a real responsibility, ownership, or abstraction boundary. |
 
 ### Collaborators stay close
 
-`design/related-symbols-close` · file · warn · proximity · fix: suggested
+`design/contiguity` · file · warn · proximity · fix: suggested
 
 *Distance between collaborators hides their relationship. Go: The methods of one receiver type are contiguous within their declaration group: no free function, type, constant or variable, and no method of another type of the same visibility, between two of them. Rust: The members of one type (its impl blocks, inherent and trait impls) are adjacent in a file: another type, a free function or an item of another owner between two impl blocks of a type is a finding; two impl blocks side by side are fine.*
 
@@ -91,10 +91,10 @@ These rules reduce accidental duplication and unnecessary boundaries without hid
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/abstract-semantic-duplication` | Abstract semantic duplication | info · model |  | Multiple implementations of the same behavior or rule MUST converge on one owner; syntax similarity alone MUST NOT trigger abstraction. |
-| `design/merge-overlapping-symbols` | Merge overlapping symbols | info · model |  | Symbols with substantially the same responsibility at the same abstraction level MUST be consolidated; one general symbol SHOULD be preferred over parallel variants, wrappers, aliases, or coordinators. |
-| `design/split-real-boundaries` | Split real boundaries | info · model |  | Symbols MUST be separated only when responsibility, invariant, ownership, lifecycle, or abstraction level differs. |
-| `design/reuse-before-extension` | Reuse before extension | info · model |  | Existing symbols and composition SHOULD be preferred before adding layers, extension points, policy knobs, or parallel mechanisms. |
+| `design/no-duplication` | Abstract semantic duplication | info · model |  | Multiple implementations of the same behavior or rule MUST converge on one owner; syntax similarity alone MUST NOT trigger abstraction. |
+| `design/no-overlapping-symbols` | Merge overlapping symbols | info · model |  | Symbols with substantially the same responsibility at the same abstraction level MUST be consolidated; one general symbol SHOULD be preferred over parallel variants, wrappers, aliases, or coordinators. |
+| `design/boundary-splits` | Split real boundaries | info · model |  | Symbols MUST be separated only when responsibility, invariant, ownership, lifecycle, or abstraction level differs. |
+| `design/prefer-reuse` | Reuse before extension | info · model |  | Existing symbols and composition SHOULD be preferred before adding layers, extension points, policy knobs, or parallel mechanisms. |
 
 ## Structural Signals
 
@@ -102,15 +102,15 @@ Structural metrics are review signals, not proof of a design violation.
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/complexity-signal`](#complexity-is-a-review-signal) | Complexity is a review signal | warn · cel |  |  |
-| [`design/coupling-signal`](#coupling-is-a-review-signal) | Coupling is a review signal | warn · cel |  |  |
-| [`design/near-clone-signal`](#near-clones-are-a-review-signal) | Near-clones are a review signal | warn · model |  |  |
+| [`design/complexity`](#complexity-is-a-review-signal) | Complexity is a review signal | warn · cel |  |  |
+| [`design/coupling`](#coupling-is-a-review-signal) | Coupling is a review signal | warn · cel |  |  |
+| [`design/clones`](#near-clones-are-a-review-signal) | Near-clones are a review signal | warn · model |  |  |
 | `design/adjacent-siblings` | Similar siblings are adjacent | warn · model |  | Similar or symmetric siblings SHOULD be adjacent when they share an owner and implementation shape. |
-| `design/signals-are-advisory` | Signals stay advisory | doc |  | Metrics MUST NOT define universal declaration order, justify automatic reordering, or prove single responsibility. Mechanical checks SHOULD be preferred for directly expressible rules; heuristic signals SHOULD remain advisory and use deliberately high thresholds. |
+| `design/advisory-signals` | Signals stay advisory | doc |  | Metrics MUST NOT define universal declaration order, justify automatic reordering, or prove single responsibility. Mechanical checks SHOULD be preferred for directly expressible rules; heuristic signals SHOULD remain advisory and use deliberately high thresholds. |
 
 ### Complexity is a review signal
 
-`design/complexity-signal` · symbol · warn · cel
+`design/complexity` · symbol · warn · cel
 
 *High complexity often marks a symbol doing too much. Rust: `if`, `else if`, `if let`, `let ... else`, `while`, `for` and `loop` count as in other languages; a `match` counts its arms other than a wildcard or binding arm; `?` adds nothing; closures and `async` blocks nest what they contain. A function that is one `match` whose arms are single values (in return position) or `return`s is a table in code form and is not reported.*
 
@@ -163,7 +163,7 @@ Also: rust
 
 ### Coupling is a review signal
 
-`design/coupling-signal` · symbol · warn · cel
+`design/coupling` · symbol · warn · cel
 
 *A dependency hub changes for many reasons. Rust: The unit is the Rust module (a `mod` and every inline module are distinct units). Methods count with their impl's type; calls through a receiver whose type is not written in the code are not seen, so fan counts are lower bounds.*
 
@@ -214,7 +214,7 @@ Also: rust
 
 ### Near-clones are a review signal
 
-`design/near-clone-signal` · symbol · warn · model
+`design/clones` · symbol · warn · model
 
 *Near-identical bodies often hide one concept implemented twice.*
 
@@ -228,10 +228,10 @@ Function structure should make meaningful behavior reusable and readable, not me
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/justified-helper` | Helpers are justified | info · model |  | A helper MUST be extracted only to remove semantic duplication, name reusable behavior or policy, isolate an abstraction level, or serve as a function value. |
+| `design/justified-helpers` | Helpers are justified | info · model |  | A helper MUST be extracted only to remove semantic duplication, name reusable behavior or policy, isolate an abstraction level, or serve as a function value. |
 | [`design/private-helper-callers`](#private-helpers-have-two-callers) | Private helpers have two callers | info · cel |  |  |
-| [`design/single-use-wrapper`](#inline-single-use-wrappers) | Inline single-use wrappers | warn · cel |  |  |
-| [`design/receiver-owned-behavior`](#behavior-lives-with-its-owner) | Behavior lives with its owner | warn · cel |  |  |
+| [`design/no-single-use-wrapper`](#inline-single-use-wrappers) | Inline single-use wrappers | warn · cel |  |  |
+| [`design/prefer-method`](#behavior-lives-with-its-owner) | Behavior lives with its owner | warn · cel |  |  |
 | `design/single-abstraction-level` | One abstraction level per function | info · model |  | One function MUST stay at one abstraction level. |
 | [`design/callers-before-callees`](#callers-before-callees) | Callers before callees | warn · cel | suggested |  |
 
@@ -239,7 +239,7 @@ Function structure should make meaningful behavior reusable and readable, not me
 
 `design/private-helper-callers` · symbol · info · cel · strict
 
-*A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count. Forwarding wrappers are reported by `design/single-use-wrapper`, and a function used as a value is not judged. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.*
+*A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count. Forwarding wrappers are reported by `design/no-single-use-wrapper`, and a function used as a value is not judged. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.*
 
 A private helper SHOULD have at least two callers.
 
@@ -275,7 +275,7 @@ Also: rust
 
 ### Inline single-use wrappers
 
-`design/single-use-wrapper` · symbol · warn · cel
+`design/no-single-use-wrapper` · symbol · warn · cel
 
 *A forwarding wrapper adds a name without adding meaning. Rust: Applies to private functions and methods (items without `pub`); a trait impl method is as visible as its trait and is not a candidate. Calls are resolved syntactically, so a method call on a receiver whose type is not written in the code is recorded as a possible use of every private method of that name in the crate, and keeps such a method from being reported.*
 
@@ -309,7 +309,7 @@ Also: rust
 
 ### Behavior lives with its owner
 
-`design/receiver-owned-behavior` · symbol · warn · cel
+`design/prefer-method` · symbol · warn · cel
 
 *Where a function lives tells readers who owns the behavior. Go: A private package function with at least one production caller, every caller being a method of one type, never used as a value and not named like a constructor, is reported. Test callers do not count. A function called by any other function, or by methods of two types, is not judged. Rust: The same for a private free function and the methods of one `impl` target type. Parameter types are not resolved for Rust, so `takes_owner_param` is always false there.*
 
@@ -383,19 +383,19 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/single-term-per-concept` | One term, one concept | info · model |  | One term MUST represent one concept across packages. |
+| `design/terminology` | One term, one concept | info · model |  | One term MUST represent one concept across packages. |
 | `design/minimal-names` | Minimal names | info · model |  | One word SHOULD be the default; a multi-word name MUST add only the minimum qualifier needed to express a distinction. |
 | [`design/max-name-words`](#names-have-at-most-a-few-words) | Names have at most a few words | warn · cel |  |  |
 | [`design/no-redundant-qualifiers`](#no-redundant-qualifiers) | No redundant qualifiers | warn · cel |  |  |
 | `design/standard-abbreviations` | Keep standard abbreviations | warn · model |  | Standard abbreviations MUST be kept in their conventional form. |
-| `design/short-names-limited` | One-letter names stay small | warn · model |  | One-letter names MUST be limited to conventional receivers, indexes, and tiny scopes. |
+| `design/short-names` | One-letter names stay small | warn · model |  | One-letter names MUST be limited to conventional receivers, indexes, and tiny scopes. |
 | `design/predicate-names` | Predicate names state their form | warn · model |  | Predicates MUST name their form: `HasX` for containing or registering X, `IsX` for a state predicate, `MatchX` for comparison or validation against X, and a bare `X` for a direct boolean value. `At` MUST be used for position or time predicates. |
-| `design/reserved-action-verbs` | Action verbs are reserved | info · model |  | Configured action verbs, by default `Build`, `Compile`, `Publish`, `Capture`, and `Use`, MUST be reserved for actions or transitions. |
-| `design/singular-capability-plural-collection` | Singular capabilities, plural collections | info · model |  | Capability names MUST be singular; collections and stores MUST be plural. |
+| `design/reserved-verbs` | Action verbs are reserved | info · model |  | Configured action verbs, by default `Build`, `Compile`, `Publish`, `Capture`, and `Use`, MUST be reserved for actions or transitions. |
+| `design/plural-collections` | Singular capabilities, plural collections | info · model |  | Capability names MUST be singular; collections and stores MUST be plural. |
 
 ### Names have at most a few words
 
-`design/max-name-words` · symbol · warn · cel
+`design/max-name-words` · symbol · warn · cel · strict
 
 *One word is the default and a longer name adds only the qualifier a distinction needs (`design/minimal-names`, which a reviewer judges). This is the part that can be counted, with the option name of ESLint's `max-lines` and `max-params`. Words are the parts of a name split at `_`, at a lower-to-upper change and at the end of an acronym: `parseHTTPRequest` and `parse_http_request` have three.*
 
@@ -451,17 +451,17 @@ Public APIs are stable contracts: expose the minimum caller-facing abstraction a
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/interface-at-consumer` | Interfaces live at the consumer | warn · model |  | Interfaces MUST be used only when callers supply behavior and MUST be defined where that behavior is consumed. |
-| `design/narrow-inputs-concrete-outputs` | Narrow inputs, concrete outputs | info · model |  | Public inputs SHOULD use the narrowest reusable abstraction that fully expresses the contract; public outputs SHOULD use the most concrete public type unless polymorphism is itself the contract. |
-| [`design/no-private-types-in-public-api`](#public-apis-do-not-expose-private-types) | Public APIs do not expose private types | warn · model |  |  |
-| `design/contract-not-state` | Exported types expose contract, not state | info · model |  | Exported types SHOULD expose contract rather than mutable implementation state; data-only values and ABI bridge types MAY expose their fields. |
+| `design/consumer-interfaces` | Interfaces live at the consumer | warn · model |  | Interfaces MUST be used only when callers supply behavior and MUST be defined where that behavior is consumed. |
+| `design/narrow-inputs` | Narrow inputs, concrete outputs | info · model |  | Public inputs SHOULD use the narrowest reusable abstraction that fully expresses the contract; public outputs SHOULD use the most concrete public type unless polymorphism is itself the contract. |
+| [`design/no-private-types`](#public-apis-do-not-expose-private-types) | Public APIs do not expose private types | warn · model |  |  |
+| `design/no-exposed-state` | Exported types expose contract, not state | info · model |  | Exported types SHOULD expose contract rather than mutable implementation state; data-only values and ABI bridge types MAY expose their fields. |
 | `design/validated-constructors` | Constructors validate | info · model |  | Constructors MUST require inputs with no safe default and MUST validate required dependencies and shape; `Build` MUST validate a complete builder. |
-| `design/required-args-optional-options` | Required arguments, optional options | info · model |  | Required constructor values MUST be passed as arguments; optional values MUST be injected through options. |
+| `design/optional-options` | Required arguments, optional options | info · model |  | Required constructor values MUST be passed as arguments; optional values MUST be injected through options. |
 | `design/no-speculative-api` | No speculative API surface | info · model |  | Generic parameter-group types, speculative options, extension points, aliases, and pass-through wrappers MUST NOT be exposed without a distinct contract. |
 
 ### Public APIs do not expose private types
 
-`design/no-private-types-in-public-api` · symbol · warn · model
+`design/no-private-types` · symbol · warn · model
 
 *Callers must be able to use an API without naming private types.*
 
@@ -485,16 +485,16 @@ Ownership makes it explicit who creates, changes, and ends mutable state or reso
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/single-state-owner` | One owner per mutable state | info · model |  | One symbol MUST own each mutable state and its transitions; shared mutable state MUST have one owner and one synchronization strategy. |
-| `design/private-state-behind-owner` | Private state stays behind its owner | warn · model |  | Private state belongs to its owner. An implementation component of an owner MAY access that owner's private state when it implements the owner's responsibility; unrelated code in the same package MUST use the owner's contract. |
-| `design/borrow-within-boundary` | Borrowed values stay within their boundary | info · model |  | Borrowed values MUST NOT cross or outlive their ownership boundary. |
-| `design/single-resource-owner` | One owner per resource transition | info · model |  | Retain/release and resource transitions MUST have one owner, and each resource MUST be released exactly once. |
-| `design/layout-declarations-hold-no-state` | Layout declarations hold no runtime state | info · model |  | Layout-only declarations MAY name private members but MUST NOT access runtime state. |
-| [`design/no-exported-mutable-global`](#no-exported-mutable-global) | No exported mutable global | warn · cel |  |  |
+| `design/state-owner` | One owner per mutable state | info · model |  | One symbol MUST own each mutable state and its transitions; shared mutable state MUST have one owner and one synchronization strategy. |
+| `design/encapsulated-state` | Private state stays behind its owner | warn · model |  | Private state belongs to its owner. An implementation component of an owner MAY access that owner's private state when it implements the owner's responsibility; unrelated code in the same package MUST use the owner's contract. |
+| `design/scoped-borrows` | Borrowed values stay within their boundary | info · model |  | Borrowed values MUST NOT cross or outlive their ownership boundary. |
+| `design/resource-owner` | One owner per resource transition | info · model |  | Retain/release and resource transitions MUST have one owner, and each resource MUST be released exactly once. |
+| `design/stateless-layout` | Layout declarations hold no runtime state | info · model |  | Layout-only declarations MAY name private members but MUST NOT access runtime state. |
+| [`design/no-mutable-globals`](#no-exported-mutable-global) | No exported mutable global | warn · cel |  |  |
 
 ### No exported mutable global
 
-`design/no-exported-mutable-global` · symbol · warn · cel
+`design/no-mutable-globals` · symbol · warn · cel
 
 *State that any importer can assign has no owner and no invariant. Go: A package-level `var` whose name is exported (and not an `Err...` sentinel) outside test and generated files. Rust: Not checked: an immutable `pub static` is not mutable state and the provider does not report whether a static is `mut`.*
 
@@ -528,7 +528,7 @@ Concurrency rules prevent races and leaks by making shared state and shutdown ow
 | --- | --- | --- | --- | --- |
 | `design/explicit-shutdown` | Long-lived tasks can be stopped | warn · model |  | Long-lived concurrent tasks MUST have an explicit shutdown path. |
 | [`design/context-first`](#cancellation-context-comes-first) | Cancellation context comes first | warn · model |  |  |
-| `design/no-stored-request-context` | Request contexts are not stored | warn · model |  | Request contexts MUST NOT be stored in long-lived objects. |
+| `design/no-stored-context` | Request contexts are not stored | warn · model |  | Request contexts MUST NOT be stored in long-lived objects. |
 
 ### Cancellation context comes first
 
@@ -552,11 +552,11 @@ Errors are contracts: callers should be able to classify failures, preserve caus
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/stable-error-categories` | Stable error categories | warn · model |  | Semantic errors MUST use stable, named error values or types, and semantic categories MUST NOT be created from ad hoc formatted messages alone. |
+| `design/error-categories` | Stable error categories | warn · model |  | Semantic errors MUST use stable, named error values or types, and semantic categories MUST NOT be created from ad hoc formatted messages alone. |
 | [`design/error-identity`](#preserve-error-identity) | Preserve error identity | warn · model |  |  |
-| `design/translate-errors-at-boundary` | Translate errors at their boundary | info · model |  | Error categories MUST be translated only at their owning boundary. |
-| `design/errors-hide-private-state` | Errors do not leak state | info · model |  | Errors MUST NOT expose private or sensitive process state. |
-| `design/errors-not-panics` | Return errors, do not panic | info · model |  | Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors. |
+| `design/error-translation` | Translate errors at their boundary | info · model |  | Error categories MUST be translated only at their owning boundary. |
+| `design/no-state-in-errors` | Errors do not leak state | info · model |  | Errors MUST NOT expose private or sensitive process state. |
+| `design/no-panic` | Return errors, do not panic | info · model |  | Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors. |
 
 ### Preserve error identity
 
@@ -581,14 +581,14 @@ Declaration order should let a reader follow ownership and behavior from public 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | [`design/declaration-groups`](#declarations-follow-ownership-groups) | Declarations follow ownership groups | error · order | safe |  |
-| `design/top-down-reading` | Read from behavior to machinery | info · model |  | A cohesive implementation MUST read from higher-level behavior toward shared machinery. |
-| `design/order-is-not-a-reason-to-split` | Ordering never justifies splits | doc |  | These ordering rules MUST NOT justify artificial file splits, wrappers, or duplicated helpers. |
+| `design/top-down-order` | Read from behavior to machinery | info · model |  | A cohesive implementation MUST read from higher-level behavior toward shared machinery. |
+| `design/no-split-for-order` | Ordering never justifies splits | doc |  | These ordering rules MUST NOT justify artificial file splits, wrappers, or duplicated helpers. |
 
 ### Declarations follow ownership groups
 
 `design/declaration-groups` · file · error · order · fix: safe
 
-*A fixed group order makes every file predictable. Go: Fixtures of a test file (its types, constants, variables and functions that take no testing handle) follow the same order; tests and test helpers are placed by `testing/test-file-layout`. Order: public types; private types; public constants; private constants; variables; all `init` functions; public options and functions; public constructors; public methods; clone, conversion and interface hooks; private functions and methods. Rust: The same principle, from the concepts to the machinery, with a type kept next to its impl blocks because that is how Rust code reads. Order: constants; statics; types, traits and their impl blocks (types and impls are one group, `owner-contiguity` keeps an owner's impls together); public free functions; private free functions. Associated functions named `new` come before the other methods of their type. Items of `#[cfg(test)]` modules are not ordered. Visibility counts as public when it is `pub` or `pub(crate)`.*
+*A fixed group order makes every file predictable. Go: Fixtures of a test file (its types, constants, variables and functions that take no testing handle) follow the same order; tests and test helpers are placed by `testing/file-layout`. Order: public types; private types; public constants; private constants; variables; all `init` functions; public options and functions; public constructors; public methods; clone, conversion and interface hooks; private functions and methods. Rust: The same principle, from the concepts to the machinery, with a type kept next to its impl blocks because that is how Rust code reads. Order: constants; statics; types, traits and their impl blocks (types and impls are one group, `owner-contiguity` keeps an owner's impls together); public free functions; private free functions. Associated functions named `new` come before the other methods of their type. Items of `#[cfg(test)]` modules are not ordered. Visibility counts as public when it is `pub` or `pub(crate)`.*
 
 Top-level declarations in a file MUST follow the language's ownership-group order, from public contract to private mechanics. Initializers MUST stay together and MUST precede non-initializer functions and methods. Within one type, constructors MUST precede other behavior.
 
@@ -622,9 +622,9 @@ Comments preserve facts that code cannot express; they should not narrate code t
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/comments-preserve-facts` | Comments preserve facts | info · model |  | Comments MAY be added only when clearly necessary to preserve invariants and consequences, external or cross-package constraints, rejected alternatives with evidence, or external contracts or specifications. A necessary comment MUST state the smallest sufficient fact, constraint, invariant, or consequence. |
+| `design/factual-comments` | Comments preserve facts | info · model |  | Comments MAY be added only when clearly necessary to preserve invariants and consequences, external or cross-package constraints, rejected alternatives with evidence, or external contracts or specifications. A necessary comment MUST state the smallest sufficient fact, constraint, invariant, or consequence. |
 | [`design/no-narration`](#comments-do-not-narrate) | Comments do not narrate | info · model |  |  |
-| [`design/section-banners`](#comments-do-not-label-sections) | Comments do not label sections | warn · cel | suggested |  |
+| [`design/no-banners`](#comments-do-not-label-sections) | Comments do not label sections | warn · cel | suggested |  |
 | [`design/exported-doc`](#exported-symbols-are-documented) | Exported symbols are documented | warn · cel |  |  |
 
 ### Comments do not narrate
@@ -647,7 +647,7 @@ count++
 
 ### Comments do not label sections
 
-`design/section-banners` · file · warn · cel · fix: suggested
+`design/no-banners` · file · warn · cel · fix: suggested
 
 *A banner restates structure that names and file layout already carry. Go: Reported when every non-blank line of a comment group is a banner line. A group that mixes banner lines with prose (a table, a diagram) is documentation and passes. Rust: Doc comments (`///`, `//!`) are Markdown and never banners; a plain `//` or block comment made only of banner lines is reported.*
 
@@ -715,5 +715,5 @@ Generated and platform-specific code should remain behind the mechanism and boun
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/generated-via-generator` | Generated files change only through their generator | warn · model |  | Generated files MUST change only through their generator. |
-| `design/platform-behind-owner` | Platform mechanics stay behind their owner | info · model |  | Platform mechanics MUST stay behind matching build constraints and owner packages. |
+| `design/no-generated-edits` | Generated files change only through their generator | warn · model |  | Generated files MUST change only through their generator. |
+| `design/encapsulated-platform` | Platform mechanics stay behind their owner | info · model |  | Platform mechanics MUST stay behind matching build constraints and owner packages. |

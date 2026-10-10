@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-mutable-globals
+  uid: 61a20af8-1053-4e04-bfbe-8512d7595901
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: ownership
+  annotations:
+    lighthouse/was-names: design/no-exported-mutable-global
+    lighthouse/migrated-from: design/ownership/rules/no-exported-mutable-global.yaml
+    lighthouse/was-exceptions: " Sentinel errors, by the `Err` name prefix, are exported variables by convention and are not reported."
+spec:
+  title: No exported mutable global
+  context: >-
+    State that any importer can assign has no owner and no invariant.
+
+    Go: A package-level `var` whose name is exported (and not an `Err...`
+    sentinel) outside test and generated files.
+
+    Rust: Not checked: an immutable `pub static` is not mutable state and
+    the provider does not report whether a static is `mut`.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    An exported package-level variable MUST NOT hold mutable state: state
+    belongs to an owner that guards it, and a global that never changes
+    SHOULD be a constant or a function. Sentinel errors, by the `Err` name
+    prefix, are exported variables by convention and are not reported.
+  severity: warn
+  check:
+    type: cel
+    where: >-
+      symbol.kind == "var" && symbol.owner == "" && symbol.visibility !=
+      "private" && symbol.lang == "go" &&
+      !symbol.name.startsWith("Err")
+    message: >-
+      exported variable {{ symbol.name }} is mutable package state anyone can
+      assign; keep it private and expose it through its owner
+    evidence:
+      symbol: symbol.id
+      module: symbol.module
+  examples:
+    - name: invalid
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package config
+
+            var Defaults = map[string]string{}
+      expect:
+        - line: 3
+    - name: valid
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package config
+
+            import "errors"
+
+            var ErrMissing = errors.New("missing")
+
+            var defaults = map[string]string{}
+
+            const Limit = 3
+    - name: rust-valid
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: "pub static LIMIT: u8 = 3;"

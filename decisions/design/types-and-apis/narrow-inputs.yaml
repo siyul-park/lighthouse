@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/narrow-inputs
+  uid: 9e7113b8-f9f7-4a1c-a9db-588048062c78
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: types-and-apis
+  annotations:
+    lighthouse/was-names: design/narrow-inputs-concrete-outputs
+spec:
+  title: "Narrow inputs, concrete outputs"
+  context: >-
+    Callers get flexibility on the way in and precision on the way out.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Public inputs SHOULD use the narrowest reusable abstraction that fully
+    expresses the contract; public outputs SHOULD use the most concrete public
+    type unless polymorphism is itself the contract.
+  severity: info
+  check:
+    type: model

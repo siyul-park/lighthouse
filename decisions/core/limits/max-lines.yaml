@@ -1,0 +1,67 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: core/max-lines
+  uid: e6ca5b54-89c2-4528-b9a1-8db7d6de564b
+  labels:
+    lighthouse/pack: core
+    lighthouse/section: limits
+  annotations:
+    lighthouse/was-names: core/max-file-lines
+    lighthouse/was-builtin: core/max-file-lines
+spec:
+  title: Files stay below a line limit
+  context: >-
+    Large files tend to mix responsibilities.
+  scope:
+    domain: code
+    subject: file
+    generated: true
+    tests: include
+  requirement: "A file SHOULD stay at or below the configured line limit (option `max`)."
+  severity: warn
+  options:
+    type: object
+    properties:
+      max:
+        type: integer
+        default: 1000
+        description: Largest number of lines a file may have.
+    additionalProperties: false
+  check:
+    type: cel
+    where: file.lines > options.max
+    message: "file has {{ file.lines }} lines, limit is {{ options.max }}"
+    evidence:
+      lines: file.lines
+      max: options.max
+    at:
+      line: options.max + 1
+      endLine: file.lines
+    identity:
+      subject: file.path
+  examples:
+    - name: over-limit
+      language: text
+      kind: invalid
+      options:
+        max: 2
+      files:
+        - path: big.txt
+          body: |-
+            a
+            b
+            c
+      expect:
+        - line: 3
+    - name: within-limit
+      language: text
+      kind: valid
+      options:
+        max: 2
+      files:
+        - path: small.txt
+          body: |-
+            a
+            b

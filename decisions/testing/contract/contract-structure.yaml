@@ -1,0 +1,26 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/contract-structure
+  uid: 61a91dad-690e-48e0-9268-8cd98e41e58d
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: contract
+  annotations:
+    lighthouse/was-names: testing/structure-serves-contract
+spec:
+  title: Structure serves the contract
+  context: >-
+    Test structure shaped by coverage or implementation hides the
+    specification.
+  scope:
+    domain: code
+    subject: test
+    tests: only
+  requirement: >-
+    Test structure MUST serve the contract rather than implementation shape or
+    coverage.
+  severity: info
+  check:
+    type: model

@@ -386,7 +386,7 @@ fn the_plan_of_a_catalog_binds_each_fixable_rule_to_the_fixer_of_its_pattern() {
     assert_eq!(groups.fixer, "design/declaration-groups");
     assert_eq!(groups.cap, Safety::Safe);
     assert!(groups.mechanical);
-    let banners = plan.get("design/section-banners").unwrap();
+    let banners = plan.get("design/no-banners").unwrap();
     assert_eq!(banners.cap, Safety::Suggested);
     assert!(!banners.mechanical);
     assert!(plan.get("design/exported-doc").is_none());

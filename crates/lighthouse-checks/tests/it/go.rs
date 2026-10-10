@@ -267,7 +267,7 @@ fn config(plugin: &Path) -> String {
 const CONFIG: &str = r#"extends = ["design/recommended"]
 
 [rules]
-"design/coupling-signal" = { level = "warn", options = { hubFanIn = 2, hubFanOut = 2, hubStatements = 1 } }
+"design/coupling" = { level = "warn", options = { hubFanIn = 2, hubFanOut = 2, hubStatements = 1 } }
 "#;
 
 fn line_of(source: &str, needle: &str) -> u32 {
@@ -302,10 +302,10 @@ fn engine_checks_a_multi_file_go_package() {
     // The original four rules; the ordering and naming rules have their own
     // examples and would also speak about this deliberately small package.
     let only = [
-        "design/complexity-signal",
-        "design/coupling-signal",
+        "design/complexity",
+        "design/coupling",
         "design/exported-doc",
-        "design/single-use-wrapper",
+        "design/no-single-use-wrapper",
     ]
     .map(str::to_owned);
     let outcome = engine(&plugin, root, "").check(&[], &only).unwrap();
@@ -325,7 +325,7 @@ fn engine_checks_a_multi_file_go_package() {
         (
             "store/load.go",
             line_of(LOAD, "func (s *Store) load"),
-            "design/single-use-wrapper",
+            "design/no-single-use-wrapper",
         ),
         (
             "store/load.go",
@@ -335,7 +335,7 @@ fn engine_checks_a_multi_file_go_package() {
         (
             "store/store.go",
             line_of(STORE, "func (s *Store) hub"),
-            "design/coupling-signal",
+            "design/coupling",
         ),
         (
             "store/store.go",

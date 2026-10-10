@@ -9,8 +9,8 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 const DOC: &str = "design/exported-doc";
-const OWNER: &str = "testing/owner-test";
-const SINGLE: &str = "testing/single-owner-test";
+const OWNER: &str = "testing/owner";
+const SINGLE: &str = "testing/unique-owner";
 
 const PACKS: &str = "\"core\", \"design\", \"testing\"";
 const PRESETS: &str = "[\"core/recommended\", \"design/recommended\", \"testing/recommended\"]";

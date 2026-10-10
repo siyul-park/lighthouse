@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/red-green
+  uid: 03849464-a542-4bd3-941e-f292e9b84e3d
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: tdd
+  annotations:
+    lighthouse/was-names: testing/red-green-cycle
+spec:
+  title: Smallest failing contract first
+  context: >-
+    Seeing the contract fail first proves the test can fail.
+  scope:
+    domain: code
+    subject: test
+    tests: only
+  requirement: >-
+    For each behavior change, the agent MUST state the contract and invariants,
+    write the narrowest falsifying test, observe the expected failure when
+    practical, implement the smallest owning change, and run focused checks
+    followed by applicable structural and repository gates.

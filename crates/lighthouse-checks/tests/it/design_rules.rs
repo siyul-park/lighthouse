@@ -99,7 +99,7 @@ fn exported_doc_skips_generated_and_test_files() {
     assert!(w.check(DOC, json!({})).is_empty());
 }
 
-const WRAP: &str = "design/single-use-wrapper";
+const WRAP: &str = "design/no-single-use-wrapper";
 
 /// `Get` calls the wrapper `load`, which only forwards to `read`.
 fn wrapped() -> (World, Symbol, Symbol, Symbol) {
@@ -181,7 +181,7 @@ fn single_use_wrapper_ignores_cycles_and_public_wrappers() {
     assert!(w.check(WRAP, json!({})).is_empty(), "public wrapper");
 }
 
-const COMPLEX: &str = "design/complexity-signal";
+const COMPLEX: &str = "design/complexity";
 
 fn branches(n: usize) -> Vec<Flow> {
     vec![Flow::new(FlowKind::If, 0); n]
@@ -232,7 +232,7 @@ fn complexity_skips_dispatchers_and_tests() {
     assert!(w.check(COMPLEX, json!({})).is_empty());
 }
 
-const COUPLE: &str = "design/coupling-signal";
+const COUPLE: &str = "design/coupling";
 
 fn hub_options() -> Value {
     json!({ "hubFanIn": 2, "hubFanOut": 2, "hubStatements": 1 })

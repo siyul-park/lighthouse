@@ -205,13 +205,13 @@ fn the_server_lists_its_tools_and_resources() {
         json!({ "uri": "lighthouse://decisions/core/max-file-lines" }),
     );
     let text = pattern["result"]["contents"][0]["text"].as_str().unwrap();
-    assert!(text.contains("max-file-lines"), "{text}");
+    assert!(text.contains("core/max-lines"), "{text}");
     let config = client.request("resources/read", json!({ "uri": "lighthouse://config" }));
     assert!(
         config["result"]["contents"][0]["text"]
             .as_str()
             .unwrap()
-            .contains("core/max-file-lines")
+            .contains("core/max-lines")
     );
     let missing = client.request(
         "resources/read",
@@ -437,7 +437,7 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
     // the project's `rules`.
     let bundled = client.tool(
         "decision_update",
-        json!({ "id": "core/max-file-lines", "patch": { "requirement": "A file MUST be short." } }),
+        json!({ "id": "core/max-lines", "patch": { "requirement": "A file MUST be short." } }),
     );
     assert!(bundled.unwrap_err().to_string().contains("rules"));
     assert!(!rules_dir.join("override-core-max-file-lines.yaml").exists());
@@ -452,11 +452,11 @@ fn decision_list_and_explain_describe_decisions() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|r| r["id"] == "core/max-file-lines")
+        .find(|r| r["id"] == "core/max-lines")
         .unwrap();
     assert_eq!(row["enabled"], true);
     let explained = client
-        .tool("explain", json!({ "id": "core/max-file-lines" }))
+        .tool("explain", json!({ "id": "core/max-lines" }))
         .unwrap();
     assert!(explained["markdown"].as_str().unwrap().contains("Status:"));
     assert!(
@@ -565,7 +565,7 @@ fn fix_selects_by_fingerprint_and_holds_suggestions_back_until_asked() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|g| g["rule"] == "design/section-banners")
+        .find(|g| g["rule"] == "design/no-banners")
         .unwrap_or_else(|| panic!("{found}"));
     let fingerprint = banners["files"]["src/lib.rs"][0][2].as_str().unwrap();
 

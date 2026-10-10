@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-stored-context
+  uid: 93ef32fc-fd96-4ffe-94c4-0ca01341e71f
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: concurrency
+  annotations:
+    lighthouse/was-names: design/no-stored-request-context
+spec:
+  title: Request contexts are not stored
+  context: >-
+    A request context outliving its request carries stale cancellation.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: Request contexts MUST NOT be stored in long-lived objects.
+  severity: warn
+  check:
+    type: model

@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-generated-edits
+  uid: ebf5aefa-0a2d-4df4-af84-1ec8f33358d6
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: generated-and-platform
+  annotations:
+    lighthouse/was-names: design/generated-via-generator
+spec:
+  title: Generated files change only through their generator
+  context: >-
+    Hand edits to generated files are lost on the next run.
+  scope:
+    domain: code
+    subject: file
+  requirement: Generated files MUST change only through their generator.
+  severity: warn
+  check:
+    type: model

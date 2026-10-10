@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-duplication
+  uid: aeab463d-9e93-4f38-9851-ab5624b963ef
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: structural-rules
+  annotations:
+    lighthouse/was-names: design/abstract-semantic-duplication
+spec:
+  title: Abstract semantic duplication
+  context: >-
+    Two implementations of one rule will diverge.
+  scope:
+    domain: code
+    subject: project
+  requirement: >-
+    Multiple implementations of the same behavior or rule MUST converge on one
+    owner; syntax similarity alone MUST NOT trigger abstraction.
+  severity: info
+  check:
+    type: model

@@ -172,6 +172,27 @@ impl Layer {
         &self.extends
     }
 
+    /// Renames the rules this layer sets (in `rules` and in every override)
+    /// by `names`, old id to new; returns the `(old, new)` pairs it renamed.
+    /// A rule already set under the new id keeps its own setting.
+    pub fn rename_rules(&mut self, names: &BTreeMap<String, String>) -> Vec<(String, String)> {
+        let mut renamed = Vec::new();
+        let sets =
+            std::iter::once(&mut self.rules).chain(self.overrides.iter_mut().map(|o| &mut o.rules));
+        for rules in sets {
+            for (old, new) in names {
+                let Some(config) = rules.remove(old) else {
+                    continue;
+                };
+                rules.entry(new.clone()).or_insert(config);
+                if !renamed.iter().any(|(o, _)| o == old) {
+                    renamed.push((old.clone(), new.clone()));
+                }
+            }
+        }
+        renamed
+    }
+
     /// Entries named in `rules` and in every override, unmerged.
     pub fn configured(&self) -> impl Iterator<Item = (&str, &RuleConfig)> {
         self.rules
@@ -439,6 +460,12 @@ impl Config {
     /// The rules this project sets and the projects it extends.
     pub fn layer(&self) -> &Layer {
         &self.layer
+    }
+
+    /// Renames the rules the project sets by `names`, old id to new; see
+    /// [`Layer::rename_rules`].
+    pub fn rename_rules(&mut self, names: &BTreeMap<String, String>) -> Vec<(String, String)> {
+        self.layer.rename_rules(names)
     }
 
     /// Project names named in `extends`, in declaration order.

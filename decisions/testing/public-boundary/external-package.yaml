@@ -1,0 +1,144 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/external-package
+  uid: 88a25428-d3d8-43c5-adf4-a2d99a45ffa6
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: public-boundary
+  annotations:
+    lighthouse/was-names: testing/external-test-package
+    lighthouse/was-builtin: testing/external-test-package
+spec:
+  title: Contract tests live outside the target
+  context: >-
+    Living outside the target makes private access impossible rather than
+    discouraged.
+
+    Go: Tests live in `package <target>_test`. A test file inside the
+    target package is reported when it uses an unexported symbol of that
+    package; one that only uses exported symbols is left alone.
+
+    Python: Contract tests import only the package's public API.
+
+    Rust: Contract tests are integration tests under `tests/`. Inline
+    `#[cfg(test)]` unit tests are never reported: the provider cannot tell
+    a `pub(crate)` item from a `pub` one of an unpublished crate, so it
+    cannot say that such a test could have lived in `tests/`.
+
+    TypeScript: Contract tests import only the package's public exports.
+  scope:
+    domain: code
+    subject: test
+    tests: only
+  requirement: >-
+    Feature contract tests MUST use only the target's public symbols and MUST
+    live outside the target's private scope.
+  severity: error
+  check:
+    type: cel
+    select: file
+    where: >-
+      file.module != '' && file.module_known
+      && file.module_test_of == '' && size(file.private_reach.symbols) > 0
+    message: >-
+      test file {{ file.path }} lives inside the package it tests and uses its private
+      symbols ({{ size(file.private_reach.symbols) }}); test through the public boundary
+      from outside the package
+    evidence:
+      test_file: file.path
+      package: file.module
+      private_symbols: file.private_reach.symbols
+    at:
+      symbol: file.private_reach.first
+    identity:
+      subject: file.private_reach.first
+  examples:
+    - name: invalid
+      language: go
+      kind: invalid
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/store
+
+            go 1.26
+        - path: store.go
+          body: |-
+            package store
+
+            func get() int { return 1 }
+
+            func Get() int { return get() }
+        - path: store_test.go
+          body: "package store\n\nimport \"testing\"\n\nfunc TestGet(t *testing.T) {\n\tif get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}"
+      expect:
+        - line: 5
+    - name: valid
+      language: go
+      kind: valid
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/store
+
+            go 1.26
+        - path: store.go
+          body: |-
+            package store
+
+            func get() int { return 1 }
+
+            func Get() int { return get() }
+        - path: store_test.go
+          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc TestGet(t *testing.T) {\n\tif store.Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}"
+    - name: internal-test-of-the-public-api
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/store
+
+            go 1.26
+        - path: store.go
+          body: |-
+            package store
+
+            func get() int { return 1 }
+
+            func Get() int { return get() }
+        - path: store_test.go
+          body: "package store\n\nimport \"testing\"\n\nfunc TestGet(t *testing.T) {\n\tif Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}"
+    - name: rust-valid
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            fn hidden() -> u8 {
+                1
+            }
+
+            pub fn get() -> u8 {
+                hidden()
+            }
+
+            #[cfg(test)]
+            mod tests {
+                use super::*;
+
+                #[test]
+                fn hidden_is_one() {
+                    assert_eq!(hidden(), 1);
+                }
+            }
+        - path: tests/store.rs
+          body: |-
+            #[test]
+            fn get_is_one() {
+                assert_eq!(workspace::get(), 1);
+            }

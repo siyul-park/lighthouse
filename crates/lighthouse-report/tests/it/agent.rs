@@ -17,12 +17,12 @@ fn span(line: u32) -> Span {
 
 fn coupling() -> Diagnostic {
     let mut d = Diagnostic::new(
-        "design/coupling-signal",
+        "design/coupling",
         Severity::Warn,
         "function coordinates 14 collaborators in its package",
         "internal/jit/compile.go",
         span(350),
-        Fingerprint::of("design/coupling-signal", "jit::compile#function", ""),
+        Fingerprint::of("design/coupling", "jit::compile#function", ""),
     );
     d.symbol = Some("jit::compile#function".to_owned());
     d.evidence = json!({ "fan_in": 2, "fan_out": 14, "callees": ["a", "b c"] });
@@ -110,12 +110,12 @@ fn mixed(count: usize) -> Vec<Diagnostic> {
             _ => {
                 let symbol = format!("store::hub{i}#function");
                 let mut d = Diagnostic::new(
-                    "design/coupling-signal",
+                    "design/coupling",
                     Severity::Warn,
                     "function coordinates 14 collaborators in its package",
                     format!("internal/store/hub{}.go", i % 3),
                     span(i as u32 * 7 + 3),
-                    Fingerprint::of("design/coupling-signal", &symbol, ""),
+                    Fingerprint::of("design/coupling", &symbol, ""),
                 );
                 d.evidence = json!({ "fan_in": 2, "fan_out": 14 + i % 3 });
                 d.symbol = Some(symbol);
@@ -184,7 +184,7 @@ fn full_agent_json_is_one_tagged_record_per_line() {
     );
 
     let coupling = &records[0];
-    assert_eq!(coupling["rule"], "design/coupling-signal");
+    assert_eq!(coupling["rule"], "design/coupling");
     assert_eq!(coupling["authored"], "warn");
     assert_eq!(coupling["symbol"], "jit::compile#function");
     assert_eq!(coupling["location"]["line"], 350);
@@ -298,7 +298,7 @@ fn full_limit_keeps_the_most_severe_findings_and_counts_the_rest() {
     });
     let text = render_with(Format::Agent, &findings, &[], &briefing);
     assert!(text.contains("acme/custom  error"), "{text}");
-    assert!(text.contains("design/coupling-signal  warn"), "{text}");
+    assert!(text.contains("design/coupling  warn"), "{text}");
     assert!(!text.contains("private-helper-callers  info"), "{text}");
     assert!(
         text.contains("... 1 more finding(s) not shown (raise --limit)"),
@@ -317,10 +317,7 @@ fn full_limit_keeps_the_most_severe_findings_and_counts_the_rest() {
     let kinds: Vec<_> = json.iter().map(|r| r["type"].as_str().unwrap()).collect();
     assert_eq!(kinds, ["finding", "finding", "truncated", "summary"]);
     assert_eq!(json[2]["omitted"], 1);
-    assert_eq!(
-        json[0]["rule"], "design/coupling-signal",
-        "original order is kept"
-    );
+    assert_eq!(json[0]["rule"], "design/coupling", "original order is kept");
     assert!(json[3]["reasons"].is_object());
 }
 
@@ -334,10 +331,7 @@ fn limit_counts_findings_and_keeps_errors_then_the_larger_groups() {
     });
     let text = render_with(Format::Agent, &findings, &[], &briefing);
     assert!(text.starts_with("acme/custom error\n"), "{text}");
-    assert!(
-        text.contains("design/coupling-signal warn [review]"),
-        "{text}"
-    );
+    assert!(text.contains("design/coupling warn [review]"), "{text}");
     assert!(!text.contains("private-helper-callers"), "{text}");
     assert!(
         text.contains("... 1 more finding(s) not shown (raise --limit)"),
@@ -357,7 +351,7 @@ fn limit_counts_findings_and_keeps_errors_then_the_larger_groups() {
         .iter()
         .map(|g| g["rule"].as_str().unwrap())
         .collect();
-    assert_eq!(rules, ["acme/custom", "design/coupling-signal"]);
+    assert_eq!(rules, ["acme/custom", "design/coupling"]);
     assert_eq!(json[0]["omitted"], json!({ "groups": 1, "findings": 1 }));
     assert_eq!(json[0]["counts"]["info"], 1, "counts cover the whole run");
     assert!(json[0]["reasons"].is_object());
@@ -627,12 +621,12 @@ fn needs_verdict_follows_the_tier_of_the_decision_and_not_the_severity() {
     heuristic.severity = Severity::Error;
     assert!(briefing.needs_verdict(&heuristic), "heuristic at error");
     let mechanical = Diagnostic::new(
-        "core/annotation-reason",
+        "core/allow-reason",
         Severity::Warn,
         "needs a reason",
         "src/lib.rs",
         span(1),
-        Fingerprint::of("core/annotation-reason", "m", ""),
+        Fingerprint::of("core/allow-reason", "m", ""),
     );
     assert!(!briefing.needs_verdict(&mechanical), "mechanical at warn");
 }

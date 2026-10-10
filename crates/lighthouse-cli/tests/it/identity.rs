@@ -142,3 +142,66 @@ fn verdicts_under_old_names_and_fingerprints_still_apply_after_migration() {
     assert_eq!(rewrites(&dir), 1, "the rewrite is recorded once");
     assert_eq!(listing(&dir, "all").len(), 1);
 }
+
+#[test]
+fn an_old_decision_id_still_works_with_a_notice_and_migrate_rewrites_it() {
+    let dir = tempfile::tempdir().unwrap();
+    write_at(
+        &dir,
+        "lighthouse.toml",
+        &lighthouse_test_support::project(
+            "plugins = [\"core\"]\n[rules]\n\"core/max-file-lines\" = { level = \"warn\", options = { max = 1 } }\n",
+        ),
+    );
+    write_at(&dir, "a.txt", "1\n2\n");
+    write_at(
+        &dir,
+        "src/lib.rs",
+        "// lighthouse:allow core/max-file-lines, design/exported-doc -- old names\npub fn open() {}\n",
+    );
+
+    let out = lighthouse(dir.path())
+        .args(["check", "--no-store"])
+        .output()
+        .unwrap();
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("warn core/max-lines"), "{text}");
+    let notices = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        notices.contains("decision `core/max-file-lines` is now `core/max-lines`"),
+        "{notices}"
+    );
+    let only = lighthouse(dir.path())
+        .args(["check", "--no-store", "--rules", "core/max-file-lines"])
+        .output()
+        .unwrap();
+    assert!(
+        String::from_utf8(only.stdout)
+            .unwrap()
+            .contains("core/max-lines")
+    );
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate", "."])
+        .assert()
+        .success();
+    let config = fs::read_to_string(dir.path().join("lighthouse.toml")).unwrap();
+    assert!(config.contains("core/max-lines"), "{config}");
+    assert!(!config.contains("max-file-lines"), "{config}");
+    let source = fs::read_to_string(dir.path().join("src/lib.rs")).unwrap();
+    assert!(
+        source.starts_with(
+            "// lighthouse-disable-next-line core/max-lines, design/exported-doc -- old names\n"
+        ),
+        "{source}"
+    );
+    let notices = String::from_utf8(
+        lighthouse(dir.path())
+            .args(["check", "--no-store"])
+            .output()
+            .unwrap()
+            .stderr,
+    )
+    .unwrap();
+    assert!(!notices.contains("is now"), "{notices}");
+}

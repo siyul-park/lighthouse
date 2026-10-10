@@ -36,7 +36,7 @@ lighthouse review resolve 395d1985afe8 --verdict rejected --reason intentional-e
   CI see the same decisions.
 - **At the code, when it belongs there.** A decision about one place can be written
   where it happens and reviewed in the diff:
-  `// lighthouse-disable-next-line design/coupling-signal -- composition root wires every service`
+  `// lighthouse-disable-next-line design/coupling -- composition root wires every service`
   (ESLint's directive forms; `-line`, and `lighthouse-disable` / `lighthouse-enable` ranges too).
   Annotations that stop matching anything are reported, so they cannot rot.
 - **Valid while it still applies.** A verdict holds while the rule's meaning and the
@@ -56,7 +56,7 @@ so docs, linter and agent cannot disagree.
 apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
-  name: design/single-use-wrapper
+  name: design/no-single-use-wrapper
   labels: { lighthouse/pack: design, lighthouse/section: functions }
 spec:
   title: Inline single-use wrappers
@@ -135,7 +135,7 @@ make plugins                                  # language plugins into target/plu
 lighthouse init                               # writes lighthouse.toml
 lighthouse check                              # analyze the project
 lighthouse check --changed --format agent     # what the working tree changed, for an agent
-lighthouse explain design/single-use-wrapper  # context, requirement, examples
+lighthouse explain design/no-single-use-wrapper  # context, requirement, examples
 lighthouse review list                        # findings Lighthouse remembers
 lighthouse decision test                      # run every decision's examples
 ```
@@ -152,7 +152,7 @@ plugins = [{ id = "lang-go", path = "target/plugins/lang-go" }, "design"]
 extends = ["design/recommended"]
 
 [spec.rules]
-"design/complexity-signal" = { level = "warn", options = { cognitive = 30 } }
+"design/complexity" = { level = "warn", options = { cognitive = 30 } }
 ```
 
 Exit codes: `0` clean, `1` an error (a warning too with `--strict` or `--max-warnings N`), `2` usage or configuration error, `3` analysis

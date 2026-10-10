@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/boundary-splits
+  uid: 8205f8dc-0230-402b-8f15-b2c5741b32ee
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: structural-rules
+  annotations:
+    lighthouse/was-names: design/split-real-boundaries
+spec:
+  title: Split real boundaries
+  context: >-
+    Differences in lifecycle or invariant deserve their own symbol.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Symbols MUST be separated only when responsibility, invariant, ownership,
+    lifecycle, or abstraction level differs.
+  severity: info
+  check:
+    type: model

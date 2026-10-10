@@ -13,7 +13,7 @@ expression: "render(Format::Sarif, &fixture(), &[])"
           "version": "0.1.0",
           "rules": [
             {
-              "id": "core/max-file-lines"
+              "id": "core/max-lines"
             },
             {
               "id": "demo/boom"
@@ -36,7 +36,7 @@ expression: "render(Format::Sarif, &fixture(), &[])"
       ],
       "results": [
         {
-          "ruleId": "core/max-file-lines",
+          "ruleId": "core/max-lines",
           "ruleIndex": 0,
           "level": "warning",
           "message": {
@@ -59,7 +59,7 @@ expression: "render(Format::Sarif, &fixture(), &[])"
             }
           ],
           "partialFingerprints": {
-            "lighthouse/v1": "49ee8394ac08c5c995a7bf36eb5d0a55d2975f52e7dbe09b05742b425af6e676"
+            "lighthouse/v1": "e3c18870ed46f5f02233be2ebf3ae86f28c22971d739ef4dc9f2bac87525026b"
           }
         },
         {

@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/single-implementation
+  uid: c6b195ac-a4d7-4461-b237-f8828b582dab
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: principles
+  annotations:
+    lighthouse/was-names: design/single-owner
+spec:
+  title: "One implementation, one owner"
+  context: >-
+    Duplicated behavior drifts; a single owner keeps it consistent.
+  scope:
+    domain: code
+    subject: project
+  requirement: >-
+    Each behavior MUST have one implementation and each semantic rule MUST have
+    one owner.
+  severity: info
+  check:
+    type: model

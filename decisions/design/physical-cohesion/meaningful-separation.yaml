@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/meaningful-separation
+  uid: 35a77216-def7-496b-bb65-6fda5ca9d747
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: physical-cohesion
+  annotations:
+    lighthouse/was-names: design/separation-is-a-boundary
+spec:
+  title: Separation marks a boundary
+  context: >-
+    A file or module split without a real boundary only adds navigation
+    cost.
+  scope:
+    domain: code
+    subject: module
+  requirement: >-
+    Physical separation MUST represent a real responsibility, ownership, or
+    abstraction boundary.
+  severity: info
+  check:
+    type: model

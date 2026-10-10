@@ -7,6 +7,7 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: naming
+    lighthouse/preset: strict
 spec:
   title: Names have at most a few words
   context: >-

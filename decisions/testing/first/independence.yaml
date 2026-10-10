@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/independence
+  uid: cc6c495d-7112-4b74-918f-3ae0237ca7d4
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: first
+  annotations:
+    lighthouse/was-names: testing/independent-tests
+spec:
+  title: Tests do not depend on hidden state
+  context: >-
+    Order-dependent or manual tests fail intermittently.
+  scope:
+    domain: code
+    subject: test
+    tests: only
+  requirement: >-
+    Tests MUST NOT depend on other tests, uncontrolled mutable state, manual
+    inspection, or unnecessary setup.
+  severity: warn
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+      - "van Deursen et al. 2001; Peruma et al., tsDetect 2020"

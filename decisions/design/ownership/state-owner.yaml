@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/state-owner
+  uid: 890df494-cd0c-426b-9f87-dba11f43afac
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: ownership
+  annotations:
+    lighthouse/was-names: design/single-state-owner
+spec:
+  title: One owner per mutable state
+  context: >-
+    Two writers without a protocol means races and broken invariants.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    One symbol MUST own each mutable state and its transitions; shared mutable
+    state MUST have one owner and one synchronization strategy.
+  severity: info
+  check:
+    type: model
