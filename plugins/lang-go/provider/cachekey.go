@@ -20,7 +20,7 @@ type cacheUnit struct {
 	content   string
 	api       string
 	ifaces    string
-	cgo       bool // imports "C": always analyzed, never recorded
+	cgo       bool // imports "C": always analyzed, its record only serves implements reuse
 	imports   []string
 	deps      []*cacheUnit
 	// apiKey covers everything but the unit's own text; key covers that too.
@@ -71,7 +71,7 @@ func (pl *planner) environment(batches []*batch) (string, []moduleRoot, bool) {
 		if err != nil {
 			return "", nil, false
 		}
-		work, extra, ok := workspaceOf(env)
+		work, extra, ok := workspaceOf(pl.r.root, env)
 		if !ok {
 			return "", nil, false
 		}
@@ -85,7 +85,7 @@ func (pl *planner) environment(batches []*batch) (string, []moduleRoot, bool) {
 		if b.synthetic {
 			continue
 		}
-		text, ok := moduleFiles(b.dir, "go.mod", "go.sum")
+		text, ok := moduleFiles(pl.r.root, b.dir, "go.mod", "go.sum")
 		if !ok {
 			return "", nil, false
 		}

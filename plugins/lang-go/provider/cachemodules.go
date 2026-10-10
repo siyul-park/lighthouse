@@ -13,7 +13,7 @@ import (
 
 // moduleFiles digests a module's go.mod and go.sum, and stamps the directories
 // its replace directives point to.
-func moduleFiles(dir, mod, sum string) (string, bool) {
+func moduleFiles(root, dir, mod, sum string) (string, bool) {
 	data, err := os.ReadFile(filepath.Join(dir, mod))
 	if err != nil {
 		return "", false
@@ -23,12 +23,12 @@ func moduleFiles(dir, mod, sum string) (string, bool) {
 		return "", false
 	}
 	sums, _ := os.ReadFile(filepath.Join(dir, sum))
-	return digest(string(data), string(sums), localReplaces(dir, file.Replace)), true
+	return digest(string(data), string(sums), localReplaces(root, dir, file.Replace)), true
 }
 
 // workspaceOf digests go.work, when the environment names one, and returns its
 // modules.
-func workspaceOf(env string) (string, []moduleRoot, bool) {
+func workspaceOf(root, env string) (string, []moduleRoot, bool) {
 	var vars map[string]string
 	if json.Unmarshal([]byte(env), &vars) != nil {
 		return "", nil, false
@@ -55,19 +55,19 @@ func workspaceOf(env string) (string, []moduleRoot, bool) {
 			return "", nil, false
 		}
 		modules = append(modules, moduleRoot{parsed.Module.Mod.Path, dir})
-		member, found := moduleFiles(dir, "go.mod", "go.sum")
+		member, found := moduleFiles(root, dir, "go.mod", "go.sum")
 		if !found {
 			return "", nil, false
 		}
 		members = append(members, member)
 	}
 	sums, _ := os.ReadFile(path + ".sum")
-	return digest(append(members, string(data), string(sums), localReplaces(filepath.Dir(path), file.Replace))...), modules, true
+	return digest(append(members, string(data), string(sums), localReplaces(root, filepath.Dir(path), file.Replace))...), modules, true
 }
 
-// localReplaces digests the code that replace directives point to, by content:
-// a replaced module is project code that the keys must see.
-func localReplaces(dir string, replaces []*modfile.Replace) string {
+// localReplaces digests the code outside the project that replace directives
+// point to, by content: the keys must see it.
+func localReplaces(root, dir string, replaces []*modfile.Replace) string {
 	var parts []string
 	for _, rep := range replaces {
 		if rep.New.Version != "" {
@@ -79,6 +79,9 @@ func localReplaces(dir string, replaces []*modfile.Replace) string {
 		}
 		if resolved, err := filepath.EvalSymlinks(target); err == nil {
 			target = resolved
+		}
+		if within(root, target) {
+			continue // project code: the keys of its units cover it
 		}
 		parts = append(parts, rep.New.Path, contents(target))
 	}
@@ -132,4 +135,13 @@ func (p *Provider) identity() string {
 		}
 	}
 	return p.build
+}
+
+// within reports whether path is root or lies under it, links resolved.
+func within(root, path string) bool {
+	if resolved, err := filepath.EvalSymlinks(root); err == nil {
+		root = resolved
+	}
+	rel, err := filepath.Rel(root, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }

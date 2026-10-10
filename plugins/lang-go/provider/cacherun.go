@@ -127,7 +127,7 @@ func (p *Provider) plan(pl *planner, store *cacheStore, env string, candidates [
 			continue
 		}
 		plan.misses = append(plan.misses, u)
-		if old, ok := store.previous(u); ok && !u.cgo {
+		if old, ok := store.previous(u); ok {
 			plan.previous[u] = old
 		}
 	}
