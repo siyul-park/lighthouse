@@ -117,7 +117,7 @@ fn resolved(language: Option<&str>, configured: &Map<String, Value>) -> Result<O
     let decision = Catalog::bundled()
         .decision(ID)
         .ok_or_else(|| fail("decision missing from the bundled catalog".to_owned()))?;
-    let resolved = decision.rule_options(configured, language)?;
+    let resolved = crate::manifest::rule_options(decision, configured, language)?;
     serde_json::from_value(Value::Object(resolved)).map_err(|e| fail(e.to_string()))
 }
 

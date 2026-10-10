@@ -1,7 +1,8 @@
+use lighthouse_model::RunScope;
 use lighthouse_model::Severity;
 use lighthouse_plugin::{
     Analyzer, AnalyzerManifest, Ctx, Error, Indexed, LanguageProvider, Plugin, PluginManifest,
-    PresetManifest, ProviderManifest, Registry, RuleManifest, Scope, Source, Workspace, options,
+    PresetManifest, ProviderManifest, Registry, RuleManifest, Source, Workspace, options,
 };
 use serde_json::Value;
 
@@ -44,7 +45,7 @@ impl Plugin for Graph {
                 Box::new(Node(AnalyzerManifest {
                     id: id.to_owned(),
                     requires: requires.iter().map(|r| (*r).to_owned()).collect(),
-                    scope: Scope::Project,
+                    scope: RunScope::Project,
                 })) as Box<dyn Analyzer>
             })
             .collect()
@@ -210,7 +211,7 @@ fn meta(id: &str, severity: Severity, strict: bool) -> RuleManifest {
     RuleManifest {
         id: id.to_owned(),
         severity,
-        scope: Scope::File,
+        scope: RunScope::File,
         description: String::new(),
         docs: String::new(),
         analyzers: Vec::new(),

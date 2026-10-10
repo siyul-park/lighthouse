@@ -917,7 +917,6 @@ dependencies = [
  "include_dir",
  "insta",
  "lighthouse-model",
- "lighthouse-plugin",
  "lighthouse-resource",
  "lighthouse-test-support",
  "schemars",

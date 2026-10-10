@@ -11,8 +11,9 @@ use std::{
     time::Duration,
 };
 
+use lighthouse_model::RunScope;
 use lighthouse_model::{Diagnostic, Fingerprint, Position, Project, Span};
-use lighthouse_plugin::{Ctx, Error as PluginError, RuleManifest, Scope};
+use lighthouse_plugin::{Ctx, Error as PluginError, RuleManifest};
 use lighthouse_process::Spec;
 use lighthouse_spec::{Batch, Check, CheckStdin, CommandCheck};
 use serde_json::{Map, Value, json};
@@ -64,13 +65,13 @@ impl CommandRule {
             options,
         };
         match (meta.scope, self.spec.batch) {
-            (Scope::File, _) => {
+            (RunScope::File, _) => {
                 let Some((file, text)) = ctx.file else {
                     return Ok(Vec::new());
                 };
                 run.one(&file.path, Some(text))
             }
-            (Scope::Project, Batch::File) => {
+            (RunScope::Project, Batch::File) => {
                 let mut found = Vec::new();
                 for file in &ctx.project.files {
                     let text = self.spec.stdin == CheckStdin::File;
@@ -79,7 +80,7 @@ impl CommandRule {
                 }
                 Ok(found)
             }
-            (Scope::Project, Batch::All) => run.all(),
+            (RunScope::Project, Batch::All) => run.all(),
         }
     }
 }

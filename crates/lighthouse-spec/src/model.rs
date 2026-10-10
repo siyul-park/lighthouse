@@ -1,6 +1,6 @@
 use std::fmt;
 
-use lighthouse_model::Severity;
+use lighthouse_model::{RunScope, Severity};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -14,7 +14,7 @@ pub enum Domain {
 }
 
 /// What a decision talks about inside its domain. Mapping to the run scope
-/// of a rule is `Subject::rule_scope`.
+/// of a rule is `Subject::run_scope`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Subject {
@@ -28,8 +28,7 @@ pub enum Subject {
 impl Subject {
     /// Symbol, file and test decisions are checked once per file; module and
     /// project decisions once over the merged project.
-    pub fn rule_scope(self) -> lighthouse_plugin::Scope {
-        use lighthouse_plugin::Scope as RunScope;
+    pub fn run_scope(self) -> RunScope {
         match self {
             Self::Symbol | Self::File | Self::Test => RunScope::File,
             Self::Module | Self::Project => RunScope::Project,

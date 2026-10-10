@@ -1,11 +1,12 @@
 use lighthouse_engine::RuleTester;
+use lighthouse_model::RunScope;
 use lighthouse_model::{
     Capability, Diagnostic, EditOp, Fingerprint, FixOutcome, Fragment, Options, Position, Safety,
     Severity, Span,
 };
 use lighthouse_plugin::{
     Ctx, Error, FixRequest, Fixer, FixerManifest, Indexed, LanguageProvider, Plugin,
-    PluginManifest, ProviderManifest, Registry, Rule, RuleManifest, Scope, Source, Workspace,
+    PluginManifest, ProviderManifest, Registry, Rule, RuleManifest, Source, Workspace,
 };
 use lighthouse_spec::Catalog;
 
@@ -137,7 +138,7 @@ impl Plugin for Fake {
             meta: RuleManifest {
                 id: "fake/marker".to_owned(),
                 severity: Severity::Warn,
-                scope: Scope::File,
+                scope: RunScope::File,
                 description: String::new(),
                 docs: String::new(),
                 analyzers: Vec::new(),

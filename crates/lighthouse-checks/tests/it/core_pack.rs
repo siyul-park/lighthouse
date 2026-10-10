@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
+use lighthouse_model::RunScope;
 use lighthouse_model::{File, Fragment, Options, Project, Severity};
-use lighthouse_plugin::{Ctx, Error, Facts, Scope, Workspace};
+use lighthouse_plugin::{Ctx, Error, Facts, Workspace};
 use serde_json::json;
 
 fn options(max: u64) -> Options {
@@ -45,11 +46,29 @@ fn registry_is_valid_and_exposes_core() {
     registry.validate().unwrap();
     assert!(registry.has_plugin("core"));
     let meta = registry.rule("core/max-file-lines").unwrap().manifest();
-    assert_eq!(meta.scope, Scope::File);
+    assert_eq!(meta.scope, RunScope::File);
     assert!(
         meta.analyzers.is_empty(),
         "the lines of a file are read from its text"
     );
+}
+
+#[test]
+fn a_rule_exists_for_a_decision_a_program_checks() {
+    let registry = lighthouse_checks::registry();
+    let meta = registry.rule("core/max-file-lines").unwrap().manifest();
+    assert_eq!(meta.id, "core/max-file-lines");
+    assert_eq!(meta.severity, Severity::Warn);
+    assert_eq!(meta.scope, RunScope::File);
+    for judged in [
+        "design/no-private-types-in-public-api",
+        "design/signals-are-advisory",
+    ] {
+        assert!(registry.rule(judged).is_none(), "{judged}");
+    }
+    for annotation in ["core/annotation-reason", "core/unused-allow"] {
+        assert!(registry.rule(annotation).is_some(), "{annotation}");
+    }
 }
 
 #[test]

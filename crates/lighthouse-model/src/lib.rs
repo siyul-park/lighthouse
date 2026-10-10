@@ -3,12 +3,14 @@ mod diagnostic;
 mod fix;
 pub mod hash;
 mod review;
+mod scope;
 mod text;
 mod ucm;
 
 pub use diagnostic::{Diagnostic, Fingerprint, Incomplete, Severity, UnknownSeverity};
 pub use fix::{Anchor, EditOp, FixOutcome, Owner, Safety, UnknownSafety};
 pub use review::{Label, MismatchedReason, Reason, ReviewerKind, UnknownTerm, Verdict};
+pub use scope::RunScope;
 pub use text::LineIndex;
 pub use ucm::{
     Capability, Comment, Edge, EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Module,

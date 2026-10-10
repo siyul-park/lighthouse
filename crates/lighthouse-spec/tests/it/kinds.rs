@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_plugin::Scope as RunScope;
+use lighthouse_model::RunScope;
 use lighthouse_spec::{
     CelCheck, Check, CheckKind, Decision, DecisionOverrideSpec, OptionSchema, OptionType,
     OptionsSchema, Select, descriptors,

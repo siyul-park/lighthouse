@@ -18,7 +18,6 @@ serde_norway.workspace = true
 similar.workspace = true
 thiserror.workspace = true
 lighthouse-model.workspace = true
-lighthouse-plugin.workspace = true
 lighthouse-resource.workspace = true
 
 [dev-dependencies]

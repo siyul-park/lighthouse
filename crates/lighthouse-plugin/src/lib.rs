@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use lighthouse_config::{Metadata, PresetSpec, Resource, RuleConfig, RuleSetting, Rules};
 use lighthouse_model::{
-    Capability, Diagnostic, File, Fragment, Incomplete, Options, Project, Severity,
+    Capability, Diagnostic, File, Fragment, Incomplete, Options, Project, RunScope, Severity,
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -44,15 +44,6 @@ pub enum Error {
     /// the same as passing. The run reports the gap and goes on.
     #[error("{0}")]
     Incomplete(String),
-}
-
-/// What an analyzer or rule looks at in one run.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Scope {
-    /// Once per file; `Ctx::file` is set.
-    File,
-    /// Once per run over the merged project; `Ctx::file` is `None`.
-    Project,
 }
 
 /// Identity of a plugin: `id` prefixes every analyzer, rule, preset and fixer
@@ -203,7 +194,7 @@ pub struct AnalyzerManifest {
     pub id: String,
     /// Analyzers whose facts this one reads.
     pub requires: Vec<String>,
-    pub scope: Scope,
+    pub scope: RunScope,
 }
 
 /// Static description of a rule: its identity, default severity, scope and
@@ -213,7 +204,7 @@ pub struct RuleManifest {
     /// Fully qualified `plugin/name`.
     pub id: String,
     pub severity: Severity,
-    pub scope: Scope,
+    pub scope: RunScope,
     pub description: String,
     pub docs: String,
     pub analyzers: Vec<String>,

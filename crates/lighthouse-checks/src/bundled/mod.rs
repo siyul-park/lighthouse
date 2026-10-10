@@ -1,7 +1,6 @@
 //! The bundled plugins, derived from the bundled catalog: every pack is a
 //! [`Declarative`] plugin of its decisions, plus what only code provides for
-//! it (the fallback text language and the annotation rules of `core`, the
-//! order keys of `design`). The `metrics` analyzers ride along.
+//! it (the fallback text language of `core`, the order keys of `design`). The `metrics` analyzers ride along.
 
 mod core_pack;
 
@@ -26,14 +25,12 @@ pub struct Pack {
 /// What only code provides for a pack.
 struct Code {
     languages: fn() -> Vec<Box<dyn LanguageProvider>>,
-    rules: fn() -> Vec<Box<dyn Rule>>,
     order_keys: fn() -> Vec<Box<dyn OrderKey>>,
 }
 
 impl Code {
     const NONE: Self = Self {
         languages: Vec::new,
-        rules: Vec::new,
         order_keys: Vec::new,
     };
 }
@@ -47,7 +44,6 @@ impl Pack {
         let code = match id {
             CORE => Code {
                 languages: core_pack::languages,
-                rules: core_pack::annotation_rules,
                 ..Code::NONE
             },
             DESIGN => Code {
@@ -71,11 +67,9 @@ impl Plugin for Pack {
         (self.code.languages)()
     }
 
-    /// The declarative rules, then the rules only code can run.
+    /// The rules of the pack's decisions.
     fn rules(&self) -> Vec<Box<dyn Rule>> {
-        let mut rules = self.decisions.rules();
-        rules.extend((self.code.rules)());
-        rules
+        self.decisions.rules()
     }
 
     /// One fixer per decision of the pack that has a `fix`.

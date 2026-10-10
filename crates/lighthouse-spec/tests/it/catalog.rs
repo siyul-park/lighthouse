@@ -1,5 +1,4 @@
-use lighthouse_model::Severity;
-use lighthouse_plugin::Scope as RunScope;
+use lighthouse_model::{RunScope, Severity};
 use lighthouse_spec::{Catalog, Content, Decision, Error, ExampleFile, Subject, authored_severity};
 use lighthouse_test_support::catalog::*;
 use serde_json::{Map, json};
@@ -43,7 +42,7 @@ fn decision_severity() {
 }
 
 #[test]
-fn subject_rule_scope() {
+fn subject_run_scope() {
     let cases = [
         (Subject::Symbol, RunScope::File),
         (Subject::File, RunScope::File),
@@ -52,26 +51,8 @@ fn subject_rule_scope() {
         (Subject::Project, RunScope::Project),
     ];
     for (subject, want) in cases {
-        assert_eq!(subject.rule_scope(), want, "{subject}");
+        assert_eq!(subject.run_scope(), want, "{subject}");
     }
-}
-
-#[test]
-fn decision_rule_meta() {
-    let meta = bundled("core/max-file-lines").rule_manifest().unwrap();
-    assert_eq!(meta.id, "core/max-file-lines");
-    assert_eq!(meta.severity, Severity::Warn);
-    assert_eq!(meta.scope, RunScope::File);
-    assert!(
-        bundled("design/no-private-types-in-public-api")
-            .rule_manifest()
-            .is_none()
-    );
-    assert!(
-        bundled("design/signals-are-advisory")
-            .rule_manifest()
-            .is_none()
-    );
 }
 
 #[test]

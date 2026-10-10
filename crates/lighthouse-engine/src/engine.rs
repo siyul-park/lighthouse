@@ -7,11 +7,12 @@ use std::{
 
 use ignore::WalkBuilder;
 use lighthouse_config::{Config, GlobSet, Rules, glob_set};
+use lighthouse_model::RunScope;
 use lighthouse_model::{
     Diagnostic, File, Fingerprint, Fragment, Incomplete, Options, Project, Severity, hash,
 };
 use lighthouse_plugin::{
-    Ctx, Facts, Indexed, LanguageProvider, Memo, Registry, Rule, Scope, Source, Workspace,
+    Ctx, Facts, Indexed, LanguageProvider, Memo, Registry, Rule, Source, Workspace,
 };
 use rayon::prelude::*;
 use serde_json::Value;
@@ -391,7 +392,7 @@ impl Engine {
             let project_scope = self
                 .registry
                 .rule(&d.rule_id)
-                .is_some_and(|r| r.manifest().scope == Scope::Project);
+                .is_some_and(|r| r.manifest().scope == RunScope::Project);
             let (path, lang) = match project.file(&d.file) {
                 Some(file) if !project_scope => (file.path.clone(), file.lang.clone()),
                 _ => (PathBuf::new(), String::new()),
@@ -618,8 +619,8 @@ impl Engine {
         for analyzer in self.registry.order(wanted)? {
             let started = Instant::now();
             let runs: Vec<(Option<&Input>, String)> = match analyzer.manifest().scope {
-                Scope::Project => vec![(None, String::new())],
-                Scope::File => inputs
+                RunScope::Project => vec![(None, String::new())],
+                RunScope::File => inputs
                     .iter()
                     .map(|i| (Some(i), i.file.path.to_string_lossy().into_owned()))
                     .collect(),
@@ -683,7 +684,7 @@ impl Engine {
         for rule in scene
             .rules
             .iter()
-            .filter(|r| r.manifest().scope == Scope::File)
+            .filter(|r| r.manifest().scope == RunScope::File)
         {
             let meta = rule.manifest();
             let Some(config) = resolved.get(&meta.id) else {
@@ -735,7 +736,7 @@ impl Engine {
         let rules: Vec<&&dyn Rule> = scene
             .rules
             .iter()
-            .filter(|r| r.manifest().scope == Scope::Project)
+            .filter(|r| r.manifest().scope == RunScope::Project)
             .collect();
         let per_rule: Vec<Result<Gathered, Error>> = rules
             .par_iter()

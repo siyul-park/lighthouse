@@ -6,13 +6,14 @@ use std::{
 
 use lighthouse_config::{Config, RuleConfig, Rules};
 use lighthouse_engine::{Engine, Error};
+use lighthouse_model::RunScope;
 use lighthouse_model::{
     Capability, Diagnostic, Fingerprint, Fragment, Incomplete, Options, Position, Severity, Span,
 };
 use lighthouse_plugin::{
     Analyzer, AnalyzerManifest, Conventions, Ctx, Error as PluginError, Indexed, LanguageProvider,
-    Plugin, PluginManifest, PresetManifest, ProviderManifest, Registry, Rule, RuleManifest, Scope,
-    Source, Workspace,
+    Plugin, PluginManifest, PresetManifest, ProviderManifest, Registry, Rule, RuleManifest, Source,
+    Workspace,
 };
 use serde_json::{Value, json};
 use tempfile::TempDir;
@@ -73,7 +74,12 @@ struct Fake {
     meta: RuleManifest,
 }
 
-fn meta(id: &str, scope: Scope, analyzers: &[&str], capabilities: &[Capability]) -> RuleManifest {
+fn meta(
+    id: &str,
+    scope: RunScope,
+    analyzers: &[&str],
+    capabilities: &[Capability],
+) -> RuleManifest {
     RuleManifest {
         id: id.to_owned(),
         severity: Severity::Warn,
@@ -148,21 +154,21 @@ impl Plugin for FakePlugin {
         vec![Box::new(CountFiles(AnalyzerManifest {
             id: "fake/count-files".to_owned(),
             requires: Vec::new(),
-            scope: Scope::Project,
+            scope: RunScope::Project,
         }))]
     }
     fn rules(&self) -> Vec<Box<dyn Rule>> {
         vec![
             Box::new(Fake {
-                meta: meta("fake/each", Scope::File, &[], &[]),
+                meta: meta("fake/each", RunScope::File, &[], &[]),
             }),
             Box::new(Fake {
-                meta: meta("fake/all", Scope::Project, &["fake/count-files"], &[]),
+                meta: meta("fake/all", RunScope::Project, &["fake/count-files"], &[]),
             }),
             Box::new(Fake {
                 meta: meta(
                     "fake/semantic",
-                    Scope::File,
+                    RunScope::File,
                     &[],
                     &[Capability::SemanticEdges],
                 ),

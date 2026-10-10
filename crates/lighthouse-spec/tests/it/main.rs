@@ -6,6 +6,5 @@ mod docs;
 mod fixes;
 mod kinds;
 mod local;
-mod rule;
 mod sources;
 mod versions;

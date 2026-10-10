@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use lighthouse_model::{EdgeKind, Severity};
+use lighthouse_model::{EdgeKind, RunScope, Severity};
 
 use crate::{
     Catalog, CheckKind, Decision, Error, Example, ExampleKind, Status,
@@ -318,7 +318,7 @@ fn kind_problem(decision: &Decision, kind: &CheckKind) -> Option<String> {
         CheckKind::Builtin(BuiltinCheck::Named(_)) => None,
         CheckKind::Builtin(BuiltinCheck::Op(op)) => op_problem(op).or_else(|| scope_problem(op, subject)),
         CheckKind::Cel(cel) => cel.problem().or_else(|| {
-            (cel.select.scope() != subject.rule_scope()).then(|| {
+            (cel.select.scope() != subject.run_scope()).then(|| {
                 format!(
                     "selects `{}`, which a `{subject}` decision cannot run over",
                     cel.select.name()
@@ -326,7 +326,7 @@ fn kind_problem(decision: &Decision, kind: &CheckKind) -> Option<String> {
             })
         }),
         CheckKind::Command(command) => command.problem().or_else(|| {
-            let per_file = subject.rule_scope() == lighthouse_plugin::Scope::File;
+            let per_file = subject.run_scope() == RunScope::File;
             (command.batch == crate::check::Batch::All && per_file).then(|| {
                 "check `batch: all` needs a module or project decision: a file-scope decision is checked one file at a time"
                     .to_owned()
@@ -344,7 +344,7 @@ fn kind_problem(decision: &Decision, kind: &CheckKind) -> Option<String> {
 
 /// A standard operation judges the shape of one file or of the whole project.
 fn scope_problem(op: &BuiltinOp, subject: crate::Subject) -> Option<String> {
-    let per_file = subject.rule_scope() == lighthouse_plugin::Scope::File;
+    let per_file = subject.run_scope() == RunScope::File;
     match (op, per_file) {
         (BuiltinOp::Order { .. } | BuiltinOp::Proximity { .. }, false) => Some(format!(
             "an `order` or `proximity` check judges one file at a time, which a `{subject}` decision does not"

@@ -16,6 +16,7 @@ mod facts;
 mod fix;
 pub mod layout;
 mod library;
+mod manifest;
 pub mod metrics;
 mod naming;
 mod ops;

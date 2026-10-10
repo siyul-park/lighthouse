@@ -13,7 +13,6 @@ mod overrides;
 mod pack;
 mod pack_docs;
 mod render;
-mod rule;
 mod sources;
 mod validate;
 
@@ -44,7 +43,6 @@ pub use options::{ObjectType, OptionSchema, OptionType, OptionsSchema};
 pub use overrides::DecisionOverrideSpec;
 pub use pack::{Pack, PackSpec, Section, SectionSpec};
 pub use render::{DOCS_DIR, decision_markdown, docs, help_path};
-pub use rule::DecisionRule;
 pub use sources::{Source, SourceMapSpec};
 
 /// The JSON Schema of every kind this crate defines.

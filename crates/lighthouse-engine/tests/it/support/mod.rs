@@ -6,6 +6,7 @@ use std::{fs, sync::LazyLock};
 
 use lighthouse_config::Config;
 use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun};
+use lighthouse_model::RunScope;
 use lighthouse_model::{
     Capability, Diagnostic, EditOp, File, Fingerprint, FixOutcome, Fragment, Incomplete, LineIndex,
     Options, Position, Safety, Severity, Span, Symbol, SymbolId, SymbolKind, Visibility,
@@ -13,7 +14,7 @@ use lighthouse_model::{
 use lighthouse_plugin::{
     Ctx, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, Indexed,
     LanguageProvider, Plugin, PluginManifest, ProviderManifest, Registry, Rule, RuleManifest,
-    Scope, Source, Workspace,
+    Source, Workspace,
 };
 use tempfile::TempDir;
 
@@ -93,7 +94,7 @@ impl Word {
             manifest: RuleManifest {
                 id: id.to_owned(),
                 severity: Severity::Error,
-                scope: Scope::File,
+                scope: RunScope::File,
                 description: String::new(),
                 docs: String::new(),
                 analyzers: Vec::new(),

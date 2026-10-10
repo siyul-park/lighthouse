@@ -5,8 +5,7 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use cel::Program;
-use lighthouse_model::Capability;
-use lighthouse_plugin::Scope as RunScope;
+use lighthouse_model::{Capability, RunScope};
 use lighthouse_resource::parse_duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

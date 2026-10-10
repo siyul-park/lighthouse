@@ -3,8 +3,9 @@ mod fan;
 
 use std::{collections::BTreeMap, sync::LazyLock};
 
+use lighthouse_model::RunScope;
 use lighthouse_model::{FlowKind, FunctionSummary, Project, Symbol, SymbolId};
-use lighthouse_plugin::{Analyzer, AnalyzerManifest, Ctx, Error, Plugin, PluginManifest, Scope};
+use lighthouse_plugin::{Analyzer, AnalyzerManifest, Ctx, Error, Plugin, PluginManifest};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
@@ -81,7 +82,7 @@ impl<T> PerFunction<T> {
             manifest: AnalyzerManifest {
                 id: id.to_owned(),
                 requires: Vec::new(),
-                scope: Scope::File,
+                scope: RunScope::File,
             },
             measure,
         }

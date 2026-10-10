@@ -132,8 +132,8 @@ impl CelRule {
             options: cel_fact(&Value::Object(options.clone())),
         };
         match meta.scope {
-            lighthouse_plugin::Scope::File => run.check_file(ctx),
-            lighthouse_plugin::Scope::Project => run.check_project(ctx),
+            lighthouse_model::RunScope::File => run.check_file(ctx),
+            lighthouse_model::RunScope::Project => run.check_project(ctx),
         }
     }
 }

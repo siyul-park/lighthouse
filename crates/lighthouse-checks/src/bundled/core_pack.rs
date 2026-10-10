@@ -1,15 +1,7 @@
-//! What only code provides for the `core` pack: the fallback text language
-//! and the rules about allow annotations.
+//! What only code provides for the `core` pack: the fallback text language.
 
-use lighthouse_model::{
-    Capability, Fragment,
-    annotation::{ANNOTATION_REASON, UNUSED_ALLOW},
-};
-use lighthouse_plugin::{
-    Ctx, Error, Indexed, LanguageProvider, ProviderManifest, Rule, RuleManifest, Source, Workspace,
-};
-use lighthouse_spec::DecisionRule;
-use serde::Deserialize;
+use lighthouse_model::{Capability, Fragment};
+use lighthouse_plugin::{Error, Indexed, LanguageProvider, ProviderManifest, Source, Workspace};
 
 /// Fallback provider: every file is plain text.
 struct Text {
@@ -48,30 +40,7 @@ impl LanguageProvider for Text {
     }
 }
 
-#[derive(Deserialize)]
-struct Unconfigured {}
-
 /// The language providers of the pack: the fallback text one.
 pub(super) fn languages() -> Vec<Box<dyn LanguageProvider>> {
     vec![Box::new(Text::new())]
-}
-
-/// The rules about allow annotations.
-pub(super) fn annotation_rules() -> Vec<Box<dyn Rule>> {
-    vec![
-        annotation_rule(ANNOTATION_REASON),
-        annotation_rule(UNUSED_ALLOW),
-    ]
-}
-
-/// A rule about allow annotations. The engine reads the annotations of the
-/// whole project and reports these findings itself, because whether an
-/// annotation is used depends on every other rule's findings; the rule exists
-/// so that configuration, presets and the catalog treat it like any other.
-fn annotation_rule(id: &'static str) -> Box<dyn Rule> {
-    Box::new(DecisionRule::new(
-        id,
-        &[],
-        |_: &RuleManifest, _: &Ctx, _: Unconfigured| Ok(Vec::new()),
-    ))
 }
