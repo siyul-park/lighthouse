@@ -279,7 +279,7 @@ impl DecisionSpec {
         let properties: Map<String, Value> = schema
             .properties
             .iter()
-            .map(|(n, p)| (name(n), json!({ "type": p.kind, "default": p.default })))
+            .map(|(n, p)| (name(n), option_content(p)))
             .collect();
         let languages: Map<String, Value> = self
             .languages
@@ -296,6 +296,16 @@ impl DecisionSpec {
             .collect();
         json!({ "properties": properties, "languages": languages })
     }
+}
+
+/// What an option contributes to the meaning: its type and default, and the
+/// alternatives or named shape a plain type does not say.
+fn option_content(property: &crate::OptionSchema) -> Value {
+    let mut content = json!({ "type": property.kind, "default": property.default });
+    if !property.one_of.is_empty() || property.reference.is_some() {
+        content["shape"] = json!(property.shape());
+    }
+    content
 }
 
 pub(crate) fn squash(text: &str) -> String {

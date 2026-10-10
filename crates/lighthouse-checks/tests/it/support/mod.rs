@@ -58,6 +58,7 @@ impl Plugin for Fixture {
         vec![Box::new(Wire(ProviderManifest {
             conventions: Conventions {
                 test_globs: vec!["**/*_test.ucm".to_owned()],
+                constructor_prefixes: vec!["New".to_owned(), "new".to_owned()],
             },
             ..ProviderManifest::new("wire", vec!["**/*.ucm".to_owned()])
         }))]
@@ -149,6 +150,8 @@ impl World {
             forwards_to: None,
             param_types: Vec::new(),
             manual_assertions: 0,
+            implementation: false,
+            constructs: false,
         });
     }
 

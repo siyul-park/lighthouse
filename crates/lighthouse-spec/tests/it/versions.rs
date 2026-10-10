@@ -47,14 +47,7 @@ mod write {
                 kind: ObjectType::Object,
                 properties: [(
                     "max".to_owned(),
-                    OptionSchema {
-                        kind: OptionType::Integer,
-                        default: json!(3),
-                        description: "Limit.".into(),
-                        items: None,
-                        properties: Default::default(),
-                        required: Vec::new(),
-                    },
+                    OptionSchema::new(OptionType::Integer, json!(3), "Limit."),
                 )]
                 .into(),
                 additional_properties: false,

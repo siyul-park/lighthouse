@@ -204,6 +204,7 @@ fn provider_claims_go_files_and_offers_semantic_edges() {
     assert_eq!(manifest.id, "go");
     assert_eq!(manifest.globs, ["**/*.go"]);
     assert_eq!(manifest.conventions.test_globs, ["**/*_test.go"]);
+    assert_eq!(manifest.conventions.constructor_prefixes, ["New", "new"]);
     assert_eq!(
         manifest.capabilities,
         [

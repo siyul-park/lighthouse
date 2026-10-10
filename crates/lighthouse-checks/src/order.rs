@@ -16,7 +16,6 @@ const ID: &str = "design/declaration-groups";
 #[serde(rename_all = "camelCase")]
 struct Options {
     groups: Vec<String>,
-    constructor_prefixes: Vec<String>,
     hook_names: Vec<String>,
 }
 
@@ -54,7 +53,7 @@ impl OrderKey for GroupKey {
         } else {
             Map::new()
         };
-        let group = group_index(Some(ctx.language), &configured)?;
+        let group = group_index(Some(ctx.language), &configured, ctx.constructors.to_vec())?;
         Ok(group(symbol).map(|g| g as u64))
     }
 }
@@ -82,14 +81,7 @@ impl OrderKey for ConstructorKey {
         {
             return Ok(None);
         }
-        let configured = if ctx.rule == ID {
-            ctx.options.clone()
-        } else {
-            Map::new()
-        };
-        let options = resolved(Some(ctx.language), &configured)?;
-        let constructor =
-            exposed(symbol) && is_constructor(&symbol.name, &options.constructor_prefixes);
+        let constructor = exposed(symbol) && is_constructor(&symbol.name, ctx.constructors);
         Ok(Some(u64::from(!constructor)))
     }
 }
@@ -104,9 +96,10 @@ pub(crate) fn keys() -> Vec<Box<dyn OrderKey>> {
 pub(crate) fn group_index(
     language: Option<&str>,
     configured: &Map<String, Value>,
+    constructors: Vec<String>,
 ) -> Result<impl Fn(&Symbol) -> Option<usize> + use<>, Error> {
     let options = resolved(language, configured)?;
-    Ok(move |symbol: &Symbol| group_of(symbol, &options))
+    Ok(move |symbol: &Symbol| group_of(symbol, &options, &constructors))
 }
 
 /// The options of `design/declaration-groups` for `language` over `configured`.
@@ -125,7 +118,7 @@ fn resolved(language: Option<&str>, configured: &Map<String, Value>) -> Result<O
 /// Index into the configured group list of the first group that fits the
 /// symbol, or `None` when the order does not mention the symbol's group. The
 /// candidates run from the most specific group to the least.
-fn group_of(symbol: &Symbol, options: &Options) -> Option<usize> {
+fn group_of(symbol: &Symbol, options: &Options, constructors: &[String]) -> Option<usize> {
     let exposed = exposed(symbol);
     let visible =
         |public: &'static str, private: &'static str| if exposed { public } else { private };
@@ -141,7 +134,7 @@ fn group_of(symbol: &Symbol, options: &Options) -> Option<usize> {
             if symbol.name == "init" {
                 candidates.push("init");
             }
-            if exposed && is_constructor(&symbol.name, &options.constructor_prefixes) {
+            if exposed && is_constructor(&symbol.name, constructors) {
                 candidates.push("constructor");
             }
             candidates.extend([visible("public-function", "private-function")]);

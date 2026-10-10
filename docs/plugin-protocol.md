@@ -59,7 +59,7 @@ absolute. Result:
 ```json
 { "id": "lang-go", "version": "0.1.0", "protocolVersion": "0.1",
   "languages": [{ "id": "go", "globs": ["**/*.go"], "priority": 0,
-                  "conventions": { "test_globs": ["**/*_test.go"] },
+                  "conventions": { "test_globs": ["**/*_test.go"], "constructor_prefixes": ["New", "new"] },
                   "capabilities": ["semantic-edges"] }] }
 ```
 
@@ -70,6 +70,10 @@ absolute. Result:
   claims files no other language claims.
 - `conventions.test_globs` mark test files for the whole host: rules skip or
   target them by this flag.
+- `conventions.constructor_prefixes` are the name prefixes that make a function a
+  constructor (a name is one when it is a prefix, or a prefix followed by a new
+  word). Every rule that tells constructors apart shares them; a project replaces
+  them once in `[languages.<id>] constructorPrefixes`.
 - Each entry of `languages` is the language's **provider manifest**
   (`ProviderManifest`): `id`, `globs`, `priority`, `fallback`, `conventions` and
   `capabilities`. It is what the host's `LanguageProvider::manifest()` returns, field
@@ -228,6 +232,17 @@ statements in the body, case clauses counting as statements), `top_level`
 (statements directly in the body), `params`, `returns`, `tokens` (leaf tokens of
 the body) and `forwards_to` (set when the body is one call that passes the
 receiver and every parameter on, in order, naming the callee).
+
+`params` counts the declared parameters, receiver excluded; `returns` counts the
+results: every result in Go, and in Rust the arity of the returned tuple (1 for a
+single value, 0 for `()`), looking inside a `Result<T, E>` at `T`.
+
+`implementation` (optional) marks a function that implements a method a trait or
+interface declares elsewhere (a method of a trait impl in Rust); `constructs`
+(optional) marks an associated function without a receiver that returns `Self` or
+its owner type, bare or in a `Result` or `Option`. Go leaves both out: the host
+reads a Go method that an interface of its module declares as an implementation,
+and a constructor by its name.
 
 `param_types` (optional) lists the project types the parameters name, receiver
 excluded, as kind-less symbol ids (`module::Type`), so rules can ask whether a

@@ -38,7 +38,7 @@ spec:
     where: >-
       func.manual_assertions > 0
     message: >-
-      {{ func.kind == 'test' ? 'test' : func.role == 'test-helper' ? 'test helper' : 'function' }}
+      {{ func.kind == 'test' ? 'test' : func.test_role == 'test-helper' ? 'test helper' : 'function' }}
       {{ func.name }} compares and fails by hand {{ func.manual_assertions }} time(s);
       use the project's assertion library
     evidence:

@@ -286,6 +286,7 @@ impl<'a> Env<'a> {
             language,
             rule: &request.finding.rule_id,
             options: request.options,
+            constructors: request.ws.constructor_prefixes(language),
         };
         let mut keys = Vec::new();
         for id in by {

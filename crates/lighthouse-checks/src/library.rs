@@ -1,6 +1,7 @@
 //! The standard functions of CEL expressions over the code model:
 //! `metrics(n)`, `callers(n)`, `callees(n)`, `edges(n, kind)`, `owner(n)`,
-//! `tests(n)`, `annotations(n)`, `rank(n, key)` and `exposed(n, internal)`,
+//! `tests(n)`, `annotations(n)`, `rank(n, key)`, `exposed(n, internal)`,
+//! `limit(n, max)` and `counted(n, count, what)`,
 //! the module path helpers `globMatch(path, glob)` and
 //! `layerOf(module, layers)`, and the text helpers `join`, `lines`, `trim`,
 //! `trimPrefixes`, `trimSuffixes`, `trimLeft`, `trimRight`, `leadingRun`,
@@ -104,6 +105,8 @@ pub(crate) fn context() -> Context<'static> {
     context.add_function("edges", keyed_reader("edges", "__edges", empty_list));
     context.add_function("rank", keyed_reader("rank", "__ranks", unranked));
     context.add_function("exposed", exposed());
+    context.add_function("limit", limit());
+    context.add_function("counted", counted());
     context.add_function("globMatch", |path: Arc<String>, glob: Arc<String>| {
         glob::matches(&path, &glob)
     });
@@ -164,6 +167,80 @@ fn keyed_reader(name: &'static str, field: &'static str, absent: fn() -> Value) 
             None => Ok(absent()),
         }
     })
+}
+
+/// The key of a limit map that covers every role it does not name.
+const FALLBACK_ROLE: &str = "default";
+
+/// `limit(node, max)`: the integer a limit option gives the node's role, else
+/// null for no limit. `max` is an integer (every role), or a map from a role
+/// or `default` to an integer or null; a role the map leaves out falls back to
+/// its `default`, and a map without one has no limit there.
+fn limit() -> Builtin {
+    Box::new(|ftx| {
+        let [node, max] = arguments(ftx)?;
+        let role = match member(node, "role", "limit")? {
+            Some(value) => text(&Value::try_from(value)?),
+            None => String::new(),
+        };
+        if let Some(map) = max.downcast_ref::<CelMap>() {
+            let at = |key: &str| {
+                map.inner()
+                    .get(&CelMapKey::String(CelString::from(key)))
+                    .map(|v| Value::try_from(v.as_ref()))
+            };
+            return match at(&role).or_else(|| at(FALLBACK_ROLE)) {
+                Some(found) => Ok(whole(found?)),
+                None => Ok(Value::Null),
+            };
+        }
+        Ok(whole(Value::try_from(max)?))
+    })
+}
+
+/// An integer as an integer, anything else (null) as no limit.
+fn whole(value: Value) -> Value {
+    match value {
+        Value::Int(i) => Value::Int(i),
+        Value::UInt(u) => Value::Int(i64::try_from(u).unwrap_or(i64::MAX)),
+        _ => Value::Null,
+    }
+}
+
+/// `counted(node, n, what)`: how a limit finding says what a function has: a
+/// constructor names the type it builds and needs `n` things, any other
+/// function has them (`NewServer needs 9 parameters`, `parse has 9
+/// parameters`).
+fn counted() -> Builtin {
+    Box::new(|ftx| {
+        let [node, n, what] = arguments(ftx)?;
+        let field = |name: &str| -> Result<String, ExecutionError> {
+            Ok(match member(node, name, "counted")? {
+                Some(value) => text(&Value::try_from(value)?),
+                None => String::new(),
+            })
+        };
+        let n = match Value::try_from(n)? {
+            Value::Int(i) => i,
+            Value::UInt(u) => i64::try_from(u).unwrap_or(i64::MAX),
+            _ => 0,
+        };
+        let what = text(&Value::try_from(what)?);
+        let (subject, verb) = if field("role")? == "constructor" {
+            (constructed(&field("owner")?, &field("name")?), "needs")
+        } else {
+            (field("name")?, "has")
+        };
+        Ok(Value::String(Arc::new(format!(
+            "{subject} {verb} {n} {what}"
+        ))))
+    })
+}
+
+/// The type a constructor builds: its owner, else its own name.
+fn constructed(owner: &str, name: &str) -> String {
+    let owner = owner.rsplit("::").next().and_then(|t| t.split('#').next());
+    owner.filter(|o| !o.is_empty()).unwrap_or(name).to_owned()
 }
 
 /// `exposed(node, internal)`: whether the node is public, or internal as well

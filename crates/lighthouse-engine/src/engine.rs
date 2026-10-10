@@ -247,6 +247,7 @@ impl Engine {
         let ws = Workspace {
             root,
             languages: config.languages().clone(),
+            constructors: constructors(&registry, &config),
             overlays: BTreeMap::new(),
         };
         let mut engine = Self {
@@ -943,6 +944,25 @@ fn validate_config(registry: &Registry, config: &Config, projects: &Projects) ->
         rule.validate(&config.options)?;
     }
     Ok(())
+}
+
+/// The constructor prefixes of each language: the project's, else the ones its
+/// provider declares.
+fn constructors(registry: &Registry, config: &Config) -> BTreeMap<String, Vec<String>> {
+    let mut found: BTreeMap<String, Vec<String>> = registry
+        .languages()
+        .map(|(_, provider)| {
+            let manifest = provider.manifest();
+            (
+                manifest.id.clone(),
+                manifest.conventions.constructor_prefixes.clone(),
+            )
+        })
+        .collect();
+    for (id, prefixes) in config.constructor_prefixes() {
+        found.insert(id.clone(), prefixes.clone());
+    }
+    found
 }
 
 /// The language providers of the registry, and which of them listed plugins enable.

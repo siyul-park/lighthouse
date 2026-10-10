@@ -51,6 +51,7 @@ impl Handler for Provider {
                         "**/tests.rs".to_owned(),
                         "**/benches/**/*.rs".to_owned(),
                     ],
+                    constructor_prefixes: vec!["new".to_owned()],
                 },
                 capabilities: vec![
                     lighthouse_protocol::EXTENT.to_owned(),

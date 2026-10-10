@@ -62,10 +62,14 @@ fn feature_envy_leaves_exported_constructors_and_used_values_alone() {
     assert!(w.check(ENVY, json!({})).is_empty(), "exported");
     assert_eq!(w.check(ENVY, json!({ "includeExported": true })).len(), 1);
 
-    let (w, _) = envious(&["items", "total", "extra"]);
+    let (mut w, summary) = envious(&["items", "total", "extra"]);
+    w.symbols
+        .iter_mut()
+        .find(|s| s.id == summary.id)
+        .unwrap()
+        .name = "newSummary".to_owned();
     assert!(
-        w.check(ENVY, json!({ "constructorPrefixes": ["summary"] }))
-            .is_empty(),
+        w.check(ENVY, json!({})).is_empty(),
         "named like a constructor"
     );
 }

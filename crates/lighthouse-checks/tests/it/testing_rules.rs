@@ -216,7 +216,9 @@ fn owner_test_exempts_data_types_and_trait_impl_methods() {
     let mut via_trait = w.member(&object, "fmt", SymbolKind::Method, "m/a.ucm");
     via_trait.id =
         lighthouse_model::SymbolId::new("m", &["Object", "Display"], "fmt", SymbolKind::Method);
-    *w.symbols.last_mut().unwrap() = via_trait;
+    *w.symbols.last_mut().unwrap() = via_trait.clone();
+    w.summarize(&via_trait, 1, &[]);
+    w.summaries.last_mut().unwrap().implementation = true;
     let found = w.names(&check(&w, OWNER, json!({})));
     assert_eq!(
         found,

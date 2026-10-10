@@ -97,6 +97,14 @@
     "Conventions": {
       "description": "Layout conventions of a language that the host cannot infer from its files.",
       "properties": {
+        "constructor_prefixes": {
+          "default": [],
+          "description": "Name prefixes that make a function a constructor, such as `New` in Go\nor `new` in Rust; a name is a constructor when it is a prefix or a\nprefix followed by a new word. The project may replace them in\n`[languages.<id>] constructorPrefixes`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "test_globs": {
           "default": [],
           "description": "Globs of test files.",
@@ -304,6 +312,10 @@
             "null"
           ]
         },
+        "constructs": {
+          "description": "The function builds a value of its owner type without taking one: an\nassociated function without a receiver that returns `Self` or the\nowner. Added in 0.1 before 1.0.",
+          "type": "boolean"
+        },
         "flow": {
           "description": "Control-flow constructs in source order.",
           "items": {
@@ -317,6 +329,10 @@
             "string",
             "null"
           ]
+        },
+        "implementation": {
+          "description": "The function implements a method that a trait or interface declares\nelsewhere (a method of a trait impl in Rust). Added in 0.1 before 1.0.",
+          "type": "boolean"
         },
         "manual_assertions": {
           "description": "Checks of a test file's function written out by hand: an `if` that\ncompares and whose only effect is to fail the test. Added in 0.1\nbefore 1.0; zero when the plugin does not count them.",
@@ -629,6 +645,7 @@
         "conventions": {
           "$ref": "#/$defs/Conventions",
           "default": {
+            "constructor_prefixes": [],
             "test_globs": []
           }
         },

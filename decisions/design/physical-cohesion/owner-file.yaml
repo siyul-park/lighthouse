@@ -48,19 +48,11 @@ spec:
         description: >-
           Where the members of a type must be: `file` (the file of the type) or
           `module-tree` (the module of the type or one below it).
-      constructorPrefixes:
-        type: array
-        default: [New, new]
-        description: >-
-          A function named like one of these, or one of these followed by a
-          word, is a constructor: it builds the type and sits where the
-          constructors are.
     additionalProperties: false
   languages:
     rust:
       options:
         unit: module-tree
-        constructorPrefixes: [new]
   check:
     type: cel
     with:

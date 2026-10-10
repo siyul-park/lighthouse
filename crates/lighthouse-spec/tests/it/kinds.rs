@@ -81,14 +81,7 @@ fn the_short_name_of_a_decision_is_its_name_inside_the_pack() {
 fn a_set_of_option_properties_is_a_closed_object_schema() {
     let schema = OptionsSchema::new(BTreeMap::from([(
         "max".to_owned(),
-        OptionSchema {
-            kind: OptionType::Integer,
-            default: json!(3),
-            description: "Limit.".to_owned(),
-            items: None,
-            properties: Default::default(),
-            required: Vec::new(),
-        },
+        OptionSchema::new(OptionType::Integer, json!(3), "Limit."),
     )]));
 
     let value = serde_json::to_value(&schema).unwrap();

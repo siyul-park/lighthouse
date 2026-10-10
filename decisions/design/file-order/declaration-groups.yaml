@@ -64,12 +64,6 @@ spec:
           `private-const`, `const`, `var`, `init`, `public-function`,
           `constructor`, `public-method`, `hook`, `private-function` (private
           functions and, where `type` is not listed, private methods).
-      constructorPrefixes:
-        type: array
-        default: [New]
-        description: >-
-          A public function whose name is one of these, or one of these followed
-          by a word (`New`, `NewStore`; not `Newton`), is a constructor.
       hookNames:
         type: array
         default:
@@ -100,7 +94,6 @@ spec:
     rust:
       options:
         groups: [const, var, type, public-function, private-function]
-        constructorPrefixes: [new]
         hookNames: []
         constructorsFirst: true
   check:

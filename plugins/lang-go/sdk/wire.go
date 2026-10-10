@@ -40,6 +40,8 @@ type ProviderManifest struct {
 // Conventions are the file conventions a language declares for the whole host.
 type Conventions struct {
 	TestGlobs []string `json:"test_globs"`
+	// ConstructorPrefixes are the name prefixes that make a function a constructor.
+	ConstructorPrefixes []string `json:"constructor_prefixes"`
 }
 
 // ProjectRef locates the project an index request refers to.

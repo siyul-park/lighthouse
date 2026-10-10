@@ -139,10 +139,10 @@ fn shape() {
         "items": { "type": "string" },
     }))
     .unwrap();
-    assert_eq!(shape.kind, lighthouse_spec::OptionType::Array);
+    assert_eq!(shape.kind, Some(lighthouse_spec::OptionType::Array));
     assert_eq!(
         shape.items.unwrap().kind,
-        lighthouse_spec::OptionType::String
+        Some(lighthouse_spec::OptionType::String)
     );
 }
 
@@ -524,6 +524,69 @@ mod validation {
             ),
             "needs a description",
         );
+    }
+
+    const LIMIT_OPTION: &str = "  options:\n    type: object\n    properties:\n      max:\n        $ref: '#/$defs/limit'\n        default: 3\n        description: d\n    additionalProperties: false\n";
+
+    fn limit_decision() -> Decision {
+        Catalog::from_files(decision_with(LIMIT_OPTION))
+            .unwrap()
+            .decision("p/a")
+            .unwrap()
+            .clone()
+    }
+
+    #[test]
+    fn a_limit_is_an_integer_or_an_object_of_integers_and_nulls() {
+        let decision = limit_decision();
+        let max = |v| Map::from_iter([("max".to_owned(), v)]);
+        for ok in [
+            json!(0),
+            json!(7),
+            json!({}),
+            json!({ "default": 6, "constructor": 7, "test": null }),
+            json!({ "default": null, "function": 3 }),
+        ] {
+            assert!(
+                decision.resolve_options(&max(ok.clone()), None).is_ok(),
+                "{ok}"
+            );
+        }
+        for (bad, needle) in [
+            (json!(-1), "at least 0"),
+            (json!("3"), "matches none of the allowed shapes"),
+            (json!(null), "matches none of the allowed shapes"),
+            (json!(1.5), "matches none of the allowed shapes"),
+            (json!({ "default": -2 }), "at least 0"),
+            (
+                json!({ "default": "x" }),
+                "matches none of the allowed shapes",
+            ),
+            (json!({ "closure": 3 }), "unknown key `closure`"),
+        ] {
+            let problem = decision
+                .resolve_options(&max(bad.clone()), None)
+                .unwrap_err()
+                .to_string();
+            assert!(problem.contains(needle), "{bad}: {problem}");
+        }
+    }
+
+    #[test]
+    fn one_of_accepts_exactly_one_matching_shape() {
+        let both = "  options:\n    type: object\n    properties:\n      v:\n        oneOf:\n          - { type: number }\n          - { type: integer }\n        default: 1.5\n        description: d\n    additionalProperties: false\n";
+        let decision = Catalog::from_files(decision_with(both))
+            .unwrap()
+            .decision("p/a")
+            .unwrap()
+            .clone();
+        let v = |x| Map::from_iter([("v".to_owned(), x)]);
+        assert!(decision.resolve_options(&v(json!(2.5)), None).is_ok());
+        let problem = decision
+            .resolve_options(&v(json!(2)), None)
+            .unwrap_err()
+            .to_string();
+        assert!(problem.contains("more than one"), "{problem}");
     }
 
     #[test]

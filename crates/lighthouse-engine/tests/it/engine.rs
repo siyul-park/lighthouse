@@ -142,6 +142,7 @@ impl Plugin for FakePlugin {
             manifest: ProviderManifest {
                 conventions: Conventions {
                     test_globs: vec!["tests/**".to_owned()],
+                    ..Conventions::default()
                 },
                 ..ProviderManifest::new("any", vec!["**".to_owned()])
             },

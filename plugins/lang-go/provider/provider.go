@@ -33,7 +33,7 @@ func (p *Provider) Initialize(params sdk.InitializeParams) (sdk.InitializeResult
 		Languages: []sdk.ProviderManifest{{
 			ID:           language,
 			Globs:        []string{"**/*.go"},
-			Conventions:  sdk.Conventions{TestGlobs: []string{"**/*_test.go"}},
+			Conventions:  sdk.Conventions{TestGlobs: []string{"**/*_test.go"}, ConstructorPrefixes: []string{"New", "new"}},
 			Capabilities: []string{sdk.SemanticEdges, sdk.Extent, sdk.ReferenceSites, sdk.Overlays},
 		}},
 	}, nil

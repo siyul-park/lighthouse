@@ -18,7 +18,7 @@ use crate::{
     },
     testcase,
     tree::{SourceFile, Vis, vis},
-    util::{count_tokens, doc_of, extent_of, signature_counts, span_of},
+    util::{constructs, count_tokens, doc_of, extent_of, signature_counts, span_of},
 };
 
 /// What macros kept from the analysis in one file.
@@ -256,6 +256,8 @@ impl Extractor<'_> {
             forwards_to: facts.forwards_to,
             param_types: Vec::new(),
             manual_assertions: 0,
+            implementation: false,
+            constructs: false,
         });
         if let Some(attrs) = test {
             self.frag.tests.push(TestCase {
@@ -630,6 +632,15 @@ impl Extractor<'_> {
             },
         };
         self.summarize(&id, &home, &f.sig, &f.block, None);
+        let constructs = ctx
+            .owner
+            .as_ref()
+            .is_some_and(|o| constructs(&f.sig, &o.name));
+        let implementation = ctx.via.is_some();
+        if let Some(summary) = self.frag.functions.iter_mut().find(|s| s.symbol == id) {
+            summary.implementation = implementation;
+            summary.constructs = constructs;
+        }
     }
 
     /// A trait impl method without docs of its own shows the documentation of

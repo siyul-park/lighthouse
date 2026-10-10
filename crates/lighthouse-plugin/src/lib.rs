@@ -61,6 +61,9 @@ pub struct Workspace {
     pub root: PathBuf,
     /// Per-language options from the configuration, keyed by language id.
     pub languages: BTreeMap<String, Options>,
+    /// The name prefixes that make a function a constructor, by language id:
+    /// what the provider declares, or the project's `constructorPrefixes`.
+    pub constructors: BTreeMap<String, Vec<String>>,
     /// Text that stands in for the file of the same project-relative path:
     /// what a provider must read instead of the disk. Empty for a normal run;
     /// a fix run checks candidate edits this way before anything is written.
@@ -71,11 +74,17 @@ pub struct Workspace {
 pub type Facts = BTreeMap<(String, String), Value>;
 
 impl Workspace {
+    /// The constructor prefixes of `language`; none for an unknown language.
+    pub fn constructor_prefixes(&self, language: &str) -> &[String] {
+        self.constructors.get(language).map_or(&[], Vec::as_slice)
+    }
+
     /// A workspace at `root` with no language options.
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
             root: root.into(),
             languages: BTreeMap::new(),
+            constructors: BTreeMap::new(),
             overlays: BTreeMap::new(),
         }
     }
@@ -105,6 +114,9 @@ pub struct Ctx<'a> {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Conventions {
     pub test_globs: Vec<String>,
+    /// Name prefixes that make a function a constructor, unless the project
+    /// replaces them (see [`Workspace::constructors`]).
+    pub constructor_prefixes: Vec<String>,
 }
 
 impl Ctx<'_> {

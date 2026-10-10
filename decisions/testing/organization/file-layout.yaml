@@ -51,9 +51,9 @@ spec:
       - name: user
         expr: symbol.helper_user
       - name: misplaced_fixture
-        expr: symbol.role == 'fixture' && size(first) > 0 && first.pos < symbol.pos
+        expr: symbol.test_role == 'fixture' && size(first) > 0 && first.pos < symbol.pos
       - name: misplaced_helper
-        expr: symbol.role == 'test-helper' && size(user) > 0
+        expr: symbol.test_role == 'test-helper' && size(user) > 0
     where: >-
       (misplaced_fixture || misplaced_helper)
     message: >-
@@ -62,7 +62,7 @@ spec:
          : 'test helper ' + symbol.name + ' must be declared below ' + user.name + ', which uses it' }}
     evidence:
       symbol: symbol.id
-      role: symbol.role
+      role: symbol.test_role
       before: "misplaced_fixture ? first.id : ''"
       after: "misplaced_helper ? user.id : ''"
     identity:

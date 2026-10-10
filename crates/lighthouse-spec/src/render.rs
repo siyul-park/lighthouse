@@ -129,7 +129,7 @@ fn options_table(out: &mut String, decision: &Decision, options: &OptionsSchema)
         let _ = writeln!(
             out,
             "| `{name}` | {} | {default} | {} |",
-            property.kind.name(),
+            property.describe(),
             property.description.trim()
         );
     }

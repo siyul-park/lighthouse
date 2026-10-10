@@ -243,10 +243,13 @@ fn options(decision: &Decision) -> Result<(), Error> {
         ));
     }
     for (key, property) in &schema.properties {
-        if !property.kind.accepts(&property.default) {
+        if property.check(&property.default, "default").is_err() {
             return Err(Error::invalid(
                 id,
-                format!("option `{key}` has a default that is not {}", property.kind),
+                format!(
+                    "option `{key}` has a default that is not {}",
+                    property.describe()
+                ),
             ));
         }
         if property.description.trim().is_empty() {
@@ -264,12 +267,12 @@ fn options(decision: &Decision) -> Result<(), Error> {
                     format!("`languages.{language}` sets unknown option `{key}`"),
                 )
             })?;
-            if !property.kind.accepts(value) {
+            if let Err(problem) = property.check(value, &format!("option `{key}`")) {
                 return Err(Error::invalid(
                     id,
                     format!(
-                        "`languages.{language}` sets option `{key}` to a value that is not {}",
-                        property.kind
+                        "`languages.{language}` sets option `{key}` to a value that is not {} ({problem})",
+                        property.describe()
                     ),
                 ));
             }

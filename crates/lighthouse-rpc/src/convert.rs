@@ -28,6 +28,7 @@ pub(crate) fn provider_manifest(language: &wire::ProviderManifest) -> ProviderMa
         globs: language.globs.clone(),
         conventions: Conventions {
             test_globs: language.conventions.test_globs.clone(),
+            constructor_prefixes: language.conventions.constructor_prefixes.clone(),
         },
         capabilities: language
             .capabilities
@@ -279,6 +280,8 @@ fn function(f: wire::FunctionSummary) -> Result<core::FunctionSummary, String> {
         forwards_to: f.forwards_to.map(core::Target::Path),
         param_types: f.param_types,
         manual_assertions: f.manual_assertions,
+        implementation: f.implementation,
+        constructs: f.constructs,
     })
 }
 

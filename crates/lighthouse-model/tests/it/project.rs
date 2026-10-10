@@ -98,6 +98,8 @@ fn summary(symbol: &Symbol, forwards_to: Option<Target>) -> FunctionSummary {
         forwards_to,
         param_types: Vec::new(),
         manual_assertions: 0,
+        implementation: false,
+        constructs: false,
     }
 }
 

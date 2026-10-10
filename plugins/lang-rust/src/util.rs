@@ -138,7 +138,7 @@ pub fn signature_counts(sig: &syn::Signature) -> (u32, u32) {
         .count();
     let returns = match &sig.output {
         syn::ReturnType::Default => 0,
-        syn::ReturnType::Type(_, ty) => match &**ty {
+        syn::ReturnType::Type(_, ty) => match unwrap_result(ty) {
             syn::Type::Tuple(t) => t.elems.len(),
             _ => 1,
         },
@@ -147,6 +147,42 @@ pub fn signature_counts(sig: &syn::Signature) -> (u32, u32) {
         u32::try_from(params).unwrap_or(u32::MAX),
         u32::try_from(returns).unwrap_or(u32::MAX),
     )
+}
+
+/// The `T` of a `Result<T, E>` as written (`io::Result<T>` and `Result<T, E>`
+/// alike); any other type as it is. A function that returns a result returns
+/// what its `Ok` holds.
+pub fn unwrap_result(ty: &syn::Type) -> &syn::Type {
+    generic_of(ty, "Result").unwrap_or(ty)
+}
+
+/// The first type argument of the last segment of `ty` when that segment is
+/// named `name`.
+fn generic_of<'a>(ty: &'a syn::Type, name: &str) -> Option<&'a syn::Type> {
+    let syn::Type::Path(path) = ty else {
+        return None;
+    };
+    let last = path.path.segments.last().filter(|s| s.ident == name)?;
+    let syn::PathArguments::AngleBracketed(args) = &last.arguments else {
+        return None;
+    };
+    args.args.iter().find_map(|a| match a {
+        syn::GenericArgument::Type(t) => Some(t),
+        _ => None,
+    })
+}
+
+/// Whether the function builds a value of `owner` without taking one: no
+/// receiver, and it returns `Self` or `owner`, bare or inside a `Result` or
+/// an `Option`.
+pub fn constructs(sig: &syn::Signature, owner: &str) -> bool {
+    let syn::ReturnType::Type(_, ty) = &sig.output else {
+        return false;
+    };
+    let ty = generic_of(ty, "Option").unwrap_or_else(|| unwrap_result(ty));
+    sig.receiver().is_none()
+        && matches!(ty, syn::Type::Path(p) if p.qself.is_none()
+            && p.path.segments.last().is_some_and(|s| s.ident == "Self" || s.ident == owner))
 }
 
 /// An attribute's path as written, `tokio::test`.

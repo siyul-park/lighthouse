@@ -294,6 +294,7 @@ pub struct Config {
     name: String,
     plugins: Vec<PluginRef>,
     languages: BTreeMap<String, Options>,
+    constructors: BTreeMap<String, Vec<String>>,
     formatters: BTreeMap<String, Formatter>,
     generated: Option<GlobSet>,
     generated_check: Option<GeneratedCheck>,
@@ -340,7 +341,11 @@ impl Config {
         let generated_check = spec.generated.check;
         let mut languages = BTreeMap::new();
         let mut formatters = BTreeMap::new();
+        let mut constructors = BTreeMap::new();
         for (id, language) in spec.languages {
+            if let Some(prefixes) = language.constructor_prefixes {
+                constructors.insert(id.clone(), prefixes);
+            }
             if let Some(formatter) = language.formatter {
                 let formatter = Formatter::from(formatter);
                 if formatter.argv.is_empty() {
@@ -358,6 +363,7 @@ impl Config {
                 .map(PluginRef::of)
                 .collect::<Result<_, _>>()?,
             languages,
+            constructors,
             formatters,
             generated,
             generated_check,
@@ -423,6 +429,12 @@ impl Config {
     /// `formatter` key is the host's and is not among them.
     pub fn languages(&self) -> &BTreeMap<String, Options> {
         &self.languages
+    }
+
+    /// The constructor prefixes the project sets per language id, which replace
+    /// the ones the language's provider declares.
+    pub fn constructor_prefixes(&self) -> &BTreeMap<String, Vec<String>> {
+        &self.constructors
     }
 
     /// Whether the project's `generated.files` name `path`.

@@ -17,7 +17,7 @@ use lighthouse_model::{
     Comment, Edge, FunctionSummary, Node, Project, Symbol, SymbolId, SymbolKind, Target,
     Visibility, annotation,
 };
-use lighthouse_plugin::{Ctx, Error, KeyCtx, OrderKey};
+use lighthouse_plugin::{Ctx, Error, KeyCtx, OrderKey, Workspace};
 use serde_json::{Map, Value, json};
 
 use crate::{
@@ -48,8 +48,8 @@ struct Measures {
 /// Builds the values of one run of a check over one file (or the project).
 pub(crate) struct Builder<'a> {
     project: &'a Project,
+    ws: &'a Workspace,
     needs: &'a Needs,
-    options: &'a Map<String, Value>,
     rule: &'a str,
     language: String,
     naming: Option<Tests<'a>>,
@@ -79,8 +79,8 @@ impl<'a> Builder<'a> {
             .collect();
         Ok(Self {
             project: ctx.project,
+            ws: ctx.ws,
             needs,
-            options,
             rule,
             language: ctx
                 .file
@@ -285,16 +285,14 @@ impl<'a> Builder<'a> {
                 json!(module_tested(project, symbol.id.module())),
             );
         }
-        if needs.mentions("constructor_named")
-            && let Some(prefixes) = self.options.get("constructorPrefixes")
-        {
-            let named = prefixes
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str)
-                .any(|p| layout::has_word_prefix(&symbol.name, p));
-            map.insert("constructor_named".to_owned(), json!(named));
+        if needs.mentions("constructor_named") {
+            map.insert(
+                "constructor_named".to_owned(),
+                json!(self.constructor_named(symbol)),
+            );
+        }
+        if needs.mentions("role") {
+            map.insert("role".to_owned(), json!(self.role(symbol, summary)));
         }
         if needs.mentions("file_first_test") {
             map.insert(
@@ -304,6 +302,70 @@ impl<'a> Builder<'a> {
         }
         if needs.mentions("helper_user") {
             map.insert("helper_user".to_owned(), self.helper_user(symbol));
+        }
+    }
+
+    /// Whether the name is one of the language's constructor prefixes, or one
+    /// followed by a new word.
+    fn constructor_named(&self, symbol: &Symbol) -> bool {
+        let language = self.language_of(symbol);
+        self.ws
+            .constructor_prefixes(language)
+            .iter()
+            .any(|p| layout::has_word_prefix(&symbol.name, p))
+    }
+
+    fn language_of(&self, symbol: &Symbol) -> &str {
+        self.project
+            .file(&symbol.file)
+            .map_or(self.language.as_str(), |f| f.lang.as_str())
+    }
+
+    /// What a function is for, the first that fits: `test`, `implementation`
+    /// (it satisfies an interface or trait, so its signature is not its own),
+    /// `constructor`, `entrypoint`, then `method` or `function`. Empty for
+    /// anything that is not a function.
+    fn role(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> &'static str {
+        if !matches!(
+            symbol.kind,
+            SymbolKind::Function | SymbolKind::Method | SymbolKind::Test
+        ) {
+            return "";
+        }
+        if symbol.kind == SymbolKind::Test || self.project.in_test(&symbol.id) {
+            return "test";
+        }
+        if summary.is_some_and(|s| s.implementation) || satisfies_interface(self.project, symbol) {
+            return "implementation";
+        }
+        if self.constructor_named(symbol) || summary.is_some_and(|s| s.constructs) {
+            return "constructor";
+        }
+        if self.entrypoint(symbol) {
+            return "entrypoint";
+        }
+        if symbol.kind == SymbolKind::Method {
+            "method"
+        } else {
+            "function"
+        }
+    }
+
+    /// Go `main` and `init` in `package main` (`init` in any package), Rust
+    /// `main` at the root of a binary target.
+    fn entrypoint(&self, symbol: &Symbol) -> bool {
+        if symbol.owner.is_some() {
+            return false;
+        }
+        let module = symbol.id.module();
+        match (self.language_of(symbol), symbol.name.as_str()) {
+            ("go", "init") => true,
+            ("go", "main") => self
+                .project
+                .module(module)
+                .is_some_and(|m| m.name.as_deref() == Some("main")),
+            ("rust", "main") => module.contains("[bin:") && !module.contains('/'),
+            _ => false,
         }
     }
 
@@ -424,6 +486,7 @@ impl<'a> Builder<'a> {
             language,
             rule: self.rule,
             options: &empty,
+            constructors: self.ws.constructor_prefixes(language),
         };
         let ranks: BTreeMap<&str, i64> = self
             .keys

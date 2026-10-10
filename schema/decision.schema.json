@@ -1219,6 +1219,17 @@
       "additionalProperties": false,
       "description": "One tunable value.",
       "properties": {
+        "$ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShapeRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A named shape defined once by the spec, such as `#/$defs/limit`."
+        },
         "default": true,
         "description": {
           "type": "string"
@@ -1233,6 +1244,21 @@
             }
           ],
           "description": "What each item of a list is."
+        },
+        "minimum": {
+          "description": "The least an integer may be.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "oneOf": {
+          "description": "Alternatives, exactly one of which a value must match.",
+          "items": {
+            "$ref": "#/$defs/Shape"
+          },
+          "type": "array"
         },
         "properties": {
           "additionalProperties": {
@@ -1249,11 +1275,17 @@
           "type": "array"
         },
         "type": {
-          "$ref": "#/$defs/OptionType"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OptionType"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
-        "type",
         "default",
         "description"
       ],
@@ -1267,7 +1299,8 @@
         "boolean",
         "string",
         "array",
-        "object"
+        "object",
+        "null"
       ],
       "type": "string"
     },
@@ -1485,8 +1518,19 @@
     },
     "Shape": {
       "additionalProperties": false,
-      "description": "The shape of a value inside an option: its type and, for a list, the shape\nof its items, for an object, its properties and which of them are required.",
+      "description": "The shape of a value inside an option: its type and, for a list, the shape\nof its items, for an object, its properties and which of them are required.\nWith `oneOf`, a value is accepted when exactly one of the shapes accepts it;\nwith `$ref`, the shape is the named one.",
       "properties": {
+        "$ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShapeRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A named shape defined once by the spec."
+        },
         "items": {
           "anyOf": [
             {
@@ -1497,6 +1541,21 @@
             }
           ],
           "description": "What each item of a list is."
+        },
+        "minimum": {
+          "description": "The least an integer may be.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "oneOf": {
+          "description": "Alternatives, exactly one of which a value must match.",
+          "items": {
+            "$ref": "#/$defs/Shape"
+          },
+          "type": "array"
         },
         "properties": {
           "additionalProperties": {
@@ -1513,13 +1572,27 @@
           "type": "array"
         },
         "type": {
-          "$ref": "#/$defs/OptionType"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OptionType"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
-      "required": [
-        "type"
-      ],
       "type": "object"
+    },
+    "ShapeRef": {
+      "description": "The named shapes a `$ref` may point to.",
+      "oneOf": [
+        {
+          "const": "#/$defs/limit",
+          "description": "A limit: a non-negative integer, or an object that gives one per role\nof a function (see [`Shape::limit`]).",
+          "type": "string"
+        }
+      ]
     },
     "Subject": {
       "description": "What a decision talks about inside its domain. Mapping to the run scope\nof a rule is `Subject::run_scope`.",
@@ -1563,6 +1636,96 @@
           "const": "only",
           "description": "Test code only.",
           "type": "string"
+        }
+      ]
+    },
+    "limit": {
+      "oneOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "properties": {
+            "constructor": {
+              "oneOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "default": {
+              "oneOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "entrypoint": {
+              "oneOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "function": {
+              "oneOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "implementation": {
+              "oneOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "method": {
+              "oneOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "test": {
+              "oneOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "type": "object"
         }
       ]
     }

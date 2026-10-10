@@ -102,6 +102,15 @@ pub struct ProjectLanguage {
     /// The command that formats a file of the language after a fix.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub formatter: Option<FormatterSpec>,
+    /// The name prefixes that make a function a constructor in this
+    /// language, replacing what its provider declares. Every decision that
+    /// tells a constructor apart shares them.
+    #[serde(
+        rename = "constructorPrefixes",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub constructor_prefixes: Option<Vec<String>>,
     /// Everything else is handed to the language's provider.
     #[serde(flatten)]
     pub options: Options,

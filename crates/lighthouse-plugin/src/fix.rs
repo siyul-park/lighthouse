@@ -62,6 +62,8 @@ pub struct KeyCtx<'a> {
     /// The rule whose finding is being fixed, and the options it ran with.
     pub rule: &'a str,
     pub options: &'a Options,
+    /// The constructor prefixes of `language`.
+    pub constructors: &'a [String],
 }
 
 /// A way to order declarations, for the `reorder` fix operation. `rank` is

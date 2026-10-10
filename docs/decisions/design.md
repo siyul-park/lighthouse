@@ -119,7 +119,6 @@ Symbols with one owner and cohesive responsibility MUST share a file.
 
 | option | default | meaning |
 | --- | --- | --- |
-| `constructorPrefixes` | `["New","new"]`; rust: `["new"]` | A function named like one of these, or one of these followed by a word, is a constructor: it builds the type and sits where the constructors are. |
 | `unit` | `"file"`; rust: `"module-tree"` | Where the members of a type must be: `file` (the file of the type) or `module-tree` (the module of the type or one below it). |
 
 ```go invalid store.go
@@ -515,7 +514,6 @@ Methods SHOULD express receiver-owned behavior; free functions SHOULD express co
 
 | option | default | meaning |
 | --- | --- | --- |
-| `constructorPrefixes` | `["New","new"]`; rust: `["new"]` | A function named like one of these, or one of these followed by a word, is a constructor and has no receiver yet. |
 | `requireOwnerParam` | `false` | Report only functions that take a value of the owner type as a parameter, the strongest sign that the owner should be the receiver. By default a function that takes one or calls or references the owner or one of its members is reported; a function that does neither is a helper with no more to do with the owner than with any other type. |
 
 ```go invalid
@@ -560,7 +558,6 @@ Derived from: Fowler, Refactoring 2nd ed., Feature Envy; Lanza and Marinescu, Ob
 
 | option | default | meaning |
 | --- | --- | --- |
-| `constructorPrefixes` | `["New","new"]`; rust: `["new"]` | A function named like one of these, or one of these followed by a word, is a constructor and has no receiver yet. |
 | `includeExported` | `false` | Also judge exported functions, whose callers outside the module would have to change. |
 | `minMembers` | `3` | Fewest distinct members of the type the function must use. |
 | `minStatements` | `3` | Fewest statements a function must have to be judged. |
@@ -878,7 +875,6 @@ Top-level declarations in a file MUST follow the language's ownership-group orde
 
 | option | default | meaning |
 | --- | --- | --- |
-| `constructorPrefixes` | `["New"]`; rust: `["new"]` | A public function whose name is one of these, or one of these followed by a word (`New`, `NewStore`; not `Newton`), is a constructor. |
 | `constructorsFirst` | `false`; rust: `true` | A constructor method (a public method named like a constructor) must precede the other methods of its type in the file. Go constructors are functions, ordered by the `constructor` group instead. |
 | `groups` | `["public-type","private-type","public-const","private-const","var","init","public-function","constructor","public-method","hook","private-function"]`; rust: `["const","var","type","public-function","private-function"]` | The group order of a file, first to last. A declaration belongs to the first of its candidate groups that this list names; one the list does not name is not ordered. Groups: `public-type`, `private-type`, `type` (types and the members of a type together), `public-const`, `private-const`, `const`, `var`, `init`, `public-function`, `constructor`, `public-method`, `hook`, `private-function` (private functions and, where `type` is not listed, private methods). |
 | `hookNames` | `["Clone","String","GoString","Error","Unwrap","MarshalJSON","UnmarshalJSON","MarshalText","UnmarshalText","MarshalBinary","UnmarshalBinary"]`; rust: `[]` | Public methods that implement clone, conversion or interface hooks; they follow the other public methods. Names are kept to ones that are never ordinary behavior. |

@@ -57,17 +57,7 @@ spec:
         type: integer
         default: 3
         description: Fewest statements a function must have to be judged.
-      constructorPrefixes:
-        type: array
-        default: [New, new]
-        description: >-
-          A function named like one of these, or one of these followed by a
-          word, is a constructor and has no receiver yet.
     additionalProperties: false
-  languages:
-    rust:
-      options:
-        constructorPrefixes: [new]
   check:
     type: cel
     select: function

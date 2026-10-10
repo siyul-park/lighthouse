@@ -221,6 +221,16 @@
       "additionalProperties": true,
       "description": "The options of one language.",
       "properties": {
+        "constructorPrefixes": {
+          "description": "The name prefixes that make a function a constructor in this\nlanguage, replacing what its provider declares. Every decision that\ntells a constructor apart shares them.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "formatter": {
           "anyOf": [
             {

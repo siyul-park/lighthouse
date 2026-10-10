@@ -79,6 +79,12 @@ pub struct Conventions {
     /// Globs of test files.
     #[serde(default)]
     pub test_globs: Vec<String>,
+    /// Name prefixes that make a function a constructor, such as `New` in Go
+    /// or `new` in Rust; a name is a constructor when it is a prefix or a
+    /// prefix followed by a new word. The project may replace them in
+    /// `[languages.<id>] constructorPrefixes`.
+    #[serde(default)]
+    pub constructor_prefixes: Vec<String>,
 }
 
 /// The project an index request belongs to.
@@ -386,6 +392,15 @@ pub struct FunctionSummary {
     /// before 1.0; zero when the plugin does not count them.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub manual_assertions: u32,
+    /// The function implements a method that a trait or interface declares
+    /// elsewhere (a method of a trait impl in Rust). Added in 0.1 before 1.0.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub implementation: bool,
+    /// The function builds a value of its owner type without taking one: an
+    /// associated function without a receiver that returns `Self` or the
+    /// owner. Added in 0.1 before 1.0.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub constructs: bool,
     /// Target of the call the body consists of when it passes the receiver and
     /// every parameter on, in order.
     #[serde(default, skip_serializing_if = "Option::is_none")]

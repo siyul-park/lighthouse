@@ -396,6 +396,15 @@ pub struct FunctionSummary {
     /// compares and whose only effect is to fail the test.
     #[serde(default)]
     pub manual_assertions: u32,
+    /// The function implements a method that a trait or interface declares
+    /// elsewhere, so its signature is not its own to choose (a method of a
+    /// trait impl in Rust).
+    #[serde(default)]
+    pub implementation: bool,
+    /// The function builds a value of its owner type without taking one: an
+    /// associated function without a receiver that returns `Self` or the owner.
+    #[serde(default)]
+    pub constructs: bool,
 }
 
 /// How a test enumerates its cases: one body over a data table, or separate scenarios.

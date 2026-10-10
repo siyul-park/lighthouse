@@ -322,6 +322,7 @@
           "top_level": 1
         },
         {
+          "constructs": true,
           "flow": [],
           "max_nesting": 0,
           "params": 0,

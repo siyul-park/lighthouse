@@ -124,6 +124,7 @@ impl Clause {
             language,
             rule: &meta.id,
             options,
+            constructors: ctx.ws.constructor_prefixes(language),
         };
         let mut found = Vec::new();
         for module in declarations(ctx) {

@@ -31,12 +31,6 @@ spec:
   options:
     type: object
     properties:
-      constructorPrefixes:
-        type: array
-        default: [New, new]
-        description: >-
-          A function named like one of these, or one of these followed by a
-          word, is a constructor and has no receiver yet.
       requireOwnerParam:
         type: boolean
         default: false
@@ -47,10 +41,6 @@ spec:
           or one of its members is reported; a function that does neither is a
           helper with no more to do with the owner than with any other type.
     additionalProperties: false
-  languages:
-    rust:
-      options:
-        constructorPrefixes: [new]
   check:
     type: cel
     select: function

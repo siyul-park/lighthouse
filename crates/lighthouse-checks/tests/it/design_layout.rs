@@ -82,12 +82,11 @@ fn constructors_come_first_within_a_type_when_asked() {
     w.member(&ty, "new", SymbolKind::Method, "m/a.ucm");
     let options = json!({
         "groups": ["type"],
-        "constructorPrefixes": ["new"],
         "constructorsFirst": true,
     });
     let found = w.check(GROUPS, options);
     assert_eq!(w.names(&found), ["new"]);
-    let relaxed = json!({ "groups": ["type"], "constructorPrefixes": ["new"] });
+    let relaxed = json!({ "groups": ["type"] });
     assert!(w.check(GROUPS, relaxed).is_empty());
 }
 

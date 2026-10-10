@@ -49,14 +49,14 @@ pub(crate) fn node(project: &Project, s: &Symbol) -> Value {
         "pos": pos(s.span.start),
         "end_line": s.span.end.line,
         "module": s.id.module(),
-        "role": s.role.map_or("", role),
+        "test_role": s.role.map_or("", role),
         "documented": s.doc.is_some(),
         "test": project.in_test(&s.id),
         "file_test": file.is_some_and(|f| f.test),
         "generated": file.is_some_and(|f| f.generated),
         "owner_key": owner_key(s).unwrap_or_default(),
         "declaration": is_declaration(project, s),
-        "implements_trait": s.kind == SymbolKind::Method && s.id.as_str().matches("::").count() > 2,
+        "implements_trait": project.function(&s.id).is_some_and(|f| f.implementation),
     })
 }
 

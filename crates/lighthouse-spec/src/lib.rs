@@ -37,7 +37,9 @@ pub use model::{
     Content, DecisionStatus, Domain, Example, ExampleFile, ExampleKind, Expect, Scope, Subject,
     authored_severity,
 };
-pub use options::{ObjectType, OptionSchema, OptionType, OptionsSchema, Shape};
+pub use options::{
+    LIMIT_ROLES, ObjectType, OptionSchema, OptionType, OptionsSchema, Shape, ShapeRef,
+};
 pub use pack::{Pack, PackSpec, Section, SectionSpec};
 pub use project::{
     Config, FILE_NAME, FILE_NAMES, Formatter, FormatterOutput, FormatterSpec, FormatterStdin,
@@ -50,8 +52,20 @@ pub use sources::{SourceLine, SourceMapSpec};
 
 /// The JSON Schema of every kind this crate defines.
 pub fn descriptors() -> Vec<Descriptor> {
+    let mut decision = Descriptor::of::<DecisionSpec>();
+    // The named shapes a `$ref` of an option may point to.
+    if let Some(defs) = decision
+        .schema
+        .get_mut("$defs")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        defs.insert(
+            "limit".to_owned(),
+            serde_json::to_value(Shape::limit()).expect("a shape serializes"),
+        );
+    }
     vec![
-        Descriptor::of::<DecisionSpec>(),
+        decision,
         Descriptor::of::<PackSpec>(),
         Descriptor::of::<ProjectSpec>(),
         Descriptor::of::<SourceMapSpec>(),
