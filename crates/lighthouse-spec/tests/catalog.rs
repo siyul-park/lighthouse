@@ -2,9 +2,7 @@ mod support;
 
 use lighthouse_model::Severity;
 use lighthouse_plugin::Scope as RunScope;
-use lighthouse_spec::{
-    Catalog, Content, Decision, Error, ExampleFile, Subject, authored_severity, needs_verdict,
-};
+use lighthouse_spec::{Catalog, Content, Decision, Error, ExampleFile, Subject, authored_severity};
 use serde_json::{Map, json};
 use support::*;
 
@@ -27,18 +25,12 @@ fn a_finding_asks_for_a_verdict_unless_its_decision_authored_an_error() {
         (Severity::Warn, true),
         (Severity::Info, true),
     ] {
-        assert_eq!(needs_verdict(authored), asks, "{authored}");
+        assert_eq!(authored.needs_verdict(), asks, "{authored}");
     }
     let warn = bundled("design/private-helper-callers");
-    assert!(needs_verdict(authored_severity(
-        Severity::Error,
-        Some(warn)
-    )));
+    assert!(authored_severity(Severity::Error, Some(warn)).needs_verdict());
     let definitive = bundled("design/declaration-groups");
-    assert!(!needs_verdict(authored_severity(
-        Severity::Warn,
-        Some(definitive)
-    )));
+    assert!(!authored_severity(Severity::Warn, Some(definitive)).needs_verdict());
 }
 
 #[test]

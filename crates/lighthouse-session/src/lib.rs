@@ -37,5 +37,8 @@ pub use skill::{SKILL_MARKER, skill, skill_for};
 pub use trust::{Basis, TRUST_VAR, revoke, trust};
 pub use validate::{Problem, Validated, validate_paths};
 
+/// Directories no search for files enters.
+pub const SKIPPED_DIRS: [&str; 4] = [".git", "target", "node_modules", "testdata"];
+
 /// Errors cross threads (the MCP server runs operations on a blocking pool).
 pub type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;

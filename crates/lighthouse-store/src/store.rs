@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_model::Reason;
+use lighthouse_model::{Reason, hash};
 use rusqlite::{
     Connection, ErrorCode, OptionalExtension, Row, Transaction, TransactionBehavior, named_params,
     params, types::Type,
@@ -15,7 +15,7 @@ use rusqlite::{
 use serde_json::{Value, json};
 
 use crate::{
-    Error, Filter, FindingRecord, FixEvent, Judgment, LatestReview, NewFix, NewReview, Observed,
+    Error, Filter, FindingRecord, FixEvent, LatestReview, NewFix, NewReview, Observed, Rejection,
     Resolved, ReviewEvent, Run, RunSummary, Stamp, Standing, StatusFilter, Unchecked, digest, log,
     migrations,
 };
@@ -134,7 +134,7 @@ impl Store {
     /// out of reports, has expired because the rule or the evidence moved, or
     /// cannot apply because the finding is mechanical (its authored severity, not its
     /// severity, decides).
-    pub fn standings(&self) -> Result<BTreeMap<String, Judgment>, Error> {
+    pub fn standings(&self) -> Result<BTreeMap<String, Rejection>, Error> {
         let mut stmt = self
             .conn
             .prepare("SELECT fingerprint, standing, reason_code FROM standings")?;
@@ -150,7 +150,7 @@ impl Store {
             let (fingerprint, standing, reason) = row?;
             let standing = Standing::parse(&standing).ok_or_else(|| unknown(&standing))?;
             let reason = reason.parse::<Reason>().map_err(|e| unknown(&e))?;
-            found.insert(fingerprint, Judgment { standing, reason });
+            found.insert(fingerprint, Rejection { standing, reason });
         }
         Ok(found)
     }
@@ -239,7 +239,7 @@ impl Store {
         let files = serde_json::to_string(&fix.files)?;
         static NONCE: AtomicU64 = AtomicU64::new(0);
         let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
-        let id = digest::hash(
+        let id = hash::short(
             &format!(
                 "{}\0{}\0{}\0{files}\0{timestamp}\0{}\0{nonce}",
                 fix.fingerprint,

@@ -40,7 +40,7 @@ pub use migrate::{
 };
 pub use model::{
     Content, Domain, Example, ExampleFile, ExampleKind, Expect, Scope, Status, Subject,
-    authored_severity, needs_verdict,
+    authored_severity,
 };
 pub use options::{ObjectType, OptionSchema, OptionType, OptionsSchema};
 pub use overrides::DecisionOverrideSpec;

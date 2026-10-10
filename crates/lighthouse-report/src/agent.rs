@@ -97,7 +97,7 @@ impl Briefing<'_> {
         let decision = self
             .catalog
             .and_then(|catalog| catalog.decision(&diagnostic.rule_id));
-        lighthouse_spec::needs_verdict(authored_severity(diagnostic.severity, decision))
+        authored_severity(diagnostic.severity, decision).needs_verdict()
     }
 }
 

@@ -25,10 +25,9 @@ use lighthouse_resource::{Format, SCHEMA_URL_BASE, header, to_yaml, yaml_values}
 use serde_json::Value as Json;
 use serde_norway::{Mapping, Value};
 
-use crate::Result;
+use crate::{Result, SKIPPED_DIRS};
 
 /// Directories never searched for documents.
-const SKIPPED: [&str; 4] = [".git", "target", "node_modules", "testdata"];
 const LOCAL_ROOT: &str = ".lighthouse";
 const LOCAL_RULES: &str = "rules";
 const LOCAL_DECISIONS: &str = "decisions";
@@ -283,7 +282,7 @@ fn walk(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
     for entry in fs::read_dir(dir)? {
         let entry = entry?.path();
         if entry.is_dir() {
-            if !SKIPPED.contains(&file_name(&entry).as_str()) {
+            if !SKIPPED_DIRS.contains(&file_name(&entry).as_str()) {
                 walk(&entry, files)?;
             }
         } else {

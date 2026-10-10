@@ -5,11 +5,11 @@ use std::{
     time::Duration,
 };
 
+use lighthouse_model::hash::{self, Hasher};
 use lighthouse_model::{Capability, Diagnostic, EditOp, Fingerprint, FixOutcome, Safety, Severity};
 use lighthouse_plugin::{FixDecision, FixRequest};
 use lighthouse_spec::write_atomic;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 
 use super::{
     AppliedFix, DeclinedFix, FileChange, FixBinding, FixPlan, FixReport, FixRun, MAX_ROUNDS,
@@ -18,7 +18,7 @@ use super::{
 };
 use lighthouse_config::{Formatter, FormatterOutput, FormatterStdin};
 
-use crate::{Engine, Error, Outcome, Overlays, hash_of};
+use crate::{Engine, Error, Outcome, Overlays};
 
 /// Settings files of formatters that look for them upward from the file.
 const SETTINGS: [&str; 4] = [
@@ -206,7 +206,7 @@ impl Orchestrator<'_> {
     /// A hash of every text the run holds, which two rounds share only when
     /// the second undid the first.
     fn state_hash(&self) -> String {
-        let mut hash = Sha256::new();
+        let mut hash = Hasher::new();
         for (path, text) in &self.texts {
             if self
                 .original
@@ -220,7 +220,7 @@ impl Orchestrator<'_> {
             hash.update(text.as_bytes());
             hash.update([0xff]);
         }
-        hash.finalize().iter().map(|b| format!("{b:02x}")).collect()
+        hash.finish()
     }
 
     /// Writes the changed files after the last round was verified, in two
@@ -247,7 +247,7 @@ impl Orchestrator<'_> {
             for path in &changed {
                 let (_, hash) = &self.original[path];
                 match fs::read_to_string(self.engine.ws.root.join(path)) {
-                    Ok(now) if hash_of(&now) == *hash => {}
+                    Ok(now) if hash::sha256(&now) == *hash => {}
                     Ok(_) => {
                         skipped.insert(path.clone(), "changed concurrently".to_owned());
                     }
@@ -353,7 +353,7 @@ impl Orchestrator<'_> {
             let guard = || {
                 sources.contain(path)?;
                 match fs::read_to_string(&target) {
-                    Ok(now) if hash_of(&now) == *hash => Ok(()),
+                    Ok(now) if hash::sha256(&now) == *hash => Ok(()),
                     _ => Err("changed concurrently".to_owned()),
                 }
             };
@@ -615,7 +615,7 @@ impl Orchestrator<'_> {
         for (file, text) in &candidates.texts {
             self.original.entry(file.clone()).or_insert_with(|| {
                 let base = candidates.bases[file].clone();
-                let hash = hash_of(&base);
+                let hash = hash::sha256(&base);
                 (base, hash)
             });
             self.texts.insert(file.clone(), text.clone());
@@ -645,7 +645,7 @@ impl Orchestrator<'_> {
                 }
             };
             let analyzed = before.project.file(file).map(|f| f.hash.as_str());
-            if analyzed.is_some_and(|hash| hash != hash_of(&base)) {
+            if analyzed.is_some_and(|hash| hash != hash::sha256(base.as_bytes())) {
                 out.failed
                     .insert(file.clone(), "changed concurrently".to_owned());
                 continue;

@@ -186,7 +186,7 @@ impl Standing {
 
 /// The standing of a rejected finding with the reason it was rejected for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Judgment {
+pub struct Rejection {
     pub standing: Standing,
     pub reason: Reason,
 }
@@ -250,11 +250,12 @@ pub struct FindingRecord {
 
 impl FindingRecord {
     /// Whether the finding asks for a verdict: its decision authored `warn` or
-    /// `info`, whatever level it is reported at. A finding recorded when
-    /// `review` was a severity of its own is one too.
+    /// `info`, whatever level it is reported at.
     pub fn needs_verdict(&self) -> bool {
-        matches!(self.authored_severity.as_deref(), Some("warn" | "info"))
-            || self.severity == "review"
+        self.authored_severity
+            .as_deref()
+            .and_then(|authored| authored.parse::<Severity>().ok())
+            .is_some_and(Severity::needs_verdict)
     }
 
     /// Where the finding is in its life; a suppression wins over the rest.

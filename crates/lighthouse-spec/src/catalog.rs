@@ -9,6 +9,7 @@ use std::{
     },
 };
 
+use lighthouse_model::hash;
 use lighthouse_resource::{
     Format, Resource, SCHEMA_URL_BASE, Spec, documents, kind_of, resource, to_document,
 };
@@ -19,7 +20,6 @@ use crate::{
     PackSpec, Section, SectionSpec,
     decision::{PACK_LABEL, SECTION_LABEL},
     load::{self, Files},
-    model::short_hash,
     sources::{Source, SourceMapSpec, extract},
     validate,
 };
@@ -333,7 +333,7 @@ impl Catalog {
             .decisions()
             .map(|d| format!("{}:{}\n", d.id(), d.version()))
             .collect();
-        short_hash(&listing)
+        hash::short(&listing, 8)
     }
 }
 

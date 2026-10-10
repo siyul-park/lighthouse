@@ -3,10 +3,9 @@ use std::{fmt, path::PathBuf, str::FromStr};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::Span;
+use crate::{Span, hash::Hasher};
 
 /// How hard a finding fails a run; serialized and parsed as the lowercase
 /// variant name. Whether a finding also asks for a verdict is not a level: it
@@ -22,6 +21,15 @@ pub enum Severity {
     Warn,
     /// Reported, never fails the run.
     Info,
+}
+
+impl Severity {
+    /// Whether findings of a decision with this authored severity ask for a
+    /// verdict. An `error` is definitive: only an annotation in the code waives
+    /// it. A `warn` or `info` is a review task: a reviewer confirms or rejects it.
+    pub fn needs_verdict(self) -> bool {
+        self != Self::Error
+    }
 }
 
 /// The text given to [`Severity::from_str`] names no severity.
@@ -62,13 +70,13 @@ impl Fingerprint {
     /// whitespace-normalized snippet.
     pub fn of(rule_id: &str, symbol_path: &str, snippet: &str) -> Self {
         let symbol_path = symbol_path.replace('\\', "/");
-        let mut hash = Sha256::new();
+        let mut hash = Hasher::new();
         for part in [rule_id, symbol_path.as_str()] {
             hash.update(part);
             hash.update([0]);
         }
         hash.update(snippet.split_whitespace().collect::<Vec<_>>().join(" "));
-        Self(hex(&hash.finalize()))
+        Self(hash.finish())
     }
 
     /// Adopts a fingerprint computed elsewhere, such as by a plugin.
@@ -81,20 +89,20 @@ impl Fingerprint {
         if n == 0 {
             return self.clone();
         }
-        let mut hash = Sha256::new();
+        let mut hash = Hasher::new();
         hash.update(&self.0);
         hash.update(n.to_le_bytes());
-        Self(hex(&hash.finalize()))
+        Self(hash.finish())
     }
 
     /// Tells apart findings that share a fingerprint by something stable about
     /// where they are, such as the symbol that encloses them.
     pub fn discriminate(&self, discriminator: &str) -> Self {
-        let mut hash = Sha256::new();
+        let mut hash = Hasher::new();
         hash.update(&self.0);
         hash.update([0xff]);
         hash.update(discriminator);
-        Self(hex(&hash.finalize()))
+        Self(hash.finish())
     }
 
     /// The opaque hex string; equal fingerprints identify the same finding.
@@ -155,8 +163,4 @@ pub struct Incomplete {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<PathBuf>,
     pub reason: String,
-}
-
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }

@@ -15,7 +15,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use sha2::{Digest, Sha256};
+use lighthouse_model::hash::Hasher;
 
 use crate::Result;
 
@@ -55,7 +55,7 @@ impl Basis {
         rules: &BTreeMap<String, String>,
         commands: &[Command],
     ) -> Self {
-        let mut hash = Sha256::new();
+        let mut hash = Hasher::new();
         field(&mut hash, "config", config.as_bytes());
         for (name, text) in rules {
             field(&mut hash, "rule-name", name.as_bytes());
@@ -77,15 +77,15 @@ impl Basis {
                     }
                 });
                 let content = named.and_then(|p| fs::read(p).ok());
-                field(
-                    &mut hash,
-                    "binary",
-                    &Sha256::digest(content.unwrap_or_default()),
-                );
+                field(&mut hash, "binary", &{
+                    let mut file = Hasher::new();
+                    file.update(content.unwrap_or_default());
+                    file.finish_bytes()
+                });
             }
         }
         Self {
-            digest: hash.finalize().iter().map(|b| format!("{b:02x}")).collect(),
+            digest: hash.finish(),
             commands: commands.iter().map(|c| c.what.clone()).collect(),
         }
     }
@@ -125,7 +125,7 @@ pub fn revoke(root: &Path) -> Result<bool> {
 
 /// Feeds one field to the digest: a tag and a value, each with its length in
 /// front, so no two different lists of fields give the same bytes.
-fn field(hash: &mut Sha256, tag: &str, value: &[u8]) {
+fn field(hash: &mut Hasher, tag: &str, value: &[u8]) {
     for part in [tag.as_bytes(), value] {
         hash.update((part.len() as u64).to_le_bytes());
         hash.update(part);

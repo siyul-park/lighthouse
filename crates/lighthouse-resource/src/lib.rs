@@ -9,7 +9,11 @@ mod error;
 mod schema;
 mod yaml;
 
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{
+    borrow::Cow,
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -19,6 +23,12 @@ pub use duration::parse_duration;
 pub use error::Error;
 pub use schema::{Descriptor, SCHEMA_URL_BASE, header, schema, schema_file};
 pub use yaml::to_yaml;
+
+/// The first of `names` that is a file in `dir`: how a project's config and a
+/// plugin's manifest are found, in the order the names are tried.
+pub fn file_in(dir: &Path, names: &[&str]) -> Option<PathBuf> {
+    names.iter().map(|n| dir.join(n)).find(|p| p.is_file())
+}
 
 /// The version every document of this model declares.
 pub const API_VERSION: &str = "lighthouse/v1alpha1";

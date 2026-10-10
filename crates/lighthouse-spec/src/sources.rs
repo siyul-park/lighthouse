@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
+use lighthouse_model::hash;
 use lighthouse_resource::Spec;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 const KEYWORDS: [&str; 3] = ["MUST", "SHOULD", "MAY"];
 
@@ -64,7 +64,7 @@ impl<'a> Out<'a> {
             return;
         };
         let heading = if heading.is_empty() { "doc" } else { &heading };
-        let base = format!("{}#{heading}-{}", self.doc, hash(&text));
+        let base = format!("{}#{heading}-{}", self.doc, hash::short(&text, 4));
         let n = self.seen.entry(base.clone()).or_default();
         *n += 1;
         let reference = if *n == 1 { base } else { format!("{base}-{n}") };
@@ -175,9 +175,4 @@ fn slug(heading: &str) -> String {
         .map(str::to_ascii_lowercase)
         .collect();
     words.join("-")
-}
-
-fn hash(text: &str) -> String {
-    let digest = Sha256::digest(text.as_bytes());
-    digest[..4].iter().map(|b| format!("{b:02x}")).collect()
 }

@@ -6,7 +6,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-use crate::{Check, Error, Example, Fix, OptionsSchema, Scope, Status, model::short_hash};
+use crate::{Check, Error, Example, Fix, OptionsSchema, Scope, Status};
+use lighthouse_model::hash;
 
 /// Label that says which pack a decision belongs to.
 pub const PACK_LABEL: &str = "lighthouse/pack";
@@ -154,7 +155,7 @@ impl Decision {
     pub fn version(&self) -> String {
         let text = serde_json::to_string(&json!({ "name": self.id(), "spec": self.spec() }))
             .expect("a decision serializes");
-        short_hash(&text)
+        hash::short(&text, 8)
     }
 
     /// Defaults filled in and configured keys checked against the declared
@@ -240,7 +241,7 @@ impl Decision {
             "check": check,
             "options": self.options_content(),
         });
-        short_hash(&content.to_string())
+        hash::short(&content.to_string(), 8)
     }
 
     /// Every version older builds recorded verdicts under that still apply
@@ -286,13 +287,13 @@ impl DecisionSpec {
     /// keep its verdicts. Wording, examples, tuning, option descriptions, the
     /// ADR fields, the envelope and the file format do not change it either.
     pub fn meaning_version(&self) -> String {
-        short_hash(&self.meaning_content().to_string())
+        hash::short(&self.meaning_content().to_string(), 8)
     }
 
     /// Identifies how the decision is checked: the hash of its `check`. It is
     /// recorded with findings for evaluation and never expires a verdict.
     pub fn check_revision(&self) -> String {
-        short_hash(&json!(self.check).to_string())
+        hash::short(&json!(self.check).to_string(), 8)
     }
 
     fn meaning_content(&self) -> Value {

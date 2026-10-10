@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, path::Path};
 use lighthouse_engine::Outcome;
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete};
 use lighthouse_spec::{Catalog, Decision, authored_severity};
-use lighthouse_store::{Judgment, Observed, Run, Standing, Store, Unchecked};
+use lighthouse_store::{Observed, Rejection, Run, Standing, Store, Unchecked};
 use serde_json::{Value, json};
 
 use crate::git;
@@ -102,14 +102,14 @@ pub fn apply_verdicts(root: &Path, outcome: &mut Outcome) -> usize {
 }
 
 /// Why a judged finding is reported anyway; `None` when it is suppressed.
-fn note(judgment: &Judgment) -> Option<String> {
-    match judgment.standing {
+fn note(rejection: &Rejection) -> Option<String> {
+    match rejection.standing {
         Standing::Suppressed => None,
         Standing::RuleChanged => Some("verdict expired: rule changed".to_owned()),
         Standing::EvidenceChanged => Some("verdict expired: evidence changed".to_owned()),
         Standing::Unsuppressible => Some(format!(
             "rejected as {} \u{2014} mechanical findings are not suppressible; fix the rule",
-            judgment.reason
+            rejection.reason
         )),
     }
 }
@@ -149,14 +149,14 @@ fn record(
     root: &Path,
     catalog: &Catalog,
     outcome: &Outcome,
-) -> Result<(BTreeMap<String, Judgment>, Vec<String>), lighthouse_store::Error> {
+) -> Result<(BTreeMap<String, Rejection>, Vec<String>), lighthouse_store::Error> {
     let mut store = Store::open(root)?;
     store.record(&run_of(root, catalog, outcome))?;
     Ok((store.standings()?, store.notices().to_vec()))
 }
 
 /// The verdicts already recorded, when recording this run was not possible.
-fn read_only(root: &Path) -> BTreeMap<String, Judgment> {
+fn read_only(root: &Path) -> BTreeMap<String, Rejection> {
     Store::open_existing(root)
         .ok()
         .flatten()

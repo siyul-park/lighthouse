@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use lighthouse_model::{Diagnostic, Options};
 use lighthouse_plugin::{Ctx, Error, Rule, RuleManifest};
 use serde::de::DeserializeOwned;
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::{Catalog, Decision};
 
@@ -24,6 +24,20 @@ impl Decision {
             strict: self.strict,
             enforced: self.enforced(),
         })
+    }
+
+    /// The options of `language` over the decision's defaults, with a failure
+    /// reported as the options error of this rule.
+    pub fn rule_options(
+        &self,
+        configured: &Options,
+        language: Option<&str>,
+    ) -> Result<Map<String, Value>, Error> {
+        self.resolve_options(configured, language)
+            .map_err(|e| Error::Options {
+                rule: self.id().to_owned(),
+                message: e.to_string(),
+            })
     }
 }
 
@@ -59,15 +73,11 @@ where
     }
 
     fn resolve(&self, configured: &Options, language: Option<&str>) -> Result<O, Error> {
-        let fail = |message: String| Error::Options {
+        let resolved = self.decision.rule_options(configured, language)?;
+        serde_json::from_value(Value::Object(resolved)).map_err(|e| Error::Options {
             rule: self.meta.id.clone(),
-            message,
-        };
-        let resolved = self
-            .decision
-            .resolve_options(configured, language)
-            .map_err(|e| fail(e.to_string()))?;
-        serde_json::from_value(Value::Object(resolved)).map_err(|e| fail(e.to_string()))
+            message: e.to_string(),
+        })
     }
 }
 

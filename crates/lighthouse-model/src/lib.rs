@@ -1,6 +1,7 @@
 pub mod annotation;
 mod diagnostic;
 mod fix;
+pub mod hash;
 mod review;
 mod text;
 mod ucm;

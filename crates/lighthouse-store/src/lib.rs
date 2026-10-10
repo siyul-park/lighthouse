@@ -19,8 +19,8 @@ use lighthouse_resource::Descriptor;
 pub use error::Error;
 pub use log::VerdictSpec;
 pub use record::{
-    Filter, FindingRecord, FixEvent, Judgment, LatestReview, NewFix, NewReview, Observed, Resolved,
-    ReviewEvent, Run, RunSummary, Stamp, Standing, State, StatusFilter, Unchecked,
+    Filter, FindingRecord, FixEvent, LatestReview, NewFix, NewReview, Observed, Rejection,
+    Resolved, ReviewEvent, Run, RunSummary, Stamp, Standing, State, StatusFilter, Unchecked,
 };
 pub use store::Store;
 

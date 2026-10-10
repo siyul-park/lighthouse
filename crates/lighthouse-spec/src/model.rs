@@ -4,7 +4,6 @@ use lighthouse_model::Severity;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use sha2::{Digest, Sha256};
 
 /// What kind of thing a decision is about. Only code exists today.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -232,19 +231,6 @@ pub struct Example {
 /// has: what decides whether a verdict may hide it and a fix may be safe.
 pub fn authored_severity(severity: Severity, decision: Option<&crate::Decision>) -> Severity {
     decision.and_then(|d| d.severity()).unwrap_or(severity)
-}
-
-/// Whether findings of a decision with this authored severity ask for a
-/// verdict. An `error` is definitive: only an annotation in the code waives
-/// it. A `warn` or `info` is a review task: a reviewer confirms or rejects it.
-pub fn needs_verdict(authored: Severity) -> bool {
-    authored != Severity::Error
-}
-
-/// The first eight bytes of the SHA-256 of `text`, in hex.
-pub(crate) fn short_hash(text: &str) -> String {
-    let digest = Sha256::digest(text.as_bytes());
-    digest[..8].iter().map(|b| format!("{b:02x}")).collect()
 }
 
 macro_rules! display {

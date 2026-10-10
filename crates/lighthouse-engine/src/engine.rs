@@ -8,14 +8,13 @@ use std::{
 use ignore::WalkBuilder;
 use lighthouse_config::{Config, GlobSet, Rules, glob_set};
 use lighthouse_model::{
-    Diagnostic, File, Fingerprint, Fragment, Incomplete, Options, Project, Severity,
+    Diagnostic, File, Fingerprint, Fragment, Incomplete, Options, Project, Severity, hash,
 };
 use lighthouse_plugin::{
     Ctx, Facts, Indexed, LanguageProvider, Memo, Registry, Rule, Scope, Source, Workspace,
 };
 use rayon::prelude::*;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
@@ -471,7 +470,7 @@ impl Engine {
             };
             if let Some(mut input) = self.read_input(entry.path(), rel, notices, incomplete) {
                 if let Some(text) = overlays.get(rel) {
-                    input.file.hash = hash_of(text);
+                    input.file.hash = hash::sha256(text);
                     input.text.clone_from(text);
                 }
                 inputs.push(input);
@@ -518,7 +517,7 @@ impl Engine {
         let file = File {
             path: rel.to_owned(),
             lang: self.provider(language).manifest().id.clone(),
-            hash: hash_of(&text),
+            hash: hash::sha256(&text),
             generated: false,
             test: self.languages[language].tests.is_match(rel),
         };
@@ -799,14 +798,6 @@ impl Engine {
     fn preset_rules(&self, id: &str) -> Option<Rules> {
         self.registry.preset_rules(id)
     }
-}
-
-/// The content hash the model records for a file's text.
-pub fn hash_of(text: &str) -> String {
-    Sha256::digest(text.as_bytes())
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
 }
 
 /// The rules the configuration enables for at least one file: the presets it

@@ -124,7 +124,7 @@ pub struct Discovered {
 
 /// The manifest file in `dir`, if it has one.
 pub fn file_in(dir: &Path) -> Option<PathBuf> {
-    FILE_NAMES.iter().map(|n| dir.join(n)).find(|p| p.is_file())
+    lighthouse_resource::file_in(dir, &FILE_NAMES)
 }
 
 /// Reads the manifest of `dir` (`lighthouse-plugin.toml`, `.yaml` or

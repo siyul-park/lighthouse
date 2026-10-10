@@ -11,19 +11,14 @@ use lighthouse_spec::{OpSpec, ReorderScope};
 use serde_json::{Value, json};
 
 use crate::{
-    Error, facts,
+    Error,
+    eval::Template,
+    facts,
     rule::{render, to_json},
 };
 
 /// The result of evaluating: edit operations, or the reason none apply.
 pub(crate) type Evaluated = Result<Vec<EditOp>, String>;
-
-enum Piece {
-    Text(String),
-    Hole(Program),
-}
-
-struct Template(Vec<Piece>);
 
 enum Step {
     Move {
@@ -101,14 +96,14 @@ impl Steps {
                 },
                 OpSpec::Rename { symbol, name, .. } => Step::Rename {
                     symbol: program("rename symbol", symbol)?,
-                    name: template(id, name)?,
+                    name: Template::compile(id, "fix template", name)?,
                 },
                 OpSpec::Replace {
                     file, span, text, ..
                 } => Step::Replace {
                     file: program("replace file", file)?,
                     span: program("replace span", span)?,
-                    text: template(id, text)?,
+                    text: Template::compile(id, "fix template", text)?,
                 },
             };
             steps.push((when, step));
@@ -263,14 +258,7 @@ impl<'a> Env<'a> {
     }
 
     fn text(&self, template: &Template) -> Result<String, PluginError> {
-        let mut out = String::new();
-        for piece in &template.0 {
-            match piece {
-                Piece::Text(text) => out.push_str(text),
-                Piece::Hole(program) => out.push_str(&render(&self.run(program)?)),
-            }
-        }
-        Ok(out)
+        template.render(|program| self.run(program))
     }
 
     /// Orders the declarations of the finding's file by the keys. Declarations
@@ -353,29 +341,6 @@ impl<'a> Env<'a> {
                 .collect(),
         }]))
     }
-}
-
-fn template(id: &str, text: &str) -> Result<Template, Error> {
-    let mut pieces = Vec::new();
-    let mut rest = text;
-    while let Some(open) = rest.find("{{") {
-        let (before, after) = rest.split_at(open);
-        if !before.is_empty() {
-            pieces.push(Piece::Text(before.to_owned()));
-        }
-        let close = after
-            .find("}}")
-            .ok_or_else(|| Error::invalid(id, "fix template: `{{` is never closed"))?;
-        let source = after[2..close].trim();
-        let program = Program::compile(source)
-            .map_err(|e| Error::invalid(id, format!("fix template `{source}`: {e}")))?;
-        pieces.push(Piece::Hole(program));
-        rest = &after[close + 2..];
-    }
-    if !rest.is_empty() {
-        pieces.push(Piece::Text(rest.to_owned()));
-    }
-    Ok(Template(pieces))
 }
 
 /// A declaration a reorder may move: it has an extent and is not a field,

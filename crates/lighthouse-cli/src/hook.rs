@@ -25,7 +25,7 @@ use std::{
 
 use clap::ValueEnum;
 use lighthouse_report::{Briefing, Detail, Format, render_with};
-use lighthouse_session::{CheckRequest, Checked, Session, Status};
+use lighthouse_session::{CheckRequest, Checked, SKIPPED_DIRS, Session, Status};
 use serde_json::{Value, json};
 
 use crate::Result;
@@ -35,8 +35,8 @@ const EDIT_LIMIT: usize = 5;
 const STOP_LIMIT: usize = 10;
 /// Bytes read to tell text from binary.
 const SNIFF: usize = 8192;
-/// Directories whose files are never analyzed.
-const SKIPPED_DIRS: [&str; 3] = [".git", ".lighthouse", "node_modules"];
+/// The directory of Lighthouse's own state; its files are never analyzed.
+const STATE_DIR: &str = ".lighthouse";
 const EDIT_TOOLS: [&str; 3] = ["Edit", "Write", "MultiEdit"];
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -156,7 +156,7 @@ fn edited_file(payload: &Value, root: &Path) -> Option<PathBuf> {
     let relative = absolute.strip_prefix(root.canonicalize().ok()?).ok()?;
     let skipped = relative
         .components()
-        .any(|c| SKIPPED_DIRS.iter().any(|d| c.as_os_str() == *d));
+        .any(|c| c.as_os_str() == STATE_DIR || SKIPPED_DIRS.iter().any(|d| c.as_os_str() == *d));
     (!skipped && is_text(&absolute)).then_some(absolute)
 }
 

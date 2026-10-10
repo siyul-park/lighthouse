@@ -19,10 +19,7 @@ use lighthouse_rpc::PluginSpec;
 use lighthouse_spec::{BuiltinCheck, BuiltinOp, Catalog, CheckKind, Decision, FixKind, OpSpec};
 use serde_json::Value;
 
-use crate::{Result, Session, decisions::test_catalog};
-
-/// Directories never searched for documents.
-const SKIPPED: [&str; 4] = [".git", "target", "node_modules", "testdata"];
+use crate::{Result, SKIPPED_DIRS, Session, decisions::test_catalog};
 
 /// One thing wrong with one file.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -237,7 +234,7 @@ fn collect(path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
             .and_then(|n| n.to_str())
             .unwrap_or_default();
         if entry.is_dir() {
-            if !SKIPPED.contains(&name) {
+            if !SKIPPED_DIRS.contains(&name) {
                 collect(&entry, files)?;
             }
         } else {

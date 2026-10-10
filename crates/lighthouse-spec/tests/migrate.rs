@@ -8,7 +8,6 @@ use lighthouse_spec::{
 };
 use serde_json::json;
 use serde_norway::Value;
-use sha2::{Digest, Sha256};
 use support::Files;
 
 const OLD: &str = "id: p/a
@@ -78,10 +77,7 @@ fn the_old_semantic_version() -> String {
         },
         "implementation": { "builtin": "p/a" },
     });
-    Sha256::digest(content.to_string().as_bytes())[..8]
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    lighthouse_model::hash::short(&content.to_string(), 8)
 }
 
 #[test]

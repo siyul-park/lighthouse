@@ -16,7 +16,7 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Reason, ReviewerKind, Verdict};
+use lighthouse_model::{Reason, ReviewerKind, Verdict, hash};
 use lighthouse_resource::{API_VERSION, Metadata, Resource, Spec};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -246,7 +246,7 @@ fn decode(value: Value) -> Result<Option<ReviewEvent>, String> {
     }
     // The id covers the spec as written, fields this build does not know
     // included.
-    let written = digest::hash(
+    let written = hash::short(
         &digest::canonical(value.get("spec").unwrap_or(&Value::Null)),
         ID_BYTES,
     );
@@ -262,7 +262,7 @@ fn decode(value: Value) -> Result<Option<ReviewEvent>, String> {
 /// The id of a record: the hash of its spec.
 fn id_of(event: &ReviewEvent) -> Result<String, Error> {
     let body = serde_json::to_value(VerdictSpec::from(event))?;
-    Ok(digest::hash(&digest::canonical(&body), ID_BYTES))
+    Ok(hash::short(&digest::canonical(&body), ID_BYTES))
 }
 
 /// The id of an entry in the flat shape from before the resource model.
@@ -271,7 +271,7 @@ fn legacy_id_of(event: &ReviewEvent) -> Result<String, Error> {
     if let Value::Object(map) = &mut body {
         map.remove("id");
     }
-    Ok(digest::hash(&digest::canonical(&body), ID_BYTES))
+    Ok(hash::short(&digest::canonical(&body), ID_BYTES))
 }
 
 fn ends_without_newline(file: &mut fs::File) -> std::io::Result<bool> {

@@ -5,13 +5,13 @@
 
 use std::collections::BTreeMap;
 
+use lighthouse_model::hash;
 use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::{
     CheckKind, Decision, DecisionSpec, OptionType,
     decision::{MIGRATED_FROM, WAS_BUILTIN, squash},
-    model::short_hash,
 };
 
 /// The names the pattern format gave the option types, with their types.
@@ -78,7 +78,7 @@ impl Decision {
             "options": options,
             "implementation": implementation,
         });
-        Some(short_hash(&decision.to_string()))
+        Some(hash::short(&decision.to_string(), 8))
     }
 }
 

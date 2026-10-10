@@ -80,12 +80,7 @@ impl DeclarativeRule {
     /// The options of the focused file's language over the decision's defaults.
     fn resolved(&self, configured: &Options, ctx: &Ctx) -> Result<Map<String, Value>, PluginError> {
         let language = ctx.file.map(|(file, _)| file.lang.as_str());
-        self.decision
-            .resolve_options(configured, language)
-            .map_err(|e| PluginError::Options {
-                rule: self.meta.id.clone(),
-                message: e.to_string(),
-            })
+        self.decision.rule_options(configured, language)
     }
 }
 
@@ -98,13 +93,7 @@ impl Rule for DeclarativeRule {
     /// Accepts the options when they resolve against the decision's declared
     /// options: known keys of the declared types.
     fn validate(&self, options: &Options) -> Result<(), PluginError> {
-        self.decision
-            .resolve_options(options, None)
-            .map(drop)
-            .map_err(|e| PluginError::Options {
-                rule: self.meta.id.clone(),
-                message: e.to_string(),
-            })
+        self.decision.rule_options(options, None).map(drop)
     }
 
     /// Runs once per file or once over the project, following the decision's scope.

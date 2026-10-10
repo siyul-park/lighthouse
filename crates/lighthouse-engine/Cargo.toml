@@ -10,7 +10,6 @@ ignore.workspace = true
 rayon.workspace = true
 serde_json.workspace = true
 similar.workspace = true
-sha2.workspace = true
 tempfile.workspace = true
 toml.workspace = true
 lighthouse-model.workspace = true

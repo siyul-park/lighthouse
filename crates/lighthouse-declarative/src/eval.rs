@@ -19,7 +19,7 @@ use crate::Error;
 
 /// A piece of a message template.
 #[derive(Debug)]
-pub(crate) enum Piece {
+enum Piece {
     Text(String),
     Hole(Program),
 }
@@ -43,6 +43,21 @@ impl Template {
             });
         }
         Ok(Self(pieces))
+    }
+
+    /// The text with each hole replaced by what `run` makes of its program.
+    pub(crate) fn render(
+        &self,
+        run: impl Fn(&Program) -> Result<cel::Value, PluginError>,
+    ) -> Result<String, PluginError> {
+        let mut out = String::new();
+        for piece in &self.0 {
+            match piece {
+                Piece::Text(text) => out.push_str(text),
+                Piece::Hole(program) => out.push_str(&render(&run(program)?)),
+            }
+        }
+        Ok(out)
     }
 }
 
@@ -89,14 +104,7 @@ impl<'a> Frame<'a> {
     }
 
     pub(crate) fn text(&self, template: &Template) -> Result<String, PluginError> {
-        let mut out = String::new();
-        for piece in &template.0 {
-            match piece {
-                Piece::Text(text) => out.push_str(text),
-                Piece::Hole(program) => out.push_str(&render(&self.run(program)?)),
-            }
-        }
-        Ok(out)
+        template.render(|program| self.run(program))
     }
 
     pub(crate) fn string(&self, program: &Program, what: &str) -> Result<String, PluginError> {

@@ -192,12 +192,8 @@ fn legacy_line() -> String {
 }
 
 fn lighthouse_store_digest(body: &serde_json::Value) -> String {
-    use sha2::{Digest, Sha256};
     let canonical = serde_json::to_string(body).unwrap();
-    Sha256::digest(canonical.as_bytes())[..16]
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    lighthouse_model::hash::short(&canonical, 16)
 }
 
 #[test]
