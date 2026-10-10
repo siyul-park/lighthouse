@@ -86,9 +86,12 @@ fn warm(dir: &Path) -> Timed {
     let (run, stderr) = check(dir, &["--timings"]);
     let line = stderr
         .lines()
-        .find(|l| l.starts_with("timings: cache "))
-        .unwrap_or_else(|| panic!("no cache line in:\n{stderr}"));
+        .find(|l| l.starts_with("timings: hashing "))
+        .unwrap_or_else(|| panic!("no hashing line in:\n{stderr}"));
     let numbers: Vec<usize> = line
+        .split_once(" (")
+        .unwrap()
+        .1
         .split(|c: char| !c.is_ascii_digit())
         .filter_map(|n| n.parse().ok())
         .collect();

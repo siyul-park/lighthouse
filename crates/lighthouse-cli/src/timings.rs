@@ -19,7 +19,12 @@ pub fn lines(timings: &Timings, report: Duration, total: Duration) -> Vec<String
     );
     out.push(line("merge", timings.merge));
     if timings.hashing > Duration::ZERO {
-        out.push(line("hashing", timings.hashing));
+        out.push(format!(
+            "{} ({} cache hit(s), {} miss(es))",
+            line("hashing", timings.hashing),
+            timings.cache_hits,
+            timings.cache_misses
+        ));
     }
     out.extend(
         timings
@@ -31,12 +36,6 @@ pub fn lines(timings: &Timings, report: Duration, total: Duration) -> Vec<String
         "{} (wall clock)",
         line("rules", timings.rules_wall)
     ));
-    if timings.cache_hits + timings.cache_misses > 0 {
-        out.push(format!(
-            "timings: cache {} hit(s), {} miss(es)",
-            timings.cache_hits, timings.cache_misses
-        ));
-    }
     out.extend(timings.rules.iter().take(TOP_RULES).map(|(rule, spent)| {
         format!(
             "{} (summed over files)",

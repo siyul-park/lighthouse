@@ -18,9 +18,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{
-    Document, Edge, EdgeKind, Node, Project, Resolution, Symbol, SymbolId, Target, hash::Hasher,
-};
+use lighthouse_model::{Document, Edge, Node, Project, Symbol, SymbolId, Target, hash::Hasher};
 use rayon::prelude::*;
 use serde::Serialize;
 
@@ -178,7 +176,7 @@ impl<'p> Ties<'p> {
     /// are part of the file's own slice.
     fn edges(&self, parts: &mut Parts, symbol: &Symbol) -> Result<(), Error> {
         for edge in self.project.edges_from(&symbol.id) {
-            parts.edges.push(digest_of(&edge_key(edge))?);
+            parts.edges.push(edge_digest(edge)?);
             let kind = format!("{}|{:?}", edge.kind.as_str(), edge.resolution);
             let other = self.end(&edge.to)?;
             parts.ties.push(tie(b"out", &symbol.id, &kind, &other));
@@ -221,7 +219,7 @@ impl<'p> Ties<'p> {
                 Node::Module(_) => false,
             };
             if !declared {
-                edges.push(digest_of(&edge_key(edge))?);
+                edges.push(edge_digest(edge)?);
             }
         }
         edges.sort_unstable();
@@ -272,6 +270,13 @@ impl SymbolOf for Target {
             Self::Path(_) => None,
         }
     }
+}
+
+/// What a file's edges and ties come to before they are put in order.
+#[derive(Default)]
+struct Parts {
+    edges: Vec<Digest>,
+    ties: Vec<Digest>,
 }
 
 /// The digest of the documents of a project, which no file digest covers.
@@ -325,13 +330,6 @@ fn describe(project: &Project, symbol: &Symbol) -> Digest {
     hasher.finish_bytes()
 }
 
-/// What a file's edges and ties come to before they are put in order.
-#[derive(Default)]
-struct Parts {
-    edges: Vec<Digest>,
-    ties: Vec<Digest>,
-}
-
 /// One tie of a symbol: the direction, the symbol, the kind of the edge and
 /// what is at the other end.
 fn tie(direction: &[u8], at: &SymbolId, kind: &str, other: &[u8]) -> Digest {
@@ -343,17 +341,17 @@ fn tie(direction: &[u8], at: &SymbolId, kind: &str, other: &[u8]) -> Digest {
     hasher.finish_bytes()
 }
 
-/// An edge without its site: which of the sites of a relation is kept
-/// depends on the order the providers answered in, and the sites are hashed
-/// on their own. Whether there is one stays.
-fn edge_key(edge: &Edge) -> (&EdgeKind, &Node, &Target, &Resolution, bool) {
-    (
-        &edge.kind,
+/// The hash of an edge without its site: which of the sites of a relation is
+/// kept depends on the order the providers answered in, and the sites are
+/// hashed on their own. Whether there is one stays.
+fn edge_digest(edge: &Edge) -> Result<Digest, Error> {
+    digest_of(&(
+        edge.kind,
         &edge.from,
         &edge.to,
-        &edge.resolution,
+        edge.resolution,
         edge.site.is_some(),
-    )
+    ))
 }
 
 /// The hash of the JSON of `value`.
