@@ -27,6 +27,7 @@ fn symbol(module: &str, name: &str, kind: SymbolKind, file: &str, lines: (u32, u
         name: name.to_owned(),
         role: None,
         optional: false,
+        type_ref: None,
     }
 }
 
@@ -42,7 +43,8 @@ fn summary(symbol: &Symbol, nesting: u32, statements: u32, flow: &[Flow]) -> Fun
         flow: flow.to_vec(),
         clone_fingerprint: None,
         forwards_to: None,
-        param_types: Vec::new(),
+        signature: Default::default(),
+        events: Vec::new(),
         manual_assertions: 0,
         implementation: false,
         constructs: false,

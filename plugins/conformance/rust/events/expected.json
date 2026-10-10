@@ -1,0 +1,815 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "events"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::Ctx#type"
+        },
+        {
+          "from": {
+            "module": "events"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::Builder#type"
+        },
+        {
+          "from": {
+            "symbol": "events::Builder#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::Builder::ctx#field"
+        },
+        {
+          "from": {
+            "symbol": "events::Builder#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::Builder::name#field"
+        },
+        {
+          "from": {
+            "module": "events"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::first#function"
+        },
+        {
+          "from": {
+            "module": "events"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::named#function"
+        },
+        {
+          "from": {
+            "symbol": "events::named#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 13
+            },
+            "start": {
+              "col": 7,
+              "line": 13
+            }
+          },
+          "to": "events::Builder::name#field"
+        },
+        {
+          "from": {
+            "module": "events"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::never#function"
+        },
+        {
+          "from": {
+            "module": "events"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::later#function"
+        },
+        {
+          "from": {
+            "module": "events"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::missing#function"
+        },
+        {
+          "from": {
+            "module": "events"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::fails#function"
+        },
+        {
+          "from": {
+            "module": "events"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::inner#function"
+        },
+        {
+          "from": {
+            "symbol": "events::inner#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 39
+            },
+            "start": {
+              "col": 11,
+              "line": 39
+            }
+          },
+          "to": "events::inner::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "events::inner#function"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::inner::helper#function"
+        },
+        {
+          "from": {
+            "module": "events"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "events::quiet#function"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "events": [
+            {
+              "detail": "unwrap",
+              "kind": "unwrap",
+              "span": {
+                "end": {
+                  "col": 34,
+                  "line": 9
+                },
+                "start": {
+                  "col": 28,
+                  "line": 9
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "&[u32]"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "events::first#function",
+          "tokens": 15,
+          "top_level": 1
+        },
+        {
+          "events": [
+            {
+              "detail": "expect",
+              "kind": "unwrap",
+              "span": {
+                "end": {
+                  "col": 36,
+                  "line": 13
+                },
+                "start": {
+                  "col": 30,
+                  "line": 13
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "events::Builder",
+                "text": "&mut Builder"
+              }
+            ],
+            "results": [
+              {
+                "text": "String"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "events::named#function",
+          "tokens": 18,
+          "top_level": 1
+        },
+        {
+          "events": [
+            {
+              "detail": "unreachable",
+              "kind": "panic",
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 17
+                },
+                "start": {
+                  "col": 5,
+                  "line": 17
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "events::never#function",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "events": [
+            {
+              "detail": "todo",
+              "kind": "panic",
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 21
+                },
+                "start": {
+                  "col": 5,
+                  "line": 21
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "events::later#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "events": [
+            {
+              "detail": "unimplemented",
+              "kind": "panic",
+              "span": {
+                "end": {
+                  "col": 21,
+                  "line": 25
+                },
+                "start": {
+                  "col": 5,
+                  "line": 25
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "events::missing#function",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "events": [
+            {
+              "detail": "panic",
+              "kind": "panic",
+              "span": {
+                "end": {
+                  "col": 30,
+                  "line": 30
+                },
+                "start": {
+                  "col": 9,
+                  "line": 30
+                }
+              }
+            }
+          ],
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "u32"
+              }
+            ],
+            "results": []
+          },
+          "statements": 2,
+          "symbol": "events::fails#function",
+          "tokens": 14,
+          "top_level": 1
+        },
+        {
+          "events": [
+            {
+              "detail": "unwrap",
+              "kind": "unwrap",
+              "span": {
+                "end": {
+                  "col": 30,
+                  "line": 38
+                },
+                "start": {
+                  "col": 24,
+                  "line": 38
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 1,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
+          "statements": 2,
+          "symbol": "events::inner#function",
+          "tokens": 39,
+          "top_level": 2
+        },
+        {
+          "events": [
+            {
+              "detail": "unwrap",
+              "kind": "unwrap",
+              "span": {
+                "end": {
+                  "col": 23,
+                  "line": 36
+                },
+                "start": {
+                  "col": 17,
+                  "line": 36
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "events::inner::helper#function",
+          "tokens": 10,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 1,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Option<u32>"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "events::quiet#function",
+          "tokens": 16,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "events",
+          "path": "events"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::Ctx#type",
+          "kind": "type",
+          "name": "Ctx",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::Builder#type",
+          "kind": "type",
+          "name": "Builder",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 4
+            },
+            "start": {
+              "col": 5,
+              "line": 4
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::Builder::ctx#field",
+          "kind": "field",
+          "name": "ctx",
+          "optional": true,
+          "owner": "events::Builder#type",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 4
+            },
+            "start": {
+              "col": 5,
+              "line": 4
+            }
+          },
+          "type_ref": {
+            "text": "Option<Ctx>"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 17,
+              "line": 5
+            },
+            "start": {
+              "col": 5,
+              "line": 5
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::Builder::name#field",
+          "kind": "field",
+          "name": "name",
+          "owner": "events::Builder#type",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 5
+            },
+            "start": {
+              "col": 5,
+              "line": 5
+            }
+          },
+          "type_ref": {
+            "text": "String"
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::first#function",
+          "kind": "function",
+          "name": "first",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::named#function",
+          "kind": "function",
+          "name": "named",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::never#function",
+          "kind": "function",
+          "name": "never",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::later#function",
+          "kind": "function",
+          "name": "later",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::missing#function",
+          "kind": "function",
+          "name": "missing",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 24
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::fails#function",
+          "kind": "function",
+          "name": "fails",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 32
+            },
+            "start": {
+              "col": 1,
+              "line": 28
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::inner#function",
+          "kind": "function",
+          "name": "inner",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 34
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 37
+            },
+            "start": {
+              "col": 5,
+              "line": 35
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::inner::helper#function",
+          "kind": "function",
+          "name": "helper",
+          "owner": "events::inner#function",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 37
+            },
+            "start": {
+              "col": 5,
+              "line": 35
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 44
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "events::quiet#function",
+          "kind": "function",
+          "name": "quiet",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 44
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

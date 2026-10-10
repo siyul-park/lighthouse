@@ -1,0 +1,1461 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": ".::Custom::Is#method",
+          "span": {
+            "end": {
+              "col": 68,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "text": "// Is compares errors on purpose: it is the method errors.Is calls."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "context"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "errors"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "fmt"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "io"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::ErrNotFound#var"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::secret#type"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Custom#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Custom#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Custom::Error#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Custom#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Custom::Is#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Custom::Is#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 68,
+              "line": 19
+            },
+            "start": {
+              "col": 57,
+              "line": 19
+            }
+          },
+          "to": ".::ErrNotFound"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Reader#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Reader#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Reader::ctx#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Reader#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Reader::name#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Reader#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Reader::cfg#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Fetch#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Open#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Must#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Compare#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Compare#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 57,
+              "line": 38
+            },
+            "start": {
+              "col": 46,
+              "line": 38
+            }
+          },
+          "to": ".::ErrNotFound"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::NotNil#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::AtEnd#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Wrapped#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Wrapping#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Plain#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Assert#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Assert#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 26,
+              "line": 51
+            },
+            "start": {
+              "col": 20,
+              "line": 51
+            }
+          },
+          "to": ".::Custom"
+        },
+        {
+          "from": {
+            "symbol": ".::Assert#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 52
+            },
+            "start": {
+              "col": 12,
+              "line": 52
+            }
+          },
+          "to": ".::Custom::Error"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Kind#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Kind#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 14,
+              "line": 59
+            },
+            "start": {
+              "col": 8,
+              "line": 59
+            }
+          },
+          "to": ".::Custom"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Choose#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Choose#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 67
+            },
+            "start": {
+              "col": 7,
+              "line": 67
+            }
+          },
+          "to": ".::ErrNotFound"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Closure#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Closure#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 48,
+              "line": 74
+            },
+            "start": {
+              "col": 37,
+              "line": 74
+            }
+          },
+          "to": ".::ErrNotFound"
+        }
+      ],
+      "file": {
+        "path": "events.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Custom::Error#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "bool"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Custom::Is#method",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              },
+              {
+                "text": "context.Context"
+              }
+            ],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Fetch#function",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 2,
+          "signature": {
+            "params": [
+              {
+                "text": "context.Context"
+              },
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "exported": false,
+                "symbol": ".::secret",
+                "text": "*example.com/events.secret"
+              },
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Open#function",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "events": [
+            {
+              "kind": "panic",
+              "span": {
+                "end": {
+                  "col": 20,
+                  "line": 33
+                },
+                "start": {
+                  "col": 3,
+                  "line": 33
+                }
+              }
+            }
+          ],
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 3,
+          "symbol": ".::Must#function",
+          "tokens": 14,
+          "top_level": 2
+        },
+        {
+          "events": [
+            {
+              "detail": "err",
+              "kind": "error-compare",
+              "span": {
+                "end": {
+                  "col": 57,
+                  "line": 38
+                },
+                "start": {
+                  "col": 39,
+                  "line": 38
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "bool"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Compare#function",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "bool"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::NotNil#function",
+          "tokens": 6,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "bool"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::AtEnd#function",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "events": [
+            {
+              "detail": "%v",
+              "kind": "errorf-unwrapped",
+              "span": {
+                "end": {
+                  "col": 68,
+                  "line": 44
+                },
+                "start": {
+                  "col": 40,
+                  "line": 44
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Wrapped#function",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Wrapping#function",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": ".::Plain#function",
+          "tokens": 11,
+          "top_level": 1
+        },
+        {
+          "events": [
+            {
+              "detail": "*Custom",
+              "kind": "error-assert",
+              "span": {
+                "end": {
+                  "col": 27,
+                  "line": 51
+                },
+                "start": {
+                  "col": 14,
+                  "line": 51
+                }
+              }
+            }
+          ],
+          "flow": [
+            {
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
+          "statements": 3,
+          "symbol": ".::Assert#function",
+          "tokens": 25,
+          "top_level": 2
+        },
+        {
+          "events": [
+            {
+              "detail": "err",
+              "kind": "error-assert",
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 58
+                },
+                "start": {
+                  "col": 9,
+                  "line": 58
+                }
+              }
+            }
+          ],
+          "flow": [
+            {
+              "arms": 1,
+              "kind": "switch",
+              "nesting": 0,
+              "returning": true
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 4,
+          "symbol": ".::Kind#function",
+          "tokens": 18,
+          "top_level": 2
+        },
+        {
+          "events": [
+            {
+              "detail": "err",
+              "kind": "error-compare",
+              "span": {
+                "end": {
+                  "col": 12,
+                  "line": 66
+                },
+                "start": {
+                  "col": 9,
+                  "line": 66
+                }
+              }
+            }
+          ],
+          "flow": [
+            {
+              "arms": 1,
+              "kind": "switch",
+              "nesting": 0,
+              "returning": true
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 4,
+          "symbol": ".::Choose#function",
+          "tokens": 13,
+          "top_level": 2
+        },
+        {
+          "events": [
+            {
+              "detail": "err",
+              "kind": "error-compare",
+              "span": {
+                "end": {
+                  "col": 48,
+                  "line": 74
+                },
+                "start": {
+                  "col": 30,
+                  "line": 74
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              }
+            ],
+            "results": [
+              {
+                "text": "func() bool"
+              }
+            ]
+          },
+          "statements": 2,
+          "symbol": ".::Closure#function",
+          "tokens": 13,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "events",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 42,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "file": "events.go",
+          "id": ".::ErrNotFound#var",
+          "kind": "var",
+          "name": "ErrNotFound",
+          "span": {
+            "end": {
+              "col": 42,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "file": "events.go",
+          "id": ".::secret#type",
+          "kind": "type",
+          "name": "secret",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 12
+            },
+            "start": {
+              "col": 6,
+              "line": 12
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 14
+            }
+          },
+          "file": "events.go",
+          "id": ".::Custom#type",
+          "kind": "type",
+          "name": "Custom",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 14
+            },
+            "start": {
+              "col": 6,
+              "line": 14
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 50,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "file": "events.go",
+          "id": ".::Custom::Error#method",
+          "kind": "method",
+          "name": "Error",
+          "owner": ".::Custom#type",
+          "span": {
+            "end": {
+              "col": 50,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Is compares errors on purpose: it is the method errors.Is calls.",
+          "extent": {
+            "end": {
+              "col": 70,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "file": "events.go",
+          "id": ".::Custom::Is#method",
+          "kind": "method",
+          "name": "Is",
+          "owner": ".::Custom#type",
+          "span": {
+            "end": {
+              "col": 70,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 25
+            },
+            "start": {
+              "col": 1,
+              "line": 21
+            }
+          },
+          "file": "events.go",
+          "id": ".::Reader#type",
+          "kind": "type",
+          "name": "Reader",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 25
+            },
+            "start": {
+              "col": 6,
+              "line": 21
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 22
+            },
+            "start": {
+              "col": 2,
+              "line": 22
+            }
+          },
+          "file": "events.go",
+          "id": ".::Reader::ctx#field",
+          "kind": "field",
+          "name": "ctx",
+          "optional": true,
+          "owner": ".::Reader#type",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 22
+            },
+            "start": {
+              "col": 2,
+              "line": 22
+            }
+          },
+          "type_ref": {
+            "text": "context.Context"
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 13,
+              "line": 23
+            },
+            "start": {
+              "col": 2,
+              "line": 23
+            }
+          },
+          "file": "events.go",
+          "id": ".::Reader::name#field",
+          "kind": "field",
+          "name": "name",
+          "owner": ".::Reader#type",
+          "span": {
+            "end": {
+              "col": 13,
+              "line": 23
+            },
+            "start": {
+              "col": 2,
+              "line": 23
+            }
+          },
+          "type_ref": {
+            "text": "string"
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 24
+            },
+            "start": {
+              "col": 2,
+              "line": 24
+            }
+          },
+          "file": "events.go",
+          "id": ".::Reader::cfg#field",
+          "kind": "field",
+          "name": "cfg",
+          "optional": true,
+          "owner": ".::Reader#type",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 24
+            },
+            "start": {
+              "col": 2,
+              "line": 24
+            }
+          },
+          "type_ref": {
+            "exported": false,
+            "symbol": ".::secret",
+            "text": "*example.com/events.secret"
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 72,
+              "line": 27
+            },
+            "start": {
+              "col": 1,
+              "line": 27
+            }
+          },
+          "file": "events.go",
+          "id": ".::Fetch#function",
+          "kind": "function",
+          "name": "Fetch",
+          "span": {
+            "end": {
+              "col": 72,
+              "line": 27
+            },
+            "start": {
+              "col": 1,
+              "line": 27
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 81,
+              "line": 29
+            },
+            "start": {
+              "col": 1,
+              "line": 29
+            }
+          },
+          "file": "events.go",
+          "id": ".::Open#function",
+          "kind": "function",
+          "name": "Open",
+          "span": {
+            "end": {
+              "col": 81,
+              "line": 29
+            },
+            "start": {
+              "col": 1,
+              "line": 29
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 31
+            }
+          },
+          "file": "events.go",
+          "id": ".::Must#function",
+          "kind": "function",
+          "name": "Must",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 36
+            },
+            "start": {
+              "col": 1,
+              "line": 31
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 59,
+              "line": 38
+            },
+            "start": {
+              "col": 1,
+              "line": 38
+            }
+          },
+          "file": "events.go",
+          "id": ".::Compare#function",
+          "kind": "function",
+          "name": "Compare",
+          "span": {
+            "end": {
+              "col": 59,
+              "line": 38
+            },
+            "start": {
+              "col": 1,
+              "line": 38
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 50,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 40
+            }
+          },
+          "file": "events.go",
+          "id": ".::NotNil#function",
+          "kind": "function",
+          "name": "NotNil",
+          "span": {
+            "end": {
+              "col": 50,
+              "line": 40
+            },
+            "start": {
+              "col": 1,
+              "line": 40
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 52,
+              "line": 42
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "file": "events.go",
+          "id": ".::AtEnd#function",
+          "kind": "function",
+          "name": "AtEnd",
+          "span": {
+            "end": {
+              "col": 52,
+              "line": 42
+            },
+            "start": {
+              "col": 1,
+              "line": 42
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 70,
+              "line": 44
+            },
+            "start": {
+              "col": 1,
+              "line": 44
+            }
+          },
+          "file": "events.go",
+          "id": ".::Wrapped#function",
+          "kind": "function",
+          "name": "Wrapped",
+          "span": {
+            "end": {
+              "col": 70,
+              "line": 44
+            },
+            "start": {
+              "col": 1,
+              "line": 44
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 71,
+              "line": 46
+            },
+            "start": {
+              "col": 1,
+              "line": 46
+            }
+          },
+          "file": "events.go",
+          "id": ".::Wrapping#function",
+          "kind": "function",
+          "name": "Wrapping",
+          "span": {
+            "end": {
+              "col": 71,
+              "line": 46
+            },
+            "start": {
+              "col": 1,
+              "line": 46
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 70,
+              "line": 48
+            },
+            "start": {
+              "col": 1,
+              "line": 48
+            }
+          },
+          "file": "events.go",
+          "id": ".::Plain#function",
+          "kind": "function",
+          "name": "Plain",
+          "span": {
+            "end": {
+              "col": 70,
+              "line": 48
+            },
+            "start": {
+              "col": 1,
+              "line": 48
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 55
+            },
+            "start": {
+              "col": 1,
+              "line": 50
+            }
+          },
+          "file": "events.go",
+          "id": ".::Assert#function",
+          "kind": "function",
+          "name": "Assert",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 55
+            },
+            "start": {
+              "col": 1,
+              "line": 50
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 63
+            },
+            "start": {
+              "col": 1,
+              "line": 57
+            }
+          },
+          "file": "events.go",
+          "id": ".::Kind#function",
+          "kind": "function",
+          "name": "Kind",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 63
+            },
+            "start": {
+              "col": 1,
+              "line": 57
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 71
+            },
+            "start": {
+              "col": 1,
+              "line": 65
+            }
+          },
+          "file": "events.go",
+          "id": ".::Choose#function",
+          "kind": "function",
+          "name": "Choose",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 71
+            },
+            "start": {
+              "col": 1,
+              "line": 65
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 75
+            },
+            "start": {
+              "col": 1,
+              "line": 73
+            }
+          },
+          "file": "events.go",
+          "id": ".::Closure#function",
+          "kind": "function",
+          "name": "Closure",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 75
+            },
+            "start": {
+              "col": 1,
+              "line": 73
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

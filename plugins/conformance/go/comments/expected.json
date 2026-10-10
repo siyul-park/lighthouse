@@ -84,6 +84,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 2,
           "symbol": ".::Run#function",
           "tokens": 7,

@@ -316,6 +316,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u8"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "extents::extra#function",
           "tokens": 3,
@@ -327,6 +335,16 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "extents::Limit",
+                "text": "Self"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "extents::Limit::new#method",
           "tokens": 8,
@@ -337,6 +355,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u8"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "extents::Limit::count#method",
           "tokens": 5,
@@ -419,6 +445,9 @@
               "col": 5,
               "line": 7
             }
+          },
+          "type_ref": {
+            "text": "u8"
           },
           "visibility": "public"
         },

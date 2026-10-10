@@ -12,11 +12,11 @@ use syn::{Attribute, Block, Item};
 
 use crate::{
     body::{self, Home},
-    comments,
+    comments, events,
     names::{
         Generics, Index, ModId, Ns, Res, Sym, TyCx, ViaTrait, generics_of, is_test_fn, symbol_id,
     },
-    signature::{optional_field, project_types, serde_default},
+    signature::{field_type, optional_field, serde_default, signature_of},
     testcase,
     tree::{SourceFile, Vis, vis},
     util::{constructs, count_tokens, doc_of, extent_of, signature_counts, span_of},
@@ -224,6 +224,7 @@ impl Extractor<'_> {
             name: String::new(),
             role: None,
             optional: false,
+            type_ref: None,
         }
     }
 
@@ -254,7 +255,7 @@ impl Extractor<'_> {
             .filter(|s| !matches!(s, syn::Stmt::Item(_)))
             .count();
         let (params, returns) = signature_counts(sig);
-        let param_types = project_types(self.idx, &home.cx, sig);
+        let signature = signature_of(self.idx, &home.cx, sig);
         self.frag.functions.push(FunctionSummary {
             symbol: id.to_owned(),
             max_nesting: facts.max_nesting,
@@ -266,7 +267,8 @@ impl Extractor<'_> {
             flow: facts.flow,
             clone_fingerprint: None,
             forwards_to: facts.forwards_to,
-            param_types,
+            signature,
+            events: events::of(self.src, block),
             manual_assertions: 0,
             implementation: role.implementation,
             constructs: role.constructs,
@@ -350,6 +352,7 @@ impl Extractor<'_> {
             Node::Module(module.clone()),
         );
         let owner = Owner {
+            m,
             id,
             name,
             module,
@@ -388,8 +391,9 @@ impl Extractor<'_> {
                 },
                 Node::Symbol(owner.id.clone()),
             );
-            if optional && let Some(last) = self.frag.symbols.last_mut() {
-                last.optional = true;
+            if let Some(last) = self.frag.symbols.last_mut() {
+                last.optional = optional;
+                last.type_ref = Some(field_type(self.idx, owner.m, &field.ty));
             }
         }
     }
@@ -714,6 +718,7 @@ enum Shape<'a> {
 }
 
 struct Owner {
+    m: ModId,
     id: String,
     name: String,
     module: String,

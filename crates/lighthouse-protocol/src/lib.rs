@@ -5,10 +5,11 @@ mod wire;
 pub use frame::{ErrorObject, FrameError, Id, Message, read_message, write_message};
 pub use serve::{Handler, ServeError, serve};
 pub use wire::{
-    Call, ClientInfo, Comment, Context, Conventions, Edge, EdgeKind, FileInfo, FileRef, Flow,
-    FlowKind, Fragment, FunctionSummary, Incomplete, IndexParams, IndexResult, InitializeParams,
-    InitializeResult, Methods, Module, Node, Overlay, Position, ProjectRef, ProviderManifest,
-    Resolution, Span, Symbol, SymbolKind, SymbolRole, TestCase, TestStyle, Visibility,
+    Call, ClientInfo, Comment, Context, Conventions, Edge, EdgeKind, Event, EventKind, FileInfo,
+    FileRef, Flow, FlowKind, Fragment, FunctionSummary, Incomplete, IndexParams, IndexResult,
+    InitializeParams, InitializeResult, Methods, Module, Node, Overlay, Position, ProjectRef,
+    ProviderManifest, Resolution, Signature, Span, Symbol, SymbolKind, SymbolRole, TestCase,
+    TestStyle, TypeRef, Visibility,
 };
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.

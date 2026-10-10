@@ -27,6 +27,7 @@ fn symbol(path: &str, name: &str) -> Symbol {
         name: name.to_owned(),
         role: None,
         optional: false,
+        type_ref: None,
     }
 }
 

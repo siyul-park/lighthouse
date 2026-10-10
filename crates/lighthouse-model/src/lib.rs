@@ -20,9 +20,9 @@ pub use review::{
 pub use scope::{Applicability, RunScope, TestScope};
 pub use text::LineIndex;
 pub use ucm::{
-    Capability, Comment, Edge, EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Module,
-    Node, Position, Project, Resolution, Site, Span, Symbol, SymbolId, SymbolKind, SymbolRole,
-    Target, TestCase, TestStyle, Visibility,
+    Capability, Comment, Edge, EdgeKind, Event, EventKind, File, Flow, FlowKind, Fragment,
+    FunctionSummary, Module, Node, Position, Project, Resolution, Signature, Site, Span, Symbol,
+    SymbolId, SymbolKind, SymbolRole, Target, TestCase, TestStyle, TypeRef, Visibility,
 };
 
 /// Rule options as configured in `lighthouse.toml`.

@@ -210,6 +210,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "core_lib::Thing::size#method",
           "tokens": 3,
@@ -220,6 +228,16 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "core_lib::Thing",
+                "text": "Thing"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "core_lib::make#function",
           "tokens": 3,

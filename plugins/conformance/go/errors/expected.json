@@ -36,6 +36,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::Fine#function",
           "tokens": 4,
@@ -154,6 +162,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::broken#function",
           "tokens": 4,

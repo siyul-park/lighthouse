@@ -56,6 +56,7 @@ fn project(names: &[&str]) -> Project {
                 name: (*name).to_owned(),
                 role: None,
                 optional: false,
+                type_ref: None,
             }
         })
         .collect();

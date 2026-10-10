@@ -286,6 +286,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "i32"
+              }
+            ],
+            "results": [
+              {
+                "text": "&'static str"
+              }
+            ]
+          },
           "statements": 4,
           "symbol": "flow::branches#function",
           "tokens": 21,
@@ -303,6 +315,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Option<i32>"
+              }
+            ],
+            "results": [
+              {
+                "text": "i32"
+              }
+            ]
+          },
           "statements": 4,
           "symbol": "flow::guarded#function",
           "tokens": 30,
@@ -320,6 +344,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "u8"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 4,
           "symbol": "flow::dispatcher#function",
           "tokens": 18,
@@ -337,6 +373,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "u8"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 3,
           "symbol": "flow::explicit_returns#function",
           "tokens": 16,
@@ -353,6 +401,14 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "u8"
+              }
+            ],
+            "results": []
+          },
           "statements": 3,
           "symbol": "flow::side_effects#function",
           "tokens": 18,
@@ -379,6 +435,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "u8"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 5,
           "symbol": "flow::statements_in_arms#function",
           "tokens": 19,
@@ -394,6 +462,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Option<u8>"
+              }
+            ],
+            "results": [
+              {
+                "text": "u8"
+              }
+            ]
+          },
           "statements": 3,
           "symbol": "flow::let_else#function",
           "tokens": 17,
@@ -413,6 +493,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Option<u8>"
+              }
+            ],
+            "results": [
+              {
+                "text": "u8"
+              }
+            ]
+          },
           "statements": 3,
           "symbol": "flow::if_let#function",
           "tokens": 17,
@@ -448,6 +540,18 @@
           "max_nesting": 3,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "&[Vec<u8>]"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 11,
           "symbol": "flow::loops#function",
           "tokens": 56,
@@ -467,6 +571,18 @@
           "max_nesting": 2,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Vec<u8>"
+              }
+            ],
+            "results": [
+              {
+                "text": "usize"
+              }
+            ]
+          },
           "statements": 4,
           "symbol": "flow::closures#function",
           "tokens": 33,
@@ -477,6 +593,18 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "&str"
+              }
+            ],
+            "results": [
+              {
+                "text": "Result<u32,std::num::ParseIntError>"
+              }
+            ]
+          },
           "statements": 2,
           "symbol": "flow::question#function",
           "tokens": 20,
@@ -498,6 +626,24 @@
           "max_nesting": 0,
           "params": 3,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "bool"
+              },
+              {
+                "text": "bool"
+              },
+              {
+                "text": "bool"
+              }
+            ],
+            "results": [
+              {
+                "text": "bool"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "flow::logic#function",
           "tokens": 9,
@@ -521,6 +667,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "u64"
+              }
+            ],
+            "results": [
+              {
+                "text": "u64"
+              }
+            ]
+          },
           "statements": 3,
           "symbol": "flow::factorial#function",
           "tokens": 20,
@@ -540,6 +698,14 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "u32"
+              }
+            ],
+            "results": []
+          },
           "statements": 2,
           "symbol": "flow::Walker::walk#method",
           "tokens": 17,
@@ -550,6 +716,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "flow::outer#function",
           "tokens": 14,
@@ -560,6 +734,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "flow::outer::inner#function",
           "tokens": 3,
@@ -579,6 +761,14 @@
           "max_nesting": 2,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 5,
           "symbol": "flow::asyncs#function",
           "tokens": 21,

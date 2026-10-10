@@ -43,6 +43,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "u32"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 4,
           "symbol": "generated/gen::table#function",
           "tokens": 18,
@@ -165,6 +177,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "generated/plain::plain#function",
           "tokens": 10,

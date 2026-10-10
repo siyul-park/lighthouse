@@ -84,6 +84,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "&'static str"
+              }
+            ]
+          },
           "statements": 2,
           "symbol": "comments::run#function",
           "tokens": 8,

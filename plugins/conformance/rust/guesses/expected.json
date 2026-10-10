@@ -448,6 +448,14 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "&external::Thing"
+              }
+            ],
+            "results": []
+          },
           "statements": 1,
           "symbol": "guesses::common#function",
           "tokens": 8,
@@ -458,6 +466,14 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "&external::Thing"
+              }
+            ],
+            "results": []
+          },
           "statements": 1,
           "symbol": "guesses::few#function",
           "tokens": 8,
@@ -468,6 +484,14 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "&external::Thing"
+              }
+            ],
+            "results": []
+          },
           "statements": 1,
           "symbol": "guesses::single#function",
           "tokens": 8,
@@ -476,11 +500,18 @@
         {
           "flow": [],
           "max_nesting": 0,
-          "param_types": [
-            "guesses::A"
-          ],
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "guesses::A",
+                "text": "&A"
+              }
+            ],
+            "results": []
+          },
           "statements": 1,
           "symbol": "guesses::exact#function",
           "tokens": 8,
@@ -511,6 +542,14 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "&external::Thing"
+              }
+            ],
+            "results": []
+          },
           "statements": 1,
           "symbol": "guesses::exercise#function",
           "tokens": 8,

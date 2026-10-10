@@ -371,6 +371,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u8"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "visibility::Open::get#method",
           "tokens": 5,
@@ -381,6 +389,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u8"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "visibility::Open::soft#method",
           "tokens": 5,
@@ -391,6 +407,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u8"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "visibility::Open::hide#method",
           "tokens": 5,
@@ -572,6 +596,9 @@
               "line": 2
             }
           },
+          "type_ref": {
+            "text": "u8"
+          },
           "visibility": "public"
         },
         {
@@ -600,6 +627,9 @@
               "line": 3
             }
           },
+          "type_ref": {
+            "text": "u8"
+          },
           "visibility": "internal"
         },
         {
@@ -627,6 +657,9 @@
               "col": 5,
               "line": 4
             }
+          },
+          "type_ref": {
+            "text": "u8"
           },
           "visibility": "private"
         },

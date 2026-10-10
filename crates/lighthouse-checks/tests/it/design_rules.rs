@@ -447,6 +447,14 @@ fn coupling_flags_a_coordinator_with_many_callees() {
     assert_eq!(w.names(&found), ["run"]);
 }
 
+fn type_ref(symbol: &str) -> lighthouse_model::TypeRef {
+    lighthouse_model::TypeRef {
+        text: symbol.to_owned(),
+        symbol: Some(symbol.to_owned()),
+        exported: None,
+    }
+}
+
 fn takes(w: &mut World, function: &lighthouse_model::Symbol, ty: &str, n: u32) {
     let summary = w
         .summaries
@@ -454,7 +462,7 @@ fn takes(w: &mut World, function: &lighthouse_model::Symbol, ty: &str, n: u32) {
         .find(|s| s.symbol == function.id)
         .unwrap();
     summary.params = n;
-    summary.param_types = vec![ty.to_owned()];
+    summary.signature.params = vec![type_ref(ty)];
 }
 
 #[test]

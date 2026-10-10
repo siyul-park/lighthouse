@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use lighthouse_model::{Project, Symbol, SymbolId, SymbolKind, Visibility};
 use serde_json::{Value, json};
 
-use super::Builder;
+use super::{Builder, effective::named_params};
 use crate::layout;
 
 impl Builder<'_> {
@@ -23,7 +23,7 @@ impl Builder<'_> {
             .map_or(owner.as_str(), |(head, _)| head);
         let takes_owner_param = project
             .function(&symbol.id)
-            .is_some_and(|f| f.param_types.iter().any(|t| t == bare));
+            .is_some_and(|f| named_params(f).any(|t| t == bare));
         let uses_owner = uses_owner(project, symbol, &owner);
         let owner_name = bare.rsplit("::").next().unwrap_or_default();
         json!({

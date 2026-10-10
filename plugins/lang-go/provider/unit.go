@@ -156,7 +156,8 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 		Tokens:           u.tokens(d.Body),
 		Flow:             f.events,
 		ForwardsTo:       forwardTarget(d, u.info(), u.res),
-		ParamTypes:       paramTypes(d.Type, u.info(), u.res),
+		Signature:        u.signature(d),
+		Events:           u.events(d),
 		Implementation:   u.implementation(d),
 		Constructs:       u.constructs(d),
 		ManualAssertions: manual,
@@ -278,12 +279,12 @@ func (u *unit) typeSpec(s *ast.TypeSpec, d *ast.GenDecl) {
 func (u *unit) fields(t *ast.StructType, owner, ownerID string) {
 	for _, field := range t.Fields.List {
 		doc := docText(field.Doc)
-		optional := u.optional(field)
+		optional, ref := u.optional(field), u.fieldType(field)
 		if len(field.Names) == 0 {
 			name := baseName(field.Type)
 			if name != "" && name != "_" {
 				id := symbolID(kindField, u.module, owner, name)
-				u.symbol(sdk.Symbol{ID: id, Kind: kindField, Name: name, Owner: ownerID, Doc: doc, Optional: optional}, field.Pos(), field.End(), u.extent(field))
+				u.symbol(sdk.Symbol{ID: id, Kind: kindField, Name: name, Owner: ownerID, Doc: doc, Optional: optional, TypeRef: ref}, field.Pos(), field.End(), u.extent(field))
 			}
 			continue
 		}
@@ -296,7 +297,7 @@ func (u *unit) fields(t *ast.StructType, owner, ownerID string) {
 			if len(field.Names) == 1 {
 				extent = u.extent(field)
 			}
-			u.symbol(sdk.Symbol{ID: id, Kind: kindField, Name: name.Name, Owner: ownerID, Doc: doc, Optional: optional}, name.Pos(), field.End(), extent)
+			u.symbol(sdk.Symbol{ID: id, Kind: kindField, Name: name.Name, Owner: ownerID, Doc: doc, Optional: optional, TypeRef: ref}, name.Pos(), field.End(), extent)
 		}
 	}
 }

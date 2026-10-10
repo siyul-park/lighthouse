@@ -503,6 +503,14 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": []
+          },
           "statements": 1,
           "symbol": ".::Base::Log#method",
           "tokens": 9,
@@ -514,6 +522,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::Base::Close#method",
           "tokens": 4,
@@ -522,11 +538,22 @@
         {
           "flow": [],
           "max_nesting": 0,
-          "param_types": [
-            ".::Service"
-          ],
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": ".::Service",
+                "text": "*example.com/embedded.Service"
+              }
+            ],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
           "statements": 2,
           "symbol": ".::run#function",
           "tokens": 14,
@@ -535,11 +562,22 @@
         {
           "flow": [],
           "max_nesting": 0,
-          "param_types": [
-            ".::Service"
-          ],
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": ".::Service",
+                "text": "*example.com/embedded.Service"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::peek#function",
           "tokens": 10,
@@ -551,6 +589,16 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": ".::Service",
+                "text": "*example.com/embedded.Service"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::build#function",
           "tokens": 20,
@@ -566,6 +614,14 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "[]example.com/embedded.LogCloser"
+              }
+            ],
+            "results": []
+          },
           "statements": 2,
           "symbol": ".::closeAll#function",
           "tokens": 18,
@@ -773,6 +829,9 @@
               "line": 22
             }
           },
+          "type_ref": {
+            "text": "string"
+          },
           "visibility": "private"
         },
         {
@@ -888,6 +947,11 @@
               "line": 32
             }
           },
+          "type_ref": {
+            "exported": true,
+            "symbol": ".::Base",
+            "text": "*example.com/embedded.Base"
+          },
           "visibility": "public"
         },
         {
@@ -917,6 +981,9 @@
               "line": 33
             }
           },
+          "type_ref": {
+            "text": "io.Reader"
+          },
           "visibility": "public"
         },
         {
@@ -944,6 +1011,9 @@
               "col": 2,
               "line": 34
             }
+          },
+          "type_ref": {
+            "text": "string"
           },
           "visibility": "private"
         },

@@ -58,6 +58,21 @@
           "max_nesting": 0,
           "params": 2,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              },
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::Add#function",
           "tokens": 6,
@@ -68,6 +83,18 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::Double#function",
           "tokens": 6,
@@ -335,6 +362,14 @@
           "max_nesting": 3,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "*testing.T"
+              }
+            ],
+            "results": []
+          },
           "statements": 5,
           "symbol": ".::TestAddTable#test",
           "tokens": 81,
@@ -345,6 +380,14 @@
           "max_nesting": 2,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "*testing.T"
+              }
+            ],
+            "results": []
+          },
           "statements": 3,
           "symbol": ".::TestNested#test",
           "tokens": 42,
@@ -356,6 +399,14 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "*testing.T"
+              }
+            ],
+            "results": []
+          },
           "statements": 1,
           "symbol": ".::TestPlain#test",
           "tokens": 6,
@@ -376,6 +427,14 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "*testing.T"
+              }
+            ],
+            "results": []
+          },
           "statements": 1,
           "symbol": ".::helper#function",
           "tokens": 10,
@@ -391,6 +450,14 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "*testing.B"
+              }
+            ],
+            "results": []
+          },
           "statements": 2,
           "symbol": ".::BenchmarkAdd#test",
           "tokens": 23,

@@ -366,6 +366,21 @@
           "max_nesting": 1,
           "params": 2,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              },
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 4,
           "symbol": ".::chain#function",
           "tokens": 24,
@@ -393,6 +408,18 @@
           "max_nesting": 3,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 7,
           "symbol": ".::labeled#function",
           "tokens": 48,
@@ -409,6 +436,24 @@
           "max_nesting": 1,
           "params": 3,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "chan int"
+              },
+              {
+                "text": "chan int"
+              },
+              {
+                "text": "<-chan struct{}"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 9,
           "symbol": ".::selects#function",
           "tokens": 32,
@@ -428,6 +473,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 3,
           "symbol": ".::fact#function",
           "tokens": 19,
@@ -451,6 +508,14 @@
           "max_nesting": 1,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 3,
           "symbol": ".::Tree::Sum#method",
           "tokens": 30,
@@ -468,6 +533,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
           "statements": 7,
           "symbol": ".::name#function",
           "tokens": 22,
@@ -484,6 +561,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
           "statements": 6,
           "symbol": ".::mixed#function",
           "tokens": 17,
@@ -519,6 +608,27 @@
           "max_nesting": 1,
           "params": 4,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "bool"
+              },
+              {
+                "text": "bool"
+              },
+              {
+                "text": "bool"
+              },
+              {
+                "text": "bool"
+              }
+            ],
+            "results": [
+              {
+                "text": "bool"
+              }
+            ]
+          },
           "statements": 3,
           "symbol": ".::logic#function",
           "tokens": 23,
@@ -538,6 +648,18 @@
           "max_nesting": 3,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "[]int"
+              }
+            ],
+            "results": [
+              {
+                "text": "func() int"
+              }
+            ]
+          },
           "statements": 6,
           "symbol": ".::closures#function",
           "tokens": 31,
@@ -557,6 +679,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 4,
           "symbol": ".::jump#function",
           "tokens": 16,
@@ -574,6 +708,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "any"
+              }
+            ],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
           "statements": 6,
           "symbol": ".::typed#function",
           "tokens": 22,
@@ -585,6 +731,21 @@
           "max_nesting": 0,
           "params": 2,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              },
+              {
+                "text": "[]int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::wrap#function",
           "tokens": 10,
@@ -595,6 +756,21 @@
           "max_nesting": 0,
           "params": 2,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              },
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::reorder#function",
           "tokens": 9,
@@ -605,6 +781,21 @@
           "max_nesting": 0,
           "params": 2,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              },
+              {
+                "text": "[]int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::inner#function",
           "tokens": 9,
@@ -616,6 +807,16 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": ".::Tree",
+                "text": "*example.com/flow.Tree"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::Tree::left0#method",
           "tokens": 8,
@@ -626,6 +827,16 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": ".::Tree",
+                "text": "*example.com/flow.Tree"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::Tree::child#method",
           "tokens": 6,
@@ -683,6 +894,11 @@
               "line": 4
             }
           },
+          "type_ref": {
+            "exported": true,
+            "symbol": ".::Tree",
+            "text": "*example.com/flow.Tree"
+          },
           "visibility": "private"
         },
         {
@@ -701,6 +917,11 @@
               "col": 8,
               "line": 4
             }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": ".::Tree",
+            "text": "*example.com/flow.Tree"
           },
           "visibility": "private"
         },
@@ -729,6 +950,9 @@
               "col": 2,
               "line": 5
             }
+          },
+          "type_ref": {
+            "text": "int"
           },
           "visibility": "private"
         },

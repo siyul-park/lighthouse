@@ -130,6 +130,21 @@
           "max_nesting": 0,
           "params": 2,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "i32"
+              },
+              {
+                "text": "i32"
+              }
+            ],
+            "results": [
+              {
+                "text": "i32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "layout::add#function",
           "tokens": 5,
@@ -140,6 +155,18 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "&[i32]"
+              }
+            ],
+            "results": [
+              {
+                "text": "i32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "layout::private_sum#function",
           "tokens": 11,
@@ -478,6 +505,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "i32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "layout[test:integration]/common::two#function",
           "tokens": 3,
@@ -910,6 +945,14 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "i32"
+              }
+            ],
+            "results": []
+          },
           "statements": 1,
           "symbol": "layout[test:integration]::cases_by_attribute#test",
           "tokens": 9,
@@ -921,6 +964,17 @@
           "max_nesting": 0,
           "params": 2,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "i32"
+              },
+              {
+                "text": "i32"
+              }
+            ],
+            "results": []
+          },
           "statements": 1,
           "symbol": "layout[test:integration]::test_case_by_path#test",
           "tokens": 9,
@@ -931,6 +985,14 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "i32"
+              }
+            ],
+            "results": []
+          },
           "statements": 1,
           "symbol": "layout[test:integration]::one_case_is_a_scenario#test",
           "tokens": 9,
@@ -1008,6 +1070,9 @@
               "line": 6
             }
           },
+          "type_ref": {
+            "text": "i32"
+          },
           "visibility": "private"
         },
         {
@@ -1035,6 +1100,9 @@
               "col": 5,
               "line": 7
             }
+          },
+          "type_ref": {
+            "text": "i32"
           },
           "visibility": "private"
         },

@@ -63,6 +63,7 @@ impl LanguageProvider for Toy {
                         name: name.to_owned(),
                         role: None,
                         optional: false,
+                        type_ref: None,
                     })
                 })
                 .collect();

@@ -193,6 +193,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::Store::Read#method",
           "tokens": 9,
@@ -203,6 +211,18 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "example.com/aliases.Handler"
+              }
+            ],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::use#function",
           "tokens": 7,
@@ -211,11 +231,22 @@
         {
           "flow": [],
           "max_nesting": 0,
-          "param_types": [
-            ".::Store"
-          ],
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": ".::Store",
+                "text": "example.com/aliases.Repo"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::count#function",
           "tokens": 8,
@@ -283,6 +314,9 @@
               "col": 20,
               "line": 4
             }
+          },
+          "type_ref": {
+            "text": "map[string]int"
           },
           "visibility": "private"
         },

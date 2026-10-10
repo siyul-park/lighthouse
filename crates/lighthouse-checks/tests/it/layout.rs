@@ -27,6 +27,7 @@ fn symbol(name: &str, kind: SymbolKind, owner: Option<&Symbol>, line: u32) -> Sy
         name: name.to_owned(),
         role: None,
         optional: false,
+        type_ref: None,
     }
 }
 

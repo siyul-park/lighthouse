@@ -55,6 +55,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "closed::Handle::id#method",
           "tokens": 5,
@@ -120,6 +128,9 @@
               "col": 5,
               "line": 2
             }
+          },
+          "type_ref": {
+            "text": "u32"
           },
           "visibility": "public"
         },
@@ -199,11 +210,22 @@
         {
           "flow": [],
           "max_nesting": 0,
-          "param_types": [
-            "shared::Handle"
-          ],
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "shared::Handle",
+                "text": "&Handle"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "consumer::identify#function",
           "tokens": 7,
@@ -302,6 +324,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "open::Handle::id#method",
           "tokens": 5,
@@ -367,6 +397,9 @@
               "col": 5,
               "line": 2
             }
+          },
+          "type_ref": {
+            "text": "u32"
           },
           "visibility": "public"
         },
@@ -456,6 +489,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "shared::Handle::id#method",
           "tokens": 5,
@@ -521,6 +562,9 @@
               "col": 5,
               "line": 2
             }
+          },
+          "type_ref": {
+            "text": "u32"
           },
           "visibility": "public"
         },

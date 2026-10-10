@@ -285,6 +285,9 @@ pub struct Symbol {
     /// `#[serde(default)]` field in Rust. Added in 0.1 before 1.0.
     #[serde(default, skip_serializing_if = "is_false")]
     pub optional: bool,
+    /// The type of a field. Added in 0.1 before 1.0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub type_ref: Option<TypeRef>,
 }
 
 /// An edge endpoint: a whole module or one symbol.
@@ -387,11 +390,16 @@ pub struct FunctionSummary {
     /// Reserved: normalized fingerprint for clone detection.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clone_fingerprint: Option<String>,
-    /// Project types named by the parameters, receiver excluded, as kind-less
-    /// symbol ids (`module::name`). Added in 0.1 before 1.0; empty when the
-    /// plugin does not resolve parameter types.
+    /// The types of the parameters and results, receiver excluded, one entry
+    /// per occurrence in order. Added in 0.1 before 1.0; empty when the plugin
+    /// does not report types.
+    #[serde(default, skip_serializing_if = "no_types")]
+    pub signature: Signature,
+    /// What the body does that a rule may flag, in source order; only a
+    /// function with a body has any. Added in 0.1 before 1.0; empty when the
+    /// plugin reports none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub param_types: Vec<String>,
+    pub events: Vec<Event>,
     /// Checks of a test file's function written out by hand: an `if` that
     /// compares and whose only effect is to fail the test. Added in 0.1
     /// before 1.0; zero when the plugin does not count them.
@@ -410,6 +418,62 @@ pub struct FunctionSummary {
     /// every parameter on, in order.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forwards_to: Option<String>,
+}
+
+/// A type as a signature or a field writes it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct TypeRef {
+    /// The type as written, normalized: Go prints it with the full package
+    /// path as qualifier (`context.Context`, `*example.com/m/x.T`,
+    /// `[]string`); Rust prints the path text without whitespace
+    /// (`Option<Ctx>`, `&mut Builder`).
+    pub text: String,
+    /// The project type it names, as a kind-less symbol id (`module::name`),
+    /// with pointers, references and slice elements stripped.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<String>,
+    /// Whether that named type is visible outside its module, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exported: Option<bool>,
+}
+
+/// The parameter and result types of a function, receiver excluded.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Signature {
+    #[serde(default)]
+    pub params: Vec<TypeRef>,
+    #[serde(default)]
+    pub results: Vec<TypeRef>,
+}
+
+/// What a function body does that a rule may flag; the same kinds for every
+/// language, each only where the language has it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum EventKind {
+    /// Go: a call of the builtin `panic`. Rust: the `panic!`, `unreachable!`,
+    /// `todo!` and `unimplemented!` macros (the detail names the macro).
+    Panic,
+    /// Rust: a `.unwrap()` or `.expect(..)` call on any receiver (the detail
+    /// names the method).
+    Unwrap,
+    /// Go: `==` or `!=` where one operand has type `error` and the other is
+    /// not nil (the detail is the operand text).
+    ErrorCompare,
+    /// Go: a type assertion or type switch on an `error` value.
+    ErrorAssert,
+    /// Go: `fmt.Errorf` given an `error` argument whose format has no `%w`
+    /// (the detail is the verb used).
+    ErrorfUnwrapped,
+}
+
+/// One body event and where it is.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Event {
+    pub kind: EventKind,
+    pub span: Span,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 /// How a test enumerates its cases: one body over a data table, or separate scenarios.
@@ -441,6 +505,10 @@ pub struct Comment {
     /// Id of the symbol the comment is the documentation of, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attached_to: Option<String>,
+}
+
+fn no_types(signature: &Signature) -> bool {
+    signature.params.is_empty() && signature.results.is_empty()
 }
 
 fn is_zero(n: &u32) -> bool {

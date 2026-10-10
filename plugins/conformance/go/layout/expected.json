@@ -118,6 +118,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "cmd/app::Greeting#function",
           "tokens": 14,
@@ -284,6 +292,18 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "string"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "internal/text::Count#function",
           "tokens": 7,

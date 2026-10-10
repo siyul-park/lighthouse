@@ -42,9 +42,7 @@ impl Builder<'_> {
             return json!({ "params": 0, "hidden": [] });
         };
         let index = self.single.0.get_or_init(|| index(self.project));
-        let hidden: Vec<Hidden> = summary
-            .param_types
-            .iter()
+        let hidden: Vec<Hidden> = named_params(summary)
             .filter_map(|ty| self.hidden(index, function, ty))
             .collect();
         let added: usize = hidden.iter().map(|h| h.fields).sum();
@@ -99,11 +97,21 @@ impl Builder<'_> {
     }
 }
 
+/// The project types the parameters name, as kind-less ids, one per parameter
+/// in order (a type taken twice appears twice).
+pub(super) fn named_params(summary: &FunctionSummary) -> impl Iterator<Item = &str> {
+    summary
+        .signature
+        .params
+        .iter()
+        .filter_map(|p| p.symbol.as_deref())
+}
+
 fn index(project: &Project) -> Index {
     let mut index = Index::default();
     for summary in &project.functions {
-        for ty in &summary.param_types {
-            let takers: &mut Vec<SymbolId> = index.takers.entry(ty.clone()).or_default();
+        for ty in named_params(summary) {
+            let takers: &mut Vec<SymbolId> = index.takers.entry(ty.to_owned()).or_default();
             if !takers.contains(&summary.symbol) {
                 takers.push(summary.symbol.clone());
             }

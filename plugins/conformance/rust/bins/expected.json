@@ -209,6 +209,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "bins::api#function",
           "tokens": 3,

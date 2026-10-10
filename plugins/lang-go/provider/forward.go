@@ -111,24 +111,3 @@ func passesOn(t *ast.FuncType, args []ast.Expr) bool {
 	}
 	return true
 }
-
-// paramTypes are the project types the parameters name, as kind-less symbol
-// ids, one per parameter in order (a type taken twice appears twice).
-func paramTypes(sig *ast.FuncType, info *types.Info, res *resolver) []string {
-	var out []string
-	for _, field := range sig.Params.List {
-		t := info.TypeOf(field.Type)
-		if t == nil {
-			continue
-		}
-		owner, ok := namedType(t)
-		if !ok || !res.inProject(owner.Pkg()) {
-			continue
-		}
-		to := target(res.module(owner.Pkg()), owner.Name())
-		for range max(1, len(field.Names)) {
-			out = append(out, to)
-		}
-	}
-	return out
-}

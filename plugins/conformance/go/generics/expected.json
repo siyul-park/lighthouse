@@ -322,6 +322,14 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "T"
+              }
+            ],
+            "results": []
+          },
           "statements": 1,
           "symbol": ".::Stack::Push#method",
           "tokens": 14,
@@ -332,6 +340,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::Stack::Len#method",
           "tokens": 9,
@@ -347,6 +363,21 @@
           "max_nesting": 1,
           "params": 2,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "[]T"
+              },
+              {
+                "text": "func(T) U"
+              }
+            ],
+            "results": [
+              {
+                "text": "[]U"
+              }
+            ]
+          },
           "statements": 4,
           "symbol": ".::Map#function",
           "tokens": 39,
@@ -362,6 +393,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "[]T"
+              }
+            ],
+            "results": [
+              {
+                "text": "T"
+              }
+            ]
+          },
           "statements": 4,
           "symbol": ".::Sum#function",
           "tokens": 19,
@@ -372,6 +415,18 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "[]string"
+              }
+            ],
+            "results": [
+              {
+                "text": "[]int"
+              }
+            ]
+          },
           "statements": 2,
           "symbol": ".::lengths#function",
           "tokens": 26,
@@ -382,6 +437,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "float64"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::total#function",
           "tokens": 9,
@@ -392,6 +455,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 3,
           "symbol": ".::fill#function",
           "tokens": 23,
@@ -487,6 +558,9 @@
               "col": 2,
               "line": 10
             }
+          },
+          "type_ref": {
+            "text": "[]T"
           },
           "visibility": "private"
         },

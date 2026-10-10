@@ -358,6 +358,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "String"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "traits::Shape::describe#method",
           "tokens": 13,
@@ -369,6 +377,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "f64"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "traits::Circle::Shape::area#method",
           "tokens": 11,
@@ -377,11 +393,22 @@
         {
           "flow": [],
           "max_nesting": 0,
-          "param_types": [
-            "traits::Shape"
-          ],
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "traits::Shape",
+                "text": "&dyn Shape"
+              }
+            ],
+            "results": [
+              {
+                "text": "String"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "traits::show#function",
           "tokens": 7,
@@ -390,11 +417,22 @@
         {
           "flow": [],
           "max_nesting": 0,
-          "param_types": [
-            "traits::Shape"
-          ],
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "traits::Shape",
+                "text": "impl Shape"
+              }
+            ],
+            "results": [
+              {
+                "text": "f64"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "traits::show_impl#function",
           "tokens": 7,
@@ -403,11 +441,22 @@
         {
           "flow": [],
           "max_nesting": 0,
-          "param_types": [
-            "traits::Shape"
-          ],
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "traits::Shape",
+                "text": "S"
+              }
+            ],
+            "results": [
+              {
+                "text": "f64"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "traits::show_generic#function",
           "tokens": 7,
@@ -416,11 +465,22 @@
         {
           "flow": [],
           "max_nesting": 0,
-          "param_types": [
-            "traits::Shape"
-          ],
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "traits::Shape",
+                "text": "S"
+              }
+            ],
+            "results": [
+              {
+                "text": "f64"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "traits::show_where#function",
           "tokens": 7,
@@ -430,11 +490,22 @@
           "flow": [],
           "forwards_to": "traits::Shape::area#method",
           "max_nesting": 0,
-          "param_types": [
-            "traits::Circle"
-          ],
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "traits::Circle",
+                "text": "&Circle"
+              }
+            ],
+            "results": [
+              {
+                "text": "f64"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "traits::show_path#function",
           "tokens": 8,
@@ -445,6 +516,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "f64"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "traits::Holder::area#method",
           "tokens": 9,
@@ -650,6 +729,9 @@
               "col": 5,
               "line": 16
             }
+          },
+          "type_ref": {
+            "text": "f64"
           },
           "visibility": "public"
         },
@@ -869,6 +951,11 @@
               "col": 5,
               "line": 49
             }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": "traits::Shape",
+            "text": "Box<dyn Shape>"
           },
           "visibility": "private"
         },

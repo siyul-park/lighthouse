@@ -121,6 +121,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "string"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::Mode#function",
           "tokens": 4,

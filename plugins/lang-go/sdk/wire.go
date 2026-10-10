@@ -143,6 +143,31 @@ type Symbol struct {
 	// Optional marks a field a caller may leave out: a pointer, slice, map,
 	// function, channel or interface.
 	Optional bool `json:"optional,omitempty"`
+	// TypeRef is the type of a field.
+	TypeRef *TypeRef `json:"type_ref,omitempty"`
+}
+
+// TypeRef is a type as a signature or a field writes it: Text is the type with
+// full package paths, Symbol the project type it names (a kind-less symbol
+// id), Exported whether that type is exported.
+type TypeRef struct {
+	Text     string `json:"text"`
+	Symbol   string `json:"symbol,omitempty"`
+	Exported *bool  `json:"exported,omitempty"`
+}
+
+// Signature is the parameter and result types of a function, receiver
+// excluded, one entry per occurrence.
+type Signature struct {
+	Params  []TypeRef `json:"params"`
+	Results []TypeRef `json:"results"`
+}
+
+// Event is something a function body does that a rule may flag.
+type Event struct {
+	Kind   string `json:"kind"`
+	Span   Span   `json:"span"`
+	Detail string `json:"detail,omitempty"`
 }
 
 // Node is a module or a symbol: exactly one field is set.
@@ -172,17 +197,18 @@ type Flow struct {
 
 // FunctionSummary is the measured shape of one function or method.
 type FunctionSummary struct {
-	Symbol           string   `json:"symbol"`
-	MaxNesting       int      `json:"max_nesting"`
-	Statements       int      `json:"statements"`
-	TopLevel         int      `json:"top_level"`
-	Params           int      `json:"params"`
-	Returns          int      `json:"returns"`
-	Tokens           int      `json:"tokens"`
-	Flow             []Flow   `json:"flow"`
-	CloneFingerprint string   `json:"clone_fingerprint,omitempty"`
-	ForwardsTo       string   `json:"forwards_to,omitempty"`
-	ParamTypes       []string `json:"param_types,omitempty"`
+	Symbol           string     `json:"symbol"`
+	MaxNesting       int        `json:"max_nesting"`
+	Statements       int        `json:"statements"`
+	TopLevel         int        `json:"top_level"`
+	Params           int        `json:"params"`
+	Returns          int        `json:"returns"`
+	Tokens           int        `json:"tokens"`
+	Flow             []Flow     `json:"flow"`
+	CloneFingerprint string     `json:"clone_fingerprint,omitempty"`
+	ForwardsTo       string     `json:"forwards_to,omitempty"`
+	Signature        *Signature `json:"signature,omitempty"`
+	Events           []Event    `json:"events,omitempty"`
 	// Implementation marks a method that satisfies an interface; Constructs a
 	// function without a receiver that returns a type of its package.
 	Implementation   bool `json:"implementation,omitempty"`

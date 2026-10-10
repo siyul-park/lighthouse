@@ -188,6 +188,7 @@ fn symbol(s: wire::Symbol) -> Result<core::Symbol, String> {
         name: s.name,
         role: s.role.map(role),
         optional: s.optional,
+        type_ref: s.type_ref.map(type_ref),
     })
 }
 
@@ -279,11 +280,37 @@ fn function(f: wire::FunctionSummary) -> Result<core::FunctionSummary, String> {
         flow: f.flow.into_iter().map(flow).collect(),
         clone_fingerprint: f.clone_fingerprint.map(core::Fingerprint::from_raw),
         forwards_to: f.forwards_to.map(core::Target::Path),
-        param_types: f.param_types,
+        signature: core::Signature {
+            params: f.signature.params.into_iter().map(type_ref).collect(),
+            results: f.signature.results.into_iter().map(type_ref).collect(),
+        },
+        events: f.events.into_iter().map(event).collect(),
         manual_assertions: f.manual_assertions,
         implementation: f.implementation,
         constructs: f.constructs,
     })
+}
+
+fn type_ref(t: wire::TypeRef) -> core::TypeRef {
+    core::TypeRef {
+        text: t.text,
+        symbol: t.symbol,
+        exported: t.exported,
+    }
+}
+
+fn event(e: wire::Event) -> core::Event {
+    core::Event {
+        kind: match e.kind {
+            wire::EventKind::Panic => core::EventKind::Panic,
+            wire::EventKind::Unwrap => core::EventKind::Unwrap,
+            wire::EventKind::ErrorCompare => core::EventKind::ErrorCompare,
+            wire::EventKind::ErrorAssert => core::EventKind::ErrorAssert,
+            wire::EventKind::ErrorfUnwrapped => core::EventKind::ErrorfUnwrapped,
+        },
+        span: span(e.span),
+        detail: e.detail,
+    }
 }
 
 fn test(t: wire::TestCase) -> Result<core::TestCase, String> {

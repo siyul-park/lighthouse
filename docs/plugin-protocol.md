@@ -238,19 +238,44 @@ results: every result in Go, and in Rust the arity of the returned tuple (1 for 
 single value, 0 for `()`), looking inside a `Result<T, E>` at `T`.
 
 `implementation` (optional) marks a function that implements a method a trait or
-interface declares elsewhere (a method of a trait impl in Rust); `constructs`
-(optional) marks an associated function without a receiver that returns `Self` or
-its owner type, bare or in a `Result` or `Option`. Go leaves both out: the host
-reads a Go method that an interface of its module declares as an implementation,
-and a constructor by its name.
+interface declares elsewhere: a method of a trait impl in Rust, a method of a type
+that satisfies an interface its package names in Go. `constructs` (optional) marks an
+associated function without a receiver that returns `Self` or its owner type, bare
+or in a `Result` or `Option`.
 
-`param_types` (optional) lists the project types the parameters name, receiver
-excluded, as kind-less symbol ids (`module::Type`), one per parameter in order (a
-type taken twice appears twice), so rules can ask whether a function takes a value
-of some type and find the struct that exists only for one function.
-A field symbol may carry `optional: true`: a caller may leave it out (Go pointer,
-slice, map, function, channel or interface; Rust `Option`, `Vec`, a map, or a
-`#[serde(default)]` field).
+`signature` (optional) is `{ params, results }`, the types of the parameters
+(receiver excluded) and results, one `TypeRef` per occurrence in order. A
+`TypeRef` is `{ text, symbol?, exported? }`:
+- `text` is the type as written, normalized. Go prints it with `types.TypeString`
+  and the full import path as qualifier (`context.Context`, `*example.com/m/x.T`,
+  `[]string`); Rust prints the type's tokens without the spaces between them
+  (`Option<Ctx>`, `&mut Builder`).
+- `symbol` is the project type it names, as a kind-less symbol id (`module::Type`),
+  behind pointers and references (Go also looks through aliases), so rules can ask
+  whether a function takes a value of some type and find the struct that exists only
+  for one function. A slice or map of the type names nothing.
+- `exported` is whether that named type is exported, when `symbol` is set: Go
+  `types.Object.Exported` of the name as written (an alias that exports an
+  unexported type counts as exported); Rust: declared `pub`.
+
+A field symbol carries the same `type_ref` for the type of the field, and may carry
+`optional: true`: a caller may leave it out (Go pointer, slice, map, function,
+channel or interface; Rust `Option`, `Vec`, a map, or a `#[serde(default)]` field).
+
+`events` (optional) lists what a function body does that a rule may flag, in
+source order, each `{ kind, span, detail? }`. The kinds are the same for every
+language and each is reported only where the language has it; only a function with
+a body has events, and a plugin that reports none leaves the field out. Closures
+count for the function that contains them; functions declared inside a body have
+summaries of their own.
+
+| kind | maps |
+|---|---|
+| `panic` | Go: a call of the builtin `panic`. Rust: the `panic!`, `unreachable!`, `todo!` and `unimplemented!` macros; `detail` is the macro name |
+| `unwrap` | Rust: a `.unwrap()` or `.expect(..)` call on any receiver, as clippy's `unwrap_used` and `expect_used` see it; `detail` is the method name |
+| `error-compare` | Go: `==` or `!=` where one operand has type `error` and the other is not `nil` (or a `switch` on an error with a case other than `nil`), after go-errorlint's `comparison`; `detail` is the error operand. `io.EOF`, `sql.ErrNoRows` and the body of an `Is(error) bool` method are exempt |
+| `error-assert` | Go: a type assertion to an error type, or a type switch, on an `error` value, after go-errorlint's `asserts`; `detail` is the asserted type, or the operand of a type switch |
+| `errorf-unwrapped` | Go: `fmt.Errorf` with a literal format that has no `%w` and an argument that is an error, after go-errorlint's `errorf`; `detail` is the verb that formats the first such argument |
 
 `manual_assertions` (optional, test files only) counts the checks a function
 writes out by hand: an `if` with no `else` whose condition compares or negates

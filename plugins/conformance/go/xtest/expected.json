@@ -53,6 +53,14 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "*testing.T"
+              }
+            ],
+            "results": []
+          },
           "statements": 2,
           "symbol": "pkg::TestHelper#test",
           "tokens": 16,
@@ -168,6 +176,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "pkg::Run#function",
           "tokens": 6,
@@ -178,6 +194,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "pkg::helper#function",
           "tokens": 4,
@@ -310,6 +334,14 @@
           "max_nesting": 1,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "*testing.T"
+              }
+            ],
+            "results": []
+          },
           "statements": 2,
           "symbol": "pkg[test]::TestRun#test",
           "tokens": 18,

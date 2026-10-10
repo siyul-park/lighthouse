@@ -561,6 +561,20 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "usize"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "impls::Stack",
+                "text": "Self"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "impls::Stack::new#method",
           "tokens": 15,
@@ -571,6 +585,14 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "T"
+              }
+            ],
+            "results": []
+          },
           "statements": 2,
           "symbol": "impls::Stack::push#method",
           "tokens": 17,
@@ -592,6 +614,18 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "&mut fmt::Formatter<'_>"
+              }
+            ],
+            "results": [
+              {
+                "text": "fmt::Result"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "impls::Stack::Display::fmt#method",
           "tokens": 13,
@@ -602,6 +636,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "String"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "impls::Named::shout#method",
           "tokens": 11,
@@ -613,6 +655,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "String"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "impls::Dog::Named::name#method",
           "tokens": 7,
@@ -624,6 +674,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "impls::Dog::Aged::name#method",
           "tokens": 3,
@@ -635,6 +693,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "String"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "impls::Dog::bark#method",
           "tokens": 7,
@@ -647,6 +713,20 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "f64"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "impls::Meters",
+                "text": "Self"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "impls::Meters::From<f64>::from#method",
           "tokens": 6,
@@ -659,6 +739,20 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "u32"
+              }
+            ],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "impls::Meters",
+                "text": "Self"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "impls::Meters::From<u32>::from#method",
           "tokens": 11,
@@ -670,6 +764,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "String"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "impls::T::Summary::summary#method",
           "tokens": 7,
@@ -681,6 +783,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "String"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "impls::String::Named::name#method",
           "tokens": 7,
@@ -692,6 +802,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "String"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "impls::Marker::Summary::summary#method",
           "tokens": 7,
@@ -702,6 +820,16 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "impls::Stack",
+                "text": "Stack<u8>"
+              }
+            ]
+          },
           "statements": 3,
           "symbol": "impls::build#function",
           "tokens": 21,
@@ -784,6 +912,9 @@
               "line": 5
             }
           },
+          "type_ref": {
+            "text": "Vec<T>"
+          },
           "visibility": "private"
         },
         {
@@ -811,6 +942,9 @@
               "col": 5,
               "line": 6
             }
+          },
+          "type_ref": {
+            "text": "usize"
           },
           "visibility": "public"
         },

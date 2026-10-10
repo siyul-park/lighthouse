@@ -188,11 +188,25 @@
         {
           "flow": [],
           "max_nesting": 0,
-          "param_types": [
-            ".::Request"
-          ],
           "params": 2,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": ".::Request",
+                "text": "example.com/signatures.Request"
+              },
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::Build#function",
           "tokens": 8,
@@ -204,6 +218,19 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 2,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": ".::Pair",
+                "text": "example.com/signatures.Pair"
+              },
+              {
+                "text": "error"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::Split#function",
           "tokens": 8,
@@ -271,6 +298,9 @@
               "line": 5
             }
           },
+          "type_ref": {
+            "text": "int"
+          },
           "visibility": "public"
         },
         {
@@ -298,6 +328,9 @@
               "col": 2,
               "line": 6
             }
+          },
+          "type_ref": {
+            "text": "string"
           },
           "visibility": "public"
         },
@@ -328,6 +361,9 @@
               "line": 7
             }
           },
+          "type_ref": {
+            "text": "[]string"
+          },
           "visibility": "public"
         },
         {
@@ -356,6 +392,9 @@
               "col": 2,
               "line": 8
             }
+          },
+          "type_ref": {
+            "text": "*int"
           },
           "visibility": "public"
         },
@@ -386,6 +425,9 @@
               "line": 9
             }
           },
+          "type_ref": {
+            "text": "func()"
+          },
           "visibility": "public"
         },
         {
@@ -414,6 +456,9 @@
               "col": 2,
               "line": 10
             }
+          },
+          "type_ref": {
+            "text": "any"
           },
           "visibility": "public"
         },
@@ -444,6 +489,9 @@
               "line": 11
             }
           },
+          "type_ref": {
+            "text": "chan int"
+          },
           "visibility": "public"
         },
         {
@@ -472,6 +520,9 @@
               "col": 2,
               "line": 12
             }
+          },
+          "type_ref": {
+            "text": "map[string]int"
           },
           "visibility": "public"
         },
@@ -519,6 +570,9 @@
               "line": 16
             }
           },
+          "type_ref": {
+            "text": "int"
+          },
           "visibility": "public"
         },
         {
@@ -536,6 +590,9 @@
               "col": 22,
               "line": 16
             }
+          },
+          "type_ref": {
+            "text": "int"
           },
           "visibility": "public"
         },

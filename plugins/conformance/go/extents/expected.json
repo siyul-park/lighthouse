@@ -376,6 +376,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::Service::Run#method",
           "tokens": 8,
@@ -386,6 +394,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": ".::helper#function",
           "tokens": 4,
@@ -626,6 +642,9 @@
               "line": 27
             }
           },
+          "type_ref": {
+            "text": "string"
+          },
           "visibility": "private"
         },
         {
@@ -653,6 +672,9 @@
               "col": 2,
               "line": 28
             }
+          },
+          "type_ref": {
+            "text": "int"
           },
           "visibility": "private"
         },
@@ -813,6 +835,9 @@
               "line": 46
             }
           },
+          "type_ref": {
+            "text": "int"
+          },
           "visibility": "private"
         },
         {
@@ -830,6 +855,9 @@
               "col": 18,
               "line": 46
             }
+          },
+          "type_ref": {
+            "text": "int"
           },
           "visibility": "private"
         },

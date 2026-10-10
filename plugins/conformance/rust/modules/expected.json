@@ -205,6 +205,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 2,
           "symbol": "modules::run#function",
           "tokens": 38,
@@ -216,6 +224,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "&'static str"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "modules::platform_name#function",
           "tokens": 7,
@@ -226,6 +242,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "modules/nested/deep::f#function",
           "tokens": 3,
@@ -352,6 +376,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "&'static str"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "modules/platform::name#function",
           "tokens": 3,
@@ -416,6 +448,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "modules/special::special#function",
           "tokens": 3,
@@ -523,6 +563,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "modules/shapes::area#function",
           "tokens": 5,
@@ -693,6 +741,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 2,
           "symbol": "modules/shapes/square::side#function",
           "tokens": 10,
@@ -776,6 +832,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "modules/util::helper#function",
           "tokens": 7,
@@ -840,6 +904,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "modules/util/hidden::secret#function",
           "tokens": 3,

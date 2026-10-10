@@ -210,6 +210,9 @@ pub struct Symbol {
     /// A field a caller may leave out (an `Option`, a collection, a pointer).
     #[serde(default)]
     pub optional: bool,
+    /// The type of a field.
+    #[serde(default)]
+    pub type_ref: Option<TypeRef>,
 }
 
 /// A vertex of the dependency graph: a whole module or one symbol.
@@ -394,10 +397,12 @@ pub struct FunctionSummary {
     /// The body is a single call that passes the receiver and every parameter
     /// on, in order.
     pub forwards_to: Option<Target>,
-    /// Project types named by the parameters, receiver excluded, as kind-less
-    /// symbol ids (`module::name`).
+    /// The types of the parameters and results, receiver excluded.
     #[serde(default)]
-    pub param_types: Vec<String>,
+    pub signature: Signature,
+    /// What the body does that a rule may flag, in source order.
+    #[serde(default)]
+    pub events: Vec<Event>,
     /// Checks written out by hand in a test file's function: an `if` that
     /// compares and whose only effect is to fail the test.
     #[serde(default)]
@@ -408,6 +413,60 @@ pub struct FunctionSummary {
     /// An associated function without a receiver that returns its owner.
     #[serde(default)]
     pub constructs: bool,
+}
+
+/// A type as a signature or a field writes it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TypeRef {
+    /// The type as written, normalized (see the wire format).
+    pub text: String,
+    /// The project type it names, as a kind-less symbol id (`module::name`),
+    /// pointers, references and slice elements stripped.
+    #[serde(default)]
+    pub symbol: Option<String>,
+    /// Whether that named type is visible outside its module, when known.
+    #[serde(default)]
+    pub exported: Option<bool>,
+}
+
+/// The parameter and result types of a function, receiver excluded, one entry
+/// per occurrence in order.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Signature {
+    pub params: Vec<TypeRef>,
+    pub results: Vec<TypeRef>,
+}
+
+/// What a function body does that a rule may flag.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum EventKind {
+    Panic,
+    Unwrap,
+    ErrorCompare,
+    ErrorAssert,
+    ErrorfUnwrapped,
+}
+
+impl EventKind {
+    /// The spelling used in files and expressions.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Panic => "panic",
+            Self::Unwrap => "unwrap",
+            Self::ErrorCompare => "error-compare",
+            Self::ErrorAssert => "error-assert",
+            Self::ErrorfUnwrapped => "errorf-unwrapped",
+        }
+    }
+}
+
+/// One body event: its kind, place and a kind-specific detail.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Event {
+    pub kind: EventKind,
+    pub span: Span,
+    pub detail: Option<String>,
 }
 
 /// How a test enumerates its cases: one body over a data table, or separate scenarios.

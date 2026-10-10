@@ -550,6 +550,16 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "calls::Counter",
+                "text": "Self"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "calls::Counter::new#method",
           "tokens": 17,
@@ -560,6 +570,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 2,
           "symbol": "calls::Counter::bump#method",
           "tokens": 13,
@@ -570,6 +588,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "calls::Counter::double#method",
           "tokens": 12,
@@ -581,6 +607,18 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "u32"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "calls::Counter::load#method",
           "tokens": 8,
@@ -591,6 +629,18 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "u32"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "calls::Counter::read#method",
           "tokens": 3,
@@ -602,6 +652,18 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "u32"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "calls::Counter::get#method",
           "tokens": 8,
@@ -612,6 +674,18 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "u32"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "calls::helper#function",
           "tokens": 3,
@@ -623,6 +697,18 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "u32"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "calls::wrapper#function",
           "tokens": 6,
@@ -633,6 +719,18 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "Vec<u32>"
+              }
+            ],
+            "results": [
+              {
+                "text": "Vec<u32>"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "calls::apply#function",
           "tokens": 16,
@@ -643,6 +741,14 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "&Mystery"
+              }
+            ],
+            "results": []
+          },
           "statements": 1,
           "symbol": "calls::unknown#function",
           "tokens": 8,
@@ -653,6 +759,16 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "calls::Counter",
+                "text": "Counter"
+              }
+            ]
+          },
           "statements": 2,
           "symbol": "calls::literal#function",
           "tokens": 22,
@@ -663,6 +779,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "HashMap<u32,u32>"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "calls::map#function",
           "tokens": 7,
@@ -671,11 +795,22 @@
         {
           "flow": [],
           "max_nesting": 0,
-          "param_types": [
-            "calls::Counter"
-          ],
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "calls::Counter",
+                "text": "&mut Counter"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "calls::typed#function",
           "tokens": 7,
@@ -686,6 +821,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 3,
           "symbol": "calls::chain#function",
           "tokens": 21,
@@ -696,6 +839,18 @@
           "max_nesting": 0,
           "params": 1,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "u32"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "calls/math::square#function",
           "tokens": 5,
@@ -766,6 +921,9 @@
               "line": 17
             }
           },
+          "type_ref": {
+            "text": "u32"
+          },
           "visibility": "private"
         },
         {
@@ -793,6 +951,9 @@
               "col": 5,
               "line": 18
             }
+          },
+          "type_ref": {
+            "text": "String"
           },
           "visibility": "private"
         },

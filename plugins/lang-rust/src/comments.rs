@@ -376,6 +376,7 @@ mod tests {
             name: "f".to_owned(),
             role: None,
             optional: false,
+            type_ref: None,
         }
     }
 

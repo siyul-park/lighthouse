@@ -164,6 +164,58 @@
       ],
       "type": "string"
     },
+    "Event": {
+      "description": "One body event and where it is.",
+      "properties": {
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/EventKind"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "span"
+      ],
+      "type": "object"
+    },
+    "EventKind": {
+      "description": "What a function body does that a rule may flag; the same kinds for every\nlanguage, each only where the language has it.",
+      "oneOf": [
+        {
+          "const": "panic",
+          "description": "Go: a call of the builtin `panic`. Rust: the `panic!`, `unreachable!`,\n`todo!` and `unimplemented!` macros (the detail names the macro).",
+          "type": "string"
+        },
+        {
+          "const": "unwrap",
+          "description": "Rust: a `.unwrap()` or `.expect(..)` call on any receiver (the detail\nnames the method).",
+          "type": "string"
+        },
+        {
+          "const": "error-compare",
+          "description": "Go: `==` or `!=` where one operand has type `error` and the other is\nnot nil (the detail is the operand text).",
+          "type": "string"
+        },
+        {
+          "const": "error-assert",
+          "description": "Go: a type assertion or type switch on an `error` value.",
+          "type": "string"
+        },
+        {
+          "const": "errorf-unwrapped",
+          "description": "Go: `fmt.Errorf` given an `error` argument whose format has no `%w`\n(the detail is the verb used).",
+          "type": "string"
+        }
+      ]
+    },
     "FileInfo": {
       "description": "Identity and classification of an indexed file.",
       "properties": {
@@ -316,6 +368,13 @@
           "description": "The function builds a value of its owner type without taking one: an\nassociated function without a receiver that returns `Self` or the\nowner. Added in 0.1 before 1.0.",
           "type": "boolean"
         },
+        "events": {
+          "description": "What the body does that a rule may flag, in source order; only a\nfunction with a body has any. Added in 0.1 before 1.0; empty when the\nplugin reports none.",
+          "items": {
+            "$ref": "#/$defs/Event"
+          },
+          "type": "array"
+        },
         "flow": {
           "description": "Control-flow constructs in source order.",
           "items": {
@@ -346,13 +405,6 @@
           "minimum": 0,
           "type": "integer"
         },
-        "param_types": {
-          "description": "Project types named by the parameters, receiver excluded, as kind-less\nsymbol ids (`module::name`). Added in 0.1 before 1.0; empty when the\nplugin does not resolve parameter types.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
         "params": {
           "format": "uint32",
           "minimum": 0,
@@ -362,6 +414,10 @@
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
+        },
+        "signature": {
+          "$ref": "#/$defs/Signature",
+          "description": "The types of the parameters and results, receiver excluded, one entry\nper occurrence in order. Added in 0.1 before 1.0; empty when the plugin\ndoes not report types."
         },
         "statements": {
           "format": "uint32",
@@ -696,6 +752,26 @@
         }
       ]
     },
+    "Signature": {
+      "description": "The parameter and result types of a function, receiver excluded.",
+      "properties": {
+        "params": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/TypeRef"
+          },
+          "type": "array"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/TypeRef"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "Span": {
       "description": "`end` is exclusive.",
       "properties": {
@@ -770,6 +846,17 @@
         },
         "span": {
           "$ref": "#/$defs/Span"
+        },
+        "type_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TypeRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The type of a field. Added in 0.1 before 1.0."
         },
         "visibility": {
           "$ref": "#/$defs/Visibility"
@@ -853,6 +940,33 @@
         "scenario"
       ],
       "type": "string"
+    },
+    "TypeRef": {
+      "description": "A type as a signature or a field writes it.",
+      "properties": {
+        "exported": {
+          "description": "Whether that named type is visible outside its module, when known.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "symbol": {
+          "description": "The project type it names, as a kind-less symbol id (`module::name`),\nwith pointers, references and slice elements stripped.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "description": "The type as written, normalized: Go prints it with the full package\npath as qualifier (`context.Context`, `*example.com/m/x.T`,\n`[]string`); Rust prints the path text without whitespace\n(`Option<Ctx>`, `&mut Builder`).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
     },
     "Visibility": {
       "description": "Who may use a symbol, as its language defines it; `internal` means visible\nwithin a bounded unit such as a crate, not outside it.",

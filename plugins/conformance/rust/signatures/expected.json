@@ -247,11 +247,25 @@
         {
           "flow": [],
           "max_nesting": 0,
-          "param_types": [
-            "signatures::Request"
-          ],
           "params": 2,
           "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "exported": true,
+                "symbol": "signatures::Request",
+                "text": "&Request"
+              },
+              {
+                "text": "u32"
+              }
+            ],
+            "results": [
+              {
+                "text": "u32"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "signatures::build#function",
           "tokens": 7,
@@ -262,6 +276,14 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 2,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "Result<(Pair,u32),String>"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "signatures::split#function",
           "tokens": 19,
@@ -273,6 +295,16 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "signatures::Server",
+                "text": "Self"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "signatures::Server::new#method",
           "tokens": 3,
@@ -285,6 +317,16 @@
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "exported": true,
+                "symbol": "signatures::Server",
+                "text": "Self"
+              }
+            ]
+          },
           "statements": 1,
           "symbol": "signatures::Server::Default::default#method",
           "tokens": 3,
@@ -351,6 +393,9 @@
               "line": 4
             }
           },
+          "type_ref": {
+            "text": "u32"
+          },
           "visibility": "public"
         },
         {
@@ -378,6 +423,9 @@
               "col": 5,
               "line": 5
             }
+          },
+          "type_ref": {
+            "text": "String"
           },
           "visibility": "public"
         },
@@ -408,6 +456,9 @@
               "line": 6
             }
           },
+          "type_ref": {
+            "text": "Option<u32>"
+          },
           "visibility": "public"
         },
         {
@@ -436,6 +487,9 @@
               "col": 5,
               "line": 7
             }
+          },
+          "type_ref": {
+            "text": "Vec<String>"
           },
           "visibility": "public"
         },
@@ -466,6 +520,9 @@
               "line": 8
             }
           },
+          "type_ref": {
+            "text": "HashMap<String,u32>"
+          },
           "visibility": "public"
         },
         {
@@ -494,6 +551,9 @@
               "col": 5,
               "line": 10
             }
+          },
+          "type_ref": {
+            "text": "u32"
           },
           "visibility": "public"
         },
@@ -550,6 +610,9 @@
               "line": 14
             }
           },
+          "type_ref": {
+            "text": "u32"
+          },
           "visibility": "public"
         },
         {
@@ -577,6 +640,9 @@
               "col": 5,
               "line": 15
             }
+          },
+          "type_ref": {
+            "text": "u32"
           },
           "visibility": "public"
         },
