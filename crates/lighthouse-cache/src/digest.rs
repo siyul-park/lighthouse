@@ -18,7 +18,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{Document, Edge, Node, Project, Symbol, SymbolId, Target, hash::Hasher};
+use lighthouse_model::{
+    Document, Edge, EdgeKind, Node, Project, Resolution, Symbol, SymbolId, Target, hash::Hasher,
+};
 use rayon::prelude::*;
 use serde::Serialize;
 
@@ -116,7 +118,7 @@ impl<'p> Ties<'p> {
     fn file(&self, path: &Path) -> Result<FileDigest, Error> {
         let project = self.project;
         let mut slice = Hasher::new();
-        let mut near = Hasher::new();
+        let mut parts = Parts::default();
         let mut modules = BTreeSet::new();
         if let Some(file) = project.file(path) {
             feed(&mut slice, file)?;
@@ -130,8 +132,8 @@ impl<'p> Ties<'p> {
                 feed(&mut slice, case)?;
             }
             modules.insert(symbol.id.module());
-            self.owned(&mut slice, &mut near, symbol)?;
-            self.edges(&mut slice, &mut near, symbol)?;
+            self.owned(&mut slice, &mut parts, symbol)?;
+            self.edges(&mut parts, symbol)?;
         }
         for comment in project.comments_in(path) {
             feed(&mut slice, comment)?;
@@ -142,6 +144,13 @@ impl<'p> Ties<'p> {
                 None => feed(&mut slice, module)?,
             }
         }
+        // The edges and ties of a file come in the order the providers made
+        // them in, which is not the same from run to run.
+        let mut near = Hasher::new();
+        parts.edges.sort_unstable();
+        parts.edges.iter().for_each(|edge| slice.update(edge));
+        parts.ties.sort_unstable();
+        parts.ties.iter().for_each(|tie| near.update(tie));
         Ok(FileDigest {
             slice: slice.finish_bytes(),
             neighbors: near.finish_bytes(),
@@ -149,17 +158,17 @@ impl<'p> Ties<'p> {
     }
 
     /// The owner of a symbol, and the members it has.
-    fn owned(&self, slice: &mut Hasher, near: &mut Hasher, symbol: &Symbol) -> Result<(), Error> {
+    fn owned(&self, slice: &mut Hasher, parts: &mut Parts, symbol: &Symbol) -> Result<(), Error> {
         let project = self.project;
         if let Some(owner) = symbol.owner.as_ref().and_then(|o| project.symbol(o)) {
             feed(slice, &(owner.kind.as_str(), &owner.name))?;
             if let Some(described) = self.described.get(&owner.id) {
-                tie(near, b"owner", &symbol.id, "", described);
+                parts.ties.push(tie(b"owner", &symbol.id, "", described));
             }
         }
         for member in project.members(&symbol.id) {
             if let Some(described) = self.described.get(member) {
-                tie(near, b"member", &symbol.id, "", described);
+                parts.ties.push(tie(b"member", &symbol.id, "", described));
             }
         }
         Ok(())
@@ -167,15 +176,17 @@ impl<'p> Ties<'p> {
 
     /// The edges that start and end at a symbol. The ones that start at it
     /// are part of the file's own slice.
-    fn edges(&self, slice: &mut Hasher, near: &mut Hasher, symbol: &Symbol) -> Result<(), Error> {
+    fn edges(&self, parts: &mut Parts, symbol: &Symbol) -> Result<(), Error> {
         for edge in self.project.edges_from(&symbol.id) {
-            feed(slice, edge)?;
+            parts.edges.push(digest_of(&edge_key(edge))?);
             let kind = format!("{}|{:?}", edge.kind.as_str(), edge.resolution);
-            tie(near, b"out", &symbol.id, &kind, &self.end(&edge.to)?);
+            let other = self.end(&edge.to)?;
+            parts.ties.push(tie(b"out", &symbol.id, &kind, &other));
         }
         for edge in self.incoming.get(&symbol.id).into_iter().flatten() {
             let kind = format!("{}|{:?}", edge.kind.as_str(), edge.resolution);
-            tie(near, b"in", &symbol.id, &kind, &self.end(&edge.from)?);
+            let other = self.end(&edge.from)?;
+            parts.ties.push(tie(b"in", &symbol.id, &kind, &other));
         }
         Ok(())
     }
@@ -203,13 +214,37 @@ impl<'p> Ties<'p> {
                 feed(whole, case)?;
             }
         }
+        let mut edges = Vec::new();
         for edge in &project.edges {
             let declared = match &edge.from {
                 Node::Symbol(id) => project.symbol(id).is_some(),
                 Node::Module(_) => false,
             };
             if !declared {
-                feed(whole, edge)?;
+                edges.push(digest_of(&edge_key(edge))?);
+            }
+        }
+        edges.sort_unstable();
+        edges.iter().for_each(|edge| whole.update(edge));
+        self.sites(whole)
+    }
+
+    /// Where each symbol is referred to. Only the rules that read the whole
+    /// project can see these, so they are not part of any file's digests.
+    fn sites(&self, whole: &mut Hasher) -> Result<(), Error> {
+        for symbol in &self.project.symbols {
+            for site in self.project.sites(&symbol.id) {
+                feed(
+                    whole,
+                    &(
+                        &symbol.id,
+                        &site.file,
+                        &site.from,
+                        site.kind,
+                        site.resolution,
+                        site.span,
+                    ),
+                )?;
             }
         }
         Ok(())
@@ -290,12 +325,42 @@ fn describe(project: &Project, symbol: &Symbol) -> Digest {
     hasher.finish_bytes()
 }
 
-/// Writes one tie of a symbol into the neighbors hasher of its file.
-fn tie(near: &mut Hasher, direction: &[u8], at: &SymbolId, kind: &str, other: &[u8]) {
+/// What a file's edges and ties come to before they are put in order.
+#[derive(Default)]
+struct Parts {
+    edges: Vec<Digest>,
+    ties: Vec<Digest>,
+}
+
+/// One tie of a symbol: the direction, the symbol, the kind of the edge and
+/// what is at the other end.
+fn tie(direction: &[u8], at: &SymbolId, kind: &str, other: &[u8]) -> Digest {
+    let mut hasher = Hasher::new();
     for part in [direction, at.as_str().as_bytes(), kind.as_bytes(), other] {
-        near.update((part.len() as u64).to_le_bytes());
-        near.update(part);
+        hasher.update((part.len() as u64).to_le_bytes());
+        hasher.update(part);
     }
+    hasher.finish_bytes()
+}
+
+/// An edge without its site: which of the sites of a relation is kept
+/// depends on the order the providers answered in, and the sites are hashed
+/// on their own. Whether there is one stays.
+fn edge_key(edge: &Edge) -> (&EdgeKind, &Node, &Target, &Resolution, bool) {
+    (
+        &edge.kind,
+        &edge.from,
+        &edge.to,
+        &edge.resolution,
+        edge.site.is_some(),
+    )
+}
+
+/// The hash of the JSON of `value`.
+fn digest_of<T: Serialize + ?Sized>(value: &T) -> Result<Digest, Error> {
+    let mut hasher = Hasher::new();
+    feed(&mut hasher, value)?;
+    Ok(hasher.finish_bytes())
 }
 
 /// Feeds the JSON of `value` to `hasher`.
