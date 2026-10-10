@@ -342,19 +342,29 @@ fn hidden_target_follows_the_naming_options_and_skips_helpers_that_are_cases() {
 }
 
 #[test]
-fn hidden_target_accepts_a_test_that_shows_other_production_code() {
+fn hidden_target_reports_a_table_case_whose_helper_calls_the_target() {
     let (mut w, _, test, _) = helped("TestGet");
-    let put = w.symbols.iter().find(|s| s.name == "Put").unwrap().clone();
-    w.edge(EdgeKind::Calls, &test, &put);
-    assert!(check(&w, HIDDEN, json!({})).is_empty());
+    let input = w.symbol("m", "Input", SymbolKind::Type, "m/a.ucm");
+    let field = w.member(&input, "Key", SymbolKind::Field, "m/a.ucm");
+    w.edge(EdgeKind::References, &test, &field);
+    assert_eq!(w.names(&check(&w, HIDDEN, json!({}))), ["TestGet"]);
+}
 
-    let ctor = w.func("m", "NewStore", "m/a.ucm");
-    let (mut w, _, test, _) = helped("TestGet");
-    w.symbols.push(ctor.clone());
-    w.edge(EdgeKind::Calls, &test, &ctor);
-    assert_eq!(
-        w.names(&check(&w, HIDDEN, json!({}))),
-        ["TestGet"],
-        "constructor"
-    );
+#[test]
+fn hidden_target_accepts_a_test_that_references_its_target_too() {
+    let (mut w, get, test, _) = helped("TestGet");
+    w.edge(EdgeKind::References, &test, &get);
+    assert!(check(&w, HIDDEN, json!({})).is_empty());
+}
+
+#[test]
+fn hidden_target_accepts_a_setup_helper_that_only_builds() {
+    let (mut w, _, _, helper) = helped("TestGet");
+    let build = w.func("m", "NewStore", "m/a.ucm");
+    w.edge(EdgeKind::Calls, &helper, &build);
+    // The helper reaches nothing the test is named after: drop its call of Get.
+    let get = w.symbols.iter().find(|s| s.name == "Get").unwrap().clone();
+    w.edges
+        .retain(|e| e.to != lighthouse_model::Target::Path(get.id.as_str().to_owned()));
+    assert!(check(&w, HIDDEN, json!({})).is_empty());
 }

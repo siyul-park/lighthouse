@@ -121,6 +121,8 @@ languages and editors are added.
 | Session domain | decisions about agent actions; a PreToolUse gate that allows, asks or denies |
 
 ## Known gaps
+- `design/layers` does not report an `ignore` entry that matches no import (import-linter's
+  `unmatched_ignore_imports_alerting`): a cel rule judges one edge at a time.
 - Rename fixes are off: no provider declares complete reference sites yet.
 - External binaries in `command` providers are trusted by their command line, not by
   content.

@@ -1223,6 +1223,31 @@
         "description": {
           "type": "string"
         },
+        "items": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Shape"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What each item of a list is."
+        },
+        "properties": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Shape"
+          },
+          "description": "The keys of an object; an object with properties refuses any other key.",
+          "type": "object"
+        },
+        "required": {
+          "description": "The keys an object must have.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "type": {
           "$ref": "#/$defs/OptionType"
         }
@@ -1241,7 +1266,8 @@
         "number",
         "boolean",
         "string",
-        "array"
+        "array",
+        "object"
       ],
       "type": "string"
     },
@@ -1457,6 +1483,44 @@
         }
       ]
     },
+    "Shape": {
+      "additionalProperties": false,
+      "description": "The shape of a value inside an option: its type and, for a list, the shape\nof its items, for an object, its properties and which of them are required.",
+      "properties": {
+        "items": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Shape"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What each item of a list is."
+        },
+        "properties": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Shape"
+          },
+          "description": "The keys of an object; an object with properties refuses any other key.",
+          "type": "object"
+        },
+        "required": {
+          "description": "The keys an object must have.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "type": {
+          "$ref": "#/$defs/OptionType"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
     "Subject": {
       "description": "What a decision talks about inside its domain. Mapping to the run scope\nof a rule is `Subject::run_scope`.",
       "oneOf": [
@@ -1468,6 +1532,11 @@
             "project",
             "test"
           ],
+          "type": "string"
+        },
+        {
+          "const": "edge",
+          "description": "A relation between two symbols or modules, such as an import.",
           "type": "string"
         },
         {

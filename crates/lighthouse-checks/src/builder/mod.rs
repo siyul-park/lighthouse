@@ -320,8 +320,8 @@ impl<'a> Builder<'a> {
         if needs.mentions("homonyms") {
             map.insert("homonyms".to_owned(), self.homonyms(symbol));
         }
-        if needs.mentions("hidden_targets") {
-            map.insert("hidden_targets".to_owned(), self.hidden_targets(symbol));
+        if needs.mentions("hidden_target") {
+            map.insert("hidden_target".to_owned(), self.hidden_target(symbol));
         }
     }
 
@@ -516,7 +516,10 @@ impl<'a> Builder<'a> {
             .filter(|id| !project.in_test(id))
             .filter_map(|id| project.symbol(id))
             .collect();
+        // A package variable that calls it is a table of handlers: the order
+        // of its entries says nothing about who the helper belongs to.
         if callers.is_empty()
+            || callers.iter().any(|s| s.kind == SymbolKind::Var)
             || !callers.iter().all(|s| s.file == callee.file)
             || cyclic(project, callee, &callers)
         {

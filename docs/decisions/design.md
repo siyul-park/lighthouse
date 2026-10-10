@@ -29,9 +29,9 @@ Dependency direction keeps stable, general code independent from specific policy
 
 ### Dependencies point down the layers
 
-`design/layers` · project · warn · cel
+`design/layers` · edge · warn · cel
 
-*Stable, general code must not break when specific code changes. The project says which modules are higher and which are lower; an import that points up, between peers of one layer, or across a forbidden line is reported. It follows import-linter's `layers`, `independence` and `forbidden` contracts (`layers`, `forbidden`, `ignore` with its `reason`) and ArchUnit's `layeredArchitecture`. Nothing is reported until `layers` or `forbidden` is configured: the layers belong to the project. A layer is a list of module globs, and `layers` lists them from the top down. In a glob `*` stands for characters inside one path segment and `**` for any number of segments, none included, so `app/**` also matches `app`. `::` and `/` both separate segments. A module that no layer names is not judged. Only imports between modules of the project count; an external module is ignored. An import is reported when it points to a higher layer, when `independent` is on and it joins two modules of one layer that match different globs (modules under one glob may import each other), or when it matches a `forbidden` entry. An import that matches an `ignore` entry is skipped, and its `reason` says why. A rule judges one import at a time, so an `ignore` entry that matches no import is not reported as stale, as import-linter's `unmatched_ignore_imports_alerting` would. Go: a module is a package, named by its directory relative to the project root (`internal/domain`). Rust: a module is a crate or one of its modules, named by the crate and the `mod` path (`my_crate/domain/order`); the crate root is the crate name.*
+*Stable, general code must not break when specific code changes. The project says which modules are higher and which are lower; an import that points up, between peers of one layer, or across a forbidden line is reported. It follows import-linter's `layers`, `independence` and `forbidden` contracts (`layers`, `forbidden`, `ignore` with its `reason`) and ArchUnit's `layeredArchitecture`. Nothing is reported until `layers` or `forbidden` is configured: the layers belong to the project. A layer is a list of module globs, and `layers` lists them from the top down. In a glob `*` stands for characters inside one path segment and `**` for any number of segments, none included, so `app/**` also matches `app`. `::` and `/` both separate segments. A module that no layer names is not judged. Only imports between modules of the project count; an external module is ignored. An import is reported when it points to a higher layer, when `independent` is on and it joins two modules of one layer that match different globs (modules under one glob may import each other), or when it matches a `forbidden` entry. An import that matches an `ignore` entry is skipped, and its `reason` says why. A module that matches the globs of several layers belongs to the first of them: the first matching layer wins, and `fromLayer` and `toLayer` in the evidence are those indices. Deferred: an `ignore` entry that matches no import is not reported as stale, as import-linter's `unmatched_ignore_imports_alerting` would. A rule judges one import at a time and cannot see that nothing matched (see the known gaps in docs/roadmap.md). Go: a module is a package, named by its directory relative to the project root (`internal/domain`). Rust: a module is a crate or one of its modules, named by the crate and the `mod` path (`my_crate/domain/order`); the crate root is the crate name.*
 
 A module MUST NOT depend on a module of a higher layer, and modules of one layer MUST stay independent of each other, as the project's layers state.
 
@@ -113,13 +113,14 @@ Physical layout should make ownership and collaboration visible while preserving
 
 `design/owner-file` · symbol · warn · cel
 
-*A reader finds an owner and everything it owns in one place. A method is reported when it is declared in another file than its type. A private free function is reported the same way when every production caller of it is a method of one type that is declared in another file and the function calls or references that type or one of its members. A function named like a constructor is not reported. Go: All methods of a receiver type stay in the file of the type. Rust: The methods of an inherent `impl` stay in the file of the type. A method of a trait impl is exempt, because the trait decides where it is written; the code model marks it by an id that carries the trait. A type that the project does not declare has no file to keep to.*
+*A reader finds an owner and everything it owns in one place. A method is reported when it is declared outside the unit of its type: its file, or its module and the modules below it (option `unit`). A private free function is reported the same way when every production caller of it is a method of one type that is declared outside the unit and the function calls or references that type or one of its members. A function named like a constructor is not reported. Go: All methods of a receiver type stay in the file of the type (`unit: file`). Rust: The methods of an inherent `impl` stay in the module of the type or in a module below it (`unit: module-tree`): a type with a child module for its impls keeps them together. The code model names the module of a method after its type, not after the `impl`, so the module tree is read from files: `m.rs` holds `m/`, a crate root or `mod.rs` the directory it is in. An impl in a sibling or parent module is reported. A method of a trait impl is exempt, because the trait decides where it is written; the code model marks it by an id that carries the trait. A type that the project does not declare has no module to keep to.*
 
 Symbols with one owner and cohesive responsibility MUST share a file.
 
 | option | default | meaning |
 | --- | --- | --- |
 | `constructorPrefixes` | `["New","new"]`; rust: `["new"]` | A function named like one of these, or one of these followed by a word, is a constructor: it builds the type and sits where the constructors are. |
+| `unit` | `"file"`; rust: `"module-tree"` | Where the members of a type must be: `file` (the file of the type) or `module-tree` (the module of the type or one below it). |
 
 ```go invalid store.go
 package sample
@@ -149,15 +150,16 @@ Also: rust
 
 `design/misplaced-symbol` · symbol · info · cel · strict
 
-*A function whose every use lies in one other module is that module's code, kept here by accident of history. This is Fowler's Move Function (Refactoring, 2nd ed.). No tool checks it: Sonar and PMD judge coupling of a class, not where a function belongs. A free function is reported when everything it calls or references in the project lies in one other module, at least `minUses` distinct functions, methods or fields of it (naming its constants and types ties nothing), and nothing in its own module, and nothing uses it as a value (a function that fills a table of handlers lives where the table is). Symbols outside the project are not counted, and neither is a module that contains the function's module: a submodule uses its parent as a matter of course. Types are not judged: the code model states no uses of a type. Go: A package function that uses only another package. Rust: A free function that uses only another module of the crate or another crate of the workspace.*
+*A function whose every use lies in one other module is that module's code, kept here by accident of history. This is Fowler's Move Function (Refactoring, 2nd ed.) with the foreign-data measure of Lanza and Marinescu (2006). No tool checks it: Sonar and PMD judge coupling of a class, not where a function belongs. A free function is reported when everything it calls or references in the project lies in one other module, at least `minUses` distinct functions, methods or fields of it (naming its constants and types ties nothing), and nothing in its own module, and nothing uses it as a value (a function that fills a table of handlers lives where the table is). Symbols outside the project are not counted, and neither is a module that contains the function's module: a submodule uses its parent as a matter of course. Types are not judged: the code model states no uses of a type. A function of fewer than `minStatements` statements is too little to judge, and so are the functions that start or wire up the program: those of a Go `main` package or the root of a Rust binary, and those an `init` function or a package variable's initializer uses. Go: A package function that uses only another package. Rust: A free function that uses only another module of the crate or another crate of the workspace.*
 
 A function SHOULD live in the module whose symbols it uses.
 
-Derived from: Fowler, Refactoring 2nd ed., Move Function
+Derived from: Fowler, Refactoring 2nd ed., Move Function; Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006
 
 | option | default | meaning |
 | --- | --- | --- |
 | `includeExported` | `false` | Also judge exported functions, whose callers would have to change. |
+| `minStatements` | `3` | Fewest statements a function must have to be judged. |
 | `minUses` | `3` | Fewest distinct symbols of the other module the function must use. |
 
 ```go invalid app/app.go
@@ -168,7 +170,10 @@ import "example.com/app/store"
 func Run() int { return load() }
 
 func load() int {
-	return store.Read() + store.Count() + store.Scan()
+	a := store.Read()
+	b := store.Count()
+	c := store.Scan()
+	return a + b + c
 }
 ```
 
@@ -180,7 +185,9 @@ import "example.com/app/store"
 func Run() int { return load() }
 
 func load() int {
-	return store.Read() + store.Count() + store.Scan() + local()
+	a := store.Read()
+	b := store.Count() + store.Scan()
+	return a + b + local()
 }
 
 func local() int { return 0 }
@@ -430,7 +437,7 @@ Function structure should make meaningful behavior reusable and readable, not me
 
 `design/private-helper-callers` · symbol · info · cel · strict
 
-*A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count. Forwarding wrappers are reported by `design/no-single-use-wrapper`, and a function used as a value is not judged. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.*
+*A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count, and neither does a package variable that calls the helper in its initializer: it is a table of handlers, not a caller to compare the helper with. Forwarding wrappers are reported by `design/no-single-use-wrapper`, and a function used as a value is not judged. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.*
 
 A private helper SHOULD have at least two callers.
 
@@ -545,17 +552,18 @@ Also: rust
 
 `design/feature-envy` · symbol · info · cel · strict
 
-*A function that spends its body on the members of one type is that type's behavior wearing another name. This is Fowler's Feature Envy (Refactoring, 2nd ed.) with the access count of Lanza and Marinescu's detection strategy (2006: ATFD, LAA, FDP). Sonar has no rule for it, and PMD's design rules have a God Class (the same authors' strategy) but no feature-envy rule. A free function is reported when it uses at least `minMembers` distinct members of one type of its own module (fields, and methods that it calls; the variants of an enum are not members) and no member of any other type, and nothing uses it as a value. Passing a value of the type on is not envy: parameters are not counted, only the members the body reaches. A function that is generic over the type cannot be told apart in the code model, so none is skipped for that. Go: A package function and the methods and fields of a type of its package. Rust: A free function and the methods and fields of a type of its module. Members the provider resolves only by name are not counted.*
+*A function that spends its body on the members of one type is that type's behavior wearing another name. This is Fowler's Feature Envy (Refactoring, 2nd ed.) with the detection strategy of Lanza and Marinescu (2006): the function accesses more than a few foreign attributes (ATFD above FEW, which they put at 3) of a few classes only (FDP at most 2; here, one). Sonar has no rule for it, and PMD's design rules have a God Class (the same authors' strategy) but no feature-envy rule. A free function is reported when it uses at least `minMembers` distinct members of one type of its own module (fields, and methods that it calls; the variants of an enum are not members) and no member of any other type, and nothing uses it as a value. Passing a value of the type on is not envy: parameters are not counted, only the members the body reaches. A function of fewer than `minStatements` statements is too little to judge, and so are the functions that start or wire up the program: those of a Go `main` package or the root of a Rust binary, and those an `init` function or a package variable's initializer uses. Go: A package function and the methods and fields of a type of its package. Rust: A free function and the methods and fields of a type of its module. Members the provider resolves only by name are not counted.*
 
 A function that uses only the members of one type SHOULD be a method of that type.
 
-Derived from: Fowler, Refactoring 2nd ed., Feature Envy; Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006
+Derived from: Fowler, Refactoring 2nd ed., Feature Envy; Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006, Feature Envy detection strategy
 
 | option | default | meaning |
 | --- | --- | --- |
 | `constructorPrefixes` | `["New","new"]`; rust: `["new"]` | A function named like one of these, or one of these followed by a word, is a constructor and has no receiver yet. |
 | `includeExported` | `false` | Also judge exported functions, whose callers outside the module would have to change. |
-| `minMembers` | `2` | Fewest distinct members of the type the function must use. |
+| `minMembers` | `3` | Fewest distinct members of the type the function must use. |
+| `minStatements` | `3` | Fewest statements a function must have to be judged. |
 
 ```go invalid
 package sample
@@ -563,12 +571,16 @@ package sample
 type Store struct {
 	items []int
 	total int
+	extra int
 }
 
 func (s *Store) Reset() { s.items = nil }
 
 func summary(s *Store) int {
-	return len(s.items) + s.total
+	n := len(s.items)
+	n += s.total
+	n += s.extra
+	return n
 }
 ```
 
@@ -583,7 +595,9 @@ type Store struct {
 func (s *Store) Total() int { return s.total }
 
 func report(s *Store) int {
-	return s.total + format(s)
+	n := s.total
+	n += len(s.items)
+	return n + format(s)
 }
 
 func format(s *Store) int { return len(s.items) }

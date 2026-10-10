@@ -13,8 +13,9 @@ spec:
   context: >-
     A function whose every use lies in one other module is that module's
     code, kept here by accident of history. This is Fowler's Move Function
-    (Refactoring, 2nd ed.). No tool checks it: Sonar and PMD judge coupling
-    of a class, not where a function belongs.
+    (Refactoring, 2nd ed.) with the foreign-data measure of Lanza and
+    Marinescu (2006). No tool checks it: Sonar and PMD judge coupling of a
+    class, not where a function belongs.
 
     A free function is reported when everything it calls or references in the
     project lies in one other module, at least `minUses` distinct functions,
@@ -23,7 +24,11 @@ spec:
     that fills a table of handlers lives where the table is). Symbols outside
     the project are not counted, and neither is a module that contains the
     function's module: a submodule uses its parent as a matter of course.
-    Types are not judged: the code model states no uses of a type.
+    Types are not judged: the code model states no uses of a type. A function
+    of fewer than `minStatements` statements is too little to judge, and so
+    are the functions that start or wire up the program: those of a Go `main`
+    package or the root of a Rust binary, and those an `init` function or a
+    package variable's initializer uses.
 
     Go: A package function that uses only another package.
 
@@ -42,6 +47,10 @@ spec:
         type: integer
         default: 3
         description: Fewest distinct symbols of the other module the function must use.
+      minStatements:
+        type: integer
+        default: 3
+        description: Fewest statements a function must have to be judged.
       includeExported:
         type: boolean
         default: false
@@ -56,7 +65,8 @@ spec:
     where: >-
       func.kind == 'function' && func.name != 'main' && func.name != 'init'
       && (func.visibility == 'private' || options.includeExported)
-      && func.references == 0 && size(envy) > 0 && size(envy.module_target) > 0
+      && func.references == 0 && func.statements >= options.minStatements
+      && size(envy) > 0 && !envy.entry && size(envy.module_target) > 0
       && size(envy.module_uses) >= options.minUses && envy.own_uses == 0
     message: >-
       {{ func.name }} uses only {{ envy.module_target }}
@@ -70,6 +80,7 @@ spec:
   provenance:
     wasDerivedFrom:
       - "Fowler, Refactoring 2nd ed., Move Function"
+      - "Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006"
   examples:
     - name: go-uses-only-another-package
       language: go
@@ -78,7 +89,7 @@ spec:
         - path: go.mod
           body: "module example.com/app\n\ngo 1.26\n"
         - path: app/app.go
-          body: "package app\n\nimport \"example.com/app/store\"\n\nfunc Run() int { return load() }\n\nfunc load() int {\n\treturn store.Read() + store.Count() + store.Scan()\n}\n"
+          body: "package app\n\nimport \"example.com/app/store\"\n\nfunc Run() int { return load() }\n\nfunc load() int {\n\ta := store.Read()\n\tb := store.Count()\n\tc := store.Scan()\n\treturn a + b + c\n}\n"
         - path: store/store.go
           body: "package store\n\nfunc Read() int { return 1 }\n\nfunc Count() int { return 2 }\n\nfunc Scan() int { return 3 }\n"
       expect:
@@ -91,7 +102,17 @@ spec:
         - path: go.mod
           body: "module example.com/app\n\ngo 1.26\n"
         - path: app/app.go
-          body: "package app\n\nimport \"example.com/app/store\"\n\nfunc Run() int { return load() }\n\nfunc load() int {\n\treturn store.Read() + store.Count() + store.Scan() + local()\n}\n\nfunc local() int { return 0 }\n"
+          body: "package app\n\nimport \"example.com/app/store\"\n\nfunc Run() int { return load() }\n\nfunc load() int {\n\ta := store.Read()\n\tb := store.Count() + store.Scan()\n\treturn a + b + local()\n}\n\nfunc local() int { return 0 }\n"
+        - path: store/store.go
+          body: "package store\n\nfunc Read() int { return 1 }\n\nfunc Count() int { return 2 }\n\nfunc Scan() int { return 3 }\n"
+    - name: go-wired-up-by-a-variable
+      language: go
+      kind: valid
+      files:
+        - path: go.mod
+          body: "module example.com/app\n\ngo 1.26\n"
+        - path: app/app.go
+          body: "package app\n\nimport \"example.com/app/store\"\n\nvar total = load()\n\nfunc load() int {\n\ta := store.Read()\n\tb := store.Count()\n\tc := store.Scan()\n\treturn a + b + c\n}\n"
         - path: store/store.go
           body: "package store\n\nfunc Read() int { return 1 }\n\nfunc Count() int { return 2 }\n\nfunc Scan() int { return 3 }\n"
     - name: rust-uses-only-another-module
@@ -109,7 +130,10 @@ spec:
             }
 
             fn load() -> i32 {
-                read() + count() + scan()
+                let a = read();
+                let b = count();
+                let c = scan();
+                a + b + c
             }
         - path: src/store.rs
           body: |-

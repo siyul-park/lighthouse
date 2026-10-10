@@ -40,6 +40,8 @@ spec:
     properties:
       allow:
         type: array
+        items:
+          type: string
         default: [Error, Result, Options, Config]
         description: Type names that are idiomatic in every module.
     additionalProperties: false

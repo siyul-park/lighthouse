@@ -58,7 +58,7 @@
           "text": "/// Kinds of work."
         },
         {
-          "attached_to": "extents::Kind::Fast#field",
+          "attached_to": "extents::Kind::Fast#variant",
           "span": {
             "end": {
               "col": 23,
@@ -158,7 +158,7 @@
           },
           "kind": "contains",
           "resolution": "syntactic",
-          "to": "extents::Kind::Fast#field"
+          "to": "extents::Kind::Fast#variant"
         },
         {
           "from": {
@@ -166,7 +166,7 @@
           },
           "kind": "contains",
           "resolution": "syntactic",
-          "to": "extents::Kind::Slow#field"
+          "to": "extents::Kind::Slow#variant"
         },
         {
           "from": {
@@ -462,8 +462,8 @@
             }
           },
           "file": "src/lib.rs",
-          "id": "extents::Kind::Fast#field",
-          "kind": "field",
+          "id": "extents::Kind::Fast#variant",
+          "kind": "variant",
           "name": "Fast",
           "owner": "extents::Kind#type",
           "span": {
@@ -490,8 +490,8 @@
             }
           },
           "file": "src/lib.rs",
-          "id": "extents::Kind::Slow#field",
-          "kind": "field",
+          "id": "extents::Kind::Slow#variant",
+          "kind": "variant",
           "name": "Slow",
           "owner": "extents::Kind#type",
           "span": {

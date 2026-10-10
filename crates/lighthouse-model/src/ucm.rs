@@ -126,6 +126,8 @@ pub enum SymbolKind {
     Method,
     Type,
     Field,
+    /// A variant of an enum or a union.
+    Variant,
     Const,
     Var,
     Interface,
@@ -133,11 +135,12 @@ pub enum SymbolKind {
 }
 
 impl SymbolKind {
-    const ALL: [Self; 8] = [
+    const ALL: [Self; 9] = [
         Self::Function,
         Self::Method,
         Self::Type,
         Self::Field,
+        Self::Variant,
         Self::Const,
         Self::Var,
         Self::Interface,
@@ -151,6 +154,7 @@ impl SymbolKind {
             Self::Method => "method",
             Self::Type => "type",
             Self::Field => "field",
+            Self::Variant => "variant",
             Self::Const => "const",
             Self::Var => "var",
             Self::Interface => "interface",

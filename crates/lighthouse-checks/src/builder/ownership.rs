@@ -58,6 +58,8 @@ impl Builder<'_> {
             "owner": owner.id.as_str(),
             "owner_name": owner.name,
             "owner_file": owner.file.to_string_lossy(),
+            "owner_module": owner.id.module(),
+            "owner_tree": tree_of(&owner.file),
         })
     }
 
@@ -73,8 +75,6 @@ impl Builder<'_> {
         let mut modules: BTreeMap<&str, BTreeSet<&SymbolId>> = BTreeMap::new();
         let mut own = 0;
         for id in used {
-            // The state and behavior of a type are its fields and methods; the
-            // variants of an enum, which a conversion names, are not.
             if let Some(owner) = owner_type(project, id)
                 && let Some(member) = project.symbol(id)
                 && matches!(member.kind, SymbolKind::Field | SymbolKind::Method)
@@ -114,12 +114,11 @@ impl Builder<'_> {
             "member_names": target.map(|(_, names)| names.iter().collect::<Vec<_>>()).unwrap_or_default(),
             "others": members.keys().filter(|id| Some(**id) != target.map(|(t, _)| t)).map(|id| id.as_str()).collect::<Vec<_>>(),
             "same_module": target.is_some_and(|(id, _)| id.module() == symbol.id.module()),
-            // A type parameter bound to the target is not read from the code model.
-            "generic": false,
             "module_target": outside.map_or("", |(module, _)| *module),
             "module_uses": outside.map(|(_, ids)| behavior(ids).iter().map(|s| s.id.as_str()).collect::<Vec<_>>()).unwrap_or_default(),
             "module_use_names": outside.map(|(_, ids)| behavior(ids).iter().map(|s| s.name.as_str()).collect::<Vec<_>>()).unwrap_or_default(),
             "own_uses": own,
+            "entry": self.is_entry(symbol),
         })
     }
 
@@ -132,6 +131,27 @@ impl Builder<'_> {
         sole_owner(&self.production_callers(symbol))
     }
 
+    /// Whether the symbol is where the program starts or is wired up: it lies
+    /// in a Go `main` package or at the root of a Rust binary, or an `init`
+    /// function or a package variable's initializer uses it. Moving such a
+    /// function says nothing about its design.
+    fn is_entry(&self, symbol: &Symbol) -> bool {
+        let project = self.project;
+        let in_binary = project.module(symbol.id.module()).is_some_and(|m| {
+            m.name.as_deref() == Some("main") || (m.path.contains("[bin:") && !m.path.contains('/'))
+        });
+        in_binary
+            || project
+                .callers(&symbol.id)
+                .iter()
+                .chain(project.references(&symbol.id))
+                .filter_map(|id| project.symbol(id))
+                .any(|user| {
+                    user.kind == SymbolKind::Var
+                        || (user.kind == SymbolKind::Function && user.name == "init")
+                })
+    }
+
     fn production_callers(&self, symbol: &Symbol) -> Vec<&Symbol> {
         let project = self.project;
         project
@@ -140,6 +160,28 @@ impl Builder<'_> {
             .filter(|id| !project.in_test(id))
             .filter_map(|id| project.symbol(id))
             .collect()
+    }
+}
+
+/// The files of the module tree of a file: the directory a Rust module `m.rs`
+/// keeps its child modules in (`m/`), or, for a crate root or a `mod.rs`, the
+/// directory the file is in. A method's id names the module of its type, not
+/// the module its `impl` is written in, so the place of the `impl` is its file.
+fn tree_of(file: &std::path::Path) -> String {
+    let dir = file.parent().map(|d| d.to_string_lossy().into_owned());
+    let dir = dir.filter(|d| !d.is_empty());
+    let stem = file.file_stem().map(|s| s.to_string_lossy().into_owned());
+    let root = matches!(stem.as_deref(), Some("lib" | "main" | "mod"));
+    let path = match (dir, stem) {
+        (Some(dir), _) if root || file.extension().is_none_or(|e| e != "rs") => dir,
+        (Some(dir), Some(stem)) => format!("{dir}/{stem}"),
+        (None, Some(stem)) if !root => stem,
+        _ => String::new(),
+    };
+    if path.is_empty() {
+        String::new()
+    } else {
+        format!("{path}/")
     }
 }
 
@@ -181,10 +223,10 @@ fn owner_type<'p>(project: &'p Project, id: &SymbolId) -> Option<&'p Symbol> {
 /// members: without that, it has no more to do with the owner than with any
 /// other type, however few callers it has.
 fn uses_owner(project: &Project, symbol: &Symbol, owner: &str) -> bool {
-    let owner_id = project
-        .symbol(&SymbolId::parse(owner).unwrap_or_else(|| symbol.id.clone()))
-        .map(|o| o.id.clone());
-    let Some(owner_id) = owner_id else {
+    let Some(owner_id) = SymbolId::parse(owner)
+        .and_then(|id| project.symbol(&id))
+        .map(|o| o.id.clone())
+    else {
         return false;
     };
     project.uses(&symbol.id).iter().any(|used| {

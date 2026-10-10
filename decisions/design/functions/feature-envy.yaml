@@ -13,16 +13,21 @@ spec:
   context: >-
     A function that spends its body on the members of one type is that type's
     behavior wearing another name. This is Fowler's Feature Envy (Refactoring,
-    2nd ed.) with the access count of Lanza and Marinescu's detection strategy
-    (2006: ATFD, LAA, FDP). Sonar has no rule for it, and PMD's design rules
-    have a God Class (the same authors' strategy) but no feature-envy rule.
+    2nd ed.) with the detection strategy of Lanza and Marinescu (2006): the
+    function accesses more than a few foreign attributes (ATFD above FEW, which
+    they put at 3) of a few classes only (FDP at most 2; here, one). Sonar has
+    no rule for it, and PMD's design rules have a God Class (the same authors'
+    strategy) but no feature-envy rule.
 
     A free function is reported when it uses at least `minMembers` distinct
     members of one type of its own module (fields, and methods that it calls;
-    the variants of an enum are not members) and no member of any other type, and nothing uses it as a value. Passing a
-    value of the type on is not envy: parameters are not counted, only the
-    members the body reaches. A function that is generic over the type cannot
-    be told apart in the code model, so none is skipped for that.
+    the variants of an enum are not members) and no member of any other type,
+    and nothing uses it as a value. Passing a value of the type on is not
+    envy: parameters are not counted, only the members the body reaches. A
+    function of fewer than `minStatements` statements is too little to judge,
+    and so are the functions that start or wire up the program: those of a Go
+    `main` package or the root of a Rust binary, and those an `init` function
+    or a package variable's initializer uses.
 
     Go: A package function and the methods and fields of a type of its package.
 
@@ -40,7 +45,7 @@ spec:
     properties:
       minMembers:
         type: integer
-        default: 2
+        default: 3
         description: Fewest distinct members of the type the function must use.
       includeExported:
         type: boolean
@@ -48,6 +53,10 @@ spec:
         description: >-
           Also judge exported functions, whose callers outside the module would
           have to change.
+      minStatements:
+        type: integer
+        default: 3
+        description: Fewest statements a function must have to be judged.
       constructorPrefixes:
         type: array
         default: [New, new]
@@ -69,8 +78,9 @@ spec:
       func.kind == 'function' && func.name != 'main' && func.name != 'init'
       && (func.visibility == 'private' || options.includeExported)
       && !func.constructor_named && func.references == 0
-      && size(envy) > 0 && envy.count >= options.minMembers
-      && size(envy.others) == 0 && envy.same_module && !envy.generic
+      && func.statements >= options.minStatements
+      && size(envy) > 0 && !envy.entry && envy.count >= options.minMembers
+      && size(envy.others) == 0 && envy.same_module
     message: >-
       {{ func.name }} depends on {{ envy.target_name }}'s members
       ({{ envy.member_names.join(', ') }}) only; consider a method of
@@ -83,9 +93,9 @@ spec:
   provenance:
     wasDerivedFrom:
       - "Fowler, Refactoring 2nd ed., Feature Envy"
-      - "Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006"
+      - "Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006, Feature Envy detection strategy"
   examples:
-    - name: go-uses-two-fields-of-one-type
+    - name: go-uses-three-fields-of-one-type
       language: go
       kind: invalid
       files:
@@ -96,15 +106,19 @@ spec:
             type Store struct {
             	items []int
             	total int
+            	extra int
             }
 
             func (s *Store) Reset() { s.items = nil }
 
             func summary(s *Store) int {
-            	return len(s.items) + s.total
+            	n := len(s.items)
+            	n += s.total
+            	n += s.extra
+            	return n
             }
       expect:
-        - line: 10
+        - line: 11
     - name: go-uses-members-of-two-types
       language: go
       kind: valid
@@ -116,14 +130,18 @@ spec:
             type Store struct {
             	items []int
             	total int
+            	extra int
             }
 
             type Cache struct{ hits int }
 
             func summary(s *Store, c *Cache) int {
-            	return len(s.items) + s.total + c.hits
+            	n := len(s.items)
+            	n += s.total + s.extra
+            	n += c.hits
+            	return n
             }
-    - name: go-passes-the-value-on
+    - name: go-uses-too-few-members
       language: go
       kind: valid
       canonical: true
@@ -140,11 +158,13 @@ spec:
             func (s *Store) Total() int { return s.total }
 
             func report(s *Store) int {
-            	return s.total + format(s)
+            	n := s.total
+            	n += len(s.items)
+            	return n + format(s)
             }
 
             func format(s *Store) int { return len(s.items) }
-    - name: rust-uses-two-fields-of-one-type
+    - name: rust-uses-three-fields-of-one-type
       language: rust
       kind: invalid
       files:
@@ -153,6 +173,7 @@ spec:
             pub struct Store {
                 items: Vec<i32>,
                 total: i32,
+                extra: i32,
             }
 
             impl Store {
@@ -162,28 +183,37 @@ spec:
             }
 
             fn summary(store: &Store) -> i32 {
-                store.items.len() as i32 + store.total
+                let mut n = store.items.len() as i32;
+                n += store.total;
+                n += store.extra;
+                n
             }
       expect:
-        - line: 12
-    - name: rust-uses-one-member
+        - line: 13
+    - name: rust-matches-over-the-variants-of-an-enum
       language: rust
       kind: valid
       canonical: true
       files:
         - path: src/lib.rs
           body: |-
-            pub struct Store {
-                items: Vec<i32>,
-                total: i32,
+            pub enum Level {
+                Error,
+                Warn,
+                Info,
             }
 
-            impl Store {
-                pub fn reset(&mut self) {
-                    self.items.clear();
+            impl Level {
+                pub fn name(&self) -> &'static str {
+                    "level"
                 }
             }
 
-            fn count(store: &Store) -> usize {
-                store.items.len()
+            fn rank(text: &str) -> Option<Level> {
+                let lower = text.to_lowercase();
+                match lower.as_str() {
+                    "error" => Some(Level::Error),
+                    "warn" => Some(Level::Warn),
+                    _ => Some(Level::Info),
+                }
             }

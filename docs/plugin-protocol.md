@@ -163,7 +163,7 @@ internal error. The host treats failures as follows, always turning them into
 
   ```
   id   = module "::" { owner "::" } name "#" kind
-  kind = function | method | type | field | const | var | interface | test
+  kind = function | method | type | field | variant | const | var | interface | test
   ```
 
   `owner` names each enclosing declaration from the outside in (a method or

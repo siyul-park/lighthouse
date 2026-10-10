@@ -308,9 +308,9 @@ impl<'t> Index<'t> {
         for variant in &e.variants {
             let v = variant.ident.to_string();
             let item = Sym {
-                id: symbol_id(&self.tree.mods[m].path, &[&name, &v], SymbolKind::Field),
+                id: symbol_id(&self.tree.mods[m].path, &[&name, &v], SymbolKind::Variant),
                 name: v.clone(),
-                kind: SymbolKind::Field,
+                kind: SymbolKind::Variant,
                 module: m,
                 vis: sym.vis,
             };
@@ -844,6 +844,7 @@ pub fn kind_name(kind: SymbolKind) -> &'static str {
         SymbolKind::Method => "method",
         SymbolKind::Type => "type",
         SymbolKind::Field => "field",
+        SymbolKind::Variant => "variant",
         SymbolKind::Const => "const",
         SymbolKind::Var => "var",
         SymbolKind::Interface => "interface",

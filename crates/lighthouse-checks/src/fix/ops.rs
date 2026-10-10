@@ -356,6 +356,6 @@ fn orderable(project: &Project, symbol: &Symbol) -> bool {
             )
     };
     symbol.extent.is_some()
-        && !matches!(symbol.kind, SymbolKind::Field)
+        && !matches!(symbol.kind, SymbolKind::Field | SymbolKind::Variant)
         && symbol.owner.as_ref().is_none_or(member_of_type)
 }

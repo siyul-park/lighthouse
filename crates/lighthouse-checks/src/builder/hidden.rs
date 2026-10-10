@@ -1,4 +1,4 @@
-//! The `hidden_targets` fact: the symbol a test is named after, when the test
+//! The `hidden_target` fact: the symbol a test is named after, when the test
 //! reaches it only through a helper of the test code.
 
 use std::collections::BTreeSet;
@@ -7,15 +7,15 @@ use lighthouse_model::{EdgeKind, Node, Symbol, SymbolId, SymbolKind, Target};
 use serde_json::{Value, json};
 
 use super::Builder;
-use crate::layout;
 
 impl Builder<'_> {
-    /// The target the test's name maps to that the test does not call itself
-    /// but a helper it calls does: `{target, helper, site}`, empty when the
-    /// test calls what it is named after, or is named after nothing it
-    /// reaches. A helper that calls the target is taken to return its result
+    /// The target the test's name maps to that the test does not call or
+    /// reference itself but a helper it calls does: `{target, helper, site}`,
+    /// empty when the test uses what it is named after, or is named after
+    /// nothing it reaches. Only helpers the test calls directly are followed,
+    /// and calls inside closures or `t.Run` helpers count as the test's own. A helper that calls the target is taken to return its result
     /// or assert on it; the code model does not say which.
-    pub(super) fn hidden_targets(&self, test: &Symbol) -> Value {
+    pub(super) fn hidden_target(&self, test: &Symbol) -> Value {
         let project = self.project;
         let (Some(naming), Some(case)) = (&self.naming, project.test(&test.id)) else {
             return json!({});
@@ -29,9 +29,6 @@ impl Builder<'_> {
             Target::Resolved(Node::Symbol(id)) if !project.in_test(id) => Some(id),
             _ => None,
         }));
-        if self.shows_production_code(&direct) {
-            return json!({});
-        }
         for helper in project
             .callees(&test.id)
             .iter()
@@ -59,28 +56,6 @@ impl Builder<'_> {
             }
         }
         json!({})
-    }
-
-    /// Whether the test itself uses production code besides constructors: it
-    /// then specifies something in plain sight, and a helper that also reaches
-    /// the target is setting up the environment, not hiding the call.
-    fn shows_production_code(&self, direct: &BTreeSet<&SymbolId>) -> bool {
-        let prefixes: Vec<&str> = self
-            .options
-            .get("constructorPrefixes")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str)
-            .collect();
-        direct
-            .iter()
-            .filter_map(|id| self.project.symbol(id))
-            .any(|used| {
-                !prefixes
-                    .iter()
-                    .any(|prefix| layout::has_word_prefix(&used.name, prefix))
-            })
     }
 
     /// The line where `from` calls `callee`; 0 when the provider reports no sites.

@@ -350,6 +350,7 @@ impl Select {
             Subject::Symbol => Some(Self::Symbol),
             Subject::File => Some(Self::File),
             Subject::Module => Some(Self::Module),
+            Subject::Edge => Some(Self::Edge),
             Subject::Test => Some(Self::Test),
             Subject::Decision => Some(Self::Decision),
             Subject::Project => None,

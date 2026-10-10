@@ -24,6 +24,8 @@ pub enum Subject {
     Symbol,
     File,
     Module,
+    /// A relation between two symbols or modules, such as an import.
+    Edge,
     Project,
     Test,
     /// A decision document, in the `spec` domain.
@@ -36,7 +38,7 @@ impl Subject {
     pub fn run_scope(self) -> RunScope {
         match self {
             Self::Symbol | Self::File | Self::Test => RunScope::File,
-            Self::Module | Self::Project | Self::Decision => RunScope::Project,
+            Self::Module | Self::Edge | Self::Project | Self::Decision => RunScope::Project,
         }
     }
 
@@ -276,7 +278,7 @@ macro_rules! display {
     };
 }
 
-display!(Subject { Symbol => "symbol", File => "file", Module => "module", Project => "project", Test => "test", Decision => "decision" });
+display!(Subject { Symbol => "symbol", File => "file", Module => "module", Edge => "edge", Project => "project", Test => "test", Decision => "decision" });
 display!(Domain { Code => "code", Spec => "spec" });
 display!(DecisionStatus { Proposed => "proposed", Accepted => "accepted", Rejected => "rejected", Superseded => "superseded", Deprecated => "deprecated" });
 display!(ExampleKind { Valid => "valid", Invalid => "invalid" });

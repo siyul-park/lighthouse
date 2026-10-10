@@ -14,16 +14,19 @@ spec:
 
     An owner test is named after its target (`TestStore_Get` is about
     `Store.Get`, by the naming of `testing/owner`). The test is reported when
-    it does not call that target itself but calls a helper of the test code
-    that does. A helper is a function of test code that is not a test case; it
-    is followed one call deep. The helper is taken to return the target's
+    it neither calls nor references that target itself but calls a helper of
+    the test code that does. A helper is a function of test code that is not a
+    test case; it is followed one call deep, and a call made inside a closure or
+    a `t.Run` helper counts as the test's own. The helper is taken to return the target's
     result or assert on it: the code model says that it calls the target, not
     what it does with the result. A test with no owner name, or that calls
     what it is named after, is not reported, and neither is a setup helper
     that only calls constructors or other code the test is not named after.
-    A test that itself calls production code other than a constructor shows
-    what it specifies, so a helper that also reaches its target is setting up
-    the environment and is not reported.
+
+    Known limit: a setup helper that reaches the target as an argument, such
+    as an environment builder that is handed the extension a test is named
+    after, is reported although it only sets up; the code model does not say
+    whether a helper asserts or builds.
 
     Go: The helper is a function that takes the test handle or a test fixture
     function.
@@ -63,18 +66,10 @@ spec:
           Count the tests of a module that tests an ancestor module as tests of
           the nested module too: the integration tests of a Rust crate test all
           of it, private modules whose items the root re-exports included.
-      constructorPrefixes:
-        type: array
-        default: [New, new]
-        description: >-
-          A function named like one of these, or one of these followed by a
-          word, is a constructor; a test may call it without showing what it
-          specifies.
     additionalProperties: false
   languages:
     rust:
       options:
-        constructorPrefixes: [new]
         testPrefix: ""
         snakeCase: true
         variantTests: false
@@ -84,7 +79,7 @@ spec:
     select: test
     with:
       - name: hidden
-        expr: test.hidden_targets
+        expr: test.hidden_target
     where: size(hidden) > 0
     message: >-
       {{ test.name }} calls {{ hidden.target_name }} only through helper

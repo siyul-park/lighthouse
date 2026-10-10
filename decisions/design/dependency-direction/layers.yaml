@@ -29,9 +29,14 @@ spec:
     matches a `forbidden` entry. An import that matches an `ignore` entry is
     skipped, and its `reason` says why.
 
-    A rule judges one import at a time, so an `ignore` entry that matches no
-    import is not reported as stale, as import-linter's
-    `unmatched_ignore_imports_alerting` would.
+    A module that matches the globs of several layers belongs to the first of
+    them: the first matching layer wins, and `fromLayer` and `toLayer` in the
+    evidence are those indices.
+
+    Deferred: an `ignore` entry that matches no import is not reported as
+    stale, as import-linter's `unmatched_ignore_imports_alerting` would. A rule
+    judges one import at a time and cannot see that nothing matched (see the
+    known gaps in docs/roadmap.md).
 
     Go: a module is a package, named by its directory relative to the project
     root (`internal/domain`).
@@ -40,7 +45,7 @@ spec:
     the `mod` path (`my_crate/domain/order`); the crate root is the crate name.
   scope:
     domain: code
-    subject: project
+    subject: edge
   requirement: >-
     A module MUST NOT depend on a module of a higher layer, and modules of one
     layer MUST stay independent of each other, as the project's layers state.
@@ -50,6 +55,10 @@ spec:
     properties:
       layers:
         type: array
+        items:
+          type: array
+          items:
+            type: string
         default: []
         description: >-
           The layers from the top down, each a list of module globs, such as
@@ -63,12 +72,30 @@ spec:
           other.
       forbidden:
         type: array
+        items:
+          type: object
+          required: [from, to]
+          properties:
+            from:
+              type: string
+            to:
+              type: string
         default: []
         description: >-
           Imports that are never allowed, each an object `{from, to}` of the
           globs of the importing and the imported module.
       ignore:
         type: array
+        items:
+          type: object
+          required: [from, to, reason]
+          properties:
+            from:
+              type: string
+            to:
+              type: string
+            reason:
+              type: string
         default: []
         description: >-
           Imports that are allowed although they break a contract, each an

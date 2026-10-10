@@ -12,18 +12,24 @@ spec:
   context: >-
     A reader finds an owner and everything it owns in one place.
 
-    A method is reported when it is declared in another file than its type. A
+    A method is reported when it is declared outside the unit of its type: its
+    file, or its module and the modules below it (option `unit`). A
     private free function is reported the same way when every production
-    caller of it is a method of one type that is declared in another file and
+    caller of it is a method of one type that is declared outside the unit and
     the function calls or references that type or one of its members. A
     function named like a constructor is not reported.
 
-    Go: All methods of a receiver type stay in the file of the type.
+    Go: All methods of a receiver type stay in the file of the type (`unit:
+    file`).
 
-    Rust: The methods of an inherent `impl` stay in the file of the type. A
-    method of a trait impl is exempt, because the trait decides where it is
-    written; the code model marks it by an id that carries the trait. A type
-    that the project does not declare has no file to keep to.
+    Rust: The methods of an inherent `impl` stay in the module of the type or
+    in a module below it (`unit: module-tree`): a type with a child module for
+    its impls keeps them together. The code model names the module of a method
+    after its type, not after the `impl`, so the module tree is read from files:
+    `m.rs` holds `m/`, a crate root or `mod.rs` the directory it is in. An impl in a sibling or parent module is reported. A method of a
+    trait impl is exempt, because the trait decides where it is written; the
+    code model marks it by an id that carries the trait. A type that the
+    project does not declare has no module to keep to.
   scope:
     domain: code
     subject: symbol
@@ -32,6 +38,12 @@ spec:
   options:
     type: object
     properties:
+      unit:
+        type: string
+        default: file
+        description: >-
+          Where the members of a type must be: `file` (the file of the type) or
+          `module-tree` (the module of the type or one below it).
       constructorPrefixes:
         type: array
         default: [New, new]
@@ -43,6 +55,7 @@ spec:
   languages:
     rust:
       options:
+        unit: module-tree
         constructorPrefixes: [new]
   check:
     type: cel
@@ -51,14 +64,20 @@ spec:
         expr: symbol.owner_home
     where: >-
       (symbol.kind == 'method' || symbol.kind == 'function')
-      && size(home) > 0 && home.owner_file != symbol.file
+      && size(home) > 0
       && !symbol.implements_trait && !symbol.constructor_named
+      && home.owner_file != symbol.file
+      && !(options.unit == 'module-tree' && home.owner_tree != ''
+           && symbol.file.startsWith(home.owner_tree))
     message: >-
       {{ symbol.name }} belongs to {{ home.owner_name }} (declared in
-      {{ home.owner_file }}); keep it in that file
+      {{ home.owner_file }}); keep it in {{ options.unit == 'module-tree'
+      ? 'that module or below' : 'that file' }}
     evidence:
       owner: home.owner
       owner_file: home.owner_file
+      owner_module: home.owner_module
+      owner_tree: home.owner_tree
     identity:
       subject: symbol.id
   examples:
@@ -113,6 +132,29 @@ spec:
             }
       expect:
         - line: 4
+    - name: rust-impl-in-a-child-module
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            mod store;
+        - path: src/store.rs
+          body: |-
+            mod total;
+
+            pub struct Store {
+                pub items: Vec<i32>,
+            }
+        - path: src/store/total.rs
+          body: |-
+            use super::Store;
+
+            impl Store {
+                pub fn total(&self) -> usize {
+                    self.items.len()
+                }
+            }
     - name: rust-impl-with-the-type
       language: rust
       kind: valid

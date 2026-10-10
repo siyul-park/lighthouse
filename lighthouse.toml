@@ -47,12 +47,12 @@ options.layers = [
   ["plugins/lang-go/sdk/**"],
 ]
 
-# One owner is split over files by concern on purpose: the fact families of
-# the checks builder, the fix half of the engine, the log encoding of a
-# judgment and the Go provider's unit by what it extracts.
+# One owner is split over sibling files by concern on purpose: the fix half
+# of the engine, the log encoding of a judgment and the Go provider's unit by
+# what it extracts. (The builder's fact families sit in child modules of
+# `builder`, which owner-file accepts for Rust.)
 [[spec.overrides]]
 files = [
-  "crates/lighthouse-checks/src/builder/**",
   "crates/lighthouse-engine/src/fix/**",
   "crates/lighthouse-store/src/log.rs",
   "plugins/lang-go/provider/comments.go",
