@@ -8,10 +8,11 @@ use std::{
 };
 
 use lighthouse_checks::Declarative;
-use lighthouse_config::{Config, FILE_NAME, Format};
 use lighthouse_plugin::Registry;
+use lighthouse_resource::Format;
 use lighthouse_rpc::Registered;
 use lighthouse_spec::{Catalog, CheckKind, FixKind, load_local, local_files};
+use lighthouse_spec::{Config, FILE_NAME};
 
 use crate::{
     Result,

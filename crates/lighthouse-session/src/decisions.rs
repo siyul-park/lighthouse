@@ -73,11 +73,10 @@ pub fn explain_bundled(id: &str) -> Result<String> {
 }
 
 /// The rules the project's configuration enables for at least one file: the
-/// presets it extends and the entries it sets, resolved over the registry of
-/// the in-process plugins.
+/// projects it extends and the entries it sets, resolved over the catalog.
 pub fn active_decisions(session: &Session) -> Result<BTreeSet<String>> {
-    let registry = session.in_process_registry()?;
-    Ok(lighthouse_engine::active_rules(&registry, &session.config)?)
+    let projects = session.catalog()?.projects()?;
+    Ok(lighthouse_engine::active_rules(&session.config, &projects)?)
 }
 
 /// The index of the project's catalog, one decision per line: id, authored
@@ -128,9 +127,6 @@ pub fn explain(catalog: &Catalog, registry: &Registry, id: &str) -> Result<Strin
                 meta.id, meta.severity, meta.description, meta.docs
             );
             let _ = writeln!(out, "Scope: {:?}", meta.scope);
-            if let Some(citation) = &meta.citation {
-                let _ = writeln!(out, "Method: {citation}");
-            }
         }
         (None, None) => return Err(format!("unknown decision or rule `{id}`").into()),
     }

@@ -1,4 +1,4 @@
-use lighthouse_config::Format;
+use lighthouse_resource::Format;
 use lighthouse_session::migrate::plugin::{is_legacy, migrate};
 
 #[test]

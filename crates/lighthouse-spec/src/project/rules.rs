@@ -50,6 +50,13 @@ impl<'de> Deserialize<'de> for RuleSetting {
     }
 }
 
+impl RuleSetting {
+    /// A rule at `severity`, with its options left to the decision's defaults.
+    pub fn level(severity: Severity) -> Self {
+        Self::Level(Level::from(Some(severity)))
+    }
+}
+
 impl From<&RuleConfig> for RuleSetting {
     fn from(config: &RuleConfig) -> Self {
         let level = Level::from(config.level);

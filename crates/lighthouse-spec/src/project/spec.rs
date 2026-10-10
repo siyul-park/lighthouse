@@ -1,5 +1,5 @@
-//! The spec of the `Project` and `Preset` kinds: what `lighthouse.toml`
-//! holds, and what a preset is.
+//! The spec of the `Project` kind: what `lighthouse.toml` holds, and what a
+//! shareable project is.
 
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -8,23 +8,28 @@ use lighthouse_resource::Spec;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{formatter::FormatterSpec, rules::RuleSetting};
+use super::{formatter::FormatterSpec, rules::RuleSetting};
 
-/// A project's configuration.
+/// A project's configuration, and the shape of a shareable one: `extends`
+/// names any project, the way an ESLint config extends a shareable config.
+/// An extended project contributes its `extends`, `rules` and `overrides`.
+/// Its `plugins` and `languages` belong to the project that is run.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectSpec {
-    /// Plugins that provide rules, languages and presets; a bare id searches
-    /// the plugin locations.
+    /// Plugins that provide rules and languages; a bare id searches the
+    /// plugin locations.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub plugins: Vec<PluginEntry>,
-    /// Presets whose rules apply first, in order.
+    /// Projects whose rules apply first, in order: the `recommended` and
+    /// `strict` projects of each pack (`core/recommended`), or any `Project`
+    /// document of the catalog.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extends: Vec<String>,
     /// Options per language id; `formatter` is the host's, the rest goes to
     /// the language's provider.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub languages: BTreeMap<String, LanguageSpec>,
+    pub languages: BTreeMap<String, ProjectLanguage>,
     /// Level and options per decision id.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub rules: BTreeMap<String, RuleSetting>,
@@ -60,7 +65,7 @@ pub struct PluginRefSpec {
 
 /// The options of one language.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct LanguageSpec {
+pub struct ProjectLanguage {
     /// The command that formats a file of the language after a fix.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub formatter: Option<FormatterSpec>,
@@ -81,19 +86,4 @@ pub struct OverrideSpec {
     pub languages: Vec<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub rules: BTreeMap<String, RuleSetting>,
-}
-
-/// Named rule configuration, referenced from `extends`.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct PresetSpec {
-    /// Presets whose rules this one starts from.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub extends: Vec<String>,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub rules: BTreeMap<String, RuleSetting>,
-}
-
-impl Spec for PresetSpec {
-    const KIND: &'static str = "Preset";
 }

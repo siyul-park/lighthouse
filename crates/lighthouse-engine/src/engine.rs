@@ -6,7 +6,6 @@ use std::{
 };
 
 use ignore::WalkBuilder;
-use lighthouse_config::{Config, GlobSet, Rules, glob_set};
 use lighthouse_model::RunScope;
 use lighthouse_model::{
     Diagnostic, File, Fingerprint, Fragment, Incomplete, Options, Project, Severity, hash,
@@ -14,6 +13,7 @@ use lighthouse_model::{
 use lighthouse_plugin::{
     Ctx, Facts, Indexed, LanguageProvider, Memo, Registry, Rule, Source, Workspace,
 };
+use lighthouse_spec::{Catalog, Config, GlobSet, ProjectError, Projects, Rules, glob_set};
 use rayon::prelude::*;
 use serde_json::Value;
 use thiserror::Error;
@@ -38,7 +38,7 @@ pub const EXIT_INCOMPLETE: u8 = 3;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
-    Config(#[from] lighthouse_config::Error),
+    Project(#[from] ProjectError),
     #[error(transparent)]
     Plugin(#[from] lighthouse_plugin::Error),
     #[error("{}: {source}", path.display())]
@@ -198,6 +198,12 @@ impl Gathered {
 pub struct Engine {
     pub(crate) registry: Registry,
     pub(crate) config: Config,
+    /// The projects `extends` can name.
+    projects: Projects,
+    /// Rules whose decision is not in force (proposed, rejected, deprecated
+    /// or superseded): they run only when a run selects them by id, such as
+    /// `decision test`; configuration and projects never enable them.
+    unenforced: BTreeSet<String>,
     pub(crate) ws: Workspace,
     /// Providers from listed plugins; indexes into `languages`.
     providers: Vec<usize>,
@@ -211,8 +217,16 @@ pub struct Engine {
 
 impl Engine {
     /// `root` is the directory of `lighthouse.toml`; globs match paths relative to it.
-    pub fn new(registry: Registry, config: Config, root: &Path) -> Result<Self, Error> {
-        validate_config(&registry, &config)?;
+    /// `catalog` supplies the projects `extends` names and which decisions are
+    /// in force; a rule no decision of it describes is in force.
+    pub fn new(
+        registry: Registry,
+        config: Config,
+        catalog: &Catalog,
+        root: &Path,
+    ) -> Result<Self, Error> {
+        let projects = catalog.projects()?;
+        validate_config(&registry, &config, &projects)?;
         let (providers, languages) = load_languages(&registry, &config)?;
         let ws = Workspace {
             root: root.canonicalize().map_err(io_error(root))?,
@@ -222,6 +236,12 @@ impl Engine {
         let mut engine = Self {
             registry,
             config,
+            projects,
+            unenforced: catalog
+                .decisions()
+                .filter(|d| !d.enforced())
+                .map(|d| d.id().to_owned())
+                .collect(),
             ws,
             providers,
             languages,
@@ -229,7 +249,7 @@ impl Engine {
             startup: Vec::new(),
             trusted: false,
         };
-        engine.active = active_rules(&engine.registry, &engine.config)?;
+        engine.active = active_rules(&engine.config, &engine.projects)?;
         Ok(engine)
     }
 
@@ -290,7 +310,10 @@ impl Engine {
             .iter()
             .filter(|id| only.is_empty() || only.contains(id))
             .filter_map(|id| self.registry.rule(id))
-            .filter(|rule| rule.manifest().enforced || only.contains(&rule.manifest().id))
+            .filter(|rule| {
+                let id = &rule.manifest().id;
+                !self.unenforced.contains(id) || only.contains(id)
+            })
             .collect();
 
         let mut outcome = Outcome::default();
@@ -372,10 +395,7 @@ impl Engine {
 
     /// The level the configuration gives a rule at a file; `None` when off.
     fn level_at(&self, rule: &str, file: &Path, lang: &str) -> Option<Severity> {
-        let rules = self
-            .config
-            .resolve(file, lang, &|id| self.preset_rules(id))
-            .ok()?;
+        let rules = self.config.resolve(file, lang, &self.projects).ok()?;
         rules.get(rule)?.level
     }
 
@@ -401,9 +421,7 @@ impl Engine {
                 std::collections::btree_map::Entry::Occupied(e) => e.into_mut(),
                 std::collections::btree_map::Entry::Vacant(e) => {
                     let (path, lang) = e.key().clone();
-                    let rules = self
-                        .config
-                        .resolve(&path, &lang, &|id| self.preset_rules(id))?;
+                    let rules = self.config.resolve(&path, &lang, &self.projects)?;
                     e.insert(rules)
                 }
             };
@@ -677,9 +695,7 @@ impl Engine {
         let mut gathered = Gathered::default();
         let resolved = self
             .config
-            .resolve(&input.file.path, &input.file.lang, &|id| {
-                self.preset_rules(id)
-            })?;
+            .resolve(&input.file.path, &input.file.lang, &self.projects)?;
         let provider = self.provider(input.language);
         for rule in scene
             .rules
@@ -730,9 +746,7 @@ impl Engine {
 
     fn apply_project_rules(&self, scene: &Scene) -> Result<Gathered, Error> {
         let languages: BTreeSet<usize> = scene.inputs.iter().map(|i| i.language).collect();
-        let resolved = self
-            .config
-            .resolve(Path::new(""), "", &|id| self.preset_rules(id))?;
+        let resolved = self.config.resolve(Path::new(""), "", &self.projects)?;
         let rules: Vec<&&dyn Rule> = scene
             .rules
             .iter()
@@ -795,17 +809,13 @@ impl Engine {
         }));
         Ok(gathered)
     }
-
-    fn preset_rules(&self, id: &str) -> Option<Rules> {
-        self.registry.preset_rules(id)
-    }
 }
 
-/// The rules the configuration enables for at least one file: the presets it
-/// extends and the entries it sets, resolved over the registry.
-pub fn active_rules(registry: &Registry, config: &Config) -> Result<BTreeSet<String>, Error> {
+/// The rules the configuration enables for at least one file: the projects it
+/// extends and the entries it sets, resolved over `projects`.
+pub fn active_rules(config: &Config, projects: &Projects) -> Result<BTreeSet<String>, Error> {
     let mut active: BTreeSet<String> = config
-        .resolve(Path::new(""), "", &|id| registry.preset_rules(id))?
+        .resolve(Path::new(""), "", projects)?
         .into_iter()
         .filter_map(|(id, c)| c.level.map(|_| id))
         .collect();
@@ -835,9 +845,9 @@ fn unfinished(
     }
 }
 
-/// Rejects a configuration that names plugins, presets or rules the registry
+/// Rejects a configuration that names plugins, projects or rules the registry
 /// lacks, lists them inconsistently, or gives a rule invalid options.
-fn validate_config(registry: &Registry, config: &Config) -> Result<(), Error> {
+fn validate_config(registry: &Registry, config: &Config, projects: &Projects) -> Result<(), Error> {
     for plugin in config.plugins() {
         if !registry.has_plugin(&plugin.id) {
             return Err(Error::UnknownPlugin(plugin.id.clone()));
@@ -845,30 +855,15 @@ fn validate_config(registry: &Registry, config: &Config) -> Result<(), Error> {
     }
     registry.validate()?;
     let listed = |id: &str| config.lists(lighthouse_plugin::plugin_of(id));
-    let mut entries: Vec<_> = config
-        .configured()
-        .map(|(id, c)| (id.to_owned(), c.options.clone()))
-        .collect();
-    for preset in config.extends() {
-        let preset = registry
-            .preset(preset)
-            .ok_or_else(|| lighthouse_config::Error::UnknownPreset(preset.clone()))?;
-        if !listed(&preset.id) {
-            return Err(Error::PluginNotListed(preset.id.clone()));
-        }
-        let rules = registry
-            .preset_rules(&preset.id)
-            .ok_or_else(|| lighthouse_config::Error::PresetCycle(preset.id.clone()))?;
-        entries.extend(rules.into_iter().map(|(id, c)| (id, c.options)));
-    }
-    for (id, options) in &entries {
+    let entries = config.layer().entries(projects)?;
+    for (id, config) in entries {
         let rule = registry
             .rule(id)
-            .ok_or_else(|| Error::UnknownRule(id.clone()))?;
+            .ok_or_else(|| Error::UnknownRule(id.to_owned()))?;
         if !listed(id) {
-            return Err(Error::PluginNotListed(id.clone()));
+            return Err(Error::PluginNotListed(id.to_owned()));
         }
-        rule.validate(options)?;
+        rule.validate(&config.options)?;
     }
     Ok(())
 }

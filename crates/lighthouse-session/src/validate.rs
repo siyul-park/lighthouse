@@ -1,8 +1,8 @@
 //! `lighthouse spec validate`: every spec document under some paths is read
 //! against its kind, and what the documents say about each other is checked:
 //! a decision's check and fix against the rules and order keys the bundled
-//! plugins register, a project's and a preset's rules and presets against the
-//! decisions and presets that exist, a decision's CEL against the CEL
+//! plugins register, a project's rules and the projects it extends against the
+//! decisions and projects that exist, a decision's CEL against the CEL
 //! compiler. Examples are checked for shape with the decision; running them
 //! is `decision test` (or `--examples`).
 
@@ -12,11 +12,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_config::{Config, PresetSpec, ProjectSpec};
 use lighthouse_plugin::{Registry, plugin_of};
 use lighthouse_resource::{Format, Resource, documents, kind_of, resource};
 use lighthouse_rpc::PluginSpec;
 use lighthouse_spec::{BuiltinCheck, BuiltinOp, Catalog, CheckKind, Decision, FixKind, OpSpec};
+use lighthouse_spec::{Config, ProjectSpec};
 use serde_json::Value;
 
 use crate::{Result, SKIPPED_DIRS, Session, decisions::test_catalog};
@@ -39,11 +39,10 @@ pub struct Validated {
 /// The documents found, by what is done with them.
 #[derive(Default)]
 struct Sets {
-    /// Catalog files (`Pack`, `Decision`, `DecisionOverride`, `SourceMap`) by
+    /// Catalog files (`Pack`, `Decision`, `SourceMap`) by
     /// the directory they lie in, with their path and text.
     catalogs: BTreeMap<PathBuf, BTreeMap<String, String>>,
     projects: Vec<(String, Resource<ProjectSpec>)>,
-    presets: Vec<(String, Resource<PresetSpec>)>,
     /// Whether a directory holds a pack, so that it is a catalog root.
     packs: BTreeSet<PathBuf>,
 }
@@ -63,24 +62,16 @@ impl Sets {
                 Ok(r) => self.projects.push((label, r)),
                 Err(e) => problems.push(problem(&label, e)),
             },
-            "Preset" => match resource::<PresetSpec>(&label, &doc) {
-                Ok(r) => self.presets.push((label, r)),
-                Err(e) => problems.push(problem(&label, e)),
-            },
+            "Preset" | "DecisionOverride" => problems.push(problem(
+                &label,
+                format!("`{kind}` is not a kind any more (run `lighthouse spec migrate`)"),
+            )),
             "Plugin" => {
                 if let Err(e) = resource::<PluginSpec>(&label, &doc) {
                     problems.push(problem(&label, e));
                 }
             }
-            "OrderKey" => match resource::<lighthouse_plugin::OrderKeySpec>(&label, &doc) {
-                Ok(key) if key.metadata.name.contains('/') => {}
-                Ok(key) => problems.push(problem(
-                    &label,
-                    format!("order key `{}` must be `plugin/name`", key.metadata.name),
-                )),
-                Err(e) => problems.push(problem(&label, e)),
-            },
-            "Pack" | "Decision" | "DecisionOverride" | "SourceMap" => {
+            "Pack" | "Decision" | "SourceMap" => {
                 let dir = file.parent().unwrap_or(Path::new("")).to_owned();
                 if kind == "Pack" {
                     self.packs.insert(dir.clone());
@@ -106,11 +97,15 @@ impl Sets {
     ) -> Result<()> {
         let bundled = Catalog::bundled();
         let mut layered: Vec<(Catalog, Vec<String>)> = Vec::new();
+        let known: BTreeSet<String> = session
+            .catalog()?
+            .projects()?
+            .names()
+            .map(str::to_owned)
+            .chain(self.projects.iter().map(|(_, p)| p.metadata.name.clone()))
+            .collect();
         for (path, config) in &self.projects {
-            self.project(path, config, registry, bundled, problems);
-        }
-        for (path, preset) in &self.presets {
-            known_rules(path, preset.spec.rules.keys(), registry, bundled, problems);
+            self.project(path, config, &known, registry, bundled, problems);
         }
         let mut roots = BTreeSet::new();
         for (dir, files) in &self.catalogs {
@@ -156,6 +151,7 @@ impl Sets {
         &self,
         path: &str,
         project: &Resource<ProjectSpec>,
+        known: &BTreeSet<String>,
         registry: &Registry,
         bundled: &Catalog,
         problems: &mut Vec<Problem>,
@@ -164,17 +160,8 @@ impl Sets {
             problems.push(problem(path, e));
             return;
         }
-        let defined: BTreeSet<&str> = self
-            .presets
-            .iter()
-            .map(|(_, p)| p.metadata.name.as_str())
-            .collect();
-        for preset in &project.spec.extends {
-            let in_process = registry.has_plugin(plugin_of(preset));
-            if in_process && registry.preset(preset).is_none() && !defined.contains(preset.as_str())
-            {
-                problems.push(problem(path, format!("extends unknown preset `{preset}`")));
-            }
+        for name in project.spec.extends.iter().filter(|n| !known.contains(*n)) {
+            problems.push(problem(path, format!("extends unknown project `{name}`")));
         }
         let rules = project
             .spec

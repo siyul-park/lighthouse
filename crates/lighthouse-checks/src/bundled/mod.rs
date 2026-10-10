@@ -4,9 +4,7 @@
 
 mod core_pack;
 
-use lighthouse_plugin::{
-    LanguageProvider, OrderKey, Plugin, PluginManifest, PresetManifest, Registry, Rule,
-};
+use lighthouse_plugin::{LanguageProvider, OrderKey, Plugin, PluginManifest, Registry, Rule};
 use lighthouse_spec::Catalog;
 
 use crate::{Declarative, metrics::Metrics, order};
@@ -80,15 +78,6 @@ impl Plugin for Pack {
     /// The keys fixes of the pack sort by.
     fn order_keys(&self) -> Vec<Box<dyn OrderKey>> {
         (self.code.order_keys)()
-    }
-
-    /// The standard presets over every rule of the pack.
-    fn presets(&self) -> Vec<PresetManifest> {
-        let rules = self.rules();
-        PresetManifest::standard(
-            &self.manifest().id,
-            rules.iter().map(|rule| rule.manifest()),
-        )
     }
 }
 

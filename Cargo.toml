@@ -34,7 +34,6 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 toml = "0.9"
 
 lighthouse-checks = { path = "crates/lighthouse-checks" }
-lighthouse-config = { path = "crates/lighthouse-config" }
 lighthouse-engine = { path = "crates/lighthouse-engine" }
 lighthouse-mcp = { path = "crates/lighthouse-mcp" }
 lighthouse-model = { path = "crates/lighthouse-model" }

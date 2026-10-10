@@ -11,7 +11,9 @@ use crate::{
 /// Everything a single layer must satisfy on its own.
 pub(crate) fn layer(catalog: &Catalog) -> Result<(), Error> {
     decisions(catalog)?;
-    sources(catalog)
+    sources(catalog)?;
+    catalog.projects()?;
+    Ok(())
 }
 
 /// Decision-level rules; also run on a merged overlay.
@@ -30,6 +32,18 @@ pub(crate) fn decisions(catalog: &Catalog) -> Result<(), Error> {
         self::decision(decision)?;
     }
     lifecycle(catalog)
+}
+
+/// The projects of a catalog: names are unique, every project they extend
+/// exists, and none extends itself, however far round.
+pub(crate) fn projects(catalog: &Catalog) -> Result<(), Error> {
+    let all = catalog.projects()?;
+    for name in all.names() {
+        if let Some(layer) = all.get(name) {
+            layer.entries(&all)?;
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {

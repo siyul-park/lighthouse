@@ -47,7 +47,10 @@ pub fn validate(paths: &[PathBuf], examples: bool) -> Result<u8> {
 /// `.lighthouse/rules` when there are none.
 pub fn migrate(paths: &[PathBuf], dry_run: bool) -> Result<u8> {
     let paths = if paths.is_empty() {
-        defaults(&lighthouse_session::project_root()?, &[LOCAL_RULES])
+        defaults(
+            &lighthouse_session::project_root()?,
+            &[LOCAL_RULES, LOCAL_DECISIONS],
+        )
     } else {
         paths.to_vec()
     };

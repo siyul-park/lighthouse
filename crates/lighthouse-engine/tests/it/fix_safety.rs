@@ -1,15 +1,16 @@
 //! The orchestrator's guarantees: verification in memory, a write at the end only,
 //! trust, eligibility, containment and the stop conditions.
 
+use lighthouse_spec::Catalog;
 use std::fs;
 
-use lighthouse_config::Config;
 use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun};
 use lighthouse_model::{Diagnostic, EditOp, FixOutcome, Options, Safety};
 use lighthouse_plugin::{
     Ctx, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, LanguageProvider,
     Plugin, PluginManifest, Registry, Rule, RuleManifest,
 };
+use lighthouse_spec::Config;
 
 use crate::support::*;
 
@@ -127,7 +128,7 @@ fn a_file_that_changed_since_it_was_read_is_skipped_and_its_fix_is_declined() {
     let config =
         Config::parse_inline("plugins = [\"meddle\"]\n[rules]\n\"meddle/todo\" = \"error\"\n")
             .unwrap();
-    let engine = Engine::new(registry, config, dir.path()).unwrap();
+    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
         "meddle/todo",
@@ -259,7 +260,7 @@ fn eligibility_is_decided_before_a_fixer_is_asked() {
     let config =
         Config::parse_inline("plugins = [\"count\"]\n[rules]\n\"count/todo\" = \"error\"\n")
             .unwrap();
-    let engine = Engine::new(registry, config, dir.path()).unwrap();
+    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
         "count/todo",
@@ -363,7 +364,7 @@ fn a_proposal_whose_edits_overlap_each_other_is_declined() {
         .unwrap();
     let config =
         Config::parse_inline("plugins = [\"twin\"]\n[rules]\n\"twin/todo\" = \"error\"\n").unwrap();
-    let engine = Engine::new(registry, config, dir.path()).unwrap();
+    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
         "twin/todo",
@@ -460,7 +461,7 @@ fn fixes_that_undo_each_other_stop_the_run_and_name_their_rules() {
         .unwrap();
     let config =
         Config::parse_inline("plugins = [\"flip\"]\n[rules]\n\"flip/any\" = \"warn\"\n").unwrap();
-    let engine = Engine::new(registry, config, dir.path()).unwrap();
+    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
         "flip/any",
@@ -525,7 +526,7 @@ fn a_fix_that_adds_a_warning_is_rolled_back_like_one_that_adds_an_error() {
         "plugins = [\"warned\"]\n[rules]\n\"warned/todo\" = \"error\"\n\"warned/warn\" = \"warn\"\n",
     )
     .unwrap();
-    let engine = Engine::new(registry, config, dir.path()).unwrap();
+    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
         "warned/todo",
@@ -641,7 +642,7 @@ fn a_fix_cannot_reach_outside_the_project_or_into_a_symlink() {
         let config =
             Config::parse_inline("plugins = [\"reach\"]\n[rules]\n\"reach/todo\" = \"error\"\n")
                 .unwrap();
-        let engine = Engine::new(registry, config, dir.path()).unwrap();
+        let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
         let mut plan = FixPlan::default();
         plan.insert(
             "reach/todo",

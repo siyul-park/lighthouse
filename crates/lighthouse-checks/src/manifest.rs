@@ -18,9 +18,6 @@ pub(crate) fn rule_manifest(decision: &Decision) -> Option<RuleManifest> {
         docs: decision.requirement.clone(),
         analyzers: Vec::new(),
         capabilities: Vec::new(),
-        citation: decision.citation.clone(),
-        strict: decision.strict,
-        enforced: decision.enforced(),
     })
 }
 

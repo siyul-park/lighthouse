@@ -9,7 +9,6 @@ test = false
 doctest = false
 
 [dependencies]
-lighthouse-config.workspace = true
 lighthouse-checks.workspace = true
 lighthouse-engine.workspace = true
 lighthouse-model.workspace = true

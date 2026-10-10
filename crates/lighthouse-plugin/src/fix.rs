@@ -2,11 +2,7 @@
 //! judges, a fixer proposes, the orchestrator executes: nothing here edits a
 //! file.
 
-use lighthouse_config::{Metadata, Resource};
 use lighthouse_model::{Capability, Diagnostic, FixOutcome, Options, Project, Symbol};
-use lighthouse_resource::Spec;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{Error, Workspace};
@@ -82,32 +78,6 @@ pub struct OrderKeyManifest {
     pub id: String,
     /// What the key orders by, for the generated docs.
     pub description: String,
-}
-
-/// The spec of the `OrderKey` kind: a way to order declarations that a
-/// `reorder` fix operation names. The ranking itself is code a plugin
-/// registers; the document describes it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct OrderKeySpec {
-    /// What the key orders by.
-    pub description: String,
-}
-
-impl Spec for OrderKeySpec {
-    const KIND: &'static str = "OrderKey";
-}
-
-impl OrderKeyManifest {
-    /// The `OrderKey` document that describes this key.
-    pub fn to_resource(&self) -> Resource<OrderKeySpec> {
-        Resource::new(
-            Metadata::named(&self.id),
-            OrderKeySpec {
-                description: self.description.clone(),
-            },
-        )
-    }
 }
 
 /// The order keys a run can use, by id.

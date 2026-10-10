@@ -3,10 +3,10 @@
 
 use std::{fs, path::Path};
 
-use lighthouse_config::Config;
 use lighthouse_engine::Engine;
 use lighthouse_model::Fingerprint;
 use lighthouse_plugin::Registry;
+use lighthouse_spec::{Catalog, Config};
 
 fn registry() -> Registry {
     let plugin = lighthouse_test_support::lang_rust();
@@ -88,7 +88,7 @@ fn exported_doc_findings(source: &str) -> Vec<(String, Fingerprint)> {
     .unwrap();
     let mut registry = lighthouse_checks::registry();
     lighthouse_rpc::register(&mut registry, &config, dir.path(), &[]).unwrap();
-    let engine = Engine::new(registry, config, dir.path()).unwrap();
+    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
     let outcome = engine.check(&[], &[]).unwrap();
     assert!(outcome.incomplete.is_empty(), "{:?}", outcome.incomplete);
     outcome

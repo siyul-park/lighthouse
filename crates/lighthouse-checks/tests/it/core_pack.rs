@@ -1,12 +1,22 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::Path};
 
 use lighthouse_model::RunScope;
 use lighthouse_model::{File, Fragment, Options, Project, Severity};
 use lighthouse_plugin::{Ctx, Error, Facts, Workspace};
+use lighthouse_spec::{Catalog, Config, Rules};
 use serde_json::json;
 
 fn options(max: u64) -> Options {
     serde_json::from_value(json!({ "max": max })).unwrap()
+}
+
+/// The rules of the standard project `name`, as a configuration that extends
+/// it resolves them.
+fn preset(name: &str) -> Rules {
+    Config::parse_inline(&format!("extends = [\"{name}\"]"))
+        .unwrap()
+        .resolve(Path::new(""), "", &Catalog::bundled().projects().unwrap())
+        .unwrap()
 }
 
 fn file() -> File {
@@ -74,19 +84,37 @@ fn a_rule_exists_for_a_decision_a_program_checks() {
 #[test]
 fn recommended_preset_derives_levels_from_rule_meta() {
     let registry = lighthouse_checks::registry();
-    let preset = registry.preset("core/recommended").unwrap();
+    let preset = preset("core/recommended");
     let want: BTreeMap<_, _> = registry
         .rules()
         .filter(|r| lighthouse_plugin::plugin_of(&r.manifest().id) == "core")
         .map(|r| (r.manifest().id.clone(), Some(r.manifest().severity)))
         .collect();
-    let got: BTreeMap<_, _> = preset
-        .rules
-        .iter()
-        .map(|(id, c)| (id.clone(), c.level))
-        .collect();
+    let got: BTreeMap<_, _> = preset.iter().map(|(id, c)| (id.clone(), c.level)).collect();
     assert_eq!(got, want);
     assert_eq!(want["core/max-file-lines"], Some(Severity::Warn));
+}
+
+#[test]
+fn the_standard_projects_hold_exactly_the_rules_the_registry_has() {
+    let registry = lighthouse_checks::registry();
+    let catalog = Catalog::bundled();
+    let projects = catalog.projects().unwrap();
+    for pack in &catalog.packs {
+        let ours: Vec<String> = registry
+            .rules()
+            .filter(|r| lighthouse_plugin::plugin_of(&r.manifest().id) == pack.id)
+            .map(|r| r.manifest().id.clone())
+            .collect();
+        let strict = format!("{}/strict", pack.id);
+        let widest = if projects.get(&strict).is_some() {
+            strict
+        } else {
+            format!("{}/recommended", pack.id)
+        };
+        let held: Vec<String> = preset(&widest).keys().cloned().collect();
+        assert_eq!(held, ours, "{}", pack.id);
+    }
 }
 
 #[test]
@@ -252,11 +280,9 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
             "design/single-use-wrapper"
         ]
     );
-    let preset = registry.preset("design/recommended").unwrap();
-    assert_eq!(preset.rules.len(), design.len() - 1);
-    assert!(!preset.rules.contains_key("design/private-helper-callers"));
-    let strict = registry.preset("design/strict").unwrap();
-    assert_eq!(strict.rules.len(), design.len());
-    let testing = registry.preset("testing/recommended").unwrap();
-    assert_eq!(testing.rules.len(), 5);
+    let recommended = preset("design/recommended");
+    assert_eq!(recommended.len(), design.len() - 1);
+    assert!(!recommended.contains_key("design/private-helper-callers"));
+    assert_eq!(preset("design/strict").len(), design.len());
+    assert_eq!(preset("testing/recommended").len(), 5);
 }

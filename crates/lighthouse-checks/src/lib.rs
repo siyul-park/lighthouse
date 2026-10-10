@@ -100,17 +100,6 @@ impl Plugin for Declarative {
             .map(|f| Box::new(f) as Box<dyn Fixer>)
             .collect()
     }
-
-    /// The standard presets over this pack's rules.
-    fn presets(&self) -> Vec<lighthouse_plugin::PresetManifest> {
-        lighthouse_plugin::PresetManifest::standard(
-            &self.manifest.id,
-            self.definitions
-                .iter()
-                .map(|r| r.manifest())
-                .filter(|m| m.enforced),
-        )
-    }
 }
 
 /// A plugin whose rules are the declarative decisions of one catalog pack.

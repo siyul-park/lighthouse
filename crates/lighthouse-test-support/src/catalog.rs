@@ -44,13 +44,6 @@ pub fn pack(id: &str, sections: &[(&str, &[&str])]) -> String {
     out
 }
 
-/// A `DecisionOverride` document named `name`, with `spec` indented by two.
-pub fn override_of(name: &str, spec: &str) -> String {
-    format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: DecisionOverride\nmetadata:\n  name: {name}\nspec:\n{spec}"
-    )
-}
-
 /// `entries` as catalog files.
 pub fn files(entries: &[(&str, String)]) -> Files {
     entries

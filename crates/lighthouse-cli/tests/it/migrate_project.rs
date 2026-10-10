@@ -1,8 +1,11 @@
 use std::{path::Path, time::Duration};
 
-use lighthouse_config::{Config, Format, FormatterOutput, RuleConfig, Rules};
 use lighthouse_model::Severity;
+use lighthouse_resource::{Format, Metadata, Resource};
 use lighthouse_session::migrate::project::{is_legacy, migrate};
+use lighthouse_spec::{
+    Config, FormatterOutput, ProjectSpec, Projects, RuleConfig, RuleSetting, Rules,
+};
 
 fn rule(level: Option<Severity>, options: &[(&str, i64)]) -> RuleConfig {
     RuleConfig {
@@ -14,16 +17,25 @@ fn rule(level: Option<Severity>, options: &[(&str, i64)]) -> RuleConfig {
     }
 }
 
-fn presets(id: &str) -> Option<Rules> {
-    (id == "core/recommended").then(|| {
-        Rules::from([
-            (
-                "core/a".to_owned(),
-                rule(Some(Severity::Warn), &[("max", 5)]),
-            ),
-            ("core/b".to_owned(), rule(Some(Severity::Info), &[])),
-        ])
-    })
+fn presets() -> Projects {
+    let rules = Rules::from([
+        (
+            "core/a".to_owned(),
+            rule(Some(Severity::Warn), &[("max", 5)]),
+        ),
+        ("core/b".to_owned(), rule(Some(Severity::Info), &[])),
+    ]);
+    Projects::new([Resource::new(
+        Metadata::named("core/recommended"),
+        ProjectSpec {
+            rules: rules
+                .iter()
+                .map(|(id, config)| (id.clone(), RuleSetting::from(config)))
+                .collect(),
+            ..ProjectSpec::default()
+        },
+    )])
+    .unwrap()
 }
 
 #[test]
@@ -56,10 +68,12 @@ rules = { "core/b" = "off", "core/c" = { level = "warn", depth = 2 } }
         FormatterOutput::InPlace
     );
     assert_eq!(config.languages()["go"]["tags"][0], "x");
-    let rules = config.resolve(Path::new("a.go"), "go", &presets).unwrap();
+    let rules = config.resolve(Path::new("a.go"), "go", &presets()).unwrap();
     assert_eq!(rules["core/a"], rule(Some(Severity::Info), &[("max", 9)]));
     assert_eq!(rules["core/b"], rule(Some(Severity::Info), &[]));
-    let in_x = config.resolve(Path::new("x/a.go"), "go", &presets).unwrap();
+    let in_x = config
+        .resolve(Path::new("x/a.go"), "go", &presets())
+        .unwrap();
     assert_eq!(in_x["core/b"].level, None);
     assert_eq!(in_x["core/c"], rule(Some(Severity::Warn), &[("depth", 2)]));
     // Only a table can be migrated.

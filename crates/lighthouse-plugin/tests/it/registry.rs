@@ -1,8 +1,7 @@
 use lighthouse_model::RunScope;
-use lighthouse_model::Severity;
 use lighthouse_plugin::{
     Analyzer, AnalyzerManifest, Ctx, Error, Indexed, LanguageProvider, Plugin, PluginManifest,
-    PresetManifest, ProviderManifest, Registry, RuleManifest, Source, Workspace, options,
+    ProviderManifest, Registry, Source, Workspace, options,
 };
 use serde_json::Value;
 
@@ -205,38 +204,6 @@ fn higher_priority_providers_come_first_and_ties_keep_registration_order() {
         .map(|(_, l)| l.manifest().id.clone())
         .collect();
     assert_eq!(ids, ["high", "tie", "tie2", "low"]);
-}
-
-fn meta(id: &str, severity: Severity, strict: bool) -> RuleManifest {
-    RuleManifest {
-        id: id.to_owned(),
-        severity,
-        scope: RunScope::File,
-        description: String::new(),
-        docs: String::new(),
-        analyzers: Vec::new(),
-        capabilities: Vec::new(),
-        citation: None,
-        strict,
-        enforced: true,
-    }
-}
-
-#[test]
-fn preset_standard_puts_strict_rules_only_in_the_strict_preset() {
-    let metas = [
-        meta("p/a", Severity::Warn, false),
-        meta("p/b", Severity::Error, true),
-    ];
-
-    let presets = PresetManifest::standard("p", &metas);
-
-    let ids: Vec<&str> = presets.iter().map(|p| p.id.as_str()).collect();
-    assert_eq!(ids, ["p/recommended", "p/strict"]);
-    assert_eq!(presets[0].rules.len(), 1);
-    assert_eq!(presets[0].rules["p/a"].level, Some(Severity::Warn));
-    assert_eq!(presets[1].rules.len(), 2);
-    assert_eq!(PresetManifest::standard("p", &metas[..1]).len(), 1);
 }
 
 #[test]

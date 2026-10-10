@@ -88,9 +88,9 @@ pub fn all() -> Vec<Tool> {
         ),
         tool(
             "decision_update",
-            "Change a project-local decision, or adjust a bundled one through the project's override file. `patch` is a JSON merge patch over the spec (null removes a key). For a bundled decision only severity, exceptions, options (new defaults), languages and examples can change. The same gate as decision_create applies, and nothing is written when it fails.",
+            "Change a project-local decision. `patch` is a JSON merge patch over the spec (null removes a key). A bundled decision is not changed in place: its level and options are the `rules` of lighthouse.toml, and different wording or examples are a local decision. The same gate as decision_create applies, and nothing is written when it fails.",
             json!({
-                "id": { "type": "string", "description": "A local decision or any catalog decision." },
+                "id": { "type": "string", "description": "A local decision (local/<name>)." },
                 "patch": { "type": ["object", "string"], "description": "JSON merge patch, as an object or JSON/YAML text." }
             }),
             &["id", "patch"],

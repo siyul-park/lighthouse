@@ -716,7 +716,6 @@ name = "lighthouse-checks"
 version = "0.1.0"
 dependencies = [
  "cel",
- "lighthouse-config",
  "lighthouse-engine",
  "lighthouse-model",
  "lighthouse-plugin",
@@ -739,7 +738,6 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "clap",
- "lighthouse-config",
  "lighthouse-engine",
  "lighthouse-mcp",
  "lighthouse-model",
@@ -757,26 +755,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "lighthouse-config"
-version = "0.1.0"
-dependencies = [
- "globset",
- "lighthouse-model",
- "lighthouse-resource",
- "schemars",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "toml",
-]
-
-[[package]]
 name = "lighthouse-engine"
 version = "0.1.0"
 dependencies = [
  "ignore",
- "lighthouse-config",
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-process",
@@ -817,10 +799,7 @@ dependencies = [
 name = "lighthouse-plugin"
 version = "0.1.0"
 dependencies = [
- "lighthouse-config",
  "lighthouse-model",
- "lighthouse-resource",
- "schemars",
  "serde",
  "serde_json",
  "thiserror",
@@ -873,13 +852,13 @@ dependencies = [
 name = "lighthouse-rpc"
 version = "0.1.0"
 dependencies = [
- "lighthouse-config",
  "lighthouse-engine",
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-process",
  "lighthouse-protocol",
  "lighthouse-resource",
+ "lighthouse-spec",
  "lighthouse-test-support",
  "schemars",
  "serde",
@@ -893,7 +872,6 @@ name = "lighthouse-session"
 version = "0.1.0"
 dependencies = [
  "lighthouse-checks",
- "lighthouse-config",
  "lighthouse-engine",
  "lighthouse-model",
  "lighthouse-plugin",
@@ -914,6 +892,7 @@ name = "lighthouse-spec"
 version = "0.1.0"
 dependencies = [
  "cel",
+ "globset",
  "include_dir",
  "insta",
  "lighthouse-model",
@@ -926,6 +905,7 @@ dependencies = [
  "similar",
  "tempfile",
  "thiserror",
+ "toml",
 ]
 
 [[package]]

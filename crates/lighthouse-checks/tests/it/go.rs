@@ -5,10 +5,10 @@ use std::{
 };
 
 use lighthouse_checks::metrics::{COGNITIVE, CYCLOMATIC};
-use lighthouse_config::Config;
 use lighthouse_engine::Engine;
 use lighthouse_model::{File, Project};
 use lighthouse_plugin::{Ctx, Facts, Registry, Source, Workspace};
+use lighthouse_spec::{Catalog, Config};
 use serde_json::Value;
 
 /// The bundled plugins plus the Go plugin built from source; `None` after a
@@ -285,7 +285,7 @@ fn write(root: &Path, path: &str, text: &str) {
 
 fn engine(plugin: &Path, root: &Path, extra: &str) -> Engine {
     let config = Config::parse_inline(&format!("{}{extra}", config(plugin))).unwrap();
-    Engine::new(registry(plugin), config, root).unwrap()
+    Engine::new(registry(plugin), config, Catalog::bundled(), root).unwrap()
 }
 
 #[test]

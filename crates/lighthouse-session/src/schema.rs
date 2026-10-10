@@ -9,8 +9,6 @@ use lighthouse_resource::{Descriptor, schema_file};
 pub fn schemas() -> BTreeMap<&'static str, Descriptor> {
     [
         lighthouse_spec::descriptors(),
-        lighthouse_config::descriptors(),
-        lighthouse_plugin::descriptors(),
         lighthouse_rpc::descriptors(),
         lighthouse_store::descriptors(),
     ]

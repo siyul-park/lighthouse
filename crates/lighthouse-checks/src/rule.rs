@@ -23,6 +23,9 @@ use crate::{
     ops,
 };
 
+/// The decisions whose named check the engine serves.
+const ANNOTATION_RULES: [&str; 2] = [ANNOTATION_REASON, UNUSED_ALLOW];
+
 /// A rule built from a decision and its check.
 #[derive(Clone)]
 pub(crate) struct DeclarativeRule {
@@ -44,9 +47,6 @@ enum Kind {
     /// other.
     Annotation,
 }
-
-/// The decisions whose named check the engine serves.
-const ANNOTATION_RULES: [&str; 2] = [ANNOTATION_REASON, UNUSED_ALLOW];
 
 impl DeclarativeRule {
     /// Compiles the check of `decision`; `None` for a decision whose check no

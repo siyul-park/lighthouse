@@ -1433,7 +1433,7 @@
       ]
     },
     "Subject": {
-      "description": "What a decision talks about inside its domain. Mapping to the run scope\nof a rule is `Subject::rule_scope`.",
+      "description": "What a decision talks about inside its domain. Mapping to the run scope\nof a rule is `Subject::run_scope`.",
       "enum": [
         "symbol",
         "file",

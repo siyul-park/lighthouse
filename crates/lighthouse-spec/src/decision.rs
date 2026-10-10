@@ -193,10 +193,6 @@ impl Decision {
         Ok(resolved)
     }
 
-    pub(crate) fn spec_mut(&mut self) -> &mut DecisionSpec {
-        &mut self.0.spec
-    }
-
     pub(crate) fn metadata_mut(&mut self) -> &mut Metadata {
         &mut self.0.metadata
     }

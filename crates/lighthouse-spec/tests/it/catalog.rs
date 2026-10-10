@@ -535,11 +535,6 @@ mod overlay {
         Catalog::from_files(files(entries)).unwrap()
     }
 
-    fn tweak(spec: &str) -> Catalog {
-        let layer = files(&[("tweak.yaml", override_of("tweak", spec))]);
-        Catalog::from_local(layer).unwrap()
-    }
-
     #[test]
     fn local_layer_adds_packs_sections_and_decisions() {
         let extra = local(&[
@@ -568,72 +563,60 @@ mod overlay {
         assert!(err.to_string().contains("defined twice"));
     }
 
-    #[test]
-    fn an_override_adjusts_only_the_overridable_fields() {
-        let patch = tweak(
-            "  extends: p/a
-  severity: warn
-  exceptions: Vendored code.
-  options: { max: 9 }
-  languages:
-    go:
-      options: { max: 5 }
-      tuning: Local wording.
-  examples:
-    - name: local
-      language: go
-      kind: valid
-      files: [{ path: a.go, body: z }]
-",
-        );
-        let merged = Catalog::overlay(&base_catalog(), &patch).unwrap();
-        let decision = merged.decision("p/a").unwrap();
-        assert_eq!(decision.severity(), Some(Severity::Warn));
-        assert_eq!(decision.exceptions.as_deref(), Some("Vendored code."));
-        assert_eq!(
-            decision.languages["go"].tuning.as_deref(),
-            Some("Local wording.")
-        );
-        assert_eq!(
-            decision.options.as_ref().unwrap().properties["max"].default,
-            9
-        );
-        assert_eq!(decision.languages["go"].options["max"], 5);
-        assert_eq!(decision.examples.len(), 1);
-        assert_eq!(decision.title, "A");
-        assert_eq!(merged.decisions().count(), 1);
+    fn team(name: &str, spec: &str) -> String {
+        format!(
+            "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: {name}\nspec:\n{spec}"
+        )
     }
 
     #[test]
-    fn an_override_cannot_change_other_fields_or_missing_targets() {
-        let bad = Catalog::from_local(files(&[(
-            "tweak.yaml",
-            override_of("tweak", "  extends: p/a\n  requirement: A MUST c.\n"),
-        )]));
-        assert!(matches!(bad, Err(Error::Document(_))));
-        let unknown = tweak("  extends: p/none\n  severity: warn\n");
+    fn a_project_document_of_a_layer_is_a_project_that_extends_can_name() {
+        let layer = Catalog::from_local(files(&[(
+            "team.yaml",
+            team("team/base", "  rules:\n    p/a: warn\n"),
+        )]))
+        .unwrap();
+        let merged = Catalog::overlay(&base_catalog(), &layer).unwrap();
+
+        let projects = merged.projects().unwrap();
+
+        let names: Vec<&str> = projects.names().collect();
+        assert!(names.contains(&"team/base"), "{names:?}");
+        assert!(projects.get("team/base").is_some());
+    }
+
+    #[test]
+    fn a_project_that_extends_an_unknown_project_or_itself_is_refused() {
+        let unknown = Catalog::from_local(files(&[(
+            "team.yaml",
+            team("team/a", "  extends: [team/none]\n"),
+        )]))
+        .unwrap();
+        let err = Catalog::overlay(&base_catalog(), &unknown).unwrap_err();
         assert!(
-            Catalog::overlay(&base_catalog(), &unknown)
-                .unwrap_err()
-                .to_string()
-                .contains("unknown decision")
+            err.to_string().contains("unknown project `team/none`"),
+            "{err}"
         );
-        let wrong_type = tweak("  extends: p/a\n  options: { max: text }\n");
-        let applied = Catalog::overlay(&base_catalog(), &wrong_type);
-        assert!(applied.is_err(), "the default must still be an integer");
+        let circle = Catalog::from_local(files(&[
+            ("a.yaml", team("team/a", "  extends: [team/b]\n")),
+            ("b.yaml", team("team/b", "  extends: [team/a]\n")),
+        ]))
+        .unwrap();
+        let err = Catalog::overlay(&base_catalog(), &circle).unwrap_err();
+        assert!(err.to_string().contains("extends itself"), "{err}");
     }
 
     #[test]
-    fn an_override_rejects_unknown_option_names() {
-        let typo = tweak("  extends: p/a\n  options: { mx: 9 }\n");
-        let err = Catalog::overlay(&base_catalog(), &typo).unwrap_err();
-        assert!(err.to_string().contains("unknown option `mx`"), "{err}");
-    }
+    fn the_retired_override_kind_says_where_its_content_goes() {
+        let spec = "  extends: p/a\n  severity: warn\n";
+        let old = format!(
+            "apiVersion: lighthouse/v1alpha1\nkind: DecisionOverride\nmetadata:\n  name: tweak\nspec:\n{spec}"
+        );
 
-    #[test]
-    fn doc_decisions_stay_without_severity_after_overlay() {
-        let doc = Catalog::from_files(base()).unwrap();
-        assert!(Catalog::overlay(&doc, &tweak("  extends: p/a\n  severity: warn\n")).is_err());
+        let err = Catalog::from_local(files(&[("tweak.yaml", old)])).unwrap_err();
+
+        assert!(matches!(err, Error::Layout { .. }));
+        assert!(err.to_string().contains("`rules` of the project"), "{err}");
     }
 
     #[test]

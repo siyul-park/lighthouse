@@ -10,8 +10,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_resource::{API_VERSION, SCHEMA_URL_BASE, resource, to_document};
-use lighthouse_spec::{Catalog, DecisionOverrideSpec, local_dir, local_files};
+use lighthouse_resource::API_VERSION;
+use lighthouse_spec::{Catalog, local_dir, local_files};
 use serde_json::{Map, Value, json};
 
 use crate::{DecisionTest, Result, Session, test_decisions};
@@ -72,48 +72,34 @@ pub fn create_decision(
 }
 
 /// Applies `patch`, a JSON merge patch (null removes a key), to the spec of
-/// the local decision `id`; for any other decision of the catalog it writes or
-/// changes the project's override file, whose spec fields are `severity`,
-/// `exceptions`, `options`, `languages` and `examples`.
+/// the local decision `id`. A bundled decision is not changed in place: its
+/// level and options are the project's `rules`, and different wording or
+/// examples are a local decision.
 pub fn update_decision(session: Session, id: &str, patch: &Value) -> Result<Authored> {
     if !patch.is_object() {
         return Err("`patch` must be an object".into());
     }
-    if patch.get("extends").is_some() {
-        return Err("`extends` cannot be changed".into());
-    }
     let _lock = lock(&session.root)?;
     let files = local_files(&session.root)?.unwrap_or_default();
-    let (name, mut doc, created) = if let Some(name) = id.strip_prefix("local/") {
-        checked_name(name)?;
-        let text = files
-            .get(&file_name(name))
-            .ok_or_else(|| format!("`{id}` is not a local decision of this project"))?;
-        (name.to_owned(), parse(text)?, false)
-    } else {
+    let Some(name) = id.strip_prefix("local/") else {
         if session.catalog()?.decision(id).is_none() {
             return Err(format!("unknown decision `{id}`").into());
         }
-        let name = format!("override-{}", id.replace('/', "-"));
-        checked_name(&name)?;
-        match files.get(&file_name(&name)) {
-            Some(text) => (name, parse(text)?, false),
-            None => {
-                let doc = json!({
-                    "apiVersion": API_VERSION,
-                    "kind": "DecisionOverride",
-                    "metadata": { "name": name },
-                    "spec": { "extends": id },
-                });
-                (name, doc, true)
-            }
-        }
+        return Err(format!(
+            "`{id}` is not a local decision of this project: set its level and options in `rules` of lighthouse.toml, or write a local decision with `decision_create`"
+        )
+        .into());
     };
+    checked_name(name)?;
+    let text = files
+        .get(&file_name(name))
+        .ok_or_else(|| format!("`{id}` is not a local decision of this project"))?;
+    let mut doc = parse(text)?;
     let spec = doc
         .get_mut("spec")
         .ok_or_else(|| format!("the file of `{id}` has no `spec`"))?;
     merge(spec, patch);
-    commit(session, id, &name, doc, created)
+    commit(session, id, name, doc, false)
 }
 
 /// Refuses a decision name that could name a file outside `.lighthouse/decisions`.
@@ -145,7 +131,7 @@ fn commit(session: Session, id: &str, name: &str, doc: Value, created: bool) -> 
     let mut files: BTreeMap<String, String> = local_files(&root)?.unwrap_or_default();
     files.insert(file_name(name), serde_norway::to_string(&doc)?);
     let local = Catalog::from_local(files)?;
-    let text = canonical(&local, id, &doc)?;
+    let text = canonical(&local, id)?;
     let candidate = session.with_local(Some(local));
     candidate.catalog()?;
     let testable = candidate
@@ -182,11 +168,7 @@ fn commit(session: Session, id: &str, name: &str, doc: Value, created: bool) -> 
 
 /// The text written to disk: the typed document, so that keys come in the
 /// schema's order and the file starts with the schema comment.
-fn canonical(local: &Catalog, id: &str, doc: &Value) -> Result<String> {
-    if doc.get("kind").and_then(Value::as_str) == Some("DecisionOverride") {
-        let override_doc = resource::<DecisionOverrideSpec>(id, doc)?;
-        return Ok(to_document(&override_doc, SCHEMA_URL_BASE));
-    }
+fn canonical(local: &Catalog, id: &str) -> Result<String> {
     let decision = local
         .decision(id)
         .ok_or_else(|| format!("`{id}` is not in the candidate layer"))?;

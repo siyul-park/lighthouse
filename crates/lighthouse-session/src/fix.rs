@@ -91,7 +91,7 @@ pub fn fix(session: Session, request: &FixRequest) -> Result<Fixed> {
     let root = session.root.clone();
     let catalog = session.catalog()?;
     let plan = fix_plan(&catalog);
-    let engine = Engine::new(registry, session.config, &root)?
+    let engine = Engine::new(registry, session.config, &catalog, &root)?
         .with_incomplete(plugins.incomplete)
         .with_trust(trusted);
     let mut messages = plugins.notices.clone();

@@ -16,10 +16,11 @@ use lighthouse_resource::{
 use serde::Serialize;
 
 use crate::{
-    Content, Decision, DecisionOverrideSpec, DecisionSpec, Error, Example, ExampleFile, Pack,
-    PackSpec, Section, SectionSpec,
+    Content, Decision, DecisionSpec, Error, Example, ExampleFile, Pack, PackSpec, ProjectError,
+    ProjectSpec, Projects, Section, SectionSpec,
     decision::{PACK_LABEL, SECTION_LABEL},
     load::{self, Files},
+    project,
     sources::{Source, SourceMapSpec, extract},
     validate,
 };
@@ -36,7 +37,9 @@ const LOCAL_SECTION: &str = "rules";
 pub struct Catalog {
     pub packs: Vec<Pack>,
     pub(crate) sources: Vec<Source>,
-    overrides: Vec<Resource<DecisionOverrideSpec>>,
+    /// The `Project` documents of the layer; the standard projects of the
+    /// packs derive from the decisions and are not listed here.
+    projects: Vec<Resource<ProjectSpec>>,
 }
 
 /// What a catalog file holds, with the directory it lies in.
@@ -44,7 +47,7 @@ struct Loaded {
     dir: String,
     packs: Vec<Resource<PackSpec>>,
     decisions: Vec<Decision>,
-    overrides: Vec<(String, Resource<DecisionOverrideSpec>)>,
+    projects: Vec<Resource<ProjectSpec>>,
     sources: Vec<Source>,
 }
 
@@ -64,9 +67,8 @@ impl Catalog {
     /// Builds a validated layer from files keyed by `/`-separated paths
     /// relative to the catalog root. Every YAML, TOML or JSON file outside a
     /// `testdata` directory holds documents of the kinds `Pack`, `Decision`,
-    /// `DecisionOverride` and `SourceMap`; a decision belongs to the pack and
-    /// section its labels name, and the pack lists it. `Decision`s that are
-    /// overrides become overrides, applied by `overlay`.
+    /// `Project` and `SourceMap`; a decision belongs to the pack and section
+    /// its labels name, and the pack lists it.
     pub fn from_files(files: Files) -> Result<Self, Error> {
         let mut catalog = Self::default();
         let mut packs = Vec::new();
@@ -80,9 +82,7 @@ impl Catalog {
                     .into_iter()
                     .map(|d| (loaded.dir.clone(), d)),
             );
-            for (dir, o) in loaded.overrides {
-                catalog.overrides.push(resolve_override(&files, &dir, o)?);
-            }
+            catalog.projects.extend(loaded.projects);
             catalog.sources.extend(loaded.sources);
         }
         packs.sort_by(|a, b| a.1.metadata.name.cmp(&b.1.metadata.name));
@@ -94,9 +94,9 @@ impl Catalog {
     /// Builds the project-local layer from the files of
     /// `.lighthouse/decisions`, keyed by file name. A `Decision` there has an
     /// id `local/<name>` and a CEL check (or none); the loader adds the
-    /// `local` pack and `rules` section labels it leaves out. A
-    /// `DecisionOverride` adjusts a decision of a lower layer as `overlay`
-    /// describes. Examples must be inline.
+    /// `local` pack and `rules` section labels it leaves out. A `Project` is a
+    /// shareable configuration that `extends` can name. Examples must be
+    /// inline.
     pub fn from_local(files: Files) -> Result<Self, Error> {
         let mut catalog = Self::default();
         let mut decisions = Vec::new();
@@ -108,9 +108,7 @@ impl Catalog {
                     format!("a local layer has no packs, found `{}`", pack.metadata.name),
                 ));
             }
-            for (_, o) in loaded.overrides {
-                catalog.overrides.push(resolve_override(&files, "", o)?);
-            }
+            catalog.projects.extend(loaded.projects);
             for decision in loaded.decisions {
                 decisions.push(local_decision(name, decision)?);
             }
@@ -137,9 +135,8 @@ impl Catalog {
 
     /// `base` with `local` on top. Local packs, sections and decisions are
     /// added; into an existing pack or section only new sections or decisions
-    /// are merged, and the base title and intro win. A local override adjusts
-    /// the decision it extends. Sources are validated per layer, not across
-    /// layers.
+    /// are merged, and the base title and intro win. The projects of both are
+    /// kept. Sources are validated per layer, not across layers.
     pub fn overlay(base: &Self, local: &Self) -> Result<Self, Error> {
         let mut merged = base.clone();
         for pack in &local.packs {
@@ -149,18 +146,20 @@ impl Catalog {
             }
         }
         merged.sources.extend(local.sources.iter().cloned());
-        for o in &local.overrides {
-            let decision = merged
-                .packs
-                .iter_mut()
-                .flat_map(|p| &mut p.sections)
-                .flat_map(|s| &mut s.decisions)
-                .find(|d| d.id() == o.spec.extends)
-                .ok_or_else(|| Error::invalid(&o.spec.extends, "extends an unknown decision"))?;
-            o.spec.apply(decision)?;
-        }
+        merged.projects.extend(local.projects.iter().cloned());
         validate::decisions(&merged)?;
+        validate::projects(&merged)?;
         Ok(merged)
+    }
+
+    /// The projects `extends` can name: the standard ones of every pack, then
+    /// the `Project` documents of the layer.
+    pub fn projects(&self) -> Result<Projects, ProjectError> {
+        Projects::new(
+            project::standard(self)
+                .into_iter()
+                .chain(self.projects.iter().cloned()),
+        )
     }
 
     /// Writes `decision` into `<root>/<pack>/<section>/` and lists it in that
@@ -399,7 +398,7 @@ fn read_documents(path: &str, text: &str) -> Result<Loaded, Error> {
         dir,
         packs: Vec::new(),
         decisions: Vec::new(),
-        overrides: Vec::new(),
+        projects: Vec::new(),
         sources: Vec::new(),
     };
     let in_testdata = path.split('/').any(|part| part == "testdata");
@@ -416,10 +415,15 @@ fn read_documents(path: &str, text: &str) -> Result<Loaded, Error> {
                     resource::<DecisionSpec>(path, &doc).map_err(Error::from)?;
                 loaded.decisions.push(Decision::new(metadata, spec));
             }
-            Some(DecisionOverrideSpec::KIND) => loaded.overrides.push((
-                loaded.dir.clone(),
-                resource::<DecisionOverrideSpec>(path, &doc).map_err(Error::from)?,
-            )),
+            Some(ProjectSpec::KIND) => loaded
+                .projects
+                .push(resource::<ProjectSpec>(path, &doc).map_err(Error::from)?),
+            Some("DecisionOverride") => {
+                return Err(Error::layout(
+                    path,
+                    "`DecisionOverride` is not a kind any more: set the decision's level and options in `rules` of the project, or write a local decision (run `lighthouse spec migrate`)",
+                ));
+            }
             Some(SourceMapSpec::KIND) => loaded.sources.extend(
                 resource::<SourceMapSpec>(path, &doc)
                     .map_err(Error::from)?
@@ -592,16 +596,6 @@ fn merge_sections(into: &mut Pack, from: &Pack) {
             Some(existing) => existing.decisions.extend(section.decisions.iter().cloned()),
         }
     }
-}
-
-fn resolve_override(
-    files: &Files,
-    dir: &str,
-    mut o: Resource<DecisionOverrideSpec>,
-) -> Result<Resource<DecisionOverrideSpec>, Error> {
-    let id = o.spec.extends.clone();
-    o.spec.examples = resolve_all(files, dir, &id, std::mem::take(&mut o.spec.examples))?;
-    Ok(o)
 }
 
 fn resolve_examples(files: &Files, dir: &str, decision: Decision) -> Result<Decision, Error> {

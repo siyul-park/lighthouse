@@ -143,9 +143,6 @@ impl Plugin for Fake {
                 docs: String::new(),
                 analyzers: Vec::new(),
                 capabilities: Vec::new(),
-                citation: None,
-                strict: false,
-                enforced: true,
             },
         })]
     }

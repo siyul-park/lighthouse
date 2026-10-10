@@ -1,5 +1,5 @@
-//! The plugin registry and presets, one binary.
+//! The plugin registry, one binary.
 
 mod memo;
-mod presets;
+
 mod registry;

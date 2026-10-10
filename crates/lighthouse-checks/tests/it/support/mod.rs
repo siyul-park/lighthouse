@@ -5,7 +5,6 @@
 use std::{collections::BTreeMap, fs};
 
 use lighthouse_checks::{Pack, metrics::Metrics};
-use lighthouse_config::Config;
 use lighthouse_engine::Engine;
 use lighthouse_model::{
     Comment, Edge, EdgeKind, File, Flow, Fragment, FunctionSummary, Module, Node, Position,
@@ -16,6 +15,7 @@ use lighthouse_plugin::{
     Registry, Source, Workspace,
 };
 use lighthouse_spec::Catalog;
+use lighthouse_spec::Config;
 use serde_json::Value;
 
 /// Reads a UCM fragment as JSON, the way an out-of-process provider would send it.
@@ -286,7 +286,7 @@ impl World {
         registry.register(&Fixture::new()).unwrap();
         registry.register(&Metrics).unwrap();
         registry.register(subject.plugin).unwrap();
-        let outcome = Engine::new(registry, config, dir.path())
+        let outcome = Engine::new(registry, config, Catalog::bundled(), dir.path())
             .unwrap()
             .check(&[], &[rule.to_owned()])
             .unwrap();

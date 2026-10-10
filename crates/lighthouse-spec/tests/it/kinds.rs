@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 
 use lighthouse_model::RunScope;
 use lighthouse_spec::{
-    CelCheck, Check, CheckKind, Decision, DecisionOverrideSpec, OptionSchema, OptionType,
-    OptionsSchema, Select, descriptors,
+    CelCheck, Check, CheckKind, Decision, OptionSchema, OptionType, OptionsSchema, Select,
+    descriptors,
 };
 use serde_json::json;
 
@@ -14,7 +14,7 @@ use serde_json::json;
 fn every_kind_of_the_catalog_has_a_schema() {
     let kinds: Vec<&str> = descriptors().iter().map(|d| d.kind).collect();
 
-    assert_eq!(kinds, ["Decision", "DecisionOverride", "Pack", "SourceMap"]);
+    assert_eq!(kinds, ["Decision", "Pack", "Project", "SourceMap"]);
     for descriptor in descriptors() {
         assert_eq!(
             descriptor.schema["properties"]["kind"]["const"],
@@ -97,22 +97,4 @@ fn a_set_of_option_properties_is_a_closed_object_schema() {
         serde_json::from_value::<OptionsSchema>(value).unwrap(),
         schema
     );
-}
-
-#[test]
-fn an_override_names_the_decision_it_adjusts_and_what_it_changes() {
-    let patch: DecisionOverrideSpec = serde_json::from_value(json!({
-        "extends": "p/a",
-        "severity": "warn",
-        "options": { "max": 9 },
-    }))
-    .unwrap();
-
-    assert_eq!(patch.extends, "p/a");
-    assert_eq!(patch.severity, Some(lighthouse_model::Severity::Warn));
-    assert_eq!(patch.options["max"], 9);
-    assert!(patch.examples.is_empty());
-    let typo =
-        serde_json::from_value::<DecisionOverrideSpec>(json!({ "extends": "p/a", "title": "x" }));
-    assert!(typo.is_err());
 }

@@ -2,9 +2,9 @@
 //! `TODO` and `BAD` are findings, and `BROKEN` makes a file unanalyzable.
 #![allow(dead_code)]
 
+use lighthouse_spec::Catalog;
 use std::{fs, sync::LazyLock};
 
-use lighthouse_config::Config;
 use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun};
 use lighthouse_model::RunScope;
 use lighthouse_model::{
@@ -16,6 +16,7 @@ use lighthouse_plugin::{
     LanguageProvider, Plugin, PluginManifest, ProviderManifest, Registry, Rule, RuleManifest,
     Source, Workspace,
 };
+use lighthouse_spec::Config;
 use tempfile::TempDir;
 
 /// The provider manifest of the toy language: it analyzes overlays.
@@ -99,9 +100,6 @@ impl Word {
                 docs: String::new(),
                 analyzers: Vec::new(),
                 capabilities: Vec::new(),
-                citation: None,
-                strict: false,
-                enforced: true,
             },
             word,
         }
@@ -270,7 +268,7 @@ pub fn engine(dir: &TempDir, extra: &str) -> Engine {
         "plugins = [\"fake\"]\n[rules]\n\"fake/todo\" = \"error\"\n\"fake/bad\" = \"error\"\n{extra}"
     ))
     .unwrap();
-    Engine::new(registry, config, dir.path()).unwrap()
+    Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap()
 }
 
 pub fn project(text: &str) -> TempDir {

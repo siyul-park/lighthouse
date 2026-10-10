@@ -20,6 +20,9 @@ pub enum Error {
     /// A project directory in a format from before the resource model.
     #[error("{path}: a format from before the resource model; run `lighthouse spec migrate`")]
     Legacy { path: String },
+    /// A project that cannot be built from the catalog.
+    #[error(transparent)]
+    Project(#[from] crate::ProjectError),
     /// A decision, option, source or overlay that breaks a catalog rule.
     #[error("`{id}`: {reason}")]
     Invalid { id: String, reason: String },

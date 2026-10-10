@@ -201,7 +201,7 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     let trusted = session.trusted();
     let root = session.root.clone();
     let catalog = session.catalog()?;
-    let engine = Engine::new(registry, session.config, &root)?
+    let engine = Engine::new(registry, session.config, &catalog, &root)?
         .with_incomplete(plugins.incomplete)
         .with_trust(trusted);
     let setup = started.elapsed();

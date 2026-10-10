@@ -1,10 +1,12 @@
 use std::path::Path;
 use std::time::Duration;
 
-use lighthouse_config::{
-    Config, Error, Format, FormatterOutput, FormatterStdin, PluginRef, RuleConfig, Rules, glob_set,
-};
 use lighthouse_model::Severity;
+use lighthouse_resource::{Format, Metadata, Resource};
+use lighthouse_spec::{
+    Config, FormatterOutput, FormatterStdin, PluginRef, ProjectError as Error, ProjectSpec,
+    Projects, RuleConfig, RuleSetting, Rules, glob_set,
+};
 
 fn rule(level: Option<Severity>, options: &[(&str, i64)]) -> RuleConfig {
     RuleConfig {
@@ -16,22 +18,39 @@ fn rule(level: Option<Severity>, options: &[(&str, i64)]) -> RuleConfig {
     }
 }
 
-fn presets(id: &str) -> Option<Rules> {
-    (id == "core/recommended").then(|| {
+fn shared(name: &str, extends: &[&str], rules: Rules) -> Resource<ProjectSpec> {
+    Resource::new(
+        Metadata::named(name),
+        ProjectSpec {
+            extends: extends.iter().map(|e| (*e).to_owned()).collect(),
+            rules: rules
+                .iter()
+                .map(|(id, config)| (id.clone(), RuleSetting::from(config)))
+                .collect(),
+            ..ProjectSpec::default()
+        },
+    )
+}
+
+fn projects() -> Projects {
+    Projects::new([shared(
+        "core/recommended",
+        &[],
         Rules::from([
             (
                 "core/a".to_owned(),
                 rule(Some(Severity::Warn), &[("max", 5)]),
             ),
             ("core/b".to_owned(), rule(Some(Severity::Info), &[])),
-        ])
-    })
+        ]),
+    )])
+    .unwrap()
 }
 
 fn resolve(text: &str, path: &str, lang: &str) -> Rules {
     Config::parse_inline(text)
         .unwrap()
-        .resolve(Path::new(path), lang, &presets)
+        .resolve(Path::new(path), lang, &projects())
         .unwrap()
 }
 
@@ -73,12 +92,15 @@ extends = ["core/recommended"]
     );
     assert_eq!(got["core/a"], rule(Some(Severity::Error), &[("max", 5)]));
 
-    let single = |_: &str| {
-        Some(Rules::from([(
+    let single = Projects::new([shared(
+        "p/x",
+        &[],
+        Rules::from([(
             "core/a".to_owned(),
             rule(Some(Severity::Warn), &[("max", 5), ("depth", 1)]),
-        )]))
-    };
+        )]),
+    )])
+    .unwrap();
     let config = Config::parse_inline(
         r#"
 extends = ["p/x"]
@@ -112,9 +134,9 @@ rules = { "core/a" = { level = "error", options = { depth = 7 } } }
 
     let config = Config::parse_inline("extends = [\"nope/x\"]").unwrap();
     let err = config
-        .resolve(Path::new("x"), "text", &presets)
+        .resolve(Path::new("x"), "text", &projects())
         .unwrap_err();
-    assert!(matches!(err, Error::UnknownPreset(id) if id == "nope/x"));
+    assert!(matches!(err, Error::UnknownProject(id) if id == "nope/x"));
 }
 
 #[test]
@@ -200,7 +222,7 @@ fn the_same_project_reads_from_yaml_toml_and_json() {
     .into_iter()
     .map(|(format, text)| {
         let config = Config::parse_as(format, "demo", text).unwrap();
-        let rules = config.resolve(Path::new("x"), "text", &presets).unwrap();
+        let rules = config.resolve(Path::new("x"), "text", &projects()).unwrap();
         (config.plugins().to_vec(), rules)
     })
     .collect();
@@ -341,26 +363,27 @@ fn config_formatters() {
 
 #[test]
 fn the_kinds_of_a_configuration_are_described_by_schemas() {
-    let kinds: Vec<&str> = lighthouse_config::descriptors()
+    let kinds: Vec<&str> = lighthouse_spec::descriptors()
         .iter()
         .map(|d| d.kind)
         .collect();
 
-    assert_eq!(kinds, ["Project", "Preset"]);
+    assert!(kinds.contains(&"Project"));
+    assert!(!kinds.contains(&"Preset"));
 }
 
 #[test]
 fn a_parsed_project_builds_a_config() {
-    let document = lighthouse_config::Resource::new(
-        lighthouse_config::Metadata::named("built"),
-        lighthouse_config::ProjectSpec {
+    let document = Resource::new(
+        Metadata::named("built"),
+        lighthouse_spec::ProjectSpec {
             extends: vec!["core/recommended".to_owned()],
             rules: [(
                 "core/a".to_owned(),
-                lighthouse_config::RuleSetting::Level(lighthouse_config::Level::Off),
+                lighthouse_spec::RuleSetting::Level(lighthouse_spec::Level::Off),
             )]
             .into(),
-            ..lighthouse_config::ProjectSpec::default()
+            ..lighthouse_spec::ProjectSpec::default()
         },
     );
 
@@ -368,13 +391,13 @@ fn a_parsed_project_builds_a_config() {
 
     assert_eq!(config.name(), "built");
     assert_eq!(config.extends(), ["core/recommended"]);
-    let rules = config.resolve(Path::new("x"), "text", &presets).unwrap();
+    let rules = config.resolve(Path::new("x"), "text", &projects()).unwrap();
     assert_eq!(rules["core/a"].level, None);
 }
 
 #[test]
 fn rule_settings_and_levels_convert_both_ways() {
-    use lighthouse_config::{Level, RuleSetting};
+    use lighthouse_spec::{Level, RuleSetting};
 
     let plain = RuleSetting::from(&rule(Some(Severity::Warn), &[]));
     let detailed = RuleSetting::from(&rule(Some(Severity::Error), &[("max", 3)]));
@@ -406,4 +429,81 @@ fn a_configuration_file_is_found_in_a_directory_by_any_of_its_names() {
         Config::file_in(dir.path()),
         Some(dir.path().join("lighthouse.toml"))
     );
+}
+
+#[test]
+fn a_project_starts_from_the_projects_it_extends() {
+    let level = |severity| Rules::from([("p/a".to_owned(), rule(Some(severity), &[]))]);
+    let projects = Projects::new([
+        shared("p/base", &[], level(Severity::Warn)),
+        shared("p/strict", &["p/base"], level(Severity::Error)),
+    ])
+    .unwrap();
+    let config = Config::parse_inline("extends = [\"p/strict\"]").unwrap();
+
+    let rules = config.resolve(Path::new("x"), "text", &projects).unwrap();
+
+    assert_eq!(rules["p/a"].level, Some(Severity::Error));
+}
+
+#[test]
+fn an_extended_project_keeps_its_overrides() {
+    let mut base = shared("p/base", &[], Rules::new());
+    base.spec.overrides = vec![lighthouse_spec::OverrideSpec {
+        files: vec!["gen/**".to_owned()],
+        rules: [("p/a".to_owned(), RuleSetting::level(Severity::Info))].into(),
+        ..lighthouse_spec::OverrideSpec::default()
+    }];
+    let projects = Projects::new([base]).unwrap();
+    let config = Config::parse_inline("extends = [\"p/base\"]\n[rules]\n\"p/a\" = \"error\"\n[[overrides]]\nfiles = [\"vendor/**\"]\nrules = { \"p/a\" = \"off\" }").unwrap();
+
+    let at = |path| config.resolve(Path::new(path), "text", &projects).unwrap()["p/a"].level;
+
+    assert_eq!(at("src/x.rs"), Some(Severity::Error));
+    assert_eq!(at("vendor/x.rs"), None);
+    // The project's own rules come after what it extends, overrides included.
+    assert_eq!(at("gen/x.rs"), Some(Severity::Error));
+}
+
+#[test]
+fn projects_that_extend_a_stranger_or_each_other_have_no_rules() {
+    let projects = Projects::new([
+        shared("p/lost", &["p/nope"], Rules::new()),
+        shared("p/one", &["p/two"], Rules::new()),
+        shared("p/two", &["p/one"], Rules::new()),
+    ])
+    .unwrap();
+    let resolve = |name: &str| {
+        Config::parse_inline(&format!("extends = [\"{name}\"]"))
+            .unwrap()
+            .resolve(Path::new("x"), "text", &projects)
+            .unwrap_err()
+    };
+
+    assert!(matches!(resolve("p/lost"), Error::UnknownProject(id) if id == "p/nope"));
+    assert!(matches!(resolve("p/one"), Error::ProjectCycle(_)));
+    assert!(matches!(resolve("p/missing"), Error::UnknownProject(_)));
+}
+
+#[test]
+fn two_projects_of_one_name_are_refused() {
+    let twice = Projects::new([
+        shared("p/a", &[], Rules::new()),
+        shared("p/a", &[], Rules::new()),
+    ]);
+
+    assert!(matches!(twice, Err(Error::DuplicateProject(name)) if name == "p/a"));
+}
+
+#[test]
+fn the_entries_of_a_project_are_those_of_what_it_extends_and_its_own() {
+    let config =
+        Config::parse_inline("extends = [\"core/recommended\"]\n[rules]\n\"core/c\" = \"info\"")
+            .unwrap();
+
+    let known = projects();
+    let entries = config.layer().entries(&known).unwrap();
+
+    let ids: Vec<&str> = entries.iter().map(|(id, _)| *id).collect();
+    assert_eq!(ids, ["core/a", "core/b", "core/c"]);
 }

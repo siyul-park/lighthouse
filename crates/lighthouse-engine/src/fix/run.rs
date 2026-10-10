@@ -8,7 +8,7 @@ use std::{
 use lighthouse_model::hash::{self, Hasher};
 use lighthouse_model::{Capability, Diagnostic, EditOp, Fingerprint, FixOutcome, Safety, Severity};
 use lighthouse_plugin::{FixDecision, FixRequest};
-use lighthouse_spec::write_atomic;
+use lighthouse_spec::{Formatter, FormatterOutput, FormatterStdin, write_atomic};
 use serde_json::Value;
 
 use super::{
@@ -16,7 +16,6 @@ use super::{
     edits::{TextEdit, apply, overlap, self_overlap},
     lower::{Lowerer, Sources},
 };
-use lighthouse_config::{Formatter, FormatterOutput, FormatterStdin};
 
 use crate::{Engine, Error, Outcome, Overlays};
 

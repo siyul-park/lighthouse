@@ -1,14 +1,15 @@
 //! Writing a verified fix: whole, or not at all.
 
+use lighthouse_spec::Catalog;
 use std::fs;
 
-use lighthouse_config::Config;
 use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun};
 use lighthouse_model::{EditOp, FixOutcome, Safety};
 use lighthouse_plugin::{
     Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, LanguageProvider, Plugin,
     PluginManifest, Registry, Rule,
 };
+use lighthouse_spec::Config;
 
 use crate::support::*;
 
@@ -97,7 +98,10 @@ fn pair(dir: &tempfile::TempDir, formatter: &str) -> (Engine, FixPlan) {
             unsupported: None,
         },
     );
-    (Engine::new(registry, config, dir.path()).unwrap(), plan)
+    (
+        Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap(),
+        plan,
+    )
 }
 
 fn two_files() -> tempfile::TempDir {
@@ -229,7 +233,7 @@ fn a_write_that_fails_midway_puts_the_written_files_back() {
     let config =
         Config::parse_inline("plugins = [\"nested\"]\n[rules]\n\"nested/todo\" = \"error\"\n")
             .unwrap();
-    let engine = Engine::new(registry, config, dir.path()).unwrap();
+    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
         "nested/todo",
@@ -300,7 +304,7 @@ fn a_file_whose_provider_does_not_analyze_overlays_is_not_fixed() {
     let config =
         Config::parse_inline("plugins = [\"plain\"]\n[rules]\n\"plain/todo\" = \"error\"\n")
             .unwrap();
-    let engine = Engine::new(registry, config, dir.path()).unwrap();
+    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
         "plain/todo",

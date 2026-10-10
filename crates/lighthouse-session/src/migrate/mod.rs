@@ -6,6 +6,8 @@
 //! `lighthouse-plugin.toml`, a catalog directory (`pack.yaml` with its
 //! `section.yaml` files, pattern files, declarative rule files, `sources.yaml`)
 //! and a project's `.lighthouse/rules`, which becomes `.lighthouse/decisions`.
+//! A `Preset` becomes a `Project`, and a `DecisionOverride` of the project
+//! becomes an entry of its `rules`.
 //!
 //! Only shapes it recognizes are touched: a pattern has an `id` and a
 //! `requirement`, an override an `extends` and an override key, a
@@ -26,8 +28,10 @@ use serde_json::Value as Json;
 use serde_norway::{Mapping, Value};
 
 pub mod catalog;
+mod fold;
 pub mod plugin;
 pub mod project;
+pub mod retired;
 
 use crate::{Result, SKIPPED_DIRS};
 
@@ -78,6 +82,10 @@ enum Shape {
     Pack,
     Sources,
     Override,
+    /// A `Preset` document: a `Project` now.
+    Preset,
+    /// A `DecisionOverride` document: an entry of the project's `rules` now.
+    OverrideDoc,
     Pattern,
     /// A `Decision` that still has `enforcement` instead of `severity`.
     Enforcement,
@@ -92,6 +100,10 @@ struct Plan {
     /// consumed them.
     consumable: BTreeSet<PathBuf>,
     consumed: BTreeSet<PathBuf>,
+    /// Overrides to fold into the project's rules, by the override file.
+    folds: Vec<(PathBuf, retired::Fold)>,
+    /// Files kept although they look like part of the old formats.
+    kept: Vec<String>,
 }
 
 /// What a pack needs from the files around its `pack.yaml`.
@@ -175,7 +187,9 @@ pub fn migrate_paths(paths: &[PathBuf], dry_run: bool) -> Result<Migrated> {
         }
     }
     migrated.unchanged += catalog(&catalog_files, &mut plan)?;
+    fold::apply(&mut plan)?;
     migrated.warnings = plan.settle();
+    migrated.warnings.append(&mut plan.kept);
     for (path, action) in &plan.actions {
         match action {
             Action::Write(_) => migrated.written.push(path.clone()),
@@ -367,16 +381,21 @@ fn legacy_config(
         return Err(several_documents(&label, docs.len()).into());
     }
     let new = convert(old).map_err(|e| format!("{label}: {e}"))?;
-    let text = match format {
-        Format::Toml => toml::to_string(&new)?,
-        Format::Json => format!("{}\n", serde_json::to_string_pretty(&new)?),
-        Format::Yaml => {
-            let kind = new["kind"].as_str().unwrap_or_default();
-            format!("{}{}", header(kind, &schema_base(path)), to_yaml(&new))
-        }
-    };
+    let text = render_config(format, path, &new)?;
     plan.actions.insert(path.to_owned(), Action::Write(text));
     Ok(0)
+}
+
+/// `doc`, one `Project` or `Plugin` document, in the format of the file at `path`.
+fn render_config(format: Format, path: &Path, doc: &Json) -> Result<String> {
+    Ok(match format {
+        Format::Toml => toml::to_string(doc)?,
+        Format::Json => format!("{}\n", serde_json::to_string_pretty(doc)?),
+        Format::Yaml => {
+            let kind = doc["kind"].as_str().unwrap_or_default();
+            format!("{}{}", header(kind, &schema_base(path)), to_yaml(doc))
+        }
+    })
 }
 
 fn several_documents(label: &str, count: usize) -> String {
@@ -413,7 +432,10 @@ fn read_legacy(files: &[PathBuf]) -> Result<(Vec<Legacy>, BTreeMap<PathBuf, usiz
         let docs = yaml_values(&label, &text)?;
         documents.insert(path.clone(), docs.len());
         for doc in docs {
-            if catalog::is_resource(&doc) && !catalog::has_enforcement(&doc) {
+            if catalog::is_resource(&doc)
+                && !catalog::has_enforcement(&doc)
+                && !retired::is_retired(&doc)
+            {
                 unchanged += 1;
             } else {
                 legacy.push(Legacy {
@@ -429,7 +451,11 @@ fn read_legacy(files: &[PathBuf]) -> Result<(Vec<Legacy>, BTreeMap<PathBuf, usiz
 /// Which legacy shape a document has.
 fn shape(path: &Path, doc: &Value) -> Shape {
     let name = file_name(path);
-    if catalog::has_enforcement(doc) {
+    if doc.get("kind").and_then(Value::as_str) == Some(retired::PRESET) {
+        Shape::Preset
+    } else if doc.get("kind").and_then(Value::as_str) == Some(retired::OVERRIDE) {
+        Shape::OverrideDoc
+    } else if catalog::has_enforcement(doc) {
         Shape::Enforcement
     } else if doc.get("select").is_some() && doc.get("where").is_some() && doc.get("id").is_none() {
         Shape::RuleFile
@@ -484,7 +510,14 @@ fn plan_item(
         Shape::Sources => write(plan, path, &catalog::migrate_sources(doc)?),
         Shape::Override => {
             let migrated = catalog::migrate_override(doc, &stem(path))?;
-            move_or_write(plan, path, target, &migrated)?;
+            fold::plan(plan, path, &migrated)?;
+        }
+        Shape::OverrideDoc => fold::plan(plan, path, doc)?,
+        Shape::Preset => {
+            let project =
+                retired::preset_to_project(serde_json::to_value(doc).map_err(|e| e.to_string())?);
+            let project: Value = serde_norway::to_value(&project).map_err(|e| e.to_string())?;
+            write(plan, path, &project);
         }
         Shape::Pattern => {
             let (migrated, rule) = decision(item, rule_files)?;

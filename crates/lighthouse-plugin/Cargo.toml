@@ -9,10 +9,7 @@ test = false
 doctest = false
 
 [dependencies]
-schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 lighthouse-model.workspace = true
-lighthouse-config.workspace = true
-lighthouse-resource.workspace = true

@@ -1,10 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use lighthouse_config::Rules;
-
 use crate::{
-    Analyzer, Error, Fixer, LanguageProvider, OrderKey, OrderKeys, Plugin, PluginManifest,
-    PresetManifest, Rule,
+    Analyzer, Error, Fixer, LanguageProvider, OrderKey, OrderKeys, Plugin, PluginManifest, Rule,
 };
 
 /// The registered plugins and everything they contribute. `register` is atomic,
@@ -15,7 +12,6 @@ pub struct Registry {
     languages: Vec<(String, Box<dyn LanguageProvider>)>,
     analyzers: BTreeMap<String, Box<dyn Analyzer>>,
     rules: BTreeMap<String, Box<dyn Rule>>,
-    presets: BTreeMap<String, PresetManifest>,
     fixers: BTreeMap<String, Box<dyn Fixer>>,
     keys: BTreeMap<String, Box<dyn OrderKey>>,
 }
@@ -36,12 +32,11 @@ impl Registry {
         let languages = plugin.languages();
         let analyzers = plugin.analyzers();
         let rules = plugin.rules();
-        let presets = plugin.presets();
         let fixers = plugin.fixers();
         let keys = plugin.order_keys();
         self.check_languages(&languages)?;
-        check_prefixes(&manifest.id, &analyzers, &rules, &presets)?;
-        self.check_unique(&analyzers, &rules, &presets)?;
+        check_prefixes(&manifest.id, &analyzers, &rules)?;
+        self.check_unique(&analyzers, &rules)?;
         self.check_fixers(&manifest.id, &fixers, &keys)?;
 
         let id = manifest.id.clone();
@@ -52,8 +47,6 @@ impl Registry {
             .extend(analyzers.into_iter().map(|a| (a.manifest().id.clone(), a)));
         self.rules
             .extend(rules.into_iter().map(|r| (r.manifest().id.clone(), r)));
-        self.presets
-            .extend(presets.into_iter().map(|p| (p.id.clone(), p)));
         self.fixers
             .extend(fixers.into_iter().map(|f| (f.manifest().id.clone(), f)));
         self.keys
@@ -130,7 +123,6 @@ impl Registry {
         &self,
         analyzers: &[Box<dyn Analyzer>],
         rules: &[Box<dyn Rule>],
-        presets: &[PresetManifest],
     ) -> Result<(), Error> {
         let mut seen = BTreeSet::new();
         for a in analyzers {
@@ -143,11 +135,6 @@ impl Registry {
             let rule = r.manifest().id.as_str();
             if self.rules.contains_key(rule) || !seen.insert(rule) {
                 return Err(Error::Duplicate(rule.to_owned()));
-            }
-        }
-        for p in presets {
-            if self.presets.contains_key(&p.id) || !seen.insert(p.id.as_str()) {
-                return Err(Error::Duplicate(p.id.clone()));
             }
         }
         Ok(())
@@ -184,35 +171,6 @@ impl Registry {
     /// Sorted by id.
     pub fn rules(&self) -> impl Iterator<Item = &dyn Rule> {
         self.rules.values().map(Box::as_ref)
-    }
-
-    /// The preset with this qualified id.
-    pub fn preset(&self, id: &str) -> Option<&PresetManifest> {
-        self.presets.get(id)
-    }
-
-    /// The rules of the preset with this id, those of the presets it extends
-    /// underneath; `None` when it or one it extends is unknown, or when the
-    /// presets extend each other in a circle.
-    pub fn preset_rules(&self, id: &str) -> Option<Rules> {
-        self.flatten(id, &mut Vec::new())
-    }
-
-    fn flatten(&self, id: &str, stack: &mut Vec<String>) -> Option<Rules> {
-        if stack.iter().any(|seen| seen == id) {
-            return None;
-        }
-        let preset = self.presets.get(id)?;
-        stack.push(id.to_owned());
-        let mut rules = Rules::new();
-        for base in &preset.extends {
-            for (rule, config) in self.flatten(base, stack)? {
-                rules.insert(rule, config);
-            }
-        }
-        stack.pop();
-        rules.extend(preset.rules.clone());
-        Some(rules)
     }
 
     /// `ids` and their transitive requirements, dependencies first.
@@ -289,13 +247,11 @@ fn check_prefixes(
     plugin: &str,
     analyzers: &[Box<dyn Analyzer>],
     rules: &[Box<dyn Rule>],
-    presets: &[PresetManifest],
 ) -> Result<(), Error> {
     let ids = analyzers
         .iter()
         .map(|a| a.manifest().id.as_str())
-        .chain(rules.iter().map(|r| r.manifest().id.as_str()))
-        .chain(presets.iter().map(|p| p.id.as_str()));
+        .chain(rules.iter().map(|r| r.manifest().id.as_str()));
     for item in ids {
         if plugin_of(item) != plugin || !item.contains('/') {
             return Err(Error::Prefix {

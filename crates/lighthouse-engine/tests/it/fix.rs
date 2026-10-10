@@ -5,13 +5,13 @@
 
 use std::path::Path;
 
-use lighthouse_config::Config;
 use lighthouse_engine::{Engine, Error, FixBinding, FixPlan, FixRun, unified_diff};
 use lighthouse_model::{EditOp, FixOutcome, Safety};
 use lighthouse_plugin::{
     Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, LanguageProvider, Plugin,
     PluginManifest, Registry, Rule,
 };
+use lighthouse_spec::{Catalog, Config};
 
 use crate::support::*;
 
@@ -339,7 +339,7 @@ fn fixes_stop_after_a_bounded_number_of_rounds() {
         .unwrap();
     let config =
         Config::parse_inline("plugins = [\"grow\"]\n[rules]\n\"grow/todo\" = \"warn\"\n").unwrap();
-    let engine = Engine::new(registry, config, dir.path()).unwrap();
+    let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
     let mut plan = FixPlan::default();
     plan.insert(
         "grow/todo",

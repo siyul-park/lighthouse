@@ -426,19 +426,14 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
             .contains("one screen")
     );
 
-    // A bundled pattern is adjusted through the overlay file.
-    let overlay = client
-        .tool(
-            "decision_update",
-            json!({ "id": "core/max-file-lines", "patch": { "exceptions": "Generated files." } }),
-        )
-        .unwrap();
-    assert_eq!(overlay["created"], true);
-    assert!(
-        rules_dir
-            .join("override-core-max-file-lines.yaml")
-            .is_file()
+    // A bundled decision is not changed in place: its level and options are
+    // the project's `rules`.
+    let bundled = client.tool(
+        "decision_update",
+        json!({ "id": "core/max-file-lines", "patch": { "requirement": "A file MUST be short." } }),
     );
+    assert!(bundled.unwrap_err().to_string().contains("rules"));
+    assert!(!rules_dir.join("override-core-max-file-lines.yaml").exists());
 }
 
 #[test]

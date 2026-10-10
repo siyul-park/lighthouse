@@ -4,7 +4,6 @@ mod registry;
 
 use std::{collections::BTreeMap, path::PathBuf};
 
-use lighthouse_config::{Metadata, PresetSpec, Resource, RuleConfig, RuleSetting, Rules};
 use lighthouse_model::{
     Capability, Diagnostic, File, Fragment, Incomplete, Options, Project, RunScope, Severity,
 };
@@ -14,7 +13,7 @@ use thiserror::Error;
 
 pub use fix::{
     FixDecision, FixRequest, Fixer, FixerManifest, KeyCtx, NoKeys, OrderKey, OrderKeyManifest,
-    OrderKeySpec, OrderKeys,
+    OrderKeys,
 };
 pub use memo::Memo;
 pub use registry::{Registry, plugin_of};
@@ -46,7 +45,7 @@ pub enum Error {
     Incomplete(String),
 }
 
-/// Identity of a plugin: `id` prefixes every analyzer, rule, preset and fixer
+/// Identity of a plugin: `id` prefixes every analyzer, rule and fixer
 /// it contributes. Every plugin kind describes itself through a manifest, a
 /// static value separate from the behavior of the kind.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -209,13 +208,6 @@ pub struct RuleManifest {
     pub docs: String,
     pub analyzers: Vec<String>,
     pub capabilities: Vec<Capability>,
-    pub citation: Option<String>,
-    /// Left out of the plugin's `recommended` preset; only `strict` enables it.
-    pub strict: bool,
-    /// In force. A rule that is not (a proposed, rejected, deprecated or
-    /// superseded decision) runs only when a run selects it by id, such as
-    /// `decision test`; configuration and presets never enable it.
-    pub enforced: bool,
 }
 
 /// A check that turns facts into diagnostics. `validate` rejects bad options
@@ -226,18 +218,7 @@ pub trait Rule: Send + Sync {
     fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, Error>;
 }
 
-/// Named rule configuration, referenced from `extends`. A preset is pure
-/// data, so it is its own manifest.
-#[derive(Debug, Clone, PartialEq)]
-pub struct PresetManifest {
-    /// Fully qualified `plugin/name`.
-    pub id: String,
-    /// Presets whose rules this one starts from.
-    pub extends: Vec<String>,
-    pub rules: Rules,
-}
-
-/// A bundle of language providers, analyzers, rules and presets, all of whose
+/// A bundle of language providers, analyzers, rules and fixers, all of whose
 /// ids are qualified with `manifest().id`. Everything defaults to empty.
 pub trait Plugin {
     fn manifest(&self) -> &PluginManifest;
@@ -250,9 +231,6 @@ pub trait Plugin {
     fn rules(&self) -> Vec<Box<dyn Rule>> {
         Vec::new()
     }
-    fn presets(&self) -> Vec<PresetManifest> {
-        Vec::new()
-    }
     /// The fixers of the plugin's decisions; see [`Fixer`].
     fn fixers(&self) -> Vec<Box<dyn Fixer>> {
         Vec::new()
@@ -261,74 +239,6 @@ pub trait Plugin {
     fn order_keys(&self) -> Vec<Box<dyn OrderKey>> {
         Vec::new()
     }
-}
-
-impl PresetManifest {
-    /// The `Preset` document that describes this preset.
-    pub fn to_resource(&self) -> Resource<PresetSpec> {
-        Resource::new(
-            Metadata::named(&self.id),
-            PresetSpec {
-                extends: self.extends.clone(),
-                rules: self
-                    .rules
-                    .iter()
-                    .map(|(id, config)| (id.clone(), RuleSetting::from(config)))
-                    .collect(),
-            },
-        )
-    }
-
-    /// The preset a `Preset` document describes.
-    pub fn from_resource(preset: Resource<PresetSpec>) -> Self {
-        Self {
-            id: preset.metadata.name,
-            extends: preset.spec.extends,
-            rules: preset
-                .spec
-                .rules
-                .into_iter()
-                .map(|(id, setting)| (id, setting.into()))
-                .collect(),
-        }
-    }
-}
-
-impl PresetManifest {
-    /// The presets of a plugin's rules: `<plugin>/recommended` holds every
-    /// rule that is not `strict` at its default severity, and
-    /// `<plugin>/strict` adds the rest, present only when some rule is strict.
-    pub fn standard<'a>(
-        plugin: &str,
-        metas: impl IntoIterator<Item = &'a RuleManifest>,
-    ) -> Vec<Self> {
-        let metas: Vec<&RuleManifest> = metas.into_iter().collect();
-        let preset = |name: &str, include: fn(&RuleManifest) -> bool| Self {
-            id: format!("{plugin}/{name}"),
-            extends: Vec::new(),
-            rules: metas
-                .iter()
-                .filter(|meta| include(meta))
-                .map(|meta| {
-                    let config = RuleConfig {
-                        level: Some(meta.severity),
-                        options: Options::new(),
-                    };
-                    (meta.id.clone(), config)
-                })
-                .collect(),
-        };
-        let mut presets = vec![preset("recommended", |meta| !meta.strict)];
-        if metas.iter().any(|meta| meta.strict) {
-            presets.push(preset("strict", |_| true));
-        }
-        presets
-    }
-}
-
-/// The JSON Schema of the kinds this crate defines.
-pub fn descriptors() -> Vec<lighthouse_resource::Descriptor> {
-    vec![lighthouse_resource::Descriptor::of::<OrderKeySpec>()]
 }
 
 /// Deserializes rule options; unknown keys are rejected when `T` denies them.

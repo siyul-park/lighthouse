@@ -1,11 +1,12 @@
 //! Source annotations, finding identity and finding facts, through the engine
 //! and the Rust provider.
 
+use lighthouse_spec::Catalog;
 use std::fs;
 
-use lighthouse_config::Config;
 use lighthouse_engine::{Engine, Outcome};
 use lighthouse_model::Severity;
+use lighthouse_spec::Config;
 
 /// Checks a one-file crate with the design and core rules plus `rules`.
 fn check(source: &str, rules: &str) -> Outcome {
@@ -26,7 +27,7 @@ fn check(source: &str, rules: &str) -> Outcome {
     .unwrap();
     let mut registry = lighthouse_checks::registry();
     lighthouse_rpc::register(&mut registry, &config, dir.path(), &[]).unwrap();
-    let outcome = Engine::new(registry, config, dir.path())
+    let outcome = Engine::new(registry, config, Catalog::bundled(), dir.path())
         .unwrap()
         .check(&[], &[])
         .unwrap();

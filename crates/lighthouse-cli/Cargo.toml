@@ -17,7 +17,6 @@ path = "src/main.rs"
 test = false
 
 [dev-dependencies]
-lighthouse-config.workspace = true
 lighthouse-engine.workspace = true
 lighthouse-model.workspace = true
 lighthouse-resource.workspace = true

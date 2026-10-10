@@ -5,9 +5,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_config::Config;
 use lighthouse_plugin::{Plugin, Registry};
 use lighthouse_rpc::{Error, discover, register, search_dirs};
+use lighthouse_spec::Config;
 
 #[cfg(unix)]
 mod process {
@@ -19,11 +19,11 @@ mod process {
     };
 
     use super::manifest;
-    use lighthouse_config::Config;
     use lighthouse_engine::{EXIT_INCOMPLETE, Engine};
     use lighthouse_model::{File, Incomplete};
     use lighthouse_plugin::{Indexed, LanguageProvider, Plugin, Registry, Source, Workspace};
     use lighthouse_rpc::{Error, RpcPlugin, register};
+    use lighthouse_spec::{Catalog, Config};
     use serde_json::{Value, json};
     use tempfile::TempDir;
 
@@ -364,6 +364,7 @@ mod process {
         Engine::new(
             registry,
             Config::parse_inline("plugins = [\"fake\"]").unwrap(),
+            Catalog::bundled(),
             root,
         )
         .unwrap()
@@ -796,7 +797,7 @@ fn the_plugin_kind_has_a_schema_and_provides_nothing_unless_it_says_so() {
     assert_eq!(kinds, ["Plugin"]);
 
     let bare = lighthouse_rpc::parse(
-        lighthouse_config::Format::Toml,
+        lighthouse_resource::Format::Toml,
         "x",
         &plugin_document("x", "./run", ""),
     )
@@ -804,7 +805,7 @@ fn the_plugin_kind_has_a_schema_and_provides_nothing_unless_it_says_so() {
     assert_eq!(bare.provides, lighthouse_rpc::Provides::default());
 
     let yaml = "apiVersion: lighthouse/v1alpha1\nkind: Plugin\nmetadata: {name: x}\nspec:\n  version: '1'\n  runtime: {command: ./run}\n  provides: {languages: [go], decisions: [decisions], orderKeys: [x/group], embedders: [x/e], fixOps: [x/op]}\n";
-    let rich = lighthouse_rpc::parse(lighthouse_config::Format::Yaml, "x", yaml).unwrap();
+    let rich = lighthouse_rpc::parse(lighthouse_resource::Format::Yaml, "x", yaml).unwrap();
     assert_eq!(rich.provides.languages, ["go"]);
     assert_eq!(rich.provides.order_keys, ["x/group"]);
     assert_eq!(rich.provides.fix_ops, ["x/op"]);
@@ -829,8 +830,8 @@ fn a_manifest_is_found_in_a_directory_by_any_of_its_names() {
 
 #[test]
 fn a_parsed_plugin_document_becomes_a_manifest() {
-    let document = lighthouse_config::Resource::new(
-        lighthouse_config::Metadata::named("x"),
+    let document = lighthouse_resource::Resource::new(
+        lighthouse_resource::Metadata::named("x"),
         lighthouse_rpc::PluginSpec {
             version: "2".to_owned(),
             runtime: lighthouse_rpc::Runtime {

@@ -1,6 +1,12 @@
+//! The project: what `lighthouse.toml` holds, and the shareable projects
+//! `extends` names. A project is a `Project` document; the `recommended` and
+//! `strict` projects of a pack derive from its decisions, and a catalog may
+//! hold more.
+
 mod formatter;
-mod project;
 mod rules;
+mod spec;
+mod standard;
 
 use std::{
     collections::BTreeMap,
@@ -15,10 +21,9 @@ use globset::{GlobBuilder, GlobSetBuilder};
 use lighthouse_model::Options;
 pub use lighthouse_resource::{Format, Metadata, Resource};
 use lighthouse_resource::{documents, parse_duration, resource};
-pub use project::{
-    LanguageSpec, OverrideSpec, PluginEntry, PluginRefSpec, PresetSpec, ProjectSpec,
-};
 pub use rules::{Level, RuleConfig, RuleDetail, RuleSetting, Rules};
+pub use spec::{OverrideSpec, PluginEntry, PluginRefSpec, ProjectLanguage, ProjectSpec};
+pub(crate) use standard::standard;
 use thiserror::Error;
 
 /// Name of the configuration file discovered in a project directory.
@@ -35,7 +40,7 @@ pub const FILE_NAMES: [&str; 4] = [
 
 /// Failure to read, parse or apply a configuration; every variant names the offending input.
 #[derive(Debug, Error)]
-pub enum Error {
+pub enum ProjectError {
     #[error("{}: {source}", path.display())]
     Io {
         path: PathBuf,
@@ -50,10 +55,12 @@ pub enum Error {
         pattern: String,
         source: globset::Error,
     },
-    #[error("unknown preset `{0}`")]
-    UnknownPreset(String),
-    #[error("preset `{0}` extends itself")]
-    PresetCycle(String),
+    #[error("unknown project `{0}`")]
+    UnknownProject(String),
+    #[error("project `{0}` extends itself")]
+    ProjectCycle(String),
+    #[error("project `{0}` is defined twice")]
+    DuplicateProject(String),
     #[error("invalid configuration: `languages.{language}.formatter` must have a non-empty `argv`")]
     Formatter { language: String },
     #[error("invalid configuration: `{text}` is not a duration such as `30s` (plugin `{plugin}`)")]
@@ -70,7 +77,7 @@ pub struct PluginRef {
     timeout: Option<Duration>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Override {
     files: Option<GlobSet>,
     languages: Vec<String>,
@@ -92,14 +99,14 @@ impl PluginRef {
         self.timeout
     }
 
-    fn of(entry: PluginEntry) -> Result<Self, Error> {
+    fn of(entry: PluginEntry) -> Result<Self, ProjectError> {
         match entry {
             PluginEntry::Id(id) => Ok(Self::new(id)),
             PluginEntry::Detailed(detail) => {
                 let timeout = detail
                     .timeout
                     .map(|text| {
-                        parse_duration(&text).ok_or_else(|| Error::Duration {
+                        parse_duration(&text).ok_or_else(|| ProjectError::Duration {
                             plugin: detail.id.clone(),
                             text,
                         })
@@ -115,18 +122,6 @@ impl PluginRef {
     }
 }
 
-/// Parsed `Project`: the content of `lighthouse.toml`.
-#[derive(Debug)]
-pub struct Config {
-    name: String,
-    plugins: Vec<PluginRef>,
-    languages: BTreeMap<String, Options>,
-    formatters: BTreeMap<String, Formatter>,
-    extends: Vec<String>,
-    rules: Rules,
-    overrides: Vec<Override>,
-}
-
 impl Override {
     fn matches(&self, path: &Path, lang: &str) -> bool {
         self.files.as_ref().is_none_or(|g| g.is_match(path))
@@ -134,18 +129,184 @@ impl Override {
     }
 }
 
+/// What a project says about rules: the projects it extends, its own `rules`
+/// and its `overrides`. An extended project is one of these and nothing more.
+#[derive(Debug, Clone, Default)]
+pub struct Layer {
+    extends: Vec<String>,
+    rules: Rules,
+    overrides: Vec<Override>,
+}
+
+impl Layer {
+    pub(crate) fn of(spec: &ProjectSpec) -> Result<Self, ProjectError> {
+        let rules = |settings: &BTreeMap<String, RuleSetting>| -> Rules {
+            settings
+                .iter()
+                .map(|(id, s)| (id.clone(), s.clone().into()))
+                .collect()
+        };
+        let overrides = spec
+            .overrides
+            .iter()
+            .map(|o| {
+                Ok(Override {
+                    files: globs(&o.files)?,
+                    languages: o.languages.clone(),
+                    rules: rules(&o.rules),
+                })
+            })
+            .collect::<Result<_, ProjectError>>()?;
+        Ok(Self {
+            extends: spec.extends.clone(),
+            rules: rules(&spec.rules),
+            overrides,
+        })
+    }
+
+    /// Project names named in `extends`, in declaration order.
+    pub fn extends(&self) -> &[String] {
+        &self.extends
+    }
+
+    /// Entries named in `rules` and in every override, unmerged.
+    pub fn configured(&self) -> impl Iterator<Item = (&str, &RuleConfig)> {
+        self.rules
+            .iter()
+            .chain(self.overrides.iter().flat_map(|o| o.rules.iter()))
+            .map(|(id, config)| (id.as_str(), config))
+    }
+
+    /// Like [`Layer::configured`], over this layer and every project it
+    /// extends, the extended ones first.
+    pub fn entries<'a>(
+        &'a self,
+        projects: &'a Projects,
+    ) -> Result<Vec<(&'a str, &'a RuleConfig)>, ProjectError> {
+        let mut out = Vec::new();
+        self.collect(projects, &mut Vec::new(), &mut out)?;
+        Ok(out)
+    }
+
+    fn collect<'a>(
+        &'a self,
+        projects: &'a Projects,
+        stack: &mut Vec<&'a str>,
+        out: &mut Vec<(&'a str, &'a RuleConfig)>,
+    ) -> Result<(), ProjectError> {
+        for name in &self.extends {
+            let base = projects.extended(name, stack)?;
+            stack.push(name);
+            base.collect(projects, stack, out)?;
+            stack.pop();
+        }
+        out.extend(self.configured());
+        Ok(())
+    }
+
+    /// Effective rules for a file: the projects it extends, then `rules`,
+    /// then matching overrides in order. `path` is relative to the project
+    /// root.
+    pub fn resolve(
+        &self,
+        path: &Path,
+        lang: &str,
+        projects: &Projects,
+    ) -> Result<Rules, ProjectError> {
+        let mut out = Rules::new();
+        self.apply(path, lang, projects, &mut Vec::new(), &mut out)?;
+        Ok(out)
+    }
+
+    fn apply<'a>(
+        &'a self,
+        path: &Path,
+        lang: &str,
+        projects: &'a Projects,
+        stack: &mut Vec<&'a str>,
+        out: &mut Rules,
+    ) -> Result<(), ProjectError> {
+        for name in &self.extends {
+            let base = projects.extended(name, stack)?;
+            stack.push(name);
+            base.apply(path, lang, projects, stack, out)?;
+            stack.pop();
+        }
+        rules::merge(out, &self.rules);
+        for o in self.overrides.iter().filter(|o| o.matches(path, lang)) {
+            rules::merge(out, &o.rules);
+        }
+        Ok(())
+    }
+}
+
+/// The projects `extends` can name, by name.
+#[derive(Debug, Clone, Default)]
+pub struct Projects {
+    by_name: BTreeMap<String, Layer>,
+}
+
+impl Projects {
+    /// The projects the documents describe. Their `plugins` and `languages`
+    /// are not used: only a project that is run has those.
+    pub fn new(
+        documents: impl IntoIterator<Item = Resource<ProjectSpec>>,
+    ) -> Result<Self, ProjectError> {
+        let mut by_name = BTreeMap::new();
+        for Resource { metadata, spec } in documents {
+            if by_name
+                .insert(metadata.name.clone(), Layer::of(&spec)?)
+                .is_some()
+            {
+                return Err(ProjectError::DuplicateProject(metadata.name));
+            }
+        }
+        Ok(Self { by_name })
+    }
+
+    /// The names, sorted.
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.by_name.keys().map(String::as_str)
+    }
+
+    /// The project named `name`.
+    pub fn get(&self, name: &str) -> Option<&Layer> {
+        self.by_name.get(name)
+    }
+
+    /// The project `name` names as an extended one, unless it is unknown or
+    /// already being extended (`stack`, outermost first).
+    fn extended(&self, name: &str, stack: &[&str]) -> Result<&Layer, ProjectError> {
+        if stack.contains(&name) {
+            return Err(ProjectError::ProjectCycle(name.to_owned()));
+        }
+        self.get(name)
+            .ok_or_else(|| ProjectError::UnknownProject(name.to_owned()))
+    }
+}
+
+/// Parsed `Project`: the content of `lighthouse.toml`.
+#[derive(Debug, Clone)]
+pub struct Config {
+    name: String,
+    plugins: Vec<PluginRef>,
+    languages: BTreeMap<String, Options>,
+    formatters: BTreeMap<String, Formatter>,
+    layer: Layer,
+}
+
 impl Config {
     /// Parses `text` as a `lighthouse.toml`: a `Project` document. Unknown
     /// fields and invalid globs are errors.
-    pub fn parse(text: &str) -> Result<Self, Error> {
+    pub fn parse(text: &str) -> Result<Self, ProjectError> {
         Self::parse_as(Format::Toml, FILE_NAME, text)
     }
 
     /// Parses `text` in `format`; `path` only names it in errors.
-    pub fn parse_as(format: Format, path: &str, text: &str) -> Result<Self, Error> {
+    pub fn parse_as(format: Format, path: &str, text: &str) -> Result<Self, ProjectError> {
         let mut docs = documents(format, path, text)?;
         if docs.len() != 1 {
-            return Err(Error::Documents {
+            return Err(ProjectError::Documents {
                 path: path.to_owned(),
                 found: docs.len(),
             });
@@ -157,7 +318,7 @@ impl Config {
     /// Parses a bare spec written in TOML, without the envelope: for
     /// configurations built in code, such as the one a decision's example
     /// runs under. The project is named `inline`.
-    pub fn parse_inline(text: &str) -> Result<Self, Error> {
+    pub fn parse_inline(text: &str) -> Result<Self, ProjectError> {
         let spec: ProjectSpec =
             toml::from_str(text).map_err(|e| lighthouse_resource::Error::Invalid {
                 path: "<inline>".to_owned(),
@@ -167,34 +328,21 @@ impl Config {
     }
 
     /// Builds the configuration a parsed `Project` describes.
-    pub fn from_resource(project: Resource<ProjectSpec>) -> Result<Self, Error> {
+    pub fn from_resource(project: Resource<ProjectSpec>) -> Result<Self, ProjectError> {
         let Resource { metadata, spec } = project;
+        let layer = Layer::of(&spec)?;
         let mut languages = BTreeMap::new();
         let mut formatters = BTreeMap::new();
         for (id, language) in spec.languages {
             if let Some(formatter) = language.formatter {
                 let formatter = Formatter::from(formatter);
                 if formatter.argv.is_empty() {
-                    return Err(Error::Formatter { language: id });
+                    return Err(ProjectError::Formatter { language: id });
                 }
                 formatters.insert(id.clone(), formatter);
             }
             languages.insert(id, language.options);
         }
-        let rules = |settings: BTreeMap<String, RuleSetting>| -> Rules {
-            settings.into_iter().map(|(id, s)| (id, s.into())).collect()
-        };
-        let overrides = spec
-            .overrides
-            .into_iter()
-            .map(|o| {
-                Ok(Override {
-                    files: globs(&o.files)?,
-                    languages: o.languages,
-                    rules: rules(o.rules),
-                })
-            })
-            .collect::<Result<_, Error>>()?;
         Ok(Self {
             name: metadata.name,
             plugins: spec
@@ -204,15 +352,13 @@ impl Config {
                 .collect::<Result<_, _>>()?,
             languages,
             formatters,
-            extends: spec.extends,
-            rules: rules(spec.rules),
-            overrides,
+            layer,
         })
     }
 
     /// Reads and parses the file at `path`, in the format its extension says.
-    pub fn load(path: &Path) -> Result<Self, Error> {
-        let text = fs::read_to_string(path).map_err(|source| Error::Io {
+    pub fn load(path: &Path) -> Result<Self, ProjectError> {
+        let text = fs::read_to_string(path).map_err(|source| ProjectError::Io {
             path: path.to_owned(),
             source,
         })?;
@@ -224,7 +370,7 @@ impl Config {
     }
 
     /// Walks up from `start` and returns the first config file with its path.
-    pub fn discover(start: &Path) -> Result<Option<(PathBuf, Self)>, Error> {
+    pub fn discover(start: &Path) -> Result<Option<(PathBuf, Self)>, ProjectError> {
         for dir in start.ancestors() {
             if let Some(path) = Self::file_in(dir) {
                 let config = Self::load(&path)?;
@@ -270,53 +416,35 @@ impl Config {
         &self.languages
     }
 
-    /// Preset ids named in `extends`, in declaration order.
+    /// The rules this project sets and the projects it extends.
+    pub fn layer(&self) -> &Layer {
+        &self.layer
+    }
+
+    /// Project names named in `extends`, in declaration order.
     pub fn extends(&self) -> &[String] {
-        &self.extends
+        self.layer.extends()
     }
 
     /// Entries named in `rules` and in every override, unmerged.
     pub fn configured(&self) -> impl Iterator<Item = (&str, &RuleConfig)> {
-        self.rules
-            .iter()
-            .chain(self.overrides.iter().flat_map(|o| o.rules.iter()))
-            .map(|(id, config)| (id.as_str(), config))
+        self.layer.configured()
     }
 
-    /// Effective rules for a file: extends, then `rules`, then matching
-    /// overrides in order. `path` is relative to the config directory.
-    /// `presets` supplies the rules of a preset id, already flattened.
+    /// Effective rules for a file; see [`Layer::resolve`].
     pub fn resolve(
         &self,
         path: &Path,
         lang: &str,
-        presets: &dyn Fn(&str) -> Option<Rules>,
-    ) -> Result<Rules, Error> {
-        let mut out = Rules::new();
-        for id in &self.extends {
-            let preset = presets(id).ok_or_else(|| Error::UnknownPreset(id.clone()))?;
-            rules::merge(&mut out, &preset);
-        }
-        rules::merge(&mut out, &self.rules);
-        for o in self.overrides.iter().filter(|o| o.matches(path, lang)) {
-            rules::merge(&mut out, &o.rules);
-        }
-        Ok(out)
+        projects: &Projects,
+    ) -> Result<Rules, ProjectError> {
+        self.layer.resolve(path, lang, projects)
     }
-}
-
-/// The JSON Schema of the kinds this crate defines.
-pub fn descriptors() -> Vec<lighthouse_resource::Descriptor> {
-    use lighthouse_resource::Descriptor;
-    vec![
-        Descriptor::of::<ProjectSpec>(),
-        Descriptor::of::<PresetSpec>(),
-    ]
 }
 
 /// Compiles path globs. `*` and `?` never cross `/`; `**` as a whole path
 /// component matches any number of directories (so `**` matches every path).
-pub fn glob_set<I>(patterns: I) -> Result<GlobSet, Error>
+pub fn glob_set<I>(patterns: I) -> Result<GlobSet, ProjectError>
 where
     I: IntoIterator,
     I::Item: AsRef<str>,
@@ -329,19 +457,19 @@ where
         let glob = GlobBuilder::new(pattern)
             .literal_separator(true)
             .build()
-            .map_err(|source| Error::Glob {
+            .map_err(|source| ProjectError::Glob {
                 pattern: pattern.to_owned(),
                 source,
             })?;
         set.add(glob);
     }
-    set.build().map_err(|source| Error::Glob {
+    set.build().map_err(|source| ProjectError::Glob {
         pattern: all.join(", "),
         source,
     })
 }
 
-fn globs(patterns: &[String]) -> Result<Option<GlobSet>, Error> {
+fn globs(patterns: &[String]) -> Result<Option<GlobSet>, ProjectError> {
     if patterns.is_empty() {
         return Ok(None);
     }

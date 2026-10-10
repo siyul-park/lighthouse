@@ -9,9 +9,9 @@ mod load;
 mod local;
 mod model;
 mod options;
-mod overrides;
 mod pack;
 mod pack_docs;
+mod project;
 mod render;
 mod sources;
 mod validate;
@@ -40,8 +40,12 @@ pub use model::{
     authored_severity,
 };
 pub use options::{ObjectType, OptionSchema, OptionType, OptionsSchema};
-pub use overrides::DecisionOverrideSpec;
 pub use pack::{Pack, PackSpec, Section, SectionSpec};
+pub use project::{
+    Config, FILE_NAME, FILE_NAMES, Formatter, FormatterOutput, FormatterSpec, FormatterStdin,
+    GlobSet, Layer, Level, OverrideSpec, PluginEntry, PluginRef, PluginRefSpec, ProjectError,
+    ProjectLanguage, ProjectSpec, Projects, RuleConfig, RuleDetail, RuleSetting, Rules, glob_set,
+};
 pub use render::{DOCS_DIR, decision_markdown, docs, help_path};
 pub use sources::{Source, SourceMapSpec};
 
@@ -49,8 +53,8 @@ pub use sources::{Source, SourceMapSpec};
 pub fn descriptors() -> Vec<Descriptor> {
     vec![
         Descriptor::of::<DecisionSpec>(),
-        Descriptor::of::<DecisionOverrideSpec>(),
         Descriptor::of::<PackSpec>(),
+        Descriptor::of::<ProjectSpec>(),
         Descriptor::of::<SourceMapSpec>(),
     ]
 }

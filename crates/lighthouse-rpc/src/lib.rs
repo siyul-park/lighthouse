@@ -9,9 +9,9 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_config::{Config, PluginRef};
 use lighthouse_model::Incomplete;
 use lighthouse_plugin::{Plugin, Registry};
+use lighthouse_spec::{Config, PluginRef};
 use thiserror::Error;
 
 pub use manifest::{

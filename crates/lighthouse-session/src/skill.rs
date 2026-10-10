@@ -18,8 +18,7 @@ const HEAD: &str = include_str!("skill-head.md");
 /// The skill of the project: its catalog layers and its configuration.
 pub fn skill_for(session: &Session) -> Result<String> {
     let catalog = session.catalog()?;
-    let registry = session.in_process_registry()?;
-    let active = active_rules(&registry, &session.config)?;
+    let active = active_rules(&session.config, &catalog.projects()?)?;
     Ok(skill(&catalog, &active))
 }
 

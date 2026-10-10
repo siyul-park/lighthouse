@@ -1,8 +1,7 @@
 use std::{fmt::Write as _, fs, path::Path};
 
-use lighthouse_config::Config;
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Catalog, Decision, Example, ExampleKind};
+use lighthouse_spec::{Catalog, Config, Decision, Example, ExampleKind};
 use serde_json::Value;
 
 use crate::{Engine, FixPlan, FixRun, unified_diff};
@@ -97,7 +96,7 @@ impl<'a> RuleTester<'a> {
         }
         let registry = (self.registry)();
         let config = config(&registry, decision, example)?;
-        let engine = Engine::new(registry, config, dir.path())
+        let engine = Engine::new(registry, config, self.catalog, dir.path())
             .map_err(|e| e.to_string())?
             .with_trust(self.trusted);
         let outcome = engine

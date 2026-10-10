@@ -1,10 +1,10 @@
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
-use lighthouse_config::{Config, RuleConfig, Rules};
 use lighthouse_engine::{Engine, Error};
 use lighthouse_model::RunScope;
 use lighthouse_model::{
@@ -12,9 +12,10 @@ use lighthouse_model::{
 };
 use lighthouse_plugin::{
     Analyzer, AnalyzerManifest, Conventions, Ctx, Error as PluginError, Indexed, LanguageProvider,
-    Plugin, PluginManifest, PresetManifest, ProviderManifest, Registry, Rule, RuleManifest, Source,
-    Workspace,
+    Plugin, PluginManifest, ProviderManifest, Registry, Rule, RuleManifest, Source, Workspace,
 };
+use lighthouse_spec::Catalog;
+use lighthouse_spec::Config;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
@@ -88,9 +89,6 @@ fn meta(
         docs: String::new(),
         analyzers: analyzers.iter().map(|a| (*a).to_owned()).collect(),
         capabilities: capabilities.to_vec(),
-        citation: None,
-        strict: false,
-        enforced: true,
     }
 }
 
@@ -175,17 +173,6 @@ impl Plugin for FakePlugin {
             }),
         ]
     }
-    fn presets(&self) -> Vec<PresetManifest> {
-        let each = RuleConfig {
-            level: Some(Severity::Warn),
-            options: Options::new(),
-        };
-        vec![PresetManifest {
-            extends: Vec::new(),
-            id: "fake/p".to_owned(),
-            rules: Rules::from([("fake/each".to_owned(), each)]),
-        }]
-    }
 }
 
 fn registry(fail_on: &'static str) -> Registry {
@@ -268,6 +255,7 @@ fn engine(dir: &TempDir, toml: &str) -> Result<Engine, Error> {
     Engine::new(
         registry("!"),
         Config::parse_inline(toml).unwrap(),
+        Catalog::bundled(),
         dir.path(),
     )
 }
@@ -366,6 +354,7 @@ fn unreadable_and_unindexed_files_are_incomplete_not_notices() {
     let engine = Engine::new(
         registry(".skip"),
         Config::parse_inline(ALL).unwrap(),
+        Catalog::bundled(),
         dir.path(),
     )
     .unwrap();
@@ -407,6 +396,7 @@ fn non_utf8_data_claimed_only_by_a_fallback_provider_is_a_notice() {
     let engine = Engine::new(
         registry,
         Config::parse_inline("plugins = [\"bin\"]").unwrap(),
+        Catalog::bundled(),
         dir.path(),
     )
     .unwrap();
@@ -419,7 +409,13 @@ fn non_utf8_data_claimed_only_by_a_fallback_provider_is_a_notice() {
 fn a_provider_with_an_execution_error_makes_its_whole_batch_incomplete_in_one_entry() {
     let dir = project(&[("a.txt", b"1"), ("b.txt", b"2"), ("boom.crash", b"3")]);
     let (registry, batches) = batched("!", ".crash");
-    let engine = Engine::new(registry, Config::parse_inline(ALL).unwrap(), dir.path()).unwrap();
+    let engine = Engine::new(
+        registry,
+        Config::parse_inline(ALL).unwrap(),
+        Catalog::bundled(),
+        dir.path(),
+    )
+    .unwrap();
     let out = engine
         .check(&root(&dir), &["fake/each".to_owned()])
         .unwrap();
@@ -440,7 +436,13 @@ fn a_provider_with_an_execution_error_makes_its_whole_batch_incomplete_in_one_en
 fn each_provider_is_called_once_with_all_its_files() {
     let dir = project(&[("a/x.txt", b"1"), ("b/y.txt", b"2"), ("z.txt", b"3")]);
     let (registry, batches) = batched("!", "!");
-    let engine = Engine::new(registry, Config::parse_inline(ALL).unwrap(), dir.path()).unwrap();
+    let engine = Engine::new(
+        registry,
+        Config::parse_inline(ALL).unwrap(),
+        Catalog::bundled(),
+        dir.path(),
+    )
+    .unwrap();
     engine.check(&root(&dir), &[]).unwrap();
     engine.check(&[dir.path().join("a")], &[]).unwrap();
     assert_eq!(*batches.lock().unwrap(), [3, 3]);
@@ -520,6 +522,7 @@ fn outcome_exit_code() {
     let engine = Engine::new(
         registry(".skip"),
         Config::parse_inline(ALL).unwrap(),
+        Catalog::bundled(),
         dir.path(),
     )
     .unwrap();
@@ -544,12 +547,8 @@ fn construction_validates_plugins_presets_rules_and_options() {
         Error::UnknownPlugin(_)
     ));
     assert!(matches!(
-        err("extends = [\"fake/p\"]"),
-        Error::PluginNotListed(_)
-    ));
-    assert!(matches!(
         err("plugins = [\"fake\"]\nextends = [\"fake/zzz\"]"),
-        Error::Config(_)
+        Error::Project(_)
     ));
     assert!(matches!(
         err("plugins = [\"fake\"]\n[rules]\n\"fake/zzz\" = \"warn\""),
@@ -700,25 +699,32 @@ fn outcome_states_report_scope_rules_that_ran_and_subject_facts() {
     assert_eq!(files.reported, [PathBuf::from("a/x.txt")]);
 }
 
+const TEAM: &str = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: fake/p\nspec:\n  rules:\n    fake/each: warn\n";
+
 #[test]
 fn active_rules() {
-    let registry = registry("!");
     let config = |toml: &str| Config::parse_inline(toml).unwrap();
-    let from_preset = lighthouse_engine::active_rules(
-        &registry,
+    let team =
+        Catalog::from_local(BTreeMap::from([("team.yaml".to_owned(), TEAM.to_owned())])).unwrap();
+    let projects = Catalog::overlay(Catalog::bundled(), &team)
+        .unwrap()
+        .projects()
+        .unwrap();
+    let from_project = lighthouse_engine::active_rules(
         &config("plugins = [\"fake\"]\nextends = [\"fake/p\"]\n"),
+        &projects,
     )
     .unwrap();
-    assert_eq!(from_preset.into_iter().collect::<Vec<_>>(), ["fake/each"]);
+    assert_eq!(from_project.into_iter().collect::<Vec<_>>(), ["fake/each"]);
 
     let set_by_entry = lighthouse_engine::active_rules(
-        &registry,
         &config("plugins = [\"fake\"]\n[rules]\n\"fake/all\" = \"warn\"\n"),
+        &projects,
     )
     .unwrap();
     assert_eq!(set_by_entry.into_iter().collect::<Vec<_>>(), ["fake/all"]);
 
-    let unknown = lighthouse_engine::active_rules(&registry, &config("extends = [\"nope/p\"]\n"));
+    let unknown = lighthouse_engine::active_rules(&config("extends = [\"nope/p\"]\n"), &projects);
     assert!(unknown.is_err());
 }
 

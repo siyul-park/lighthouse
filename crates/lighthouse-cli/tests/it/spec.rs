@@ -106,6 +106,81 @@ fn migrate_applies_every_write_before_it_removes_anything() {
     assert_eq!(fs::read_to_string(rule).unwrap(), OLD_RULE);
 }
 
+const PROJECT: &str = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: demo\nspec:\n  plugins: [core]\n  extends: [core/recommended]\n";
+
+const PRESET: &str = "apiVersion: lighthouse/v1alpha1\nkind: Preset\nmetadata:\n  name: team/strict\nspec:\n  extends: [core/recommended]\n  rules:\n    core/max-file-lines: error\n";
+
+fn override_of(spec: &str) -> String {
+    format!(
+        "apiVersion: lighthouse/v1alpha1\nkind: DecisionOverride\nmetadata:\n  name: tweak\nspec:\n{spec}"
+    )
+}
+
+#[test]
+fn migrate_turns_a_preset_into_a_project() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "presets/strict.yaml", PRESET);
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate", "presets/strict.yaml"])
+        .assert()
+        .success();
+
+    let text = fs::read_to_string(dir.path().join("presets/strict.yaml")).unwrap();
+    assert!(text.contains("kind: Project"), "{text}");
+    assert!(text.contains("core/max-file-lines: error"), "{text}");
+    lighthouse(dir.path())
+        .args(["spec", "migrate", "presets/strict.yaml"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("0 file(s) written, 0 removed"));
+}
+
+#[test]
+fn migrate_folds_an_override_into_the_rules_of_the_project() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "lighthouse.yaml", PROJECT);
+    write(
+        dir.path(),
+        ".lighthouse/decisions/tweak.yaml",
+        &override_of(
+            "  extends: core/max-file-lines\n  severity: error\n  options: { max: 300 }\n",
+        ),
+    );
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate"])
+        .assert()
+        .success();
+
+    assert!(!dir.path().join(".lighthouse/decisions/tweak.yaml").exists());
+    let project = fs::read_to_string(dir.path().join("lighthouse.yaml")).unwrap();
+    assert!(project.contains("core/max-file-lines"), "{project}");
+    assert!(project.contains("level: error"), "{project}");
+    assert!(project.contains("max: 300"), "{project}");
+    lighthouse(dir.path())
+        .args(["spec", "validate"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn migrate_keeps_an_override_that_needs_a_local_decision_and_says_so() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "lighthouse.yaml", PROJECT);
+    let wording = override_of("  extends: core/max-file-lines\n  exceptions: Vendored code.\n");
+    write(dir.path(), ".lighthouse/decisions/tweak.yaml", &wording);
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("write a local decision"));
+
+    let kept = fs::read_to_string(dir.path().join(".lighthouse/decisions/tweak.yaml")).unwrap();
+    assert_eq!(kept, wording);
+}
+
 #[test]
 fn migrate_refuses_a_file_of_several_documents_and_changes_nothing() {
     let dir = tempfile::tempdir().unwrap();
@@ -296,7 +371,7 @@ fn validate_names_what_is_wrong_across_documents() {
         .assert()
         .code(1)
         .stdout(predicate::str::contains(
-            "extends unknown preset `core/nope`",
+            "extends unknown project `core/nope`",
         ))
         .stdout(predicate::str::contains(
             "rule `core/nonesuch` is not registered",
@@ -342,7 +417,7 @@ fn checked_in_schemas_match_the_types() {
             .success();
     }
     let schemas = lighthouse_session::schemas();
-    assert_eq!(schemas.len(), 9);
+    assert_eq!(schemas.len(), 6);
     let on_disk = fs::read_dir(&root)
         .unwrap()
         .filter(|e| {
@@ -350,7 +425,7 @@ fn checked_in_schemas_match_the_types() {
             name.to_string_lossy().ends_with(".schema.json")
         })
         .count();
-    assert_eq!(on_disk, 9, "a schema file nothing generates is stale");
+    assert_eq!(on_disk, 6, "a schema file nothing generates is stale");
     for descriptor in schemas.into_values() {
         let file = root.join(lighthouse_resource::schema_file(descriptor.kind));
         let mut want = serde_json::to_string_pretty(&descriptor.schema).unwrap();

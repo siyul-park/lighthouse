@@ -22,7 +22,6 @@ lighthouse-resource.workspace = true
 lighthouse-spec.workspace = true
 
 [dev-dependencies]
-lighthouse-config.workspace = true
 lighthouse-engine.workspace = true
 lighthouse-rpc.workspace = true
 tempfile.workspace = true
