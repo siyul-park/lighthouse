@@ -48,7 +48,6 @@ impl LanguageProvider for Files {
 /// A rule that counts the times it runs and says what it saw.
 struct Counting {
     meta: RuleManifest,
-    reach: Reach,
     runs: Arc<AtomicUsize>,
 }
 
@@ -80,18 +79,13 @@ impl Rule for Counting {
             fingerprint,
         )])
     }
-    fn caching(&self) -> Option<Caching> {
-        Some(Caching {
-            reach: self.reach,
-            revision: "1".to_owned(),
-        })
-    }
 }
 
 /// The rules of the plugin and the counters of their runs.
 struct Counted {
     local: Arc<AtomicUsize>,
     global: Arc<AtomicUsize>,
+    rows: Arc<AtomicUsize>,
 }
 
 struct CountingPlugin {
@@ -110,7 +104,7 @@ impl Plugin for CountingPlugin {
         )))]
     }
     fn rules(&self) -> Vec<Box<dyn Rule>> {
-        let meta = |id: &str, scope| RuleManifest {
+        let meta = |id: &str, scope, reach| RuleManifest {
             id: id.to_owned(),
             uid: None,
             severity: Severity::Warn,
@@ -120,26 +114,38 @@ impl Plugin for CountingPlugin {
             analyzers: Vec::new(),
             capabilities: Vec::new(),
             applicability: Applicability::default(),
+            caching: Some(Caching {
+                reach,
+                positions: false,
+                revision: "1".to_owned(),
+            }),
         };
         vec![
             Box::new(Counting {
-                meta: meta("counting/local", RunScope::File),
-                reach: Reach::Local,
+                meta: meta("counting/local", RunScope::File, Reach::Local),
                 runs: Arc::clone(&self.counted.local),
             }),
             Box::new(Counting {
-                meta: meta("counting/global", RunScope::Project),
-                reach: Reach::Global,
+                meta: meta("counting/global", RunScope::Project, Reach::Global),
                 runs: Arc::clone(&self.counted.global),
+            }),
+            Box::new(Counting {
+                meta: meta("counting/rows", RunScope::File, Reach::Global),
+                runs: Arc::clone(&self.counted.rows),
             }),
         ]
     }
 }
 
 fn engine(root: &Path) -> (Engine, Counted) {
+    engine_with(root, CONFIG)
+}
+
+fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
     let counted = Counted {
         local: Arc::default(),
         global: Arc::default(),
+        rows: Arc::default(),
     };
     let mut registry = Registry::default();
     registry
@@ -151,12 +157,13 @@ fn engine(root: &Path) -> (Engine, Counted) {
             counted: Counted {
                 local: Arc::clone(&counted.local),
                 global: Arc::clone(&counted.global),
+                rows: Arc::clone(&counted.rows),
             },
         })
         .unwrap();
     let engine = Engine::new(
         registry,
-        Config::parse_inline(CONFIG).unwrap(),
+        Config::parse_inline(config).unwrap(),
         Catalog::bundled(),
         root,
     )
@@ -258,4 +265,34 @@ fn engine_with_cache_runs_without_it_when_it_cannot_be_opened() {
         "{:?}",
         outcome.notices
     );
+}
+
+#[test]
+fn a_global_rule_that_runs_per_file_keeps_one_row_for_the_project_state() {
+    const ROWS: &str = "plugins = [\"counting\"]\n[rules]\n\"counting/rows\" = \"warn\"\n";
+    let dir = project();
+    let cache = tempfile::tempdir().unwrap();
+    let cached = || {
+        let (engine, counted) = engine_with(dir.path(), ROWS);
+        (
+            engine.with_cache(cache.path().join("cache"), u64::MAX),
+            counted,
+        )
+    };
+    let (first, first_runs) = cached();
+    let first = first.check(&[], &[]).unwrap();
+    assert_eq!(first_runs.rows.load(Ordering::SeqCst), 2);
+
+    let (second, second_runs) = cached();
+    let second = second.check(&[], &[]).unwrap();
+    assert_eq!(second_runs.rows.load(Ordering::SeqCst), 0);
+    assert_eq!(found(&second), found(&first));
+
+    // Any change of the project is another state: every file is judged again.
+    fs::write(dir.path().join("b.txt"), "bbbb").unwrap();
+    let (third, third_runs) = cached();
+    let third = third.check(&[], &[]).unwrap();
+    assert_eq!(third_runs.rows.load(Ordering::SeqCst), 2);
+    let (plain, _) = engine_with(dir.path(), ROWS);
+    assert_eq!(found(&third), found(&plain.check(&[], &[]).unwrap()));
 }

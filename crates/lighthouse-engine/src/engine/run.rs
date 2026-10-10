@@ -146,7 +146,7 @@ impl Engine {
             project
         };
         let started = Instant::now();
-        let cache = self.open_cache(&project, &mut progress.outcome.notices);
+        let cache = self.open_cache(&project, selected, &mut progress.outcome.notices);
         progress.timings.hashing = started.elapsed();
         Loaded {
             inputs,

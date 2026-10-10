@@ -9,6 +9,7 @@ globset.workspace = true
 thiserror.workspace = true
 ignore.workspace = true
 rayon.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 similar.workspace = true
 tempfile.workspace = true

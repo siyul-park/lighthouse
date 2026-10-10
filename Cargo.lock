@@ -721,6 +721,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
 ]
 
@@ -729,6 +730,7 @@ name = "lighthouse-checks"
 version = "0.1.0"
 dependencies = [
  "cel",
+ "lighthouse-cache",
  "lighthouse-engine",
  "lighthouse-model",
  "lighthouse-plugin",
@@ -780,6 +782,7 @@ dependencies = [
  "lighthouse-resource",
  "lighthouse-spec",
  "rayon",
+ "serde",
  "serde_json",
  "similar",
  "tempfile",

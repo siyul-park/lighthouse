@@ -247,6 +247,76 @@ impl World {
             .collect()
     }
 
+    /// The fragment of each file of the world, by path.
+    pub fn fragments(&self) -> Vec<(String, Fragment)> {
+        self.files
+            .iter()
+            .map(|(path, generated)| {
+                let file = File {
+                    path: path.into(),
+                    lang: "wire".to_owned(),
+                    hash: String::new(),
+                    generated: *generated,
+                    test: path.ends_with("_test.ucm"),
+                };
+                let own = |s: &Symbol| s.file.to_string_lossy() == path.as_str();
+                let ids: Vec<&SymbolId> = self
+                    .symbols
+                    .iter()
+                    .filter(|s| own(s))
+                    .map(|s| &s.id)
+                    .collect();
+                let fragment = Fragment {
+                    files: vec![file],
+                    modules: self.modules.clone(),
+                    symbols: self.symbols.iter().filter(|s| own(s)).cloned().collect(),
+                    functions: self
+                        .summaries
+                        .iter()
+                        .filter(|f| ids.contains(&&f.symbol))
+                        .cloned()
+                        .collect(),
+                    edges: self
+                        .edges
+                        .iter()
+                        .filter(|e| matches!(&e.from, Node::Symbol(id) if ids.contains(&id)))
+                        .cloned()
+                        .chain(
+                            self.imports
+                                .iter()
+                                .filter(|(from, _)| ids.iter().any(|id| id.module() == from))
+                                .map(|(from, to)| Edge {
+                                    kind: EdgeKind::Imports,
+                                    from: Node::Module(from.clone()),
+                                    to: Target::Path(to.clone()),
+                                    resolution: Resolution::Syntactic,
+                                    site: None,
+                                }),
+                        )
+                        .collect(),
+                    tests: self
+                        .tests
+                        .iter()
+                        .filter(|t| ids.contains(&&t.symbol))
+                        .cloned()
+                        .collect(),
+                    comments: self
+                        .comments
+                        .iter()
+                        .filter(|c| c.file.to_string_lossy() == path.as_str())
+                        .cloned()
+                        .collect(),
+                };
+                (path.clone(), fragment)
+            })
+            .collect()
+    }
+
+    /// The world as the engine merges it.
+    pub fn project(&self) -> lighthouse_model::Project {
+        lighthouse_model::Project::merge(self.fragments().into_iter().map(|(_, f)| f))
+    }
+
     fn diagnose_in(
         &self,
         subject: &Subject,
@@ -254,62 +324,7 @@ impl World {
         options: Value,
     ) -> Vec<lighthouse_model::Diagnostic> {
         let dir = tempfile::tempdir().unwrap();
-        for (path, generated) in &self.files {
-            let file = File {
-                path: path.into(),
-                lang: "wire".to_owned(),
-                hash: String::new(),
-                generated: *generated,
-                test: path.ends_with("_test.ucm"),
-            };
-            let own = |s: &Symbol| s.file.to_string_lossy() == path.as_str();
-            let ids: Vec<&SymbolId> = self
-                .symbols
-                .iter()
-                .filter(|s| own(s))
-                .map(|s| &s.id)
-                .collect();
-            let fragment = Fragment {
-                files: vec![file],
-                modules: self.modules.clone(),
-                symbols: self.symbols.iter().filter(|s| own(s)).cloned().collect(),
-                functions: self
-                    .summaries
-                    .iter()
-                    .filter(|f| ids.contains(&&f.symbol))
-                    .cloned()
-                    .collect(),
-                edges: self
-                    .edges
-                    .iter()
-                    .filter(|e| matches!(&e.from, Node::Symbol(id) if ids.contains(&id)))
-                    .cloned()
-                    .chain(
-                        self.imports
-                            .iter()
-                            .filter(|(from, _)| ids.iter().any(|id| id.module() == from))
-                            .map(|(from, to)| Edge {
-                                kind: EdgeKind::Imports,
-                                from: Node::Module(from.clone()),
-                                to: Target::Path(to.clone()),
-                                resolution: Resolution::Syntactic,
-                                site: None,
-                            }),
-                    )
-                    .collect(),
-                tests: self
-                    .tests
-                    .iter()
-                    .filter(|t| ids.contains(&&t.symbol))
-                    .cloned()
-                    .collect(),
-                comments: self
-                    .comments
-                    .iter()
-                    .filter(|c| c.file.to_string_lossy() == path.as_str())
-                    .cloned()
-                    .collect(),
-            };
+        for (path, fragment) in self.fragments() {
             let target = dir.path().join(path);
             fs::create_dir_all(target.parent().unwrap()).unwrap();
             fs::write(target, serde_json::to_string(&fragment).unwrap()).unwrap();

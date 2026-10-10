@@ -168,7 +168,7 @@ impl<'a> Builder<'a> {
         // Whether a file is generated is what the merged model says, not what
         // the run read from disk.
         value["generated"] = json!(self.project.file(&file.path).is_none_or(|f| f.generated));
-        if self.needs.mentions("private_reach") {
+        if self.needs.fact("private_reach") {
             value["private_reach"] = self.private_reach(file);
             value["module"] = json!(self.file_module(file).unwrap_or_default());
             value["module_known"] = json!(
@@ -240,7 +240,7 @@ impl<'a> Builder<'a> {
     ) {
         let needs = self.needs;
         let project = self.project;
-        if needs.mentions("forwards_only") || needs.mentions("forward_target") {
+        if needs.fact("forwards_only") || needs.fact("forward_target") {
             let target = summary.and_then(|_| forwarded(project, symbol));
             map.insert("forwards_only".to_owned(), json!(target.is_some()));
             map.insert(
@@ -248,13 +248,13 @@ impl<'a> Builder<'a> {
                 json!(target.map_or("", |t| t.as_str())),
             );
         }
-        if needs.mentions("documented_by_interface") {
+        if needs.fact("documented_by_interface") {
             map.insert(
                 "documented_by_interface".to_owned(),
                 json!(documented_by_interface(project, symbol)),
             );
         }
-        if needs.mentions("receiver_affinity") {
+        if needs.fact("receiver_affinity") {
             map.insert(
                 "receiver_affinity".to_owned(),
                 self.receiver_affinity(symbol),
@@ -263,31 +263,31 @@ impl<'a> Builder<'a> {
         self.placement_facts(map, symbol);
         self.api_facts(map, symbol, summary);
         self.role_facts(map, symbol, summary);
-        if needs.mentions("local_callers") {
+        if needs.fact("local_callers") {
             map.insert("local_callers".to_owned(), self.local_callers(symbol));
         }
-        if needs.mentions("touched_by_tests") {
+        if needs.fact("touched_by_tests") {
             map.insert(
                 "touched_by_tests".to_owned(),
                 json!(touched_by_tests(project, symbol)),
             );
         }
-        if needs.mentions("data_only") {
+        if needs.fact("data_only") {
             map.insert("data_only".to_owned(), json!(data_only(project, symbol)));
         }
-        if needs.mentions("module_tested") {
+        if needs.fact("module_tested") {
             map.insert(
                 "module_tested".to_owned(),
                 json!(module_tested(project, symbol.id.module())),
             );
         }
-        if needs.mentions("file_first_test") {
+        if needs.fact("file_first_test") {
             map.insert(
                 "file_first_test".to_owned(),
                 self.first_test(symbol).unwrap_or_else(|| json!({})),
             );
         }
-        if needs.mentions("helper_user") {
+        if needs.fact("helper_user") {
             map.insert("helper_user".to_owned(), self.helper_user(symbol));
         }
     }
@@ -296,16 +296,16 @@ impl<'a> Builder<'a> {
     /// of the project.
     fn placement_facts(&self, map: &mut Map<String, Value>, symbol: &Symbol) {
         let needs = self.needs;
-        if needs.mentions("envy") {
+        if needs.fact("envy") {
             map.insert("envy".to_owned(), self.envy(symbol));
         }
-        if needs.mentions("owner_home") {
+        if needs.fact("owner_home") {
             map.insert("owner_home".to_owned(), self.owner_home(symbol));
         }
-        if needs.mentions("homonyms") {
+        if needs.fact("homonyms") {
             map.insert("homonyms".to_owned(), self.homonyms(symbol));
         }
-        if needs.mentions("hidden_target") {
+        if needs.fact("hidden_target") {
             map.insert("hidden_target".to_owned(), self.hidden_target(symbol));
         }
     }

@@ -18,7 +18,7 @@ use crate::{
     eval::{Frame, Template, compile, compile_all},
     layout::declarations,
     library::{self, Needs},
-    reach,
+    order, reach,
 };
 
 /// `order`: declarations follow the order of registered order keys.
@@ -62,6 +62,7 @@ impl OrderRule {
         let mut compiled = Vec::new();
         for clause in clauses {
             sources.push(&clause.message);
+            sources.extend(clause.when.as_deref());
             sources.extend(clause.evidence.values().map(String::as_str));
             compiled.push(Clause {
                 within: clause.within,
@@ -87,9 +88,15 @@ impl OrderRule {
     }
 
     /// The declarations of a file are ordered by what the file says of them,
-    /// besides what the messages mention.
-    pub(crate) fn reach(&self) -> Reach {
-        reach::of(&self.needs)
+    /// besides what the expressions mention; a key from another plugin may
+    /// read the project.
+    pub(crate) fn reach(&self) -> (Reach, bool) {
+        let core = |id: &String| order::CORE_KEYS.contains(&id.as_str());
+        if self.clauses.iter().all(|c| c.by.iter().all(core)) {
+            reach::of(&self.needs)
+        } else {
+            (Reach::Global, false)
+        }
     }
 
     pub(crate) fn check(
@@ -240,6 +247,7 @@ impl ProximityRule {
             return Err(Error::invalid(id, "not a proximity check"));
         };
         let mut sources: Vec<&str> = vec![group.as_str(), message.as_str()];
+        sources.extend(when.as_deref());
         sources.extend(separator.as_deref());
         sources.extend(evidence.values().map(String::as_str));
         Ok(Self {
@@ -264,7 +272,7 @@ impl ProximityRule {
     }
 
     /// Declarations that belong together stay together within a file.
-    pub(crate) fn reach(&self) -> Reach {
+    pub(crate) fn reach(&self) -> (Reach, bool) {
         reach::of(&self.needs)
     }
 

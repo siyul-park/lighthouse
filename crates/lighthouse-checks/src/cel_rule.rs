@@ -124,10 +124,10 @@ impl CelRule {
     /// How far the findings about one subject reach: a project decision reads
     /// the whole project, and so does one that reports at a symbol other than
     /// its subject; else what the expressions read.
-    pub(crate) fn reach(&self, scope: lighthouse_model::RunScope) -> Reach {
+    pub(crate) fn reach(&self, scope: lighthouse_model::RunScope) -> (Reach, bool) {
         let elsewhere = self.at.as_ref().is_some_and(|at| at.symbol.is_some());
         if scope == lighthouse_model::RunScope::Project || elsewhere {
-            return Reach::Global;
+            return (Reach::Global, false);
         }
         reach::of(&self.needs)
     }

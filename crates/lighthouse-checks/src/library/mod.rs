@@ -75,6 +75,16 @@ impl Needs {
         })
     }
 
+    /// Whether some expression mentions the fact `word`; the one way the
+    /// builder asks, so that a fact without a declared reach is caught.
+    pub(crate) fn fact(&self, word: &'static str) -> bool {
+        debug_assert!(
+            crate::reach::fact_declared(word),
+            "fact `{word}` has no declared reach"
+        );
+        self.mentions(word)
+    }
+
     /// Whether some expression calls library function `name`.
     pub(crate) fn function(&self, name: &str) -> bool {
         self.names.contains(&name)

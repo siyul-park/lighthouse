@@ -2,6 +2,7 @@
 
 mod agent;
 mod cache;
+mod cache_fixtures;
 mod checks;
 mod cli;
 mod command_sarif;

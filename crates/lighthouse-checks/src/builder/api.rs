@@ -25,7 +25,7 @@ impl Builder<'_> {
         symbol: &Symbol,
         summary: Option<&FunctionSummary>,
     ) {
-        if self.needs.mentions("signature") {
+        if self.needs.fact("signature") {
             let signature = summary.map(|s| &s.signature);
             let list = |types: Option<&[TypeRef]>| {
                 types
@@ -43,7 +43,7 @@ impl Builder<'_> {
                 }),
             );
         }
-        if self.needs.mentions("type_ref") {
+        if self.needs.fact("type_ref") {
             map.insert("type_ref".to_owned(), type_ref(symbol.type_ref.as_ref(), 0));
         }
     }

@@ -4,7 +4,7 @@
 use sha2::{Digest, Sha256};
 
 /// A SHA-256 being fed bytes.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Hasher(Sha256);
 
 impl Hasher {

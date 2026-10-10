@@ -23,6 +23,8 @@ mod modules;
 mod naming;
 mod ops;
 mod order;
+#[doc(hidden)]
+pub mod probe;
 pub mod reach;
 mod rule;
 mod table;

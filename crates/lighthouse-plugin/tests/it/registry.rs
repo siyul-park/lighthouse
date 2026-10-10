@@ -245,6 +245,7 @@ fn rule_manifest_fingerprints_are_seeded_by_the_uid_so_a_rename_moves_none() {
         analyzers: Vec::new(),
         capabilities: Vec::new(),
         applicability: lighthouse_model::Applicability::default(),
+        caching: None,
     };
     let by_name = meta.fingerprint("pkg::f#function", "snippet");
     assert_eq!(

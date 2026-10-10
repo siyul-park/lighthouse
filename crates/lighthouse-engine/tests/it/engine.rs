@@ -91,6 +91,7 @@ fn meta(
         analyzers: analyzers.iter().map(|a| (*a).to_owned()).collect(),
         capabilities: capabilities.to_vec(),
         applicability: Applicability::default(),
+        caching: None,
     }
 }
 

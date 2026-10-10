@@ -13,7 +13,7 @@ impl Key {
 
 /// Builds a [`Key`] from parts. Every part is length-prefixed, so that
 /// `["ab", "c"]` and `["a", "bc"]` are different keys.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct KeyBuilder(Hasher);
 
 impl KeyBuilder {

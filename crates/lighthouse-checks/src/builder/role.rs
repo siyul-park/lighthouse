@@ -26,18 +26,19 @@ impl Builder<'_> {
         summary: Option<&FunctionSummary>,
     ) {
         let needs = self.needs;
-        if needs.mentions("constructor_named") {
+        if needs.fact("constructor_named") {
             map.insert(
                 "constructor_named".to_owned(),
                 json!(self.constructor_named(symbol)),
             );
         }
-        if needs.mentions("effective") {
+        if needs.fact("effective") {
             map.insert("effective".to_owned(), self.effective(symbol, summary));
         }
-        if ["role", "limit(", "counted(", "built"]
-            .iter()
-            .any(|word| needs.mentions(word))
+        if needs.fact("role")
+            || needs.fact("built")
+            || needs.calls("limit")
+            || needs.calls("counted")
         {
             map.insert("role".to_owned(), json!(self.role(symbol, summary)));
             map.insert("built".to_owned(), json!(self.built(symbol)));

@@ -86,13 +86,20 @@ pub const FUNCTIONS: &[(&str, Reach)] = &[
 ];
 
 /// The fields that say where in its file a value is. The neighbors digest
-/// leaves them out, so a check that reads them of a neighbor reaches the
-/// project.
+/// leaves them out, so a check that mentions them is keyed on the digest that
+/// has them.
 const POSITIONS: [&str; 4] = ["line", "col", "pos", "end_line"];
 
-/// The reach of the expressions: the greatest reach of the facts they
-/// mention and the functions they call.
-pub(crate) fn of(needs: &Needs) -> Reach {
+/// Whether `word` is a fact with a declared reach. A fact the builder derives
+/// without a declaration reaches the whole project.
+pub(crate) fn fact_declared(word: &str) -> bool {
+    FACTS.iter().any(|(declared, _)| *declared == word)
+}
+
+/// The reach of the expressions, and whether they read the place of
+/// neighbors: the greatest reach of the facts they mention and the functions
+/// they call.
+pub(crate) fn of(needs: &Needs) -> (Reach, bool) {
     let facts = FACTS.iter().filter(|(word, _)| needs.mentions(word));
     let functions = FUNCTIONS.iter().filter(|(name, _)| needs.calls(name));
     let reach = facts
@@ -100,9 +107,6 @@ pub(crate) fn of(needs: &Needs) -> Reach {
         .map(|(_, reach)| *reach)
         .max()
         .unwrap_or(Reach::Local);
-    if reach >= Reach::Neighbors && POSITIONS.iter().any(|word| needs.mentions(word)) {
-        Reach::Global
-    } else {
-        reach
-    }
+    let positions = reach == Reach::Neighbors && POSITIONS.iter().any(|word| needs.mentions(word));
+    (reach, positions)
 }

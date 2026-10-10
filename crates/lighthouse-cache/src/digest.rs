@@ -1,7 +1,7 @@
 //! The hashes of a merged project that keys are built from, computed once per
 //! run from what the merge already holds, the files side by side.
 //!
-//! Per file there are two. The `slice` covers what the file itself contributes:
+//! Per file there are three. The `slice` covers what the file itself contributes:
 //! its record, symbols, function summaries, tests, comments, outgoing edges,
 //! the modules and owners of its symbols. The `neighbors` digest covers what
 //! its symbols are tied to: each edge that starts or ends at one, the owner of
@@ -9,7 +9,8 @@
 //! (identity, kind, visibility, owner, file, test and generation flags, the
 //! number of its callers, callees, references and members) but not where in
 //! its file it lies, so that an edit that only moves a neighbor changes
-//! nothing. The whole-project digest is made of every slice and what belongs
+//! nothing. The `neighbors_at` digest is the same with the place of each
+//! neighbor, for the rules that read it. The whole-project digest is made of every slice and what belongs
 //! to no file.
 
 use std::{
@@ -32,6 +33,7 @@ pub type Digest = [u8; 32];
 pub struct FileDigest {
     pub slice: Digest,
     pub neighbors: Digest,
+    pub neighbors_at: Digest,
 }
 
 /// The digests of a project: one per file and one for all of it.
@@ -88,7 +90,7 @@ impl Digests {
 /// symbol, and the edges that end at each.
 struct Ties<'p> {
     project: &'p Project,
-    described: HashMap<&'p SymbolId, Digest>,
+    described: HashMap<&'p SymbolId, Described>,
     incoming: HashMap<&'p SymbolId, Vec<&'p Edge>>,
 }
 
@@ -137,6 +139,7 @@ impl<'p> Ties<'p> {
             feed(&mut slice, comment)?;
         }
         for module in modules {
+            // A module the project does not list is hashed by its path.
             match project.module(module) {
                 Some(module) => feed(&mut slice, module)?,
                 None => feed(&mut slice, module)?,
@@ -145,13 +148,16 @@ impl<'p> Ties<'p> {
         // The edges and ties of a file come in the order the providers made
         // them in, which is not the same from run to run.
         let mut near = Hasher::new();
+        let mut near_at = Hasher::new();
         parts.edges.sort_unstable();
         parts.edges.iter().for_each(|edge| slice.update(edge));
         parts.ties.sort_unstable();
-        parts.ties.iter().for_each(|tie| near.update(tie));
+        parts.ties.iter().for_each(|tie| near.update(tie.plain));
+        parts.ties.iter().for_each(|tie| near_at.update(tie.at));
         Ok(FileDigest {
             slice: slice.finish_bytes(),
             neighbors: near.finish_bytes(),
+            neighbors_at: near_at.finish_bytes(),
         })
     }
 
@@ -161,12 +167,16 @@ impl<'p> Ties<'p> {
         if let Some(owner) = symbol.owner.as_ref().and_then(|o| project.symbol(o)) {
             feed(slice, &(owner.kind.as_str(), &owner.name))?;
             if let Some(described) = self.described.get(&owner.id) {
-                parts.ties.push(tie(b"owner", &symbol.id, "", described));
+                parts
+                    .ties
+                    .push(tie(b"owner", &symbol.id, [0, 0], described.pair()));
             }
         }
         for member in project.members(&symbol.id) {
             if let Some(described) = self.described.get(member) {
-                parts.ties.push(tie(b"member", &symbol.id, "", described));
+                parts
+                    .ties
+                    .push(tie(b"member", &symbol.id, [0, 0], described.pair()));
             }
         }
         Ok(())
@@ -177,24 +187,29 @@ impl<'p> Ties<'p> {
     fn edges(&self, parts: &mut Parts, symbol: &Symbol) -> Result<(), Error> {
         for edge in self.project.edges_from(&symbol.id) {
             parts.edges.push(edge_digest(edge)?);
-            let kind = format!("{}|{:?}", edge.kind.as_str(), edge.resolution);
             let other = self.end(&edge.to)?;
-            parts.ties.push(tie(b"out", &symbol.id, &kind, &other));
+            parts
+                .ties
+                .push(tie(b"out", &symbol.id, kind_of(edge), other));
         }
         for edge in self.incoming.get(&symbol.id).into_iter().flatten() {
-            let kind = format!("{}|{:?}", edge.kind.as_str(), edge.resolution);
             let other = self.end(&edge.from)?;
-            parts.ties.push(tie(b"in", &symbol.id, &kind, &other));
+            parts
+                .ties
+                .push(tie(b"in", &symbol.id, kind_of(edge), other));
         }
         Ok(())
     }
 
     /// What identifies an end of an edge: the description of its symbol, or
     /// the end as written when it is not a symbol of the project.
-    fn end<T: Serialize + SymbolOf>(&self, end: &T) -> Result<Vec<u8>, Error> {
+    fn end<T: Serialize + SymbolOf>(&self, end: &T) -> Result<(Digest, Digest), Error> {
         match end.symbol().and_then(|id| self.described.get(id)) {
-            Some(described) => Ok(described.to_vec()),
-            None => Ok(serde_json::to_vec(end)?),
+            Some(described) => Ok(described.pair()),
+            None => {
+                let written = digest_of(end)?;
+                Ok((written, written))
+            }
         }
     }
 
@@ -276,7 +291,27 @@ impl SymbolOf for Target {
 #[derive(Default)]
 struct Parts {
     edges: Vec<Digest>,
-    ties: Vec<Digest>,
+    ties: Vec<Tie>,
+}
+
+/// A tie as the `neighbors` and the `neighbors_at` digest see it.
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct Tie {
+    plain: Digest,
+    at: Digest,
+}
+
+/// A symbol as its neighbors see it, without and with its place.
+#[derive(Clone, Copy)]
+struct Described {
+    plain: Digest,
+    at: Digest,
+}
+
+impl Described {
+    fn pair(self) -> (Digest, Digest) {
+        (self.plain, self.at)
+    }
 }
 
 /// The digest of the documents of a project, which no file digest covers.
@@ -298,47 +333,87 @@ pub fn documents(documents: &[Document]) -> Result<Digest, Error> {
     Ok(hasher.finish_bytes())
 }
 
-/// A description of a symbol that does not say where in its file it is.
-fn describe(project: &Project, symbol: &Symbol) -> Digest {
+/// A description of a symbol: every field the facts of a node carry about a
+/// neighbor except its place, which only `at` includes. The fields are fed
+/// with their lengths, so that none runs into the next.
+fn describe(project: &Project, symbol: &Symbol) -> Described {
     let id = &symbol.id;
     let owner = symbol.owner.as_ref().and_then(|o| project.symbol(o));
     let file = project.file(&symbol.file);
-    let text = format!(
-        "{}|{}|{}|{:?}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
-        id.as_str(),
-        symbol.name,
-        symbol.kind.as_str(),
-        symbol.visibility,
-        symbol.owner.as_ref().map_or("", SymbolId::as_str),
-        owner.map_or("", |o| o.kind.as_str()),
-        owner.map_or_else(String::new, |o| o.file.to_string_lossy().into_owned()),
-        symbol.role,
-        symbol.doc.is_some(),
-        project.in_test(id),
-        symbol.file.display(),
-        file.map_or("", |f| f.lang.as_str()),
-        file.is_some_and(|f| f.test),
-        file.is_some_and(|f| f.generated),
-        project.function(id).is_some_and(|f| f.implementation),
+    let counts = [
         project.callers(id).len(),
         project.callees(id).len(),
         project.references(id).len(),
         project.members(id).len(),
-    );
+    ];
+    let flags = [
+        symbol.doc.is_some(),
+        project.in_test(id),
+        file.is_some_and(|f| f.test),
+        file.is_some_and(|f| f.generated),
+        project.function(id).is_some_and(|f| f.implementation),
+    ];
     let mut hasher = Hasher::new();
-    hasher.update(text);
-    hasher.finish_bytes()
+    let mut part = |bytes: &[u8]| {
+        hasher.update((bytes.len() as u64).to_le_bytes());
+        hasher.update(bytes);
+    };
+    part(id.as_str().as_bytes());
+    part(symbol.name.as_bytes());
+    part(symbol.kind.as_str().as_bytes());
+    part(&[
+        symbol.visibility as u8,
+        symbol.role.map_or(255, |r| r as u8),
+    ]);
+    part(
+        symbol
+            .owner
+            .as_ref()
+            .map_or("", SymbolId::as_str)
+            .as_bytes(),
+    );
+    part(owner.map_or("", |o| o.kind.as_str()).as_bytes());
+    part(
+        owner
+            .map_or(Path::new(""), |o| o.file.as_path())
+            .as_os_str()
+            .as_encoded_bytes(),
+    );
+    part(symbol.file.as_os_str().as_encoded_bytes());
+    part(file.map_or("", |f| f.lang.as_str()).as_bytes());
+    part(&flags.map(u8::from));
+    counts.iter().for_each(|n| part(&(*n as u64).to_le_bytes()));
+    let plain = hasher.clone().finish_bytes();
+    let span = symbol.span;
+    for n in [span.start.line, span.start.col, span.end.line, span.end.col] {
+        hasher.update(n.to_le_bytes());
+    }
+    Described {
+        plain,
+        at: hasher.finish_bytes(),
+    }
 }
 
 /// One tie of a symbol: the direction, the symbol, the kind of the edge and
 /// what is at the other end.
-fn tie(direction: &[u8], at: &SymbolId, kind: &str, other: &[u8]) -> Digest {
-    let mut hasher = Hasher::new();
-    for part in [direction, at.as_str().as_bytes(), kind.as_bytes(), other] {
-        hasher.update((part.len() as u64).to_le_bytes());
-        hasher.update(part);
+fn tie(direction: &[u8], at: &SymbolId, kind: [u8; 2], (plain, placed): (Digest, Digest)) -> Tie {
+    let make = |other: Digest| {
+        let mut hasher = Hasher::new();
+        for part in [direction, at.as_str().as_bytes(), &kind, &other] {
+            hasher.update((part.len() as u64).to_le_bytes());
+            hasher.update(part);
+        }
+        hasher.finish_bytes()
+    };
+    Tie {
+        plain: make(plain),
+        at: make(placed),
     }
-    hasher.finish_bytes()
+}
+
+/// The kind and the resolution of an edge, as two numbers.
+fn kind_of(edge: &Edge) -> [u8; 2] {
+    [edge.kind as u8, edge.resolution as u8]
 }
 
 /// The hash of an edge without its site: which of the sites of a relation is

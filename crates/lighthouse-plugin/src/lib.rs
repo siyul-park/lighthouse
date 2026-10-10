@@ -242,6 +242,10 @@ pub struct RuleManifest {
     pub capabilities: Vec<Capability>,
     /// What code the rule's subjects may be in, from its decision's scope.
     pub applicability: Applicability,
+    /// What the findings depend on, when the host may store and reuse them;
+    /// `None` when it must run the rule every time, such as one that reads
+    /// more than the code model.
+    pub caching: Option<Caching>,
 }
 
 impl RuleManifest {
@@ -262,8 +266,12 @@ impl RuleManifest {
 pub struct Caching {
     /// How much of the project the findings about one subject depend on.
     pub reach: Reach,
-    /// Changes whenever the way the rule judges changes (its check, as the
-    /// decision wrote it), so that stored findings of the old way are not used.
+    /// Whether the findings read the place of the symbols one edge away (their
+    /// lines and columns), not only what they are.
+    pub positions: bool,
+    /// Changes whenever the way the rule judges changes (its check, scope,
+    /// severity and option defaults, as the decision wrote them), so that
+    /// stored findings of the old way are not used.
     pub revision: String,
 }
 
@@ -273,12 +281,6 @@ pub trait Rule: Send + Sync {
     fn manifest(&self) -> &RuleManifest;
     fn validate(&self, options: &Options) -> Result<(), Error>;
     fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, Error>;
-    /// What the findings of this rule depend on, when the host may store and
-    /// reuse them; `None` (the default) when it must run every time, such as a
-    /// rule that reads more than the code model.
-    fn caching(&self) -> Option<Caching> {
-        None
-    }
 }
 
 /// A bundle of language providers, analyzers, rules and fixers, all of whose
