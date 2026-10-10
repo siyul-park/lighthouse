@@ -9,7 +9,7 @@ use std::{
 use lighthouse_engine::Outcome;
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Suppressed, Suppression};
 use lighthouse_spec::{Catalog, Decision, authored_severity};
-use lighthouse_store::{Observed, Ruling, Run, Standing, Store, Unchecked};
+use lighthouse_store::{Observed, Ruling, Run, Standing, Store, Subject, Unchecked};
 use serde_json::{Value, json};
 
 use crate::git;
@@ -39,6 +39,10 @@ struct Versions {
     wording: String,
 }
 
+/// What the store has to say about a run's findings, with what opening it
+/// skipped.
+type Judged = (BTreeMap<String, Ruling>, Vec<String>);
+
 /// The versions of the decisions seen so far in a run, by decision id.
 #[derive(Default)]
 struct Seen(BTreeMap<String, Versions>);
@@ -64,12 +68,26 @@ impl Seen {
 pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut Outcome) -> Remembered {
     let mut remembered = Remembered::default();
     let rulings = match record(root, catalog, outcome) {
-        Ok(rulings) => rulings,
+        Ok((rulings, notices)) => {
+            remembered.messages.extend(notices);
+            rulings
+        }
         Err(e) => {
             remembered
                 .messages
                 .push(format!("findings not recorded: {e}"));
-            read_only(root)
+            match read_only(root, catalog, outcome) {
+                Ok((rulings, notices)) => {
+                    remembered.messages.extend(notices);
+                    rulings
+                }
+                Err(e) => {
+                    remembered.messages.push(format!(
+                        "judgments not applied, so findings they hide are reported: {e}"
+                    ));
+                    BTreeMap::new()
+                }
+            }
         }
     };
     let mut kept = Vec::with_capacity(outcome.diagnostics.len());
@@ -107,16 +125,22 @@ pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut Outcome) -> Rememb
 
 /// Removes from `outcome` the findings that the committed decision log hides,
 /// without recording anything: for runs that do not use the store but still
-/// honor what the team decided.
-pub fn apply_judgments(root: &Path, outcome: &mut Outcome) -> usize {
-    let rulings = read_only(root);
+/// honor what the team decided. The judgments are matched to the findings of
+/// this run, so a clone that holds only the log applies them too. A log that
+/// cannot be read is an error, never "nothing to apply".
+pub fn apply_judgments(
+    root: &Path,
+    catalog: &Catalog,
+    outcome: &mut Outcome,
+) -> Result<usize, lighthouse_store::Error> {
+    let (rulings, _) = read_only(root, catalog, outcome)?;
     let before = outcome.diagnostics.len();
     outcome.diagnostics.retain(|d| {
         rulings
             .get(d.fingerprint.as_str())
             .is_none_or(|r| r.standing != Standing::Suppressed)
     });
-    before - outcome.diagnostics.len()
+    Ok(before - outcome.diagnostics.len())
 }
 
 /// Why a judged finding is reported anyway; `None` when nothing needs saying.
@@ -167,19 +191,39 @@ fn record(
     root: &Path,
     catalog: &Catalog,
     outcome: &Outcome,
-) -> Result<BTreeMap<String, Ruling>, lighthouse_store::Error> {
+) -> Result<Judged, lighthouse_store::Error> {
     let mut store = Store::open(root)?;
-    store.record(&run_of(root, catalog, outcome))?;
-    store.standings()
+    let run = run_of(root, catalog, outcome);
+    let subjects: Vec<Subject> = run.observed.iter().map(Observed::subject).collect();
+    store.record(&run)?;
+    Ok((store.standings_for(&subjects)?, store.notices().to_vec()))
 }
 
-/// The judgments already recorded, when recording this run was not possible.
-fn read_only(root: &Path) -> BTreeMap<String, Ruling> {
-    Store::open_existing(root)
-        .ok()
-        .flatten()
-        .and_then(|store| store.standings().ok())
-        .unwrap_or_default()
+/// The judgments already recorded, matched to this run's findings, without
+/// recording the run.
+fn read_only(
+    root: &Path,
+    catalog: &Catalog,
+    outcome: &Outcome,
+) -> Result<Judged, lighthouse_store::Error> {
+    let Some(store) = Store::open_existing(root)? else {
+        return Ok((BTreeMap::new(), Vec::new()));
+    };
+    let subjects: Vec<Subject> = observed_all(catalog, outcome)
+        .iter()
+        .map(Observed::subject)
+        .collect();
+    Ok((store.standings_for(&subjects)?, store.notices().to_vec()))
+}
+
+/// Every finding of the run as the store records it.
+fn observed_all(catalog: &Catalog, outcome: &Outcome) -> Vec<Observed> {
+    let mut seen = Seen::default();
+    outcome
+        .diagnostics
+        .iter()
+        .map(|d| observed(d, catalog, outcome, &mut seen))
+        .collect()
 }
 
 /// What the store needs to know about a run: its findings with their facts,
@@ -187,14 +231,7 @@ fn read_only(root: &Path) -> BTreeMap<String, Ruling> {
 /// check, and where and with which tools it ran.
 fn run_of(root: &Path, catalog: &Catalog, outcome: &Outcome) -> Run {
     Run {
-        observed: {
-            let mut seen = Seen::default();
-            outcome
-                .diagnostics
-                .iter()
-                .map(|d| observed(d, catalog, outcome, &mut seen))
-                .collect()
-        },
+        observed: observed_all(catalog, outcome),
         reported: outcome
             .reported
             .iter()

@@ -135,13 +135,13 @@ fn judgments_and_suppressions_hide_and_show_findings_the_same_in_every_run() {
     assert_eq!(
         suppressions("function c "),
         [serde_json::json!({
-            "kind": "external", "status": "accepted", "justification": "named policy"
+            "kind": "external", "justification": "named policy"
         })]
     );
     assert_eq!(
         suppressions("function e "),
         [serde_json::json!({
-            "kind": "inSource", "status": "accepted", "justification": "documented at its origin"
+            "kind": "inSource", "justification": "documented at its origin"
         })]
     );
     assert_eq!(
@@ -158,4 +158,22 @@ fn judgments_and_suppressions_hide_and_show_findings_the_same_in_every_run() {
     fs::write(clone.path().join(".lighthouse/decisions.jsonl"), &log).unwrap();
     assert_eq!(reported(&clone, &[]), shown);
     assert_eq!(listing(&clone, "suppressed").len(), 3);
+}
+
+#[test]
+fn a_suppression_without_a_justification_is_refused_and_records_nothing() {
+    let dir = rust_project(&[("src/lib.rs", SEVERAL)]);
+    lighthouse(dir.path()).arg("check").assert().success();
+    let fingerprint = finding_named(&dir, "a");
+
+    for blank in ["", "   "] {
+        lighthouse(dir.path())
+            .args(["review", "resolve", &fingerprint])
+            .args(["--judgment", "fail", "--suppress", blank])
+            .assert()
+            .code(2)
+            .stderr(predicates::str::contains("needs a justification"));
+    }
+
+    assert!(!dir.path().join(".lighthouse/decisions.jsonl").exists());
 }

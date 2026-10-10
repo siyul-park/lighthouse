@@ -167,7 +167,7 @@ fn suppressed(
     if store {
         findings::remember(root, catalog, &mut outcome);
     } else {
-        findings::apply_judgments(root, &mut outcome);
+        findings::apply_judgments(root, catalog, &mut outcome)?;
     }
     let kept: BTreeSet<Fingerprint> = outcome
         .diagnostics

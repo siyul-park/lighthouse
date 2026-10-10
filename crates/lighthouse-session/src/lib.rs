@@ -1,6 +1,6 @@
 //! The operations every Lighthouse frontend shares: loading a project, running
 //! a check and remembering it, recording judgments, testing and
-//! authoring decisions, migrating and validating spec documents, and writing
+//! authoring decisions, validating spec documents, and writing
 //! the agent skill. The CLI, the MCP server and
 //! the agent hooks only parse their own input and print the results of these.
 

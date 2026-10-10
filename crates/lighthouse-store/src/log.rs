@@ -9,9 +9,15 @@
 //! `Suppression`, a finding that is right and is left in place on purpose (see
 //! [`SuppressionSpec`]). A line of any other kind, or whose id does not match
 //! its spec, is an error that names the file and the line: a decision that
-//! cannot be read must not be skipped.
+//! cannot be read must not be skipped. The one exception is a last line an
+//! interrupted write cut short.
+//!
+//! The log is the only source of truth. Records are written here first, in one
+//! append, and the cache is derived from them; nothing is ever written here
+//! from the cache.
 
 use std::{
+    collections::BTreeSet,
     fs::{self, OpenOptions},
     io::{Read, Seek, SeekFrom, Write},
     path::Path,
@@ -222,6 +228,9 @@ impl LoggedSuppression {
 pub(crate) struct Logged {
     pub judgments: Vec<JudgmentEvent>,
     pub suppressions: Vec<LoggedSuppression>,
+    /// What the reader skipped: a torn last line, a suppression that goes
+    /// with no judgment of its finding.
+    pub notices: Vec<String>,
 }
 
 /// What a log line holds.
@@ -253,7 +262,11 @@ pub(crate) fn line<S: Spec + Serialize>(id: &str, spec: S) -> Result<String, Err
 
 /// Every record of the log, in file order; none if there is no log. A line
 /// that is not valid JSON, a record of a kind this build does not write, or
-/// one whose id does not match its content is an error naming the line.
+/// one whose id does not match its content is an error naming the line. The
+/// exception is a torn last line: one that does not end with a newline and is
+/// not JSON is what an interrupted write leaves, and is skipped with a notice.
+/// A suppression that goes with no judgment of its finding is skipped with a
+/// notice too.
 pub(crate) fn read(path: &Path) -> Result<Logged, Error> {
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
@@ -261,6 +274,7 @@ pub(crate) fn read(path: &Path) -> Result<Logged, Error> {
         Err(source) => return Err(io(path, source)),
     };
     let mut read = Logged::default();
+    let torn_from = (!text.ends_with('\n')).then(|| text.lines().count());
     for (index, text) in text
         .lines()
         .enumerate()
@@ -271,18 +285,31 @@ pub(crate) fn read(path: &Path) -> Result<Logged, Error> {
             line: index + 1,
             reason,
         };
-        let value: Value = serde_json::from_str(text).map_err(|e| fail(e.to_string()))?;
+        let value: Value = match serde_json::from_str(text) {
+            Ok(value) => value,
+            Err(_) if torn_from == Some(index + 1) => {
+                read.notices.push(format!(
+                    "{}: line {} is cut short and was skipped; the next judgment replaces it",
+                    path.display(),
+                    index + 1
+                ));
+                continue;
+            }
+            Err(e) => return Err(fail(e.to_string())),
+        };
         match decode(value).map_err(fail)? {
             Record::Judgment(event) => read.judgments.push(*event),
             Record::Suppression(suppression) => read.suppressions.push(*suppression),
         }
     }
+    drop_orphans(path, &mut read);
     Ok(read)
 }
 
-/// Appends one line, in a single write, and flushes it to disk before
-/// returning.
-pub(crate) fn append(path: &Path, line: &str) -> Result<(), Error> {
+/// Appends `lines` in a single write and flushes it to disk before
+/// returning, so a judgment and its suppression are in the log together or
+/// not at all. A last line an interrupted write cut short is cut off first.
+pub(crate) fn append(path: &Path, lines: &[String]) -> Result<(), Error> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir).map_err(|source| io(dir, source))?;
     }
@@ -294,13 +321,39 @@ pub(crate) fn append(path: &Path, line: &str) -> Result<(), Error> {
         .map_err(|source| io(path, source))?;
     let mut text = String::new();
     if ends_without_newline(&mut file).map_err(|source| io(path, source))? {
+        let torn = cut_torn_line(&mut file).map_err(|source| io(path, source))?;
+        if !torn {
+            text.push('\n');
+        }
+    }
+    for line in lines {
+        text.push_str(line);
         text.push('\n');
     }
-    text.push_str(line);
-    text.push('\n');
     file.write_all(text.as_bytes())
         .and_then(|()| file.sync_all())
         .map_err(|source| io(path, source))
+}
+
+/// Removes the suppressions that go with no judgment of their finding.
+fn drop_orphans(path: &Path, read: &mut Logged) {
+    let judged: BTreeSet<(&str, &str)> = read
+        .judgments
+        .iter()
+        .map(|j| (j.id.as_str(), j.fingerprint.as_str()))
+        .collect();
+    let (kept, orphans): (Vec<_>, Vec<_>) = std::mem::take(&mut read.suppressions)
+        .into_iter()
+        .partition(|s| judged.contains(&(s.judgment.as_str(), s.fingerprint.as_str())));
+    for orphan in &orphans {
+        read.notices.push(format!(
+            "{}: the suppression {} goes with no judgment of {} and was ignored",
+            path.display(),
+            orphan.event.id,
+            orphan.fingerprint
+        ));
+    }
+    read.suppressions = kept;
 }
 
 /// The record a log line holds.
@@ -347,6 +400,21 @@ fn decode(value: Value) -> Result<Record, String> {
             record.spec,
         ))))
     }
+}
+
+/// Truncates the file after its last newline when the last line is not JSON.
+/// Returns whether it did.
+fn cut_torn_line(file: &mut fs::File) -> std::io::Result<bool> {
+    let mut all = String::new();
+    file.seek(SeekFrom::Start(0))?;
+    file.read_to_string(&mut all)?;
+    let start = all.rfind('\n').map_or(0, |i| i + 1);
+    if serde_json::from_str::<Value>(&all[start..]).is_ok() {
+        return Ok(false);
+    }
+    file.set_len(start as u64)?;
+    file.seek(SeekFrom::End(0))?;
+    Ok(true)
 }
 
 fn ends_without_newline(file: &mut fs::File) -> std::io::Result<bool> {

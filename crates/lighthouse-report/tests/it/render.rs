@@ -177,3 +177,44 @@ fn sarif_describes_a_rule_by_the_decision_it_cites_and_links_its_docs() {
             .is_some_and(|f| f.len() == 64)
     );
 }
+
+#[test]
+fn sarif_lists_suppressed_findings_leaving_out_the_default_status_and_an_empty_justification() {
+    use lighthouse_model::{Suppressed, SuppressionStatus};
+    let found = fixture();
+    let mut proposed = lighthouse_model::Suppression::external("later");
+    proposed.status = SuppressionStatus::UnderReview;
+    let suppressed = vec![
+        Suppressed {
+            diagnostic: found[0].clone(),
+            suppression: lighthouse_model::Suppression::in_source("documented at its origin"),
+        },
+        Suppressed {
+            diagnostic: found[1].clone(),
+            suppression: lighthouse_model::Suppression::external("  "),
+        },
+        Suppressed {
+            diagnostic: found[1].clone(),
+            suppression: proposed,
+        },
+    ];
+    let briefing = Briefing {
+        suppressions: Some(&suppressed),
+        ..Briefing::default()
+    };
+
+    let sarif: serde_json::Value =
+        serde_json::from_str(&render_with(Format::Sarif, &[], &[], &briefing)).unwrap();
+
+    let results = sarif["runs"][0]["results"].as_array().unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(
+        results[0]["suppressions"],
+        json!([{ "kind": "inSource", "justification": "documented at its origin" }])
+    );
+    assert_eq!(results[1]["suppressions"], json!([{ "kind": "external" }]));
+    assert_eq!(
+        results[2]["suppressions"],
+        json!([{ "kind": "external", "status": "underReview", "justification": "later" }])
+    );
+}

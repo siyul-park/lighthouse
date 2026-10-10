@@ -299,6 +299,7 @@ fn resolve_freezes_the_finding_as_it_was_last_seen() {
     input.reason = Some("hot path".to_owned());
     input.suppress = Some("named policy".to_owned());
     let resolved = store.resolve(&input, stamp("sem1")).unwrap();
+    thread::sleep(std::time::Duration::from_millis(2));
     let event = &resolved.event;
     assert_eq!(event.fingerprint, "f1");
     assert_eq!(event.decision_name, "design/a");
@@ -403,7 +404,11 @@ fn standings_follow_the_latest_judgment() {
     judge_suppressed(&mut store, "left", "project-allowed");
     judge(&mut store, "broad", Judgment::NotApplicable);
     judge_suppressed(&mut store, "reconsidered", "named policy");
-    let standings = store.standings().unwrap();
+    let subjects: Vec<_> = ["pass", "fail", "left", "broad", "reconsidered", "unjudged"]
+        .iter()
+        .map(|f| observed(f, "design/a", "x.go").subject())
+        .collect();
+    let standings = store.standings_for(&subjects).unwrap();
     let keys: Vec<_> = standings.keys().map(String::as_str).collect();
     assert_eq!(
         keys,
@@ -662,13 +667,13 @@ fn changing_only_how_a_decision_is_checked_keeps_its_judgments_and_changing_what
     let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
     judge(&mut store, "f1", Judgment::Pass);
 
-    // Same meaning, another check: the verdict stands.
+    // Same meaning, another check: the judgment stands.
     let mut rechecked = observed("f1", "design/a", "a.go");
     rechecked.check_revision = Some("chk2".to_owned());
     store.record(&run(vec![rechecked])).unwrap();
     assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
 
-    // Another meaning: the verdict is asked again.
+    // Another meaning: the judgment is asked again.
     let mut reworded = observed("f1", "design/a", "a.go");
     reworded.meaning_version = Some("sem2".to_owned());
     store.record(&run(vec![reworded])).unwrap();
@@ -682,4 +687,110 @@ fn a_standing_stands_while_it_neither_expired_nor_was_refused() {
     assert!(!Standing::RuleChanged.stands());
     assert!(!Standing::EvidenceChanged.stands());
     assert!(!Standing::Unsuppressible.stands());
+}
+
+#[test]
+fn a_judgment_applies_to_a_finding_the_store_never_recorded_and_expires_against_the_current_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut author = Store::open(dir.path()).unwrap();
+    author
+        .record(&run(vec![observed("f1", "design/a", "a.go")]))
+        .unwrap();
+    judge(&mut author, "f1", Judgment::Pass);
+    drop(author);
+
+    // A clone: the log, no cache, and no finding recorded.
+    let clone = tempfile::tempdir().unwrap();
+    fs::create_dir_all(clone.path().join(".lighthouse")).unwrap();
+    fs::write(Store::log_path_in(clone.path()), log_of(dir.path())).unwrap();
+    let store = Store::open(clone.path()).unwrap();
+    assert!(store.list(&all()).unwrap().is_empty(), "no findings yet");
+
+    let same = observed("f1", "design/a", "a.go");
+    assert_eq!(standing_for(&store, &same), Some(Standing::Suppressed));
+    let mut grown = same.clone();
+    grown.evidence = json!({ "fan_out": 20 });
+    assert_eq!(
+        standing_for(&store, &grown),
+        Some(Standing::EvidenceChanged)
+    );
+    let mut reworded = same.clone();
+    reworded.meaning_version = Some("sem2".to_owned());
+    assert_eq!(standing_for(&store, &reworded), Some(Standing::RuleChanged));
+    let mut error = same;
+    error.authored_severity = Severity::Error;
+    assert_eq!(standing_for(&store, &error), Some(Standing::Unsuppressible));
+}
+
+#[test]
+fn a_person_outranks_an_agent_on_the_same_subject_and_meaning_version() {
+    let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
+    let mut person = review("f1", Judgment::Fail);
+    person.suppress = Some("named policy".to_owned());
+    person.attribution.kind = lighthouse_model::AgentKind::Person;
+    person.attribution.id = Some("ana".to_owned());
+    store.resolve(&person, stamp("sem1")).unwrap();
+    thread::sleep(std::time::Duration::from_millis(2));
+
+    judge(&mut store, "f1", Judgment::Pass);
+
+    let history = store.history("f1").unwrap();
+    assert_eq!(history.len(), 2, "the weaker judgment is recorded");
+    let finding = store.finding("f1").unwrap();
+    assert_eq!(finding.judgment, Some(Judgment::Fail), "and does not stand");
+    assert_eq!(finding.justification.as_deref(), Some("named policy"));
+    assert_eq!(finding.standing, Some(Standing::Suppressed));
+
+    // Equal strength: the later one stands.
+    let mut later = review("f1", Judgment::NotApplicable);
+    later.attribution.kind = lighthouse_model::AgentKind::Person;
+    store.resolve(&later, stamp("sem1")).unwrap();
+    assert_eq!(
+        store.finding("f1").unwrap().judgment,
+        Some(Judgment::NotApplicable)
+    );
+
+    // Under another meaning version a person's judgment does not outrank an
+    // agent's: the agent's was given under the current one.
+    let mut reworded = observed("f1", "design/a", "a.go");
+    reworded.meaning_version = Some("sem2".to_owned());
+    store.record(&run(vec![reworded])).unwrap();
+    store
+        .resolve(&review("f1", Judgment::Pass), stamp("sem2"))
+        .unwrap();
+    assert_eq!(store.finding("f1").unwrap().judgment, Some(Judgment::Pass));
+    assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
+}
+
+#[test]
+fn a_suppression_needs_a_justification() {
+    let mut store = memory_with(&[observed("f1", "design/a", "a.go")]);
+    for blank in ["", "   ", "\t\n"] {
+        let mut input = review("f1", Judgment::Fail);
+        input.suppress = Some(blank.to_owned());
+        let error = store.resolve(&input, stamp("sem1")).unwrap_err();
+        assert!(matches!(error, Error::EmptyJustification), "{blank:?}");
+    }
+    assert!(store.history("f1").unwrap().is_empty());
+}
+
+#[test]
+fn a_cache_with_tables_and_no_version_is_built_again_from_the_log() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut first = Store::open(dir.path()).unwrap();
+    first
+        .record(&run(vec![observed("f1", "design/a", "a.go")]))
+        .unwrap();
+    judge(&mut first, "f1", Judgment::Pass);
+    drop(first);
+    Connection::open(Store::path_in(dir.path()))
+        .unwrap()
+        .pragma_update(None, "user_version", 0)
+        .unwrap();
+
+    let rebuilt = Store::open(dir.path()).unwrap();
+
+    assert_eq!(rebuilt.schema_version().unwrap(), 8);
+    assert_eq!(rebuilt.history("f1").unwrap().len(), 1, "from the log");
+    assert!(rebuilt.list(&all()).unwrap().is_empty());
 }

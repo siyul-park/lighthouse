@@ -86,3 +86,8 @@ fn an_unknown_term_names_the_text_and_what_was_expected() {
         "{message}"
     );
 }
+
+#[test]
+fn a_person_weighs_more_than_an_agent() {
+    assert!(AgentKind::Person.strength() > AgentKind::SoftwareAgent.strength());
+}

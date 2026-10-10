@@ -122,8 +122,12 @@ struct SarifResult<'a> {
 #[derive(Serialize)]
 struct SarifSuppression<'a> {
     kind: &'static str,
-    status: &'static str,
-    justification: &'a str,
+    /// Left out when `accepted`, which is what SARIF takes it to be.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<&'static str>,
+    /// Left out when empty.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    justification: Option<&'a str>,
 }
 
 /// A SARIF `fix`: what to change, as replacements of regions per artifact.
@@ -332,8 +336,8 @@ fn result<'a>(
         suppressions: suppression
             .map(|s| SarifSuppression {
                 kind: s.kind.as_str(),
-                status: s.status.as_str(),
-                justification: &s.justification,
+                status: (!s.in_force()).then(|| s.status.as_str()),
+                justification: Some(s.justification.as_str()).filter(|j| !j.trim().is_empty()),
             })
             .into_iter()
             .collect(),

@@ -123,7 +123,13 @@ pub fn run(command: ReviewCommand) -> Result<u8> {
             status,
             format,
         } => match review_tasks(&root, &query(rule, status, all))? {
-            Some(tasks) => list(&tasks.findings, format),
+            Some(tasks) => {
+                tasks
+                    .notices
+                    .iter()
+                    .for_each(|n| eprintln!("lighthouse: {n}"));
+                list(&tasks.findings, format)
+            }
             None => {
                 eprintln!("lighthouse: no findings recorded yet (run `lighthouse check`)");
                 Ok(0)

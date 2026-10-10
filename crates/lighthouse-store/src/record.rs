@@ -67,11 +67,31 @@ impl Observed {
         }
     }
 
+    /// The finding as a judgment is compared with it.
+    pub fn subject(&self) -> Subject {
+        Subject {
+            fingerprint: self.fingerprint.clone(),
+            authored_severity: self.authored_severity,
+            meaning_version: self.meaning_version.clone(),
+            evidence_digest: self.evidence_digest(),
+        }
+    }
+
     /// Identifies the evidence for as long as it says the same thing: a hash
     /// of its normalized values.
     pub fn evidence_digest(&self) -> String {
         digest::evidence(&self.evidence)
     }
+}
+
+/// A finding as the current run saw it: what the judgments on its fingerprint
+/// are compared with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Subject {
+    pub fingerprint: String,
+    pub authored_severity: Severity,
+    pub meaning_version: Option<String>,
+    pub evidence_digest: String,
 }
 
 /// What a run could not check, and therefore cannot say was fixed.
@@ -159,14 +179,6 @@ pub enum Standing {
 }
 
 impl Standing {
-    const ALL: [Self; 5] = [
-        Self::Suppressed,
-        Self::Judged,
-        Self::RuleChanged,
-        Self::EvidenceChanged,
-        Self::Unsuppressible,
-    ];
-
     /// The text the standing is stored as.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -176,10 +188,6 @@ impl Standing {
             Self::EvidenceChanged => "evidence-changed",
             Self::Unsuppressible => "unsuppressible",
         }
-    }
-
-    pub(crate) fn parse(text: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|s| s.as_str() == text)
     }
 
     /// Whether the judgment still stands for the finding: it neither expired

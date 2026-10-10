@@ -74,6 +74,7 @@ pub fn tasks(args: TasksArgs) -> Outcome {
         };
         return Ok(json!({ empty: [], "note": "no findings recorded yet: run `check` first" }));
     };
+    let notices = tasks.notices.clone();
     let wanted: Vec<&FindingRecord> = tasks.findings.iter().collect();
     let limit = args.limit.unwrap_or(DEFAULT_TASKS);
     if detail == Detail::Compact {
@@ -85,12 +86,17 @@ pub fn tasks(args: TasksArgs) -> Outcome {
             mcp: true,
         };
         let grouped = Grouped::of(entries, &options);
-        return Ok(Value::Object(grouped.fields()));
+        let mut fields = grouped.fields();
+        if !tasks.notices.is_empty() {
+            fields.insert("notices".to_owned(), json!(tasks.notices));
+        }
+        return Ok(Value::Object(fields));
     }
     let tasks: Vec<Value> = wanted.iter().take(limit).map(|f| task(f)).collect();
     Ok(json!({
         "tasks": tasks,
         "omitted": wanted.len().saturating_sub(limit),
+        "notices": notices,
     }))
 }
 

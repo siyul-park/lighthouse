@@ -92,11 +92,17 @@ pub fn memory_with(findings: &[Observed]) -> Store {
 }
 
 pub fn standing_of(store: &Store, fingerprint: &str) -> Option<Standing> {
+    store.finding(fingerprint).unwrap().standing
+}
+
+/// What the judgments do to a finding as a run sees it, whether or not the
+/// store has recorded the finding.
+pub fn standing_for(store: &Store, finding: &Observed) -> Option<Standing> {
     store
-        .standings()
+        .standings_for(&[finding.subject()])
         .unwrap()
-        .get(fingerprint)
-        .map(|j| j.standing)
+        .get(&finding.fingerprint)
+        .map(|r| r.standing)
 }
 
 /// The text of the decision log of the project at `dir`; empty if it has none.

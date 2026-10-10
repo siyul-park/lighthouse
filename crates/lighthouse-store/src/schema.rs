@@ -11,13 +11,11 @@ pub(crate) const VERSION: i64 = 8;
 /// Findings with the judgments and suppressions on them. Locators, evidence and
 /// facts are JSON text, so nothing here assumes the artifact is code.
 ///
-/// `judgments` and `suppressions` are append-only, enforced by triggers: a
-/// judgment is a recorded label, and a later one replaces it in the views
-/// without editing it. The latest judgment of a finding stands; it hides the
-/// finding when it is `pass` or `notApplicable`, or `fail` with an accepted
-/// suppression, and stops doing so when the decision's meaning or the
-/// finding's evidence moved. What the decision authored as `error` is never
-/// hidden by a judgment.
+/// `judgments` and `suppressions` are a copy of the decision log, which is the
+/// only source of truth: a record is written to the log first, and opening the
+/// store makes the tables hold exactly the log's records. While the cache is in
+/// use they are append-only, enforced by triggers. What a judgment does to a
+/// finding is computed from them, not stored.
 const SCHEMA: &str = "
 CREATE TABLE findings (
     fingerprint       TEXT PRIMARY KEY,
@@ -72,10 +70,6 @@ CREATE TABLE judgments (
 );
 CREATE INDEX judgments_fingerprint ON judgments (fingerprint, generated_at);
 CREATE INDEX judgments_rule ON judgments (rule_id);
-CREATE TRIGGER judgments_append_only_update BEFORE UPDATE ON judgments
-BEGIN SELECT RAISE(ABORT, 'judgments is append-only'); END;
-CREATE TRIGGER judgments_append_only_delete BEFORE DELETE ON judgments
-BEGIN SELECT RAISE(ABORT, 'judgments is append-only'); END;
 
 CREATE TABLE suppressions (
     suppression_id TEXT PRIMARY KEY,
@@ -89,10 +83,6 @@ CREATE TABLE suppressions (
     generated_at   TEXT NOT NULL
 );
 CREATE INDEX suppressions_judgment ON suppressions (judgment_id);
-CREATE TRIGGER suppressions_append_only_update BEFORE UPDATE ON suppressions
-BEGIN SELECT RAISE(ABORT, 'suppressions is append-only'); END;
-CREATE TRIGGER suppressions_append_only_delete BEFORE DELETE ON suppressions
-BEGIN SELECT RAISE(ABORT, 'suppressions is append-only'); END;
 
 CREATE TABLE fix_events (
     event_id           TEXT PRIMARY KEY,
@@ -107,66 +97,54 @@ CREATE TABLE fix_events (
     timestamp          TEXT NOT NULL
 );
 CREATE INDEX fix_events_fingerprint ON fix_events (fingerprint, timestamp);
+";
 
-CREATE VIEW latest_judgments AS
-SELECT j.fingerprint, j.judgment_id, j.judgment, j.reason, j.meaning_version, j.evidence_digest
-FROM judgments j
-WHERE j.judgment_id = (
-    SELECT x.judgment_id FROM judgments x WHERE x.fingerprint = j.fingerprint
-    ORDER BY x.generated_at DESC, x.judgment_id DESC LIMIT 1
-);
-
-CREATE VIEW standings AS
-SELECT fingerprint, judgment, justification, narrowing,
-    CASE
-        WHEN hides AND authored = 'error' THEN 'unsuppressible'
-        WHEN judged_version IS NOT NULL AND meaning_version IS NOT NULL
-             AND judged_version <> meaning_version THEN 'rule-changed'
-        WHEN judged_digest IS NOT NULL AND evidence_digest IS NOT NULL
-             AND judged_digest <> evidence_digest THEN 'evidence-changed'
-        WHEN hides THEN 'suppressed'
-        ELSE 'judged'
-    END AS standing
-FROM (
-    SELECT f.fingerprint, l.judgment, f.meaning_version, f.evidence_digest,
-        l.meaning_version AS judged_version, l.evidence_digest AS judged_digest,
-        f.authored_severity AS authored,
-        (l.judgment = 'notApplicable') AS narrowing,
-        (SELECT s.justification FROM suppressions s
-         WHERE s.judgment_id = l.judgment_id AND s.status = 'accepted'
-         ORDER BY s.generated_at, s.suppression_id LIMIT 1) AS justification,
-        (l.judgment <> 'fail' OR EXISTS (
-            SELECT 1 FROM suppressions s
-            WHERE s.judgment_id = l.judgment_id AND s.status = 'accepted')) AS hides
-    FROM findings f
-    JOIN latest_judgments l ON l.fingerprint = f.fingerprint
-);
-
-CREATE VIEW finding_states AS
-SELECT f.*, l.judgment AS latest_judgment,
-       s.standing AS standing, s.justification AS justification,
-       COALESCE(s.narrowing, 0) AS narrowing
-FROM findings f
-LEFT JOIN latest_judgments l ON l.fingerprint = f.fingerprint
-LEFT JOIN standings s ON s.fingerprint = f.fingerprint;
+/// The guards that keep a record from being edited or deleted while the cache
+/// is in use. Rebuilding the cache from the log lifts them for the moment it
+/// takes.
+const TRIGGERS: &str = "
+CREATE TRIGGER judgments_append_only_update BEFORE UPDATE ON judgments
+BEGIN SELECT RAISE(ABORT, 'judgments is append-only'); END;
+CREATE TRIGGER judgments_append_only_delete BEFORE DELETE ON judgments
+BEGIN SELECT RAISE(ABORT, 'judgments is append-only'); END;
+CREATE TRIGGER suppressions_append_only_update BEFORE UPDATE ON suppressions
+BEGIN SELECT RAISE(ABORT, 'suppressions is append-only'); END;
+CREATE TRIGGER suppressions_append_only_delete BEFORE DELETE ON suppressions
+BEGIN SELECT RAISE(ABORT, 'suppressions is append-only'); END;
 ";
 
 /// Brings the database to this build's schema. The version is read after
 /// taking the write lock, so two processes opening a fresh database take
-/// turns and the second finds nothing to do. A database of another version
-/// is emptied and built again in the same transaction.
+/// turns and the second finds nothing to do. A database of another version,
+/// or one that has objects but no version, is emptied and built again in the
+/// same transaction; nothing is lost that the log does not hold.
 pub(crate) fn prepare(conn: &mut Connection) -> Result<(), Error> {
     let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
     let found: i64 = tx.pragma_query_value(None, "user_version", |row| row.get(0))?;
     if found != VERSION {
-        if found != 0 {
-            drop_all(&tx)?;
-        }
+        drop_all(&tx)?;
         tx.execute_batch(SCHEMA)?;
+        tx.execute_batch(TRIGGERS)?;
         tx.execute_batch(&format!("PRAGMA user_version = {VERSION}"))?;
     }
     tx.commit()?;
     Ok(())
+}
+
+/// Lifts the append-only guards, for the moment the cache is made to hold what
+/// the log holds.
+pub(crate) fn lift_guards(conn: &Connection) -> Result<(), Error> {
+    for table in ["judgments", "suppressions"] {
+        for op in ["update", "delete"] {
+            conn.execute_batch(&format!("DROP TRIGGER IF EXISTS {table}_append_only_{op}"))?;
+        }
+    }
+    Ok(())
+}
+
+/// Puts the append-only guards back.
+pub(crate) fn restore_guards(conn: &Connection) -> Result<(), Error> {
+    Ok(conn.execute_batch(TRIGGERS)?)
 }
 
 /// The version recorded in the database.

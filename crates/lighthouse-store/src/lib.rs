@@ -11,6 +11,7 @@
 
 mod digest;
 mod error;
+mod judged;
 mod log;
 mod record;
 mod schema;
@@ -22,7 +23,8 @@ pub use error::Error;
 pub use log::{JudgmentSpec, SuppressionSpec};
 pub use record::{
     Filter, FindingRecord, FixEvent, JudgmentEvent, NewFix, NewJudgment, Observed, Resolved,
-    Ruling, Run, RunSummary, Stamp, Standing, State, StatusFilter, SuppressionEvent, Unchecked,
+    Ruling, Run, RunSummary, Stamp, Standing, State, StatusFilter, Subject, SuppressionEvent,
+    Unchecked,
 };
 pub use store::Store;
 

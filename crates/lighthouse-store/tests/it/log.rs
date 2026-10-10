@@ -64,7 +64,7 @@ fn a_judgment_is_logged_before_the_cache_and_the_cache_is_rebuilt_from_the_log()
 }
 
 #[test]
-fn a_log_that_is_missing_is_written_again_from_the_cache() {
+fn a_deleted_log_is_not_written_again_from_the_cache() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = Store::open(dir.path()).unwrap();
     store
@@ -72,18 +72,20 @@ fn a_log_that_is_missing_is_written_again_from_the_cache() {
         .unwrap();
     judge_suppressed(&mut store, "f1", "named policy");
     drop(store);
-    let log = log_of(dir.path());
     fs::remove_file(Store::log_path_in(dir.path())).unwrap();
 
-    drop(Store::open(dir.path()).unwrap());
+    let store = Store::open(dir.path()).unwrap();
 
-    assert_eq!(log.lines().count(), 2);
-    let written = log_of(dir.path());
-    let mut again: Vec<&str> = written.lines().collect();
-    let mut was: Vec<&str> = log.lines().collect();
-    again.sort_unstable();
-    was.sort_unstable();
-    assert_eq!(again, was, "the same two records");
+    assert!(
+        store.history("f1").unwrap().is_empty(),
+        "the log is the truth"
+    );
+    assert_eq!(standing_of(&store, "f1"), None);
+    drop(store);
+    assert!(
+        !Store::log_path_in(dir.path()).exists(),
+        "and opening wrote nothing"
+    );
 }
 
 #[test]
@@ -187,15 +189,13 @@ fn a_line_of_any_other_kind_is_an_error_naming_the_file_and_the_line() {
     );
     let log = log_of(dir.path());
     let path = Store::log_path_in(dir.path());
-    let verdict = r#"{"apiVersion":"lighthouse/v1alpha1","kind":"Verdict","metadata":{"name":"v1"},"spec":{"fingerprint":"f9"}}"#;
-    let flat = r#"{"fingerprint":"f9","id":"x","verdict":"rejected"}"#;
-    let rewrite = r#"{"apiVersion":"lighthouse/v1alpha1","kind":"Rewrite","metadata":{"name":"r1"},"spec":{}}"#;
+    let signal = r#"{"apiVersion":"lighthouse/v1alpha1","kind":"Signal","metadata":{"name":"s1"},"spec":{}}"#;
+    let flat = r#"{"fingerprint":"f9","id":"x"}"#;
     let newer = log.replace("v1alpha1", "v9");
 
     for (line, mention) in [
-        (verdict, "`Verdict` is not a kind of the decision log"),
+        (signal, "`Signal` is not a kind of the decision log"),
         (flat, "no `kind`"),
-        (rewrite, "`Rewrite` is not a kind of the decision log"),
         (newer.as_str().trim_end(), "`apiVersion`"),
     ] {
         fs::write(&path, format!("{log}{line}\n")).unwrap();
@@ -298,4 +298,196 @@ fn a_judgment_spec_is_what_a_recorded_judgment_shows() {
     assert_eq!(spec.judgment, Judgment::Pass);
     assert_eq!(spec.meaning_version.as_deref(), Some("sem1"));
     assert_eq!(spec.generated_at_time, event.generated_at_time);
+}
+
+#[test]
+fn a_branch_switch_shows_only_the_judgments_of_the_log_that_is_there() {
+    let findings = [
+        observed("f1", "design/a", "a.go"),
+        observed("f2", "design/a", "b.go"),
+    ];
+    let main = clone_with(&findings, &[("f1", Judgment::Pass)]);
+    let feature = clone_with(&findings, &[("f2", Judgment::NotApplicable)]);
+
+    // One working tree, one cache, the log of one branch and then of the other.
+    let tree = tempfile::tempdir().unwrap();
+    fs::create_dir_all(tree.path().join(".lighthouse")).unwrap();
+    let log = Store::log_path_in(tree.path());
+    fs::write(&log, log_of(main.path())).unwrap();
+    {
+        let mut store = Store::open(tree.path()).unwrap();
+        store.record(&run(findings.to_vec())).unwrap();
+        assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
+        assert_eq!(standing_of(&store, "f2"), None);
+    }
+
+    fs::write(&log, log_of(feature.path())).unwrap();
+    let store = Store::open(tree.path()).unwrap();
+    assert_eq!(standing_of(&store, "f1"), None, "main's judgment is gone");
+    assert_eq!(standing_of(&store, "f2"), Some(Standing::Suppressed));
+    assert!(store.history("f1").unwrap().is_empty());
+    assert_eq!(
+        log_of(tree.path()),
+        log_of(feature.path()),
+        "opening wrote nothing to the log"
+    );
+}
+
+#[test]
+fn a_removed_log_line_stays_removed() {
+    let dir = clone_with(
+        &[observed("f1", "design/a", "a.go")],
+        &[("f1", Judgment::Pass), ("f1", Judgment::Fail)],
+    );
+    let log = log_of(dir.path());
+    assert_eq!(log.lines().count(), 2);
+    let kept: String = log.lines().take(1).map(|l| format!("{l}\n")).collect();
+    fs::write(Store::log_path_in(dir.path()), &kept).unwrap();
+
+    let store = Store::open(dir.path()).unwrap();
+    assert_eq!(store.history("f1").unwrap().len(), 1);
+    drop(store);
+    assert_eq!(log_of(dir.path()), kept, "and the log was not written back");
+    assert_eq!(
+        Store::open(dir.path())
+            .unwrap()
+            .history("f1")
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn concurrent_opens_and_resolves_write_each_line_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut seed = Store::open(dir.path()).unwrap();
+    seed.record(&run(vec![observed("f1", "design/a", "a.go")]))
+        .unwrap();
+    drop(seed);
+    let root = dir.path().to_owned();
+    let workers: Vec<_> = (0..4)
+        .map(|n| {
+            let root = root.clone();
+            std::thread::spawn(move || {
+                for round in 0..5 {
+                    let mut store = Store::open(&root).unwrap();
+                    if round % 2 == 0 {
+                        let mut input = review("f1", Judgment::Fail);
+                        input.reason = Some(format!("worker {n} round {round}"));
+                        store.resolve(&input, stamp("sem1")).unwrap();
+                    }
+                }
+            })
+        })
+        .collect();
+    for worker in workers {
+        worker.join().unwrap();
+    }
+
+    let log = log_of(dir.path());
+    let lines: Vec<&str> = log.lines().collect();
+    let distinct: std::collections::BTreeSet<&str> = lines.iter().copied().collect();
+    assert_eq!(lines.len(), 12, "four workers, three resolves each");
+    assert_eq!(distinct.len(), lines.len(), "no duplicate line");
+    assert_eq!(
+        Store::open(dir.path())
+            .unwrap()
+            .history("f1")
+            .unwrap()
+            .len(),
+        12
+    );
+}
+
+#[test]
+fn a_judgment_and_its_suppression_are_one_write_to_the_log() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::open(dir.path()).unwrap();
+    store
+        .record(&run(vec![observed("f1", "design/a", "a.go")]))
+        .unwrap();
+    judge_suppressed(&mut store, "f1", "named policy");
+    let log = log_of(dir.path());
+    let kinds: Vec<String> = log
+        .lines()
+        .map(|l| {
+            serde_json::from_str::<serde_json::Value>(l).unwrap()["kind"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        })
+        .collect();
+    assert_eq!(kinds, ["Judgment", "Suppression"]);
+    assert!(log.ends_with('\n'));
+}
+
+#[test]
+fn a_last_line_an_interrupted_write_cut_short_is_skipped_with_a_notice() {
+    let dir = clone_with(
+        &[observed("f1", "design/a", "a.go")],
+        &[("f1", Judgment::Pass)],
+    );
+    let path = Store::log_path_in(dir.path());
+    let log = log_of(dir.path());
+    fs::write(&path, format!("{log}{{\"apiVersion\":\"lighthouse/v1al")).unwrap();
+
+    let store = Store::open(dir.path()).unwrap();
+
+    assert_eq!(store.history("f1").unwrap().len(), 1);
+    assert_eq!(store.notices().len(), 1, "{:?}", store.notices());
+    assert!(store.notices()[0].contains("line 2 is cut short"));
+    drop(store);
+
+    // The next judgment cuts the torn line off instead of gluing to it.
+    let mut store = Store::open(dir.path()).unwrap();
+    judge(&mut store, "f1", Judgment::Fail);
+    drop(store);
+    let healed = Store::open(dir.path()).unwrap();
+    assert!(healed.notices().is_empty());
+    assert_eq!(healed.history("f1").unwrap().len(), 2);
+
+    // A bad line anywhere else is still an error.
+    fs::write(&path, format!("garbage\n{log}")).unwrap();
+    let error = Store::open(dir.path()).err().unwrap();
+    assert!(matches!(error, Error::Log { line: 1, .. }), "{error}");
+}
+
+#[test]
+fn a_suppression_without_its_judgment_is_ignored_with_a_notice() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::open(dir.path()).unwrap();
+    store
+        .record(&run(vec![
+            observed("f1", "design/a", "a.go"),
+            observed("f2", "design/a", "b.go"),
+        ]))
+        .unwrap();
+    judge_suppressed(&mut store, "f1", "named policy");
+    judge(&mut store, "f2", Judgment::Fail);
+    drop(store);
+    let log = log_of(dir.path());
+    let mut lines: Vec<&str> = log.lines().collect();
+    let suppression = lines.remove(1).to_owned();
+    let path = Store::log_path_in(dir.path());
+
+    // Its judgment is missing.
+    fs::write(&path, format!("{}\n{suppression}\n", lines[1])).unwrap();
+    let store = Store::open(dir.path()).unwrap();
+    assert_eq!(store.notices().len(), 1, "{:?}", store.notices());
+    assert_eq!(standing_of(&store, "f1"), None);
+    assert_eq!(standing_of(&store, "f2"), Some(Standing::Judged));
+    drop(store);
+    let without: String = lines.iter().map(|l| format!("{l}\n")).collect();
+
+    // Its judgment is another finding's.
+    let mut record: serde_json::Value = serde_json::from_str(&suppression).unwrap();
+    record["spec"]["judgment"] =
+        serde_json::from_str::<serde_json::Value>(lines[1]).unwrap()["metadata"]["name"].clone();
+    let canonical = serde_json::to_string(&record["spec"]).unwrap();
+    record["metadata"]["name"] = lighthouse_model::hash::short(&canonical, 16).into();
+    fs::write(&path, format!("{without}{record}\n")).unwrap();
+    let store = Store::open(dir.path()).unwrap();
+    assert_eq!(store.notices().len(), 1, "{:?}", store.notices());
+    assert_eq!(standing_of(&store, "f1"), Some(Standing::Judged));
 }

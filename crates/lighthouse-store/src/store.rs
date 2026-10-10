@@ -16,7 +16,9 @@ use serde_json::{Value, json};
 
 use crate::{
     Error, Filter, FindingRecord, FixEvent, JudgmentEvent, NewFix, NewJudgment, Observed, Resolved,
-    Ruling, Run, RunSummary, Stamp, Standing, StatusFilter, SuppressionEvent, Unchecked, digest,
+    Ruling, Run, RunSummary, Stamp, Standing, StatusFilter, Subject, SuppressionEvent, Unchecked,
+    digest,
+    judged::Judged,
     log,
     log::{JudgmentSpec, LoggedSuppression},
     schema,
@@ -94,9 +96,19 @@ impl Store {
         conn.pragma_update_and_check(None, "journal_mode", "WAL", |row| row.get::<_, String>(0))?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         schema::prepare(&mut conn)?;
-        let mut store = Self { conn, log };
+        let mut store = Self {
+            conn,
+            log,
+            notices: Vec::new(),
+        };
         store.sync()?;
         Ok(store)
+    }
+
+    /// What opening the store skipped in the log: a last line an interrupted
+    /// write cut short, a suppression that goes with no judgment.
+    pub fn notices(&self) -> &[String] {
+        &self.notices
     }
 
     /// The schema version of the database.
@@ -124,60 +136,33 @@ impl Store {
         Ok(summary)
     }
 
-    /// What the latest judgment does to each finding it applies to: keeps it
-    /// out of reports, stands without hiding it, has expired because the
-    /// decision or the evidence moved, or cannot hide it because the finding is
-    /// an error (its authored severity, not its severity, decides).
-    pub fn standings(&self) -> Result<BTreeMap<String, Ruling>, Error> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT fingerprint, standing, judgment, justification FROM standings")?;
-        let rows = stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, Option<String>>(3)?,
-            ))
-        })?;
-        let mut found = BTreeMap::new();
-        for row in rows {
-            let (fingerprint, standing, judgment, justification) = row?;
-            let standing = Standing::parse(&standing).ok_or_else(|| unknown(&standing))?;
-            let judgment = judgment.parse::<Judgment>().map_err(|e| unknown(&e))?;
-            found.insert(
-                fingerprint,
-                Ruling {
-                    standing,
-                    judgment,
-                    justification,
-                },
-            );
-        }
-        Ok(found)
+    /// What the judgment that stands does to each of `subjects`, the findings a
+    /// run saw: it keeps one out of reports, stands without hiding it, has
+    /// expired because the decision or the evidence moved, or cannot hide it
+    /// because the finding is an error (its authored severity, not its
+    /// severity, decides). It is computed from the judgments alone, so it holds
+    /// on a clone that has no findings recorded yet.
+    pub fn standings_for(&self, subjects: &[Subject]) -> Result<BTreeMap<String, Ruling>, Error> {
+        let judged = Judged::load(&self.conn)?;
+        Ok(subjects
+            .iter()
+            .filter_map(|s| Some((s.fingerprint.clone(), judged.ruling(s)?)))
+            .collect())
     }
 
     /// The findings matching `filter`, by path and first sighting.
     pub fn list(&self, filter: &Filter) -> Result<Vec<FindingRecord>, Error> {
-        let status = match filter.status {
-            StatusFilter::Open => {
-                "resolved_at IS NULL AND inactive_at IS NULL AND COALESCE(standing, '') <> 'suppressed'"
-            }
-            StatusFilter::Suppressed => "standing = 'suppressed'",
-            StatusFilter::Narrowing => "standing = 'suppressed' AND narrowing = 1",
-            StatusFilter::Inactive => {
-                "inactive_at IS NOT NULL AND COALESCE(standing, '') <> 'suppressed'"
-            }
-            StatusFilter::Resolved => "resolved_at IS NOT NULL",
-            StatusFilter::All => "1",
-        };
-        let sql = format!(
-            "SELECT * FROM finding_states WHERE (?1 IS NULL OR rule_id = ?1) AND {status} \
-             ORDER BY path, first_seen, fingerprint"
-        );
-        let mut stmt = self.conn.prepare(&sql)?;
-        let rows = stmt.query_map(params![filter.rule], finding_record)?;
-        Ok(rows.collect::<Result<_, _>>()?)
+        let mut stmt = self.conn.prepare(
+            "SELECT * FROM findings WHERE (?1 IS NULL OR rule_id = ?1) \
+             ORDER BY path, first_seen, fingerprint",
+        )?;
+        let judged = Judged::load(&self.conn)?;
+        let rows = stmt.query_map(params![filter.rule], |row| finding_record(row, &judged))?;
+        let found: Vec<FindingRecord> = rows.collect::<Result<_, _>>()?;
+        Ok(found
+            .into_iter()
+            .filter(|f| listed(f, filter.status))
+            .collect())
     }
 
     /// The finding whose fingerprint is, or uniquely starts with, `fingerprint`.
@@ -207,6 +192,13 @@ impl Store {
         if review.suppress.is_some() && review.judgment != Judgment::Fail {
             return Err(Error::SuppressionWithoutFail(review.judgment));
         }
+        if review
+            .suppress
+            .as_deref()
+            .is_some_and(|j| j.trim().is_empty())
+        {
+            return Err(Error::EmptyJustification);
+        }
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -226,10 +218,11 @@ impl Store {
             .map(|justification| suppression_of(&event, justification))
             .transpose()?;
         if let Some(path) = &self.log {
-            log::append(path, &log::line(&event.id, JudgmentSpec::from(&event))?)?;
+            let mut lines = vec![log::line(&event.id, JudgmentSpec::from(&event))?];
             if let Some(s) = &suppression {
-                log::append(path, &log::line(&s.event.id, s.spec())?)?;
+                lines.push(log::line(&s.event.id, s.spec())?);
             }
+            log::append(path, &lines)?;
         }
         insert_judgment(&tx, &event)?;
         if let Some(s) = &suppression {
@@ -308,7 +301,7 @@ impl Store {
                 fixer: row.get(3)?,
                 safety: row.get(4)?,
                 description: row.get(5)?,
-                files: serde_json::from_str(&files).unwrap_or_default(),
+                files: serde_json::from_str(&files).map_err(conversion)?,
                 commit: row.get(7)?,
                 timestamp: row.get(8)?,
             })
@@ -335,44 +328,57 @@ impl Store {
         Ok(self.conn.execute(&sql, [])?)
     }
 
-    /// Imports the records of the decision log the cache does not have, and
-    /// exports the ones only the cache has (the log was deleted) to the log.
-    /// Importing is idempotent: records are identified by content.
+    /// Makes the cache hold exactly what the decision log holds, the only source
+    /// of truth: records the log has are imported, records it lacks (a branch
+    /// switch, a removed line) are dropped from the cache. The log is read after
+    /// the write lock is taken, so a record being appended is never half seen.
+    /// Nothing is ever written to the log from here.
     fn sync(&mut self) -> Result<(), Error> {
         let Some(path) = self.log.clone() else {
             return Ok(());
         };
-        let read = log::read(&path)?;
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let read = log::read(&path)?;
+        self.notices.extend(read.notices);
+        let wanted: BTreeSet<&str> = read
+            .judgments
+            .iter()
+            .map(|e| e.id.as_str())
+            .chain(read.suppressions.iter().map(|s| s.event.id.as_str()))
+            .collect();
+        let mut stale: Vec<(&str, &str, String)> = Vec::new();
+        for (table, column) in [
+            ("judgments", "judgment_id"),
+            ("suppressions", "suppression_id"),
+        ] {
+            let mut stmt = tx.prepare(&format!("SELECT {column} FROM {table}"))?;
+            let ids = stmt.query_map([], |row| row.get::<_, String>(0))?;
+            for id in ids {
+                let id = id?;
+                if !wanted.contains(id.as_str()) {
+                    stale.push((table, column, id));
+                }
+            }
+        }
+        if !stale.is_empty() {
+            schema::lift_guards(&tx)?;
+            for (table, column, id) in &stale {
+                tx.execute(
+                    &format!("DELETE FROM {table} WHERE {column} = ?1"),
+                    params![id],
+                )?;
+            }
+            schema::restore_guards(&tx)?;
+        }
         for event in &read.judgments {
             insert_judgment(&tx, event)?;
         }
         for suppression in &read.suppressions {
             insert_suppression(&tx, suppression)?;
         }
-        let known: BTreeSet<&str> = read
-            .judgments
-            .iter()
-            .map(|e| e.id.as_str())
-            .chain(read.suppressions.iter().map(|s| s.event.id.as_str()))
-            .collect();
-        let only_here: Vec<JudgmentEvent> = judgments_of(&tx, None)?
-            .into_iter()
-            .filter(|e| !known.contains(e.id.as_str()))
-            .collect();
-        let only_here_suppressions: Vec<LoggedSuppression> = suppressions_of(&tx)?
-            .into_iter()
-            .filter(|s| !known.contains(s.event.id.as_str()))
-            .collect();
         tx.commit()?;
-        for event in &only_here {
-            log::append(&path, &log::line(&event.id, JudgmentSpec::from(event))?)?;
-        }
-        for s in &only_here_suppressions {
-            log::append(&path, &log::line(&s.event.id, s.spec())?)?;
-        }
         Ok(())
     }
 }
@@ -385,6 +391,7 @@ impl Store {
 pub struct Store {
     conn: Connection,
     log: Option<PathBuf>,
+    notices: Vec<String>,
 }
 
 fn retry_busy<T>(mut attempt: impl FnMut() -> Result<T, Error>) -> Result<T, Error> {
@@ -595,13 +602,29 @@ fn expand(conn: &Connection, prefix: &str) -> Result<String, Error> {
 
 fn load_finding(conn: &Connection, prefix: &str) -> Result<FindingRecord, Error> {
     let full = expand(conn, prefix)?;
+    let judged = Judged::load(conn)?;
     conn.query_row(
-        "SELECT * FROM finding_states WHERE fingerprint = ?1",
+        "SELECT * FROM findings WHERE fingerprint = ?1",
         params![full],
-        finding_record,
+        |row| finding_record(row, &judged),
     )
     .optional()?
     .ok_or_else(|| Error::UnknownFinding(prefix.to_owned()))
+}
+
+/// Whether a finding belongs to a listing of `status`.
+fn listed(finding: &FindingRecord, status: StatusFilter) -> bool {
+    let hidden = finding.standing == Some(Standing::Suppressed);
+    match status {
+        StatusFilter::Open => {
+            finding.resolved_at.is_none() && finding.inactive_at.is_none() && !hidden
+        }
+        StatusFilter::Suppressed => hidden,
+        StatusFilter::Narrowing => hidden && finding.narrowing,
+        StatusFilter::Inactive => finding.inactive_at.is_some() && !hidden,
+        StatusFilter::Resolved => finding.resolved_at.is_some(),
+        StatusFilter::All => true,
+    }
 }
 
 /// The judgments of one finding (every finding when `None`), oldest first,
@@ -776,15 +799,23 @@ fn insert_suppression(tx: &Transaction, s: &LoggedSuppression) -> Result<(), Err
     Ok(())
 }
 
-fn finding_record(row: &Row) -> rusqlite::Result<FindingRecord> {
-    let judgment: Option<String> = row.get("latest_judgment")?;
-    let standing: Option<String> = row.get("standing")?;
-    Ok(FindingRecord {
+fn finding_record(row: &Row, judged: &Judged) -> rusqlite::Result<FindingRecord> {
+    let authored_severity = severity(row, "authored_severity")?;
+    let subject = Subject {
         fingerprint: row.get("fingerprint")?,
+        authored_severity,
+        meaning_version: row.get("meaning_version")?,
+        evidence_digest: row
+            .get::<_, Option<String>>("evidence_digest")?
+            .unwrap_or_default(),
+    };
+    let ruling = judged.ruling(&subject);
+    Ok(FindingRecord {
+        fingerprint: subject.fingerprint.clone(),
         rule_id: row.get("rule_id")?,
         decision_uid: row.get("decision_uid")?,
         severity: severity(row, "severity")?,
-        authored_severity: severity(row, "authored_severity")?,
+        authored_severity,
         path: row.get("path")?,
         locator: json_column(row, "locator")?,
         symbol: row.get("symbol")?,
@@ -801,11 +832,13 @@ fn finding_record(row: &Row) -> rusqlite::Result<FindingRecord> {
         dirty: row.get("last_dirty")?,
         lighthouse_version: row.get("lighthouse_version")?,
         catalog_version: row.get("catalog_version")?,
-        meaning_version: row.get("meaning_version")?,
-        judgment: judgment.as_deref().map(parse).transpose()?,
-        standing: standing.as_deref().and_then(Standing::parse),
-        justification: row.get("justification")?,
-        narrowing: row.get::<_, i64>("narrowing")? != 0,
+        meaning_version: subject.meaning_version,
+        judgment: ruling.as_ref().map(|r| r.judgment),
+        standing: ruling.as_ref().map(|r| r.standing),
+        justification: ruling.as_ref().and_then(|r| r.justification.clone()),
+        narrowing: ruling
+            .as_ref()
+            .is_some_and(|r| r.judgment == Judgment::NotApplicable),
     })
 }
 
@@ -854,12 +887,6 @@ where
 
 fn conversion(error: impl std::error::Error + Send + Sync + 'static) -> rusqlite::Error {
     rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(error))
-}
-
-fn unknown(what: &(impl std::fmt::Display + ?Sized)) -> Error {
-    Error::Sqlite(rusqlite::Error::InvalidColumnName(format!(
-        "unexpected value `{what}`"
-    )))
 }
 
 fn io(path: &Path, source: std::io::Error) -> Error {

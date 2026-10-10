@@ -744,6 +744,14 @@ fn a_run_without_the_store_still_honors_the_committed_decisions() {
         ])
         .assert()
         .success();
+    // A clone has the committed log and nothing recorded: the judgment still
+    // applies to the findings this run sees.
+    for suffix in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(
+            dir.path()
+                .join(format!(".lighthouse/lighthouse.db{suffix}")),
+        );
+    }
 
     lighthouse(dir.path())
         .args(["check", "--fix", "--unsafe-fixes", "--no-store"])

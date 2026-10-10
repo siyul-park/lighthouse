@@ -182,7 +182,20 @@ right but will not be acted on:
 
 A judgment carries `wasAttributedTo` (a `Person` or a `SoftwareAgent`) and `generatedAtTime`
 (W3C PROV), and belongs to the decision's `meaningVersion`: it stops standing when that
-moves. The two kinds are the only records of the decision log; they are one line each, a
+moves.
+
+**Which judgment stands.** Several judgments may exist for one subject. Among those given
+under the decision's current `meaningVersion` the stronger attribution stands: a `Person`
+over a `SoftwareAgent`, and an agent over a model. A weaker judgment is recorded but does
+not replace a stronger one, so an agent cannot undo what a person decided. At equal strength
+the later `generatedAtTime` stands, then the larger record id. `generatedAtTime` is the
+clock of the machine that wrote the record, so two clones whose clocks differ by more than
+the gap between their judgments can disagree about which is later; the record id only
+makes the choice deterministic, it does not make it right. When no judgment was given under
+the current meaning version, the same order picks one and it has expired: the finding is
+reported again with a note. A judgment is matched to the findings a run sees by fingerprint,
+meaning version and evidence digest, from the decision log alone, so a clone that holds only
+the log applies it. The two kinds are the only records of the decision log; they are one line each, a
 `Suppression` naming the id of the `Judgment` it goes with.
 
 What a run **reports** uses SARIF results with their standard meaning:

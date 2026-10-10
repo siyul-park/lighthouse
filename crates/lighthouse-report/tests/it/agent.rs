@@ -205,7 +205,6 @@ fn full_agent_json_is_one_tagged_record_per_line() {
         "{command}"
     );
     assert!(command.contains(&review["fingerprint"].as_str().unwrap()[..12]));
-    assert!(review["resolve"].get("verdicts").is_none());
 
     let custom = &records[2];
     assert_eq!(custom["authored"], "error");

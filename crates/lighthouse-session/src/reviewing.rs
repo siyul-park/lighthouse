@@ -72,6 +72,9 @@ pub struct TaskQuery {
 /// The remembered findings that wait for review.
 pub struct Tasks {
     pub findings: Vec<FindingRecord>,
+    /// What opening the store skipped in the log, such as a last line an
+    /// interrupted write cut short.
+    pub notices: Vec<String>,
 }
 
 /// The findings the store remembers that match `query`; `None` when no check
@@ -89,6 +92,7 @@ pub fn review_tasks(root: &Path, query: &TaskQuery) -> Result<Option<Tasks>> {
             .into_iter()
             .filter(|f| query.all_tiers || waits(f, query.status))
             .collect(),
+        notices: store.notices().to_vec(),
     }))
 }
 
@@ -119,10 +123,7 @@ pub fn record_judgment(root: &Path, review: &NewJudgment) -> Result<Recorded> {
         Err(e) => (None, Some(e.to_string())),
     };
     let resolved = store.resolve(review, |finding| stamp(catalog.as_ref(), finding))?;
-    let standing = store
-        .standings()?
-        .get(&resolved.event.fingerprint)
-        .map(|j| j.standing);
+    let standing = store.finding(&resolved.event.fingerprint)?.standing;
     Ok(Recorded {
         warnings: warnings(&resolved.finding),
         event: resolved.event,

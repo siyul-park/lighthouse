@@ -186,6 +186,15 @@ pub enum AgentKind {
 }
 
 impl AgentKind {
+    /// How much a judgment by this kind of agent weighs against another's on the
+    /// same subject: a person over an agent (a model would rank below it).
+    pub fn strength(self) -> u8 {
+        match self {
+            Self::Person => 2,
+            Self::SoftwareAgent => 1,
+        }
+    }
+
     /// The PROV class: `Person` or `SoftwareAgent`.
     pub fn as_str(self) -> &'static str {
         match self {

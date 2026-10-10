@@ -244,8 +244,9 @@ stderr, and still applies the judgments it can read. The database uses WAL with
 `synchronous=NORMAL`, writers take the write lock up front (`BEGIN IMMEDIATE`) and wait
 for each other, and opening is serialized the same way, so a hook, a stop script and a
 human can run at once. The database is a cache with one schema and no migrations: its
-version is `PRAGMA user_version`, and a database of another version is emptied and
-filled again from the log (only the history of sightings is lost). A file that is not a
+version is `PRAGMA user_version`, and a database of another version, or one that has tables
+and no version, is emptied and filled again from the log (only the history of sightings is
+lost). A file that is not a
 database is named in the error and left where it is (move it aside; it is rebuilt from
 the log).
 
@@ -345,8 +346,11 @@ the finding has been seen again since the reviewer read it, and the finding is r
 same transaction that records the judgment. `review resolve` works without a readable
 catalog: it warns, and the versions are left out.
 
-**What a judgment does is derived**, never stored, from the latest judgment per finding
-(ordered by time, then record id). A hiding judgment (`pass`, `notApplicable`, or `fail`
+**What a judgment does is derived**, never stored, from the judgment that stands for the
+finding (the stronger attribution first, a person over an agent; then the later
+`generatedAtTime`, then the record id; see [rule-pipeline](rule-pipeline.md#judgment-and-suppression)).
+It is matched to the findings of the run by fingerprint, meaning version and evidence
+digest, so it holds on a clone with an empty findings table. A hiding judgment (`pass`, `notApplicable`, or `fail`
 with an accepted suppression) hides the finding only while it is valid:
 
 - the finding is not an error: findings of `error` decisions are decided by the rule,
@@ -389,9 +393,14 @@ Opening the store imports the records the cache does not have and ignores the on
 so the cache can always be deleted and rebuilt, a teammate's judgments apply as soon as
 the log is pulled, and CI hides what developers hid. Two branches that both appended merge
 by keeping both lines (`.gitattributes`: `merge=union`); the same record twice is one
-record; ordering uses the records' timestamps. A record the cache has and the log lacks
-(the log was deleted) is written to the log again. Records are never edited or deleted; a
-later judgment replaces the standing of the finding.
+record. The log is the only source of truth and the cache is derived from it: opening
+the store (under the write lock, after reading the log) makes the cache hold exactly the
+log's records and never writes to the log, so a branch switch or a removed line shows only
+what the log there says. `review resolve` appends the judgment and its suppression in one
+write, then updates the cache. A last line an interrupted write cut short is skipped with a
+notice, and the next append cuts it off; a suppression that goes with no judgment of its
+finding is ignored with a notice. Records are never edited by Lighthouse; a later or
+stronger judgment replaces the standing of the finding.
 
 **Source directives** put the decision next to the code it is about, where a reviewer
 sees it change. They are directives in ESLint's forms, in a comment line that starts with

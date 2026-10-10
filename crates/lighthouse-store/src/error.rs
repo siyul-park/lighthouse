@@ -40,6 +40,8 @@ pub enum Error {
         "the finding was seen again at {actual}, after {expected}; read it again before judging"
     )]
     Changed { expected: String, actual: String },
+    #[error("a suppression needs a justification: say why the finding stays")]
+    EmptyJustification,
     #[error("a suppression goes with a `fail`, not with `{0}`")]
     SuppressionWithoutFail(Judgment),
 }

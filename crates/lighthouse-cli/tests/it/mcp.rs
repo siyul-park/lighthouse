@@ -321,17 +321,18 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
                 "seen": "1999-01-01T00:00:00Z" }),
     );
     assert!(stale.is_err());
+    let blank = client.tool(
+        "review_resolve",
+        json!({ "fingerprint": prefix, "judgment": "fail",
+                "suppress": { "justification": " " } }),
+    );
+    assert!(blank.unwrap_err().contains("needs a justification"));
     let misplaced = client.tool(
         "review_resolve",
         json!({ "fingerprint": prefix, "judgment": "pass",
                 "suppress": { "justification": "why" } }),
     );
     assert!(misplaced.unwrap_err().contains("goes with a `fail`"));
-    let old_words = client.tool(
-        "review_resolve",
-        json!({ "fingerprint": prefix, "verdict": "rejected" }),
-    );
-    assert!(old_words.is_err(), "the old arguments are gone");
 
     let done = client
         .tool(
