@@ -62,6 +62,20 @@ learned checks are later judged against. Checking cost comes first.
 - **Gate:** a warm run equals a cold run byte for byte, and a one-file edit re-checks only
   what depends on it.
 
+### Signals that earn their place
+- **Measured info signals:** a deterministic check below 20% precision after cheap
+  fixes merges into the decision that already states its requirement, or becomes a
+  `model` check. The rest are refined at their measured false-positive causes.
+- **Clean Code, fully covered:** every item of Martin's *Smells and Heuristics* and every
+  chapter rule has one home: an existing decision, a new decision, or a recorded
+  "not applicable". A coverage test enforces it.
+  - A new deterministic check ships only if its sampled precision passes. Otherwise it
+    ships as a `model` check.
+  - A project can replace a bundled decision's check (`rules."<id>".check`) to wrap a
+    linter it already runs.
+  - New facts are general shapes (flow attributes, event kinds, external calls,
+    parameter attributes, type origin). Effects, locals and clone fingerprints follow.
+
 ### Packaging
 - Prebuilt binaries that bundle the Go and Rust providers, and a one-command install,
   verified on clean machines early, so real-environment problems surface before the
