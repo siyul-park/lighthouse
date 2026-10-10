@@ -80,6 +80,7 @@ spec:
       decisions:
         - single-term-per-concept
         - minimal-names
+        - max-name-words
         - no-redundant-qualifiers
         - standard-abbreviations
         - short-names-limited

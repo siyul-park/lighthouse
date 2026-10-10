@@ -9,7 +9,7 @@ use std::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::Fingerprint;
+use crate::{Document, Fingerprint};
 
 /// 1-based line and column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -451,6 +451,7 @@ pub struct Project {
     all: Fragment,
     index: Index,
     notices: Vec<String>,
+    documents: Vec<Document>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -507,7 +508,20 @@ impl Project {
             all,
             index,
             notices,
+            documents: Vec::new(),
         }
+    }
+
+    /// The same project with these documents, sorted by file and line.
+    pub fn with_documents(mut self, mut documents: Vec<Document>) -> Self {
+        documents.sort_by(|a, b| (&a.file, a.at, &a.name).cmp(&(&b.file, b.at, &b.name)));
+        self.documents = documents;
+        self
+    }
+
+    /// The documents of the project that are not code, in file order.
+    pub fn documents(&self) -> &[Document] {
+        &self.documents
     }
 
     /// Things merging dropped or could not decide, for the user to see.

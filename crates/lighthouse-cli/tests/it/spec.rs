@@ -750,6 +750,63 @@ fn migrate_rewrites_allow_comments_in_source_files_and_nothing_else() {
         .stdout(predicate::str::contains("0 file(s) written"));
 }
 
+/// A local decision named `name`, with a uid, as `migrate` leaves one.
+fn named(name: &str) -> String {
+    UNIDENTIFIED
+        .replace(
+            "name: local/plain # keep this comment",
+            &format!("name: local/{name}\n  uid: 3f1c4a52-9b0e-4e6a-8f55-6a1d0c2b7e90"),
+        )
+        .replace("# keep this comment", "")
+}
+
+#[test]
+fn check_and_validate_hold_decision_names_to_the_convention() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        "lighthouse.toml",
+        &lighthouse_test_support::project(
+            "plugins = [\"core\"]\nextends = [\"core/recommended\"]\n",
+        ),
+    );
+    write(
+        dir.path(),
+        ".lighthouse/decisions/long.yaml",
+        &named("order-is-not-a-reason"),
+    );
+
+    lighthouse(dir.path())
+        .args(["check", "--no-store"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            ".lighthouse/decisions/long.yaml:5:9: warn core/decision-naming: decision name `local/order-is-not-a-reason` has 5 words, at most 3; uses `is`",
+        ));
+    lighthouse(dir.path())
+        .args(["spec", "validate", ".lighthouse/decisions"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains(
+            "long.yaml:5: decision name `local/order-is-not-a-reason`",
+        ));
+
+    write(
+        dir.path(),
+        ".lighthouse/decisions/long.yaml",
+        &named("order"),
+    );
+    lighthouse(dir.path())
+        .args(["check", "--no-store"])
+        .assert()
+        .success()
+        .stdout("");
+    lighthouse(dir.path())
+        .args(["spec", "validate", ".lighthouse/decisions"])
+        .assert()
+        .success();
+}
+
 #[test]
 fn validate_asks_a_decision_without_a_uid_to_be_migrated() {
     let dir = tempfile::tempdir().unwrap();

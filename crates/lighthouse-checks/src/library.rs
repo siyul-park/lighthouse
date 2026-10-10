@@ -2,7 +2,7 @@
 //! `metrics(n)`, `callers(n)`, `callees(n)`, `edges(n, kind)`, `owner(n)`,
 //! `tests(n)`, `annotations(n)`, `rank(n, key)` and `exposed(n, internal)`,
 //! and the text helpers `lines`, `trim`, `trimPrefixes`, `trimSuffixes`,
-//! `trimLeft`, `trimRight`, `leadingRun` and `drop`.
+//! `trimLeft`, `trimRight`, `leadingRun`, `drop` and `words`.
 //!
 //! A function reads a fact that was computed for the value `n` before the
 //! expression ran, so an expression is pure and the facts are the same however
@@ -227,6 +227,17 @@ fn text_helpers(context: &mut Context<'static>) {
     });
     context.add_function("leadingRun", |s: Arc<String>, chars: Arc<String>| {
         s.chars().take_while(|c| chars.contains(*c)).count() as i64
+    });
+    // The words of a name: of an identifier, or of the part of a decision id
+    // after its pack.
+    context.add_function("words", |s: Arc<String>| {
+        let name = s.rsplit('/').next().unwrap_or_default();
+        Arc::new(
+            crate::text::words(name)
+                .into_iter()
+                .map(|w| Value::String(Arc::new(w)))
+                .collect::<Vec<_>>(),
+        )
     });
     context.add_function("drop", |s: Arc<String>, n: i64| {
         s.chars()

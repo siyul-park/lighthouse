@@ -97,3 +97,35 @@ An allow annotation SHOULD suppress a finding; one whose rule no longer fires th
 ```
 
 Also: rust
+
+## Naming
+
+A name is read in findings, configuration and directives for as long as the decision lives; the first decision over documents rather than code keeps decision names consistent.
+
+| id | title | check | fix | requirement |
+| --- | --- | --- | --- | --- |
+| [`core/decision-naming`](#decision-names-follow-the-eslint-convention) | Decision names follow the ESLint convention | warn · cel |  |  |
+
+### Decision names follow the ESLint convention
+
+`core/decision-naming` · decision · warn · cel
+
+*A decision is named once and read everywhere: in findings, configuration, directives and the log. Its identity is the uid, so a name costs nothing to get right later, and the convention is the one ESLint rules follow. The semantic part, which a reviewer judges, is that the name is a noun phrase naming what the decision requires, and a standard smell or refactoring name where one exists (complexity, feature-envy). The check covers what can be counted. Names are cohesive: one word where it stays unambiguous within its pack.*
+
+A decision name SHOULD be kebab-case with at most three words, not counting a `no-`, `max-` or `prefer-` prefix; SHOULD contain none of the words `is`, `are`, `be`, `should`, `must`, `when` or `not`; and SHOULD NOT repeat the name of its pack in a word. `no-<thing>` names a prohibition, `max-<thing>` a limit and `prefer-<thing>` a preference; any other name is a noun phrase naming what is required.
+
+```text invalid
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/Private_Types
+```
+
+```text valid
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/no-private-types
+  labels:
+    lighthouse/pack: design
+```

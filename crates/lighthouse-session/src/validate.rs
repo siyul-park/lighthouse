@@ -12,6 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lighthouse_engine::Engine;
 use lighthouse_plugin::{Registry, plugin_of};
 use lighthouse_resource::{Format, Resource, documents, kind_of, resource};
 use lighthouse_rpc::PluginSpec;
@@ -20,6 +21,9 @@ use lighthouse_spec::{Config, ProjectSpec};
 use serde_json::Value;
 
 use crate::{Result, SKIPPED_DIRS, Session, decisions::test_catalog};
+
+/// The decision that asks decisions to be named well.
+const DECISION_NAMING: &str = "core/decision-naming";
 
 /// One thing wrong with one file.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -108,7 +112,9 @@ impl Sets {
             self.project(path, config, &known, registry, bundled, problems);
         }
         let mut roots = BTreeSet::new();
+        let mut named = BTreeSet::new();
         for (dir, files) in &self.catalogs {
+            let at = self.catalog_root(dir).unwrap_or_else(|| dir.clone());
             let loaded = match self.catalog_root(dir) {
                 Some(root) if !roots.insert(root.clone()) => continue,
                 Some(root) => Catalog::load(&root).map(|c| (root.display().to_string(), c)),
@@ -119,6 +125,9 @@ impl Sets {
             match loaded {
                 Ok((place, catalog)) => {
                     references(&catalog, registry, &place, problems);
+                    if named.insert(at.clone()) {
+                        naming(session, &at, problems)?;
+                    }
                     let own = catalog
                         .decisions()
                         .filter(|d| d.automated() && bundled.decision(d.id()).is_none())
@@ -236,6 +245,30 @@ fn problem(path: &str, message: impl ToString) -> Problem {
         path: path.to_owned(),
         message: message.to_string(),
     }
+}
+
+/// The decisions written under `root` are named the way `core/decision-naming`
+/// asks: the rule runs over them like it does over any project, and each
+/// finding is a problem of the file it is in.
+fn naming(session: &Session, root: &Path, problems: &mut Vec<Problem>) -> Result<()> {
+    let config = Config::parse_inline(&format!(
+        "plugins = [\"core\"]\n[rules]\n\"{DECISION_NAMING}\" = \"warn\"\n"
+    ))?;
+    let engine = Engine::new(
+        session.in_process_registry()?,
+        config,
+        Catalog::bundled(),
+        root,
+    )?;
+    let outcome = engine.check(&[], &[DECISION_NAMING.to_owned()])?;
+    problems.extend(outcome.diagnostics.iter().map(|d| {
+        let at = root.join(&d.file);
+        problem(
+            &format!("{}:{}", at.display(), d.span.start.line),
+            &d.message,
+        )
+    }));
+    Ok(())
 }
 
 /// A rule named in configuration exists, when its plugin is one that runs in

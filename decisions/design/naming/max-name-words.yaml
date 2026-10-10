@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/max-name-words
+  uid: 62aac8ec-b65d-4539-8351-9e849887fa99
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: naming
+spec:
+  title: Names have at most a few words
+  context: >-
+    One word is the default and a longer name adds only the qualifier a
+    distinction needs (`design/minimal-names`, which a reviewer judges). This
+    is the part that can be counted, with the option name of ESLint's
+    `max-lines` and `max-params`. Words are the parts of a name split at `_`,
+    at a lower-to-upper change and at the end of an acronym: `parseHTTPRequest`
+    and `parse_http_request` have three.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    A name SHOULD have at most the configured number of words (option `max`).
+  severity: warn
+  options:
+    type: object
+    properties:
+      max:
+        type: integer
+        default: 3
+        description: Most words a name may have.
+    additionalProperties: false
+  check:
+    type: cel
+    where: size(words(symbol.name)) > options.max
+    message: "{{ symbol.kind }} {{ symbol.name }} has {{ size(words(symbol.name)) }} words, limit is {{ options.max }}"
+    evidence:
+      name: symbol.name
+      words: size(words(symbol.name))
+      max: options.max
+    identity:
+      subject: symbol.id
+  examples:
+    - name: go-long-name
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            func parseHTTPRequestBodyBytes() {}
+      expect:
+        - line: 3
+    - name: go-short-name
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            func parseHTTPRequest() {}
+    - name: go-higher-limit
+      language: go
+      kind: valid
+      options:
+        max: 5
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            func parseHTTPRequestBodyBytes() {}
+    - name: rust-long-name
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            fn parse_http_request_body_bytes() {}
+      expect:
+        - line: 1
+    - name: rust-short-name
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            fn parse_http_request() {}

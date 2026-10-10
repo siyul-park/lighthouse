@@ -23,6 +23,8 @@ formatter = { argv = ["rustfmt", "--edition", "2024", "--emit", "stdout"], stdin
 
 [spec.rules]
 "core/max-file-lines" = { level = "warn", options = { max = 1000 } }
+# Four words: the visitor methods of syn and the field names of SARIF are not ours to rename.
+"design/max-name-words" = { level = "warn", options = { max = 4 } }
 
 # Fixtures and their goldens describe code on purpose; they are not the
 # project's own design.

@@ -15,7 +15,8 @@ use lighthouse_plugin::{
     Ctx, Facts, Indexed, LanguageProvider, Memo, Registry, Rule, RuleManifest, Source, Workspace,
 };
 use lighthouse_spec::{
-    Catalog, Config, GeneratedCheck, GlobSet, ProjectError, Projects, RuleConfig, Rules, glob_set,
+    Catalog, Config, Domain, GeneratedCheck, GlobSet, ProjectError, Projects, RuleConfig, Rules,
+    glob_set,
 };
 use rayon::prelude::*;
 use serde_json::Value;
@@ -23,6 +24,7 @@ use thiserror::Error;
 
 use crate::{
     annotations::{self, Allowed},
+    documents,
     generated::Attributes,
     identity,
     subject::Subjects,
@@ -208,6 +210,9 @@ pub struct Engine {
     /// or superseded): they run only when a run selects them by id, such as
     /// `decision test`; configuration and projects never enable them.
     unenforced: BTreeSet<String>,
+    /// Rules whose decision is about the project's own documents (the `spec`
+    /// domain): a run that selects one finds those documents first.
+    documented: BTreeSet<String>,
     /// The `linguist-generated` attributes of the project.
     attributes: Attributes,
     /// What assembling the engine found worth telling; every run reports it.
@@ -250,6 +255,11 @@ impl Engine {
             unenforced: catalog
                 .decisions()
                 .filter(|d| !d.enforced())
+                .map(|d| d.id().to_owned())
+                .collect(),
+            documented: catalog
+                .decisions()
+                .filter(|d| d.scope.domain == Domain::Spec)
                 .map(|d| d.id().to_owned())
                 .collect(),
             attributes,
@@ -345,6 +355,14 @@ impl Engine {
             (&mut outcome.notices, &mut incomplete),
             &mut timings,
         );
+        let project = if selected
+            .iter()
+            .any(|rule| self.documented.contains(&rule.manifest().id))
+        {
+            project.with_documents(documents::find(&self.ws.root, overlays))
+        } else {
+            project
+        };
         let memo = Memo::default();
         let facts = self.analyze(&selected, &inputs, &project, &memo, &mut timings)?;
         let started = Instant::now();

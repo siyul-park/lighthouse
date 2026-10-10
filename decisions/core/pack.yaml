@@ -17,3 +17,10 @@ spec:
         A finding that is right to leave in place can be allowed where it
         happens, in a comment that a reviewer sees in the diff.
       decisions: [allow-annotation, annotation-reason, unused-allow]
+    - name: naming
+      title: Naming
+      intro: >-
+        A name is read in findings, configuration and directives for as long as
+        the decision lives; the first decision over documents rather than code
+        keeps decision names consistent.
+      decisions: [decision-naming]

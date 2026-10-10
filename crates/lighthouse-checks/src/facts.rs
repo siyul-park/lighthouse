@@ -5,14 +5,15 @@
 use std::path::Path;
 
 use lighthouse_model::{
-    Edge, Module, Node, Position, Project, Symbol, SymbolKind, SymbolRole, Target, TestCase,
-    Visibility,
+    Document, Edge, Module, Node, Position, Project, Symbol, SymbolKind, SymbolRole, Target,
+    TestCase, Visibility,
 };
 
 use crate::{
     layout::{is_declaration, owner_key},
     text,
 };
+use lighthouse_spec::{PACK_LABEL, SECTION_LABEL};
 use serde_json::{Value, json};
 
 const POS_LINE: u64 = 1 << 20;
@@ -154,6 +155,28 @@ pub(crate) fn edge(project: &Project, e: &Edge) -> Value {
         "resolution": serde_json::to_value(e.resolution).unwrap_or(Value::Null),
         "from": graph_node(project, &e.from),
         "to": to,
+    })
+}
+
+/// A document of the project, such as a decision: its name, the pack and
+/// section its labels (else its name) put it in, and where it is written.
+pub(crate) fn document(d: &Document) -> Value {
+    let label = |key: &str| d.labels.get(key).cloned();
+    let pack = label(PACK_LABEL).unwrap_or_else(|| {
+        d.name
+            .split_once('/')
+            .map_or(d.name.as_str(), |(p, _)| p)
+            .to_owned()
+    });
+    json!({
+        "name": d.name,
+        "kind": d.kind,
+        "pack": pack,
+        "section": label(SECTION_LABEL).unwrap_or_default(),
+        "labels": d.labels,
+        "uid": d.uid.clone().unwrap_or_default(),
+        "file": path(&d.file),
+        "line": d.at.line,
     })
 }
 

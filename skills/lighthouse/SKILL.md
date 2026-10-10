@@ -70,7 +70,7 @@ Do not memorize decision text; ask for it when a finding names a rule.
 - `lighthouse://config` is the effective configuration.
 - `review_history` shows every verdict recorded on a finding.
 
-## Active decisions (19)
+## Active decisions (21)
 
 A decision declares the severity of its findings: `error` is definitive, so it needs no verdict and only an annotation in the code waives it; `warn` and `info` are review tasks, and a verdict can hide them whatever level the configuration reports them at. `fixable: safe|suggested` marks a decision with a fixer.
 
@@ -79,6 +79,7 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 - `core/max-file-lines` (warn) Files stay below a line limit
 - `core/annotation-reason` (error) An allow annotation states its reason
 - `core/unused-allow` (warn, fixable: suggested) Allow annotations suppress something
+- `core/decision-naming` (warn) Decision names follow the ESLint convention
 
 ### design
 
@@ -88,6 +89,7 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 - `design/single-use-wrapper` (warn) Inline single-use wrappers
 - `design/receiver-owned-behavior` (warn) Behavior lives with its owner
 - `design/callers-before-callees` (warn, fixable: suggested) Callers before callees
+- `design/max-name-words` (warn) Names have at most a few words
 - `design/no-redundant-qualifiers` (warn) No redundant qualifiers
 - `design/no-exported-mutable-global` (warn) No exported mutable global
 - `design/declaration-groups` (error, fixable: safe) Declarations follow ownership groups

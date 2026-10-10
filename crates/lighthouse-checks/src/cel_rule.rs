@@ -167,7 +167,7 @@ impl Run<'_> {
             }
             Select::Symbol | Select::Function | Select::Test => self.check_symbols(ctx, file),
             Select::Comment => self.check_comments(ctx, file, text),
-            Select::File | Select::Edge | Select::Module => Ok(Vec::new()),
+            Select::File | Select::Edge | Select::Module | Select::Decision => Ok(Vec::new()),
         }
     }
 
@@ -267,7 +267,28 @@ impl Run<'_> {
                     found.extend(self.judge(value, place, &key)?);
                 }
             }
+            Select::Decision => found.extend(self.check_decisions(project)?),
             _ => {}
+        }
+        Ok(found)
+    }
+
+    /// The decision documents of the project that are subjects.
+    fn check_decisions(&self, project: &Project) -> Result<Vec<Diagnostic>, PluginError> {
+        let mut found = Vec::new();
+        for document in project.documents().iter().filter(|d| d.kind == "Decision") {
+            let value = cel_fact(&facts::document(document));
+            let place = Place {
+                file: document.file.clone(),
+                span: Span {
+                    start: document.at,
+                    end: document.at,
+                },
+                symbol: None,
+            };
+            // A decision is the same one under another name.
+            let key = document.uid.as_deref().unwrap_or(&document.name);
+            found.extend(self.judge(value, place, key)?);
         }
         Ok(found)
     }

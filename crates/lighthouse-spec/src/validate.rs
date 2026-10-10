@@ -64,6 +64,17 @@ pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {
         .ok_or_else(|| Error::invalid(id, "an id is `<pack>/<name>`"))?;
     kebab(pack)?;
     kebab(name)?;
+    if decision.scope.subject.domain() != decision.scope.domain {
+        return Err(Error::invalid(
+            id,
+            format!(
+                "a `{}` decision is in the `{}` domain, not `{}`",
+                decision.scope.subject,
+                decision.scope.subject.domain(),
+                decision.scope.domain
+            ),
+        ));
+    }
     if let Some(uid) = decision.uid()
         && !lighthouse_resource::is_uid(uid)
     {

@@ -272,6 +272,7 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
             "design/coupling-signal",
             "design/declaration-groups",
             "design/exported-doc",
+            "design/max-name-words",
             "design/no-exported-mutable-global",
             "design/no-redundant-qualifiers",
             "design/private-helper-callers",

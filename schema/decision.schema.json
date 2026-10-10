@@ -674,11 +674,20 @@
       ]
     },
     "Domain": {
-      "description": "What kind of thing a decision is about. Only code exists today.",
-      "enum": [
-        "code"
-      ],
-      "type": "string"
+      "description": "What kind of thing a decision is about: source code, or Lighthouse's own\ndocuments (the decisions of a catalog).",
+      "oneOf": [
+        {
+          "enum": [
+            "code"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "spec",
+          "description": "The documents of a project that configure Lighthouse.",
+          "type": "string"
+        }
+      ]
     },
     "Example": {
       "additionalProperties": false,
@@ -1420,6 +1429,11 @@
           "const": "comment",
           "description": "A comment of a file, with its text and position.",
           "type": "string"
+        },
+        {
+          "const": "decision",
+          "description": "A decision document of the project: its name, pack, labels and kind,\nand where it is written.",
+          "type": "string"
         }
       ]
     },
@@ -1445,14 +1459,23 @@
     },
     "Subject": {
       "description": "What a decision talks about inside its domain. Mapping to the run scope\nof a rule is `Subject::run_scope`.",
-      "enum": [
-        "symbol",
-        "file",
-        "module",
-        "project",
-        "test"
-      ],
-      "type": "string"
+      "oneOf": [
+        {
+          "enum": [
+            "symbol",
+            "file",
+            "module",
+            "project",
+            "test"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "decision",
+          "description": "A decision document, in the `spec` domain.",
+          "type": "string"
+        }
+      ]
     },
     "TestScope": {
       "description": "Which test code a decision applies to.",

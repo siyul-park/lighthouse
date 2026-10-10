@@ -1,0 +1,156 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: core/decision-naming
+  uid: 76c3ebca-9320-478b-90ab-31b0c0056b09
+  labels:
+    lighthouse/pack: core
+    lighthouse/section: naming
+spec:
+  title: Decision names follow the ESLint convention
+  context: >-
+    A decision is named once and read everywhere: in findings, configuration,
+    directives and the log. Its identity is the uid, so a name costs nothing to
+    get right later, and the convention is the one ESLint rules follow.
+
+
+    The semantic part, which a reviewer judges, is that the name is a noun
+    phrase naming what the decision requires, and a standard smell or
+    refactoring name where one exists (complexity, feature-envy). The check
+    covers what can be counted. Names are cohesive: one word where it stays
+    unambiguous within its pack.
+  scope:
+    domain: spec
+    subject: decision
+  requirement: >-
+    A decision name SHOULD be kebab-case with at most three words, not counting
+    a `no-`, `max-` or `prefer-` prefix; SHOULD contain none of the words `is`,
+    `are`, `be`, `should`, `must`, `when` or `not`; and SHOULD NOT repeat the
+    name of its pack in a word. `no-<thing>` names a prohibition, `max-<thing>`
+    a limit and `prefer-<thing>` a preference; any other name is a noun phrase
+    naming what is required.
+  severity: warn
+  check:
+    type: cel
+    with:
+      - name: shape
+        expr: decision.name.matches('^[a-z][a-z0-9]*/[a-z][a-z0-9]*(-[a-z0-9]+)*$')
+      - name: parts
+        expr: words(decision.name)
+      - name: counted
+        expr: >-
+          size(parts) - (size(parts) > 0 && parts[0] in ['no', 'max', 'prefer'] ? 1 : 0)
+      - name: banned
+        expr: parts.filter(w, w in ['is', 'are', 'be', 'should', 'must', 'when', 'not'])
+      - name: echoes
+        expr: >-
+          parts.filter(w, trimSuffixes(w, 's') == decision.pack
+            || (size(trimSuffixes(w, 's')) >= 4 && decision.pack.startsWith(trimSuffixes(w, 's'))))
+      - name: problems
+        expr: >-
+          (shape ? '' : ' is not kebab-case;')
+          + (counted > 3 ? ' has ' + string(counted) + ' words, at most 3;' : '')
+          + (size(banned) > 0 ? ' uses `' + banned[0] + '`;' : '')
+          + (size(echoes) > 0 ? ' repeats its pack in `' + echoes[0] + '`;' : '')
+    where: size(problems) > 0
+    message: "decision name `{{ decision.name }}`{{ trimRight(problems, ';') }}"
+    evidence:
+      name: decision.name
+      words: string(size(parts))
+    identity:
+      subject: "decision.uid != '' ? decision.uid : decision.name"
+  examples:
+    - name: kebab-prohibition
+      language: text
+      kind: valid
+      canonical: true
+      files:
+        - path: decisions/design/no-private-types.yaml
+          body: |-
+            apiVersion: lighthouse/v1alpha1
+            kind: Decision
+            metadata:
+              name: design/no-private-types
+              labels:
+                lighthouse/pack: design
+    - name: noun-phrase-and-limit
+      language: text
+      kind: valid
+      files:
+        - path: decisions/core/max-lines.yaml
+          body: |-
+            apiVersion: lighthouse/v1alpha1
+            kind: Decision
+            metadata:
+              name: core/max-lines
+        - path: decisions/design/layout.yaml
+          body: |-
+            apiVersion: lighthouse/v1alpha1
+            kind: Decision
+            metadata:
+              name: design/layout
+    - name: not-kebab-case
+      language: text
+      kind: invalid
+      files:
+        - path: decisions/design/Private_Types.yaml
+          body: |-
+            apiVersion: lighthouse/v1alpha1
+            kind: Decision
+            metadata:
+              name: design/Private_Types
+      expect:
+        - line: 4
+          message: is not kebab-case
+    - name: too-many-words
+      language: text
+      kind: invalid
+      files:
+        - path: decisions/design/long.yaml
+          body: |-
+            apiVersion: lighthouse/v1alpha1
+            kind: Decision
+            metadata:
+              name: design/translate-errors-at-the-boundary
+      expect:
+        - line: 4
+          message: has 5 words
+    - name: prefix-is-not-counted
+      language: text
+      kind: valid
+      files:
+        - path: decisions/design/prefer.yaml
+          body: |-
+            apiVersion: lighthouse/v1alpha1
+            kind: Decision
+            metadata:
+              name: design/prefer-small-public-api
+    - name: banned-word
+      language: text
+      kind: invalid
+      files:
+        - path: decisions/design/sentence.yaml
+          body: |-
+            apiVersion: lighthouse/v1alpha1
+            kind: Decision
+            metadata:
+              name: design/order-is-not-a-reason
+      expect:
+        - line: 4
+          message: uses `is`
+    - name: repeats-the-pack
+      language: text
+      kind: invalid
+      files:
+        - path: decisions/testing/unique.yaml
+          body: |-
+            apiVersion: lighthouse/v1alpha1
+            kind: Decision
+            metadata:
+              name: testing/unique-owner-test
+              labels:
+                lighthouse/pack: testing
+      expect:
+        - line: 4
+          message: repeats its pack in `test`

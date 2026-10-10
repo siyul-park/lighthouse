@@ -5,12 +5,15 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-/// What kind of thing a decision is about. Only code exists today.
+/// What kind of thing a decision is about: source code, or Lighthouse's own
+/// documents (the decisions of a catalog).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Domain {
     #[default]
     Code,
+    /// The documents of a project that configure Lighthouse.
+    Spec,
 }
 
 /// What a decision talks about inside its domain. Mapping to the run scope
@@ -23,15 +26,25 @@ pub enum Subject {
     Module,
     Project,
     Test,
+    /// A decision document, in the `spec` domain.
+    Decision,
 }
 
 impl Subject {
-    /// Symbol, file and test decisions are checked once per file; module and
-    /// project decisions once over the merged project.
+    /// Symbol, file and test decisions are checked once per file; module,
+    /// project and decision decisions once over the merged project.
     pub fn run_scope(self) -> RunScope {
         match self {
             Self::Symbol | Self::File | Self::Test => RunScope::File,
-            Self::Module | Self::Project => RunScope::Project,
+            Self::Module | Self::Project | Self::Decision => RunScope::Project,
+        }
+    }
+
+    /// The domain this subject belongs to.
+    pub fn domain(self) -> Domain {
+        match self {
+            Self::Decision => Domain::Spec,
+            _ => Domain::Code,
         }
     }
 }
@@ -263,8 +276,8 @@ macro_rules! display {
     };
 }
 
-display!(Subject { Symbol => "symbol", File => "file", Module => "module", Project => "project", Test => "test" });
-display!(Domain { Code => "code" });
+display!(Subject { Symbol => "symbol", File => "file", Module => "module", Project => "project", Test => "test", Decision => "decision" });
+display!(Domain { Code => "code", Spec => "spec" });
 display!(DecisionStatus { Proposed => "proposed", Accepted => "accepted", Rejected => "rejected", Superseded => "superseded", Deprecated => "deprecated" });
 display!(ExampleKind { Valid => "valid", Invalid => "invalid" });
 

@@ -42,6 +42,22 @@ fn decision_severity() {
 }
 
 #[test]
+fn subject_domain_follows_the_subject_and_decisions_are_judged_over_the_project() {
+    use lighthouse_spec::Domain;
+
+    assert_eq!(Subject::Decision.domain(), Domain::Spec);
+    assert_eq!(Subject::Decision.run_scope(), RunScope::Project);
+    for subject in [
+        Subject::Symbol,
+        Subject::File,
+        Subject::Module,
+        Subject::Test,
+    ] {
+        assert_eq!(subject.domain(), Domain::Code, "{subject}");
+    }
+}
+
+#[test]
 fn subject_run_scope() {
     let cases = [
         (Subject::Symbol, RunScope::File),
@@ -188,6 +204,25 @@ fn identities_map_every_name_a_decision_answers_to_its_uid() {
 
 mod validation {
     use super::*;
+
+    #[test]
+    fn a_decision_about_decisions_is_in_the_spec_domain() {
+        let in_domain = |domain: &str| {
+            decision(
+                "p/a",
+                "s",
+                &SPEC.replace(
+                    "scope: { subject: file }",
+                    &format!("scope: {{ domain: {domain}, subject: decision }}"),
+                ),
+            )
+        };
+        rejected(
+            with("p/s/a.yaml", &in_domain("code")),
+            "`decision` decision is in the `spec` domain, not `code`",
+        );
+        assert!(Catalog::from_files(with("p/s/a.yaml", &in_domain("spec"))).is_ok());
+    }
 
     #[test]
     fn a_uid_is_a_uuid_v4_and_belongs_to_one_decision() {

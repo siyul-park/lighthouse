@@ -385,12 +385,39 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 | --- | --- | --- | --- | --- |
 | `design/single-term-per-concept` | One term, one concept | info · model |  | One term MUST represent one concept across packages. |
 | `design/minimal-names` | Minimal names | info · model |  | One word SHOULD be the default; a multi-word name MUST add only the minimum qualifier needed to express a distinction. |
+| [`design/max-name-words`](#names-have-at-most-a-few-words) | Names have at most a few words | warn · cel |  |  |
 | [`design/no-redundant-qualifiers`](#no-redundant-qualifiers) | No redundant qualifiers | warn · cel |  |  |
 | `design/standard-abbreviations` | Keep standard abbreviations | warn · model |  | Standard abbreviations MUST be kept in their conventional form. |
 | `design/short-names-limited` | One-letter names stay small | warn · model |  | One-letter names MUST be limited to conventional receivers, indexes, and tiny scopes. |
 | `design/predicate-names` | Predicate names state their form | warn · model |  | Predicates MUST name their form: `HasX` for containing or registering X, `IsX` for a state predicate, `MatchX` for comparison or validation against X, and a bare `X` for a direct boolean value. `At` MUST be used for position or time predicates. |
 | `design/reserved-action-verbs` | Action verbs are reserved | info · model |  | Configured action verbs, by default `Build`, `Compile`, `Publish`, `Capture`, and `Use`, MUST be reserved for actions or transitions. |
 | `design/singular-capability-plural-collection` | Singular capabilities, plural collections | info · model |  | Capability names MUST be singular; collections and stores MUST be plural. |
+
+### Names have at most a few words
+
+`design/max-name-words` · symbol · warn · cel
+
+*One word is the default and a longer name adds only the qualifier a distinction needs (`design/minimal-names`, which a reviewer judges). This is the part that can be counted, with the option name of ESLint's `max-lines` and `max-params`. Words are the parts of a name split at `_`, at a lower-to-upper change and at the end of an acronym: `parseHTTPRequest` and `parse_http_request` have three.*
+
+A name SHOULD have at most the configured number of words (option `max`).
+
+| option | default | meaning |
+| --- | --- | --- |
+| `max` | `3` | Most words a name may have. |
+
+```go invalid
+package sample
+
+func parseHTTPRequestBodyBytes() {}
+```
+
+```go valid
+package sample
+
+func parseHTTPRequest() {}
+```
+
+Also: rust
 
 ### No redundant qualifiers
 

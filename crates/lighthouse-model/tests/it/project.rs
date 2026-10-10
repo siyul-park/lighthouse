@@ -1,8 +1,9 @@
 use std::path::Path;
 
 use lighthouse_model::{
-    Comment, Edge, EdgeKind, File, Fragment, FunctionSummary, Module, Node, Position, Project,
-    Resolution, Span, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle, Visibility,
+    Comment, Document, Edge, EdgeKind, File, Fragment, FunctionSummary, Module, Node, Position,
+    Project, Resolution, Span, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle,
+    Visibility,
 };
 
 fn at() -> Span {
@@ -493,4 +494,31 @@ fn file_of(symbol: &Symbol) -> File {
         generated: false,
         test: false,
     }
+}
+
+#[test]
+fn project_with_documents_keeps_them_in_file_order_and_project_documents_lists_them() {
+    let document = |file: &str, line: u32, name: &str| Document {
+        file: file.into(),
+        at: Position { line, col: 9 },
+        kind: "Decision".to_owned(),
+        name: name.to_owned(),
+        uid: None,
+        labels: Default::default(),
+    };
+    let project = Project::merge([Fragment::default()]);
+    assert!(project.documents().is_empty());
+
+    let project = project.with_documents(vec![
+        document("b.yaml", 2, "p/b"),
+        document("a.yaml", 7, "p/z"),
+        document("a.yaml", 3, "p/a"),
+    ]);
+
+    let names: Vec<_> = project
+        .documents()
+        .iter()
+        .map(|d| d.name.as_str())
+        .collect();
+    assert_eq!(names, ["p/a", "p/z", "p/b"]);
 }

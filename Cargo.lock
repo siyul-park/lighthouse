@@ -763,6 +763,7 @@ dependencies = [
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-process",
+ "lighthouse-resource",
  "lighthouse-spec",
  "rayon",
  "serde_json",

@@ -261,6 +261,22 @@ fn how_a_decision_is_checked_changes_its_check_revision_and_never_its_meaning() 
 /// every bundled pattern: recorded verdicts carry these values.
 const LEGACY: &str = include_str!("legacy-semantic-versions.tsv");
 
+/// Decisions written after those builds: they have no earlier version, and
+/// nothing was ever recorded under one.
+const NEW_SINCE: [&str; 2] = ["core/decision-naming", "design/max-name-words"];
+
+#[test]
+fn a_decision_written_after_the_old_builds_has_no_earlier_version() {
+    for id in NEW_SINCE {
+        let decision = bundled(id);
+        assert_eq!(decision.legacy_semantic_version(), None, "{id}");
+        assert!(
+            !LEGACY.contains(id) && !BEFORE_REVISION_28.contains(id),
+            "{id} is pinned among the old decisions"
+        );
+    }
+}
+
 #[test]
 fn migrated_decisions_keep_the_semantic_version_their_verdicts_were_recorded_under() {
     let mut seen = 0;
@@ -274,7 +290,10 @@ fn migrated_decisions_keep_the_semantic_version_their_verdicts_were_recorded_und
         );
         seen += 1;
     }
-    assert_eq!(seen, Catalog::bundled().decisions().count());
+    assert_eq!(
+        seen + NEW_SINCE.len(),
+        Catalog::bundled().decisions().count()
+    );
 }
 
 #[test]
@@ -346,5 +365,8 @@ fn the_meaning_a_decision_had_before_revision_28_is_among_its_earlier_versions()
         );
         seen += 1;
     }
-    assert_eq!(seen, Catalog::bundled().decisions().count());
+    assert_eq!(
+        seen + NEW_SINCE.len(),
+        Catalog::bundled().decisions().count()
+    );
 }

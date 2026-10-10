@@ -1,5 +1,6 @@
 pub mod annotation;
 mod diagnostic;
+mod document;
 mod fix;
 pub mod hash;
 mod review;
@@ -8,6 +9,7 @@ mod text;
 mod ucm;
 
 pub use diagnostic::{Diagnostic, Fingerprint, Incomplete, Severity, UnknownSeverity};
+pub use document::Document;
 pub use fix::{Anchor, EditOp, FixOutcome, Owner, Safety, UnknownSafety};
 pub use review::{Label, MismatchedReason, Reason, ReviewerKind, UnknownTerm, Verdict};
 pub use scope::{Applicability, RunScope, TestScope};

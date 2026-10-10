@@ -337,6 +337,9 @@ pub enum Select {
     Test,
     /// A comment of a file, with its text and position.
     Comment,
+    /// A decision document of the project: its name, pack, labels and kind,
+    /// and where it is written.
+    Decision,
 }
 
 impl Select {
@@ -348,6 +351,7 @@ impl Select {
             Subject::File => Some(Self::File),
             Subject::Module => Some(Self::Module),
             Subject::Test => Some(Self::Test),
+            Subject::Decision => Some(Self::Decision),
             Subject::Project => None,
         }
     }
@@ -355,7 +359,7 @@ impl Select {
     /// Edges and modules are judged once over the project; the rest per file.
     pub fn scope(self) -> RunScope {
         match self {
-            Self::Edge | Self::Module => RunScope::Project,
+            Self::Edge | Self::Module | Self::Decision => RunScope::Project,
             _ => RunScope::File,
         }
     }
@@ -379,6 +383,7 @@ impl Select {
             Self::File => "file",
             Self::Test => "test",
             Self::Comment => "comment",
+            Self::Decision => "decision",
         }
     }
 }
@@ -469,7 +474,8 @@ impl CelCheck {
         };
         for binding in &self.bindings {
             let reserved = [
-                "options", "symbol", "func", "edge", "module", "file", "test",
+                "options", "symbol", "func", "edge", "module", "file", "test", "comment",
+                "decision",
             ];
             let valid = !binding.name.is_empty()
                 && binding
