@@ -90,16 +90,19 @@ Rule-based checking is finished before any retrieval or learning work.
 - Baseline and ratchet; cycle, clone and stability analyzers.
 - `lighthouse log compact` folds expired and superseded events in `decisions.jsonl`;
   the full history stays in git.
-- Decision retrieval for decisions that rules cannot capture precisely:
-  - Retrieval first filters decisions by scope, language, status and target files, then
-    ranks them, lexically (SQLite FTS5) or with a local embedding model (EmbeddingGemma 2
-    via the `Model` kind) once that beats the lexical ranking.
-  - `decisions_relevant` over MCP and CLI takes a short task frame: task, targets, intent
-    and approach.
+- One `search` tool (MCP and CLI) over decisions, judgments, findings, examples, symbols
+  and revisions. It serves decisions that rules cannot capture precisely:
+  - Each kind is first filtered (scope, language, status, target files).
+  - Then lexical (SQLite FTS5 BM25), dense (a local embedding model such as EmbeddingGemma 2,
+    via the `Model` kind) and structural rankings are fused with Reciprocal Rank Fusion.
+  - The dense ranking joins only when it improves the fused result on the evaluation set.
+  - An agent passes a short task frame (task, targets, intent, approach); hooks search
+    decisions only.
   - Hooks call it when a task starts and before a file's first edit, in shadow mode at
     first.
   - The evaluation set comes from history: a finding or judgment of a decision on a file
-    marks that decision as relevant to edits of that file.
+    marks that decision as relevant to edits of that file. Recall@k, nDCG@10 and MRR are
+    measured per ranker and for the fused result.
   - Retrieval never creates findings or blocks; the index is a rebuildable cache.
 
 ### 4: decision evolution
