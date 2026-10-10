@@ -12,6 +12,10 @@ spec:
   context: >-
     A helper that wraps the call hides the very thing being specified.
 
+    Until the code model says whether a helper returns or asserts on the
+    target's result, or only builds with it, this is a review signal: a setup
+    helper that hands the target to a constructor is reported too.
+
     An owner test is named after its target (`TestStore_Get` is about
     `Store.Get`, by the naming of `testing/owner`). The test is reported when
     it neither calls nor references that target itself but calls a helper of
@@ -41,7 +45,7 @@ spec:
     Wrappers, builders, or helpers MUST NOT hide the target call or result being
     specified, and MUST NOT be added merely for reuse. Setup helpers MAY exist
     only when the specified behavior remains visible.
-  severity: warn
+  severity: info
   options:
     type: object
     properties:

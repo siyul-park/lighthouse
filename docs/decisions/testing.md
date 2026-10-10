@@ -23,7 +23,7 @@ Contract tests should prove behavior through the same public boundary available 
 | --- | --- | --- | --- | --- |
 | [`testing/external-package`](#contract-tests-live-outside-the-target) | Contract tests live outside the target | error · cel |  |  |
 | `testing/no-private-access` | Tests do not reach private symbols | warn · model |  | Tests MUST NOT reference private symbols of the target; private-symbol testing MUST be resolved at the public boundary rather than by exposing internals solely for tests. |
-| [`testing/no-hidden-target`](#helpers-do-not-hide-the-target-call) | Helpers do not hide the target call | warn · cel |  |  |
+| [`testing/no-hidden-target`](#helpers-do-not-hide-the-target-call) | Helpers do not hide the target call | info · cel |  |  |
 
 ### Contract tests live outside the target
 
@@ -61,9 +61,9 @@ Also: rust
 
 ### Helpers do not hide the target call
 
-`testing/no-hidden-target` · test · warn · cel
+`testing/no-hidden-target` · test · info · cel
 
-*A helper that wraps the call hides the very thing being specified. An owner test is named after its target (`TestStore_Get` is about `Store.Get`, by the naming of `testing/owner`). The test is reported when it neither calls nor references that target itself but calls a helper of the test code that does. A helper is a function of test code that is not a test case; it is followed one call deep, and a call made inside a closure or a `t.Run` helper counts as the test's own. The helper is taken to return the target's result or assert on it: the code model says that it calls the target, not what it does with the result. A test with no owner name, or that calls what it is named after, is not reported, and neither is a setup helper that only calls constructors or other code the test is not named after. Known limit: a setup helper that reaches the target as an argument, such as an environment builder that is handed the extension a test is named after, is reported although it only sets up; the code model does not say whether a helper asserts or builds. Go: The helper is a function that takes the test handle or a test fixture function. Rust: The helper is a function of the test crate or of an inline test module; the test is named after its target in snake case.*
+*A helper that wraps the call hides the very thing being specified. Until the code model says whether a helper returns or asserts on the target's result, or only builds with it, this is a review signal: a setup helper that hands the target to a constructor is reported too. An owner test is named after its target (`TestStore_Get` is about `Store.Get`, by the naming of `testing/owner`). The test is reported when it neither calls nor references that target itself but calls a helper of the test code that does. A helper is a function of test code that is not a test case; it is followed one call deep, and a call made inside a closure or a `t.Run` helper counts as the test's own. The helper is taken to return the target's result or assert on it: the code model says that it calls the target, not what it does with the result. A test with no owner name, or that calls what it is named after, is not reported, and neither is a setup helper that only calls constructors or other code the test is not named after. Known limit: a setup helper that reaches the target as an argument, such as an environment builder that is handed the extension a test is named after, is reported although it only sets up; the code model does not say whether a helper asserts or builds. Go: The helper is a function that takes the test handle or a test fixture function. Rust: The helper is a function of the test crate or of an inline test module; the test is named after its target in snake case.*
 
 Wrappers, builders, or helpers MUST NOT hide the target call or result being specified, and MUST NOT be added merely for reuse. Setup helpers MAY exist only when the specified behavior remains visible.
 

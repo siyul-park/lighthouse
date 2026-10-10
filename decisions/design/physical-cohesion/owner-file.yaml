@@ -12,6 +12,10 @@ spec:
   context: >-
     A reader finds an owner and everything it owns in one place.
 
+    This is a review signal: most findings are deliberate splits of an owner
+    by concern, which the code model cannot tell from accidents, and no tool
+    backs the Go convention of one file per receiver type.
+
     A method is reported when it is declared outside the unit of its type: its
     file, or its module and the modules below it (option `unit`). A
     private free function is reported the same way when every production
@@ -34,7 +38,7 @@ spec:
     domain: code
     subject: symbol
   requirement: Symbols with one owner and cohesive responsibility MUST share a file.
-  severity: warn
+  severity: info
   options:
     type: object
     properties:

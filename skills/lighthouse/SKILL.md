@@ -87,7 +87,7 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 ### design
 
 - `design/layers` (warn) Dependencies point down the layers
-- `design/owner-file` (warn) One owner, one file
+- `design/owner-file` (info) One owner, one file
 - `design/misplaced-symbol` (info) A function lives with what it uses
 - `design/tiny-modules` (info) A module earns its boundary
 - `design/contiguity` (warn, fixable: suggested) Collaborators stay close
@@ -108,7 +108,7 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 ### testing
 
 - `testing/external-package` (error) Contract tests live outside the target
-- `testing/no-hidden-target` (warn) Helpers do not hide the target call
+- `testing/no-hidden-target` (info) Helpers do not hide the target call
 - `testing/standard-assertions` (warn) Assertions use the standard library
 - `testing/owner` (warn) Every public symbol has an owner test
 - `testing/unique-owner` (error) One owner test per public symbol
