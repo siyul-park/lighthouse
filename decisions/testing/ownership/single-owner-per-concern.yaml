@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: ownership
 spec:
   title: One owner per concern
-  intent: A concern restated in two places drifts apart.
+  context: >-
+    A concern restated in two places drifts apart.
   scope:
     domain: code
     subject: project

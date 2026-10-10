@@ -15,7 +15,7 @@ use serde_json::json;
 fn local(scope: &str, check: &str) -> Result<Declarative, String> {
     let indented: String = check.lines().map(|l| format!("    {l}\n")).collect();
     let text = format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  intent: A probe.\n  scope: {{ subject: {scope} }}\n  requirement: A probe MUST hold.\n  severity: error\n  evidence: [x]\n  check:\n    type: cel\n{indented}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: {scope}, tests: include }}\n  requirement: A probe MUST hold.\n  severity: error\n  check:\n    type: cel\n{indented}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
     );
     let layer = Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)]))
         .map_err(|e| e.to_string())?;
@@ -179,7 +179,7 @@ fn local_files_need_the_local_prefix_and_a_cel_check_and_inline_examples() {
     let files = |text: &str| BTreeMap::from([("x.yaml".to_owned(), text.to_owned())]);
     let header = |name: &str| {
         format!(
-            "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: {name}\nspec:\n  title: t\n  intent: i\n  scope: {{ subject: symbol }}\n  requirement: A MUST b.\n"
+            "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: {name}\nspec:\n  title: t\n  context: i\n  scope: {{ subject: symbol }}\n  requirement: A MUST b.\n"
         )
     };
     assert!(

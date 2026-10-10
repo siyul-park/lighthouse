@@ -108,7 +108,7 @@ pub fn decision_text(session: &Session, id: &str) -> Result<String> {
     Ok(lighthouse_spec::decision_markdown(decision, 1))
 }
 
-/// The text that explains a decision or rule: intent, requirement, examples and
+/// The text that explains a decision or rule: context, requirement, examples and
 /// status, then the rule's analyzers and capabilities.
 pub fn explain(catalog: &Catalog, registry: &Registry, id: &str) -> Result<String> {
     let decision = catalog.decision(id);

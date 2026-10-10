@@ -25,8 +25,8 @@ pub use check::{
     OrderClause, OrderReport, OrderScope, RpcCheck, Select, TemplatePart, parse_template,
 };
 pub use decision::{
-    Decision, DecisionSpec, LanguageSpec, MIGRATED_FROM, PACK_LABEL, SECTION_LABEL, WAS_BUILTIN,
-    WAS_ENFORCEMENT,
+    Decision, DecisionSpec, LanguageSpec, MIGRATED_FROM, PACK_LABEL, PRESET_LABEL, Provenance,
+    SECTION_LABEL, STRICT, WAS_BUILTIN, WAS_ENFORCEMENT, WAS_EXCEPTIONS,
 };
 pub use error::Error;
 pub use fix::{
@@ -36,18 +36,19 @@ pub use fix_docs::{OPERATIONS, Operation, Param, fix_operations_markdown};
 pub use legacy::from_legacy_type;
 pub use local::{load_local, local_dir, local_files};
 pub use model::{
-    Content, Domain, Example, ExampleFile, ExampleKind, Expect, Scope, Status, Subject,
+    Content, DecisionStatus, Domain, Example, ExampleFile, ExampleKind, Expect, Scope, Subject,
     authored_severity,
 };
 pub use options::{ObjectType, OptionSchema, OptionType, OptionsSchema};
 pub use pack::{Pack, PackSpec, Section, SectionSpec};
 pub use project::{
     Config, FILE_NAME, FILE_NAMES, Formatter, FormatterOutput, FormatterSpec, FormatterStdin,
-    GlobSet, Layer, Level, OverrideSpec, PluginEntry, PluginRef, PluginRefSpec, ProjectError,
-    ProjectLanguage, ProjectSpec, Projects, RuleConfig, RuleDetail, RuleSetting, Rules, glob_set,
+    GeneratedCheck, GeneratedSpec, GlobSet, Layer, Level, OverrideSpec, PluginEntry, PluginRef,
+    PluginRefSpec, ProjectError, ProjectLanguage, ProjectSpec, Projects, RuleConfig, RuleDetail,
+    RuleSetting, Rules, glob_set,
 };
 pub use render::{DOCS_DIR, decision_markdown, docs, help_path};
-pub use sources::{Source, SourceMapSpec};
+pub use sources::{SourceLine, SourceMapSpec};
 
 /// The JSON Schema of every kind this crate defines.
 pub fn descriptors() -> Vec<Descriptor> {

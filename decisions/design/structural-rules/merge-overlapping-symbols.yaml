@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: structural-rules
 spec:
   title: Merge overlapping symbols
-  intent: Parallel variants multiply what readers must learn.
+  context: >-
+    Parallel variants multiply what readers must learn.
   scope:
     domain: code
     subject: symbol

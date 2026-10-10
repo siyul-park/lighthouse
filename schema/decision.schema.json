@@ -285,7 +285,15 @@
               "type": "array"
             },
             "select": {
-              "$ref": "#/$defs/Select"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Select"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What the check looks at. Default: what the decision's `scope.subject`\nis about; a decision about the project says which it looks at."
             },
             "timeout": {
               "description": "How long one run of the provider may take, such as `30s` or `2m`.",
@@ -312,7 +320,6 @@
           },
           "required": [
             "type",
-            "select",
             "where",
             "message"
           ],
@@ -544,12 +551,6 @@
             }
           ]
         },
-        "citation": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "consequences": {
           "description": "What follows from the decision, good and bad.",
           "type": [
@@ -557,24 +558,15 @@
             "null"
           ]
         },
-        "evidence": {
-          "description": "Fields a checker emits as diagnostic evidence.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+        "context": {
+          "description": "Why the decision exists: the forces at play, as an architecture\ndecision record's context states them.",
+          "type": "string"
         },
         "examples": {
           "items": {
             "$ref": "#/$defs/Example"
           },
           "type": "array"
-        },
-        "exceptions": {
-          "type": [
-            "string",
-            "null"
-          ]
         },
         "fix": {
           "anyOf": [
@@ -586,9 +578,6 @@
             }
           ],
           "description": "How the findings of the rule are fixed; the catalog is the one place\nthat says."
-        },
-        "intent": {
-          "type": "string"
         },
         "languages": {
           "additionalProperties": {
@@ -607,6 +596,10 @@
             }
           ],
           "description": "Tunable values, as a JSON Schema object."
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance",
+          "description": "Where the decision comes from."
         },
         "requirement": {
           "description": "What the decision demands, in RFC 2119 words.",
@@ -627,12 +620,8 @@
           "description": "The severity of the decision's findings, as authored. `error` is\ndefinitive: it needs no verdict and only an annotation in the code\nwaives it, and its fix may be safe. `warn` and `info` are review\ntasks: a reviewer's verdict may hide them and a fix is at most\nsuggested. A decision without a `check` has none. A configuration\n`level` changes what is reported and the exit code, never this."
         },
         "status": {
-          "$ref": "#/$defs/Status",
+          "$ref": "#/$defs/DecisionStatus",
           "description": "Where the decision stands: only an accepted one is enforced."
-        },
-        "strict": {
-          "description": "Review-level advice that is too noisy for the `recommended` preset;\nthe `strict` preset enables it.",
-          "type": "boolean"
         },
         "supersedes": {
           "description": "The decisions this one replaces, by id. Each becomes `superseded`.",
@@ -647,11 +636,42 @@
       },
       "required": [
         "title",
-        "intent",
+        "context",
         "scope",
         "requirement"
       ],
       "type": "object"
+    },
+    "DecisionStatus": {
+      "description": "Where a decision stands in its life, as an architecture decision record\ndoes. Only an accepted decision is enforced.",
+      "oneOf": [
+        {
+          "enum": [
+            "accepted"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "proposed",
+          "description": "Under discussion: written down, not yet enforced.",
+          "type": "string"
+        },
+        {
+          "const": "rejected",
+          "description": "Considered and turned down; kept so the question is not asked again.",
+          "type": "string"
+        },
+        {
+          "const": "superseded",
+          "description": "Replaced by another decision (named in that decision's `supersedes`).",
+          "type": "string"
+        },
+        {
+          "const": "deprecated",
+          "description": "No longer wanted, and nothing replaces it.",
+          "type": "string"
+        }
+      ]
     },
     "Domain": {
       "description": "What kind of thing a decision is about. Only code exists today.",
@@ -956,19 +976,12 @@
     },
     "LanguageSpec": {
       "additionalProperties": false,
-      "description": "What one language changes about a decision.",
+      "description": "What one language changes about a decision: the values of its options.",
       "properties": {
         "options": {
           "additionalProperties": true,
           "description": "Values of the decision's options that replace their defaults here.",
           "type": "object"
-        },
-        "tuning": {
-          "description": "Wording of the decision for this language.",
-          "type": [
-            "string",
-            "null"
-          ]
         }
       },
       "type": "object"
@@ -1313,6 +1326,20 @@
         }
       ]
     },
+    "Provenance": {
+      "additionalProperties": false,
+      "description": "Where a decision comes from, in the vocabulary of W3C PROV.",
+      "properties": {
+        "wasDerivedFrom": {
+          "description": "The sources the decision was derived from: a paper, a tool's rule, the\nlines of a document it covers.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "ReorderScope": {
       "description": "The declarations a `reorder` permutes.",
       "oneOf": [
@@ -1345,14 +1372,22 @@
     },
     "Scope": {
       "additionalProperties": false,
-      "description": "Where a decision applies: its domain and what it is about.",
+      "description": "Where a decision applies: its domain, what it is about, and which code its\nsubjects may be in. Generated and test code are told apart by the host\n(the provider's marker, `.gitattributes`, the project's `generated`\nglobs), and the engine leaves the subjects out that the scope excludes\nbefore any check runs.",
       "properties": {
         "domain": {
           "$ref": "#/$defs/Domain",
           "default": "code"
         },
+        "generated": {
+          "description": "Generated code is a subject too. Default: it is not.",
+          "type": "boolean"
+        },
         "subject": {
           "$ref": "#/$defs/Subject"
+        },
+        "tests": {
+          "$ref": "#/$defs/TestScope",
+          "description": "Which test code is a subject: `exclude` (the default), `include` or\n`only`."
         }
       },
       "required": [
@@ -1401,37 +1436,6 @@
         }
       ]
     },
-    "Status": {
-      "description": "Where a decision stands in its life, as an architecture decision record\ndoes. Only an accepted decision is enforced.",
-      "oneOf": [
-        {
-          "enum": [
-            "accepted"
-          ],
-          "type": "string"
-        },
-        {
-          "const": "proposed",
-          "description": "Under discussion: written down, not yet enforced.",
-          "type": "string"
-        },
-        {
-          "const": "rejected",
-          "description": "Considered and turned down; kept so the question is not asked again.",
-          "type": "string"
-        },
-        {
-          "const": "superseded",
-          "description": "Replaced by another decision (named in that decision's `supersedes`).",
-          "type": "string"
-        },
-        {
-          "const": "deprecated",
-          "description": "No longer wanted, and nothing replaces it.",
-          "type": "string"
-        }
-      ]
-    },
     "Subject": {
       "description": "What a decision talks about inside its domain. Mapping to the run scope\nof a rule is `Subject::run_scope`.",
       "enum": [
@@ -1442,6 +1446,26 @@
         "test"
       ],
       "type": "string"
+    },
+    "TestScope": {
+      "description": "Which test code a decision applies to.",
+      "oneOf": [
+        {
+          "const": "exclude",
+          "description": "Production code only.",
+          "type": "string"
+        },
+        {
+          "const": "include",
+          "description": "Production and test code.",
+          "type": "string"
+        },
+        {
+          "const": "only",
+          "description": "Test code only.",
+          "type": "string"
+        }
+      ]
     }
   },
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/decision.schema.json",

@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: structural-rules
 spec:
   title: Split real boundaries
-  intent: Differences in lifecycle or invariant deserve their own symbol.
+  context: >-
+    Differences in lifecycle or invariant deserve their own symbol.
   scope:
     domain: code
     subject: symbol

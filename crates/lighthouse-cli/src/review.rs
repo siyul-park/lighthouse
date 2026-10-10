@@ -35,7 +35,7 @@ pub enum ReviewCommand {
         /// longer enables. `resolved`: no longer reported by a complete run.
         /// `all`: every remembered finding.
         #[arg(long, value_enum, default_value = "open")]
-        status: Status,
+        status: StatusArg,
         #[arg(long, value_enum, default_value = "text")]
         format: Format,
     },
@@ -96,7 +96,7 @@ pub enum ReviewCommand {
 }
 
 #[derive(Clone, Copy, ValueEnum)]
-pub enum Status {
+pub enum StatusArg {
     Open,
     Suppressed,
     Narrowing,
@@ -168,14 +168,14 @@ pub fn run(command: ReviewCommand) -> Result<u8> {
 }
 
 /// What `list` asks the session for.
-fn query(rule: Option<String>, status: Status, all_tiers: bool) -> TaskQuery {
+fn query(rule: Option<String>, status: StatusArg, all_tiers: bool) -> TaskQuery {
     let status = match status {
-        Status::Open => StatusFilter::Open,
-        Status::Suppressed => StatusFilter::Suppressed,
-        Status::Narrowing => StatusFilter::Narrowing,
-        Status::Inactive => StatusFilter::Inactive,
-        Status::Resolved => StatusFilter::Resolved,
-        Status::All => StatusFilter::All,
+        StatusArg::Open => StatusFilter::Open,
+        StatusArg::Suppressed => StatusFilter::Suppressed,
+        StatusArg::Narrowing => StatusFilter::Narrowing,
+        StatusArg::Inactive => StatusFilter::Inactive,
+        StatusArg::Resolved => StatusFilter::Resolved,
+        StatusArg::All => StatusFilter::All,
     };
     TaskQuery {
         rule,

@@ -10,13 +10,15 @@ metadata:
     lighthouse/was-builtin: core/max-file-lines
 spec:
   title: Files stay below a line limit
-  intent: Large files tend to mix responsibilities.
+  context: >-
+    Large files tend to mix responsibilities.
   scope:
     domain: code
     subject: file
+    generated: true
+    tests: include
   requirement: "A file SHOULD stay at or below the configured line limit (option `max`)."
   severity: warn
-  evidence: [lines, max]
   options:
     type: object
     properties:
@@ -27,7 +29,6 @@ spec:
     additionalProperties: false
   check:
     type: cel
-    select: file
     where: file.lines > options.max
     message: "file has {{ file.lines }} lines, limit is {{ options.max }}"
     evidence:

@@ -8,10 +8,12 @@ metadata:
     lighthouse/section: tdd
 spec:
   title: Smallest failing contract first
-  intent: Seeing the contract fail first proves the test can fail.
+  context: >-
+    Seeing the contract fail first proves the test can fail.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     For each behavior change, the agent MUST state the contract and invariants,
     write the narrowest falsifying test, observe the expected failure when

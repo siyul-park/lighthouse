@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 
 use crate::{
     CheckKind, Decision, DecisionSpec, OptionType,
-    decision::{MIGRATED_FROM, WAS_BUILTIN, squash},
+    decision::{MIGRATED_FROM, WAS_BUILTIN, snake_case, squash},
 };
 
 /// The names the pattern format gave the option types, with their types.
@@ -29,7 +29,7 @@ struct LegacyOption<'a> {
     #[serde(rename = "type")]
     kind: &'static str,
     default: &'a Value,
-    description: &'a str,
+    description: String,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     per_language: BTreeMap<&'a str, &'a Value>,
 }
@@ -53,7 +53,12 @@ impl Decision {
             (None, Some(CheckKind::Model(_))) => Value::Null,
             (None, None) => Value::Null,
         };
-        let options: BTreeMap<&str, LegacyOption> = spec
+        let names: Vec<&String> = spec
+            .options
+            .iter()
+            .flat_map(|schema| schema.properties.keys())
+            .collect();
+        let options: BTreeMap<String, LegacyOption> = spec
             .options
             .iter()
             .flat_map(|schema| &schema.properties)
@@ -66,14 +71,14 @@ impl Decision {
                 let option = LegacyOption {
                     kind: legacy_type(p.kind),
                     default: &p.default,
-                    description: &p.description,
+                    description: earlier_description(&p.description, &names),
                     per_language,
                 };
-                (name.as_str(), option)
+                (snake_case(name), option)
             })
             .collect();
         let decision = json!({
-            "requirement": squash(&spec.requirement),
+            "requirement": squash(&self.earlier_requirement()),
             "enforcement": self.was_enforcement(),
             "options": options,
             "implementation": implementation,
@@ -94,4 +99,11 @@ fn legacy_type(kind: OptionType) -> &'static str {
         .iter()
         .find_map(|(legacy, k)| (*k == kind).then_some(*legacy))
         .expect("every option type has a legacy name")
+}
+
+/// A description with the option names it mentions as they were spelled then.
+fn earlier_description(text: &str, names: &[&String]) -> String {
+    names.iter().fold(text.to_owned(), |text, name| {
+        text.replace(&format!("`{name}`"), &format!("`{}`", snake_case(name)))
+    })
 }

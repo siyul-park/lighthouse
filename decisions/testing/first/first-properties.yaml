@@ -8,12 +8,16 @@ metadata:
     lighthouse/section: first
 spec:
   title: "Fast, independent, repeatable, self-validating, timely"
-  intent: Unreliable tests train people to ignore failures.
+  context: >-
+    Unreliable tests train people to ignore failures.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: "Tests MUST be Fast, Independent, Repeatable, Self-validating, and Timely."
   severity: info
   check:
     type: model
-  citation: "Martin, Clean Code, chapter 9"
+  provenance:
+    wasDerivedFrom:
+      - "Martin, Clean Code, chapter 9"

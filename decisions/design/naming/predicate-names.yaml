@@ -8,7 +8,11 @@ metadata:
     lighthouse/section: naming
 spec:
   title: Predicate names state their form
-  intent: The prefix tells callers what kind of question a predicate answers.
+  context: >-
+    The prefix tells callers what kind of question a predicate answers.
+
+    Go: Spelled as shown for exported names; unexported names use lower
+    camel case.
   scope:
     domain: code
     subject: symbol
@@ -18,11 +22,5 @@ spec:
     X, and a bare `X` for a direct boolean value. `At` MUST be used for position
     or time predicates.
   severity: warn
-  evidence: [name, expected_form]
-  languages:
-    go:
-      tuning: >-
-        Spelled as shown for exported names; unexported names use lower camel
-        case.
   check:
     type: model

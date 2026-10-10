@@ -13,6 +13,7 @@ use crate::layout::{exposed, has_word_prefix, is_declaration, owner_key};
 const ID: &str = "design/declaration-groups";
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Options {
     groups: Vec<String>,
     constructor_prefixes: Vec<String>,
@@ -60,7 +61,7 @@ impl OrderKey for GroupKey {
 
 /// Orders the methods of a type constructors first: a constructor (a public
 /// method named like one) ranks before the other methods. It orders nothing
-/// else, and nothing at all unless `constructors_first` is on.
+/// else, and nothing at all unless `constructorsFirst` is on.
 pub(crate) struct ConstructorKey;
 
 impl OrderKey for ConstructorKey {

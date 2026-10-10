@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: principles
 spec:
   title: "One implementation, one owner"
-  intent: "Duplicated behavior drifts; a single owner keeps it consistent."
+  context: >-
+    Duplicated behavior drifts; a single owner keeps it consistent.
   scope:
     domain: code
     subject: project
@@ -16,6 +17,5 @@ spec:
     Each behavior MUST have one implementation and each semantic rule MUST have
     one owner.
   severity: info
-  evidence: [owner, duplicates]
   check:
     type: model

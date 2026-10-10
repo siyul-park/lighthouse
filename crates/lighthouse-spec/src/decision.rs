@@ -6,7 +6,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-use crate::{Check, Error, Example, Fix, OptionsSchema, Scope, Status};
+use crate::{Check, DecisionStatus, Error, Example, Fix, OptionsSchema, Scope};
 use lighthouse_model::hash;
 
 /// Label that says which pack a decision belongs to.
@@ -23,17 +23,40 @@ pub const WAS_BUILTIN: &str = "lighthouse/was-builtin";
 /// cannot be told from its severity: `mechanical`, `heuristic`, `judgment` or
 /// `doc`. It keeps the versions older verdicts were recorded under.
 pub const WAS_ENFORCEMENT: &str = "lighthouse/was-enforcement";
+/// Annotation of a decision whose `exceptions` were appended to its
+/// requirement: the text that was appended. Verdicts recorded under the
+/// requirement without it keep applying while the rest is unchanged.
+pub const WAS_EXCEPTIONS: &str = "lighthouse/was-exceptions";
+/// Label that says which preset a decision joins beyond `recommended`; the
+/// only value is `strict`.
+pub const PRESET_LABEL: &str = "lighthouse/preset";
+/// The value of [`PRESET_LABEL`] of a decision only the `strict` preset enables.
+pub const STRICT: &str = "strict";
 
-/// What one language changes about a decision.
+/// What one language changes about a decision: the values of its options.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LanguageSpec {
     /// Values of the decision's options that replace their defaults here.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub options: Map<String, Value>,
-    /// Wording of the decision for this language.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tuning: Option<String>,
+}
+
+/// Where a decision comes from, in the vocabulary of W3C PROV.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct Provenance {
+    /// The sources the decision was derived from: a paper, a tool's rule, the
+    /// lines of a document it covers.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub was_derived_from: Vec<String>,
+}
+
+impl Provenance {
+    /// Whether nothing is said about where the decision comes from.
+    pub fn is_empty(&self) -> bool {
+        self.was_derived_from.is_empty()
+    }
 }
 
 /// A design decision, the way an architecture decision record states one:
@@ -44,13 +67,15 @@ pub struct LanguageSpec {
 #[serde(deny_unknown_fields)]
 pub struct DecisionSpec {
     pub title: String,
-    pub intent: String,
+    /// Why the decision exists: the forces at play, as an architecture
+    /// decision record's context states them.
+    pub context: String,
     pub scope: Scope,
     /// What the decision demands, in RFC 2119 words.
     pub requirement: String,
     /// Where the decision stands: only an accepted one is enforced.
-    #[serde(default, skip_serializing_if = "Status::is_default")]
-    pub status: Status,
+    #[serde(default, skip_serializing_if = "DecisionStatus::is_default")]
+    pub status: DecisionStatus,
     /// The decisions this one replaces, by id. Each becomes `superseded`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub supersedes: Vec<String>,
@@ -65,11 +90,6 @@ pub struct DecisionSpec {
     /// `level` changes what is reported and the exit code, never this.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub severity: Option<Severity>,
-    /// Fields a checker emits as diagnostic evidence.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub evidence: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub exceptions: Option<String>,
     /// Tunable values, as a JSON Schema object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<OptionsSchema>,
@@ -82,12 +102,9 @@ pub struct DecisionSpec {
     /// that says.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fix: Option<Fix>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub citation: Option<String>,
-    /// Review-level advice that is too noisy for the `recommended` preset;
-    /// the `strict` preset enables it.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub strict: bool,
+    /// Where the decision comes from.
+    #[serde(default, skip_serializing_if = "Provenance::is_empty")]
+    pub provenance: Provenance,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub examples: Vec<Example>,
 }
@@ -106,6 +123,12 @@ impl Decision {
     /// A decision with this identity and content.
     pub fn new(metadata: Metadata, spec: DecisionSpec) -> Self {
         Self(Resource::new(metadata, spec))
+    }
+
+    /// Whether only the `strict` preset enables the decision: review-level
+    /// advice that is too noisy for `recommended`.
+    pub fn strict(&self) -> bool {
+        self.label(PRESET_LABEL) == Some(STRICT)
     }
 
     /// The `<pack>/<name>` id.
@@ -203,6 +226,29 @@ impl Decision {
 }
 
 impl Decision {
+    /// The requirement as it was before the decision's `exceptions` were
+    /// appended to it, as the annotation of a migrated decision recorded them.
+    pub(crate) fn earlier_requirement(&self) -> String {
+        let requirement = squash(&self.requirement);
+        let appended = self.metadata().annotations.get(WAS_EXCEPTIONS);
+        let rest = appended.and_then(|text| requirement.strip_suffix(squash(text).as_str()));
+        rest.map_or(requirement.clone(), |rest| rest.trim_end().to_owned())
+    }
+
+    /// What [`DecisionSpec::meaning_version`] hashed before a decision's
+    /// exceptions were part of its requirement, its scope said which code it
+    /// applies to, and its option names were camelCase: the same meaning, so
+    /// the verdicts recorded under it keep applying.
+    pub fn earlier_meaning_version(&self) -> String {
+        let content = json!({
+            "requirement": squash(&self.earlier_requirement()),
+            "severity": self.severity,
+            "scope": { "domain": self.scope.domain, "subject": self.scope.subject },
+            "options": self.options_content(true),
+        });
+        hash::short(&content.to_string(), 8)
+    }
+
     /// The `enforcement` this decision had before severities replaced it:
     /// what its annotation recorded, else what its severity implies.
     pub(crate) fn was_enforcement(&self) -> &str {
@@ -231,11 +277,11 @@ impl Decision {
             (None, _) => Value::Null,
         };
         let content = json!({
-            "requirement": squash(&self.requirement),
+            "requirement": squash(&self.earlier_requirement()),
             "enforcement": self.was_enforcement(),
-            "scope": self.scope,
+            "scope": { "domain": self.scope.domain, "subject": self.scope.subject },
             "check": check,
-            "options": self.options_content(),
+            "options": self.options_content(true),
         });
         hash::short(&content.to_string(), 8)
     }
@@ -245,6 +291,7 @@ impl Decision {
     pub fn earlier_versions(&self) -> Vec<String> {
         let mut versions = vec![self.previous_semantic_version()];
         versions.extend(self.legacy_semantic_version());
+        versions.push(self.earlier_meaning_version());
         versions.dedup();
         versions
     }
@@ -280,7 +327,7 @@ impl DecisionSpec {
     /// language sets). A verdict stays valid exactly while this does not
     /// change. How the decision is checked is not part of it, so a decision
     /// may move from review to a rule, or from one provider to another, and
-    /// keep its verdicts. Wording, examples, tuning, option descriptions, the
+    /// keep its verdicts. Wording, examples, option descriptions, the
     /// ADR fields, the envelope and the file format do not change it either.
     pub fn meaning_version(&self) -> String {
         hash::short(&self.meaning_content().to_string(), 8)
@@ -297,37 +344,58 @@ impl DecisionSpec {
             "requirement": squash(&self.requirement),
             "severity": self.severity,
             "scope": self.scope,
-            "options": self.options_content(),
+            "options": self.options_content(false),
         })
     }
 
-    fn options_content(&self) -> Value {
+    /// The options, by name; with `snake`, by the names they had before they
+    /// were camelCase.
+    pub(crate) fn options_content(&self, snake: bool) -> Value {
         let empty = OptionsSchema::default();
         let schema = self.options.as_ref().unwrap_or(&empty);
+        let name = |name: &str| {
+            if snake {
+                snake_case(name)
+            } else {
+                name.to_owned()
+            }
+        };
         let properties: Map<String, Value> = schema
             .properties
             .iter()
-            .map(|(name, p)| {
-                (
-                    name.clone(),
-                    json!({ "type": p.kind, "default": p.default }),
-                )
-            })
+            .map(|(n, p)| (name(n), json!({ "type": p.kind, "default": p.default })))
             .collect();
         let languages: Map<String, Value> = self
             .languages
             .iter()
             .filter(|(_, l)| !l.options.is_empty())
-            .map(|(id, l)| (id.clone(), Value::Object(l.options.clone())))
+            .map(|(id, l)| {
+                let renamed: Map<String, Value> = l
+                    .options
+                    .iter()
+                    .map(|(k, v)| (name(k), v.clone()))
+                    .collect();
+                (id.clone(), Value::Object(renamed))
+            })
             .collect();
         json!({ "properties": properties, "languages": languages })
     }
 }
 
-pub(crate) fn squash(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
+/// `hubFanIn` as `hub_fan_in`: the names options had before they were camelCase.
+pub(crate) fn snake_case(name: &str) -> String {
+    let mut out = String::new();
+    for c in name.chars() {
+        if c.is_ascii_uppercase() {
+            out.push('_');
+            out.push(c.to_ascii_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
-fn is_false(value: &bool) -> bool {
-    !value
+pub(crate) fn squash(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }

@@ -8,7 +8,9 @@ metadata:
     lighthouse/section: dependency-direction
 spec:
   title: Generalize when extracting
-  intent: Moving code downward without generalizing only relocates the complexity.
+  context: >-
+    Moving code downward without generalizing only relocates the
+    complexity.
   scope:
     domain: code
     subject: symbol

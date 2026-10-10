@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: naming
 spec:
   title: One-letter names stay small
-  intent: One-letter names are only readable where context is a few lines.
+  context: >-
+    One-letter names are only readable where context is a few lines.
   scope:
     domain: code
     subject: symbol
@@ -16,6 +17,5 @@ spec:
     One-letter names MUST be limited to conventional receivers, indexes, and
     tiny scopes.
   severity: warn
-  evidence: [name, scope_lines]
   check:
     type: model

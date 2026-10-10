@@ -4,7 +4,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cel::Program;
-use lighthouse_model::{Diagnostic, Fingerprint, Node, Position, Project, Span, Symbol, SymbolId};
+use lighthouse_model::{
+    Diagnostic, File, Fingerprint, Node, Position, Project, Span, Symbol, SymbolId,
+};
 use lighthouse_plugin::{Ctx, Error as PluginError, RuleManifest};
 use lighthouse_spec::{CelCheck, Decision, Select};
 use serde_json::{Map, Value};
@@ -69,7 +71,9 @@ impl CelRule {
             source.as_deref().map(|s| compile(id, what, s)).transpose()
         };
         Ok(Self {
-            select: check.select,
+            select: check
+                .selects(decision.scope.subject)
+                .ok_or_else(|| Error::invalid(id, "a project decision needs a `select`"))?,
             bindings: check
                 .bindings
                 .iter()
@@ -150,50 +154,65 @@ impl Run<'_> {
         let Some((file, text)) = ctx.file else {
             return Ok(Vec::new());
         };
-        let project = ctx.project;
-        let mut found = Vec::new();
         match self.rule.select {
-            Select::File => {
+            Select::File if ctx.applies.admits_file(file) => {
                 let value = cel_fact(&self.builder.file(file, text));
                 let anchor = Place {
                     file: file.path.clone(),
                     span: top_of_file(),
                     symbol: None,
                 };
-                found.extend(self.judge(value, anchor, &file.path.to_string_lossy())?);
+                Ok(self
+                    .judge(value, anchor, &file.path.to_string_lossy())?
+                    .into_iter()
+                    .collect())
             }
-            Select::Symbol => {
-                for symbol in project.symbols_in(&file.path) {
-                    let value = self.builder.symbol_fact(symbol);
-                    found.extend(self.judge_symbol(symbol, value)?);
-                }
+            Select::Symbol | Select::Function | Select::Test => self.check_symbols(ctx, file),
+            Select::Comment => self.check_comments(ctx, file, text),
+            Select::File | Select::Edge | Select::Module => Ok(Vec::new()),
+        }
+    }
+
+    /// The symbols of `file` that are subjects of the decision's scope.
+    fn check_symbols(&self, ctx: &Ctx, file: &File) -> Result<Vec<Diagnostic>, PluginError> {
+        let project = ctx.project;
+        let mut found = Vec::new();
+        for symbol in project
+            .symbols_in(&file.path)
+            .filter(|s| ctx.applies.admits_symbol(project, s))
+        {
+            let value = match self.rule.select {
+                Select::Function => self.builder.function_fact(symbol),
+                Select::Test => self.builder.test_fact(symbol),
+                _ => Some(self.builder.symbol_fact(symbol)),
+            };
+            if let Some(value) = value {
+                found.extend(self.judge_symbol(symbol, value)?);
             }
-            Select::Function => {
-                for symbol in project.symbols_in(&file.path) {
-                    if let Some(value) = self.builder.function_fact(symbol) {
-                        found.extend(self.judge_symbol(symbol, value)?);
-                    }
-                }
+        }
+        Ok(found)
+    }
+
+    /// The comments of `file` that are subjects of the decision's scope.
+    fn check_comments(
+        &self,
+        ctx: &Ctx,
+        file: &File,
+        text: &str,
+    ) -> Result<Vec<Diagnostic>, PluginError> {
+        let project = ctx.project;
+        let mut found = Vec::new();
+        for comment in project.comments_in(&file.path) {
+            if !ctx.applies.admits_comment(project.file(&comment.file)) {
+                continue;
             }
-            Select::Test => {
-                for symbol in project.symbols_in(&file.path) {
-                    if let Some(value) = self.builder.test_fact(symbol) {
-                        found.extend(self.judge_symbol(symbol, value)?);
-                    }
-                }
-            }
-            Select::Comment => {
-                for comment in project.comments_in(&file.path) {
-                    let value = cel_fact(&self.builder.comment(comment, text));
-                    let place = Place {
-                        file: file.path.clone(),
-                        span: comment.span,
-                        symbol: None,
-                    };
-                    found.extend(self.judge(value, place, &comment.text)?);
-                }
-            }
-            Select::Edge | Select::Module => {}
+            let value = cel_fact(&self.builder.comment(comment, text));
+            let place = Place {
+                file: file.path.clone(),
+                span: comment.span,
+                symbol: None,
+            };
+            found.extend(self.judge(value, place, &comment.text)?);
         }
         Ok(found)
     }

@@ -8,9 +8,9 @@ metadata:
     lighthouse/section: principles
 spec:
   title: Coherent symbol responsibility
-  intent: >-
-    A symbol with one responsibility and a narrow contract is easy to name, test
-    and reuse.
+  context: >-
+    A symbol with one responsibility and a narrow contract is easy to
+    name, test and reuse.
   scope:
     domain: code
     subject: symbol

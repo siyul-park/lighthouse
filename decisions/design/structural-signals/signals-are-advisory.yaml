@@ -8,9 +8,9 @@ metadata:
     lighthouse/section: structural-signals
 spec:
   title: Signals stay advisory
-  intent: >-
-    Metrics approximate design quality; treating them as proof produces harmful
-    churn.
+  context: >-
+    Metrics approximate design quality; treating them as proof produces
+    harmful churn.
   scope:
     domain: code
     subject: project

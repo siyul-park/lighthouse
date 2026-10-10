@@ -15,6 +15,7 @@ fn rule(level: Option<Severity>, options: &[(&str, i64)]) -> RuleConfig {
             .iter()
             .map(|(k, v)| ((*k).to_owned(), (*v).into()))
             .collect(),
+        generated: None,
     }
 }
 
@@ -506,4 +507,43 @@ fn the_entries_of_a_project_are_those_of_what_it_extends_and_its_own() {
 
     let ids: Vec<&str> = entries.iter().map(|(id, _)| *id).collect();
     assert_eq!(ids, ["core/a", "core/b", "core/c"]);
+}
+
+const GENERATED: &str = "[generated]\nfiles = [\"**/*.pb.go\"]\ncheck = \"skip\"\n";
+
+#[test]
+fn config_is_generated() {
+    let config = Config::parse_inline(GENERATED).unwrap();
+
+    assert!(config.is_generated(Path::new("api/x.pb.go")));
+    assert!(!config.is_generated(Path::new("api/x.go")));
+    assert!(
+        !Config::parse_inline("")
+            .unwrap()
+            .is_generated(Path::new("x.pb.go"))
+    );
+}
+
+#[test]
+fn config_generated_check() {
+    use lighthouse_spec::GeneratedCheck;
+
+    let config = Config::parse_inline(GENERATED).unwrap();
+    assert_eq!(config.generated_check(), Some(GeneratedCheck::Skip));
+    let include = Config::parse_inline("[generated]\ncheck = \"include\"").unwrap();
+    assert_eq!(include.generated_check(), Some(GeneratedCheck::Include));
+    assert_eq!(Config::parse_inline("").unwrap().generated_check(), None);
+}
+
+#[test]
+fn a_rule_can_say_whether_it_checks_generated_code() {
+    let config = Config::parse_inline(
+        "[rules]\n\"core/a\" = { level = \"warn\", generated = true }\n\"core/b\" = \"warn\"",
+    )
+    .unwrap();
+
+    let rules = config.resolve(Path::new("x"), "text", &projects()).unwrap();
+
+    assert_eq!(rules["core/a"].generated, Some(true));
+    assert_eq!(rules["core/b"].generated, None);
 }

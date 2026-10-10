@@ -8,17 +8,17 @@ metadata:
     lighthouse/section: organization
 spec:
   title: One case style and one writing style
-  intent: >-
-    Table and scenario cases answer different questions and mixed styles force
-    readers to relearn the test at every step.
+  context: >-
+    Table and scenario cases answer different questions and mixed styles
+    force readers to relearn the test at every step.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     A test function MUST use either table cases or scenario cases, never both,
     and SHOULD use one case style per level. Tests MUST NOT mix different
     writing styles or abstraction levels at one level.
   severity: warn
-  evidence: [test, styles]
   check:
     type: model

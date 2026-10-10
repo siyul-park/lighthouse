@@ -8,7 +8,10 @@ metadata:
     lighthouse/section: concurrency
 spec:
   title: Cancellation context comes first
-  intent: A uniform position makes cancellation visible and checkable.
+  context: >-
+    A uniform position makes cancellation visible and checkable.
+
+    Go: `ctx context.Context` is the first parameter.
   scope:
     domain: code
     subject: symbol
@@ -16,10 +19,6 @@ spec:
     Blocking, I/O, and process-boundary operations MUST take the cancellation
     context as their first parameter.
   severity: warn
-  evidence: [function, parameter_index]
-  languages:
-    go:
-      tuning: "`ctx context.Context` is the first parameter."
   check:
     type: model
   examples:

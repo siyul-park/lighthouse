@@ -13,7 +13,7 @@ const CONTEXT: usize = 1;
 
 /// The fix proposed for a finding, computed without writing anything.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Fix {
+pub struct ProposedFix {
     pub safety: Safety,
     pub description: String,
     /// The files it changes, sorted by path.
@@ -97,7 +97,7 @@ enum Body {
 impl Shown {
     /// How `fix`, proposed for a finding in `finding_file`, is shown. A file
     /// other than the finding's gets `---`/`+++` headers.
-    pub(crate) fn of(fix: &Fix, finding_file: &str) -> Self {
+    pub(crate) fn of(fix: &ProposedFix, finding_file: &str) -> Self {
         let diff = diff(fix, finding_file);
         let body = if diff.lines().count() <= DIFF_LINES {
             Body::Diff(diff)
@@ -132,7 +132,7 @@ impl Shown {
 
 /// The unified diff of a fix: hunks, with `---` and `+++` headers for every file
 /// when the fix touches a file other than `finding_file`. Trailing newlines are trimmed.
-pub(crate) fn diff(fix: &Fix, finding_file: &str) -> String {
+pub(crate) fn diff(fix: &ProposedFix, finding_file: &str) -> String {
     let headers = fix.files.iter().any(|f| f.path != finding_file);
     let mut out = String::new();
     for file in &fix.files {

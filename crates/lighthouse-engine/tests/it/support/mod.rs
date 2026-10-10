@@ -6,7 +6,7 @@ use lighthouse_spec::Catalog;
 use std::{fs, sync::LazyLock};
 
 use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun};
-use lighthouse_model::RunScope;
+use lighthouse_model::{Applicability, RunScope};
 use lighthouse_model::{
     Capability, Diagnostic, EditOp, File, Fingerprint, FixOutcome, Fragment, Incomplete, LineIndex,
     Options, Position, Safety, Severity, Span, Symbol, SymbolId, SymbolKind, Visibility,
@@ -100,6 +100,7 @@ impl Word {
                 docs: String::new(),
                 analyzers: Vec::new(),
                 capabilities: Vec::new(),
+                applicability: Applicability::default(),
             },
             word,
         }
@@ -288,7 +289,7 @@ pub fn plan(fixer: &str, cap: Safety, mechanical: bool) -> FixPlan {
             decision: FixDecision {
                 id: "fake/todo".to_owned(),
                 requirement: String::new(),
-                intent: String::new(),
+                context: String::new(),
             },
             unsupported: None,
         },

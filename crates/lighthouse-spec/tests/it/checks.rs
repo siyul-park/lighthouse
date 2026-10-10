@@ -2,8 +2,8 @@
 
 use lighthouse_model::Severity;
 use lighthouse_spec::{
-    Batch, BuiltinCheck, Catalog, Check, CheckKind, CommandCheck, Decision, ExitCodes, ModelCheck,
-    NamedRule, Status,
+    Batch, BuiltinCheck, Catalog, Check, CheckKind, CommandCheck, Decision, DecisionStatus,
+    ExitCodes, ModelCheck, NamedRule,
 };
 use lighthouse_test_support::catalog::*;
 use serde_json::json;
@@ -96,7 +96,7 @@ fn decision_spec_enforced_needs_an_accepted_status_and_a_check() {
     let decision = bundled("core/max-file-lines");
     assert!(decision.enforced());
     let proposed = decision.clone().map_spec(|mut s| {
-        s.status = Status::Proposed;
+        s.status = DecisionStatus::Proposed;
         s
     });
     assert!(!proposed.enforced());
@@ -106,12 +106,12 @@ fn decision_spec_enforced_needs_an_accepted_status_and_a_check() {
 
 #[test]
 fn status_enforced_is_true_only_for_accepted() {
-    assert!(Status::Accepted.enforced());
+    assert!(DecisionStatus::Accepted.enforced());
     for status in [
-        Status::Proposed,
-        Status::Rejected,
-        Status::Deprecated,
-        Status::Superseded,
+        DecisionStatus::Proposed,
+        DecisionStatus::Rejected,
+        DecisionStatus::Deprecated,
+        DecisionStatus::Superseded,
     ] {
         assert!(!status.enforced(), "{status}");
     }
@@ -119,8 +119,8 @@ fn status_enforced_is_true_only_for_accepted() {
 
 #[test]
 fn status_is_default_only_for_accepted() {
-    assert!(Status::Accepted.is_default());
-    assert!(!Status::Rejected.is_default());
+    assert!(DecisionStatus::Accepted.is_default());
+    assert!(!DecisionStatus::Rejected.is_default());
 }
 
 #[test]
@@ -189,7 +189,7 @@ fn a_builtin_names_one_operation_and_only_its_own_fields() {
 fn a_command_cannot_be_a_placeholder() {
     let catalog = |argv: &str| {
         let spec = format!(
-            "  severity: error\n  evidence: [x]\n  check:\n    type: command\n    argv: {argv}\n  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{{ path: a.go, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: go\n      kind: valid\n      files: [{{ path: a.go, body: y }}]\n"
+            "  severity: error\n  check:\n    type: command\n    argv: {argv}\n  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{{ path: a.go, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: go\n      kind: valid\n      files: [{{ path: a.go, body: y }}]\n"
         );
         Catalog::from_files(decision_with(&spec))
     };
@@ -200,15 +200,15 @@ fn a_command_cannot_be_a_placeholder() {
 
 #[test]
 fn a_standard_operation_needs_the_scope_it_judges() {
-    let order = "  severity: error\n  evidence: [x]\n  check:\n    type: builtin\n    op: order\n    clauses:\n      - { within: file, by: [p/k], message: m }\n";
-    let cycle = "  severity: error\n  evidence: [x]\n  check:\n    type: builtin\n    op: cycle\n    edge: imports\n    level: module\n";
+    let order = "  severity: error\n  check:\n    type: builtin\n    op: order\n    clauses:\n      - { within: file, by: [p/k], message: m }\n";
+    let cycle = "  severity: error\n  check:\n    type: builtin\n    op: cycle\n    edge: imports\n    level: module\n";
     let examples = "  examples:\n    - name: bad\n      language: go\n      kind: invalid\n      files: [{ path: a.go, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: go\n      kind: valid\n      files: [{ path: a.go, body: y }]\n";
     let load = |scope: &str, check: &str| {
         let text = decision(
             "p/a",
             "s",
             &format!(
-                "  title: A\n  intent: i\n  scope: {{ subject: {scope} }}\n  requirement: A MUST b.\n{check}{examples}"
+                "  title: A\n  context: i\n  scope: {{ subject: {scope} }}\n  requirement: A MUST b.\n{check}{examples}"
             ),
         );
         Catalog::from_files(with("p/s/a.yaml", &text))

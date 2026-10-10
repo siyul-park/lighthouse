@@ -93,7 +93,7 @@ fn pair(dir: &tempfile::TempDir, formatter: &str) -> (Engine, FixPlan) {
             decision: FixDecision {
                 id: "pair/todo".to_owned(),
                 requirement: String::new(),
-                intent: String::new(),
+                context: String::new(),
             },
             unsupported: None,
         },
@@ -244,7 +244,7 @@ fn a_write_that_fails_midway_puts_the_written_files_back() {
             decision: FixDecision {
                 id: "nested/todo".to_owned(),
                 requirement: String::new(),
-                intent: String::new(),
+                context: String::new(),
             },
             unsupported: None,
         },
@@ -315,7 +315,7 @@ fn a_file_whose_provider_does_not_analyze_overlays_is_not_fixed() {
             decision: FixDecision {
                 id: "plain/todo".to_owned(),
                 requirement: String::new(),
-                intent: String::new(),
+                context: String::new(),
             },
             unsupported: None,
         },

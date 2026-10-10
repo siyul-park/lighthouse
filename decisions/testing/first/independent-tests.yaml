@@ -8,15 +8,18 @@ metadata:
     lighthouse/section: first
 spec:
   title: Tests do not depend on hidden state
-  intent: Order-dependent or manual tests fail intermittently.
+  context: >-
+    Order-dependent or manual tests fail intermittently.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     Tests MUST NOT depend on other tests, uncontrolled mutable state, manual
     inspection, or unnecessary setup.
   severity: warn
-  evidence: [test, smell]
   check:
     type: model
-  citation: "van Deursen et al. 2001; Peruma et al., tsDetect 2020"
+  provenance:
+    wasDerivedFrom:
+      - "van Deursen et al. 2001; Peruma et al., tsDetect 2020"

@@ -99,9 +99,10 @@ fn a_pattern_becomes_a_decision_that_loads() {
     assert_eq!(options.properties["max"].kind.name(), "integer");
     assert_eq!(options.properties["kinds"].kind.name(), "array");
     assert_eq!(decision.languages["go"].options["max"], 4);
-    assert_eq!(
-        decision.languages["go"].tuning.as_deref(),
-        Some("Go wording.")
+    assert!(
+        decision.context.contains("Go: Go wording."),
+        "{}",
+        decision.context
     );
     assert!(matches!(
         decision.check.as_ref().map(|c| &c.kind),
@@ -155,7 +156,11 @@ fn a_declarative_rule_file_is_inlined_and_remembered() {
     let Some(CheckKind::Cel(cel)) = decision.check.as_ref().map(|c| &c.kind) else {
         panic!("cel expected");
     };
-    assert_eq!(cel.select.name(), "file");
+    assert_eq!(
+        cel.select, None,
+        "a select that repeats the scope is dropped"
+    );
+    assert_eq!(cel.selects(decision.scope.subject).unwrap().name(), "file");
     assert_eq!(cel.evidence["path"], "file.path");
     assert!(decision.legacy_semantic_version().is_some());
     assert_eq!(

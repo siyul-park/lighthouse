@@ -67,6 +67,7 @@ fn measure(plugin: &Path, analyzer: &str, source: &str) -> BTreeMap<String, u32>
         keys: &lighthouse_plugin::NoKeys,
         trusted: false,
         memo: &lighthouse_plugin::Memo::default(),
+        applies: lighthouse_model::Applicability::default(),
     };
     let analyzer = registry.order([analyzer]).unwrap().remove(0);
     let value: Value = analyzer.run(&ctx).unwrap();
@@ -266,7 +267,7 @@ fn config(plugin: &Path) -> String {
 const CONFIG: &str = r#"extends = ["design/recommended"]
 
 [rules]
-"design/coupling-signal" = { level = "warn", options = { hub_fan_in = 2, hub_fan_out = 2, hub_statements = 1 } }
+"design/coupling-signal" = { level = "warn", options = { hubFanIn = 2, hubFanOut = 2, hubStatements = 1 } }
 "#;
 
 fn line_of(source: &str, needle: &str) -> u32 {

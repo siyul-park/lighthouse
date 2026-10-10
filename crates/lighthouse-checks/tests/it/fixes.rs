@@ -88,7 +88,7 @@ const EXAMPLES: &str = "  examples:
 fn document(id: &str, pack: &str, section: &str, fix: &str, check: &str) -> String {
     let indented: String = fix.lines().map(|l| format!("    {l}\n")).collect();
     format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: {id}\n  labels:\n    lighthouse/pack: {pack}\n    lighthouse/section: {section}\nspec:\n  title: Probe\n  intent: A probe.\n  scope: {{ subject: file }}\n  requirement: A probe MUST hold.\n  severity: error\n  evidence: [x]\n{check}  fix:\n{indented}{EXAMPLES}"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: {id}\n  labels:\n    lighthouse/pack: {pack}\n    lighthouse/section: {section}\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: file }}\n  requirement: A probe MUST hold.\n  severity: error\n{check}  fix:\n{indented}{EXAMPLES}"
     )
 }
 
@@ -188,7 +188,7 @@ fn run(
     let decision = FixDecision {
         id: "local/probe".to_owned(),
         requirement: String::new(),
-        intent: String::new(),
+        context: String::new(),
     };
     let root = tempfile::tempdir().unwrap();
     let ws = Workspace::new(root.path());

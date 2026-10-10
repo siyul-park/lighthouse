@@ -3,9 +3,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use lighthouse_model::{EdgeKind, RunScope, Severity};
 
 use crate::{
-    Catalog, CheckKind, Decision, Error, Example, ExampleKind, Status,
+    Catalog, CheckKind, Decision, DecisionStatus, Error, Example, ExampleKind,
     check::{BuiltinCheck, BuiltinOp},
-    sources::{Source, has_keyword},
+    sources::{SourceLine, has_keyword},
 };
 
 /// Everything a single layer must satisfy on its own.
@@ -53,8 +53,8 @@ pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {
         .ok_or_else(|| Error::invalid(id, "an id is `<pack>/<name>`"))?;
     kebab(pack)?;
     kebab(name)?;
-    if decision.title.trim().is_empty() || decision.intent.trim().is_empty() {
-        return Err(Error::invalid(id, "title and intent must not be empty"));
+    if decision.title.trim().is_empty() || decision.context.trim().is_empty() {
+        return Err(Error::invalid(id, "title and context must not be empty"));
     }
     if !has_keyword(&decision.requirement) {
         return Err(Error::invalid(
@@ -81,12 +81,6 @@ pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {
         .check
         .as_ref()
         .is_some_and(crate::Check::is_automated);
-    if automated && decision.evidence.is_empty() {
-        return Err(Error::invalid(
-            id,
-            "a checked decision lists its evidence fields",
-        ));
-    }
     for reference in decision.supersedes.iter() {
         if reference.trim().is_empty() {
             return Err(Error::invalid(id, "`supersedes` entries are not empty"));
@@ -119,7 +113,7 @@ fn lifecycle(catalog: &Catalog) -> Result<(), Error> {
             if old == id {
                 return Err(fail("a decision cannot supersede itself".to_owned()));
             }
-            if target.status != Status::Superseded {
+            if target.status != DecisionStatus::Superseded {
                 return Err(fail(format!(
                     "it is `{}`; set its status to `superseded`",
                     target.status
@@ -331,13 +325,14 @@ fn kind_problem(decision: &Decision, kind: &CheckKind) -> Option<String> {
         }
         CheckKind::Builtin(BuiltinCheck::Named(_)) => None,
         CheckKind::Builtin(BuiltinCheck::Op(op)) => op_problem(op).or_else(|| scope_problem(op, subject)),
-        CheckKind::Cel(cel) => cel.problem().or_else(|| {
-            (cel.select.scope() != subject.run_scope()).then(|| {
+        CheckKind::Cel(cel) => cel.problem().or_else(|| match cel.selects(subject) {
+            None => Some(format!("a `{subject}` decision needs a `select`")),
+            Some(select) => (select.scope() != subject.run_scope()).then(|| {
                 format!(
                     "selects `{}`, which a `{subject}` decision cannot run over",
-                    cel.select.name()
+                    select.name()
                 )
-            })
+            }),
         }),
         CheckKind::Command(command) => command.problem().or_else(|| {
             let per_file = subject.run_scope() == RunScope::File;
@@ -468,7 +463,7 @@ fn kebab(name: &str) -> Result<(), Error> {
 }
 
 fn sources(catalog: &Catalog) -> Result<(), Error> {
-    let mut seen: BTreeMap<&str, &Source> = BTreeMap::new();
+    let mut seen: BTreeMap<&str, &SourceLine> = BTreeMap::new();
     for source in &catalog.sources {
         let fail = |reason: &str| Error::invalid(&source.reference, reason);
         if seen.insert(&source.reference, source).is_some() {

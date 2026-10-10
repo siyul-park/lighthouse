@@ -28,7 +28,7 @@ fn write(dir: &Path, name: &str, text: &str) {
 /// A local decision `local/probe` with `extra` after its spec lines.
 fn decision(extra: &str) -> String {
     format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  intent: A probe.\n  scope: {{ subject: file }}\n  requirement: A file MUST NOT say hello.\n  severity: error\n  evidence: [x]\n{extra}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: bad.txt, body: hello }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: good.txt, body: bye }}]\n"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: file }}\n  requirement: A file MUST NOT say hello.\n  severity: error\n{extra}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: bad.txt, body: hello }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: good.txt, body: bye }}]\n"
     )
 }
 

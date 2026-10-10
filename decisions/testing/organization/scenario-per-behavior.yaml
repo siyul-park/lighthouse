@@ -8,10 +8,13 @@ metadata:
     lighthouse/section: organization
 spec:
   title: One case per scenario
-  intent: Different scenarios are different specifications and need different names.
+  context: >-
+    Different scenarios are different specifications and need different
+    names.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     Different scenarios MUST use one case per scenario, named for the behavior
     it states.

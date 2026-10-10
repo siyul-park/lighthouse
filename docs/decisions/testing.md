@@ -29,17 +29,9 @@ Contract tests should prove behavior through the same public boundary available 
 
 `testing/external-test-package` · test · error · cel
 
-*Living outside the target makes private access impossible rather than discouraged.*
+*Living outside the target makes private access impossible rather than discouraged. Go: Tests live in `package <target>_test`. A test file inside the target package is reported when it uses an unexported symbol of that package; one that only uses exported symbols is left alone. Python: Contract tests import only the package's public API. Rust: Contract tests are integration tests under `tests/`. Inline `#[cfg(test)]` unit tests are never reported: the provider cannot tell a `pub(crate)` item from a `pub` one of an unpublished crate, so it cannot say that such a test could have lived in `tests/`. TypeScript: Contract tests import only the package's public exports.*
 
 Feature contract tests MUST use only the target's public symbols and MUST live outside the target's private scope.
-
-Tuning (go): Tests live in `package <target>_test`. A test file inside the target package is reported when it uses an unexported symbol of that package; one that only uses exported symbols is left alone.
-
-Tuning (python): Contract tests import only the package's public API.
-
-Tuning (rust): Contract tests are integration tests under `tests/`. Inline `#[cfg(test)]` unit tests are never reported: the provider cannot tell a `pub(crate)` item from a `pub` one of an unpublished crate, so it cannot say that such a test could have lived in `tests/`.
-
-Tuning (typescript): Contract tests import only the package's public exports.
 
 ```go invalid store_test.go
 package store
@@ -80,13 +72,9 @@ A readable test is a small, direct specification whose behavior can be understoo
 
 `testing/standard-assertions` · test · warn · cel
 
-*A hand-written compare-and-fail repeats what the project's assertion library already states, with worse failure output.*
+*A hand-written compare-and-fail repeats what the project's assertion library already states, with worse failure output. Go: The library is `github.com/stretchr/testify/require`. A function of a test file that has an `if` with no `else` whose condition compares or negates and whose only effect is `t.Fatal`, `t.Fatalf`, `t.Error`, `t.Errorf`, `t.Fail` or `t.FailNow` is reported with the number of such checks. A check that does more than fail, such as one that also returns, is not a plain assertion. Rust: Use `assert_eq!`, `assert_ne!` and `assert!` with a message instead of helpers that compare and `panic!`. Not enforced for Rust, whose provider does not count hand-written checks.*
 
 Tests SHOULD assert through the project's standard assertion library, and a test helper SHOULD NOT reimplement a comparison and failure that the library already provides.
-
-Tuning (go): The library is `github.com/stretchr/testify/require`. A function of a test file that has an `if` with no `else` whose condition compares or negates and whose only effect is `t.Fatal`, `t.Fatalf`, `t.Error`, `t.Errorf`, `t.Fail` or `t.FailNow` is reported with the number of such checks. A check that does more than fail, such as one that also returns, is not a plain assertion.
-
-Tuning (rust): Use `assert_eq!`, `assert_ne!` and `assert!` with a message instead of helpers that compare and `panic!`. Not enforced for Rust, whose provider does not count hand-written checks.
 
 ```go invalid store_test.go
 package store_test
@@ -133,8 +121,8 @@ Test structure should provide one obvious owner for each public contract and kee
 | [`testing/owner-test`](#every-public-symbol-has-an-owner-test) | Every public symbol has an owner test | warn · cel |  |  |
 | [`testing/single-owner-test`](#one-owner-test-per-public-symbol) | One owner test per public symbol | error · cel |  |  |
 | [`testing/test-file-layout`](#a-test-file-reads-fixtures-tests-helpers) | A test file reads fixtures, tests, helpers | error · cel | safe |  |
-| [`testing/case-depth`](#cases-are-at-most-two-levels-deep) | Cases are at most two levels deep | warn · model |  |  |
-| [`testing/table-for-same-behavior`](#tables-for-one-behavior-over-many-inputs) | Tables for one behavior over many inputs | info · model |  |  |
+| `testing/case-depth` | Cases are at most two levels deep | warn · model |  | Test structure MUST have at most two levels: the test function and its direct cases. |
+| `testing/table-for-same-behavior` | Tables for one behavior over many inputs | info · model |  | Same behavior over many inputs MUST use one inline table of named inputs and expected outputs, each entry one case; cases that specify the same behavior MUST be merged into one case or one table. |
 | `testing/scenario-per-behavior` | One case per scenario | info · model |  | Different scenarios MUST use one case per scenario, named for the behavior it states. |
 | `testing/single-case-style` | One case style and one writing style | warn · model |  | A test function MUST use either table cases or scenario cases, never both, and SHOULD use one case style per level. Tests MUST NOT mix different writing styles or abstraction levels at one level. |
 | `testing/assertions-in-cases` | Assertions belong to cases | info · model |  | Assertions outside cases SHOULD describe setup, preconditions, or test-wide invariants, not case behavior. |
@@ -145,24 +133,20 @@ Test structure should provide one obvious owner for each public contract and kee
 
 `testing/owner-test` · test · warn · cel
 
-*A contract without an owner test has no place to read or extend its specification.*
+*A contract without an owner test has no place to read or extend its specification. Go: The owner of a function or type is `TestName`, of a method `TestType_Method`. A symbol that no test names and no test code calls or references is reported; a type counts as tested when one of its members is. Only modules that have tests are judged. Types without methods and interfaces are not required to have one. Rust: The owner of a function or type is the test named after it in snake case (`get`, `store`), of a method `type_method`. A public item that no test code, in `tests/` or inline, calls or references is reported, in crates that have tests. The integration tests of a crate count for every module of it, including public items that the crate root re-exports from private modules, and a method call on a value of unknown type counts for the public methods of that name. Methods of trait impls and types without methods are not required to have one.*
 
 Each public symbol SHOULD have one top-level test function, and exported contracts MUST have an owning test.
 
-Tuning (go): The owner of a function or type is `TestName`, of a method `TestType_Method`. A symbol that no test names and no test code calls or references is reported; a type counts as tested when one of its members is. Only modules that have tests are judged. Types without methods and interfaces are not required to have one.
-
-Tuning (rust): The owner of a function or type is the test named after it in snake case (`get`, `store`), of a method `type_method`. A public item that no test code, in `tests/` or inline, calls or references is reported, in crates that have tests. The integration tests of a crate count for every module of it, including public items that the crate root re-exports from private modules, and a method call on a value of unknown type counts for the public methods of that name. Methods of trait impls and types without methods are not required to have one.
-
 | option | default | meaning |
 | --- | --- | --- |
-| `ancestor_tests` | `false`; rust: `true` | Count the tests of a module that tests an ancestor module as tests of the nested module too: the integration tests of a Rust crate test all of it, private modules whose items the root re-exports included. |
-| `exempt_methods` | `["String","Error","Unwrap","GoString"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]` | Method names that implement well-known interfaces. |
-| `include_data_types` | `false` | Also require owner tests for types that declare no method; such a type is specified by the functions that build and read it. |
-| `include_internal` | `false`; go: `true` | Also require owner tests for symbols public only inside the project. |
+| `ancestorTests` | `false`; rust: `true` | Count the tests of a module that tests an ancestor module as tests of the nested module too: the integration tests of a Rust crate test all of it, private modules whose items the root re-exports included. |
+| `exemptMethods` | `["String","Error","Unwrap","GoString"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]` | Method names that implement well-known interfaces. |
+| `includeDataTypes` | `false` | Also require owner tests for types that declare no method; such a type is specified by the functions that build and read it. |
+| `includeInternal` | `false`; go: `true` | Also require owner tests for symbols public only inside the project. |
 | `kinds` | `["function","method","type"]` | Kinds of public symbols that need an owner test. Interfaces are tested through their implementations and are left out by default. |
-| `snake_case` | `false`; rust: `true` | Compare names in snake case, as Rust tests are written. |
-| `test_prefix` | `"Test"`; rust: `""` | Prefix of the name of an owner test; a test without it is not one. |
-| `variant_tests` | `true`; rust: `false` | Count `TestGet_Missing` as a second owner of `Get`; a name that adds a suffix to the symbol's own name restates the same contract. |
+| `snakeCase` | `false`; rust: `true` | Compare names in snake case, as Rust tests are written. |
+| `testPrefix` | `"Test"`; rust: `""` | Prefix of the name of an owner test; a test without it is not one. |
+| `variantTests` | `true`; rust: `false` | Count `TestGet_Missing` as a second owner of `Get`; a name that adds a suffix to the symbol's own name restates the same contract. |
 
 ```go invalid go.mod
 module example.com/store
@@ -206,20 +190,16 @@ Also: rust
 
 `testing/single-owner-test` · test · error · cel
 
-*Several semantic owners split one contract across places and let them contradict.*
+*Several semantic owners split one contract across places and let them contradict. Go: `TestGet` and `TestGet_Missing` both own `Get`: the second is a case of the first, written with `t.Run`. A name matches the longest symbol it starts with, so `TestStore_Get_Missing` belongs to the method `Get`, not to the type `Store`. Rust: A test is an owner of the item it is named after in snake case. Rust tests are many small functions, so names that merely extend a symbol's name are not owners; two tests with exactly the name of one item (in different test crates, or inline and in `tests/`) are.*
 
 A public symbol MUST NOT have multiple semantic owner test functions.
 
-Tuning (go): `TestGet` and `TestGet_Missing` both own `Get`: the second is a case of the first, written with `t.Run`. A name matches the longest symbol it starts with, so `TestStore_Get_Missing` belongs to the method `Get`, not to the type `Store`.
-
-Tuning (rust): A test is an owner of the item it is named after in snake case. Rust tests are many small functions, so names that merely extend a symbol's name are not owners; two tests with exactly the name of one item (in different test crates, or inline and in `tests/`) are.
-
 | option | default | meaning |
 | --- | --- | --- |
-| `include_internal` | `false`; go: `true` | Also judge symbols public only inside the project. |
-| `snake_case` | `false`; rust: `true` | Compare names in snake case, as Rust tests are written. |
-| `test_prefix` | `"Test"`; rust: `""` | Prefix of the name of an owner test; a test without it is not one. |
-| `variant_tests` | `true`; rust: `false` | Count `TestGet_Missing` as a second owner of `Get`; a name that adds a suffix to the symbol's own name restates the same contract. |
+| `includeInternal` | `false`; go: `true` | Also judge symbols public only inside the project. |
+| `snakeCase` | `false`; rust: `true` | Compare names in snake case, as Rust tests are written. |
+| `testPrefix` | `"Test"`; rust: `""` | Prefix of the name of an owner test; a test without it is not one. |
+| `variantTests` | `true`; rust: `false` | Count `TestGet_Missing` as a second owner of `Get`; a name that adds a suffix to the symbol's own name restates the same contract. |
 
 ```go invalid store.go
 package store
@@ -285,13 +265,9 @@ Also: rust
 
 `testing/test-file-layout` · test · error · cel · fix: safe
 
-*A test file reads top-down: what the tests use, then the specification, then how it checks.*
+*A test file reads top-down: what the tests use, then the specification, then how it checks. Go: A fixture is a type, constant, variable or function without a `*testing.T`, `*testing.B`, `*testing.F` or `testing.TB` parameter; a helper is a function with one. Fixtures follow `design/declaration- groups`. Methods are judged with their type. Test entry points are `Test`, `Benchmark`, `Fuzz` and `Example` functions; a helper that no test or helper of the same file uses may sit anywhere below the fixtures. Rust: The same reading order applies to a `#[cfg(test)]` module and to files of `tests/`: fixtures and builders first, then the `#[test]` functions, then the helpers that check. It is not enforced for Rust, whose provider does not tell fixtures from helpers.*
 
 A test file MUST declare its fixtures (test types, constants, variables and the functions that build them without the test framework's handle) above its tests, and its test helpers (functions that take the test framework's handle and are called from tests) below the tests that use them. Fixtures keep the declaration-group order among themselves and sit next to the fixtures they compose.
-
-Tuning (go): A fixture is a type, constant, variable or function without a `*testing.T`, `*testing.B`, `*testing.F` or `testing.TB` parameter; a helper is a function with one. Fixtures follow `design/declaration-groups`. Methods are judged with their type. Test entry points are `Test`, `Benchmark`, `Fuzz` and `Example` functions; a helper that no test or helper of the same file uses may sit anywhere below the fixtures.
-
-Tuning (rust): The same reading order applies to a `#[cfg(test)]` module and to files of `tests/`: fixtures and builders first, then the `#[test]` functions, then the helpers that check. It is not enforced for Rust, whose provider does not tell fixtures from helpers.
 
 ```diff
 --- a/store_test.go
@@ -312,30 +288,6 @@ Tuning (rust): The same reading order applies to a `#[cfg(test)]` module and to 
 
 Also: rust
 
-### Cases are at most two levels deep
-
-`testing/case-depth` · test · warn · model
-
-*Deep nesting hides which behavior a case specifies.*
-
-Test structure MUST have at most two levels: the test function and its direct cases.
-
-Tuning (go): Counts `t.Run` nesting.
-
-Tuning (python): Counts class and function nesting.
-
-Tuning (typescript): Counts `describe` and `it` nesting.
-
-### Tables for one behavior over many inputs
-
-`testing/table-for-same-behavior` · test · info · model
-
-*A table says the behavior is the same and only the data differs.*
-
-Same behavior over many inputs MUST use one inline table of named inputs and expected outputs, each entry one case; cases that specify the same behavior MUST be merged into one case or one table.
-
-Tuning (go): Use an inline anonymous struct table.
-
 ## F.I.R.S.T.
 
 F.I.R.S.T. keeps tests reliable evidence rather than intermittent diagnostics.
@@ -353,7 +305,7 @@ F.I.R.S.T. keeps tests reliable evidence rather than intermittent diagnostics.
 
 Tests MUST be Fast, Independent, Repeatable, Self-validating, and Timely.
 
-Method: Martin, Clean Code, chapter 9
+Derived from: Martin, Clean Code, chapter 9
 
 ### Tests do not depend on hidden state
 
@@ -363,7 +315,7 @@ Method: Martin, Clean Code, chapter 9
 
 Tests MUST NOT depend on other tests, uncontrolled mutable state, manual inspection, or unnecessary setup.
 
-Method: van Deursen et al. 2001; Peruma et al., tsDetect 2020
+Derived from: van Deursen et al. 2001; Peruma et al., tsDetect 2020
 
 ## TDD
 

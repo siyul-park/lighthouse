@@ -8,10 +8,13 @@ metadata:
     lighthouse/section: contract
 spec:
   title: Structure serves the contract
-  intent: Test structure shaped by coverage or implementation hides the specification.
+  context: >-
+    Test structure shaped by coverage or implementation hides the
+    specification.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     Test structure MUST serve the contract rather than implementation shape or
     coverage.

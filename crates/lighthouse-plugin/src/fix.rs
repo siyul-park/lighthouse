@@ -23,7 +23,7 @@ pub struct FixerManifest {
 pub struct FixDecision {
     pub id: String,
     pub requirement: String,
-    pub intent: String,
+    pub context: String,
 }
 
 /// Everything a fixer may read to answer for one finding. The project is the

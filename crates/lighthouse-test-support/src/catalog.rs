@@ -5,14 +5,13 @@ use std::collections::BTreeMap;
 
 /// The spec of decision `p/a`, indented as it sits under `spec:`.
 pub const SPEC: &str = "  title: A
-  intent: i
+  context: i
   scope: { subject: file }
   requirement: A MUST b.
 ";
 
 /// What a checked decision adds to `SPEC`: an authored severity and evidence.
 pub const CHECKED_SPEC: &str = "  severity: error
-  evidence: [x]
 ";
 
 /// Catalog files keyed by `/`-separated path.

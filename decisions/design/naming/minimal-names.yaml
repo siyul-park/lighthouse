@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: naming
 spec:
   title: Minimal names
-  intent: "Longer names add words, not meaning."
+  context: >-
+    Longer names add words, not meaning.
   scope:
     domain: code
     subject: symbol

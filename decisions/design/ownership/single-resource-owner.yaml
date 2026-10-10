@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: ownership
 spec:
   title: One owner per resource transition
-  intent: "Resources leak when nobody, or two parties, ends them."
+  context: >-
+    Resources leak when nobody, or two parties, ends them.
   scope:
     domain: code
     subject: symbol

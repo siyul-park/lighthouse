@@ -6,31 +6,29 @@ metadata:
   labels:
     lighthouse/pack: design
     lighthouse/section: functions
+    lighthouse/preset: strict
   annotations:
     lighthouse/was-builtin: design/private-helper-callers
     lighthouse/was-enforcement: heuristic
 spec:
   title: Private helpers have two callers
-  intent: A private helper with one caller is usually part of that caller.
+  context: >-
+    A private helper with one caller is usually part of that caller.
+
+    Go: A review item, not an error: a helper with one caller may be
+    justified by naming a policy or isolating an abstraction level. Test
+    callers do not count. Forwarding wrappers are reported by
+    `design/single-use-wrapper`, and a function used as a value is not
+    judged.
+
+    Rust: Private free functions and methods that have exactly one caller
+    outside test code and are never named as a value. A method that some
+    call may reach through a receiver of unknown type is not judged.
   scope:
     domain: code
     subject: symbol
   requirement: A private helper SHOULD have at least two callers.
   severity: info
-  evidence: [caller, callers, statements]
-  languages:
-    go:
-      tuning: >-
-        A review item, not an error: a helper with one caller may be justified
-        by naming a policy or isolating an abstraction level. Test callers do
-        not count. Forwarding wrappers are reported by
-        `design/single-use-wrapper`, and a function used as a value is not
-        judged.
-    rust:
-      tuning: >-
-        Private free functions and methods that have exactly one caller outside
-        test code and are never named as a value. A method that some call may
-        reach through a receiver of unknown type is not judged.
   check:
     type: cel
     select: function
@@ -38,7 +36,7 @@ spec:
       - name: production
         expr: callers(func).filter(c, !c.test)
     where: >-
-      !func.file_test && !func.generated && !func.test && (func.kind == 'function' || func.kind == 'method')
+      (func.kind == 'function' || func.kind == 'method')
       && func.visibility == 'private' && func.name != 'main' && func.name != 'init'
       && func.references == 0 && !func.satisfies_interface && !func.forwards_only
       && size(production) == 1
@@ -51,7 +49,6 @@ spec:
       statements: func.statements
     identity:
       subject: func.id
-  strict: true
   examples:
     - name: invalid
       language: go

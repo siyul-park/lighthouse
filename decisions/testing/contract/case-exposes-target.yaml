@@ -8,10 +8,12 @@ metadata:
     lighthouse/section: contract
 spec:
   title: A case exposes its target
-  intent: "A reader should see what is called, with what, and what is expected."
+  context: >-
+    A reader should see what is called, with what, and what is expected.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     A test MUST expose the target, input, operation, and expected result in the
     case; the target and its behavior MUST remain visible.

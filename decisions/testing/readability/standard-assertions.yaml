@@ -10,37 +10,34 @@ metadata:
     lighthouse/was-builtin: testing/standard-assertions
 spec:
   title: Assertions use the standard library
-  intent: >-
-    A hand-written compare-and-fail repeats what the project's assertion library
-    already states, with worse failure output.
+  context: >-
+    A hand-written compare-and-fail repeats what the project's assertion
+    library already states, with worse failure output.
+
+    Go: The library is `github.com/stretchr/testify/require`. A function
+    of a test file that has an `if` with no `else` whose condition
+    compares or negates and whose only effect is `t.Fatal`, `t.Fatalf`,
+    `t.Error`, `t.Errorf`, `t.Fail` or `t.FailNow` is reported with the
+    number of such checks. A check that does more than fail, such as one
+    that also returns, is not a plain assertion.
+
+    Rust: Use `assert_eq!`, `assert_ne!` and `assert!` with a message
+    instead of helpers that compare and `panic!`. Not enforced for Rust,
+    whose provider does not count hand-written checks.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     Tests SHOULD assert through the project's standard assertion library, and a
     test helper SHOULD NOT reimplement a comparison and failure that the library
     already provides.
   severity: warn
-  evidence: [symbol, manual_assertions]
-  languages:
-    go:
-      tuning: >-
-        The library is `github.com/stretchr/testify/require`. A function of a
-        test file that has an `if` with no `else` whose condition compares or
-        negates and whose only effect is `t.Fatal`, `t.Fatalf`, `t.Error`,
-        `t.Errorf`, `t.Fail` or `t.FailNow` is reported with the number of such
-        checks. A check that does more than fail, such as one that also returns,
-        is not a plain assertion.
-    rust:
-      tuning: >-
-        Use `assert_eq!`, `assert_ne!` and `assert!` with a message instead of
-        helpers that compare and `panic!`. Not enforced for Rust, whose provider
-        does not count hand-written checks.
   check:
     type: cel
     select: function
     where: >-
-      func.file_test && !func.generated && func.manual_assertions > 0
+      func.manual_assertions > 0
     message: >-
       {{ func.kind == 'test' ? 'test' : func.role == 'test-helper' ? 'test helper' : 'function' }}
       {{ func.name }} compares and fails by hand {{ func.manual_assertions }} time(s);

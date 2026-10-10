@@ -279,13 +279,12 @@ metadata:
   name: local/old-suffix
 spec:
   title: Functions do not end in Old
-  intent: Names do not carry their history.
+  context: Names do not carry their history.
   scope:
     domain: code
     subject: symbol
   requirement: A function MUST NOT have a name that ends in Old.
   severity: error
-  evidence: [name]
   check:
     type: cel
     select: function
@@ -350,13 +349,12 @@ metadata:
   name: local/shout
 spec:
   title: Notes are upper case
-  intent: Notes are read from far away.
+  context: Notes are read from far away.
   scope:
     domain: code
     subject: file
   requirement: A note MUST be written in upper case.
   severity: error
-  evidence: [path]
   check:
     type: cel
     select: file
@@ -538,13 +536,12 @@ metadata:
   name: local/plain
 spec:
   title: Notes are not lowercase
-  intent: Notes are read from far away.
+  context: Notes are read from far away.
   scope:
     domain: code
     subject: file
   requirement: A note MUST NOT be written in lower case.
   severity: error
-  evidence: [path]
   check:
     type: cel
     select: file
@@ -611,13 +608,12 @@ metadata:
   name: local/documented
 spec:
   title: Public functions have a doc line
-  intent: A reader should not have to guess what an exported function is for.
+  context: A reader should not have to guess what an exported function is for.
   scope:
     domain: code
     subject: symbol
   requirement: A public function MUST have a doc comment.
   severity: error
-  evidence: [name]
   check:
     type: cel
     select: function

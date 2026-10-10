@@ -10,7 +10,7 @@ mod ucm;
 pub use diagnostic::{Diagnostic, Fingerprint, Incomplete, Severity, UnknownSeverity};
 pub use fix::{Anchor, EditOp, FixOutcome, Owner, Safety, UnknownSafety};
 pub use review::{Label, MismatchedReason, Reason, ReviewerKind, UnknownTerm, Verdict};
-pub use scope::RunScope;
+pub use scope::{Applicability, RunScope, TestScope};
 pub use text::LineIndex;
 pub use ucm::{
     Capability, Comment, Edge, EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Module,

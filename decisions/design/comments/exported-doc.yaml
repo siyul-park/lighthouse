@@ -10,7 +10,25 @@ metadata:
     lighthouse/was-builtin: design/exported-doc
 spec:
   title: Exported symbols are documented
-  intent: Public API changes need facts callers cannot read from the code.
+  context: >-
+    Public API changes need facts callers cannot read from the code.
+
+    Go: Normal Go doc comments beginning with the symbol name.
+
+    Rust: Doc comments (`///`, `#[doc]`) on items reachable from outside
+    the library crate: `pub` items whose modules are all `pub` or that a
+    `pub use` re-exports. Items in binary crates, in tests and in
+    `pub(crate)` positions are not exported. A trait impl method without
+    docs of its own shows the documentation of the trait's method, as
+    rustdoc does; a method that implements a method of a trait declared in
+    the project is documented where the trait declares it, and the methods
+    of the standard traits (`fmt`, `from`, `default`, `drop`, ...) need
+    none. The public items of a library that cannot be published (`publish
+    = false`) are importable only inside the project and count as
+    internal, unless another package of the project depends on the
+    library: then its public items are a contract between packages and
+    stay public (`[languages.rust] unpublished = "auto" | "public" |
+    "internal"`). Code in an inline `#[cfg(test)]` module is test code.
   scope:
     domain: code
     subject: symbol
@@ -19,7 +37,6 @@ spec:
     Public API changes SHOULD document user-visible behavior, constraints,
     ownership, or other facts the code cannot express.
   severity: warn
-  evidence: [symbol]
   options:
     type: object
     properties:
@@ -27,20 +44,20 @@ spec:
         type: array
         default: [function, method, type, interface, const, var]
         description: Symbol kinds that must be documented when exported.
-      include_internal:
+      includeInternal:
         type: boolean
         default: false
         description: >-
           Also require docs for symbols exported only inside the project, such
           as under an internal path.
-      exempt_interface_methods:
+      exemptInterfaceMethods:
         type: boolean
         default: false
         description: >-
           Do not require docs on a method that implements a documented method of
           an interface (or trait) the project declares, since it is documented
           where the interface declares it.
-      exempt_methods:
+      exemptMethods:
         type: array
         default: [String, Error, Unwrap]
         description: >-
@@ -48,12 +65,10 @@ spec:
           comment of their own.
     additionalProperties: false
   languages:
-    go:
-      tuning: Normal Go doc comments beginning with the symbol name.
     rust:
       options:
-        exempt_interface_methods: true
-        exempt_methods:
+        exemptInterfaceMethods: true
+        exemptMethods:
           - fmt
           - source
           - from
@@ -78,35 +93,18 @@ spec:
           - index_mut
           - serialize
           - deserialize
-      tuning: >-
-        Doc comments (`///`, `#[doc]`) on items reachable from outside the
-        library crate: `pub` items whose modules are all `pub` or that a `pub
-        use` re-exports. Items in binary crates, in tests and in `pub(crate)`
-        positions are not exported. A trait impl method without docs of its own
-        shows the documentation of the trait's method, as rustdoc does; a method
-        that implements a method of a trait declared in the project is
-        documented where the trait declares it, and the methods of the standard
-        traits (`fmt`, `from`, `default`, `drop`, ...) need none. The public
-        items of a library that cannot be published (`publish = false`) are
-        importable only inside the project and count as internal, unless another
-        package of the project depends on the library: then its public items are
-        a contract between packages and stay public (`[languages.rust]
-        unpublished = "auto" | "public" | "internal"`). Code in an inline
-        `#[cfg(test)]` module is test code.
   check:
     type: cel
-    select: symbol
     with:
       - name: owner
         expr: owner(symbol)
     where: >-
-      !symbol.file_test && !symbol.generated && !symbol.test
-      && options.kinds.exists(k, k == symbol.kind)
-      && exposed(symbol, options.include_internal)
-      && (owner.kind == '' || (exposed(owner, options.include_internal) && owner.kind != 'interface'))
+      options.kinds.exists(k, k == symbol.kind)
+      && exposed(symbol, options.includeInternal)
+      && (owner.kind == '' || (exposed(owner, options.includeInternal) && owner.kind != 'interface'))
       && !(symbol.kind == 'method'
-           && (options.exempt_methods.exists(m, m == symbol.name)
-               || (options.exempt_interface_methods && symbol.documented_by_interface)))
+           && (options.exemptMethods.exists(m, m == symbol.name)
+               || (options.exemptInterfaceMethods && symbol.documented_by_interface)))
       && !symbol.documented
     message: "exported {{ symbol.kind }} {{ symbol.name }} must have a doc comment"
     evidence:

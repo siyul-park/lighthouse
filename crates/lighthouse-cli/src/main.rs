@@ -9,7 +9,7 @@ use std::{
 
 use clap::{Parser, Subcommand, ValueEnum};
 use lighthouse_report::{Briefing, Detail, Format, render_with};
-use lighthouse_session::{CheckRequest, DEFAULT_CONFIG, FILE_NAME, FailOn, FixRequest, Session};
+use lighthouse_session::{CheckRequest, DEFAULT_CONFIG, FILE_NAME, FailOn, FixSelection, Session};
 use review::ReviewCommand;
 
 mod decisions;
@@ -152,7 +152,7 @@ enum Command {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// Show a decision or rule: intent, requirement, examples and status.
+    /// Show a decision or rule: context, requirement, examples and status.
     Explain { id: String },
     /// Validate and migrate spec documents.
     Spec {
@@ -599,14 +599,14 @@ fn fixing(
     store: bool,
     fix: FixOptions,
 ) -> Result<()> {
-    let request = FixRequest {
+    let request = FixSelection {
         paths: paths.to_vec(),
         rules: only.to_vec(),
         dry_run: fix.dry_run,
         unsafe_fixes: fix.unsafe_fixes,
         fixer: fix.fixer,
         store,
-        ..FixRequest::default()
+        ..FixSelection::default()
     };
     let fixed = lighthouse_session::fix(Session::load(config)?, &request)?;
     for message in &fixed.messages {

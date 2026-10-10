@@ -80,6 +80,7 @@ pub fn migrate_decision(old: &Value, section: &str, rule: Option<(&str, &Value)>
     let metadata = decision_metadata(text(old, "id")?, section, rule.map(|(file, _)| file));
     let mut decision = document("Decision", metadata, decision_spec(old, rule)?);
     convert_enforcement(&mut decision)?;
+    super::modern::modernize(&mut decision);
     Ok(decision)
 }
 

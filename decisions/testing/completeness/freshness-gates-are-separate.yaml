@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: completeness
 spec:
   title: Freshness is a repository gate
-  intent: Generated output and docs drift independent of test coverage.
+  context: >-
+    Generated output and docs drift independent of test coverage.
   scope:
     domain: code
     subject: project

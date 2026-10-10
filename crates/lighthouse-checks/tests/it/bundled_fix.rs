@@ -15,11 +15,10 @@ metadata:
     lighthouse/section: s
 spec:
   title: Scratch notes are emptied
-  intent: A scratch note holds nothing.
+  context: A scratch note holds nothing.
   scope: { subject: file }
   requirement: A scratch note MUST be empty.
   severity: error
-  evidence: [path]
   check:
     type: cel
     select: file

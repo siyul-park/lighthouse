@@ -12,7 +12,7 @@ const KEYWORDS: [&str; 3] = ["MUST", "SHOULD", "MAY"];
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SourceMapSpec {
-    pub sources: Vec<Source>,
+    pub sources: Vec<SourceLine>,
 }
 
 impl Spec for SourceMapSpec {
@@ -22,7 +22,7 @@ impl Spec for SourceMapSpec {
 /// One normative line of a source document and where it went.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct Source {
+pub struct SourceLine {
     /// `<doc>#<heading-slug>-<content hash>`; moving or reordering a bullet
     /// keeps its ref, rewording it changes the ref.
     #[serde(rename = "ref")]

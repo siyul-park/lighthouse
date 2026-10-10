@@ -8,10 +8,12 @@ metadata:
     lighthouse/section: contract
 spec:
   title: A case is a behavior
-  intent: "Cases named after branches test the implementation, not the promise."
+  context: >-
+    Cases named after branches test the implementation, not the promise.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     A case MUST represent behavior, not a branch or implementation path, and
     MUST contain the behavior it claims to specify.

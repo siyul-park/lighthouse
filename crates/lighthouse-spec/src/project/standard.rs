@@ -19,8 +19,8 @@ pub(crate) fn standard(catalog: &Catalog) -> Vec<Resource<ProjectSpec>> {
             .flat_map(|s| &s.decisions)
             .filter(|d| runs_as_rule(d) && d.enforced())
             .collect();
-        projects.push(project(pack, "recommended", &rules, |d| !d.strict));
-        if rules.iter().any(|d| d.strict) {
+        projects.push(project(pack, "recommended", &rules, |d| !d.strict()));
+        if rules.iter().any(|d| d.strict()) {
             projects.push(project(pack, "strict", &rules, |_| true));
         }
     }

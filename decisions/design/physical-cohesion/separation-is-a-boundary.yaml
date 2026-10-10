@@ -8,7 +8,9 @@ metadata:
     lighthouse/section: physical-cohesion
 spec:
   title: Separation marks a boundary
-  intent: A file or module split without a real boundary only adds navigation cost.
+  context: >-
+    A file or module split without a real boundary only adds navigation
+    cost.
   scope:
     domain: code
     subject: module

@@ -12,7 +12,7 @@ use serde_json::{Map, Value, json};
 use crate::{
     evidence::{bounded, evidence, pairs},
     expected::{Subject, expected, one_line},
-    fix::{Fix, Shown},
+    fix::{ProposedFix, Shown},
 };
 
 /// Shortest fingerprint prefix shown, as in git; longer when the findings of
@@ -48,7 +48,7 @@ pub struct Entry<'a> {
     /// structure.
     pub facts: Option<Value>,
     /// The fix proposed for the finding, when one was computed.
-    pub fix: Option<&'a Fix>,
+    pub fix: Option<&'a ProposedFix>,
 }
 
 /// What shapes the groups.

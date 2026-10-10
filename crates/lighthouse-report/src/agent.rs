@@ -9,7 +9,7 @@ use thiserror::Error;
 use crate::{
     evidence::{evidence, evidence_line},
     expected::{Expected, Subject, expected, one_line},
-    fix::{Fix, Shown},
+    fix::{ProposedFix, Shown},
     group::{Entry, GroupOptions, Grouped, reasons, reasons_line},
 };
 
@@ -42,7 +42,7 @@ pub struct Briefing<'a> {
     pub detail: Detail,
     /// The fixes proposed for findings, by fingerprint: shown with the
     /// finding, and as `fixes` in SARIF.
-    pub fixes: Option<&'a BTreeMap<String, Fix>>,
+    pub fixes: Option<&'a BTreeMap<String, ProposedFix>>,
     /// The text of the files of findings, by project-relative path, for
     /// formats whose columns count characters and not bytes (SARIF).
     pub sources: Option<&'a BTreeMap<String, String>>,
@@ -146,7 +146,7 @@ struct Finding<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     requirement: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    intent: Option<String>,
+    context: Option<String>,
     #[serde(skip_serializing_if = "Value::is_null")]
     evidence: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -468,7 +468,7 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
         symbol: diagnostic.symbol.as_deref(),
         message: &diagnostic.message,
         requirement: decision.map(|d| one_line(&d.requirement)),
-        intent: decision.map(|d| one_line(&d.intent)),
+        context: decision.map(|d| one_line(&d.context)),
         evidence: evidence(&diagnostic.evidence, diagnostic.symbol.as_deref()),
         expected: decision.and_then(|d| expected(d, &subject, &diagnostic.file)),
         note: briefing
@@ -531,7 +531,7 @@ fn fields(finding: &Finding, width: usize) -> Vec<(&'static str, String)> {
             .clone()
             .map(|text| ("requirement:", text)),
     );
-    fields.extend(finding.intent.clone().map(|text| ("intent:", text)));
+    fields.extend(finding.context.clone().map(|text| ("context:", text)));
     fields.extend(evidence_line(&finding.evidence).map(|text| ("evidence:", text)));
     if let Some(expected) = &finding.expected {
         let picture = expected.excerpt.lines().map(|l| format!("  {l}"));

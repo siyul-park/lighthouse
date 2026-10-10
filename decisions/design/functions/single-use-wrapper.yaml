@@ -10,7 +10,15 @@ metadata:
     lighthouse/was-builtin: design/single-use-wrapper
 spec:
   title: Inline single-use wrappers
-  intent: A forwarding wrapper adds a name without adding meaning.
+  context: >-
+    A forwarding wrapper adds a name without adding meaning.
+
+    Rust: Applies to private functions and methods (items without `pub`);
+    a trait impl method is as visible as its trait and is not a candidate.
+    Calls are resolved syntactically, so a method call on a receiver whose
+    type is not written in the code is recorded as a possible use of every
+    private method of that name in the crate, and keeps such a method from
+    being reported.
   scope:
     domain: code
     subject: symbol
@@ -19,21 +27,11 @@ spec:
     real policy or mechanic; complex one-use mechanics require review rather
     than mechanical removal.
   severity: warn
-  evidence: [callee, callers]
-  languages:
-    rust:
-      tuning: >-
-        Applies to private functions and methods (items without `pub`); a trait
-        impl method is as visible as its trait and is not a candidate. Calls are
-        resolved syntactically, so a method call on a receiver whose type is not
-        written in the code is recorded as a possible use of every private
-        method of that name in the crate, and keeps such a method from being
-        reported.
   check:
     type: cel
     select: function
     where: >-
-      !func.file_test && !func.generated && !func.test && (func.kind == 'function' || func.kind == 'method')
+      (func.kind == 'function' || func.kind == 'method')
       && func.forwards_only
     message: "private helper {{ func.name }} is a single-use forwarding wrapper; inline it"
     evidence:

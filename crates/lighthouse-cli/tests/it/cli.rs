@@ -564,11 +564,10 @@ metadata:
   name: local/long-file
 spec:
   title: Files stay short
-  intent: Long files are hard to read.
+  context: Long files are hard to read.
   scope: { subject: file }
   requirement: A file MUST have at most three lines.
   severity: error
-  evidence: [path]
   check:
     type: cel
     select: file

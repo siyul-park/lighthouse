@@ -10,6 +10,7 @@ use lighthouse_model::{Module, Project, Symbol, SymbolId, SymbolKind, TestCase};
 use serde::Deserialize;
 
 #[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct Naming {
     /// Prefix of an owner test's name (`Test` in Go); a test without it is
     /// not an owner test.
@@ -75,7 +76,7 @@ impl<'p> Tests<'p> {
     /// The tests of the modules that test `symbol`'s module from inside or
     /// outside, whose names map to `symbol`. Names resolve within the one
     /// module the symbol belongs to, so a name never maps to two symbols of
-    /// different modules. With `ancestor_tests` also the tests of a module
+    /// different modules. With `ancestorTests` also the tests of a module
     /// that tests an ancestor of the symbol's module, so the integration tests
     /// of a crate root count for every module of the crate, including the
     /// private ones whose public items the root re-exports.
@@ -146,13 +147,13 @@ impl<'p> Tests<'p> {
 }
 
 impl Naming {
-    /// The naming convention a decision's options declare (`test_prefix`,
-    /// `snake_case`, `variant_tests`, `ancestor_tests`); `None` for a decision
+    /// The naming convention a decision's options declare (`testPrefix`,
+    /// `snakeCase`, `variantTests`, `ancestorTests`); `None` for a decision
     /// that declares none.
     pub(crate) fn from_options(
         options: &serde_json::Map<String, serde_json::Value>,
     ) -> Option<Self> {
-        options.get("test_prefix")?;
+        options.get("testPrefix")?;
         serde_json::from_value(serde_json::Value::Object(options.clone())).ok()
     }
 

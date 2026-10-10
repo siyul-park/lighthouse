@@ -8,15 +8,17 @@ metadata:
     lighthouse/section: annotations
 spec:
   title: An allow annotation states its reason
-  intent: An exception without a reason cannot be reviewed or revisited.
+  context: >-
+    An exception without a reason cannot be reviewed or revisited.
   scope:
     domain: code
     subject: file
+    generated: true
+    tests: include
   requirement: >-
     An allow annotation MUST give a reason after `--`; an annotation without one
     is ignored and reported.
   severity: error
-  evidence: [rules, reason]
   check:
     type: builtin
     id: core/annotation-reason

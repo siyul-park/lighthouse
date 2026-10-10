@@ -8,18 +8,22 @@ use std::{
 use ignore::WalkBuilder;
 use lighthouse_model::RunScope;
 use lighthouse_model::{
-    Diagnostic, File, Fingerprint, Fragment, Incomplete, Options, Project, Severity, hash,
+    Applicability, Diagnostic, File, Fingerprint, Fragment, Incomplete, Options, Project, Severity,
+    hash,
 };
 use lighthouse_plugin::{
     Ctx, Facts, Indexed, LanguageProvider, Memo, Registry, Rule, Source, Workspace,
 };
-use lighthouse_spec::{Catalog, Config, GlobSet, ProjectError, Projects, Rules, glob_set};
+use lighthouse_spec::{
+    Catalog, Config, GeneratedCheck, GlobSet, ProjectError, Projects, RuleConfig, Rules, glob_set,
+};
 use rayon::prelude::*;
 use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
     annotations::{self, Allowed},
+    generated::Attributes,
     identity,
     subject::Subjects,
     timings::{Timings, in_pool},
@@ -204,6 +208,8 @@ pub struct Engine {
     /// or superseded): they run only when a run selects them by id, such as
     /// `decision test`; configuration and projects never enable them.
     unenforced: BTreeSet<String>,
+    /// The `linguist-generated` attributes of the project.
+    attributes: Attributes,
     pub(crate) ws: Workspace,
     /// Providers from listed plugins; indexes into `languages`.
     providers: Vec<usize>,
@@ -228,8 +234,10 @@ impl Engine {
         let projects = catalog.projects()?;
         validate_config(&registry, &config, &projects)?;
         let (providers, languages) = load_languages(&registry, &config)?;
+        let root = root.canonicalize().map_err(io_error(root))?;
+        let attributes = Attributes::of(&root);
         let ws = Workspace {
-            root: root.canonicalize().map_err(io_error(root))?,
+            root,
             languages: config.languages().clone(),
             overlays: BTreeMap::new(),
         };
@@ -242,6 +250,7 @@ impl Engine {
                 .filter(|d| !d.enforced())
                 .map(|d| d.id().to_owned())
                 .collect(),
+            attributes,
             ws,
             providers,
             languages,
@@ -537,7 +546,7 @@ impl Engine {
             path: rel.to_owned(),
             lang: self.provider(language).manifest().id.clone(),
             hash: hash::sha256(&text),
-            generated: false,
+            generated: self.config.is_generated(rel) || self.attributes.is_generated(rel),
             test: self.languages[language].tests.is_match(rel),
         };
         Some(Input {
@@ -652,6 +661,7 @@ impl Engine {
                     keys: &self.registry,
                     trusted: self.trusted,
                     memo,
+                    applies: Applicability::default(),
                 };
                 let fact = analyzer.run(&ctx)?;
                 facts.insert((analyzer.manifest().id.clone(), key), fact);
@@ -697,6 +707,9 @@ impl Engine {
             .config
             .resolve(&input.file.path, &input.file.lang, &self.projects)?;
         let provider = self.provider(input.language);
+        // What the merged model says of the file: a provider may know it is
+        // generated where the host, reading it, did not.
+        let file = scene.project.file(&input.file.path).unwrap_or(&input.file);
         for rule in scene
             .rules
             .iter()
@@ -707,6 +720,10 @@ impl Engine {
                 continue;
             };
             let Some(level) = config.level else { continue };
+            let applies = self.applies(meta.applicability, config);
+            if applies.excludes_file(file) {
+                continue;
+            }
             if let Some(missing) = meta
                 .capabilities
                 .iter()
@@ -721,11 +738,12 @@ impl Engine {
             let ctx = Ctx {
                 ws: &self.ws,
                 project: scene.project,
-                file: Some((&input.file, input.text.as_str())),
+                file: Some((file, input.text.as_str())),
                 facts: scene.facts,
                 keys: &self.registry,
                 trusted: self.trusted,
                 memo: scene.memo,
+                applies,
             };
             let started = Instant::now();
             let checked = rule.check(&ctx, &config.options);
@@ -798,6 +816,7 @@ impl Engine {
             keys: &self.registry,
             trusted: self.trusted,
             memo: scene.memo,
+            applies: meta.applicability,
         };
         let started = Instant::now();
         let checked = rule.check(&ctx, &config.options);
@@ -808,6 +827,22 @@ impl Engine {
             d
         }));
         Ok(gathered)
+    }
+}
+
+impl Engine {
+    /// What code a rule may report on at a file: the decision's scope, unless
+    /// the project says otherwise for all its decisions (`generated.check`)
+    /// or for this rule (`generated`).
+    fn applies(&self, declared: Applicability, rule: &RuleConfig) -> Applicability {
+        let project = self
+            .config
+            .generated_check()
+            .map(|c| c == GeneratedCheck::Include);
+        Applicability {
+            generated: rule.generated.or(project).unwrap_or(declared.generated),
+            ..declared
+        }
     }
 }
 

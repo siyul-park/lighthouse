@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: ownership
 spec:
   title: One owner per mutable state
-  intent: Two writers without a protocol means races and broken invariants.
+  context: >-
+    Two writers without a protocol means races and broken invariants.
   scope:
     domain: code
     subject: symbol

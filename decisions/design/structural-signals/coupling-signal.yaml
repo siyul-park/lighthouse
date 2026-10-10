@@ -10,7 +10,13 @@ metadata:
     lighthouse/was-builtin: design/coupling-signal
 spec:
   title: Coupling is a review signal
-  intent: A dependency hub changes for many reasons.
+  context: >-
+    A dependency hub changes for many reasons.
+
+    Rust: The unit is the Rust module (a `mod` and every inline module are
+    distinct units). Methods count with their impl's type; calls through a
+    receiver whose type is not written in the code are not seen, so fan
+    counts are lower bounds.
   scope:
     domain: code
     subject: symbol
@@ -21,46 +27,38 @@ spec:
     packages and from tests do not count: a widely used public function is a
     service, not a hub.
   severity: warn
-  evidence: [fan_in, fan_out, statements]
   options:
     type: object
     properties:
-      hub_fan_in:
+      hubFanIn:
         type: integer
         default: 8
         description: >-
-          Callers that, with `hub_fan_out` and `hub_statements`, mark a
+          Callers that, with `hubFanOut` and `hubStatements`, mark a
           dependency hub.
-      hub_fan_out:
+      hubFanOut:
         type: integer
         default: 6
         description: Callees of a dependency hub.
-      hub_statements:
+      hubStatements:
         type: integer
         default: 20
         description: Statement count of a dependency hub.
-      coordinator_fan_out:
+      coordinatorFanOut:
         type: integer
         default: 12
         description: >-
           Callees that, with the other `coordinator_*` options, mark a
           coordinator.
-      coordinator_max_fan_in:
+      coordinatorMaxFanIn:
         type: integer
         default: 1
         description: Most callers a coordinator may have.
-      coordinator_statements:
+      coordinatorStatements:
         type: integer
         default: 15
         description: Statement count of a coordinator.
     additionalProperties: false
-  languages:
-    rust:
-      tuning: >-
-        The unit is the Rust module (a `mod` and every inline module are
-        distinct units). Methods count with their impl's type; calls through a
-        receiver whose type is not written in the code are not seen, so fan
-        counts are lower bounds.
   check:
     type: cel
     select: function
@@ -69,16 +67,15 @@ spec:
         expr: metrics(func)
       - name: role
         expr: >-
-          (m.fan_in >= options.hub_fan_in && m.fan_out >= options.hub_fan_out
-           && m.statements >= options.hub_statements)
+          (m.fan_in >= options.hubFanIn && m.fan_out >= options.hubFanOut
+           && m.statements >= options.hubStatements)
           ? 'a dependency hub'
-          : (m.fan_out >= options.coordinator_fan_out
-             && m.fan_in <= options.coordinator_max_fan_in
-             && m.statements >= options.coordinator_statements)
+          : (m.fan_out >= options.coordinatorFanOut
+             && m.fan_in <= options.coordinatorMaxFanIn
+             && m.statements >= options.coordinatorStatements)
           ? 'a high fan-out coordinator' : ''
     where: >-
-      !func.file_test && !func.generated && !func.test
-      && (func.kind == 'function' || func.kind == 'method')
+      (func.kind == 'function' || func.kind == 'method')
       && m.measured && !m.dispatcher && role != ''
     message: "function {{ func.name }} is {{ role }}: fan-in={{ m.fan_in }} fan-out={{ m.fan_out }}"
     evidence:
@@ -87,15 +84,17 @@ spec:
       statements: m.statements
     identity:
       subject: func.id
-  citation: "Henry and Kafura 1981, information flow"
+  provenance:
+    wasDerivedFrom:
+      - "Henry and Kafura 1981, information flow"
   examples:
     - name: hub
       language: go
       kind: invalid
       options:
-        hub_fan_in: 2
-        hub_fan_out: 2
-        hub_statements: 1
+        hubFanIn: 2
+        hubFanOut: 2
+        hubStatements: 1
       files:
         - path: sample.go
           body: "package sample\n\nfunc hub() {\n\tleft()\n\tright()\n}\n\nfunc left()  {}\nfunc right() {}\n\nfunc a() { hub() }\nfunc b() { hub() }"
@@ -105,10 +104,10 @@ spec:
       language: go
       kind: invalid
       options:
-        hub_fan_in: 100
-        coordinator_fan_out: 3
-        coordinator_max_fan_in: 0
-        coordinator_statements: 3
+        hubFanIn: 100
+        coordinatorFanOut: 3
+        coordinatorMaxFanIn: 0
+        coordinatorStatements: 3
       files:
         - path: sample.go
           body: "package sample\n\nfunc run() {\n\tone()\n\ttwo()\n\tthree()\n}\n\nfunc one()   {}\nfunc two()   {}\nfunc three() {}"
@@ -125,9 +124,9 @@ spec:
       language: rust
       kind: invalid
       options:
-        hub_fan_in: 2
-        hub_fan_out: 2
-        hub_statements: 1
+        hubFanIn: 2
+        hubFanOut: 2
+        hubStatements: 1
       files:
         - path: src/lib.rs
           body: |-
@@ -151,10 +150,10 @@ spec:
       language: rust
       kind: invalid
       options:
-        hub_fan_in: 100
-        coordinator_fan_out: 3
-        coordinator_max_fan_in: 0
-        coordinator_statements: 3
+        hubFanIn: 100
+        coordinatorFanOut: 3
+        coordinatorMaxFanIn: 0
+        coordinatorStatements: 3
       files:
         - path: src/lib.rs
           body: |-
@@ -194,9 +193,9 @@ spec:
       language: rust
       kind: valid
       options:
-        hub_fan_in: 2
-        hub_fan_out: 2
-        hub_statements: 1
+        hubFanIn: 2
+        hubFanOut: 2
+        hubStatements: 1
       files:
         - path: src/lib.rs
           body: |-

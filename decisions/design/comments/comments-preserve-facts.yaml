@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: comments
 spec:
   title: Comments preserve facts
-  intent: A comment is justified only by a fact the code cannot say.
+  context: >-
+    A comment is justified only by a fact the code cannot say.
   scope:
     domain: code
     subject: symbol

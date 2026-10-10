@@ -44,7 +44,7 @@ pub fn decision_markdown(decision: &Decision, level: usize) -> String {
         .check
         .as_ref()
         .map_or("none", |check| check.kind.label());
-    let preset = if decision.strict {
+    let preset = if decision.strict() {
         " · preset `strict`"
     } else {
         ""
@@ -69,11 +69,8 @@ pub fn decision_markdown(decision: &Decision, level: usize) -> String {
     if let Some(consequences) = &decision.consequences {
         block(&mut out, "Consequences", consequences);
     }
-    block(&mut out, "Intent", &decision.intent);
+    block(&mut out, "Context", &decision.context);
     block(&mut out, "Requirement", &decision.requirement);
-    if let Some(exceptions) = &decision.exceptions {
-        block(&mut out, "Exceptions", exceptions);
-    }
     if let Some(options) = decision
         .options
         .as_ref()
@@ -87,13 +84,12 @@ pub fn decision_markdown(decision: &Decision, level: usize) -> String {
     for example in &decision.examples {
         example_markdown(&mut out, example);
     }
-    for (language, spec) in &decision.languages {
-        if let Some(text) = &spec.tuning {
-            block(&mut out, &format!("Tuning: {language}"), text);
-        }
-    }
-    if let Some(citation) = &decision.citation {
-        block(&mut out, "Method", citation);
+    if !decision.provenance.is_empty() {
+        block(
+            &mut out,
+            "Derived from",
+            &decision.provenance.was_derived_from.join("; "),
+        );
     }
     out
 }

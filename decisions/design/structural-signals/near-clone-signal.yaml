@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: structural-signals
 spec:
   title: Near-clones are a review signal
-  intent: Near-identical bodies often hide one concept implemented twice.
+  context: >-
+    Near-identical bodies often hide one concept implemented twice.
   scope:
     domain: code
     subject: symbol
@@ -16,7 +17,8 @@ spec:
     Near-clone analysis SHOULD require meaningful body size and a semantic or
     naming relation; syntax similarity alone MUST NOT require abstraction.
   severity: warn
-  evidence: [peer, similarity, statements]
   check:
     type: model
-  citation: "Jiang et al., Deckard 2007; Roy and Cordy 2007"
+  provenance:
+    wasDerivedFrom:
+      - "Jiang et al., Deckard 2007; Roy and Cordy 2007"

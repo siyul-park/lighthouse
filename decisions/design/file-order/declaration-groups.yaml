@@ -10,17 +10,36 @@ metadata:
     lighthouse/was-builtin: design/declaration-groups
 spec:
   title: Declarations follow ownership groups
-  intent: A fixed group order makes every file predictable.
+  context: >-
+    A fixed group order makes every file predictable.
+
+    Go: Fixtures of a test file (its types, constants, variables and
+    functions that take no testing handle) follow the same order; tests
+    and test helpers are placed by `testing/test-file-layout`. Order:
+    public types; private types; public constants; private constants;
+    variables; all `init` functions; public options and functions; public
+    constructors; public methods; clone, conversion and interface hooks;
+    private functions and methods.
+
+    Rust: The same principle, from the concepts to the machinery, with a
+    type kept next to its impl blocks because that is how Rust code reads.
+    Order: constants; statics; types, traits and their impl blocks (types
+    and impls are one group, `owner-contiguity` keeps an owner's impls
+    together); public free functions; private free functions. Associated
+    functions named `new` come before the other methods of their type.
+    Items of `#[cfg(test)]` modules are not ordered. Visibility counts as
+    public when it is `pub` or `pub(crate)`.
   scope:
     domain: code
     subject: file
+    generated: true
+    tests: include
   requirement: >-
     Top-level declarations in a file MUST follow the language's ownership-group
     order, from public contract to private mechanics. Initializers MUST stay
     together and MUST precede non-initializer functions and methods. Within one
     type, constructors MUST precede other behavior.
   severity: error
-  evidence: [declaration, group, expected_after, before]
   options:
     type: object
     properties:
@@ -46,13 +65,13 @@ spec:
           `private-const`, `const`, `var`, `init`, `public-function`,
           `constructor`, `public-method`, `hook`, `private-function` (private
           functions and, where `type` is not listed, private methods).
-      constructor_prefixes:
+      constructorPrefixes:
         type: array
         default: [New]
         description: >-
           A public function whose name is one of these, or one of these followed
           by a word (`New`, `NewStore`; not `Newton`), is a constructor.
-      hook_names:
+      hookNames:
         type: array
         default:
           - Clone
@@ -70,7 +89,7 @@ spec:
           Public methods that implement clone, conversion or interface hooks;
           they follow the other public methods. Names are kept to ones that are
           never ordinary behavior.
-      constructors_first:
+      constructorsFirst:
         type: boolean
         default: false
         description: >-
@@ -79,30 +98,12 @@ spec:
           functions, ordered by the `constructor` group instead.
     additionalProperties: false
   languages:
-    go:
-      tuning: >-
-        Fixtures of a test file (its types, constants, variables and functions
-        that take no testing handle) follow the same order; tests and test
-        helpers are placed by `testing/test-file-layout`. Order: public types;
-        private types; public constants; private constants; variables; all
-        `init` functions; public options and functions; public constructors;
-        public methods; clone, conversion and interface hooks; private functions
-        and methods.
     rust:
       options:
         groups: [const, var, type, public-function, private-function]
-        constructor_prefixes: [new]
-        hook_names: []
-        constructors_first: true
-      tuning: >-
-        The same principle, from the concepts to the machinery, with a type kept
-        next to its impl blocks because that is how Rust code reads. Order:
-        constants; statics; types, traits and their impl blocks (types and impls
-        are one group, `owner-contiguity` keeps an owner's impls together);
-        public free functions; private free functions. Associated functions
-        named `new` come before the other methods of their type. Items of
-        `#[cfg(test)]` modules are not ordered. Visibility counts as public when
-        it is `pub` or `pub(crate)`.
+        constructorPrefixes: [new]
+        hookNames: []
+        constructorsFirst: true
   check:
     type: builtin
     op: order
@@ -120,7 +121,7 @@ spec:
       - within: owner
         by: [design/constructor-first]
         report: late
-        when: options.constructors_first
+        when: options.constructorsFirst
         message: >-
           constructor {{ symbol.name }} must precede the other methods of its type,
           such as {{ earlier.name }}

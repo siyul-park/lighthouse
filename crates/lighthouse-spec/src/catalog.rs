@@ -21,7 +21,7 @@ use crate::{
     decision::{PACK_LABEL, SECTION_LABEL},
     load::{self, Files},
     project,
-    sources::{Source, SourceMapSpec, extract},
+    sources::{SourceLine, SourceMapSpec, extract},
     validate,
 };
 
@@ -36,7 +36,7 @@ const LOCAL_SECTION: &str = "rules";
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Catalog {
     pub packs: Vec<Pack>,
-    pub(crate) sources: Vec<Source>,
+    pub(crate) sources: Vec<SourceLine>,
     /// The `Project` documents of the layer; the standard projects of the
     /// packs derive from the decisions and are not listed here.
     projects: Vec<Resource<ProjectSpec>>,
@@ -48,7 +48,7 @@ struct Loaded {
     packs: Vec<Resource<PackSpec>>,
     decisions: Vec<Decision>,
     projects: Vec<Resource<ProjectSpec>>,
-    sources: Vec<Source>,
+    sources: Vec<SourceLine>,
 }
 
 impl Catalog {

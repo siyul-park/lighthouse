@@ -40,11 +40,9 @@ pub(crate) fn is_row(decision: &Decision) -> bool {
             .as_ref()
             .is_none_or(|o| o.properties.is_empty())
         && decision.examples.is_empty()
-        && decision.exceptions.is_none()
-        && decision.languages.values().all(|l| l.tuning.is_none())
         && decision.fix.is_none()
-        && decision.citation.is_none()
-        && !decision.strict
+        && decision.provenance.is_empty()
+        && !decision.strict()
 }
 
 /// The GitHub heading anchor of `title`.
@@ -109,7 +107,7 @@ fn entry_markdown(out: &mut String, decision: &Decision, dir: &str) {
     if let Some(fix) = &decision.fix {
         let _ = write!(meta, " · fix: {}", fix.safety);
     }
-    if decision.strict {
+    if decision.strict() {
         meta.push_str(" · strict");
     }
     if !decision.status.is_default() {
@@ -119,21 +117,17 @@ fn entry_markdown(out: &mut String, decision: &Decision, dir: &str) {
         let _ = write!(meta, " · supersedes {}", decision.supersedes.join(", "));
     }
     let _ = writeln!(out, "{meta}\n");
-    let _ = writeln!(out, "*{}*\n", one_line(&decision.intent));
+    let _ = writeln!(out, "*{}*\n", one_line(&decision.context));
     let _ = writeln!(out, "{}\n", decision.requirement.trim());
     if let Some(consequences) = &decision.consequences {
         let _ = writeln!(out, "Consequences: {}\n", one_line(consequences));
     }
-    if let Some(exceptions) = &decision.exceptions {
-        let _ = writeln!(out, "Exceptions: {}\n", exceptions.trim());
-    }
-    for (language, spec) in &decision.languages {
-        if let Some(text) = &spec.tuning {
-            let _ = writeln!(out, "Tuning ({language}): {}\n", text.trim());
-        }
-    }
-    if let Some(citation) = &decision.citation {
-        let _ = writeln!(out, "Method: {}\n", citation.trim());
+    if !decision.provenance.is_empty() {
+        let _ = writeln!(
+            out,
+            "Derived from: {}\n",
+            decision.provenance.was_derived_from.join("; ")
+        );
     }
     if let Some(options) = decision
         .options

@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: types-and-apis
 spec:
   title: "Exported types expose contract, not state"
-  intent: Exposed state becomes part of the contract by accident.
+  context: >-
+    Exposed state becomes part of the contract by accident.
   scope:
     domain: code
     subject: symbol

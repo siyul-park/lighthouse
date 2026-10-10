@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: file-order
 spec:
   title: Ordering never justifies splits
-  intent: "Order rules serve readability; they are not a mandate for structure."
+  context: >-
+    Order rules serve readability; they are not a mandate for structure.
   scope:
     domain: code
     subject: file

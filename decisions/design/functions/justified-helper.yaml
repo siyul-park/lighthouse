@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: functions
 spec:
   title: Helpers are justified
-  intent: A helper that earns nothing is indirection.
+  context: >-
+    A helper that earns nothing is indirection.
   scope:
     domain: code
     subject: symbol

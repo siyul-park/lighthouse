@@ -279,7 +279,7 @@ impl<'a> Builder<'a> {
             );
         }
         if needs.mentions("constructor_named")
-            && let Some(prefixes) = self.options.get("constructor_prefixes")
+            && let Some(prefixes) = self.options.get("constructorPrefixes")
         {
             let named = prefixes
                 .as_array()

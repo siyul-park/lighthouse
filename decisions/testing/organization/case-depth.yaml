@@ -10,21 +10,21 @@ metadata:
     lighthouse/was-enforcement: mechanical
 spec:
   title: Cases are at most two levels deep
-  intent: Deep nesting hides which behavior a case specifies.
+  context: >-
+    Deep nesting hides which behavior a case specifies.
+
+    Go: Counts `t.Run` nesting.
+
+    Python: Counts class and function nesting.
+
+    TypeScript: Counts `describe` and `it` nesting.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     Test structure MUST have at most two levels: the test function and its
     direct cases.
   severity: warn
-  evidence: [test, depth]
-  languages:
-    go:
-      tuning: "Counts `t.Run` nesting."
-    python:
-      tuning: Counts class and function nesting.
-    typescript:
-      tuning: "Counts `describe` and `it` nesting."
   check:
     type: model

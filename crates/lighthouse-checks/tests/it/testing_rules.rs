@@ -80,7 +80,7 @@ fn owner_test_judges_only_modules_with_tests_and_public_symbols() {
         "internal by default"
     );
     assert_eq!(
-        w.names(&check(&w, OWNER, json!({ "include_internal": true }))),
+        w.names(&check(&w, OWNER, json!({ "includeInternal": true }))),
         ["Put"]
     );
 }
@@ -116,7 +116,7 @@ fn single_owner_flags_variants_of_one_symbol() {
         ("TestPut", None),
     ]);
     assert_eq!(w.names(&check(&w, SINGLE, json!({}))), ["Get"]);
-    let exact_only = check(&w, SINGLE, json!({ "variant_tests": false }));
+    let exact_only = check(&w, SINGLE, json!({ "variantTests": false }));
     assert!(exact_only.is_empty());
 }
 
@@ -134,7 +134,7 @@ fn single_owner_judges_internal_symbols_only_when_asked() {
         "internal by default"
     );
     assert_eq!(
-        w.names(&check(&w, SINGLE, json!({ "include_internal": true }))),
+        w.names(&check(&w, SINGLE, json!({ "includeInternal": true }))),
         ["Get"]
     );
 }
@@ -165,7 +165,7 @@ fn single_owner_reads_snake_case_names() {
         let test = w.symbol(module, "parse_header", SymbolKind::Test, "c/tests/a.ucm");
         w.test_case(&test, &[]);
     }
-    let options = json!({ "test_prefix": "", "snake_case": true, "variant_tests": false });
+    let options = json!({ "testPrefix": "", "snakeCase": true, "variantTests": false });
     assert_eq!(w.names(&check(&w, SINGLE, options)), ["parse_header"]);
 }
 
@@ -223,7 +223,7 @@ fn owner_test_exempts_data_types_and_trait_impl_methods() {
         ["Object"],
         "Data has no methods; fmt is a trait impl"
     );
-    let all = w.names(&check(&w, OWNER, json!({ "include_data_types": true })));
+    let all = w.names(&check(&w, OWNER, json!({ "includeDataTypes": true })));
     assert_eq!(all, ["Data", "Object"]);
 }
 
@@ -243,7 +243,7 @@ fn crate_with_submodule(tests: &[&str]) -> (World, Symbol) {
 }
 
 fn rust_naming() -> Value {
-    json!({ "test_prefix": "", "snake_case": true, "variant_tests": false, "ancestor_tests": true })
+    json!({ "testPrefix": "", "snakeCase": true, "variantTests": false, "ancestorTests": true })
 }
 
 #[test]
@@ -272,7 +272,7 @@ fn owner_test_accepts_a_heuristic_reference_from_test_code() {
 fn owner_test_credits_ancestor_tests_only_when_asked() {
     let (w, _) = crate_with_submodule(&["parse"]);
     let mut options = rust_naming();
-    options["ancestor_tests"] = json!(false);
+    options["ancestorTests"] = json!(false);
     assert_eq!(w.names(&check(&w, OWNER, options)), ["parse"]);
 }
 
@@ -280,6 +280,6 @@ fn owner_test_credits_ancestor_tests_only_when_asked() {
 fn single_owner_keeps_names_within_one_module() {
     let (w, _) = crate_with_submodule(&["parse"]);
     let mut options = rust_naming();
-    options.as_object_mut().unwrap().remove("ancestor_tests");
+    options.as_object_mut().unwrap().remove("ancestorTests");
     assert!(check(&w, SINGLE, options).is_empty());
 }

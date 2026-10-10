@@ -8,15 +8,18 @@ metadata:
     lighthouse/section: annotations
 spec:
   title: Allow annotations suppress something
-  intent: An exception that no longer applies is noise that hides the next real one.
+  context: >-
+    An exception that no longer applies is noise that hides the next real
+    one.
   scope:
     domain: code
     subject: file
+    generated: true
+    tests: include
   requirement: >-
     An allow annotation SHOULD suppress a finding; one whose rule no longer
     fires there, or is not enabled, SHOULD be removed.
   severity: warn
-  evidence: [rules, reason, annotation]
   check:
     type: builtin
     id: core/unused-allow

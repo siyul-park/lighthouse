@@ -513,7 +513,8 @@ impl<'g> Walk<'g> {
     }
 }
 
-/// Whether the check runs on the focused file.
+/// Whether the check runs on the focused file: the file is a subject of the
+/// decision's scope and the check's own `when` holds.
 fn applies(
     frame_rule: &str,
     when: Option<&Program>,
@@ -521,6 +522,12 @@ fn applies(
     ctx: &Ctx,
     options: &Map<String, Value>,
 ) -> Result<bool, PluginError> {
+    if ctx
+        .file
+        .is_some_and(|(file, _)| !ctx.applies.admits_file(file))
+    {
+        return Ok(false);
+    }
     let Some(when) = when else {
         return Ok(true);
     };

@@ -8,10 +8,12 @@ metadata:
     lighthouse/section: organization
 spec:
   title: Assertions belong to cases
-  intent: Assertions outside cases blur which behavior failed.
+  context: >-
+    Assertions outside cases blur which behavior failed.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     Assertions outside cases SHOULD describe setup, preconditions, or test-wide
     invariants, not case behavior.

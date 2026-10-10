@@ -25,7 +25,7 @@ use std::{
 
 use clap::ValueEnum;
 use lighthouse_report::{Briefing, Detail, Format, render_with};
-use lighthouse_session::{CheckRequest, Checked, SKIPPED_DIRS, Session, Status};
+use lighthouse_session::{CheckRequest, Checked, RunStatus, SKIPPED_DIRS, Session};
 use serde_json::{Value, json};
 
 use crate::Result;
@@ -176,7 +176,7 @@ fn is_text(path: &Path) -> bool {
 /// are context. Clean and complete is silent.
 fn after_edit(checked: &Checked, allow_incomplete: bool) -> Option<Value> {
     let summary = checked.summary();
-    let incomplete = summary.status == Status::Incomplete;
+    let incomplete = summary.status == RunStatus::Incomplete;
     if summary.errors + summary.warnings > 0 || (incomplete && !allow_incomplete) {
         return Some(json!({
             "decision": "block",
@@ -223,7 +223,7 @@ fn at_stop(
     note: Option<String>,
 ) -> Option<Value> {
     let summary = checked.summary();
-    let incomplete = summary.status == Status::Incomplete;
+    let incomplete = summary.status == RunStatus::Incomplete;
     let blocking = summary.errors > 0 || incomplete;
     if blocking && !stop_hook_active {
         let mut why = Vec::new();

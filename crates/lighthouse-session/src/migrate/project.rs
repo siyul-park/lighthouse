@@ -33,12 +33,45 @@ pub fn migrate(old: &serde_json::Value, name: &str) -> Result<serde_json::Value,
         };
         spec.insert(key.clone(), value);
     }
+    let mut spec = Value::Object(spec);
+    super::modern::rename_project_options(&mut spec);
     Ok(json!({
         "apiVersion": API_VERSION,
         "kind": "Project",
         "metadata": { "name": name },
-        "spec": Value::Object(spec),
+        "spec": spec,
     }))
+}
+
+/// A `Project` document that already is a resource but sets options by the
+/// names they had before they were camelCase: rewritten in its own format.
+/// `None` when the file is not such a document.
+pub(super) fn modernize_file(
+    path: &std::path::Path,
+    plan: &mut super::Plan,
+) -> crate::Result<Option<usize>> {
+    use lighthouse_resource::{Format, documents};
+    let format = Format::of_path(path).unwrap_or(Format::Toml);
+    let label = path.display().to_string();
+    let text = std::fs::read_to_string(path)?;
+    let mut docs = documents(format, &label, &text)?;
+    let outdated = docs.len() == 1
+        && docs[0].get("apiVersion").is_some()
+        && docs[0].get("kind").and_then(serde_json::Value::as_str) == Some("Project")
+        && docs[0]
+            .get("spec")
+            .is_some_and(super::modern::has_snake_rule_options);
+    if !outdated {
+        return Ok(None);
+    }
+    let mut doc = docs.remove(0);
+    if let Some(spec) = doc.get_mut("spec") {
+        super::modern::rename_project_options(spec);
+    }
+    let text = super::render_config(format, path, &doc)?;
+    plan.actions
+        .insert(path.to_owned(), super::Action::Write(text));
+    Ok(Some(0))
 }
 
 fn migrate_plugins(value: &serde_json::Value) -> Result<serde_json::Value, String> {

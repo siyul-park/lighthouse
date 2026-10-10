@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: validation
 spec:
   title: Expand validation to the contract
-  intent: Validation breadth follows what the change can break.
+  context: >-
+    Validation breadth follows what the change can break.
   scope:
     domain: code
     subject: project

@@ -14,6 +14,7 @@ fn rule(level: Option<Severity>, options: &[(&str, i64)]) -> RuleConfig {
             .iter()
             .map(|(k, v)| ((*k).to_owned(), (*v).into()))
             .collect(),
+        generated: None,
     }
 }
 

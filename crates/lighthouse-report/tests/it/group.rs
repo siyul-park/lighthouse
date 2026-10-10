@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use lighthouse_model::{Diagnostic, Fingerprint, Position, Severity, Span};
 use lighthouse_report::{
-    Briefing, Entry, Fix, FixFile, Format, GroupOptions, Grouped, render_with,
+    Briefing, Entry, FixFile, Format, GroupOptions, Grouped, ProposedFix, render_with,
 };
 use serde_json::{Value, json};
 
@@ -214,7 +214,7 @@ fn sarif_columns_count_utf16_code_units_and_not_bytes() {
         start: at(1, 7),
         end: at(1, 8),
     };
-    let fix = Fix {
+    let fix = ProposedFix {
         safety: lighthouse_model::Safety::Safe,
         description: "rename".to_owned(),
         files: vec![FixFile::new(
@@ -259,13 +259,13 @@ fn a_fix_diff_names_the_files_when_it_edits_one_besides_the_findings() {
             [(at(2, 1), at(2, 2), "c".to_owned())],
         )
     };
-    let fix = |files| Fix {
+    let fix = |files| ProposedFix {
         safety: lighthouse_model::Safety::Safe,
         description: "edit".to_owned(),
         files,
     };
     let findings = [unknown_rule()];
-    let render_fix = |fix: Fix| {
+    let render_fix = |fix: ProposedFix| {
         let fixes = BTreeMap::from([(findings[0].fingerprint.as_str().to_owned(), fix)]);
         let briefing = Briefing {
             fixes: Some(&fixes),

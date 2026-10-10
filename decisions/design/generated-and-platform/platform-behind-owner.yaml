@@ -8,7 +8,10 @@ metadata:
     lighthouse/section: generated-and-platform
 spec:
   title: Platform mechanics stay behind their owner
-  intent: Platform differences leak when they are not fenced.
+  context: >-
+    Platform differences leak when they are not fenced.
+
+    Go: Use matching build constraints or file-name suffixes.
   scope:
     domain: code
     subject: module
@@ -16,8 +19,5 @@ spec:
     Platform mechanics MUST stay behind matching build constraints and owner
     packages.
   severity: info
-  languages:
-    go:
-      tuning: Use matching build constraints or file-name suffixes.
   check:
     type: model

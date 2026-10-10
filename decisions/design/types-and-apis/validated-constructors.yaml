@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: types-and-apis
 spec:
   title: Constructors validate
-  intent: A constructed value should be valid or not exist.
+  context: >-
+    A constructed value should be valid or not exist.
   scope:
     domain: code
     subject: symbol

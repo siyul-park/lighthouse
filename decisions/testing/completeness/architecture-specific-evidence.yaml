@@ -8,7 +8,9 @@ metadata:
     lighthouse/section: completeness
 spec:
   title: Architecture-specific contracts need specific evidence
-  intent: Generic tests cannot prove contracts that only exist on one architecture.
+  context: >-
+    Generic tests cannot prove contracts that only exist on one
+    architecture.
   scope:
     domain: code
     subject: project

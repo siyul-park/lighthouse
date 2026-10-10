@@ -18,7 +18,7 @@ pub fn all() -> Vec<Tool> {
                 "diff": { "type": "string", "description": "Report only files changed since the merge base with this git ref." },
                 "rules": { "type": "array", "items": { "type": "string" }, "description": format!("Run only these rules; {FORMATS}.") },
                 "limit": { "type": "integer", "minimum": 1, "description": "Most findings to return, errors first, then larger groups (default 25); `omitted` says what was left out." },
-                "detail": { "type": "string", "enum": ["compact", "full"], "description": "Default `compact`. `full` returns one self-contained record per finding (requirement, intent, evidence, expected structure, resolve command)." }
+                "detail": { "type": "string", "enum": ["compact", "full"], "description": "Default `compact`. `full` returns one self-contained record per finding (requirement, context, evidence, expected structure, resolve command)." }
             }),
             &[],
         ),
@@ -36,7 +36,7 @@ pub fn all() -> Vec<Tool> {
         ),
         tool(
             "explain",
-            "Explain a decision or rule: intent, requirement, examples, exceptions and status, as Markdown.",
+            "Explain a decision or rule: context, requirement, examples and status, as Markdown.",
             json!({ "id": { "type": "string", "description": "A decision or rule id such as `design/exported-doc`." } }),
             &["id"],
         ),

@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: principles
 spec:
   title: Every symbol earns its existence
-  intent: "Each symbol pays for itself; otherwise it is noise."
+  context: >-
+    Each symbol pays for itself; otherwise it is noise.
   scope:
     domain: code
     subject: symbol

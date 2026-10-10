@@ -8,7 +8,10 @@ metadata:
     lighthouse/section: types-and-apis
 spec:
   title: "Required arguments, optional options"
-  intent: The signature shows what is mandatory.
+  context: >-
+    The signature shows what is mandatory.
+
+    Go: Optional values are injected through functional options.
   scope:
     domain: code
     subject: symbol
@@ -16,8 +19,5 @@ spec:
     Required constructor values MUST be passed as arguments; optional values
     MUST be injected through options.
   severity: info
-  languages:
-    go:
-      tuning: Optional values are injected through functional options.
   check:
     type: model

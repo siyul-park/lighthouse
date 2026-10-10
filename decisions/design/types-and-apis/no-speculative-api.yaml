@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: types-and-apis
 spec:
   title: No speculative API surface
-  intent: Every public knob has to be supported forever.
+  context: >-
+    Every public knob has to be supported forever.
   scope:
     domain: code
     subject: symbol

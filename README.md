@@ -59,7 +59,7 @@ metadata:
   labels: { lighthouse/pack: design, lighthouse/section: functions }
 spec:
   title: Inline single-use wrappers
-  intent: A forwarding wrapper adds a name without adding meaning.
+  context: A forwarding wrapper adds a name without adding meaning.
   scope: { domain: code, subject: symbol }
   requirement: >-
     A simple single-use wrapper SHOULD be inlined unless its name expresses a
@@ -73,7 +73,7 @@ spec:
   examples: [...]            # executable valid/invalid fixtures, per language
 ```
 
-A decision states its intent once; each language realizes it in its own terms. Rules can
+A decision states its context once; each language realizes it in its own terms. Rules can
 be built in, written as CEL expressions over the code model, or added per project under
 `.lighthouse/decisions/`. Every decision ships executable examples, and `lighthouse decision test`
 runs them. Every spec document, `lighthouse.toml` included, has a JSON Schema in [schema/](schema).
@@ -105,7 +105,7 @@ design/private-helper-callers  info (heuristic)  src/lib.rs:5:1
   owner:       demo::clamp#function
   message:     private function clamp has one caller (run)
   requirement: A private helper SHOULD have at least two callers.
-  intent:      A private helper with one caller is usually part of that caller.
+  context:     A private helper with one caller is usually part of that caller.
   evidence:    caller=demo::run#function callers=1 statements=3
   expected:    canonical rust example (src/lib.rs)
                  pub fn run(x: u8) -> u8 { x.min(9) + 1 }
@@ -134,7 +134,7 @@ make plugins                                  # language plugins into target/plu
 lighthouse init                               # writes lighthouse.toml
 lighthouse check                              # analyze the project
 lighthouse check --changed --format agent     # what the working tree changed, for an agent
-lighthouse explain design/single-use-wrapper  # intent, requirement, examples
+lighthouse explain design/single-use-wrapper  # context, requirement, examples
 lighthouse review list                        # findings Lighthouse remembers
 lighthouse decision test                      # run every decision's examples
 ```
@@ -160,7 +160,7 @@ incomplete. "Not checked" never counts as "passed".
 ## Built from plugins
 
 The core only coordinates. Every capability is a plugin kind with one interface and
-any number of providers: languages, analyzers, rules, presets, and next fixers and
+any number of providers: languages, analyzers, rules, and next fixers and
 judges. Bundled capabilities use the same contracts as third-party ones. A plugin is a
 contract boundary, not necessarily a process: language plugins run as separate
 processes written in their own language (the Go plugin uses `go/packages` and
@@ -175,7 +175,7 @@ documents and design files can follow.
 | Area | Available now | Next |
 | --- | --- | --- |
 | Decision Memory | committed decision log, expiring verdicts with evidence snapshots, source annotations, finding history | MCP tools for agents, hooks |
-| Decision Catalog | `design` and `testing` packs, generated docs, JSON Schemas, SARIF, project overrides, CEL checks, `decision test` | more executable examples |
+| Decision Catalog | `design` and `testing` packs, generated docs, JSON Schemas, SARIF, shareable projects, CEL checks, `decision test` | more executable examples |
 | Rule Evolution | | decision index and similarity, coverage analysis, rule proposals |
 | Rules | complexity, coupling, docs, wrappers, declaration order and layout, naming, banners, test contracts | dependency direction, cohesion, clones |
 | Languages | Go (semantic), Rust (syntactic) | TypeScript, Python |

@@ -8,7 +8,7 @@ metadata:
     lighthouse/section: principles
 spec:
   title: No reuse by merging unrelated roles
-  intent: >-
+  context: >-
     Reuse bought by merging unrelated roles couples things that change for
     different reasons.
   scope:

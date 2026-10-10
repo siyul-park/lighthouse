@@ -10,24 +10,32 @@ metadata:
     lighthouse/was-builtin: design/section-banners
 spec:
   title: Comments do not label sections
-  intent: A banner restates structure that names and file layout already carry.
+  context: >-
+    A banner restates structure that names and file layout already carry.
+
+    Go: Reported when every non-blank line of a comment group is a banner
+    line. A group that mixes banner lines with prose (a table, a diagram)
+    is documentation and passes.
+
+    Rust: Doc comments (`///`, `//!`) are Markdown and never banners; a
+    plain `//` or block comment made only of banner lines is reported.
   scope:
     domain: code
     subject: file
+    tests: include
   requirement: >-
     A comment MUST NOT only label a section of code: banner lines such as `//
     ---- Helpers ----`, `// ====` rules and `// MARK:` markers are a substitute
     for splitting, naming or ordering, and SHOULD be replaced by one of them.
   severity: warn
-  evidence: [comment, label]
   options:
     type: object
     properties:
-      min_run:
+      minRun:
         type: integer
         default: 3
         description: Rule characters in a row that make a banner line.
-      rule_chars:
+      ruleChars:
         type: string
         default: "-=*~_+"
         description: Characters a banner rule is drawn with.
@@ -36,16 +44,6 @@ spec:
         default: ["MARK:", "#region", "#endregion"]
         description: Line prefixes that label a section on their own.
     additionalProperties: false
-  languages:
-    go:
-      tuning: >-
-        Reported when every non-blank line of a comment group is a banner line.
-        A group that mixes banner lines with prose (a table, a diagram) is
-        documentation and passes.
-    rust:
-      tuning: >-
-        Doc comments (`///`, `//!`) are Markdown and never banners; a plain `//`
-        or block comment made only of banner lines is reported.
   check:
     type: cel
     select: comment
@@ -67,13 +65,13 @@ spec:
           bodies.map(b,
             options.labels.exists(m, b.startsWith(m))
             ? trim(drop(b, size(options.labels.filter(m, b.startsWith(m))[0])))
-            : trim(trimRight(trim(drop(b, leadingRun(b, options.rule_chars))), options.rule_chars)))
+            : trim(trimRight(trim(drop(b, leadingRun(b, options.ruleChars))), options.ruleChars)))
       - name: named
         expr: texts.filter(t, t != '')
     where: >-
-      comment.standalone && !comment.generated && !documentation && size(bodies) > 0
+      comment.standalone && !documentation && size(bodies) > 0
       && bodies.all(b, options.labels.exists(m, b.startsWith(m))
-                       || leadingRun(b, options.rule_chars) >= options.min_run)
+                       || leadingRun(b, options.ruleChars) >= options.minRun)
     message: "comment labels a section instead of stating a fact; name the code or split it instead"
     evidence:
       comment: comment.text

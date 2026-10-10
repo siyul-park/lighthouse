@@ -11,7 +11,7 @@ use lighthouse_model::{Diagnostic, Incomplete, Severity};
 use thiserror::Error;
 
 pub use agent::{AgentReport, Briefing, Detail, UnknownDetail, agent_report, shown};
-pub use fix::{Fix, FixEdit, FixFile};
+pub use fix::{FixEdit, FixFile, ProposedFix};
 pub use group::{Entry, GroupOptions, Grouped};
 
 /// Output format of [`render`]; parsed from `text`, `json`, `sarif`, `agent`

@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: principles
 spec:
   title: Fewest necessary symbols
-  intent: Keep the conceptual surface small so readers hold less in their head.
+  context: >-
+    Keep the conceptual surface small so readers hold less in their head.
   scope:
     domain: code
     subject: project
@@ -16,6 +17,5 @@ spec:
     Required behavior MUST use the fewest necessary symbols and the least
     necessary code without weakening ownership or responsibility boundaries.
   severity: info
-  evidence: [symbols, candidates]
   check:
     type: model

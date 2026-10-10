@@ -8,7 +8,7 @@ use std::{
 
 use lighthouse_engine::{Engine, FixPlan, Outcome};
 use lighthouse_model::{Diagnostic, Severity};
-use lighthouse_report::{Briefing, Detail, Fix, FixFile};
+use lighthouse_report::{Briefing, Detail, FixFile, ProposedFix};
 use lighthouse_spec::Catalog;
 use serde::Serialize;
 
@@ -33,7 +33,7 @@ pub struct CheckRequest {
 /// "passed".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Status {
+pub enum RunStatus {
     Clean,
     Findings,
     Incomplete,
@@ -42,7 +42,7 @@ pub enum Status {
 /// The counts of a run, shared by every frontend that reports on one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct Summary {
-    pub status: Status,
+    pub status: RunStatus,
     pub errors: usize,
     pub warnings: usize,
     pub infos: usize,
@@ -84,11 +84,11 @@ impl Checked {
         };
         let incomplete = outcome.incomplete.len();
         let status = if incomplete > 0 {
-            Status::Incomplete
+            RunStatus::Incomplete
         } else if outcome.diagnostics.is_empty() {
-            Status::Clean
+            RunStatus::Clean
         } else {
-            Status::Findings
+            RunStatus::Findings
         };
         Summary {
             status,
@@ -113,7 +113,7 @@ impl Checked {
     /// nothing is written, formatted or re-checked, and a finding whose fix
     /// does not apply cleanly, runs a program or does not exist has none.
     /// Applying a fix goes through a fix run, which verifies it.
-    pub fn fixes(&self, findings: &[&Diagnostic]) -> BTreeMap<String, Fix> {
+    pub fn fixes(&self, findings: &[&Diagnostic]) -> BTreeMap<String, ProposedFix> {
         let plan = FixPlan::from_catalog(&self.catalog);
         self.engine
             .preview_fixes(&plan, &self.outcome, findings)
@@ -132,7 +132,7 @@ impl Checked {
                         )
                     })
                     .collect();
-                let fix = Fix {
+                let fix = ProposedFix {
                     safety: preview.safety,
                     description: preview.description,
                     files,
@@ -165,7 +165,11 @@ impl Checked {
     /// The fixes of the findings an agent format shows at `detail` under
     /// `limit`, or of the first `cap` findings for a format that shows them
     /// all.
-    pub fn shown_fixes(&self, limit: Option<usize>, detail: Detail) -> BTreeMap<String, Fix> {
+    pub fn shown_fixes(
+        &self,
+        limit: Option<usize>,
+        detail: Detail,
+    ) -> BTreeMap<String, ProposedFix> {
         let briefing = Briefing {
             detail,
             ..self.briefing(limit)

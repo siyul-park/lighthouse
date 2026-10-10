@@ -36,6 +36,39 @@ pub struct ProjectSpec {
     /// Rules that apply to some files or languages only, after `rules`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub overrides: Vec<OverrideSpec>,
+    /// Which files are generated code, beyond what the providers and
+    /// `.gitattributes` say, and whether it is checked.
+    #[serde(default, skip_serializing_if = "GeneratedSpec::is_empty")]
+    pub generated: GeneratedSpec,
+}
+
+/// What a project says about generated code.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GeneratedSpec {
+    /// Globs of project-relative paths that are generated code.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<String>,
+    /// `skip`: no decision checks generated code; `include`: every decision
+    /// does. Unset, each decision's own scope says. A rule's `generated`
+    /// setting wins over both.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check: Option<GeneratedCheck>,
+}
+
+impl GeneratedSpec {
+    /// Whether the project says nothing about generated code.
+    pub fn is_empty(&self) -> bool {
+        self.files.is_empty() && self.check.is_none()
+    }
+}
+
+/// Whether decisions check generated code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum GeneratedCheck {
+    Skip,
+    Include,
 }
 
 impl Spec for ProjectSpec {

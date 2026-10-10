@@ -10,7 +10,7 @@ use serde_json::json;
 
 fn plugin(level: &str) -> Declarative {
     let text = format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/acyclic\nspec:\n  title: No cycles\n  intent: Dependencies point one way.\n  scope: {{ subject: project }}\n  requirement: Modules MUST NOT depend on each other in a circle.\n  severity: error\n  evidence: [members]\n  check:\n    type: builtin\n    op: cycle\n    edge: imports\n    level: {level}\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: y }}]\n"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/acyclic\nspec:\n  title: No cycles\n  context: Dependencies point one way.\n  scope: {{ subject: project }}\n  requirement: Modules MUST NOT depend on each other in a circle.\n  severity: error\n  check:\n    type: builtin\n    op: cycle\n    edge: imports\n    level: {level}\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: y }}]\n"
     );
     let layer = Catalog::from_local(BTreeMap::from([("acyclic.yaml".to_owned(), text)])).unwrap();
     Declarative::from_catalog("local", &layer).unwrap()

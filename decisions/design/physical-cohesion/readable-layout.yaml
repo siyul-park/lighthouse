@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: physical-cohesion
 spec:
   title: Layout shows ownership
-  intent: Layout is documentation that cannot go stale.
+  context: >-
+    Layout is documentation that cannot go stale.
   scope:
     domain: code
     subject: file

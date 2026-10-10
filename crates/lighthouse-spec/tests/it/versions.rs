@@ -1,6 +1,7 @@
 use lighthouse_model::Severity;
 use lighthouse_spec::{
-    Catalog, Check, CheckKind, Decision, ExampleFile, ModelCheck, Status, Subject,
+    Catalog, Check, CheckKind, Decision, DecisionStatus, ExampleFile, ModelCheck, Provenance,
+    Subject,
 };
 use lighthouse_test_support::catalog::*;
 use serde_json::{Map, json};
@@ -34,15 +35,13 @@ mod write {
         };
         let spec = DecisionSpec {
             title: "Rich".into(),
-            intent: "To be written.".into(),
+            context: "To be written.".into(),
             scope: Scope::code(Subject::File),
             requirement: "A rich decision MUST round-trip.".into(),
-            status: Status::Accepted,
+            status: DecisionStatus::Accepted,
             supersedes: Vec::new(),
             consequences: Some("More tests.".into()),
             severity: Some(Severity::Warn),
-            evidence: vec!["x".into()],
-            exceptions: Some("Generated code.".into()),
             options: Some(OptionsSchema {
                 kind: ObjectType::Object,
                 properties: [(
@@ -60,7 +59,6 @@ mod write {
                 "go".to_owned(),
                 LanguageSpec {
                     options: Map::from_iter([("max".to_owned(), json!(4))]),
-                    tuning: Some("Go wording.".into()),
                 },
             )]
             .into(),
@@ -70,8 +68,9 @@ mod write {
                 },
             )))),
             fix: None,
-            citation: Some("Someone 2001".into()),
-            strict: false,
+            provenance: Provenance {
+                was_derived_from: vec!["Someone 2001".into()],
+            },
             examples: vec![
                 Example {
                     name: "bad".into(),
@@ -143,7 +142,7 @@ mod write {
         let dir = tempfile::tempdir().unwrap();
         write_base(dir.path());
         let bad = rich().map_spec(|mut spec| {
-            spec.intent = String::new();
+            spec.context = String::new();
             spec
         });
         assert!(Catalog::write_decision(dir.path(), &bad).is_err());
@@ -181,14 +180,11 @@ fn catalog_version_changes_with_any_decision() {
 }
 
 #[test]
-fn meaning_version_ignores_wording_examples_tuning_option_descriptions_and_adr_prose() {
+fn meaning_version_ignores_wording_examples_option_descriptions_and_adr_prose() {
     let decision = bundled("design/coupling-signal");
     let reworded = decision.clone().map_spec(|mut spec| {
-        spec.intent.push_str(" More prose.");
+        spec.context.push_str(" More prose.");
         spec.examples.clear();
-        for language in spec.languages.values_mut() {
-            language.tuning = None;
-        }
         for property in spec.options.as_mut().unwrap().properties.values_mut() {
             property.description.push_str(" Reworded.");
         }
@@ -236,7 +232,7 @@ fn meaning_version_follows_what_the_decision_demands() {
                 .entry("go".into())
                 .or_default()
                 .options
-                .insert("hub_fan_in".into(), json!(77));
+                .insert("hubFanIn".into(), json!(77));
         }),
         base
     );
@@ -310,7 +306,7 @@ fn a_cel_decision_that_was_never_a_rule_file_has_no_legacy_version() {
         decision(
             "local/probe",
             "rules",
-            "  title: P\n  intent: i\n  scope: { subject: file }\n  requirement: A MUST b.\n  severity: info\n  evidence: [x]\n  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{ path: a.txt, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: text\n      kind: valid\n      files: [{ path: a.txt, body: x }]\n",
+            "  title: P\n  context: i\n  scope: { subject: file }\n  requirement: A MUST b.\n  severity: info\n  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{ path: a.txt, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: text\n      kind: valid\n      files: [{ path: a.txt, body: x }]\n",
         ),
     )]))
     .unwrap();
@@ -330,4 +326,24 @@ fn from_legacy_type_names_the_option_types_of_the_pattern_format() {
     assert_eq!(from_legacy_type("int"), Some(OptionType::Integer));
     assert_eq!(from_legacy_type("list"), Some(OptionType::Array));
     assert_eq!(from_legacy_type("integer"), None);
+}
+
+/// What `meaning_version` was before Revision 28, for every bundled decision:
+/// verdicts recorded under these values must keep applying.
+const BEFORE_REVISION_28: &str = include_str!("meaning-versions.tsv");
+
+#[test]
+fn the_meaning_a_decision_had_before_revision_28_is_among_its_earlier_versions() {
+    let mut seen = 0;
+    for line in BEFORE_REVISION_28.lines().filter(|l| !l.starts_with('#')) {
+        let (id, version) = line.split_once('\t').unwrap();
+        let decision = bundled(id);
+        assert_eq!(decision.earlier_meaning_version(), version, "{id}");
+        assert!(
+            decision.earlier_versions().iter().any(|v| v == version),
+            "{id}"
+        );
+        seen += 1;
+    }
+    assert_eq!(seen, Catalog::bundled().decisions().count());
 }

@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: dependency-direction
 spec:
   title: Depend toward the stable and general
-  intent: "Stable, general code must not break when specific code changes."
+  context: >-
+    Stable, general code must not break when specific code changes.
   scope:
     domain: code
     subject: module
@@ -16,7 +17,8 @@ spec:
     A symbol MUST NOT depend on code that is more specific, more
     context-dependent, or less stable than itself.
   severity: warn
-  evidence: [from, to, from_instability, to_instability]
   check:
     type: model
-  citation: "Martin, Stable Dependencies Principle"
+  provenance:
+    wasDerivedFrom:
+      - "Martin, Stable Dependencies Principle"

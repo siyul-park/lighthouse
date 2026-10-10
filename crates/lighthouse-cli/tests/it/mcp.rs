@@ -135,11 +135,10 @@ fn text_project() -> TempDir {
 
 const LONG_FILE_SPEC: &str = r#"
 title: Notes stay short
-intent: Notes are read in one glance.
+context: Notes are read in one glance.
 scope: { subject: file }
 requirement: A note file MUST NOT exceed three lines.
 severity: error
-evidence: [path]
 check:
   type: cel
   select: file
@@ -416,7 +415,7 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
     let updated = client
         .tool(
             "decision_update",
-            json!({ "id": "local/short-notes", "patch": { "intent": "Notes fit one screen." } }),
+            json!({ "id": "local/short-notes", "patch": { "context": "Notes fit one screen." } }),
         )
         .unwrap();
     assert_eq!(updated["created"], false);
@@ -475,7 +474,7 @@ fn decision_names_cannot_leave_the_decisions_directory() {
     assert!(!dir.path().join(".lighthouse/decisions").exists());
     let update = client.tool(
         "decision_update",
-        json!({ "id": "local/../x", "patch": { "intent": "x" } }),
+        json!({ "id": "local/../x", "patch": { "context": "x" } }),
     );
     assert!(update.is_err());
 }

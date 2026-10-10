@@ -8,15 +8,15 @@ metadata:
     lighthouse/section: naming
 spec:
   title: Keep standard abbreviations
-  intent: Conventional abbreviations are recognized faster than their expansions.
+  context: >-
+    Conventional abbreviations are recognized faster than their
+    expansions.
+
+    Go: Initialisms keep a uniform case, for example `ID` and `IP`.
   scope:
     domain: code
     subject: symbol
   requirement: Standard abbreviations MUST be kept in their conventional form.
   severity: warn
-  evidence: [name, abbreviation]
-  languages:
-    go:
-      tuning: "Initialisms keep a uniform case, for example `ID` and `IP`."
   check:
     type: model

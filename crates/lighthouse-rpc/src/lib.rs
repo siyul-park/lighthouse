@@ -15,7 +15,7 @@ use lighthouse_spec::{Config, PluginRef};
 use thiserror::Error;
 
 pub use manifest::{
-    Discovered, FILE_NAME, FILE_NAMES, Found, PluginManifest, PluginSpec, Provides, Runtime,
+    Discovered, FILE_NAME, FILE_NAMES, Found, PluginSpec, ProcessManifest, Provides, Runtime,
     discover, file_in, load, parse,
 };
 pub use plugin::RpcPlugin;

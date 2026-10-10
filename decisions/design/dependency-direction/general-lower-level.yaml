@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: dependency-direction
 spec:
   title: Lower-level code is general
-  intent: Reusable code that knows its callers is not reusable.
+  context: >-
+    Reusable code that knows its callers is not reusable.
   scope:
     domain: code
     subject: symbol

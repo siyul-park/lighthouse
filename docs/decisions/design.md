@@ -35,7 +35,7 @@ Dependency direction keeps stable, general code independent from specific policy
 
 A symbol MUST NOT depend on code that is more specific, more context-dependent, or less stable than itself.
 
-Method: Martin, Stable Dependencies Principle
+Derived from: Martin, Stable Dependencies Principle
 
 ### Lower-level code does not depend on its callers
 
@@ -45,7 +45,7 @@ Method: Martin, Stable Dependencies Principle
 
 Higher-level code MAY depend on lower-level code when that code is general and context-independent; lower-level code MUST NOT depend on its callers.
 
-Method: Tarjan 1972, strongly connected components
+Derived from: Tarjan 1972, strongly connected components
 
 ## Physical Cohesion
 
@@ -53,36 +53,22 @@ Physical layout should make ownership and collaboration visible while preserving
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/single-file-per-owner`](#one-owner-one-file) | One owner, one file | warn · model |  |  |
+| `design/single-file-per-owner` | One owner, one file | warn · model |  | Symbols with one owner and cohesive responsibility MUST share a file. |
 | [`design/related-symbols-close`](#collaborators-stay-close) | Collaborators stay close | warn · proximity | suggested |  |
 | `design/readable-layout` | Layout shows ownership | info · model |  | Files and declaration order MUST make ownership, responsibility, and relationships easy to read. |
 | `design/separation-is-a-boundary` | Separation marks a boundary | info · model |  | Physical separation MUST represent a real responsibility, ownership, or abstraction boundary. |
-
-### One owner, one file
-
-`design/single-file-per-owner` · symbol · warn · model
-
-*A reader finds an owner and everything it owns in one place.*
-
-Symbols with one owner and cohesive responsibility MUST share a file.
-
-Tuning (go): All methods of a receiver type stay in one file.
 
 ### Collaborators stay close
 
 `design/related-symbols-close` · file · warn · proximity · fix: suggested
 
-*Distance between collaborators hides their relationship.*
+*Distance between collaborators hides their relationship. Go: The methods of one receiver type are contiguous within their declaration group: no free function, type, constant or variable, and no method of another type of the same visibility, between two of them. Rust: The members of one type (its impl blocks, inherent and trait impls) are adjacent in a file: another type, a free function or an item of another owner between two impl blocks of a type is a finding; two impl blocks side by side are fine.*
 
 Strongly related symbols MUST be physically close; direct collaborators SHOULD be adjacent.
 
-Tuning (go): The methods of one receiver type are contiguous within their declaration group: no free function, type, constant or variable, and no method of another type of the same visibility, between two of them.
-
-Tuning (rust): The members of one type (its impl blocks, inherent and trait impls) are adjacent in a file: another type, a free function or an item of another owner between two impl blocks of a type is a finding; two impl blocks side by side are fine.
-
 | option | default | meaning |
 | --- | --- | --- |
-| `visibility_groups` | `true`; rust: `false` | The layout groups methods by visibility (public methods of all types, then private ones), so a method of another owner in the other visibility group does not separate an owner's methods. Set to false when a file puts every owner's methods together, as impl blocks do. |
+| `visibilityGroups` | `true`; rust: `false` | The layout groups methods by visibility (public methods of all types, then private ones), so a method of another owner in the other visibility group does not separate an owner's methods. Set to false when a file puts every owner's methods together, as impl blocks do. |
 
 ```diff
 --- a/example.go
@@ -126,25 +112,21 @@ Structural metrics are review signals, not proof of a design violation.
 
 `design/complexity-signal` · symbol · warn · cel
 
-*High complexity often marks a symbol doing too much.*
+*High complexity often marks a symbol doing too much. Rust: `if`, `else if`, `if let`, `let ... else`, `while`, `for` and `loop` count as in other languages; a `match` counts its arms other than a wildcard or binding arm; `?` adds nothing; closures and `async` blocks nest what they contain. A function that is one `match` whose arms are single values (in return position) or `return`s is a table in code form and is not reported.*
 
-Complexity SHOULD be judged from cyclomatic complexity together with statement count and nesting depth, against deliberately high thresholds. Cyclomatic complexity is one path plus each `if`, `else if`, loop, error handler clause, non-default switch arm and boolean operator (`&&`, `||`); nesting counts the deepest level of nested constructs, a flat body being 0, and nested functions count as a level.
+Complexity SHOULD be judged from cyclomatic complexity together with statement count and nesting depth, against deliberately high thresholds. Cyclomatic complexity is one path plus each `if`, `else if`, loop, error handler clause, non-default switch arm and boolean operator (`&&`, `||`); nesting counts the deepest level of nested constructs, a flat body being 0, and nested functions count as a level. A body that is one switch whose every arm is a single return is a table in code form and is not reported. A body whose only top-level branching is one switch of any arms, nested at most two levels, is a flat dispatch: its many paths do not make it hard to follow, so only cognitive complexity can report it.
 
-Exceptions: A body that is one switch whose every arm is a single return is a table in code form and is not reported. A body whose only top-level branching is one switch of any arms, nested at most two levels, is a flat dispatch: its many paths do not make it hard to follow, so only cognitive complexity can report it.
-
-Tuning (rust): `if`, `else if`, `if let`, `let ... else`, `while`, `for` and `loop` count as in other languages; a `match` counts its arms other than a wildcard or binding arm; `?` adds nothing; closures and `async` blocks nest what they contain. A function that is one `match` whose arms are single values (in return position) or `return`s is a table in code form and is not reported.
-
-Method: McCabe 1976; Campbell, Cognitive Complexity (SonarSource 2018)
+Derived from: McCabe 1976; Campbell, Cognitive Complexity (SonarSource 2018)
 
 | option | default | meaning |
 | --- | --- | --- |
-| `cognitive` | `30` | Cognitive complexity that, with `cognitive_statements`, marks a hard-to-follow body. |
-| `cognitive_statements` | `30` | Statement count of the cognitive signal. |
+| `cognitive` | `30` | Cognitive complexity that, with `cognitiveStatements`, marks a hard-to-follow body. |
+| `cognitiveStatements` | `30` | Statement count of the cognitive signal. |
 | `cyclomatic` | `15` | Cyclomatic complexity that, with `statements`, marks high complexity. |
 | `statements` | `30` | Statement count that, with `cyclomatic`, marks high complexity. |
-| `structural_cyclomatic` | `10` | Cyclomatic complexity of the structural signal. |
-| `structural_nesting` | `5` | Nesting depth of the structural signal; a flat body is 0. |
-| `structural_statements` | `25` | Statement count of the structural signal. |
+| `structuralCyclomatic` | `10` | Cyclomatic complexity of the structural signal. |
+| `structuralNesting` | `5` | Nesting depth of the structural signal; a flat body is 0. |
+| `structuralStatements` | `25` | Statement count of the structural signal. |
 
 ```go invalid
 package sample
@@ -183,22 +165,20 @@ Also: rust
 
 `design/coupling-signal` · symbol · warn · cel
 
-*A dependency hub changes for many reasons.*
+*A dependency hub changes for many reasons. Rust: The unit is the Rust module (a `mod` and every inline module are distinct units). Methods count with their impl's type; calls through a receiver whose type is not written in the code are not seen, so fan counts are lower bounds.*
 
 Coupling SHOULD be judged from direct intra-package fan-in and fan-out, that is the functions and methods of the same package that call a symbol or are called by it, against deliberately high thresholds. Calls from other packages and from tests do not count: a widely used public function is a service, not a hub.
 
-Tuning (rust): The unit is the Rust module (a `mod` and every inline module are distinct units). Methods count with their impl's type; calls through a receiver whose type is not written in the code are not seen, so fan counts are lower bounds.
-
-Method: Henry and Kafura 1981, information flow
+Derived from: Henry and Kafura 1981, information flow
 
 | option | default | meaning |
 | --- | --- | --- |
-| `coordinator_fan_out` | `12` | Callees that, with the other `coordinator_*` options, mark a coordinator. |
-| `coordinator_max_fan_in` | `1` | Most callers a coordinator may have. |
-| `coordinator_statements` | `15` | Statement count of a coordinator. |
-| `hub_fan_in` | `8` | Callers that, with `hub_fan_out` and `hub_statements`, mark a dependency hub. |
-| `hub_fan_out` | `6` | Callees of a dependency hub. |
-| `hub_statements` | `20` | Statement count of a dependency hub. |
+| `coordinatorFanOut` | `12` | Callees that, with the other `coordinator_*` options, mark a coordinator. |
+| `coordinatorMaxFanIn` | `1` | Most callers a coordinator may have. |
+| `coordinatorStatements` | `15` | Statement count of a coordinator. |
+| `hubFanIn` | `8` | Callers that, with `hubFanOut` and `hubStatements`, mark a dependency hub. |
+| `hubFanOut` | `6` | Callees of a dependency hub. |
+| `hubStatements` | `20` | Statement count of a dependency hub. |
 
 ```go invalid
 package sample
@@ -240,7 +220,7 @@ Also: rust
 
 Near-clone analysis SHOULD require meaningful body size and a semantic or naming relation; syntax similarity alone MUST NOT require abstraction.
 
-Method: Jiang et al., Deckard 2007; Roy and Cordy 2007
+Derived from: Jiang et al., Deckard 2007; Roy and Cordy 2007
 
 ## Functions
 
@@ -259,13 +239,9 @@ Function structure should make meaningful behavior reusable and readable, not me
 
 `design/private-helper-callers` · symbol · info · cel · strict
 
-*A private helper with one caller is usually part of that caller.*
+*A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count. Forwarding wrappers are reported by `design/single-use-wrapper`, and a function used as a value is not judged. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.*
 
 A private helper SHOULD have at least two callers.
-
-Tuning (go): A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count. Forwarding wrappers are reported by `design/single-use-wrapper`, and a function used as a value is not judged.
-
-Tuning (rust): Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.
 
 ```go invalid
 package sample
@@ -301,11 +277,9 @@ Also: rust
 
 `design/single-use-wrapper` · symbol · warn · cel
 
-*A forwarding wrapper adds a name without adding meaning.*
+*A forwarding wrapper adds a name without adding meaning. Rust: Applies to private functions and methods (items without `pub`); a trait impl method is as visible as its trait and is not a candidate. Calls are resolved syntactically, so a method call on a receiver whose type is not written in the code is recorded as a possible use of every private method of that name in the crate, and keeps such a method from being reported.*
 
 A simple single-use wrapper SHOULD be inlined unless its name expresses a real policy or mechanic; complex one-use mechanics require review rather than mechanical removal.
-
-Tuning (rust): Applies to private functions and methods (items without `pub`); a trait impl method is as visible as its trait and is not a candidate. Calls are resolved syntactically, so a method call on a receiver whose type is not written in the code is recorded as a possible use of every private method of that name in the crate, and keeps such a method from being reported.
 
 ```go invalid
 package sample
@@ -337,18 +311,14 @@ Also: rust
 
 `design/receiver-owned-behavior` · symbol · warn · cel
 
-*Where a function lives tells readers who owns the behavior.*
+*Where a function lives tells readers who owns the behavior. Go: A private package function with at least one production caller, every caller being a method of one type, never used as a value and not named like a constructor, is reported. Test callers do not count. A function called by any other function, or by methods of two types, is not judged. Rust: The same for a private free function and the methods of one `impl` target type. Parameter types are not resolved for Rust, so `takes_owner_param` is always false there.*
 
 Methods SHOULD express receiver-owned behavior; free functions SHOULD express construction or behavior with no natural receiver.
 
-Tuning (go): A private package function with at least one production caller, every caller being a method of one type, never used as a value and not named like a constructor, is reported. Test callers do not count. A function called by any other function, or by methods of two types, is not judged.
-
-Tuning (rust): The same for a private free function and the methods of one `impl` target type. Parameter types are not resolved for Rust, so `takes_owner_param` is always false there.
-
 | option | default | meaning |
 | --- | --- | --- |
-| `constructor_prefixes` | `["New","new"]`; rust: `["new"]` | A function named like one of these, or one of these followed by a word, is a constructor and has no receiver yet. |
-| `require_owner_param` | `false` | Report only functions that take a value of the owner type as a parameter, the strongest sign that the owner should be the receiver. By default a function that takes one or calls or references the owner or one of its members is reported; a function that does neither is a helper with no more to do with the owner than with any other type. |
+| `constructorPrefixes` | `["New","new"]`; rust: `["new"]` | A function named like one of these, or one of these followed by a word, is a constructor and has no receiver yet. |
+| `requireOwnerParam` | `false` | Report only functions that take a value of the owner type as a parameter, the strongest sign that the owner should be the receiver. By default a function that takes one or calls or references the owner or one of its members is reported; a function that does neither is a helper with no more to do with the owner than with any other type. |
 
 ```go invalid
 package sample
@@ -384,15 +354,13 @@ Also: rust
 
 `design/callers-before-callees` · file · warn · cel · fix: suggested
 
-*Readers follow behavior from intent to mechanics.*
+*Readers follow behavior from intent to mechanics. Rust: Applies to private free functions and private methods. A function that some call may reach through a receiver of unknown type is not judged. A declaration-group order that places the callee before its caller (a type's methods precede the free functions of a Rust file) fixes the callee's position, so such a pair is not judged. Neither is a private method of an inherent impl called by a method of a trait impl: inherent impls come first.*
 
 Declarations MUST be ordered for reading: callers before callees, related symbols adjacent, and cohesive implementations together. Callers MUST precede their exclusive helpers, and shared leaves MUST follow the code that uses them.
 
-Tuning (rust): Applies to private free functions and private methods. A function that some call may reach through a receiver of unknown type is not judged. A declaration-group order that places the callee before its caller (a type's methods precede the free functions of a Rust file) fixes the callee's position, so such a pair is not judged. Neither is a private method of an inherent impl called by a method of a trait impl: inherent impls come first.
-
 | option | default | meaning |
 | --- | --- | --- |
-| `shared_after_last_caller` | `false` | Require a helper used by several functions of its file to follow all of them, not only the first. |
+| `sharedAfterLastCaller` | `false` | Require a helper used by several functions of its file to follow all of them, not only the first. |
 
 ```diff
 --- a/example.go
@@ -418,9 +386,9 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 | `design/single-term-per-concept` | One term, one concept | info · model |  | One term MUST represent one concept across packages. |
 | `design/minimal-names` | Minimal names | info · model |  | One word SHOULD be the default; a multi-word name MUST add only the minimum qualifier needed to express a distinction. |
 | [`design/no-redundant-qualifiers`](#no-redundant-qualifiers) | No redundant qualifiers | warn · cel |  |  |
-| [`design/standard-abbreviations`](#keep-standard-abbreviations) | Keep standard abbreviations | warn · model |  |  |
+| `design/standard-abbreviations` | Keep standard abbreviations | warn · model |  | Standard abbreviations MUST be kept in their conventional form. |
 | `design/short-names-limited` | One-letter names stay small | warn · model |  | One-letter names MUST be limited to conventional receivers, indexes, and tiny scopes. |
-| [`design/predicate-names`](#predicate-names-state-their-form) | Predicate names state their form | warn · model |  |  |
+| `design/predicate-names` | Predicate names state their form | warn · model |  | Predicates MUST name their form: `HasX` for containing or registering X, `IsX` for a state predicate, `MatchX` for comparison or validation against X, and a bare `X` for a direct boolean value. `At` MUST be used for position or time predicates. |
 | `design/reserved-action-verbs` | Action verbs are reserved | info · model |  | Configured action verbs, by default `Build`, `Compile`, `Publish`, `Capture`, and `Use`, MUST be reserved for actions or transitions. |
 | `design/singular-capability-plural-collection` | Singular capabilities, plural collections | info · model |  | Capability names MUST be singular; collections and stores MUST be plural. |
 
@@ -428,15 +396,9 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 
 `design/no-redundant-qualifiers` · symbol · warn · cel
 
-*Context already names the package, receiver, phase, or representation.*
+*Context already names the package, receiver, phase, or representation. Go: The package name, as the importing code writes it, repeated at the start of a longer exported name: `provider.ProviderOptions`, `sdk.SDKFrame`. Whole words only (`provider.Providence` is fine). Rust: Off by default (`kinds` is empty): the path callers write is the crate's public path, and the provider cannot say whether a public item is reached through its module (`store::StoreHandle`) or re-exported from the crate root (`crate::StoreHandle`), where the module name is not repeated. Set `kinds` to check the name of the module, the last component of its path, as a prefix or suffix of a longer public item name; the root module of a crate is matched by the crate name as a whole.*
 
-Package, receiver, phase, or representation MUST NOT be repeated in a name without meaning.
-
-Exceptions: A name equal to its package or module name (`provider.Provider`, `list.List`, `time.Time`) is the package's primary concept; repeating it has meaning and is never reported.
-
-Tuning (go): The package name, as the importing code writes it, repeated at the start of a longer exported name: `provider.ProviderOptions`, `sdk.SDKFrame`. Whole words only (`provider.Providence` is fine).
-
-Tuning (rust): Off by default (`kinds` is empty): the path callers write is the crate's public path, and the provider cannot say whether a public item is reached through its module (`store::StoreHandle`) or re-exported from the crate root (`crate::StoreHandle`), where the module name is not repeated. Set `kinds` to check the name of the module, the last component of its path, as a prefix or suffix of a longer public item name; the root module of a crate is matched by the crate name as a whole.
+Package, receiver, phase, or representation MUST NOT be repeated in a name without meaning. A name equal to its package or module name (`provider.Provider`, `list.List`, `time.Time`) is the package's primary concept; repeating it has meaning and is never reported.
 
 | option | default | meaning |
 | --- | --- | --- |
@@ -456,49 +418,19 @@ type Provider struct{}
 
 Also: rust
 
-### Keep standard abbreviations
-
-`design/standard-abbreviations` · symbol · warn · model
-
-*Conventional abbreviations are recognized faster than their expansions.*
-
-Standard abbreviations MUST be kept in their conventional form.
-
-Tuning (go): Initialisms keep a uniform case, for example `ID` and `IP`.
-
-### Predicate names state their form
-
-`design/predicate-names` · symbol · warn · model
-
-*The prefix tells callers what kind of question a predicate answers.*
-
-Predicates MUST name their form: `HasX` for containing or registering X, `IsX` for a state predicate, `MatchX` for comparison or validation against X, and a bare `X` for a direct boolean value. `At` MUST be used for position or time predicates.
-
-Tuning (go): Spelled as shown for exported names; unexported names use lower camel case.
-
 ## Types and APIs
 
 Public APIs are stable contracts: expose the minimum caller-facing abstraction and keep implementation state behind its owner.
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/interface-at-consumer`](#interfaces-live-at-the-consumer) | Interfaces live at the consumer | warn · model |  |  |
+| `design/interface-at-consumer` | Interfaces live at the consumer | warn · model |  | Interfaces MUST be used only when callers supply behavior and MUST be defined where that behavior is consumed. |
 | `design/narrow-inputs-concrete-outputs` | Narrow inputs, concrete outputs | info · model |  | Public inputs SHOULD use the narrowest reusable abstraction that fully expresses the contract; public outputs SHOULD use the most concrete public type unless polymorphism is itself the contract. |
 | [`design/no-private-types-in-public-api`](#public-apis-do-not-expose-private-types) | Public APIs do not expose private types | warn · model |  |  |
 | `design/contract-not-state` | Exported types expose contract, not state | info · model |  | Exported types SHOULD expose contract rather than mutable implementation state; data-only values and ABI bridge types MAY expose their fields. |
 | `design/validated-constructors` | Constructors validate | info · model |  | Constructors MUST require inputs with no safe default and MUST validate required dependencies and shape; `Build` MUST validate a complete builder. |
-| [`design/required-args-optional-options`](#required-arguments-optional-options) | Required arguments, optional options | info · model |  |  |
+| `design/required-args-optional-options` | Required arguments, optional options | info · model |  | Required constructor values MUST be passed as arguments; optional values MUST be injected through options. |
 | `design/no-speculative-api` | No speculative API surface | info · model |  | Generic parameter-group types, speculative options, extension points, aliases, and pass-through wrappers MUST NOT be exposed without a distinct contract. |
-
-### Interfaces live at the consumer
-
-`design/interface-at-consumer` · symbol · warn · model
-
-*An interface describes what a caller needs, so it belongs to the caller.*
-
-Interfaces MUST be used only when callers supply behavior and MUST be defined where that behavior is consumed.
-
-Tuning (go): Declare the interface in the consuming package, not beside its only implementation.
 
 ### Public APIs do not expose private types
 
@@ -520,16 +452,6 @@ type Config struct{}
 func New() Config { return Config{} }
 ```
 
-### Required arguments, optional options
-
-`design/required-args-optional-options` · symbol · info · model
-
-*The signature shows what is mandatory.*
-
-Required constructor values MUST be passed as arguments; optional values MUST be injected through options.
-
-Tuning (go): Optional values are injected through functional options.
-
 ## Ownership
 
 Ownership makes it explicit who creates, changes, and ends mutable state or resources.
@@ -537,35 +459,19 @@ Ownership makes it explicit who creates, changes, and ends mutable state or reso
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | `design/single-state-owner` | One owner per mutable state | info · model |  | One symbol MUST own each mutable state and its transitions; shared mutable state MUST have one owner and one synchronization strategy. |
-| [`design/private-state-behind-owner`](#private-state-stays-behind-its-owner) | Private state stays behind its owner | warn · model |  |  |
+| `design/private-state-behind-owner` | Private state stays behind its owner | warn · model |  | Private state belongs to its owner. An implementation component of an owner MAY access that owner's private state when it implements the owner's responsibility; unrelated code in the same package MUST use the owner's contract. |
 | `design/borrow-within-boundary` | Borrowed values stay within their boundary | info · model |  | Borrowed values MUST NOT cross or outlive their ownership boundary. |
 | `design/single-resource-owner` | One owner per resource transition | info · model |  | Retain/release and resource transitions MUST have one owner, and each resource MUST be released exactly once. |
 | `design/layout-declarations-hold-no-state` | Layout declarations hold no runtime state | info · model |  | Layout-only declarations MAY name private members but MUST NOT access runtime state. |
 | [`design/no-exported-mutable-global`](#no-exported-mutable-global) | No exported mutable global | warn · cel |  |  |
 
-### Private state stays behind its owner
-
-`design/private-state-behind-owner` · symbol · warn · model
-
-*State reachable from anywhere cannot keep an invariant.*
-
-Private state belongs to its owner. An implementation component of an owner MAY access that owner's private state when it implements the owner's responsibility; unrelated code in the same package MUST use the owner's contract.
-
-Tuning (go): An unexported implementation component may access its exported owner's private fields; unrelated same-package code uses the owner's methods.
-
 ### No exported mutable global
 
 `design/no-exported-mutable-global` · symbol · warn · cel
 
-*State that any importer can assign has no owner and no invariant.*
+*State that any importer can assign has no owner and no invariant. Go: A package-level `var` whose name is exported (and not an `Err...` sentinel) outside test and generated files. Rust: Not checked: an immutable `pub static` is not mutable state and the provider does not report whether a static is `mut`.*
 
-An exported package-level variable MUST NOT hold mutable state: state belongs to an owner that guards it, and a global that never changes SHOULD be a constant or a function.
-
-Exceptions: Sentinel errors, by the `Err` name prefix, are exported variables by convention and are not reported.
-
-Tuning (go): A package-level `var` whose name is exported (and not an `Err...` sentinel) outside test and generated files.
-
-Tuning (rust): Not checked: an immutable `pub static` is not mutable state and the provider does not report whether a static is `mut`.
+An exported package-level variable MUST NOT hold mutable state: state belongs to an owner that guards it, and a global that never changes SHOULD be a constant or a function. Sentinel errors, by the `Err` name prefix, are exported variables by convention and are not reported.
 
 ```go invalid
 package config
@@ -593,29 +499,17 @@ Concurrency rules prevent races and leaks by making shared state and shutdown ow
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/explicit-shutdown`](#long-lived-tasks-can-be-stopped) | Long-lived tasks can be stopped | warn · model |  |  |
+| `design/explicit-shutdown` | Long-lived tasks can be stopped | warn · model |  | Long-lived concurrent tasks MUST have an explicit shutdown path. |
 | [`design/context-first`](#cancellation-context-comes-first) | Cancellation context comes first | warn · model |  |  |
 | `design/no-stored-request-context` | Request contexts are not stored | warn · model |  | Request contexts MUST NOT be stored in long-lived objects. |
-
-### Long-lived tasks can be stopped
-
-`design/explicit-shutdown` · symbol · warn · model
-
-*A task nobody can stop leaks and blocks shutdown.*
-
-Long-lived concurrent tasks MUST have an explicit shutdown path.
-
-Tuning (go): Applies to goroutines.
 
 ### Cancellation context comes first
 
 `design/context-first` · symbol · warn · model
 
-*A uniform position makes cancellation visible and checkable.*
+*A uniform position makes cancellation visible and checkable. Go: `ctx context.Context` is the first parameter.*
 
 Blocking, I/O, and process-boundary operations MUST take the cancellation context as their first parameter.
-
-Tuning (go): `ctx context.Context` is the first parameter.
 
 ```go invalid
 func Fetch(url string, ctx context.Context) ([]byte, error)
@@ -631,31 +525,19 @@ Errors are contracts: callers should be able to classify failures, preserve caus
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/stable-error-categories`](#stable-error-categories) | Stable error categories | warn · model |  |  |
+| `design/stable-error-categories` | Stable error categories | warn · model |  | Semantic errors MUST use stable, named error values or types, and semantic categories MUST NOT be created from ad hoc formatted messages alone. |
 | [`design/error-identity`](#preserve-error-identity) | Preserve error identity | warn · model |  |  |
 | `design/translate-errors-at-boundary` | Translate errors at their boundary | info · model |  | Error categories MUST be translated only at their owning boundary. |
 | `design/errors-hide-private-state` | Errors do not leak state | info · model |  | Errors MUST NOT expose private or sensitive process state. |
 | `design/errors-not-panics` | Return errors, do not panic | info · model |  | Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors. |
 
-### Stable error categories
-
-`design/stable-error-categories` · symbol · warn · model
-
-*Callers classify failures by identity, not by message text.*
-
-Semantic errors MUST use stable, named error values or types, and semantic categories MUST NOT be created from ad hoc formatted messages alone.
-
-Tuning (go): Semantic errors are `ErrXxx` sentinels; `fmt.Errorf` alone does not create a category.
-
 ### Preserve error identity
 
 `design/error-identity` · symbol · warn · model
 
-*Adding context must not hide the cause callers depend on.*
+*Adding context must not hide the cause callers depend on. Go: Wrap with `%w` when adding context.*
 
 Dependency identity MUST be preserved when callers depend on it; context added to an error MUST keep the cause reachable.
-
-Tuning (go): Wrap with `%w` when adding context.
 
 ```go invalid
 return fmt.Errorf("load %s: %v", name, err)
@@ -679,20 +561,16 @@ Declaration order should let a reader follow ownership and behavior from public 
 
 `design/declaration-groups` · file · error · order · fix: safe
 
-*A fixed group order makes every file predictable.*
+*A fixed group order makes every file predictable. Go: Fixtures of a test file (its types, constants, variables and functions that take no testing handle) follow the same order; tests and test helpers are placed by `testing/test-file-layout`. Order: public types; private types; public constants; private constants; variables; all `init` functions; public options and functions; public constructors; public methods; clone, conversion and interface hooks; private functions and methods. Rust: The same principle, from the concepts to the machinery, with a type kept next to its impl blocks because that is how Rust code reads. Order: constants; statics; types, traits and their impl blocks (types and impls are one group, `owner-contiguity` keeps an owner's impls together); public free functions; private free functions. Associated functions named `new` come before the other methods of their type. Items of `#[cfg(test)]` modules are not ordered. Visibility counts as public when it is `pub` or `pub(crate)`.*
 
 Top-level declarations in a file MUST follow the language's ownership-group order, from public contract to private mechanics. Initializers MUST stay together and MUST precede non-initializer functions and methods. Within one type, constructors MUST precede other behavior.
 
-Tuning (go): Fixtures of a test file (its types, constants, variables and functions that take no testing handle) follow the same order; tests and test helpers are placed by `testing/test-file-layout`. Order: public types; private types; public constants; private constants; variables; all `init` functions; public options and functions; public constructors; public methods; clone, conversion and interface hooks; private functions and methods.
-
-Tuning (rust): The same principle, from the concepts to the machinery, with a type kept next to its impl blocks because that is how Rust code reads. Order: constants; statics; types, traits and their impl blocks (types and impls are one group, `owner-contiguity` keeps an owner's impls together); public free functions; private free functions. Associated functions named `new` come before the other methods of their type. Items of `#[cfg(test)]` modules are not ordered. Visibility counts as public when it is `pub` or `pub(crate)`.
-
 | option | default | meaning |
 | --- | --- | --- |
-| `constructor_prefixes` | `["New"]`; rust: `["new"]` | A public function whose name is one of these, or one of these followed by a word (`New`, `NewStore`; not `Newton`), is a constructor. |
-| `constructors_first` | `false`; rust: `true` | A constructor method (a public method named like a constructor) must precede the other methods of its type in the file. Go constructors are functions, ordered by the `constructor` group instead. |
+| `constructorPrefixes` | `["New"]`; rust: `["new"]` | A public function whose name is one of these, or one of these followed by a word (`New`, `NewStore`; not `Newton`), is a constructor. |
+| `constructorsFirst` | `false`; rust: `true` | A constructor method (a public method named like a constructor) must precede the other methods of its type in the file. Go constructors are functions, ordered by the `constructor` group instead. |
 | `groups` | `["public-type","private-type","public-const","private-const","var","init","public-function","constructor","public-method","hook","private-function"]`; rust: `["const","var","type","public-function","private-function"]` | The group order of a file, first to last. A declaration belongs to the first of its candidate groups that this list names; one the list does not name is not ordered. Groups: `public-type`, `private-type`, `type` (types and the members of a type together), `public-const`, `private-const`, `const`, `var`, `init`, `public-function`, `constructor`, `public-method`, `hook`, `private-function` (private functions and, where `type` is not listed, private methods). |
-| `hook_names` | `["Clone","String","GoString","Error","Unwrap","MarshalJSON","UnmarshalJSON","MarshalText","UnmarshalText","MarshalBinary","UnmarshalBinary"]`; rust: `[]` | Public methods that implement clone, conversion or interface hooks; they follow the other public methods. Names are kept to ones that are never ordinary behavior. |
+| `hookNames` | `["Clone","String","GoString","Error","Unwrap","MarshalJSON","UnmarshalJSON","MarshalText","UnmarshalText","MarshalBinary","UnmarshalBinary"]`; rust: `[]` | Public methods that implement clone, conversion or interface hooks; they follow the other public methods. Names are kept to ones that are never ordinary behavior. |
 
 ```diff
 --- a/example.go
@@ -744,19 +622,15 @@ count++
 
 `design/section-banners` · file · warn · cel · fix: suggested
 
-*A banner restates structure that names and file layout already carry.*
+*A banner restates structure that names and file layout already carry. Go: Reported when every non-blank line of a comment group is a banner line. A group that mixes banner lines with prose (a table, a diagram) is documentation and passes. Rust: Doc comments (`///`, `//!`) are Markdown and never banners; a plain `//` or block comment made only of banner lines is reported.*
 
 A comment MUST NOT only label a section of code: banner lines such as `// ---- Helpers ----`, `// ====` rules and `// MARK:` markers are a substitute for splitting, naming or ordering, and SHOULD be replaced by one of them.
-
-Tuning (go): Reported when every non-blank line of a comment group is a banner line. A group that mixes banner lines with prose (a table, a diagram) is documentation and passes.
-
-Tuning (rust): Doc comments (`///`, `//!`) are Markdown and never banners; a plain `//` or block comment made only of banner lines is reported.
 
 | option | default | meaning |
 | --- | --- | --- |
 | `labels` | `["MARK:","#region","#endregion"]` | Line prefixes that label a section on their own. |
-| `min_run` | `3` | Rule characters in a row that make a banner line. |
-| `rule_chars` | `"-=*~_+"` | Characters a banner rule is drawn with. |
+| `minRun` | `3` | Rule characters in a row that make a banner line. |
+| `ruleChars` | `"-=*~_+"` | Characters a banner rule is drawn with. |
 
 ```diff
 --- a/example.go
@@ -775,19 +649,15 @@ Also: rust
 
 `design/exported-doc` · symbol · warn · cel
 
-*Public API changes need facts callers cannot read from the code.*
+*Public API changes need facts callers cannot read from the code. Go: Normal Go doc comments beginning with the symbol name. Rust: Doc comments (`///`, `#[doc]`) on items reachable from outside the library crate: `pub` items whose modules are all `pub` or that a `pub use` re-exports. Items in binary crates, in tests and in `pub(crate)` positions are not exported. A trait impl method without docs of its own shows the documentation of the trait's method, as rustdoc does; a method that implements a method of a trait declared in the project is documented where the trait declares it, and the methods of the standard traits (`fmt`, `from`, `default`, `drop`, ...) need none. The public items of a library that cannot be published (`publish = false`) are importable only inside the project and count as internal, unless another package of the project depends on the library: then its public items are a contract between packages and stay public (`[languages.rust] unpublished = "auto" | "public" | "internal"`). Code in an inline `#[cfg(test)]` module is test code.*
 
 Exported symbols SHOULD have doc comments in the language's standard form. Public API changes SHOULD document user-visible behavior, constraints, ownership, or other facts the code cannot express.
 
-Tuning (go): Normal Go doc comments beginning with the symbol name.
-
-Tuning (rust): Doc comments (`///`, `#[doc]`) on items reachable from outside the library crate: `pub` items whose modules are all `pub` or that a `pub use` re-exports. Items in binary crates, in tests and in `pub(crate)` positions are not exported. A trait impl method without docs of its own shows the documentation of the trait's method, as rustdoc does; a method that implements a method of a trait declared in the project is documented where the trait declares it, and the methods of the standard traits (`fmt`, `from`, `default`, `drop`, ...) need none. The public items of a library that cannot be published (`publish = false`) are importable only inside the project and count as internal, unless another package of the project depends on the library: then its public items are a contract between packages and stay public (`[languages.rust] unpublished = "auto" | "public" | "internal"`). Code in an inline `#[cfg(test)]` module is test code.
-
 | option | default | meaning |
 | --- | --- | --- |
-| `exempt_interface_methods` | `false`; rust: `true` | Do not require docs on a method that implements a documented method of an interface (or trait) the project declares, since it is documented where the interface declares it. |
-| `exempt_methods` | `["String","Error","Unwrap"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]` | Method names that implement well-known interfaces and need no doc comment of their own. |
-| `include_internal` | `false` | Also require docs for symbols exported only inside the project, such as under an internal path. |
+| `exemptInterfaceMethods` | `false`; rust: `true` | Do not require docs on a method that implements a documented method of an interface (or trait) the project declares, since it is documented where the interface declares it. |
+| `exemptMethods` | `["String","Error","Unwrap"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]` | Method names that implement well-known interfaces and need no doc comment of their own. |
+| `includeInternal` | `false` | Also require docs for symbols exported only inside the project, such as under an internal path. |
 | `kinds` | `["function","method","type","interface","const","var"]` | Symbol kinds that must be documented when exported. |
 
 ```go invalid
@@ -819,14 +689,4 @@ Generated and platform-specific code should remain behind the mechanism and boun
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | `design/generated-via-generator` | Generated files change only through their generator | warn · model |  | Generated files MUST change only through their generator. |
-| [`design/platform-behind-owner`](#platform-mechanics-stay-behind-their-owner) | Platform mechanics stay behind their owner | info · model |  |  |
-
-### Platform mechanics stay behind their owner
-
-`design/platform-behind-owner` · module · info · model
-
-*Platform differences leak when they are not fenced.*
-
-Platform mechanics MUST stay behind matching build constraints and owner packages.
-
-Tuning (go): Use matching build constraints or file-name suffixes.
+| `design/platform-behind-owner` | Platform mechanics stay behind their owner | info · model |  | Platform mechanics MUST stay behind matching build constraints and owner packages. |

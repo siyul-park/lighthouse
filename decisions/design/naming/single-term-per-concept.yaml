@@ -8,12 +8,12 @@ metadata:
     lighthouse/section: naming
 spec:
   title: "One term, one concept"
-  intent: Synonyms make readers suspect a difference that is not there.
+  context: >-
+    Synonyms make readers suspect a difference that is not there.
   scope:
     domain: code
     subject: project
   requirement: One term MUST represent one concept across packages.
   severity: info
-  evidence: [term, locations]
   check:
     type: model

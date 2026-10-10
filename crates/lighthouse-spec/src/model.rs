@@ -1,6 +1,6 @@
 use std::fmt;
 
-use lighthouse_model::{RunScope, Severity};
+use lighthouse_model::{Applicability, RunScope, Severity, TestScope};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -36,13 +36,24 @@ impl Subject {
     }
 }
 
-/// Where a decision applies: its domain and what it is about.
+/// Where a decision applies: its domain, what it is about, and which code its
+/// subjects may be in. Generated and test code are told apart by the host
+/// (the provider's marker, `.gitattributes`, the project's `generated`
+/// globs), and the engine leaves the subjects out that the scope excludes
+/// before any check runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Scope {
     #[serde(default)]
     pub domain: Domain,
     pub subject: Subject,
+    /// Generated code is a subject too. Default: it is not.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub generated: bool,
+    /// Which test code is a subject: `exclude` (the default), `include` or
+    /// `only`.
+    #[serde(default, skip_serializing_if = "TestScope::is_default")]
+    pub tests: TestScope,
 }
 
 impl Scope {
@@ -51,6 +62,16 @@ impl Scope {
         Self {
             domain: Domain::Code,
             subject,
+            generated: false,
+            tests: TestScope::Exclude,
+        }
+    }
+
+    /// What code the subjects may be in.
+    pub fn applicability(self) -> Applicability {
+        Applicability {
+            generated: self.generated,
+            tests: self.tests,
         }
     }
 }
@@ -65,7 +86,7 @@ impl fmt::Display for Scope {
 /// does. Only an accepted decision is enforced.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
-pub enum Status {
+pub enum DecisionStatus {
     /// Under discussion: written down, not yet enforced.
     Proposed,
     #[default]
@@ -78,7 +99,7 @@ pub enum Status {
     Deprecated,
 }
 
-impl Status {
+impl DecisionStatus {
     /// Whether decisions in this state are enforced.
     pub fn enforced(self) -> bool {
         self == Self::Accepted
@@ -244,7 +265,7 @@ macro_rules! display {
 
 display!(Subject { Symbol => "symbol", File => "file", Module => "module", Project => "project", Test => "test" });
 display!(Domain { Code => "code" });
-display!(Status { Proposed => "proposed", Accepted => "accepted", Rejected => "rejected", Superseded => "superseded", Deprecated => "deprecated" });
+display!(DecisionStatus { Proposed => "proposed", Accepted => "accepted", Rejected => "rejected", Superseded => "superseded", Deprecated => "deprecated" });
 display!(ExampleKind { Valid => "valid", Invalid => "invalid" });
 
 fn is_false(value: &bool) -> bool {

@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: evidence
 spec:
   title: Coverage proves reachability
-  intent: "Coverage shows code ran, not that behavior is right."
+  context: >-
+    Coverage shows code ran, not that behavior is right.
   scope:
     domain: code
     subject: project

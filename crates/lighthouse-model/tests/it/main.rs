@@ -6,5 +6,6 @@ mod fix;
 mod hash;
 mod project;
 mod review;
+mod scope;
 mod sites;
 mod text;

@@ -10,38 +10,35 @@ metadata:
     lighthouse/was-builtin: testing/external-test-package
 spec:
   title: Contract tests live outside the target
-  intent: >-
+  context: >-
     Living outside the target makes private access impossible rather than
     discouraged.
+
+    Go: Tests live in `package <target>_test`. A test file inside the
+    target package is reported when it uses an unexported symbol of that
+    package; one that only uses exported symbols is left alone.
+
+    Python: Contract tests import only the package's public API.
+
+    Rust: Contract tests are integration tests under `tests/`. Inline
+    `#[cfg(test)]` unit tests are never reported: the provider cannot tell
+    a `pub(crate)` item from a `pub` one of an unpublished crate, so it
+    cannot say that such a test could have lived in `tests/`.
+
+    TypeScript: Contract tests import only the package's public exports.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     Feature contract tests MUST use only the target's public symbols and MUST
     live outside the target's private scope.
   severity: error
-  evidence: [test_file, package, private_symbols]
-  languages:
-    go:
-      tuning: >-
-        Tests live in `package <target>_test`. A test file inside the target
-        package is reported when it uses an unexported symbol of that package;
-        one that only uses exported symbols is left alone.
-    python:
-      tuning: "Contract tests import only the package's public API."
-    rust:
-      tuning: >-
-        Contract tests are integration tests under `tests/`. Inline
-        `#[cfg(test)]` unit tests are never reported: the provider cannot tell a
-        `pub(crate)` item from a `pub` one of an unpublished crate, so it cannot
-        say that such a test could have lived in `tests/`.
-    typescript:
-      tuning: "Contract tests import only the package's public exports."
   check:
     type: cel
     select: file
     where: >-
-      file.test && !file.generated && file.module != '' && file.module_known
+      file.module != '' && file.module_known
       && file.module_test_of == '' && size(file.private_reach.symbols) > 0
     message: >-
       test file {{ file.path }} lives inside the package it tests and uses its private

@@ -10,7 +10,16 @@ metadata:
     lighthouse/was-builtin: design/callers-before-callees
 spec:
   title: Callers before callees
-  intent: Readers follow behavior from intent to mechanics.
+  context: >-
+    Readers follow behavior from intent to mechanics.
+
+    Rust: Applies to private free functions and private methods. A
+    function that some call may reach through a receiver of unknown type
+    is not judged. A declaration-group order that places the callee before
+    its caller (a type's methods precede the free functions of a Rust
+    file) fixes the callee's position, so such a pair is not judged.
+    Neither is a private method of an inherent impl called by a method of
+    a trait impl: inherent impls come first.
   scope:
     domain: code
     subject: file
@@ -20,27 +29,16 @@ spec:
     precede their exclusive helpers, and shared leaves MUST follow the code that
     uses them.
   severity: warn
-  evidence: [caller, callee]
   options:
     type: object
     properties:
-      shared_after_last_caller:
+      sharedAfterLastCaller:
         type: boolean
         default: false
         description: >-
           Require a helper used by several functions of its file to follow all
           of them, not only the first.
     additionalProperties: false
-  languages:
-    rust:
-      tuning: >-
-        Applies to private free functions and private methods. A function that
-        some call may reach through a receiver of unknown type is not judged. A
-        declaration-group order that places the callee before its caller (a
-        type's methods precede the free functions of a Rust file) fixes the
-        callee's position, so such a pair is not judged. Neither is a private
-        method of an inherent impl called by a method of a trait impl: inherent
-        impls come first.
   check:
     type: cel
     select: function
@@ -50,9 +48,9 @@ spec:
       - name: anchor
         expr: >-
           size(local) == 0 ? func
-          : options.shared_after_last_caller ? local[size(local) - 1] : local[0]
+          : options.sharedAfterLastCaller ? local[size(local) - 1] : local[0]
     where: >-
-      !func.file_test && !func.generated && !func.test && (func.kind == 'function' || func.kind == 'method')
+      (func.kind == 'function' || func.kind == 'method')
       && size(local) > 0 && func.pos <= anchor.pos
       && !(rank(func, 'design/group') >= 0 && rank(anchor, 'design/group') >= 0
            && rank(func, 'design/group') < rank(anchor, 'design/group'))
@@ -122,7 +120,7 @@ spec:
 
             func leaf() int { return 1 }
       options:
-        shared_after_last_caller: true
+        sharedAfterLastCaller: true
       files:
         - path: example.go
           body: |-

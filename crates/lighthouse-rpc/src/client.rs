@@ -14,7 +14,7 @@ use std::{
 use lighthouse_protocol::{Id, Message, read_message, write_message};
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::manifest::PluginManifest;
+use crate::manifest::ProcessManifest;
 
 /// Most recent stderr lines kept, and the bytes kept of each.
 const STDERR_LINES: usize = 50;
@@ -63,7 +63,7 @@ pub(crate) struct Client {
 
 impl Client {
     pub(crate) fn spawn(
-        manifest: &PluginManifest,
+        manifest: &ProcessManifest,
         dir: &Path,
         cwd: &Path,
         timeout: Duration,

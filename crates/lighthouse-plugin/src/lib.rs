@@ -5,7 +5,8 @@ mod registry;
 use std::{collections::BTreeMap, path::PathBuf};
 
 use lighthouse_model::{
-    Capability, Diagnostic, File, Fragment, Incomplete, Options, Project, RunScope, Severity,
+    Applicability, Capability, Diagnostic, File, Fragment, Incomplete, Options, Project, RunScope,
+    Severity,
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -94,6 +95,10 @@ pub struct Ctx<'a> {
     pub trusted: bool,
     /// Values the rules of this run share, so that each is computed once.
     pub memo: &'a Memo,
+    /// What code the rule being run may report on: its decision's scope as
+    /// the project's configuration left it. The engine drops the files that
+    /// are out before the rule runs; a rule drops the symbols that are.
+    pub applies: Applicability,
 }
 
 /// Layout conventions a language declares; the engine applies them to every file of that language.
@@ -208,6 +213,8 @@ pub struct RuleManifest {
     pub docs: String,
     pub analyzers: Vec<String>,
     pub capabilities: Vec<Capability>,
+    /// What code the rule's subjects may be in, from its decision's scope.
+    pub applicability: Applicability,
 }
 
 /// A check that turns facts into diagnostics. `validate` rejects bad options

@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: file-order
 spec:
   title: Read from behavior to machinery
-  intent: The top of a cohesive implementation states what it does.
+  context: >-
+    The top of a cohesive implementation states what it does.
   scope:
     domain: code
     subject: file

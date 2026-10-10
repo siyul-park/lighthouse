@@ -8,21 +8,33 @@ metadata:
     lighthouse/section: naming
   annotations:
     lighthouse/was-builtin: design/no-redundant-qualifiers
+    lighthouse/was-exceptions: " A name equal to its package or module name (`provider.Provider`, `list.List`, `time.Time`) is the package's primary concept; repeating it has meaning and is never reported."
 spec:
   title: No redundant qualifiers
-  intent: "Context already names the package, receiver, phase, or representation."
+  context: >-
+    Context already names the package, receiver, phase, or representation.
+
+    Go: The package name, as the importing code writes it, repeated at the
+    start of a longer exported name: `provider.ProviderOptions`,
+    `sdk.SDKFrame`. Whole words only (`provider.Providence` is fine).
+
+    Rust: Off by default (`kinds` is empty): the path callers write is the
+    crate's public path, and the provider cannot say whether a public item
+    is reached through its module (`store::StoreHandle`) or re-exported
+    from the crate root (`crate::StoreHandle`), where the module name is
+    not repeated. Set `kinds` to check the name of the module, the last
+    component of its path, as a prefix or suffix of a longer public item
+    name; the root module of a crate is matched by the crate name as a
+    whole.
   scope:
     domain: code
     subject: symbol
   requirement: >-
-    Package, receiver, phase, or representation MUST NOT be repeated in a name
-    without meaning.
+    Package, receiver, phase, or representation MUST NOT be repeated in a
+    name without meaning. A name equal to its package or module name
+    (`provider.Provider`, `list.List`, `time.Time`) is the package's
+    primary concept; repeating it has meaning and is never reported.
   severity: warn
-  evidence: [name, repeated]
-  exceptions: >-
-    A name equal to its package or module name (`provider.Provider`,
-    `list.List`, `time.Time`) is the package's primary concept; repeating it has
-    meaning and is never reported.
   options:
     type: object
     properties:
@@ -34,34 +46,18 @@ spec:
           Rust: see its tuning.
     additionalProperties: false
   languages:
-    go:
-      tuning: >-
-        The package name, as the importing code writes it, repeated at the start
-        of a longer exported name: `provider.ProviderOptions`, `sdk.SDKFrame`.
-        Whole words only (`provider.Providence` is fine).
     rust:
       options:
         kinds: []
-      tuning: >-
-        Off by default (`kinds` is empty): the path callers write is the crate's
-        public path, and the provider cannot say whether a public item is
-        reached through its module (`store::StoreHandle`) or re-exported from
-        the crate root (`crate::StoreHandle`), where the module name is not
-        repeated. Set `kinds` to check the name of the module, the last
-        component of its path, as a prefix or suffix of a longer public item
-        name; the root module of a crate is matched by the crate name as a
-        whole.
   check:
     type: cel
-    select: symbol
     with:
       - name: repeated
         expr: >-
           symbol.module_forms.filter(f, f.key != ''
             && (symbol.name_key.startsWith(f.key + '_') || symbol.name_key.endsWith('_' + f.key)))
     where: >-
-      !symbol.file_test && !symbol.generated && !symbol.test
-      && symbol.owner == '' && symbol.visibility != 'private'
+      symbol.owner == '' && symbol.visibility != 'private'
       && options.kinds.exists(k, k == symbol.kind)
       && !(symbol.kind == 'function' && symbol.name == 'main')
       && size(repeated) > 0

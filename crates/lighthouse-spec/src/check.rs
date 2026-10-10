@@ -6,6 +6,8 @@ use std::{collections::BTreeMap, time::Duration};
 
 use cel::Program;
 use lighthouse_model::{Capability, RunScope};
+
+use crate::Subject;
 use lighthouse_resource::parse_duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -338,6 +340,18 @@ pub enum Select {
 }
 
 impl Select {
+    /// What a check looks at when it does not say: the subject of the
+    /// decision. A `project` decision has no such default.
+    pub fn of(subject: Subject) -> Option<Self> {
+        match subject {
+            Subject::Symbol => Some(Self::Symbol),
+            Subject::File => Some(Self::File),
+            Subject::Module => Some(Self::Module),
+            Subject::Test => Some(Self::Test),
+            Subject::Project => None,
+        }
+    }
+
     /// Edges and modules are judged once over the project; the rest per file.
     pub fn scope(self) -> RunScope {
         match self {
@@ -378,7 +392,10 @@ impl Select {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct CelCheck {
-    pub select: Select,
+    /// What the check looks at. Default: what the decision's `scope.subject`
+    /// is about; a decision about the project says which it looks at.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub select: Option<Select>,
     /// Named intermediate values, evaluated in order before `where`; each
     /// expression sees the ones before it.
     #[serde(default, rename = "with", skip_serializing_if = "Vec::is_empty")]
@@ -437,6 +454,12 @@ pub struct Identity {
 }
 
 impl CelCheck {
+    /// What the check looks at for a decision about `subject`: its `select`,
+    /// else the subject's own; `None` for a project decision that names none.
+    pub fn selects(&self, subject: Subject) -> Option<Select> {
+        self.select.or_else(|| Select::of(subject))
+    }
+
     /// The first expression that does not compile, described.
     pub(crate) fn problem(&self) -> Option<String> {
         let compile = |what: &str, source: &str| {

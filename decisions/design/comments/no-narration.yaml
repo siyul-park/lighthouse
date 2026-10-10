@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: comments
 spec:
   title: Comments do not narrate
-  intent: Narration repeats the code and goes stale.
+  context: >-
+    Narration repeats the code and goes stale.
   scope:
     domain: code
     subject: symbol
@@ -17,7 +18,6 @@ spec:
     explain obvious behavior; a better name, type, or structure SHOULD be
     preferred.
   severity: info
-  evidence: [comment, restated_identifiers]
   check:
     type: model
   examples:

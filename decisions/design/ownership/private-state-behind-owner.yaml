@@ -10,7 +10,12 @@ metadata:
     lighthouse/was-enforcement: mechanical
 spec:
   title: Private state stays behind its owner
-  intent: State reachable from anywhere cannot keep an invariant.
+  context: >-
+    State reachable from anywhere cannot keep an invariant.
+
+    Go: An unexported implementation component may access its exported
+    owner's private fields; unrelated same-package code uses the owner's
+    methods.
   scope:
     domain: code
     subject: symbol
@@ -20,11 +25,5 @@ spec:
     responsibility; unrelated code in the same package MUST use the owner's
     contract.
   severity: warn
-  evidence: [owner, accessor, member]
-  languages:
-    go:
-      tuning: >-
-        An unexported implementation component may access its exported owner's
-        private fields; unrelated same-package code uses the owner's methods.
   check:
     type: model

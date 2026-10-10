@@ -8,10 +8,12 @@ metadata:
     lighthouse/section: evidence
 spec:
   title: Golden output is independent
-  intent: Golden output produced by the implementation only proves it is stable.
+  context: >-
+    Golden output produced by the implementation only proves it is stable.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     Golden tests MUST define expected low-level output independently of the
     implementation that produced it, with the required complete output and

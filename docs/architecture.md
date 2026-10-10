@@ -28,24 +28,22 @@ out-of-process plugins satisfy the same traits. Every kind describes itself thro
 
 | Kind | Manifest | Behavior |
 | --- | --- | --- |
-| `Plugin` | `PluginManifest { id, version }` | `languages`, `analyzers`, `rules`, `presets`, `fixers`, `order_keys` |
+| `Plugin` | `PluginManifest { id, version }` | `languages`, `analyzers`, `rules`, `fixers`, `order_keys` |
 | `LanguageProvider` | `ProviderManifest { id, globs, conventions, capabilities, fallback, priority }` | `index` |
 | `Analyzer` | `AnalyzerManifest { id, requires, scope }` | `run` |
-| `Rule` | `RuleManifest { id, severity, scope, description, docs, analyzers, capabilities, citation, strict }` | `validate`, `check` |
-| `Preset` | `PresetManifest { id, rules }` (pure data) | none |
+| `Rule` | `RuleManifest { id, severity, scope, description, docs, analyzers, capabilities, applicability }` | `validate`, `check` |
 | `Fixer` | `FixerManifest { id, requires }` | `fix` |
-| `OrderKey` | `OrderKeyManifest { id, description }` | `rank` |
+| `OrderKey` | `OrderKeyManifest { id, description }` | `rank` (runtime only: no resource) |
 
 The `initialize` result of a plugin process is its `PluginManifest` plus one
 `ProviderManifest` per language, field for field (see
 [plugin-protocol.md](plugin-protocol.md)).
 
-Dependency direction runs from the general to the specific:
-`model` ← `plugin` (contracts) ← `protocol` (wire types) ← `rpc` (host and the only
-wire-to-model conversion) ← `engine` ← `cli`. The wire model is separate from the
-core model: renaming a core field is not a protocol change. `store` knows only
-`model` (artifact-neutral records), and `report` knows `model` and the decision
-catalog in `spec`.
+Dependencies point down only (see [Crates](#crates)): `spec` and `plugin` never depend on each other, `plugin` knows no configuration, and protocol stays dependency-free.
+The wire model is separate from the core model: renaming a core field is not a
+protocol change. The bridge from a decision to its `Rule` (`rule_manifest`, option
+resolution) lives in `checks`; `spec` only describes. `engine` takes the catalog it runs
+over, for the projects `extends` names and for which decisions are in force.
 
 ## Analysis scope and report scope
 
@@ -89,21 +87,18 @@ spec: { ... }
 
 | Kind | Holds | Lives in |
 | --- | --- | --- |
-| `Decision` | a decision: `title intent scope requirement status supersedes consequences severity evidence exceptions options languages check fix citation strict examples` | `decisions/<pack>/<section>/<name>.yaml`, `.lighthouse/decisions/` |
-| `DecisionOverride` | a project's adjustment of a decision of a lower layer (`extends`) | `.lighthouse/decisions/` |
+| `Decision` | a decision: `title context scope requirement status supersedes consequences severity options languages check fix provenance examples` | `decisions/<pack>/<section>/<name>.yaml`, `.lighthouse/decisions/` |
 | `Pack` | title, intro and the ordered sections, each listing its decisions | `decisions/<pack>/pack.yaml` |
 | `SourceMap` | which decision covers each normative line of the documents a catalog came from | `decisions/sources.yaml` |
-| `Project` | `lighthouse.toml`: `plugins extends languages rules overrides` | project root |
-| `Preset` | named rule configuration (`extends`, `rules`); the `recommended` and `strict` presets of a plugin are derived from its decisions | in code |
+| `Project` | `lighthouse.toml`: `plugins extends languages rules overrides generated`; also a shareable configuration, which `extends` names like an ESLint shareable config. `<pack>/recommended` and `<pack>/strict` are Projects derived from the decisions (a decision joins `strict` by the label `lighthouse/preset: strict`); a catalog layer may hold more | project root, `.lighthouse/decisions/` |
 | `Plugin` | `lighthouse-plugin.toml`: `runtime {command, args}` and `provides` | plugin directory |
-| `OrderKey` | a way to order declarations for a `reorder` fix | in code |
 | `Verdict` | a record of the decision log | `.lighthouse/decisions.jsonl` |
 
-Conventions: keys are lowerCamelCase (option names inside a decision stay as the
-decision authors them), durations are strings (`30s`), enums are lowercase kebab,
+Conventions: keys are lowerCamelCase, option names included (`hubFanIn`; `spec migrate`
+converts the old snake_case), durations are strings (`30s`), enums are lowercase kebab,
 paths are relative with `/`. A decision belongs to a pack and section by its
 labels; the `Pack` document only orders them, so where the file lies carries no
-meaning. `scope` is `{domain, subject}` (`domain` is `code`). `options` is a JSON
+meaning. `scope` is `{domain, subject, generated, tests}` (`domain` is `code`; `generated: true` makes generated code a subject, default false; `tests: exclude|include|only`, default `exclude`, set explicitly where a decision is about tests or covers them). The host tells generated code apart once (the provider's marker such as Go's `// Code generated ... DO NOT EDIT.`, `.gitattributes` `linguist-generated`, the project's `[generated] files`) and the engine leaves out the subjects the scope excludes before any check runs, so no expression guards against `generated` or `test`. A project overrides it with `[generated] check = "skip"|"include"` for all decisions, or `rules."<id>".generated = true|false` for one. A `cel` check's `select` defaults to the scope's subject. `options` is a JSON
 Schema object (`type`, `default`, `description` per property, closed with
 `additionalProperties: false`); `languages.<id>` holds the option values and the
 wording of one language. `check` and `fix` choose a provider by `type`: `check` is
@@ -115,12 +110,23 @@ The JSON Schema (2020-12) of each kind is generated from the Rust types into
 writes all; a test fails when the files are stale). Documents carry a
 `# yaml-language-server: $schema=...` comment so editors validate them.
 `lighthouse spec validate [paths]` checks each document against its schema and
-against the others (presets and rules name things that exist, fix operations name
+against the others (extended projects and rules name things that exist, fix operations name
 registered order keys, CEL compiles, examples are well formed; `--examples` also
 runs them). `lighthouse spec migrate [paths]` rewrites the formats from before the
 model (decision files of the earlier format, `pack.yaml` with `section.yaml`, rule files, `sources.yaml`,
-`lighthouse.toml`, `lighthouse-plugin.toml`, `.lighthouse/rules`) and leaves a
-document that already has an `apiVersion` alone, so it is idempotent. Readers
+`lighthouse.toml`, `lighthouse-plugin.toml`, `.lighthouse/rules`) and, for documents that already have
+an `apiVersion`, the shapes Revision 27 and 28 retired: a `Preset` becomes a `Project`; a `DecisionOverride`
+is folded into the `rules` of the project that owns its `.lighthouse` directory (level and options;
+one that says more, such as wording or examples, stays and is reported: write a local decision);
+`intent` and `rationale` become `context`, a language's `tuning` is appended to it; `exceptions` are appended
+to the `requirement`; `citation` becomes `provenance.wasDerivedFrom`; the declared `evidence` goes (the check
+says what it emits); `strict` becomes a label; a `select` that repeats the scope goes; option names become
+camelCase, in the decision and in the `rules` of a project. It is idempotent.
+Meaning versions do not move: a migrated decision records the text it appended in
+`lighthouse/was-exceptions`, and `Decision::earlier_versions` includes the meaning
+hashed before (requirement without the appended text, the scope without applicability,
+snake_case option names), so recorded verdicts survive; `legacy_semantic_version`
+undoes the same changes. Readers
 accept the new format only, and say so: a project that still has `.lighthouse/rules`,
 a catalog of the earlier format or a configuration without an envelope fails to load
 with a pointer to `lighthouse spec migrate`. TOML comments are not preserved by the
@@ -163,13 +169,13 @@ authored severities: mechanical is `error`, heuristic `warn`, judgment `info`.)
 Every implemented rule belongs to a catalog decision whose `check` is
 one provider of the union `builtin | cel | command | rpc | model`, with the common fields `requires` and `timeout`:
 
-- `builtin` is a standard, decision-agnostic operation (`order`, `proximity`, `cycle`) or, for the two rules the engine reports itself (`core/annotation-reason`, `core/unused-allow`), a rule registered by name.
+- `builtin` is a standard, decision-agnostic operation (`order`, `proximity`, `cycle`) or, for the two rules the engine reports itself (`core/annotation-reason`, `core/unused-allow`), a rule named by `id`.
 - `cel` is an expression over the code model, written in the decision, with the standard function library `metrics callers callees edges owner tests annotations rank exposed` and the text helpers `lines trim trimPrefixes trimSuffixes trimLeft trimRight leadingRun drop`.
 - `command` runs a program under the process contract: argv without a shell, `{file}`/`{files}`/`{rule}` filling whole arguments, `batch: file|all`, exit `0` clean, `1` findings (stdout lines, an optional `path:line[:col]: ` prefix), anything else an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script. A command is not sandboxed: it runs with the user's privileges, in the project root, with an environment cleared to `PATH`, `LANG`, `TMPDIR` and the declared `env` (no `HOME`) plus `LIGHTHOUSE_*`. Trust is the only protection; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean.
 - `rpc` is reserved until plugin protocol 0.2 and refused at load.
 - `model` hands the decision to agent review (`select` and `prompt` optional); it is not deterministic and caps the severity at `warn`.
 
-A decision with no `check` is documentation. How a decision is checked is not part of what it means: the *meaning version* hashes requirement, severity, scope and options, and the `check_revision` records the check on findings and verdicts without ever expiring one.
+A decision with no `check` is documentation. How a decision is checked is not part of what it means: the *meaning version* hashes requirement, severity, scope (with its applicability) and options, and the `check_revision` records the check on findings and verdicts without ever expiring one.
 
 ```yaml
 check:
@@ -197,7 +203,7 @@ plugin the configuration lists.
 
 Language specifics stay out of the rules: provider facts (symbols, owners,
 visibility, spans, comments) are the same everywhere, and per-language option
-defaults and tuning prose in the decision realize a rule per language.
+defaults in the decision realize a rule per language; the context says what each language makes of it.
 
 ## Incomplete analysis
 
@@ -342,7 +348,7 @@ since has no legacy version.
 
 A verdict is a review event: the finding's fingerprint, rule id, `rule_version` (the
 *meaning* version of the decision: a hash of its requirement, severity, scope and options,
-not of its check, prose, examples or tuning notes), `check_revision` (a hash of the
+not of its check, prose or examples), `check_revision` (a hash of the
 `check`, recorded for evaluation and never compared to expire a verdict), `decision_hash` (the whole
 decision definition), `catalog_version`, the Lighthouse version, a nullable
 `pattern_fingerprint` (code-shape identity, filled by the similarity index), the
@@ -447,7 +453,7 @@ design/private-helper-callers  info (heuristic)  src/lib.rs:5:1
   owner:       demo::clamp#function
   message:     private function clamp has one caller (run); review whether ...
   requirement: A private helper SHOULD have at least two callers.
-  intent:      A private helper with one caller is usually part of that caller.
+  context:     A private helper with one caller is usually part of that caller.
   evidence:    caller=demo::run#function callers=1 statements=3
   expected:    valid rust example `rust-valid` (src/lib.rs), canonical
                  pub fn run(x: u8) -> u8 { ... }
@@ -455,12 +461,12 @@ design/private-helper-callers  info (heuristic)  src/lib.rs:5:1
   resolve:     lighthouse review resolve 395d1985afe8 --verdict <verdict> --reason <reason> --reviewer-kind agent
 ```
 
-The requirement and intent come from the catalog. The expected structure is a valid
+The requirement and context come from the catalog. The expected structure is a valid
 example of the decision for the file's language, at most 12 lines and 600 characters,
 chosen in this order, and the block says why: the example marked `canonical` (at most
 one per language and kind, enforced by the catalog validation); a valid example whose name
 or whose invalid counterpart's name mentions the kind or visibility of the finding's
-symbol; the shortest valid example; the decision's tuning note for the language. Evidence
+symbol; the shortest valid example. Evidence
 that repeats the owner symbol is left out and long values are cut. Fingerprints are
 shown as 12-character prefixes, longer when two shown findings would collide, and the
 store accepts any unambiguous prefix. Only findings that ask for a verdict carry a
@@ -686,20 +692,19 @@ fix:
 ## Crates
 
 Dependencies point down; the only exceptions are marked and go away with the
-move of the project model into `spec` (`spec` → `plugin`, `plugin` → `config`).
+move of the project model into `spec` (`spec` → `plugin`, `plugin` → `config`), and `lighthouse-config` is now `spec::project`.
 
 ```
 L5  cli, mcp                  -> session, report            (nothing else: no store, registry or engine)
 L4  session                   -> every layer below          (composition root; owns every legacy reader: `migrate`)
     report                    -> model, spec
 L3  store                     -> model, resource            (findings, verdicts, the decision log)
-L2  engine                    -> plugin, config, spec, model, process   (analysis, fix orchestration, rule tester)
+L2  engine                    -> plugin, spec, model, process   (analysis, fix orchestration, rule tester)
     checks                    -> plugin, spec, model, process, resource (declarative checks, metrics, order keys,
                                                                        the bundled registry derived from the catalog's packs)
-    rpc                       -> plugin, config, protocol, process, model, resource  (language plugins as processes)
-L1  plugin                    -> model, config, resource    (SPI and Registry)
-    spec                      -> model, plugin, resource    (decision kinds, Catalog, local layer)
-    config                    -> model, resource            (Project, rule levels, overrides)
+    rpc                       -> plugin, spec, protocol, process, model, resource  (language plugins as processes)
+L1  plugin                    -> model                      (SPI and Registry)
+    spec                      -> model, resource            (decision kinds, Catalog, local layer, `spec::project`)
 L0  model, resource, protocol, process   (no workspace dependencies)
 ```
 
@@ -744,7 +749,7 @@ See [agents.md](agents.md).
 ## Dogfooding
 
 Lighthouse checks its own sources. The repository's `lighthouse.toml` enables the
-bundled `core`, `design` and `testing` plugins with their recommended presets (`<plugin>/strict` adds the advice that is too noisy to recommend, such as `design/private-helper-callers`) and
+bundled `core`, `design` and `testing` plugins with their recommended projects (`<plugin>/strict` adds the advice that is too noisy to recommend, such as `design/private-helper-callers`) and
 the Go and Rust plugins built by `make plugins`, and `make lint` (part of `make ci`)
 ends with `lighthouse check .`, which must exit 0: a finding is either fixed in the code, or it exposes a rule or
 provider that is imprecise, and that is fixed instead of silenced. The only

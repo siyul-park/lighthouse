@@ -21,7 +21,7 @@ judged intentional is remembered with its reason and is not raised again.
    A group says once what its decision requires and what the code should look
    like (`expected`), plus the evidence all its findings share; a finding is
    `[line:col, message, fingerprint prefix]` with the evidence that sets it
-   apart as an optional fourth element. For more (the intent, every example),
+   apart as an optional fourth element. For more (the context, every example),
    read the decision: MCP resource `lighthouse://decisions/<id>`, tool
    `explain`, or `lighthouse explain <id>`. `detail: "full"` (`--detail full`)
    returns one self-contained record per finding instead.
@@ -63,7 +63,7 @@ judged intentional is remembered with its reason and is not raised again.
 Do not memorize decision text; ask for it when a finding names a rule.
 
 - `decision_list` lists decisions; `lighthouse://catalog` is the index.
-- `lighthouse://decisions/<id>` renders one decision (intent, requirement,
-  examples, exceptions).
+- `lighthouse://decisions/<id>` renders one decision (context, requirement,
+  examples).
 - `lighthouse://config` is the effective configuration.
 - `review_history` shows every verdict recorded on a finding.

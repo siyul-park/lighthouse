@@ -6,7 +6,7 @@ design/coupling-signal  warn  internal/jit/compile.go:350:1
   owner:       jit::compile#function
   message:     function coordinates 14 collaborators in its package
   requirement: Coupling SHOULD be judged from direct intra-package fan-in and fan-out, that is the functions and methods of the same package that call a symbol or are called by it, against deliberately high thresholds. Calls from other packages and from tests do not count: a widely used public function is a service, not a hub.
-  intent:      A dependency hub changes for many reasons.
+  context:     A dependency hub changes for many reasons. Rust: The unit is the Rust module (a `mod` and every inline module are distinct units). Methods count with their impl's type; calls through a receiver whose type is not written in the code are not seen, so fan counts are lower bounds.
   evidence:    callees=["a","b c"] fan_in=2 fan_out=14
   expected:    valid go example `ordinary-fan` (sample.go), canonical
                  package sample
@@ -28,7 +28,7 @@ design/private-helper-callers  info  src/lib.rs:7:1
   owner:       m::helper#function
   message:     private helper has one caller
   requirement: A private helper SHOULD have at least two callers.
-  intent:      A private helper with one caller is usually part of that caller.
+  context:     A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count. Forwarding wrappers are reported by `design/single-use-wrapper`, and a function used as a value is not judged. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.
   expected:    valid rust example `rust-valid` (src/lib.rs), canonical
                  pub fn run(x: u8) -> u8 {
                      clamp(x) + 1

@@ -69,7 +69,7 @@ pub struct Provides {
 
 /// A plugin manifest: the `Plugin` document of a plugin directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PluginManifest {
+pub struct ProcessManifest {
     /// `metadata.name`; must equal the id the plugin reports.
     pub id: String,
     pub version: String,
@@ -80,7 +80,7 @@ pub struct PluginManifest {
     pub provides: Provides,
 }
 
-impl PluginManifest {
+impl ProcessManifest {
     /// Reads a parsed `Plugin` document.
     pub fn from_resource(plugin: lighthouse_resource::Resource<PluginSpec>) -> Self {
         let lighthouse_resource::Resource { metadata, spec } = plugin;
@@ -106,7 +106,7 @@ impl PluginManifest {
 /// A manifest and the directory it was found in.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Found {
-    pub manifest: PluginManifest,
+    pub manifest: ProcessManifest,
     pub dir: PathBuf,
 }
 
@@ -150,7 +150,7 @@ pub fn load(dir: &Path) -> Result<Found, Error> {
 }
 
 /// Parses the text of a manifest.
-pub fn parse(format: Format, path: &str, text: &str) -> Result<PluginManifest, String> {
+pub fn parse(format: Format, path: &str, text: &str) -> Result<ProcessManifest, String> {
     let mut docs = documents(format, path, text).map_err(|e| e.to_string())?;
     if docs.len() != 1 {
         return Err(format!(
@@ -159,7 +159,7 @@ pub fn parse(format: Format, path: &str, text: &str) -> Result<PluginManifest, S
         ));
     }
     resource::<PluginSpec>(path, &docs.remove(0))
-        .map(PluginManifest::from_resource)
+        .map(ProcessManifest::from_resource)
         .map_err(|e| e.to_string())
 }
 

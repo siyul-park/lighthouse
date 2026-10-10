@@ -18,7 +18,7 @@ use crate::{Result, Session, findings, git};
 /// What to fix. At least one of `paths`, `fingerprints` and `rules` narrows a
 /// run from the whole project.
 #[derive(Default)]
-pub struct FixRequest {
+pub struct FixSelection {
     pub paths: Vec<PathBuf>,
     /// Fingerprints or unambiguous prefixes.
     pub fingerprints: Vec<String>,
@@ -85,7 +85,7 @@ pub fn fix_plan(catalog: &Catalog) -> FixPlan {
 /// Fixes what `request` selects. With `dry_run` nothing is left changed and
 /// nothing is recorded; otherwise every applied fix is recorded and the
 /// findings it removed are resolved in the store.
-pub fn fix(session: Session, request: &FixRequest) -> Result<Fixed> {
+pub fn fix(session: Session, request: &FixSelection) -> Result<Fixed> {
     let (registry, plugins) = session.registry()?;
     let trusted = session.trusted();
     let root = session.root.clone();

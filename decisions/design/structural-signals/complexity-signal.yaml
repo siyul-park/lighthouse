@@ -8,27 +8,34 @@ metadata:
     lighthouse/section: structural-signals
   annotations:
     lighthouse/was-builtin: design/complexity-signal
+    lighthouse/was-exceptions: " A body that is one switch whose every arm is a single return is a table in code form and is not reported. A body whose only top-level branching is one switch of any arms, nested at most two levels, is a flat dispatch: its many paths do not make it hard to follow, so only cognitive complexity can report it."
 spec:
   title: Complexity is a review signal
-  intent: High complexity often marks a symbol doing too much.
+  context: >-
+    High complexity often marks a symbol doing too much.
+
+    Rust: `if`, `else if`, `if let`, `let ... else`, `while`, `for` and
+    `loop` count as in other languages; a `match` counts its arms other
+    than a wildcard or binding arm; `?` adds nothing; closures and `async`
+    blocks nest what they contain. A function that is one `match` whose
+    arms are single values (in return position) or `return`s is a table in
+    code form and is not reported.
   scope:
     domain: code
     subject: symbol
   requirement: >-
     Complexity SHOULD be judged from cyclomatic complexity together with
-    statement count and nesting depth, against deliberately high thresholds.
-    Cyclomatic complexity is one path plus each `if`, `else if`, loop, error
-    handler clause, non-default switch arm and boolean operator (`&&`, `||`);
-    nesting counts the deepest level of nested constructs, a flat body being 0,
-    and nested functions count as a level.
+    statement count and nesting depth, against deliberately high
+    thresholds. Cyclomatic complexity is one path plus each `if`, `else
+    if`, loop, error handler clause, non-default switch arm and boolean
+    operator (`&&`, `||`); nesting counts the deepest level of nested
+    constructs, a flat body being 0, and nested functions count as a
+    level. A body that is one switch whose every arm is a single return is
+    a table in code form and is not reported. A body whose only top-level
+    branching is one switch of any arms, nested at most two levels, is a
+    flat dispatch: its many paths do not make it hard to follow, so only
+    cognitive complexity can report it.
   severity: warn
-  evidence: [cyclomatic, cognitive, statements, nesting]
-  exceptions: >-
-    A body that is one switch whose every arm is a single return is a table in
-    code form and is not reported. A body whose only top-level branching is one
-    switch of any arms, nested at most two levels, is a flat dispatch: its many
-    paths do not make it hard to follow, so only cognitive complexity can report
-    it.
   options:
     type: object
     properties:
@@ -40,15 +47,15 @@ spec:
         type: integer
         default: 30
         description: "Statement count that, with `cyclomatic`, marks high complexity."
-      structural_cyclomatic:
+      structuralCyclomatic:
         type: integer
         default: 10
         description: Cyclomatic complexity of the structural signal.
-      structural_statements:
+      structuralStatements:
         type: integer
         default: 25
         description: Statement count of the structural signal.
-      structural_nesting:
+      structuralNesting:
         type: integer
         default: 5
         description: "Nesting depth of the structural signal; a flat body is 0."
@@ -56,22 +63,13 @@ spec:
         type: integer
         default: 30
         description: >-
-          Cognitive complexity that, with `cognitive_statements`, marks a
+          Cognitive complexity that, with `cognitiveStatements`, marks a
           hard-to-follow body.
-      cognitive_statements:
+      cognitiveStatements:
         type: integer
         default: 30
         description: Statement count of the cognitive signal.
     additionalProperties: false
-  languages:
-    rust:
-      tuning: >-
-        `if`, `else if`, `if let`, `let ... else`, `while`, `for` and `loop`
-        count as in other languages; a `match` counts its arms other than a
-        wildcard or binding arm; `?` adds nothing; closures and `async` blocks
-        nest what they contain. A function that is one `match` whose arms are
-        single values (in return position) or `return`s is a table in code form
-        and is not reported.
   check:
     type: cel
     select: function
@@ -79,21 +77,20 @@ spec:
       - name: m
         expr: metrics(func)
       - name: cognitive
-        expr: m.cognitive >= options.cognitive && m.statements >= options.cognitive_statements
+        expr: m.cognitive >= options.cognitive && m.statements >= options.cognitiveStatements
       - name: verdict
         expr: >-
           m.flat_dispatch
           ? (cognitive ? 'high cognitive complexity' : '')
           : (m.cyclomatic >= options.cyclomatic && m.statements >= options.statements)
           ? 'high complexity'
-          : (m.cyclomatic >= options.structural_cyclomatic
-             && m.statements >= options.structural_statements
-             && m.nesting >= options.structural_nesting)
+          : (m.cyclomatic >= options.structuralCyclomatic
+             && m.statements >= options.structuralStatements
+             && m.nesting >= options.structuralNesting)
           ? 'high structural complexity'
           : cognitive ? 'high cognitive complexity' : ''
     where: >-
-      !func.file_test && !func.generated && !func.test
-      && (func.kind == 'function' || func.kind == 'method')
+      (func.kind == 'function' || func.kind == 'method')
       && m.measured && !m.dispatcher && verdict != ''
     message: >-
       function {{ func.name }} has {{ verdict }}: cyclomatic={{ m.cyclomatic }}
@@ -105,7 +102,9 @@ spec:
       nesting: m.nesting
     identity:
       subject: func.id
-  citation: "McCabe 1976; Campbell, Cognitive Complexity (SonarSource 2018)"
+  provenance:
+    wasDerivedFrom:
+      - "McCabe 1976; Campbell, Cognitive Complexity (SonarSource 2018)"
   examples:
     - name: many-branches
       language: go
@@ -123,7 +122,7 @@ spec:
       kind: invalid
       options:
         cognitive: 6
-        cognitive_statements: 6
+        cognitiveStatements: 6
       files:
         - path: sample.go
           body: "package sample\n\nfunc scan(rows [][]int) int {\n\ttotal := 0\n\tfor _, row := range rows {\n\t\tfor _, v := range row {\n\t\t\tif v > 0 {\n\t\t\t\ttotal += v\n\t\t\t}\n\t\t}\n\t}\n\treturn total\n}"
@@ -173,7 +172,7 @@ spec:
       kind: invalid
       options:
         cognitive: 6
-        cognitive_statements: 6
+        cognitiveStatements: 6
       files:
         - path: src/lib.rs
           body: |-

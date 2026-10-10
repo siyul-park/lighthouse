@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: ownership
 spec:
   title: Borrowed values stay within their boundary
-  intent: A borrowed value that escapes its owner dangles or aliases.
+  context: >-
+    A borrowed value that escapes its owner dangles or aliases.
   scope:
     domain: code
     subject: symbol

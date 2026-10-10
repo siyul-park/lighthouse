@@ -76,6 +76,39 @@
         }
       ]
     },
+    "GeneratedCheck": {
+      "description": "Whether decisions check generated code.",
+      "enum": [
+        "skip",
+        "include"
+      ],
+      "type": "string"
+    },
+    "GeneratedSpec": {
+      "additionalProperties": false,
+      "description": "What a project says about generated code.",
+      "properties": {
+        "check": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GeneratedCheck"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`skip`: no decision checks generated code; `include`: every decision\ndoes. Unset, each decision's own scope says. A rule's `generated`\nsetting wins over both."
+        },
+        "files": {
+          "description": "Globs of project-relative paths that are generated code.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "Level": {
       "description": "A level a project can set: a severity, or `off`, which only\nconfiguration has.",
       "enum": [
@@ -206,6 +239,10 @@
           },
           "type": "array"
         },
+        "generated": {
+          "$ref": "#/$defs/GeneratedSpec",
+          "description": "Which files are generated code, beyond what the providers and\n`.gitattributes` say, and whether it is checked."
+        },
         "languages": {
           "additionalProperties": {
             "$ref": "#/$defs/ProjectLanguage"
@@ -241,6 +278,13 @@
       "additionalProperties": false,
       "description": "A level with options.",
       "properties": {
+        "generated": {
+          "description": "Check generated code with this rule (`true`) or not (`false`),\nwhatever the decision's scope and the project's `generated.check` say.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "level": {
           "$ref": "#/$defs/Level"
         },

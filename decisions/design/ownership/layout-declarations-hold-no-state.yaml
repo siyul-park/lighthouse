@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: ownership
 spec:
   title: Layout declarations hold no runtime state
-  intent: Pure layout can be shared without sharing ownership.
+  context: >-
+    Pure layout can be shared without sharing ownership.
   scope:
     domain: code
     subject: symbol

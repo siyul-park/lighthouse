@@ -350,7 +350,7 @@ fn fixes_stop_after_a_bounded_number_of_rounds() {
             decision: FixDecision {
                 id: "grow/todo".to_owned(),
                 requirement: String::new(),
-                intent: String::new(),
+                context: String::new(),
             },
             unsupported: None,
         },

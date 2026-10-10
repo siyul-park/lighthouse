@@ -97,6 +97,7 @@ impl Fold {
             json!({ "level": level, "options": options })
         };
         rules.insert(self.id.clone(), rule);
+        super::modern::rename_rule_options(rules);
         Ok(())
     }
 }

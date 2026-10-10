@@ -8,10 +8,12 @@ metadata:
     lighthouse/section: contract
 spec:
   title: Tests show the public contract
-  intent: A test that documents internals breaks when internals change.
+  context: >-
+    A test that documents internals breaks when internals change.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: A test MUST show public usage and promised behavior.
   severity: info
   check:

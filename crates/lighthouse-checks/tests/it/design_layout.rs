@@ -82,12 +82,12 @@ fn constructors_come_first_within_a_type_when_asked() {
     w.member(&ty, "new", SymbolKind::Method, "m/a.ucm");
     let options = json!({
         "groups": ["type"],
-        "constructor_prefixes": ["new"],
-        "constructors_first": true,
+        "constructorPrefixes": ["new"],
+        "constructorsFirst": true,
     });
     let found = w.check(GROUPS, options);
     assert_eq!(w.names(&found), ["new"]);
-    let relaxed = json!({ "groups": ["type"], "constructor_prefixes": ["new"] });
+    let relaxed = json!({ "groups": ["type"], "constructorPrefixes": ["new"] });
     assert!(w.check(GROUPS, relaxed).is_empty());
 }
 
@@ -126,7 +126,7 @@ fn close_tolerates_other_visibility_groups_unless_told_not_to() {
         w.check(CLOSE, json!({})).is_empty(),
         "a private method of B is in B's group"
     );
-    let strict = w.check(CLOSE, json!({ "visibility_groups": false }));
+    let strict = w.check(CLOSE, json!({ "visibilityGroups": false }));
     assert_eq!(w.names(&strict), ["Two"]);
 }
 
@@ -206,7 +206,7 @@ fn callers_ignore_test_callers_and_can_ask_for_the_last_caller() {
     w.edge(EdgeKind::Calls, &first, &leaf);
     w.edge(EdgeKind::Calls, &second, &leaf);
     assert!(w.check(CALLERS, json!({})).is_empty());
-    let strict = w.check(CALLERS, json!({ "shared_after_last_caller": true }));
+    let strict = w.check(CALLERS, json!({ "sharedAfterLastCaller": true }));
     assert_eq!(w.names(&strict), ["leaf"]);
 }
 
@@ -274,7 +274,7 @@ fn banners_are_tunable_and_skip_generated_files() {
     w.comment("m/a.ucm", 1, "// ---- x");
     w.comment("m/a.ucm", 2, "// -- x");
     w.comment("m/a.ucm", 3, "// REGION x");
-    let options = json!({ "min_run": 2, "labels": ["REGION"] });
+    let options = json!({ "minRun": 2, "labels": ["REGION"] });
     let lines: Vec<u32> = w.check(BANNERS, options).iter().map(|(_, l)| *l).collect();
     assert_eq!(lines, [1, 2, 3]);
     w.files.insert("m/a.ucm".to_owned(), true);

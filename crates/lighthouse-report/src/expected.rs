@@ -7,18 +7,15 @@ use serde_json::Value;
 /// Longest excerpt of an example, in lines and in characters.
 const EXCERPT_LINES: usize = 12;
 const EXCERPT_CHARS: usize = 600;
-/// Longest tuning text, in characters.
-const TUNING_CHARS: usize = 300;
 
 /// A short picture of what the code should look like.
 #[derive(Serialize)]
 pub(crate) struct Expected {
-    /// `example` (a valid example of the decision) or `tuning` (its note for
-    /// the language).
+    /// `example`: a valid example of the decision.
     pub(crate) source: &'static str,
     pub(crate) language: String,
-    /// Why this one: `canonical`, `matches kind=function`, `shortest valid
-    /// example` or `tuning`.
+    /// Why this one: `canonical`, `matches kind=function` or `shortest valid
+    /// example`.
     pub(crate) basis: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) name: Option<String>,
@@ -69,16 +66,7 @@ pub(crate) fn expected(decision: &Decision, subject: &Subject, file: &Path) -> O
     if let Some((example, basis)) = chosen {
         return Some(from_example(example, basis, file));
     }
-    let language = subject.language?;
-    let text = decision.languages.get(language)?.tuning.as_ref()?;
-    Some(Expected {
-        source: "tuning",
-        language: language.to_owned(),
-        basis: "tuning".to_owned(),
-        name: None,
-        path: None,
-        excerpt: truncate(&one_line(text), TUNING_CHARS),
-    })
+    None
 }
 
 /// The valid example that mentions the most of the subject's kind and

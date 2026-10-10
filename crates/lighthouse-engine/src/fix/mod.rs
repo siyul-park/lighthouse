@@ -73,7 +73,7 @@ impl FixPlan {
                     decision: FixDecision {
                         id: decision.id().to_owned(),
                         requirement: decision.requirement.clone(),
-                        intent: decision.intent.clone(),
+                        context: decision.context.clone(),
                     },
                     unsupported: matches!(fix.kind, FixKind::Rpc { .. }).then(|| {
                         "the fix of this rule is of kind `rpc`, which is not yet supported"

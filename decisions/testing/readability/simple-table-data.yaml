@@ -8,10 +8,12 @@ metadata:
     lighthouse/section: readability
 spec:
   title: Table data stays simple
-  intent: A table that needs its own logic is no longer a specification.
+  context: >-
+    A table that needs its own logic is no longer a specification.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     Table data and generation code MUST remain simple enough to read as
     specification.

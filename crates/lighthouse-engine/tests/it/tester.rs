@@ -1,5 +1,5 @@
 use lighthouse_engine::RuleTester;
-use lighthouse_model::RunScope;
+use lighthouse_model::{Applicability, RunScope};
 use lighthouse_model::{
     Capability, Diagnostic, EditOp, Fingerprint, FixOutcome, Fragment, Options, Position, Safety,
     Severity, Span,
@@ -143,6 +143,7 @@ impl Plugin for Fake {
                 docs: String::new(),
                 analyzers: Vec::new(),
                 capabilities: Vec::new(),
+                applicability: Applicability::default(),
             },
         })]
     }
@@ -179,11 +180,10 @@ metadata:
     lighthouse/section: s
 spec:
   title: Marker
-  intent: Words are flagged.
+  context: Words are flagged.
   scope: {{ subject: file }}
   requirement: A file MUST NOT contain the marker word.
   severity: warn
-  evidence: [word]
   options:
     type: object
     properties:

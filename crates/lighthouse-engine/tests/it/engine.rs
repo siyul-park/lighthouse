@@ -6,7 +6,7 @@ use std::{
 };
 
 use lighthouse_engine::{Engine, Error};
-use lighthouse_model::RunScope;
+use lighthouse_model::{Applicability, RunScope};
 use lighthouse_model::{
     Capability, Diagnostic, Fingerprint, Fragment, Incomplete, Options, Position, Severity, Span,
 };
@@ -89,6 +89,7 @@ fn meta(
         docs: String::new(),
         analyzers: analyzers.iter().map(|a| (*a).to_owned()).collect(),
         capabilities: capabilities.to_vec(),
+        applicability: Applicability::default(),
     }
 }
 
@@ -760,5 +761,66 @@ fn an_overlaid_check_reads_the_overlay_not_the_disk_and_leaves_the_disk_alone() 
     assert_eq!(
         fs::read_to_string(dir.path().join("a.txt")).unwrap(),
         "on disk"
+    );
+}
+
+/// The files `fake/each` reported on.
+fn reported(dir: &TempDir, toml: &str) -> Vec<String> {
+    let out = engine(dir, toml)
+        .unwrap()
+        .check(&[], &["fake/each".to_owned()])
+        .unwrap();
+    let mut files: Vec<String> = out
+        .diagnostics
+        .iter()
+        .map(|d| d.file.to_string_lossy().into_owned())
+        .collect();
+    files.dedup();
+    files
+}
+
+#[test]
+fn test_code_is_not_a_subject_unless_the_scope_says_so() {
+    let dir = project(&[("a/x.txt", b"1"), ("tests/t.txt", b"2")]);
+
+    assert_eq!(reported(&dir, ALL), ["a/x.txt"]);
+}
+
+#[test]
+fn generated_code_is_told_apart_by_the_host_and_left_out_of_the_subjects() {
+    let dir = project(&[
+        ("a/x.txt", b"1"),
+        ("gen/g.txt", b"2"),
+        ("vendor/v.txt", b"3"),
+        (
+            ".gitattributes",
+            b"gen/** linguist-generated=true\n*.md -linguist-generated\n",
+        ),
+    ]);
+
+    assert_eq!(reported(&dir, ALL), ["a/x.txt", "vendor/v.txt"]);
+    let by_config = format!("{ALL}[generated]\nfiles = [\"vendor/**\"]\n");
+    assert_eq!(reported(&dir, &by_config), ["a/x.txt"]);
+}
+
+#[test]
+fn the_project_decides_whether_generated_code_is_checked() {
+    let dir = project(&[
+        ("a/x.txt", b"1"),
+        ("gen/g.txt", b"2"),
+        (".gitattributes", b"gen/** linguist-generated\n"),
+    ]);
+    let include = "plugins = [\"fake\"]\n[generated]\ncheck = \"include\"\n[rules]\n\"fake/each\" = \"error\"\n";
+    let one_rule =
+        "plugins = [\"fake\"]\n[rules]\n\"fake/each\" = { level = \"error\", generated = true }\n";
+    let skip_over_rule = "plugins = [\"fake\"]\n[generated]\ncheck = \"skip\"\n[rules]\n\"fake/each\" = { level = \"error\", generated = true }\n";
+    let all = ["a/x.txt", "gen/g.txt"];
+
+    assert_eq!(reported(&dir, include), all);
+    assert_eq!(reported(&dir, one_rule), all);
+    assert_eq!(
+        reported(&dir, skip_over_rule),
+        all,
+        "a rule's own setting wins over the project's"
     );
 }

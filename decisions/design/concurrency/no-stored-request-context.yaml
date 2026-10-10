@@ -8,12 +8,12 @@ metadata:
     lighthouse/section: concurrency
 spec:
   title: Request contexts are not stored
-  intent: A request context outliving its request carries stale cancellation.
+  context: >-
+    A request context outliving its request carries stale cancellation.
   scope:
     domain: code
     subject: symbol
   requirement: Request contexts MUST NOT be stored in long-lived objects.
   severity: warn
-  evidence: [type, field]
   check:
     type: model

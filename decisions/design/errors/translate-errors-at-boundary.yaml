@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: errors
 spec:
   title: Translate errors at their boundary
-  intent: "Early translation loses information; late translation leaks layers."
+  context: >-
+    Early translation loses information; late translation leaks layers.
   scope:
     domain: code
     subject: symbol

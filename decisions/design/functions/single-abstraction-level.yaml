@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: functions
 spec:
   title: One abstraction level per function
-  intent: Mixed levels force readers to switch between intent and mechanics.
+  context: >-
+    Mixed levels force readers to switch between intent and mechanics.
   scope:
     domain: code
     subject: symbol

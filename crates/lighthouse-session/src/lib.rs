@@ -23,14 +23,14 @@ mod validate;
 use std::error::Error;
 
 pub use authoring::{Authored, create_decision, update_decision};
-pub use check::{CheckRequest, Checked, Status, Summary, check};
+pub use check::{CheckRequest, Checked, RunStatus, Summary, check};
 pub use decisions::{
     DecisionRow, DecisionTest, active_decisions, bundled_decision_rows, catalog_index,
     decision_rows, decision_text, explain, explain_bundled, test_decisions,
 };
 pub use docs::bundled_docs;
 pub use findings::Remembered;
-pub use fix::{AppliedRow, DeclinedRow, FixRequest, Fixed, fix, fix_plan};
+pub use fix::{AppliedRow, DeclinedRow, FixSelection, Fixed, fix, fix_plan};
 pub use git::head;
 pub use lighthouse_engine::{FailOn, Timings};
 pub use lighthouse_model::{Reason, ReviewerKind, Severity, Verdict};

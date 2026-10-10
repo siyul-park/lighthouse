@@ -6,7 +6,7 @@ use std::{
 use lighthouse_model::{Diagnostic, Incomplete, Position, Severity};
 use lighthouse_spec::{Catalog, Decision, help_path};
 
-use crate::fix::{Fix, FixEdit, utf16_position};
+use crate::fix::{FixEdit, ProposedFix, utf16_position};
 use serde::Serialize;
 
 const SCHEMA: &str = "https://json.schemastore.org/sarif-2.1.0.json";
@@ -192,7 +192,7 @@ pub fn render(
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
     catalog: Option<&Catalog>,
-    fixes: Option<&BTreeMap<String, Fix>>,
+    fixes: Option<&BTreeMap<String, ProposedFix>>,
     sources: Option<&BTreeMap<String, String>>,
 ) -> String {
     let ids: BTreeSet<&str> = diagnostics.iter().map(|d| d.rule_id.as_str()).collect();
@@ -288,7 +288,7 @@ fn rule_ref<'a>(id: &'a str, decision: Option<&'a Decision>) -> RuleRef<'a> {
 fn result<'a>(
     d: &'a Diagnostic,
     rules: &[&str],
-    fix: Option<&'a Fix>,
+    fix: Option<&'a ProposedFix>,
     sources: Option<&BTreeMap<String, String>>,
 ) -> SarifResult<'a> {
     SarifResult {
@@ -325,7 +325,7 @@ fn region(d: &Diagnostic, sources: Option<&BTreeMap<String, String>>) -> Region 
     }
 }
 
-fn sarif_fix(fix: &Fix) -> SarifFix<'_> {
+fn sarif_fix(fix: &ProposedFix) -> SarifFix<'_> {
     SarifFix {
         description: Message {
             text: &fix.description,

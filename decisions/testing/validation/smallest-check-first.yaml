@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: validation
 spec:
   title: Run the smallest falsifying check first
-  intent: Fast feedback finds most problems.
+  context: >-
+    Fast feedback finds most problems.
   scope:
     domain: code
     subject: project

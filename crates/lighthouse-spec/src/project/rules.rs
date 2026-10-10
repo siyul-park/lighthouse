@@ -14,6 +14,9 @@ pub struct RuleConfig {
     /// `None` disables the rule.
     pub level: Option<Severity>,
     pub options: Options,
+    /// Whether generated code is checked by this rule; `None` leaves it to
+    /// the project's `generated.check` and the decision's scope.
+    pub generated: Option<bool>,
 }
 
 /// A level a project can set: a severity, or `off`, which only
@@ -60,12 +63,13 @@ impl RuleSetting {
 impl From<&RuleConfig> for RuleSetting {
     fn from(config: &RuleConfig) -> Self {
         let level = Level::from(config.level);
-        if config.options.is_empty() {
+        if config.options.is_empty() && config.generated.is_none() {
             RuleSetting::Level(level)
         } else {
             RuleSetting::Detailed(RuleDetail {
                 level,
                 options: config.options.clone(),
+                generated: config.generated,
             })
         }
     }
@@ -80,6 +84,10 @@ pub struct RuleDetail {
     /// The decision's options, as its own schema declares them.
     #[serde(default, skip_serializing_if = "Options::is_empty")]
     pub options: Options,
+    /// Check generated code with this rule (`true`) or not (`false`),
+    /// whatever the decision's scope and the project's `generated.check` say.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generated: Option<bool>,
 }
 
 impl From<Level> for Option<Severity> {
@@ -110,10 +118,12 @@ impl From<RuleSetting> for RuleConfig {
             RuleSetting::Level(level) => Self {
                 level: level.into(),
                 options: Options::new(),
+                generated: None,
             },
             RuleSetting::Detailed(detail) => Self {
                 level: detail.level.into(),
                 options: detail.options,
+                generated: detail.generated,
             },
         }
     }
@@ -126,6 +136,7 @@ pub(crate) fn merge(into: &mut Rules, from: &Rules) {
             Some(prev) => {
                 prev.level = next.level;
                 prev.options.extend(next.options.clone());
+                prev.generated = next.generated.or(prev.generated);
             }
             None => {
                 into.insert(id.clone(), next.clone());

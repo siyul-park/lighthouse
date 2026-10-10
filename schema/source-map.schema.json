@@ -28,7 +28,7 @@
       ],
       "type": "object"
     },
-    "Source": {
+    "SourceLine": {
       "additionalProperties": false,
       "description": "One normative line of a source document and where it went.",
       "properties": {
@@ -72,7 +72,7 @@
       "properties": {
         "sources": {
           "items": {
-            "$ref": "#/$defs/Source"
+            "$ref": "#/$defs/SourceLine"
           },
           "type": "array"
         }

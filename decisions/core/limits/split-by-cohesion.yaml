@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: limits
 spec:
   title: Split files by cohesion
-  intent: Splitting by size alone creates arbitrary boundaries.
+  context: >-
+    Splitting by size alone creates arbitrary boundaries.
   scope:
     domain: code
     subject: file

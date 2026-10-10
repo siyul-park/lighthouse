@@ -139,7 +139,7 @@ fn a_file_that_changed_since_it_was_read_is_skipped_and_its_fix_is_declined() {
             decision: FixDecision {
                 id: "meddle/todo".to_owned(),
                 requirement: String::new(),
-                intent: String::new(),
+                context: String::new(),
             },
             unsupported: None,
         },
@@ -271,7 +271,7 @@ fn eligibility_is_decided_before_a_fixer_is_asked() {
             decision: FixDecision {
                 id: "count/todo".to_owned(),
                 requirement: String::new(),
-                intent: String::new(),
+                context: String::new(),
             },
             unsupported: None,
         },
@@ -375,7 +375,7 @@ fn a_proposal_whose_edits_overlap_each_other_is_declined() {
             decision: FixDecision {
                 id: "twin/todo".to_owned(),
                 requirement: String::new(),
-                intent: String::new(),
+                context: String::new(),
             },
             unsupported: None,
         },
@@ -472,7 +472,7 @@ fn fixes_that_undo_each_other_stop_the_run_and_name_their_rules() {
             decision: FixDecision {
                 id: "flip/any".to_owned(),
                 requirement: String::new(),
-                intent: String::new(),
+                context: String::new(),
             },
             unsupported: None,
         },
@@ -537,7 +537,7 @@ fn a_fix_that_adds_a_warning_is_rolled_back_like_one_that_adds_an_error() {
             decision: FixDecision {
                 id: "warned/todo".to_owned(),
                 requirement: String::new(),
-                intent: String::new(),
+                context: String::new(),
             },
             unsupported: None,
         },
@@ -653,7 +653,7 @@ fn a_fix_cannot_reach_outside_the_project_or_into_a_symlink() {
                 decision: FixDecision {
                     id: "reach/todo".to_owned(),
                     requirement: String::new(),
-                    intent: String::new(),
+                    context: String::new(),
                 },
                 unsupported: None,
             },

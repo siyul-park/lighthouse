@@ -94,7 +94,7 @@ findings the report did not show can share the prefix: an ambiguous prefix is
 refused with a message to retry with a longer prefix, listing up to five
 candidate full fingerprints. The symbol
 is evidence unless the message names it; `authored` appears on a group only when
-it differs from the severity; `intent` is left to `explain`. `limit` counts
+it differs from the severity; `context` is left to `explain`. `limit` counts
 findings and what is cut is in `omitted`. The agent text prints a header per
 group (`rule severity [review] - requirement`), `expected:` once, then
 `path:line:col message fingerprint` per finding, the gaps, `resolve:` and
@@ -176,16 +176,16 @@ Every verdict recorded through the server is a review of kind `agent`. The id is
 ### Authoring decisions
 
 `decision_create` takes an `id` (`local/<name>`), the `spec` of a `Decision`
-(title, intent, `scope: {subject}`, requirement with MUST or SHOULD,
-severity, evidence, and a `check` of `type: cel` with `select`, `where` as a
+(title, context, `scope: {subject}`, requirement with MUST or SHOULD,
+severity, and a `check` of `type: cel` with `select`, `where` as a
 CEL expression that is true for a violation, `message` and `evidence`) and
 examples (at least one valid and one invalid per language the project runs).
 The candidate is validated, compiled and tested through the whole engine before
 anything is written, to `.lighthouse/decisions/<name>.yaml`; a failure names the
 example and writes nothing. `decision_update` applies a JSON merge patch to the
-spec of a local decision, or, for a bundled decision, to the project's
-`DecisionOverride` file `override-<pack>-<name>.yaml` (`severity`, `exceptions`,
-`options` as new defaults, `languages`, `examples`), through the same gate.
+spec of a local decision through the same gate. A bundled decision is not
+changed in place: its level and options are the `rules` of `lighthouse.toml`, and
+different wording or examples are a local decision.
 Decision names are lowercase letters, digits, `.`, `_` and `-` (no `/`, `\` or
 `..`), checked before anything else runs, and authoring takes a per-project
 lock (`.lighthouse/authoring.db-lock`, ignored by version control) around its
@@ -197,7 +197,7 @@ Example:
 ```json
 { "name": "decision_create", "arguments": {
   "id": "local/short-notes",
-  "spec": "title: Notes stay short\nintent: Notes are read at a glance.\nscope: { subject: file }\nrequirement: A note file MUST NOT exceed three lines.\nseverity: error\nevidence: [path]\ncheck:\n  type: cel\n  select: file\n  where: 'file.lines > 3'\n  message: '{{ file.path }} is too long'\n  evidence:\n    path: file.path",
+  "spec": "title: Notes stay short\ncontext: Notes are read at a glance.\nscope: { subject: file }\nrequirement: A note file MUST NOT exceed three lines.\nseverity: error\ncheck:\n  type: cel\n  select: file\n  where: 'file.lines > 3'\n  message: '{{ file.path }} is too long'\n  evidence:\n    path: file.path",
   "examples": [
     { "name": "long", "language": "text", "kind": "invalid",
       "files": [{ "path": "a.txt", "body": "a\nb\nc\nd\n" }], "expect": [{ "line": 1 }] },

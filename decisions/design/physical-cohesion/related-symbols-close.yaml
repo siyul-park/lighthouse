@@ -10,7 +10,17 @@ metadata:
     lighthouse/was-builtin: design/related-symbols-close
 spec:
   title: Collaborators stay close
-  intent: Distance between collaborators hides their relationship.
+  context: >-
+    Distance between collaborators hides their relationship.
+
+    Go: The methods of one receiver type are contiguous within their
+    declaration group: no free function, type, constant or variable, and
+    no method of another type of the same visibility, between two of them.
+
+    Rust: The members of one type (its impl blocks, inherent and trait
+    impls) are adjacent in a file: another type, a free function or an
+    item of another owner between two impl blocks of a type is a finding;
+    two impl blocks side by side are fine.
   scope:
     domain: code
     subject: file
@@ -18,11 +28,10 @@ spec:
     Strongly related symbols MUST be physically close; direct collaborators
     SHOULD be adjacent.
   severity: warn
-  evidence: [symbols, distance]
   options:
     type: object
     properties:
-      visibility_groups:
+      visibilityGroups:
         type: boolean
         default: true
         description: >-
@@ -32,28 +41,17 @@ spec:
           when a file puts every owner's methods together, as impl blocks do.
     additionalProperties: false
   languages:
-    go:
-      tuning: >-
-        The methods of one receiver type are contiguous within their declaration
-        group: no free function, type, constant or variable, and no method of
-        another type of the same visibility, between two of them.
     rust:
       options:
-        visibility_groups: false
-      tuning: >-
-        The members of one type (its impl blocks, inherent and trait impls) are
-        adjacent in a file: another type, a free function or an item of another
-        owner between two impl blocks of a type is a finding; two impl blocks
-        side by side are fine.
+        visibilityGroups: false
   check:
     type: builtin
     op: proximity
-    when: "!file.test && !file.generated"
     group: "symbol.kind == 'method' ? symbol.owner_key : ''"
     separator: >-
       between.kind != 'method'
       || (between.owner_key != key
-          && (!options.visibility_groups
+          && (!options.visibilityGroups
               || (between.visibility != 'private') == (member.visibility != 'private')))
     message: >-
       method {{ symbol.name }} is separated from the other methods of its type by

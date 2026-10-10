@@ -8,10 +8,12 @@ metadata:
     lighthouse/section: organization
 spec:
   title: Polling conditions only observe
-  intent: Assertions inside a poll hide whether readiness or behavior failed.
+  context: >-
+    Assertions inside a poll hide whether readiness or behavior failed.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     Polling conditions MUST return readiness and observed results or errors
     only; assertions belong after readiness is established.

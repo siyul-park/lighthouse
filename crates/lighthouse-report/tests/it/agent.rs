@@ -474,11 +474,11 @@ fn fingerprint_prefixes_are_git_short_and_grow_until_the_findings_are_distinct()
     );
 }
 
-fn decision_with(examples: &str, tuning: &str) -> Catalog {
+fn decision_with(examples: &str) -> Catalog {
     let indented: String = examples.lines().map(|l| format!("  {l}\n")).collect();
     let empty = if examples.is_empty() { " []" } else { "" };
     let decision = format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: p/a\n  labels:\n    lighthouse/pack: p\n    lighthouse/section: s\nspec:\n  title: A\n  intent: i\n  scope: {{ subject: symbol }}\n  requirement: A MUST b.\n  severity: info\n  check:\n    type: model\n{tuning}  examples:{empty}\n{indented}"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: p/a\n  labels:\n    lighthouse/pack: p\n    lighthouse/section: s\nspec:\n  title: A\n  context: i\n  scope: {{ subject: symbol }}\n  requirement: A MUST b.\n  severity: info\n  check:\n    type: model\n  examples:{empty}\n{indented}"
     );
     let files = std::collections::BTreeMap::from([
         (
@@ -524,36 +524,30 @@ fn expected_basis(catalog: &Catalog, kind: &str) -> Option<(String, String)> {
 }
 
 #[test]
-fn expected_structure_prefers_canonical_then_a_match_then_the_shortest_then_tuning() {
-    let canonical = decision_with(
-        &format!(
-            "{}{}",
-            example("short-valid", "valid", false, "x"),
-            example("long-valid", "valid", true, "x\n          y\n          z")
-        ),
-        "",
-    );
+fn expected_structure_prefers_canonical_then_a_match_then_the_shortest() {
+    let canonical = decision_with(&format!(
+        "{}{}",
+        example("short-valid", "valid", false, "x"),
+        example("long-valid", "valid", true, "x\n          y\n          z")
+    ));
     assert_eq!(
         expected_basis(&canonical, "function"),
         Some(("canonical".to_owned(), "long-valid".to_owned()))
     );
 
-    let matched = decision_with(
-        &format!(
-            "{}{}{}{}",
-            example("plain-valid", "valid", false, "x"),
-            example("method-valid", "valid", false, "x\n          y"),
-            example("plain-invalid", "invalid", false, "x").replace(
-                "canonical: false",
-                "canonical: false\n    expect: [{ line: 1 }]"
-            ),
-            example("method-invalid", "invalid", false, "x").replace(
-                "canonical: false",
-                "canonical: false\n    expect: [{ line: 1 }]"
-            ),
+    let matched = decision_with(&format!(
+        "{}{}{}{}",
+        example("plain-valid", "valid", false, "x"),
+        example("method-valid", "valid", false, "x\n          y"),
+        example("plain-invalid", "invalid", false, "x").replace(
+            "canonical: false",
+            "canonical: false\n    expect: [{ line: 1 }]"
         ),
-        "",
-    );
+        example("method-invalid", "invalid", false, "x").replace(
+            "canonical: false",
+            "canonical: false\n    expect: [{ line: 1 }]"
+        ),
+    ));
     assert_eq!(
         expected_basis(&matched, "method"),
         Some(("matches kind=method".to_owned(), "method-valid".to_owned()))
@@ -566,15 +560,7 @@ fn expected_structure_prefers_canonical_then_a_match_then_the_shortest_then_tuni
         ))
     );
 
-    let tuned = decision_with(
-        "",
-        "  languages:\n    go:\n      tuning: Write it the Go way.\n",
-    );
-    assert_eq!(
-        expected_basis(&tuned, "function"),
-        Some(("tuning".to_owned(), "tuning".to_owned()))
-    );
-    assert_eq!(expected_basis(&decision_with("", ""), "function"), None);
+    assert_eq!(expected_basis(&decision_with(""), "function"), None);
 }
 
 #[test]

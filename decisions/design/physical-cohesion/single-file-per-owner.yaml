@@ -10,15 +10,14 @@ metadata:
     lighthouse/was-enforcement: mechanical
 spec:
   title: "One owner, one file"
-  intent: A reader finds an owner and everything it owns in one place.
+  context: >-
+    A reader finds an owner and everything it owns in one place.
+
+    Go: All methods of a receiver type stay in one file.
   scope:
     domain: code
     subject: symbol
   requirement: Symbols with one owner and cohesive responsibility MUST share a file.
   severity: warn
-  evidence: [owner, files]
-  languages:
-    go:
-      tuning: All methods of a receiver type stay in one file.
   check:
     type: model

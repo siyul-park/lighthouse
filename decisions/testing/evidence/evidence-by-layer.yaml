@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: evidence
 spec:
   title: Each layer proves its own facts
-  intent: Using the wrong layer either over-claims or leaves facts unproven.
+  context: >-
+    Using the wrong layer either over-claims or leaves facts unproven.
   scope:
     domain: code
     subject: project

@@ -120,11 +120,10 @@ fn checked_decisions_carry_runnable_examples() {
 fn a_cel_check_lives_in_its_decision() {
     let rule = decision_with("");
     let probe = "  title: P
-  intent: i
+  context: i
   scope: { subject: symbol }
   requirement: A MUST b.
   severity: error
-  evidence: [x]
   check:
     type: cel
     select: symbol
@@ -237,14 +236,14 @@ mod validation {
             "needs a `severity`",
         );
         rejected(swap("MUST", "must"), "MUST, SHOULD or MAY");
-        rejected(swap("intent: i", "intent: ' '"), "intent");
-        let no_evidence = "  severity: error\n  check:\n    type: builtin\n    id: p/a\n";
+        rejected(swap("context: i", "context: ' '"), "context");
+        let no_examples = "  severity: error\n  check:\n    type: builtin\n    id: p/a\n";
         rejected(
             with(
                 "p/s/a.yaml",
-                &decision("p/a", "s", &format!("{SPEC}{no_evidence}")),
+                &decision("p/a", "s", &format!("{SPEC}{no_examples}")),
             ),
-            "evidence",
+            "valid and an invalid example",
         );
         rejected(
             swap("title: A\n", "title: A\n  nonsense: 1\n"),
@@ -467,7 +466,7 @@ mod validation {
     #[test]
     fn the_same_catalog_reads_from_json_and_toml() {
         let json = r#"{"apiVersion":"lighthouse/v1alpha1","kind":"Pack","metadata":{"name":"p"},"spec":{"title":"P","intro":"x","sections":[{"name":"s","title":"S","intro":"x","decisions":["a"]}]}}"#;
-        let toml = "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Decision\"\n[metadata]\nname = \"p/a\"\n[metadata.labels]\n\"lighthouse/pack\" = \"p\"\n\"lighthouse/section\" = \"s\"\n[spec]\ntitle = \"A\"\nintent = \"i\"\nrequirement = \"A MUST b.\"\n[spec.scope]\nsubject = \"file\"\n";
+        let toml = "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Decision\"\n[metadata]\nname = \"p/a\"\n[metadata.labels]\n\"lighthouse/pack\" = \"p\"\n\"lighthouse/section\" = \"s\"\n[spec]\ntitle = \"A\"\ncontext = \"i\"\nrequirement = \"A MUST b.\"\n[spec.scope]\nsubject = \"file\"\n";
         let mut files = Files::new();
         files.insert("p/pack.json".into(), json.into());
         files.insert("p/s/a.toml".into(), toml.into());
@@ -679,7 +678,7 @@ fn checked_decisions_mark_one_canonical_example_per_language() {
 
 #[test]
 fn decision_text_and_write_local_round_trip_through_the_local_layer() {
-    let spec = "  title: Probe\n  intent: A probe.\n  scope: { subject: file }\n  requirement: A probe MUST hold.\n  severity: error\n  evidence: [path]\n  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{ path: a.txt, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: text\n      kind: valid\n      files: [{ path: a.txt, body: x }]\n";
+    let spec = "  title: Probe\n  context: A probe.\n  scope: { subject: file }\n  requirement: A probe MUST hold.\n  severity: error\n  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{ path: a.txt, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: text\n      kind: valid\n      files: [{ path: a.txt, body: x }]\n";
     let layer = Catalog::from_local(files(&[(
         "probe.yaml",
         decision("local/probe", "rules", spec),
@@ -754,4 +753,23 @@ fn write_atomic_guarded() {
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
     let leftovers = std::fs::read_dir(dir.path()).unwrap().count();
     assert_eq!(leftovers, 1, "a refused write leaves no temporary file");
+}
+
+#[test]
+fn decision_strict() {
+    assert!(bundled("design/private-helper-callers").strict());
+    assert!(!bundled("design/exported-doc").strict());
+}
+
+#[test]
+fn scope_applicability() {
+    let scope = bundled("testing/external-test-package").scope;
+    assert_eq!(
+        scope.applicability().tests,
+        lighthouse_model::TestScope::Only
+    );
+    assert!(!scope.applicability().generated);
+    let all = bundled("core/max-file-lines").scope.applicability();
+    assert!(all.generated);
+    assert_eq!(all.tests, lighthouse_model::TestScope::Include);
 }

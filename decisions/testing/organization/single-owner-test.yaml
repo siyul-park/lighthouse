@@ -10,33 +10,42 @@ metadata:
     lighthouse/was-builtin: testing/single-owner-test
 spec:
   title: One owner test per public symbol
-  intent: >-
+  context: >-
     Several semantic owners split one contract across places and let them
     contradict.
+
+    Go: `TestGet` and `TestGet_Missing` both own `Get`: the second is a
+    case of the first, written with `t.Run`. A name matches the longest
+    symbol it starts with, so `TestStore_Get_Missing` belongs to the
+    method `Get`, not to the type `Store`.
+
+    Rust: A test is an owner of the item it is named after in snake case.
+    Rust tests are many small functions, so names that merely extend a
+    symbol's name are not owners; two tests with exactly the name of one
+    item (in different test crates, or inline and in `tests/`) are.
   scope:
     domain: code
     subject: test
   requirement: A public symbol MUST NOT have multiple semantic owner test functions.
   severity: error
-  evidence: [symbol, owner_tests]
   options:
     type: object
     properties:
-      test_prefix:
+      testPrefix:
         type: string
         default: Test
         description: "Prefix of the name of an owner test; a test without it is not one."
-      snake_case:
+      snakeCase:
         type: boolean
         default: false
         description: "Compare names in snake case, as Rust tests are written."
-      variant_tests:
+      variantTests:
         type: boolean
         default: true
         description: >-
           Count `TestGet_Missing` as a second owner of `Get`; a name that adds a
           suffix to the symbol's own name restates the same contract.
-      include_internal:
+      includeInternal:
         type: boolean
         default: false
         description: Also judge symbols public only inside the project.
@@ -44,22 +53,12 @@ spec:
   languages:
     go:
       options:
-        include_internal: true
-      tuning: >-
-        `TestGet` and `TestGet_Missing` both own `Get`: the second is a case of
-        the first, written with `t.Run`. A name matches the longest symbol it
-        starts with, so `TestStore_Get_Missing` belongs to the method `Get`, not
-        to the type `Store`.
+        includeInternal: true
     rust:
       options:
-        test_prefix: ""
-        snake_case: true
-        variant_tests: false
-      tuning: >-
-        A test is an owner of the item it is named after in snake case. Rust
-        tests are many small functions, so names that merely extend a symbol's
-        name are not owners; two tests with exactly the name of one item (in
-        different test crates, or inline and in `tests/`) are.
+        testPrefix: ""
+        snakeCase: true
+        variantTests: false
   check:
     type: cel
     select: symbol
@@ -67,8 +66,7 @@ spec:
       - name: owners
         expr: tests(symbol)
     where: >-
-      !symbol.file_test && !symbol.generated && !symbol.test
-      && exposed(symbol, options.include_internal)
+      exposed(symbol, options.includeInternal)
       && (symbol.kind == 'function' || symbol.kind == 'method'
           || symbol.kind == 'type' || symbol.kind == 'interface')
       && size(owners) >= 2

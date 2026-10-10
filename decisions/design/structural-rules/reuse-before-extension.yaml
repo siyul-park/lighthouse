@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: structural-rules
 spec:
   title: Reuse before extension
-  intent: Every extra layer or knob is a permanent cost.
+  context: >-
+    Every extra layer or knob is a permanent cost.
   scope:
     domain: code
     subject: project

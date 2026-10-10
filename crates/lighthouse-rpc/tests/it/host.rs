@@ -737,7 +737,7 @@ fn plugin_manifest_reads_command_and_defaults_args_and_rejects_unknown_keys() {
     )
     .unwrap();
     let found = lighthouse_rpc::load(dir.path()).unwrap();
-    let manifest: &lighthouse_rpc::PluginManifest = &found.manifest;
+    let manifest: &lighthouse_rpc::ProcessManifest = &found.manifest;
     assert_eq!(
         (manifest.id.as_str(), manifest.command.as_str()),
         ("x", "./run")
@@ -842,7 +842,7 @@ fn a_parsed_plugin_document_becomes_a_manifest() {
         },
     );
 
-    let manifest = lighthouse_rpc::PluginManifest::from_resource(document);
+    let manifest = lighthouse_rpc::ProcessManifest::from_resource(document);
 
     assert_eq!(
         (

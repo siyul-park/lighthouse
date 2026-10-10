@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: types-and-apis
 spec:
   title: "Narrow inputs, concrete outputs"
-  intent: Callers get flexibility on the way in and precision on the way out.
+  context: >-
+    Callers get flexibility on the way in and precision on the way out.
   scope:
     domain: code
     subject: symbol

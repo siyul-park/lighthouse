@@ -22,7 +22,10 @@ use lighthouse_model::Options;
 pub use lighthouse_resource::{Format, Metadata, Resource};
 use lighthouse_resource::{documents, parse_duration, resource};
 pub use rules::{Level, RuleConfig, RuleDetail, RuleSetting, Rules};
-pub use spec::{OverrideSpec, PluginEntry, PluginRefSpec, ProjectLanguage, ProjectSpec};
+pub use spec::{
+    GeneratedCheck, GeneratedSpec, OverrideSpec, PluginEntry, PluginRefSpec, ProjectLanguage,
+    ProjectSpec,
+};
 pub(crate) use standard::standard;
 use thiserror::Error;
 
@@ -292,6 +295,8 @@ pub struct Config {
     plugins: Vec<PluginRef>,
     languages: BTreeMap<String, Options>,
     formatters: BTreeMap<String, Formatter>,
+    generated: Option<GlobSet>,
+    generated_check: Option<GeneratedCheck>,
     layer: Layer,
 }
 
@@ -331,6 +336,8 @@ impl Config {
     pub fn from_resource(project: Resource<ProjectSpec>) -> Result<Self, ProjectError> {
         let Resource { metadata, spec } = project;
         let layer = Layer::of(&spec)?;
+        let generated = globs(&spec.generated.files)?;
+        let generated_check = spec.generated.check;
         let mut languages = BTreeMap::new();
         let mut formatters = BTreeMap::new();
         for (id, language) in spec.languages {
@@ -352,6 +359,8 @@ impl Config {
                 .collect::<Result<_, _>>()?,
             languages,
             formatters,
+            generated,
+            generated_check,
             layer,
         })
     }
@@ -414,6 +423,17 @@ impl Config {
     /// `formatter` key is the host's and is not among them.
     pub fn languages(&self) -> &BTreeMap<String, Options> {
         &self.languages
+    }
+
+    /// Whether the project's `generated.files` name `path`.
+    pub fn is_generated(&self, path: &Path) -> bool {
+        self.generated.as_ref().is_some_and(|g| g.is_match(path))
+    }
+
+    /// The project's `generated.check`: whether every decision checks
+    /// generated code, or none does; `None` leaves it to each decision.
+    pub fn generated_check(&self) -> Option<GeneratedCheck> {
+        self.generated_check
     }
 
     /// The rules this project sets and the projects it extends.

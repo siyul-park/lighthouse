@@ -8,15 +8,14 @@ metadata:
     lighthouse/section: concurrency
 spec:
   title: Long-lived tasks can be stopped
-  intent: A task nobody can stop leaks and blocks shutdown.
+  context: >-
+    A task nobody can stop leaks and blocks shutdown.
+
+    Go: Applies to goroutines.
   scope:
     domain: code
     subject: symbol
   requirement: Long-lived concurrent tasks MUST have an explicit shutdown path.
   severity: warn
-  evidence: [task, spawned_at]
-  languages:
-    go:
-      tuning: Applies to goroutines.
   check:
     type: model

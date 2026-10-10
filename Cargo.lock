@@ -758,6 +758,7 @@ dependencies = [
 name = "lighthouse-engine"
 version = "0.1.0"
 dependencies = [
+ "globset",
  "ignore",
  "lighthouse-model",
  "lighthouse-plugin",

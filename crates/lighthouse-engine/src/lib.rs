@@ -1,6 +1,7 @@
 mod annotations;
 mod engine;
 mod fix;
+mod generated;
 mod identity;
 mod subject;
 mod tester;

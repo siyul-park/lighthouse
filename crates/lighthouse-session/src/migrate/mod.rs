@@ -29,6 +29,7 @@ use serde_norway::{Mapping, Value};
 
 pub mod catalog;
 mod fold;
+mod modern;
 pub mod plugin;
 pub mod project;
 pub mod retired;
@@ -86,6 +87,8 @@ enum Shape {
     Preset,
     /// A `DecisionOverride` document: an entry of the project's `rules` now.
     OverrideDoc,
+    /// A `Decision` with fields Revision 28 removed or option names in snake_case.
+    Outdated,
     Pattern,
     /// A `Decision` that still has `enforcement` instead of `severity`.
     Enforcement,
@@ -335,6 +338,9 @@ fn kind_of_file(path: &Path) -> FileKind {
 }
 
 fn project(path: &Path, plan: &mut Plan) -> Result<usize> {
+    if let Some(unchanged) = project::modernize_file(path, plan)? {
+        return Ok(unchanged);
+    }
     let name = path
         .canonicalize()
         .ok()
@@ -435,6 +441,7 @@ fn read_legacy(files: &[PathBuf]) -> Result<(Vec<Legacy>, BTreeMap<PathBuf, usiz
             if catalog::is_resource(&doc)
                 && !catalog::has_enforcement(&doc)
                 && !retired::is_retired(&doc)
+                && !modern::is_outdated(&doc)
             {
                 unchanged += 1;
             } else {
@@ -457,6 +464,8 @@ fn shape(path: &Path, doc: &Value) -> Shape {
         Shape::OverrideDoc
     } else if catalog::has_enforcement(doc) {
         Shape::Enforcement
+    } else if modern::is_outdated(doc) {
+        Shape::Outdated
     } else if doc.get("select").is_some() && doc.get("where").is_some() && doc.get("id").is_none() {
         Shape::RuleFile
     } else if name == "section.yaml" && doc.is_mapping() && doc.get("id").is_some() {
@@ -491,47 +500,67 @@ fn plan_item(
         return Err(several_documents("this file", count));
     }
     let target = is_local(path).then(|| local_target(path));
-    let dir = parent(path);
     match shape {
         Shape::RuleFile | Shape::Section => {
             plan.consumable.insert(path.clone());
         }
-        Shape::Pack => {
-            let sections = section_docs(around.sections.get(&dir));
-            let overrides = around.overrides.get(&dir).cloned().unwrap_or_default();
-            let migrated = catalog::migrate_pack(doc, &sections, &overrides)?;
-            for name in listed_sections(doc) {
-                if let Some(section) = around.sections.get(&dir).and_then(|s| s.get(&name)) {
-                    plan.consumed.insert(section.path.clone());
-                }
-            }
-            write(plan, path, &migrated);
-        }
+        Shape::Pack => plan_pack(item, around, plan)?,
         Shape::Sources => write(plan, path, &catalog::migrate_sources(doc)?),
         Shape::Override => {
             let migrated = catalog::migrate_override(doc, &stem(path))?;
             fold::plan(plan, path, &migrated)?;
         }
         Shape::OverrideDoc => fold::plan(plan, path, doc)?,
-        Shape::Preset => {
-            let project =
-                retired::preset_to_project(serde_json::to_value(doc).map_err(|e| e.to_string())?);
-            let project: Value = serde_norway::to_value(&project).map_err(|e| e.to_string())?;
-            write(plan, path, &project);
+        Shape::Preset | Shape::Enforcement | Shape::Outdated => {
+            write(plan, path, &rewritten(doc, &shape)?);
         }
         Shape::Pattern => {
             let (migrated, rule) = decision(item, rule_files)?;
             plan.consumed.extend(rule);
             move_or_write(plan, path, target, &migrated)?;
         }
-        Shape::Enforcement => {
-            let mut migrated = doc.clone();
-            catalog::convert_enforcement(&mut migrated)?;
-            write(plan, path, &migrated);
-        }
         Shape::Foreign => {}
     }
     Ok(())
+}
+
+/// A `pack.yaml` as a `Pack`, with the `section.yaml` files it consumed.
+fn plan_pack(
+    item: &Legacy,
+    around: &Surroundings,
+    plan: &mut Plan,
+) -> std::result::Result<(), String> {
+    let (path, doc) = (&item.path, &item.doc);
+    let dir = parent(path);
+    let sections = section_docs(around.sections.get(&dir));
+    let overrides = around.overrides.get(&dir).cloned().unwrap_or_default();
+    let migrated = catalog::migrate_pack(doc, &sections, &overrides)?;
+    for name in listed_sections(doc) {
+        if let Some(section) = around.sections.get(&dir).and_then(|s| s.get(&name)) {
+            plan.consumed.insert(section.path.clone());
+        }
+    }
+    write(plan, path, &migrated);
+    Ok(())
+}
+
+/// A document of an older shape as it is written now: a `Preset` as a
+/// `Project`, a decision with `enforcement` or with fields Revision 28 removed.
+fn rewritten(doc: &Value, shape: &Shape) -> std::result::Result<Value, String> {
+    let mut migrated = doc.clone();
+    match shape {
+        Shape::Preset => {
+            let json = serde_json::to_value(doc).map_err(|e| e.to_string())?;
+            migrated = serde_norway::to_value(retired::preset_to_project(json))
+                .map_err(|e| e.to_string())?;
+        }
+        Shape::Enforcement => {
+            catalog::convert_enforcement(&mut migrated)?;
+            modern::modernize(&mut migrated);
+        }
+        _ => modern::modernize(&mut migrated),
+    }
+    Ok(migrated)
 }
 
 /// The sections a `pack.yaml` lists, by name.

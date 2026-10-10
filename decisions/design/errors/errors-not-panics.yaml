@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: errors
 spec:
   title: "Return errors, do not panic"
-  intent: "Panics bypass the caller's control flow."
+  context: >-
+    Panics bypass the caller's control flow.
   scope:
     domain: code
     subject: symbol

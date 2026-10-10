@@ -477,7 +477,7 @@ impl Orchestrator<'_> {
                 decision: FixDecision {
                     id: rule.to_owned(),
                     requirement: String::new(),
-                    intent: String::new(),
+                    context: String::new(),
                 },
             }),
             None => self.plan.get(rule).cloned(),

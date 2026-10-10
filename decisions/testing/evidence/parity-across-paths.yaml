@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: evidence
 spec:
   title: Test parity across execution paths
-  intent: Two paths for one contract can silently diverge.
+  context: >-
+    Two paths for one contract can silently diverge.
   scope:
     domain: code
     subject: project

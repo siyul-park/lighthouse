@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use lighthouse_model::RunScope;
 use lighthouse_spec::{
-    CelCheck, Check, CheckKind, Decision, OptionSchema, OptionType, OptionsSchema, Select,
+    CelCheck, Check, CheckKind, Decision, OptionSchema, OptionType, OptionsSchema, Select, Subject,
     descriptors,
 };
 use serde_json::json;
@@ -59,7 +59,7 @@ fn a_cel_check_reads_its_select_where_message_and_evidence() {
     else {
         panic!("cel expected");
     };
-    assert_eq!(select, Select::Function);
+    assert_eq!(select, Some(Select::Function));
     assert_eq!(condition, "func.statements > 5");
     assert_eq!(message, "{{ func.name }} is long");
     assert_eq!(evidence["name"], "func.name");
@@ -97,4 +97,33 @@ fn a_set_of_option_properties_is_a_closed_object_schema() {
         serde_json::from_value::<OptionsSchema>(value).unwrap(),
         schema
     );
+}
+
+#[test]
+fn select_of() {
+    assert_eq!(Select::of(Subject::Symbol), Some(Select::Symbol));
+    assert_eq!(Select::of(Subject::File), Some(Select::File));
+    assert_eq!(Select::of(Subject::Module), Some(Select::Module));
+    assert_eq!(Select::of(Subject::Test), Some(Select::Test));
+    assert_eq!(Select::of(Subject::Project), None);
+}
+
+#[test]
+fn cel_check_selects() {
+    let check = |select: Option<Select>| CelCheck {
+        select,
+        bindings: Vec::new(),
+        condition: "true".to_owned(),
+        message: "m".to_owned(),
+        evidence: BTreeMap::new(),
+        at: None,
+        identity: None,
+    };
+
+    assert_eq!(check(None).selects(Subject::File), Some(Select::File));
+    assert_eq!(
+        check(Some(Select::Function)).selects(Subject::Symbol),
+        Some(Select::Function)
+    );
+    assert_eq!(check(None).selects(Subject::Project), None);
 }

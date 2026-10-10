@@ -8,9 +8,9 @@ metadata:
     lighthouse/section: annotations
 spec:
   title: Allow a finding in source
-  intent: >-
-    A decision to accept a finding belongs next to the code it is about, where a
-    reviewer sees it change.
+  context: >-
+    A decision to accept a finding belongs next to the code it is about,
+    where a reviewer sees it change.
   scope:
     domain: code
     subject: symbol

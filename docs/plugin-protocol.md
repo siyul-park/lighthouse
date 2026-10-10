@@ -2,7 +2,7 @@
 
 Normative contract between Lighthouse (the host) and a language plugin: a
 separate process that analyzes source in its own language with native tools.
-Rules, analyzers and presets stay in the host; a plugin only turns files into
+Rules and analyzers stay in the host; a plugin only turns files into
 the code model. The wire types are defined by
 [`protocol/schema/lighthouse-protocol-0.1.json`](../protocol/schema/lighthouse-protocol-0.1.json),
 generated from the `lighthouse-protocol` crate and checked in; where this text

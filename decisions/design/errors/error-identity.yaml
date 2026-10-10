@@ -8,7 +8,10 @@ metadata:
     lighthouse/section: errors
 spec:
   title: Preserve error identity
-  intent: Adding context must not hide the cause callers depend on.
+  context: >-
+    Adding context must not hide the cause callers depend on.
+
+    Go: Wrap with `%w` when adding context.
   scope:
     domain: code
     subject: symbol
@@ -16,10 +19,6 @@ spec:
     Dependency identity MUST be preserved when callers depend on it; context
     added to an error MUST keep the cause reachable.
   severity: warn
-  evidence: [call, verb]
-  languages:
-    go:
-      tuning: "Wrap with `%w` when adding context."
   check:
     type: model
   examples:

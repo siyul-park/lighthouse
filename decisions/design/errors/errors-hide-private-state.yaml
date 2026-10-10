@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: errors
 spec:
   title: Errors do not leak state
-  intent: Error text and values are part of the public contract.
+  context: >-
+    Error text and values are part of the public contract.
   scope:
     domain: code
     subject: symbol

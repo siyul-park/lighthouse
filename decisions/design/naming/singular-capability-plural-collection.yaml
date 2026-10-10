@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: naming
 spec:
   title: "Singular capabilities, plural collections"
-  intent: Number in a name tells what the value is.
+  context: >-
+    Number in a name tells what the value is.
   scope:
     domain: code
     subject: symbol

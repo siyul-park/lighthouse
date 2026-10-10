@@ -8,7 +8,8 @@ metadata:
     lighthouse/section: structural-rules
 spec:
   title: Abstract semantic duplication
-  intent: Two implementations of one rule will diverge.
+  context: >-
+    Two implementations of one rule will diverge.
   scope:
     domain: code
     subject: project
@@ -16,6 +17,5 @@ spec:
     Multiple implementations of the same behavior or rule MUST converge on one
     owner; syntax similarity alone MUST NOT trigger abstraction.
   severity: info
-  evidence: [owners, locations]
   check:
     type: model

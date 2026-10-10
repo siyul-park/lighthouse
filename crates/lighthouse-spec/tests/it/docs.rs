@@ -4,11 +4,10 @@ use lighthouse_spec::{Catalog, decision_markdown, docs, help_path};
 use lighthouse_test_support::catalog::{decision, files, pack};
 
 const ALPHA: &str = "  title: Alpha holds
-  intent: Keeps alpha true.
+  context: Keeps alpha true.
   scope: { subject: symbol }
   requirement: Alpha MUST hold.
   severity: error
-  evidence: [name]
   check:
     type: builtin
     id: demo/alpha
@@ -23,7 +22,6 @@ const ALPHA: &str = "  title: Alpha holds
   languages:
     go:
       options: { limit: 5 }
-      tuning: Go spells it differently.
   examples:
     - name: broken
       language: go
@@ -37,12 +35,12 @@ const ALPHA: &str = "  title: Alpha holds
       language: go
       kind: valid
       files: [{ path: a.go, body: 'fine()' }]
-  exceptions: Generated code.
-  citation: Someone 2001
+  provenance:
+    wasDerivedFrom: [Someone 2001]
 ";
 
 const BETA: &str = "  title: Beta is advice
-  intent: Advises beta.
+  context: Advises beta.
   scope: { subject: project }
   requirement: Beta SHOULD be considered.
 ";
@@ -111,11 +109,10 @@ fn committed_docs_match_the_bundled_catalog() {
 
 fn fixed_fixture() -> Catalog {
     let gamma = "  title: Gamma order
-  intent: Orders gamma.
+  context: Orders gamma.
   scope: { subject: file }
   requirement: Gamma MUST come first.
   severity: error
-  evidence: [name]
   check:
     type: builtin
     id: p/a

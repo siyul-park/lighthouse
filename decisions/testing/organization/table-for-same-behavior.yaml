@@ -8,17 +8,18 @@ metadata:
     lighthouse/section: organization
 spec:
   title: Tables for one behavior over many inputs
-  intent: A table says the behavior is the same and only the data differs.
+  context: >-
+    A table says the behavior is the same and only the data differs.
+
+    Go: Use an inline anonymous struct table.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     Same behavior over many inputs MUST use one inline table of named inputs and
     expected outputs, each entry one case; cases that specify the same behavior
     MUST be merged into one case or one table.
   severity: info
-  languages:
-    go:
-      tuning: Use an inline anonymous struct table.
   check:
     type: model

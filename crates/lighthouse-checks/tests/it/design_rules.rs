@@ -31,7 +31,7 @@ fn exported_doc_can_include_internal_symbols() {
     let internal = w.symbol("m", "Internal", SymbolKind::Function, "m/a.ucm");
     w.symbols[0].visibility = Visibility::Internal;
     assert!(w.check(DOC, json!({})).is_empty());
-    let found = w.check(DOC, json!({ "include_internal": true }));
+    let found = w.check(DOC, json!({ "includeInternal": true }));
     assert_eq!(w.names(&found), [internal.name]);
 }
 
@@ -58,7 +58,7 @@ fn exported_doc_skips_exempt_methods_interface_members_private_owners_and_kinds(
     assert_eq!(w.names(&found), ["Flagged"]);
     let strict = w.check(
         DOC,
-        json!({ "exempt_methods": [], "kinds": ["method", "field"] }),
+        json!({ "exemptMethods": [], "kinds": ["method", "field"] }),
     );
     assert_eq!(w.names(&strict), ["String", "Field", "Flagged"]);
 }
@@ -83,10 +83,10 @@ fn exported_doc_can_leave_interface_implementations_to_the_interface() {
     let by_default = w.check(DOC, json!({}));
     assert_eq!(w.names(&by_default), ["Read", "Other"]);
     // The interface's own method must carry the documentation.
-    let exempt = w.check(DOC, json!({ "exempt_interface_methods": true }));
+    let exempt = w.check(DOC, json!({ "exemptInterfaceMethods": true }));
     assert_eq!(w.names(&exempt), ["Read", "Other"]);
     w.symbols.last_mut().unwrap().doc = Some("Read reads.".to_owned());
-    let exempt = w.check(DOC, json!({ "exempt_interface_methods": true }));
+    let exempt = w.check(DOC, json!({ "exemptInterfaceMethods": true }));
     assert_eq!(w.names(&exempt), ["Other"]);
 }
 
@@ -235,7 +235,7 @@ fn complexity_skips_dispatchers_and_tests() {
 const COUPLE: &str = "design/coupling-signal";
 
 fn hub_options() -> Value {
-    json!({ "hub_fan_in": 2, "hub_fan_out": 2, "hub_statements": 1 })
+    json!({ "hubFanIn": 2, "hubFanOut": 2, "hubStatements": 1 })
 }
 
 fn hub_world() -> (World, Symbol) {
@@ -286,10 +286,10 @@ fn coupling_flags_a_coordinator_with_many_callees() {
         w.edge(EdgeKind::Calls, &run, &step);
     }
     let options = json!({
-        "hub_fan_in": 100,
-        "coordinator_fan_out": 3,
-        "coordinator_max_fan_in": 0,
-        "coordinator_statements": 1,
+        "hubFanIn": 100,
+        "coordinatorFanOut": 3,
+        "coordinatorMaxFanIn": 0,
+        "coordinatorStatements": 1,
     });
     let found = w.check(COUPLE, options);
     assert_eq!(w.names(&found), ["run"]);

@@ -181,6 +181,113 @@ fn migrate_keeps_an_override_that_needs_a_local_decision_and_says_so() {
     assert_eq!(kept, wording);
 }
 
+const OUTDATED: &str = "apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/long
+spec:
+  title: Long
+  intent: Long files are hard to read.
+  scope: { subject: file }
+  requirement: A file MUST have at most three lines.
+  severity: warn
+  evidence: [path]
+  exceptions: Vendored code is exempt.
+  citation: Fowler 1999
+  strict: true
+  options:
+    type: object
+    properties:
+      max_lines:
+        type: integer
+        default: 3
+        description: The most lines a file may have.
+    additionalProperties: false
+  languages:
+    go:
+      options: { max_lines: 5 }
+      tuning: Count Go lines.
+  check:
+    type: cel
+    select: file
+    where: 'file.lines > options.max_lines'
+    message: too long
+    evidence: { path: file.path }
+  examples:
+    - name: long
+      language: text
+      kind: invalid
+      files: [{ path: a.txt, body: \"1\\n2\\n3\\n4\" }]
+      expect: [{ line: 1 }]
+    - name: short
+      language: text
+      kind: valid
+      files: [{ path: a.txt, body: \"1\" }]
+";
+
+#[test]
+fn migrate_rewrites_the_fields_revision_28_removed_and_camel_cases_options() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "lighthouse.yaml", PROJECT);
+    write(dir.path(), ".lighthouse/decisions/long.yaml", OUTDATED);
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate"])
+        .assert()
+        .success();
+
+    let text = fs::read_to_string(dir.path().join(".lighthouse/decisions/long.yaml")).unwrap();
+    for gone in [
+        "intent:",
+        "evidence: [",
+        "\n  exceptions:",
+        "citation:",
+        "strict:",
+        "tuning:",
+        "select:",
+        "max_lines",
+    ] {
+        assert!(!text.contains(gone), "{gone} survived:\n{text}");
+    }
+    for kept in [
+        "context:",
+        "Go: Count Go lines.",
+        "Vendored code is exempt.",
+        "wasDerivedFrom",
+        "lighthouse/preset: strict",
+        "lighthouse/was-exceptions",
+        "maxLines",
+        "options.maxLines",
+    ] {
+        assert!(text.contains(kept), "{kept} missing:\n{text}");
+    }
+    lighthouse(dir.path())
+        .args(["spec", "migrate"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("0 file(s) written, 0 removed"));
+    lighthouse(dir.path())
+        .args(["spec", "validate", "--examples"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn migrate_renames_the_options_a_project_sets_to_camel_case() {
+    let dir = tempfile::tempdir().unwrap();
+    let project = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: demo\nspec:\n  plugins: [core, design]\n  rules:\n    design/coupling-signal: { level: warn, options: { hub_fan_in: 9 } }\n";
+    write(dir.path(), "lighthouse.yaml", project);
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate"])
+        .assert()
+        .success();
+
+    let text = fs::read_to_string(dir.path().join("lighthouse.yaml")).unwrap();
+    assert!(text.contains("hubFanIn"), "{text}");
+    assert!(!text.contains("hub_fan_in"), "{text}");
+}
+
 #[test]
 fn migrate_refuses_a_file_of_several_documents_and_changes_nothing() {
     let dir = tempfile::tempdir().unwrap();

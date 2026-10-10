@@ -10,15 +10,16 @@ metadata:
     lighthouse/was-enforcement: mechanical
 spec:
   title: Tests do not reach private symbols
-  intent: Private-symbol tests freeze the implementation.
+  context: >-
+    Private-symbol tests freeze the implementation.
   scope:
     domain: code
     subject: test
+    tests: only
   requirement: >-
     Tests MUST NOT reference private symbols of the target; private-symbol
     testing MUST be resolved at the public boundary rather than by exposing
     internals solely for tests.
   severity: warn
-  evidence: [test_file, symbol]
   check:
     type: model

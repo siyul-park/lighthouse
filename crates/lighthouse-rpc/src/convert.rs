@@ -84,7 +84,7 @@ pub(crate) fn indexed(result: wire::IndexResult, sources: &[Source]) -> Result<I
         let generated = fragment.file.generated;
         let mut converted = self::fragment(fragment)?;
         converted.files = vec![core::File {
-            generated,
+            generated: generated || file.generated,
             ..(*file).clone()
         }];
         accepted.insert(path);
