@@ -667,7 +667,7 @@ fn engine_with_trust_tells_the_rules_the_user_trusts_the_project() {
 }
 
 #[test]
-fn engine_without_cache_gives_the_providers_no_directory_to_keep_results_in() {
+fn engine_with_cache_gives_the_providers_a_directory_to_keep_results_in_and_without_it_none() {
     let dir = project(&[("x.txt", b"1")]);
     let seen = Arc::default();
     let probe = |cached: bool| {
@@ -686,9 +686,12 @@ fn engine_without_cache_gives_the_providers_no_directory_to_keep_results_in() {
         )
         .unwrap();
         let engine = if cached {
-            engine
+            engine.with_cache(
+                dir.path().canonicalize().unwrap().join(".lighthouse/cache"),
+                u64::MAX,
+            )
         } else {
-            engine.without_cache()
+            engine
         };
         engine.check(&root(&dir), &[]).unwrap();
     };
