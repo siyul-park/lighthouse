@@ -143,7 +143,7 @@ Every implemented rule belongs to a catalog decision whose `check` is
 one provider of the union `builtin | cel | command | rpc | model`, with the common fields `requires` and `timeout`:
 
 - `builtin` is a standard, decision-agnostic operation (`order`, `proximity`, `cycle`) or, for the two rules the engine reports itself (`core/allow-reason`, `core/no-unused-allow`), a rule named by `id`.
-- `cel` is an expression over the code model, written in the decision, with the standard function library `metrics callers callees edges owner tests annotations rank exposed` and the text helpers `lines trim trimPrefixes trimSuffixes trimLeft trimRight leadingRun drop`.
+- `cel` is an expression over the code model, written in the decision, with the standard function library `metrics callers callees edges owner tests annotations rank exposed`, the module path helpers `globMatch layerOf` and the text helpers `lines trim join trimPrefixes trimSuffixes trimLeft trimRight leadingRun drop`.
 - `command` runs a program under the process contract: argv without a shell, `{file}`/`{files}`/`{rule}` filling whole arguments, `batch: file|all`, exit `0` clean, `1` findings (stdout lines, an optional `path:line[:col]: ` prefix), anything else an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script. A command is not sandboxed: it runs with the user's privileges, in the project root, with an environment cleared to `PATH`, `LANG`, `TMPDIR` and the declared `env` (no `HOME`) plus `LIGHTHOUSE_*`. Trust is the only protection; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean.
 - `rpc` is reserved until plugin protocol 0.2 and refused at load.
 - `model` hands the decision to agent review (`select` and `prompt` optional); it is not deterministic and caps the severity at `warn`.
@@ -164,7 +164,7 @@ reserves) with the fields of that kind: symbols have `id name kind visibility
 owner owner_kind file line module lang documented test generated callers callees
 references members`; functions add `statements top_level params returns
 max_nesting tokens branches`; edges have `kind resolution from to` (each end with
-`kind id module name`); modules `path name test_of files symbols`; files `path
+`kind id module name`); modules `path name test_of files symbols lines dependents declares`; files `path
 lang test generated lines symbols functions`; tests add `nesting style targets
 target_count`. Absent values are empty strings, never null. `edge` and `module`
 rules run once over the project, the others once per file. Projects add their

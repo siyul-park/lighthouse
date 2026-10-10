@@ -299,5 +299,5 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
     }
     assert!(recommended.contains_key("design/layers"));
     assert_eq!(preset("design/strict").len(), design.len());
-    assert_eq!(preset("testing/recommended").len(), 5);
+    assert_eq!(preset("testing/recommended").len(), 6);
 }

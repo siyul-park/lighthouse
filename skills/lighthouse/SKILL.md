@@ -73,7 +73,7 @@ Do not memorize decision text; ask for it when a finding names a rule.
 - `lighthouse://config` is the effective configuration.
 - `review_history` shows every judgment recorded on a finding.
 
-## Active decisions (27)
+## Active decisions (28)
 
 A decision declares the severity of its findings: `error` is definitive, so it needs no review and only a directive in the code suppresses it; `warn` and `info` are review tasks, and a judgment can hide them whatever level the configuration reports them at. `fixable: safe|suggested` marks a decision with a fixer.
 
@@ -108,6 +108,7 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 ### testing
 
 - `testing/external-package` (error) Contract tests live outside the target
+- `testing/no-hidden-target` (warn) Helpers do not hide the target call
 - `testing/standard-assertions` (warn) Assertions use the standard library
 - `testing/owner` (warn) Every public symbol has an owner test
 - `testing/unique-owner` (error) One owner test per public symbol

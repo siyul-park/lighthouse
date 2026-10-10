@@ -7,6 +7,7 @@ use lighthouse_model::{EdgeKind, Node, Symbol, SymbolId, SymbolKind, Target};
 use serde_json::{Value, json};
 
 use super::Builder;
+use crate::layout;
 
 impl Builder<'_> {
     /// The target the test's name maps to that the test does not call itself
@@ -25,9 +26,12 @@ impl Builder<'_> {
             .filter(|id| !project.in_test(id))
             .collect();
         direct.extend(case.targets.iter().filter_map(|target| match target {
-            Target::Resolved(Node::Symbol(id)) => Some(id),
+            Target::Resolved(Node::Symbol(id)) if !project.in_test(id) => Some(id),
             _ => None,
         }));
+        if self.shows_production_code(&direct) {
+            return json!({});
+        }
         for helper in project
             .callees(&test.id)
             .iter()
@@ -55,6 +59,28 @@ impl Builder<'_> {
             }
         }
         json!({})
+    }
+
+    /// Whether the test itself uses production code besides constructors: it
+    /// then specifies something in plain sight, and a helper that also reaches
+    /// the target is setting up the environment, not hiding the call.
+    fn shows_production_code(&self, direct: &BTreeSet<&SymbolId>) -> bool {
+        let prefixes: Vec<&str> = self
+            .options
+            .get("constructorPrefixes")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .collect();
+        direct
+            .iter()
+            .filter_map(|id| self.project.symbol(id))
+            .any(|used| {
+                !prefixes
+                    .iter()
+                    .any(|prefix| layout::has_word_prefix(&used.name, prefix))
+            })
     }
 
     /// The line where `from` calls `callee`; 0 when the provider reports no sites.

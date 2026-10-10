@@ -23,7 +23,7 @@ Contract tests should prove behavior through the same public boundary available 
 | --- | --- | --- | --- | --- |
 | [`testing/external-package`](#contract-tests-live-outside-the-target) | Contract tests live outside the target | error · cel |  |  |
 | `testing/no-private-access` | Tests do not reach private symbols | warn · model |  | Tests MUST NOT reference private symbols of the target; private-symbol testing MUST be resolved at the public boundary rather than by exposing internals solely for tests. |
-| `testing/no-hidden-target` | Helpers do not hide the target call | warn · model |  | Wrappers, builders, or helpers MUST NOT hide the target call or result being specified, and MUST NOT be added merely for reuse. Setup helpers MAY exist only when the specified behavior remains visible. |
+| [`testing/no-hidden-target`](#helpers-do-not-hide-the-target-call) | Helpers do not hide the target call | warn · cel |  |  |
 
 ### Contract tests live outside the target
 
@@ -54,6 +54,61 @@ func TestGet(t *testing.T) {
 	if Get() != 1 {
 		t.Fatal("get")
 	}
+}
+```
+
+Also: rust
+
+### Helpers do not hide the target call
+
+`testing/no-hidden-target` · test · warn · cel
+
+*A helper that wraps the call hides the very thing being specified. An owner test is named after its target (`TestStore_Get` is about `Store.Get`, by the naming of `testing/owner`). The test is reported when it does not call that target itself but calls a helper of the test code that does. A helper is a function of test code that is not a test case; it is followed one call deep. The helper is taken to return the target's result or assert on it: the code model says that it calls the target, not what it does with the result. A test with no owner name, or that calls what it is named after, is not reported, and neither is a setup helper that only calls constructors or other code the test is not named after. A test that itself calls production code other than a constructor shows what it specifies, so a helper that also reaches its target is setting up the environment and is not reported. Go: The helper is a function that takes the test handle or a test fixture function. Rust: The helper is a function of the test crate or of an inline test module; the test is named after its target in snake case.*
+
+Wrappers, builders, or helpers MUST NOT hide the target call or result being specified, and MUST NOT be added merely for reuse. Setup helpers MAY exist only when the specified behavior remains visible.
+
+Derived from: Meszaros, xUnit Test Patterns, Obscure Test
+
+| option | default | meaning |
+| --- | --- | --- |
+| `ancestorTests` | `false`; rust: `true` | Count the tests of a module that tests an ancestor module as tests of the nested module too: the integration tests of a Rust crate test all of it, private modules whose items the root re-exports included. |
+| `constructorPrefixes` | `["New","new"]`; rust: `["new"]` | A function named like one of these, or one of these followed by a word, is a constructor; a test may call it without showing what it specifies. |
+| `snakeCase` | `false`; rust: `true` | Compare names in snake case, as Rust tests are written. |
+| `testPrefix` | `"Test"`; rust: `""` | Prefix of the name of an owner test; a test without it is not one. |
+| `variantTests` | `true`; rust: `false` | Count `TestGet_Missing` as a test of `Get`; a name that adds a suffix to the symbol's own name restates the same contract. |
+
+```go invalid store_test.go
+package store
+
+import "testing"
+
+func TestStore_Get(t *testing.T) {
+	check(t, 1)
+}
+
+func check(t *testing.T, want int) {
+	s := &Store{}
+	if s.Get() != want {
+		t.Fatal("get")
+	}
+}
+```
+
+```go valid store_test.go
+package store
+
+import "testing"
+
+func TestStore_Get(t *testing.T) {
+	s := newStore(t)
+	if s.Get() != 1 {
+		t.Fatal("get")
+	}
+}
+
+func newStore(t *testing.T) *Store {
+	t.Helper()
+	return &Store{}
 }
 ```
 
