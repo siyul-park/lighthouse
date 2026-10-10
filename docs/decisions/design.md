@@ -22,20 +22,69 @@ Dependency direction keeps stable, general code independent from specific policy
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/no-upward-dependency`](#depend-toward-the-stable-and-general) | Depend toward the stable and general | warn · model |  |  |
+| [`design/layers`](#dependencies-point-down-the-layers) | Dependencies point down the layers | warn · cel |  |  |
 | `design/general-lower-levels` | Lower-level code is general | info · model |  | Lower-level or reusable symbols MUST express their responsibility in the most general form that fully fits it and MUST NOT depend on caller-specific policy, types, lifecycle, or semantics. |
 | [`design/no-caller-dependency`](#lower-level-code-does-not-depend-on-its-callers) | Lower-level code does not depend on its callers | warn · model |  |  |
 | `design/general-extraction` | Generalize when extracting | info · model |  | Shared functionality MUST be generalized when extracted; it MUST NOT be moved downward merely to relocate complexity. |
 
-### Depend toward the stable and general
+### Dependencies point down the layers
 
-`design/no-upward-dependency` · module · warn · model
+`design/layers` · edge · warn · cel
 
-*Stable, general code must not break when specific code changes.*
+*Stable, general code must not break when specific code changes. The project says which modules are higher and which are lower; an import that points up, between peers of one layer, or across a forbidden line is reported. It follows import-linter's `layers`, `independence` and `forbidden` contracts (`layers`, `forbidden`, `ignore` with its `reason`) and ArchUnit's `layeredArchitecture`. Nothing is reported until `layers` or `forbidden` is configured: the layers belong to the project. A layer is a list of module globs, and `layers` lists them from the top down. In a glob `*` stands for characters inside one path segment and `**` for any number of segments, none included, so `app/**` also matches `app`. `::` and `/` both separate segments. A module that no layer names is not judged. Only imports between modules of the project count; an external module is ignored. An import is reported when it points to a higher layer, when `independent` is on and it joins two modules of one layer that match different globs (modules under one glob may import each other), or when it matches a `forbidden` entry. An import that matches an `ignore` entry is skipped, and its `reason` says why. A module that matches the globs of several layers belongs to the first of them: the first matching layer wins, and `fromLayer` and `toLayer` in the evidence are those indices. Deferred: an `ignore` entry that matches no import is not reported as stale, as import-linter's `unmatched_ignore_imports_alerting` would. A rule judges one import at a time and cannot see that nothing matched (see the known gaps in docs/roadmap.md). Go: a module is a package, named by its directory relative to the project root (`internal/domain`). Rust: a module is a crate or one of its modules, named by the crate and the `mod` path (`my_crate/domain/order`); the crate root is the crate name.*
 
-A symbol MUST NOT depend on code that is more specific, more context-dependent, or less stable than itself.
+A module MUST NOT depend on a module of a higher layer, and modules of one layer MUST stay independent of each other, as the project's layers state.
 
-Derived from: Martin, Stable Dependencies Principle
+Derived from: import-linter, layers, independence and forbidden contracts; ArchUnit, layeredArchitecture; Martin, Stable Dependencies Principle
+
+| option | default | meaning |
+| --- | --- | --- |
+| `forbidden` | `[]` | Imports that are never allowed, each an object `{from, to}` of the globs of the importing and the imported module. |
+| `ignore` | `[]` | Imports that are allowed although they break a contract, each an object `{from, to, reason}`: the globs of both modules and the reason it stays. |
+| `independent` | `true` | Modules of one layer that match different globs do not import each other. |
+| `layers` | `[]` | The layers from the top down, each a list of module globs, such as `[["app/cli"], ["app/**"], ["app/model"]]`. A module imports only modules of its own layer or below. |
+
+```go invalid go.mod
+module example.com/app
+
+go 1.26
+```
+
+```go invalid domain/domain.go
+package domain
+
+import "example.com/app/infra"
+
+func Load() string { return infra.Read() }
+```
+
+```go invalid infra/infra.go
+package infra
+
+func Read() string { return "" }
+```
+
+```go valid go.mod
+module example.com/app
+
+go 1.26
+```
+
+```go valid domain/domain.go
+package domain
+
+import "example.com/app/infra"
+
+func Load() string { return infra.Read() }
+```
+
+```go valid infra/infra.go
+package infra
+
+func Read() string { return "" }
+```
+
+Also: rust
 
 ### Lower-level code does not depend on its callers
 
@@ -53,10 +102,158 @@ Physical layout should make ownership and collaboration visible while preserving
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/owner-file` | One owner, one file | warn · model |  | Symbols with one owner and cohesive responsibility MUST share a file. |
+| [`design/owner-file`](#one-owner-one-file) | One owner, one file | info · cel |  |  |
+| [`design/misplaced-symbol`](#a-function-lives-with-what-it-uses) | A function lives with what it uses | info · cel |  |  |
+| [`design/tiny-modules`](#a-module-earns-its-boundary) | A module earns its boundary | info · cel |  |  |
 | [`design/contiguity`](#collaborators-stay-close) | Collaborators stay close | warn · proximity | suggested |  |
 | `design/layout` | Layout shows ownership | info · model |  | Files and declaration order MUST make ownership, responsibility, and relationships easy to read. |
 | `design/meaningful-separation` | Separation marks a boundary | info · model |  | Physical separation MUST represent a real responsibility, ownership, or abstraction boundary. |
+
+### One owner, one file
+
+`design/owner-file` · symbol · info · cel
+
+*A reader finds an owner and everything it owns in one place. This is a review signal: most findings are deliberate splits of an owner by concern, which the code model cannot tell from accidents, and no tool backs the Go convention of one file per receiver type. A method is reported when it is declared outside the unit of its type: its file, or its module and the modules below it (option `unit`). A private free function is reported the same way when every production caller of it is a method of one type that is declared outside the unit and the function calls or references that type or one of its members. A function named like a constructor is not reported. Go: All methods of a receiver type stay in the file of the type (`unit: file`). Rust: The methods of an inherent `impl` stay in the module of the type or in a module below it (`unit: module-tree`): a type with a child module for its impls keeps them together. The code model names the module of a method after its type, not after the `impl`, so the module tree is read from files: `m.rs` holds `m/`, a crate root or `mod.rs` the directory it is in. An impl in a sibling or parent module is reported. A method of a trait impl is exempt, because the trait decides where it is written; the code model marks it by an id that carries the trait. A type that the project does not declare has no module to keep to.*
+
+Symbols with one owner and cohesive responsibility MUST share a file.
+
+| option | default | meaning |
+| --- | --- | --- |
+| `constructorPrefixes` | `["New","new"]`; rust: `["new"]` | A function named like one of these, or one of these followed by a word, is a constructor: it builds the type and sits where the constructors are. |
+| `unit` | `"file"`; rust: `"module-tree"` | Where the members of a type must be: `file` (the file of the type) or `module-tree` (the module of the type or one below it). |
+
+```go invalid store.go
+package sample
+
+type Store struct{ items []int }
+```
+
+```go invalid total.go
+package sample
+
+func (s *Store) Total() int { return len(s.items) }
+```
+
+```go valid
+package sample
+
+type Store struct{ items []int }
+
+func (s *Store) Total() int { return count(s) }
+
+func count(s *Store) int { return len(s.items) }
+```
+
+Also: rust
+
+### A function lives with what it uses
+
+`design/misplaced-symbol` · symbol · info · cel · strict
+
+*A function whose every use lies in one other module is that module's code, kept here by accident of history. This is Fowler's Move Function (Refactoring, 2nd ed.) with the foreign-data measure of Lanza and Marinescu (2006). No tool checks it: Sonar and PMD judge coupling of a class, not where a function belongs. A free function is reported when everything it calls or references in the project lies in one other module, at least `minUses` distinct functions, methods or fields of it (naming its constants and types ties nothing), and nothing in its own module, and nothing uses it as a value (a function that fills a table of handlers lives where the table is). Symbols outside the project are not counted, and neither is a module that contains the function's module: a submodule uses its parent as a matter of course. Types are not judged: the code model states no uses of a type. A function of fewer than `minStatements` statements is too little to judge, and so are the functions that start or wire up the program: those of a Go `main` package or the root of a Rust binary, and those an `init` function or a package variable's initializer uses. Go: A package function that uses only another package. Rust: A free function that uses only another module of the crate or another crate of the workspace.*
+
+A function SHOULD live in the module whose symbols it uses.
+
+Derived from: Fowler, Refactoring 2nd ed., Move Function; Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006
+
+| option | default | meaning |
+| --- | --- | --- |
+| `includeExported` | `false` | Also judge exported functions, whose callers would have to change. |
+| `minStatements` | `3` | Fewest statements a function must have to be judged. |
+| `minUses` | `3` | Fewest distinct symbols of the other module the function must use. |
+
+```go invalid app/app.go
+package app
+
+import "example.com/app/store"
+
+func Run() int { return load() }
+
+func load() int {
+	a := store.Read()
+	b := store.Count()
+	c := store.Scan()
+	return a + b + c
+}
+```
+
+```go valid app/app.go
+package app
+
+import "example.com/app/store"
+
+func Run() int { return load() }
+
+func load() int {
+	a := store.Read()
+	b := store.Count() + store.Scan()
+	return a + b + local()
+}
+
+func local() int { return 0 }
+```
+
+Also: rust
+
+### A module earns its boundary
+
+`design/tiny-modules` · module · info · cel · strict
+
+*A small module with one user is that user's detail, and a module that only forwards others adds a hop without a concept. No tool checks this: Sonar and PMD bound the size of a file or class from above only. A module is reported when it has fewer than `minLines` lines and either exactly one production module imports it or it declares nothing of its own. Lines run from the first to the last declaration of each file of the module, because the code model does not carry the length of a file. Declarations are the types, interfaces, constants, variables and functions at module level, without `init`; a Rust re-export is not one. Tests and generated code are not judged, and a module that tests another is not a dependent. Go: A package is a module. Rust: A crate or a `mod` is a module; a crate root that only declares `mod` and `pub use` is reported when small, as the facade it is.*
+
+A module SHOULD hold enough to justify its boundary: a small module that one other module uses SHOULD be merged into its user, or its boundary justified.
+
+Derived from: Fowler, Refactoring 2nd ed., Inline Class
+
+| option | default | meaning |
+| --- | --- | --- |
+| `minLines` | `300` | Fewer lines than this make a module small. |
+
+```go invalid go.mod
+module example.com/app
+
+go 1.26
+```
+
+```go invalid app/app.go
+package app
+
+import "example.com/app/tiny"
+
+func Run() int { return tiny.One() }
+
+func Other() int { return 2 }
+
+func Third() int { return 3 }
+
+func Fourth() int { return 4 }
+
+func Fifth() int { return 5 }
+```
+
+```go invalid tiny/tiny.go
+package tiny
+
+func One() int { return 1 }
+```
+
+```go valid cli/cli.go
+package cli
+
+import "example.com/app/tiny"
+
+func Run() int { return tiny.One() }
+
+func Other() int { return 2 }
+
+func Third() int { return 3 }
+
+func Fourth() int { return 4 }
+
+func Fifth() int { return 5 }
+```
+
+Also: rust
 
 ### Collaborators stay close
 
@@ -232,6 +429,7 @@ Function structure should make meaningful behavior reusable and readable, not me
 | [`design/private-helper-callers`](#private-helpers-have-two-callers) | Private helpers have two callers | info · cel |  |  |
 | [`design/no-single-use-wrapper`](#inline-single-use-wrappers) | Inline single-use wrappers | warn · cel |  |  |
 | [`design/prefer-method`](#behavior-lives-with-its-owner) | Behavior lives with its owner | warn · cel |  |  |
+| [`design/feature-envy`](#a-function-that-wants-another-types-members) | A function that wants another type's members | info · cel |  |  |
 | `design/single-abstraction-level` | One abstraction level per function | info · model |  | One function MUST stay at one abstraction level. |
 | [`design/callers-before-callees`](#callers-before-callees) | Callers before callees | warn · cel | suggested |  |
 
@@ -239,7 +437,7 @@ Function structure should make meaningful behavior reusable and readable, not me
 
 `design/private-helper-callers` · symbol · info · cel · strict
 
-*A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count. Forwarding wrappers are reported by `design/no-single-use-wrapper`, and a function used as a value is not judged. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.*
+*A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count, and neither does a package variable that calls the helper in its initializer: it is a table of handlers, not a caller to compare the helper with. Forwarding wrappers are reported by `design/no-single-use-wrapper`, and a function used as a value is not judged. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.*
 
 A private helper SHOULD have at least two callers.
 
@@ -350,6 +548,63 @@ func newStore() *Store { return &Store{items: []int{}} }
 
 Also: rust
 
+### A function that wants another type's members
+
+`design/feature-envy` · symbol · info · cel · strict
+
+*A function that spends its body on the members of one type is that type's behavior wearing another name. This is Fowler's Feature Envy (Refactoring, 2nd ed.) with the detection strategy of Lanza and Marinescu (2006): the function accesses more than a few foreign attributes (ATFD above FEW, which they put at 3) of a few classes only (FDP at most 2; here, one). Sonar has no rule for it, and PMD's design rules have a God Class (the same authors' strategy) but no feature-envy rule. A free function is reported when it uses at least `minMembers` distinct members of one type of its own module (fields, and methods that it calls; the variants of an enum are not members) and no member of any other type, and nothing uses it as a value. Passing a value of the type on is not envy: parameters are not counted, only the members the body reaches. A function of fewer than `minStatements` statements is too little to judge, and so are the functions that start or wire up the program: those of a Go `main` package or the root of a Rust binary, and those an `init` function or a package variable's initializer uses. Go: A package function and the methods and fields of a type of its package. Rust: A free function and the methods and fields of a type of its module. Members the provider resolves only by name are not counted.*
+
+A function that uses only the members of one type SHOULD be a method of that type.
+
+Derived from: Fowler, Refactoring 2nd ed., Feature Envy; Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006, Feature Envy detection strategy
+
+| option | default | meaning |
+| --- | --- | --- |
+| `constructorPrefixes` | `["New","new"]`; rust: `["new"]` | A function named like one of these, or one of these followed by a word, is a constructor and has no receiver yet. |
+| `includeExported` | `false` | Also judge exported functions, whose callers outside the module would have to change. |
+| `minMembers` | `3` | Fewest distinct members of the type the function must use. |
+| `minStatements` | `3` | Fewest statements a function must have to be judged. |
+
+```go invalid
+package sample
+
+type Store struct {
+	items []int
+	total int
+	extra int
+}
+
+func (s *Store) Reset() { s.items = nil }
+
+func summary(s *Store) int {
+	n := len(s.items)
+	n += s.total
+	n += s.extra
+	return n
+}
+```
+
+```go valid
+package sample
+
+type Store struct {
+	items []int
+	total int
+}
+
+func (s *Store) Total() int { return s.total }
+
+func report(s *Store) int {
+	n := s.total
+	n += len(s.items)
+	return n + format(s)
+}
+
+func format(s *Store) int { return len(s.items) }
+```
+
+Also: rust
+
 ### Callers before callees
 
 `design/callers-before-callees` · file · warn · cel · fix: suggested
@@ -384,6 +639,7 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | `design/terminology` | One term, one concept | info · model |  | One term MUST represent one concept across packages. |
+| [`design/unique-type-names`](#one-type-name-one-concept) | One type name, one concept | info · cel |  |  |
 | `design/minimal-names` | Minimal names | info · model |  | One word SHOULD be the default; a multi-word name MUST add only the minimum qualifier needed to express a distinction. |
 | [`design/max-name-words`](#names-have-at-most-a-few-words) | Names have at most a few words | warn · cel |  |  |
 | [`design/no-redundant-qualifiers`](#no-redundant-qualifiers) | No redundant qualifiers | warn · cel |  |  |
@@ -392,6 +648,34 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 | `design/predicate-names` | Predicate names state their form | warn · model |  | Predicates MUST name their form: `HasX` for containing or registering X, `IsX` for a state predicate, `MatchX` for comparison or validation against X, and a bare `X` for a direct boolean value. `At` MUST be used for position or time predicates. |
 | `design/reserved-verbs` | Action verbs are reserved | info · model |  | Configured action verbs, by default `Build`, `Compile`, `Publish`, `Capture`, and `Use`, MUST be reserved for actions or transitions. |
 | `design/plural-collections` | Singular capabilities, plural collections | info · model |  | Capability names MUST be singular; collections and stores MUST be plural. |
+
+### One type name, one concept
+
+`design/unique-type-names` · symbol · info · cel · strict
+
+*The deterministic companion of `design/terminology`: two public types of one name in different modules make a reader suspect they are the same concept, or hide that they are not. No tool checks this exactly; Sonar's S101 (type names follow a convention) is the nearest naming-consistency rule. A public type of production code is reported when another module of the project declares a public type of the same name, one finding for each declaration. The names in `allow` are idiomatic in every module and are not judged. Types of tests and of generated files are not compared, and only types of one language are: a type mirrored in another language is not a homonym. Go: `Error`, `Result`, `Options` and `Config` are the usual per-package names. Interfaces are not compared. Rust: `Error` and `Result` are idiomatic in every module.*
+
+A public type name SHOULD name one concept in the project; two modules SHOULD NOT export types of the same name.
+
+Derived from: Sonar, S101 naming conventions
+
+| option | default | meaning |
+| --- | --- | --- |
+| `allow` | `["Error","Result","Options","Config"]` | Type names that are idiomatic in every module. |
+
+```go invalid billing/billing.go
+package billing
+
+type Account struct{}
+```
+
+```go valid billing/billing.go
+package billing
+
+type Invoice struct{}
+```
+
+Also: rust
 
 ### Names have at most a few words
 

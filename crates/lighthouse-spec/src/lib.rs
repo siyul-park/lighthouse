@@ -37,7 +37,7 @@ pub use model::{
     Content, DecisionStatus, Domain, Example, ExampleFile, ExampleKind, Expect, Scope, Subject,
     authored_severity,
 };
-pub use options::{ObjectType, OptionSchema, OptionType, OptionsSchema};
+pub use options::{ObjectType, OptionSchema, OptionType, OptionsSchema, Shape};
 pub use pack::{Pack, PackSpec, Section, SectionSpec};
 pub use project::{
     Config, FILE_NAME, FILE_NAMES, Formatter, FormatterOutput, FormatterSpec, FormatterStdin,

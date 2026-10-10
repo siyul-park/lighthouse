@@ -270,3 +270,32 @@ fn columns_count_bytes_not_characters() {
     assert_eq!(after.span.start.col as usize, at);
     assert_eq!(after.span.end.col as usize, line.len() + 1);
 }
+
+#[test]
+fn a_static_initializer_uses_what_it_names_and_enum_variants_are_variants() {
+    let dir = project(&[
+        ("Cargo.toml", MANIFEST),
+        (
+            "src/lib.rs",
+            "pub enum Mode { Fast, Slow }\nfn run() {}\nstatic HANDLERS: &[fn()] = &[run];\n",
+        ),
+    ]);
+    let result = index(dir.path(), serde_json::json!({}));
+    assert!(result.incomplete.is_empty(), "{:?}", result.incomplete);
+    let fragment = &result.fragments[0];
+    let variants: Vec<&str> = fragment
+        .symbols
+        .iter()
+        .filter(|s| s.kind == wire::SymbolKind::Variant)
+        .map(|s| s.id.as_str())
+        .collect();
+    assert_eq!(
+        variants,
+        ["demo::Mode::Fast#variant", "demo::Mode::Slow#variant"]
+    );
+    let uses_run = fragment.edges.iter().any(|e| {
+        matches!(&e.from, wire::Node::Symbol(from) if from == "demo::HANDLERS#var")
+            && e.to == "demo::run#function"
+    });
+    assert!(uses_run, "{:?}", fragment.edges);
+}

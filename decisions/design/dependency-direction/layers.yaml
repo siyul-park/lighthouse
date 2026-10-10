@@ -1,0 +1,290 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/layers
+  uid: be0e8004-85e1-4b34-abb9-30dc46192e5c
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: dependency-direction
+spec:
+  title: Dependencies point down the layers
+  context: >-
+    Stable, general code must not break when specific code changes. The
+    project says which modules are higher and which are lower; an import that
+    points up, between peers of one layer, or across a forbidden line is
+    reported. It follows import-linter's `layers`, `independence` and
+    `forbidden` contracts (`layers`, `forbidden`, `ignore` with its `reason`)
+    and ArchUnit's `layeredArchitecture`. Nothing is reported until `layers`
+    or `forbidden` is configured: the layers belong to the project.
+
+    A layer is a list of module globs, and `layers` lists them from the top
+    down. In a glob `*` stands for characters inside one path segment and `**`
+    for any number of segments, none included, so `app/**` also matches `app`.
+    `::` and `/` both separate segments. A module that no layer names is not
+    judged. Only imports between modules of the project count; an external
+    module is ignored. An import is reported when it points to a higher layer,
+    when `independent` is on and it joins two modules of one layer that match
+    different globs (modules under one glob may import each other), or when it
+    matches a `forbidden` entry. An import that matches an `ignore` entry is
+    skipped, and its `reason` says why.
+
+    A module that matches the globs of several layers belongs to the first of
+    them: the first matching layer wins, and `fromLayer` and `toLayer` in the
+    evidence are those indices.
+
+    Deferred: an `ignore` entry that matches no import is not reported as
+    stale, as import-linter's `unmatched_ignore_imports_alerting` would. A rule
+    judges one import at a time and cannot see that nothing matched (see the
+    known gaps in docs/roadmap.md).
+
+    Go: a module is a package, named by its directory relative to the project
+    root (`internal/domain`).
+
+    Rust: a module is a crate or one of its modules, named by the crate and
+    the `mod` path (`my_crate/domain/order`); the crate root is the crate name.
+  scope:
+    domain: code
+    subject: edge
+  requirement: >-
+    A module MUST NOT depend on a module of a higher layer, and modules of one
+    layer MUST stay independent of each other, as the project's layers state.
+  severity: warn
+  options:
+    type: object
+    properties:
+      layers:
+        type: array
+        items:
+          type: array
+          items:
+            type: string
+        default: []
+        description: >-
+          The layers from the top down, each a list of module globs, such as
+          `[["app/cli"], ["app/**"], ["app/model"]]`. A module imports only
+          modules of its own layer or below.
+      independent:
+        type: boolean
+        default: true
+        description: >-
+          Modules of one layer that match different globs do not import each
+          other.
+      forbidden:
+        type: array
+        items:
+          type: object
+          required: [from, to]
+          properties:
+            from:
+              type: string
+            to:
+              type: string
+        default: []
+        description: >-
+          Imports that are never allowed, each an object `{from, to}` of the
+          globs of the importing and the imported module.
+      ignore:
+        type: array
+        items:
+          type: object
+          required: [from, to, reason]
+          properties:
+            from:
+              type: string
+            to:
+              type: string
+            reason:
+              type: string
+        default: []
+        description: >-
+          Imports that are allowed although they break a contract, each an
+          object `{from, to, reason}`: the globs of both modules and the reason
+          it stays.
+    additionalProperties: false
+  check:
+    type: cel
+    select: edge
+    with:
+      - name: from
+        expr: >-
+          edge.kind == 'imports' && edge.to.kind == 'module'
+          ? layerOf(edge.from.module, options.layers) : -1
+      - name: to
+        expr: >-
+          edge.kind == 'imports' && edge.to.kind == 'module'
+          ? layerOf(edge.to.module, options.layers) : -1
+      - name: contract
+        expr: >-
+          edge.kind != 'imports' || edge.to.kind != 'module' ? ''
+          : options.ignore.exists(i, globMatch(edge.from.module, i.from)
+              && globMatch(edge.to.module, i.to)) ? ''
+          : options.forbidden.exists(f, globMatch(edge.from.module, f.from)
+              && globMatch(edge.to.module, f.to)) ? 'forbidden'
+          : from >= 0 && to >= 0 && to < from ? 'layers'
+          : options.independent && from >= 0 && to == from
+              && !options.layers[from].exists(g, globMatch(edge.from.module, g)
+                  && globMatch(edge.to.module, g)) ? 'independence'
+          : ''
+    where: contract != ''
+    message: >-
+      {{ contract == 'forbidden'
+      ? edge.from.module + ' must not import ' + edge.to.module
+      : edge.from.module + ' (layer ' + string(from) + ') imports '
+        + edge.to.module + ' (layer ' + string(to) + '); '
+        + (contract == 'layers' ? 'dependencies must point down'
+           : 'peers in one layer stay independent') }}
+    evidence:
+      from: edge.from.module
+      to: edge.to.module
+      fromLayer: from
+      toLayer: to
+      contract: contract
+    identity:
+      subject: "'imports:' + edge.from.module + '->' + edge.to.module"
+  provenance:
+    wasDerivedFrom:
+      - "import-linter, layers, independence and forbidden contracts"
+      - "ArchUnit, layeredArchitecture"
+      - "Martin, Stable Dependencies Principle"
+  examples:
+    - name: go-import-points-up
+      language: go
+      kind: invalid
+      options:
+        layers: [["infra"], ["domain"]]
+      files:
+        - path: go.mod
+          body: "module example.com/app\n\ngo 1.26\n"
+        - path: domain/domain.go
+          body: "package domain\n\nimport \"example.com/app/infra\"\n\nfunc Load() string { return infra.Read() }\n"
+        - path: infra/infra.go
+          body: "package infra\n\nfunc Read() string { return \"\" }\n"
+      expect:
+        - line: 5
+    - name: go-import-points-down
+      language: go
+      kind: valid
+      canonical: true
+      options:
+        layers: [["domain"], ["infra"]]
+      files:
+        - path: go.mod
+          body: "module example.com/app\n\ngo 1.26\n"
+        - path: domain/domain.go
+          body: "package domain\n\nimport \"example.com/app/infra\"\n\nfunc Load() string { return infra.Read() }\n"
+        - path: infra/infra.go
+          body: "package infra\n\nfunc Read() string { return \"\" }\n"
+    - name: go-peers
+      language: go
+      kind: invalid
+      options:
+        layers: [["http", "grpc"]]
+      files:
+        - path: go.mod
+          body: "module example.com/app\n\ngo 1.26\n"
+        - path: http/http.go
+          body: "package http\n\nimport \"example.com/app/grpc\"\n\nfunc Serve() string { return grpc.Serve() }\n"
+        - path: grpc/grpc.go
+          body: "package grpc\n\nfunc Serve() string { return \"\" }\n"
+      expect:
+        - line: 5
+    - name: go-peers-may-be-dependent
+      language: go
+      kind: valid
+      options:
+        layers: [["http", "grpc"]]
+        independent: false
+      files:
+        - path: go.mod
+          body: "module example.com/app\n\ngo 1.26\n"
+        - path: http/http.go
+          body: "package http\n\nimport \"example.com/app/grpc\"\n\nfunc Serve() string { return grpc.Serve() }\n"
+        - path: grpc/grpc.go
+          body: "package grpc\n\nfunc Serve() string { return \"\" }\n"
+    - name: go-submodules-of-one-glob
+      language: go
+      kind: valid
+      options:
+        layers: [["http/**"], ["domain"]]
+      files:
+        - path: go.mod
+          body: "module example.com/app\n\ngo 1.26\n"
+        - path: http/api/api.go
+          body: "package api\n\nimport \"example.com/app/http/wire\"\n\nfunc Serve() string { return wire.Encode() }\n"
+        - path: http/wire/wire.go
+          body: "package wire\n\nfunc Encode() string { return \"\" }\n"
+    - name: go-forbidden
+      language: go
+      kind: invalid
+      options:
+        forbidden: [{from: "domain", to: "infra/**"}]
+      files:
+        - path: go.mod
+          body: "module example.com/app\n\ngo 1.26\n"
+        - path: domain/domain.go
+          body: "package domain\n\nimport \"example.com/app/infra/db\"\n\nfunc Load() string { return db.Read() }\n"
+        - path: infra/db/db.go
+          body: "package db\n\nfunc Read() string { return \"\" }\n"
+      expect:
+        - line: 5
+    - name: go-ignored-with-a-reason
+      language: go
+      kind: valid
+      options:
+        layers: [["infra"], ["domain"]]
+        ignore: [{from: "domain", to: "infra", reason: "the config loader moves down in the next release"}]
+      files:
+        - path: go.mod
+          body: "module example.com/app\n\ngo 1.26\n"
+        - path: domain/domain.go
+          body: "package domain\n\nimport \"example.com/app/infra\"\n\nfunc Load() string { return infra.Read() }\n"
+        - path: infra/infra.go
+          body: "package infra\n\nfunc Read() string { return \"\" }\n"
+    - name: rust-mod-points-up
+      language: rust
+      kind: invalid
+      options:
+        layers: [["workspace/infra"], ["workspace/domain"]]
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub mod domain;
+            pub mod infra;
+        - path: src/domain.rs
+          body: |-
+            use crate::infra::read;
+
+            pub fn load() -> String {
+                read()
+            }
+        - path: src/infra.rs
+          body: |-
+            pub fn read() -> String {
+                String::new()
+            }
+      expect:
+        - line: 3
+    - name: rust-mod-points-down
+      language: rust
+      kind: valid
+      canonical: true
+      options:
+        layers: [["workspace/domain"], ["workspace/infra"]]
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub mod domain;
+            pub mod infra;
+        - path: src/domain.rs
+          body: |-
+            use crate::infra::read;
+
+            pub fn load() -> String {
+                read()
+            }
+        - path: src/infra.rs
+          body: |-
+            pub fn read() -> String {
+                String::new()
+            }

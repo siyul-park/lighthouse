@@ -15,7 +15,9 @@ spec:
 
     Go: A review item, not an error: a helper with one caller may be
     justified by naming a policy or isolating an abstraction level. Test
-    callers do not count. Forwarding wrappers are reported by
+    callers do not count, and neither does a package variable that calls the
+    helper in its initializer: it is a table of handlers, not a caller to
+    compare the helper with. Forwarding wrappers are reported by
     `design/no-single-use-wrapper`, and a function used as a value is not
     judged.
 
@@ -37,7 +39,7 @@ spec:
       (func.kind == 'function' || func.kind == 'method')
       && func.visibility == 'private' && func.name != 'main' && func.name != 'init'
       && func.references == 0 && !func.satisfies_interface && !func.forwards_only
-      && size(production) == 1
+      && size(production) == 1 && production[0].kind != 'var'
     message: >-
       private {{ func.kind }} {{ func.name }} has one caller ({{ production[0].name }});
       review whether it is part of that caller or names a real policy
@@ -56,6 +58,12 @@ spec:
           body: "package sample\n\nfunc Run(x int) int { return clamp(x) + 1 }\n\nfunc clamp(x int) int {\n\tif x > 10 {\n\t\treturn 10\n\t}\n\treturn x\n}"
       expect:
         - line: 5
+    - name: called-by-a-table
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: "package sample\n\nvar handlers = map[string]func(int) int{\n\t\"clamp\": func(x int) int { return clamp(x) },\n}\n\nfunc clamp(x int) int {\n\tif x > 10 {\n\t\treturn 10\n\t}\n\treturn x\n}"
     - name: valid
       language: go
       kind: valid

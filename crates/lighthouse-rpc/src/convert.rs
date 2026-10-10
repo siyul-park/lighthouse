@@ -202,6 +202,7 @@ fn symbol_kind(kind: wire::SymbolKind) -> core::SymbolKind {
         wire::SymbolKind::Method => core::SymbolKind::Method,
         wire::SymbolKind::Type => core::SymbolKind::Type,
         wire::SymbolKind::Field => core::SymbolKind::Field,
+        wire::SymbolKind::Variant => core::SymbolKind::Variant,
         wire::SymbolKind::Const => core::SymbolKind::Const,
         wire::SymbolKind::Var => core::SymbolKind::Var,
         wire::SymbolKind::Interface => core::SymbolKind::Interface,

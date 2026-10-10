@@ -28,6 +28,10 @@ use crate::{
     table::Table,
 };
 
+mod hidden;
+mod homonyms;
+mod ownership;
+
 /// The analyzers a check needs when its expressions call `metrics`.
 pub(crate) const METRIC_ANALYZERS: [&str; 5] = [SIZE, CYCLOMATIC, COGNITIVE, NESTING, FAN];
 
@@ -52,6 +56,7 @@ pub(crate) struct Builder<'a> {
     keys: Vec<(String, &'a dyn OrderKey)>,
     measures: Option<Measures>,
     table: Arc<Table>,
+    names: Arc<homonyms::Names>,
     first_test: OnceCell<Option<Value>>,
 }
 
@@ -85,6 +90,7 @@ impl<'a> Builder<'a> {
             keys,
             measures,
             table: ctx.memo.slot(),
+            names: ctx.memo.slot(),
             first_test: OnceCell::new(),
         })
     }
@@ -260,6 +266,7 @@ impl<'a> Builder<'a> {
                 self.receiver_affinity(symbol),
             );
         }
+        self.placement_facts(map, symbol);
         if needs.mentions("local_callers") {
             map.insert("local_callers".to_owned(), self.local_callers(symbol));
         }
@@ -297,6 +304,24 @@ impl<'a> Builder<'a> {
         }
         if needs.mentions("helper_user") {
             map.insert("helper_user".to_owned(), self.helper_user(symbol));
+        }
+    }
+
+    /// The facts about where a symbol sits among the types, modules and tests
+    /// of the project.
+    fn placement_facts(&self, map: &mut Map<String, Value>, symbol: &Symbol) {
+        let needs = self.needs;
+        if needs.mentions("envy") {
+            map.insert("envy".to_owned(), self.envy(symbol));
+        }
+        if needs.mentions("owner_home") {
+            map.insert("owner_home".to_owned(), self.owner_home(symbol));
+        }
+        if needs.mentions("homonyms") {
+            map.insert("homonyms".to_owned(), self.homonyms(symbol));
+        }
+        if needs.mentions("hidden_target") {
+            map.insert("hidden_target".to_owned(), self.hidden_target(symbol));
         }
     }
 
@@ -471,40 +496,6 @@ impl<'a> Builder<'a> {
             .map_or_else(|| json!({}), |user| self.node(user))
     }
 
-    /// A private free function whose every production caller is a method of
-    /// one owner type, with how it relates to that owner.
-    fn receiver_affinity(&self, symbol: &Symbol) -> Value {
-        let project = self.project;
-        let none = || json!({});
-        if symbol.kind != SymbolKind::Function || symbol.visibility != Visibility::Private {
-            return none();
-        }
-        let callers: Vec<&Symbol> = project
-            .callers(&symbol.id)
-            .iter()
-            .filter(|id| !project.in_test(id))
-            .filter_map(|id| project.symbol(id))
-            .collect();
-        let Some(owner) = sole_owner(&callers) else {
-            return none();
-        };
-        let bare = owner
-            .rsplit_once('#')
-            .map_or(owner.as_str(), |(head, _)| head);
-        let takes_owner_param = project
-            .function(&symbol.id)
-            .is_some_and(|f| f.param_types.iter().any(|t| t == bare));
-        let uses_owner = uses_owner(project, symbol, &owner);
-        let owner_name = bare.rsplit("::").next().unwrap_or_default();
-        json!({
-            "owner": owner,
-            "owner_name": owner_name,
-            "callers": callers.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(),
-            "takes_owner_param": takes_owner_param,
-            "uses_owner": uses_owner,
-        })
-    }
-
     /// The production callers of a private function in source order, when every
     /// one of them lives in the function's file, it is never used as a value,
     /// and no call leads back to it. Empty when the order cannot be judged
@@ -525,7 +516,10 @@ impl<'a> Builder<'a> {
             .filter(|id| !project.in_test(id))
             .filter_map(|id| project.symbol(id))
             .collect();
+        // A package variable that calls it is a table of handlers: the order
+        // of its entries says nothing about who the helper belongs to.
         if callers.is_empty()
+            || callers.iter().any(|s| s.kind == SymbolKind::Var)
             || !callers.iter().all(|s| s.file == callee.file)
             || cyclic(project, callee, &callers)
         {
@@ -681,38 +675,6 @@ fn cyclic(project: &Project, callee: &Symbol, callers: &[&Symbol]) -> bool {
         }
     }
     false
-}
-
-/// The owner every caller is a method of, when there is at least one caller
-/// and they all are methods of the same owner.
-fn sole_owner(callers: &[&Symbol]) -> Option<String> {
-    let mut owners = callers.iter().map(|c| {
-        (c.kind == SymbolKind::Method)
-            .then(|| layout::owner_key(c))
-            .flatten()
-    });
-    let first = owners.next()??;
-    owners
-        .all(|o| o.as_deref() == Some(first.as_str()))
-        .then_some(first)
-}
-
-/// Whether the function calls or references the owner type or one of its
-/// members: without that, it has no more to do with the owner than with any
-/// other type, however few callers it has.
-fn uses_owner(project: &Project, symbol: &Symbol, owner: &str) -> bool {
-    let owner_id = project
-        .symbol(&SymbolId::parse(owner).unwrap_or_else(|| symbol.id.clone()))
-        .map(|o| o.id.clone());
-    let Some(owner_id) = owner_id else {
-        return false;
-    };
-    project.uses(&symbol.id).iter().any(|used| {
-        *used == owner_id
-            || project
-                .symbol(used)
-                .is_some_and(|u| u.owner.as_ref() == Some(&owner_id))
-    })
 }
 
 /// Whether test code uses the symbol, or a member of it. Heuristic references

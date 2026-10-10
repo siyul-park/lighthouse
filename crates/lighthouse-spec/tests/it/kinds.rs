@@ -85,6 +85,9 @@ fn a_set_of_option_properties_is_a_closed_object_schema() {
             kind: OptionType::Integer,
             default: json!(3),
             description: "Limit.".to_owned(),
+            items: None,
+            properties: Default::default(),
+            required: Vec::new(),
         },
     )]));
 

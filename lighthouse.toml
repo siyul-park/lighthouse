@@ -25,6 +25,27 @@ formatter = { argv = ["rustfmt", "--edition", "2024", "--emit", "stdout"], stdin
 "core/max-lines" = { level = "warn", options = { max = 1000 } }
 # Four words: the visitor methods of syn and the field names of SARIF are not ours to rename.
 "design/max-name-words" = { level = "warn", options = { max = 4 } }
+"design/unique-type-names" = "info"
+"design/tiny-modules" = "info"
+"design/feature-envy" = "info"
+"design/misplaced-symbol" = "info"
+
+# The workspace layers, top down: a crate imports crates of the layers below
+# it and never a peer of its own layer. The crate labels of binaries carry
+# their target (`lighthouse_cli[bin:lighthouse]`), so those globs end in `*`.
+[spec.rules."design/layers"]
+level = "warn"
+options.layers = [
+  ["lighthouse_cli*/**", "lighthouse_mcp/**", "lang_rust*/**"],
+  ["lighthouse_session/**"],
+  ["lighthouse_report/**", "lighthouse_store/**"],
+  ["lighthouse_engine/**", "lighthouse_checks/**", "lighthouse_rpc/**"],
+  ["lighthouse_plugin/**", "lighthouse_spec/**"],
+  ["lighthouse_model/**", "lighthouse_resource/**", "lighthouse_protocol/**", "lighthouse_process/**"],
+  ["plugins/lang-go/cmd/**"],
+  ["plugins/lang-go/provider/**"],
+  ["plugins/lang-go/sdk/**"],
+]
 
 # Fixtures and their goldens describe code on purpose; they are not the
 # project's own design.

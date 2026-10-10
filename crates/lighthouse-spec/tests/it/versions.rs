@@ -51,6 +51,9 @@ mod write {
                         kind: OptionType::Integer,
                         default: json!(3),
                         description: "Limit.".into(),
+                        items: None,
+                        properties: Default::default(),
+                        required: Vec::new(),
                     },
                 )]
                 .into(),

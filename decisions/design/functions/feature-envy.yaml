@@ -1,0 +1,219 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/feature-envy
+  uid: 12b3bc32-3d58-4eec-a202-728c95622ffe
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: functions
+    lighthouse/preset: strict
+spec:
+  title: A function that wants another type's members
+  context: >-
+    A function that spends its body on the members of one type is that type's
+    behavior wearing another name. This is Fowler's Feature Envy (Refactoring,
+    2nd ed.) with the detection strategy of Lanza and Marinescu (2006): the
+    function accesses more than a few foreign attributes (ATFD above FEW, which
+    they put at 3) of a few classes only (FDP at most 2; here, one). Sonar has
+    no rule for it, and PMD's design rules have a God Class (the same authors'
+    strategy) but no feature-envy rule.
+
+    A free function is reported when it uses at least `minMembers` distinct
+    members of one type of its own module (fields, and methods that it calls;
+    the variants of an enum are not members) and no member of any other type,
+    and nothing uses it as a value. Passing a value of the type on is not
+    envy: parameters are not counted, only the members the body reaches. A
+    function of fewer than `minStatements` statements is too little to judge,
+    and so are the functions that start or wire up the program: those of a Go
+    `main` package or the root of a Rust binary, and those an `init` function
+    or a package variable's initializer uses.
+
+    Go: A package function and the methods and fields of a type of its package.
+
+    Rust: A free function and the methods and fields of a type of its module.
+    Members the provider resolves only by name are not counted.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    A function that uses only the members of one type SHOULD be a method of
+    that type.
+  severity: info
+  options:
+    type: object
+    properties:
+      minMembers:
+        type: integer
+        default: 3
+        description: Fewest distinct members of the type the function must use.
+      includeExported:
+        type: boolean
+        default: false
+        description: >-
+          Also judge exported functions, whose callers outside the module would
+          have to change.
+      minStatements:
+        type: integer
+        default: 3
+        description: Fewest statements a function must have to be judged.
+      constructorPrefixes:
+        type: array
+        default: [New, new]
+        description: >-
+          A function named like one of these, or one of these followed by a
+          word, is a constructor and has no receiver yet.
+    additionalProperties: false
+  languages:
+    rust:
+      options:
+        constructorPrefixes: [new]
+  check:
+    type: cel
+    select: function
+    with:
+      - name: envy
+        expr: func.envy
+    where: >-
+      func.kind == 'function' && func.name != 'main' && func.name != 'init'
+      && (func.visibility == 'private' || options.includeExported)
+      && !func.constructor_named && func.references == 0
+      && func.statements >= options.minStatements
+      && size(envy) > 0 && !envy.entry && envy.count >= options.minMembers
+      && size(envy.others) == 0 && envy.same_module
+    message: >-
+      {{ func.name }} depends on {{ envy.target_name }}'s members
+      ({{ envy.member_names.join(', ') }}) only; consider a method of
+      {{ envy.target_name }}
+    evidence:
+      target: envy.target
+      members: envy.member_names
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+      - "Fowler, Refactoring 2nd ed., Feature Envy"
+      - "Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006, Feature Envy detection strategy"
+  examples:
+    - name: go-uses-three-fields-of-one-type
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Store struct {
+            	items []int
+            	total int
+            	extra int
+            }
+
+            func (s *Store) Reset() { s.items = nil }
+
+            func summary(s *Store) int {
+            	n := len(s.items)
+            	n += s.total
+            	n += s.extra
+            	return n
+            }
+      expect:
+        - line: 11
+    - name: go-uses-members-of-two-types
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Store struct {
+            	items []int
+            	total int
+            	extra int
+            }
+
+            type Cache struct{ hits int }
+
+            func summary(s *Store, c *Cache) int {
+            	n := len(s.items)
+            	n += s.total + s.extra
+            	n += c.hits
+            	return n
+            }
+    - name: go-uses-too-few-members
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Store struct {
+            	items []int
+            	total int
+            }
+
+            func (s *Store) Total() int { return s.total }
+
+            func report(s *Store) int {
+            	n := s.total
+            	n += len(s.items)
+            	return n + format(s)
+            }
+
+            func format(s *Store) int { return len(s.items) }
+    - name: rust-uses-three-fields-of-one-type
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store {
+                items: Vec<i32>,
+                total: i32,
+                extra: i32,
+            }
+
+            impl Store {
+                pub fn reset(&mut self) {
+                    self.items.clear();
+                }
+            }
+
+            fn summary(store: &Store) -> i32 {
+                let mut n = store.items.len() as i32;
+                n += store.total;
+                n += store.extra;
+                n
+            }
+      expect:
+        - line: 13
+    - name: rust-matches-over-the-variants-of-an-enum
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub enum Level {
+                Error,
+                Warn,
+                Info,
+            }
+
+            impl Level {
+                pub fn name(&self) -> &'static str {
+                    "level"
+                }
+            }
+
+            fn rank(text: &str) -> Option<Level> {
+                let lower = text.to_lowercase();
+                match lower.as_str() {
+                    "error" => Some(Level::Error),
+                    "warn" => Some(Level::Warn),
+                    _ => Some(Level::Info),
+                }
+            }

@@ -407,7 +407,7 @@ impl<'i> Walker<'i> {
             Hit::Item(sym) => match sym.kind {
                 SymbolKind::Function => self.idx.return_sym(&sym.id, unwrap),
                 SymbolKind::Type if !unwrap => Some(sym),
-                SymbolKind::Field if !unwrap => self.idx.variant_owner.get(&sym.id).cloned(),
+                SymbolKind::Variant if !unwrap => self.idx.variant_owner.get(&sym.id).cloned(),
                 _ => None,
             },
             Hit::Assoc(sym, name) => {
@@ -421,7 +421,7 @@ impl<'i> Walker<'i> {
     fn struct_hint(&self, s: &ExprStruct) -> Option<Sym> {
         match self.hit(&s.path, Ns::Type) {
             Hit::Item(sym) if sym.kind == SymbolKind::Type => Some(sym),
-            Hit::Item(sym) if sym.kind == SymbolKind::Field => {
+            Hit::Item(sym) if sym.kind == SymbolKind::Variant => {
                 self.idx.variant_owner.get(&sym.id).cloned()
             }
             _ => None,
@@ -682,7 +682,7 @@ impl<'i> Walker<'i> {
         match hit {
             Hit::Item(sym) => match sym.kind {
                 SymbolKind::Function => Some((EdgeKind::Calls, sym.id.clone())),
-                SymbolKind::Type | SymbolKind::Field | SymbolKind::Const | SymbolKind::Var => {
+                SymbolKind::Type | SymbolKind::Variant | SymbolKind::Const | SymbolKind::Var => {
                     Some((EdgeKind::References, sym.id.clone()))
                 }
                 _ => None,
@@ -805,7 +805,7 @@ impl<'i> Walker<'i> {
                     }
                 }
             }
-            Hit::Item(sym) if sym.kind == SymbolKind::Field => {
+            Hit::Item(sym) if sym.kind == SymbolKind::Variant => {
                 if let Some(at) = last_ident(&s.path) {
                     self.add(EdgeKind::References, sym.id.clone(), at);
                 }

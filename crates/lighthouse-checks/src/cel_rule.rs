@@ -15,6 +15,7 @@ use crate::{
     eval::{Fact, Frame, Template, cel_fact, compile, compile_all},
     facts,
     library::{self, Needs},
+    modules,
 };
 
 /// A CEL check with every expression compiled.
@@ -222,6 +223,8 @@ impl Run<'_> {
         let mut found = Vec::new();
         match self.rule.select {
             Select::Module => {
+                let stats = modules::stats(project);
+                let none = modules::Stats::default();
                 for module in &project.modules {
                     let Some((anchor, count)) = first_file.get(module.path.as_str()) else {
                         continue;
@@ -230,7 +233,12 @@ impl Run<'_> {
                         continue;
                     }
                     let files = files_of.get(module.path.as_str()).map_or(0, BTreeSet::len);
-                    let value = cel_fact(&facts::module(module, files, *count));
+                    let value = cel_fact(&facts::module(
+                        module,
+                        files,
+                        *count,
+                        stats.get(module.path.as_str()).unwrap_or(&none),
+                    ));
                     let place = Place {
                         file: anchor.file.clone(),
                         span: top_of_file(),

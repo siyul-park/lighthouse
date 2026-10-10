@@ -283,3 +283,88 @@ fn single_owner_keeps_names_within_one_module() {
     options.as_object_mut().unwrap().remove("ancestorTests");
     assert!(check(&w, SINGLE, options).is_empty());
 }
+
+const HIDDEN: &str = "testing/no-hidden-target";
+
+/// A package `m` with public `Get` and `Put`, and the test `name` that calls
+/// the test helper `check`, which calls `Get`.
+fn helped(name: &str) -> (World, Symbol, Symbol, Symbol) {
+    let mut w = World::default();
+    w.module("m", Some("m"), None);
+    w.module("m[test]", Some("m_test"), Some("m"));
+    let get = w.func("m", "Get", "m/a.ucm");
+    w.func("m", "Put", "m/a.ucm");
+    let test = w.symbol("m[test]", name, SymbolKind::Test, "m/a_test.ucm");
+    w.test_case(&test, &[]);
+    let check_helper = w.func("m[test]", "check", "m/a_test.ucm");
+    w.edge(EdgeKind::Calls, &test, &check_helper);
+    w.edge(EdgeKind::Calls, &check_helper, &get);
+    (w, get, test, check_helper)
+}
+
+#[test]
+fn hidden_target_flags_a_test_that_reaches_its_target_through_a_helper() {
+    let (w, ..) = helped("TestGet");
+    assert_eq!(w.names(&check(&w, HIDDEN, json!({}))), ["TestGet"]);
+}
+
+#[test]
+fn hidden_target_accepts_a_test_that_calls_the_target_itself() {
+    let (mut w, get, test, _) = helped("TestGet");
+    w.edge(EdgeKind::Calls, &test, &get);
+    assert!(check(&w, HIDDEN, json!({})).is_empty());
+}
+
+#[test]
+fn hidden_target_accepts_setup_helpers_and_tests_named_after_nothing() {
+    let (w, ..) = helped("TestPut");
+    assert!(
+        check(&w, HIDDEN, json!({})).is_empty(),
+        "the helper calls Get, the test is about Put"
+    );
+    let (w, ..) = helped("TestFlow");
+    assert!(check(&w, HIDDEN, json!({})).is_empty(), "no owner name");
+}
+
+#[test]
+fn hidden_target_follows_the_naming_options_and_skips_helpers_that_are_cases() {
+    let (w, ..) = helped("get");
+    assert!(check(&w, HIDDEN, json!({})).is_empty(), "not a Test name");
+    let options = json!({ "testPrefix": "", "snakeCase": true, "variantTests": false });
+    assert_eq!(w.names(&check(&w, HIDDEN, options)), ["get"]);
+
+    let (mut w, _, _, helper) = helped("TestGet");
+    w.test_case(&helper, &[]);
+    assert!(
+        check(&w, HIDDEN, json!({})).is_empty(),
+        "a helper that is a case"
+    );
+}
+
+#[test]
+fn hidden_target_reports_a_table_case_whose_helper_calls_the_target() {
+    let (mut w, _, test, _) = helped("TestGet");
+    let input = w.symbol("m", "Input", SymbolKind::Type, "m/a.ucm");
+    let field = w.member(&input, "Key", SymbolKind::Field, "m/a.ucm");
+    w.edge(EdgeKind::References, &test, &field);
+    assert_eq!(w.names(&check(&w, HIDDEN, json!({}))), ["TestGet"]);
+}
+
+#[test]
+fn hidden_target_accepts_a_test_that_references_its_target_too() {
+    let (mut w, get, test, _) = helped("TestGet");
+    w.edge(EdgeKind::References, &test, &get);
+    assert!(check(&w, HIDDEN, json!({})).is_empty());
+}
+
+#[test]
+fn hidden_target_accepts_a_setup_helper_that_only_builds() {
+    let (mut w, _, _, helper) = helped("TestGet");
+    let build = w.func("m", "NewStore", "m/a.ucm");
+    w.edge(EdgeKind::Calls, &helper, &build);
+    // The helper reaches nothing the test is named after: drop its call of Get.
+    let get = w.symbols.iter().find(|s| s.name == "Get").unwrap().clone();
+    w.edges
+        .retain(|e| e.to != lighthouse_model::Target::Path(get.id.as_str().to_owned()));
+    assert!(check(&w, HIDDEN, json!({})).is_empty());
+}

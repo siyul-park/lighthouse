@@ -225,15 +225,33 @@ func (u *unit) general(d *ast.GenDecl) {
 			if len(s.Names) == 1 {
 				extent = u.specExtent(d, s)
 			}
-			for _, name := range s.Names {
+			for i, name := range s.Names {
 				if name.Name == "_" {
 					continue
 				}
 				id := symbolID(kind, u.module, name.Name)
 				u.symbol(kind, name.Name, "", id, name.Pos(), s.End(), docText(s.Doc, d.Doc), extent)
+				if kind == kindVar {
+					u.initializer(id, initializersOf(s, i))
+				}
 			}
 		}
 	}
+}
+
+// initializer records what the initializer of a package variable uses, as
+// edges of the variable: a function named in a table of handlers is used there.
+func (u *unit) initializer(from string, values []ast.Expr) {
+	w := &uses{
+		res:     u.res,
+		info:    u.info(),
+		handled: map[ast.Node]bool{},
+		seen:    map[usage]bool{},
+	}
+	for _, value := range values {
+		ast.Walk(w, value)
+	}
+	u.siteEdges(from, w.all)
 }
 
 func (u *unit) typeSpec(s *ast.TypeSpec, d *ast.GenDecl) {
@@ -395,4 +413,16 @@ func baseName(e ast.Expr) string {
 
 func hasComponent(dir, name string) bool {
 	return slices.Contains(strings.Split(dir, "/"), name)
+}
+
+// initializersOf are the expressions that give the i-th name of a spec its
+// value: its own, or all of them when one call initializes several names.
+func initializersOf(s *ast.ValueSpec, i int) []ast.Expr {
+	if len(s.Values) == len(s.Names) {
+		return s.Values[i : i+1]
+	}
+	if i == 0 {
+		return s.Values
+	}
+	return nil
 }

@@ -79,6 +79,8 @@ pub struct World {
     pub comments: Vec<Comment>,
     pub tests: Vec<TestCase>,
     pub modules: Vec<Module>,
+    /// `(importer, imported)` module paths, as import edges of the model.
+    pub imports: Vec<(String, String)>,
 }
 
 pub fn at(line: u32) -> Span {
@@ -158,6 +160,11 @@ impl World {
             resolution: Resolution::Syntactic,
             site: None,
         });
+    }
+
+    /// Module `from` imports module `to`.
+    pub fn import(&mut self, from: &str, to: &str) {
+        self.imports.push((from.to_owned(), to.to_owned()));
     }
 
     pub fn forward(&mut self, from: &Symbol, to: &Symbol) {
@@ -246,6 +253,18 @@ impl World {
                     .iter()
                     .filter(|e| matches!(&e.from, Node::Symbol(id) if ids.contains(&id)))
                     .cloned()
+                    .chain(
+                        self.imports
+                            .iter()
+                            .filter(|(from, _)| ids.iter().any(|id| id.module() == from))
+                            .map(|(from, to)| Edge {
+                                kind: EdgeKind::Imports,
+                                from: Node::Module(from.clone()),
+                                to: Target::Path(to.clone()),
+                                resolution: Resolution::Syntactic,
+                                site: None,
+                            }),
+                    )
                     .collect(),
                 tests: self
                     .tests

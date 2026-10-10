@@ -141,8 +141,14 @@ impl Extractor<'_> {
             }
             Item::Enum(e) => self.type_item(m, &e.ident, &e.vis, &e.attrs, e, Shape::Enum(e)),
             Item::Type(t) => self.type_item(m, &t.ident, &t.vis, &t.attrs, t, Shape::Plain),
-            Item::Const(c) => self.value_item(m, &c.ident, &c.vis, &c.attrs, c, SymbolKind::Const),
-            Item::Static(s) => self.value_item(m, &s.ident, &s.vis, &s.attrs, s, SymbolKind::Var),
+            Item::Const(c) => {
+                self.value_item(m, &c.ident, &c.vis, &c.attrs, c, SymbolKind::Const);
+                self.initializer(m, &c.ident, SymbolKind::Const, &c.expr);
+            }
+            Item::Static(s) => {
+                self.value_item(m, &s.ident, &s.vis, &s.attrs, s, SymbolKind::Var);
+                self.initializer(m, &s.ident, SymbolKind::Var, &s.expr);
+            }
             Item::Trait(t) => self.trait_item(m, t),
             Item::Impl(i) => self.impl_item(m, i),
             Item::Macro(mac) => self.item_macro(mac),
@@ -370,11 +376,11 @@ impl Extractor<'_> {
     fn variants(&mut self, owner: &Owner, e: &syn::ItemEnum) {
         for variant in &e.variants {
             let name = variant.ident.to_string();
-            let id = symbol_id(&owner.module, &[&owner.name, &name], SymbolKind::Field);
+            let id = symbol_id(&owner.module, &[&owner.name, &name], SymbolKind::Variant);
             self.declare(
                 Decl {
                     id,
-                    kind: SymbolKind::Field,
+                    kind: SymbolKind::Variant,
                     visibility: owner.visibility,
                     owner: Some(owner.id.clone()),
                     span: span_of(self.src, variant),
@@ -383,6 +389,36 @@ impl Extractor<'_> {
                     name,
                 },
                 Node::Symbol(owner.id.clone()),
+            );
+        }
+    }
+
+    /// Records what the initializer of a const or static uses, as edges of the
+    /// item: a function named in a table of handlers is used there.
+    fn initializer(&mut self, m: ModId, ident: &syn::Ident, kind: SymbolKind, init: &syn::Expr) {
+        let module = self.idx.module_path(m).to_owned();
+        let name = ident.to_string();
+        let id = symbol_id(&module, &[&name], kind);
+        let sig: syn::Signature = syn::parse_quote!(fn initializer());
+        let block: Block = syn::parse_quote!({ #init });
+        let home = Home {
+            kind,
+            module_path: module,
+            parts: vec![name],
+            cx: TyCx {
+                module: m,
+                self_ty: None,
+                generics: generics_of(&syn::Generics::default(), None),
+            },
+        };
+        let facts = body::analyze(self.idx, self.src, &home, &sig, &block);
+        for u in &facts.sites {
+            self.edge_as(
+                u.kind,
+                Node::Symbol(id.clone()),
+                u.to.clone(),
+                u.resolution,
+                Some(u.site),
             );
         }
     }

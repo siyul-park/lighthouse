@@ -73,7 +73,7 @@
           },
           "kind": "contains",
           "resolution": "syntactic",
-          "to": "visibility::Kind::A#field"
+          "to": "visibility::Kind::A#variant"
         },
         {
           "from": {
@@ -81,7 +81,7 @@
           },
           "kind": "contains",
           "resolution": "syntactic",
-          "to": "visibility::Kind::B#field"
+          "to": "visibility::Kind::B#variant"
         },
         {
           "from": {
@@ -722,8 +722,8 @@
             }
           },
           "file": "src/lib.rs",
-          "id": "visibility::Kind::A#field",
-          "kind": "field",
+          "id": "visibility::Kind::A#variant",
+          "kind": "variant",
           "name": "A",
           "owner": "visibility::Kind#type",
           "span": {
@@ -750,8 +750,8 @@
             }
           },
           "file": "src/lib.rs",
-          "id": "visibility::Kind::B#field",
-          "kind": "field",
+          "id": "visibility::Kind::B#variant",
+          "kind": "variant",
           "name": "B",
           "owner": "visibility::Kind#type",
           "span": {

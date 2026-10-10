@@ -114,6 +114,32 @@ func helper(t *testing.T)             {}
 		require.Len(t, cases, 3, "only Test, TestAdd and Test_add are test cases")
 	})
 
+	t.Run("a package variable's initializer uses what it names", func(t *testing.T) {
+		root := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/p\n\ngo 1.22\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(root, "p.go"), []byte(
+			"package p\n\nfunc run() {}\n\nfunc build() int { return 1 }\n\nvar handlers = map[string]func(){\"a\": run}\n\nvar size = build()\n"), 0o644))
+
+		result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
+			Project:  sdk.ProjectRef{Root: root},
+			Language: "go",
+			Files:    goFiles(t, root),
+		})
+
+		require.NoError(t, err)
+		require.Empty(t, result.Incomplete)
+		uses := map[string]string{}
+		for _, f := range result.Fragments {
+			for _, e := range f.Edges {
+				if e.From.Symbol != "" {
+					uses[e.From.Symbol+" "+e.Kind] = e.To
+				}
+			}
+		}
+		require.Equal(t, ".::run", uses[".::handlers#var references"])
+		require.Equal(t, ".::build", uses[".::size#var calls"])
+	})
+
 	t.Run("reports an unknown option key as incomplete", func(t *testing.T) {
 		g := provider.New("lang-go", "test")
 		options := map[string]json.RawMessage{"go": json.RawMessage(`{"tagz":[]}`)}
@@ -133,6 +159,27 @@ func helper(t *testing.T)             {}
 
 		require.NoError(t, err)
 		require.Empty(t, result.Incomplete)
+	})
+
+	t.Run("a toolchain missing from PATH leaves the files incomplete, never clean", func(t *testing.T) {
+		root := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/p\n\ngo 1.22\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(root, "p.go"), []byte("package p\n"), 0o644))
+		t.Setenv("PATH", t.TempDir())
+		t.Setenv("GOROOT", "")
+
+		result, err := provider.New("lang-go", "test").Index(sdk.IndexParams{
+			Project:  sdk.ProjectRef{Root: root},
+			Language: "go",
+			Files:    goFiles(t, root),
+		})
+
+		require.NoError(t, err)
+		require.NotEmpty(t, result.Incomplete, "no go command must not look like a clean run")
+		require.Contains(t, result.Incomplete[0].Reason, "go")
+		for _, f := range result.Fragments {
+			require.Empty(t, f.Symbols, "nothing is claimed of a file that was not analyzed")
+		}
 	})
 
 	t.Run("reports a missing go command as incomplete", func(t *testing.T) {

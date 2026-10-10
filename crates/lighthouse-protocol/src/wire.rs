@@ -204,6 +204,7 @@ pub enum SymbolKind {
     Method,
     Type,
     Field,
+    Variant,
     Const,
     Var,
     Interface,

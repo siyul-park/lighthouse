@@ -195,12 +195,9 @@ impl Decision {
                 .properties
                 .get(key)
                 .ok_or_else(|| Error::invalid(id, format!("unknown option `{key}`")))?;
-            if !property.kind.accepts(value) {
-                return Err(Error::invalid(
-                    id,
-                    format!("option `{key}` must be {}", property.kind),
-                ));
-            }
+            property
+                .check(value, &format!("option `{key}`"))
+                .map_err(|problem| Error::invalid(id, problem))?;
         }
         let overrides = language.and_then(|l| spec.languages.get(l));
         let mut resolved = Map::new();

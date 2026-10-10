@@ -158,6 +158,11 @@ Public adoption waits until the decision loop has been shown working.
 | Session domain | decisions about agent actions; a PreToolUse gate that allows, asks or denies |
 
 ## Known gaps
+- `testing/no-hidden-target` cannot tell a helper that returns or asserts on the target's
+  result from one that only builds with it (a data-flow fact: built or consumed against
+  returned or asserted), so it is info.
+- `design/layers` does not report an `ignore` entry that matches no import (import-linter's
+  `unmatched_ignore_imports_alerting`): a cel rule judges one edge at a time.
 - Rename fixes are off: no provider declares complete reference sites yet.
 - External binaries in `command` providers are trusted by their command line, not by
   content.

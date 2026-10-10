@@ -65,6 +65,7 @@ fn subject_run_scope() {
         (Subject::File, RunScope::File),
         (Subject::Test, RunScope::File),
         (Subject::Module, RunScope::Project),
+        (Subject::Edge, RunScope::Project),
         (Subject::Project, RunScope::Project),
     ];
     for (subject, want) in cases {
@@ -109,6 +110,40 @@ fn decision_resolve_options() {
             .contains("unknown option")
     );
     assert!(decision.resolve_options(&set(json!("big")), None).is_err());
+}
+
+#[test]
+fn decision_resolve_options_checks_the_shape_of_lists_and_objects() {
+    let decision = bundled("design/layers");
+    let options = |ignore| Map::from_iter([("ignore".to_owned(), ignore)]);
+    let ok = json!([{ "from": "a", "to": "b", "reason": "moves down" }]);
+    assert!(decision.resolve_options(&options(ok), None).is_ok());
+    let missing = json!([{ "from": "a", "to": "b" }]);
+    let problem = decision
+        .resolve_options(&options(missing), None)
+        .unwrap_err()
+        .to_string();
+    assert!(problem.contains("needs `reason`"), "{problem}");
+    let wrong = json!([{ "from": "a", "to": 1, "reason": "r" }]);
+    assert!(decision.resolve_options(&options(wrong), None).is_err());
+    let extra = json!([{ "from": "a", "to": "b", "reason": "r", "why": "x" }]);
+    assert!(decision.resolve_options(&options(extra), None).is_err());
+    let layers = Map::from_iter([("layers".to_owned(), json!([["a"], "b"]))]);
+    assert!(decision.resolve_options(&layers, None).is_err());
+}
+
+#[test]
+fn shape() {
+    let shape: lighthouse_spec::Shape = serde_json::from_value(json!({
+        "type": "array",
+        "items": { "type": "string" },
+    }))
+    .unwrap();
+    assert_eq!(shape.kind, lighthouse_spec::OptionType::Array);
+    assert_eq!(
+        shape.items.unwrap().kind,
+        lighthouse_spec::OptionType::String
+    );
 }
 
 #[test]
