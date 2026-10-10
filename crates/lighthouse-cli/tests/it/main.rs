@@ -1,6 +1,7 @@
 //! The command line against real projects and language plugins, one binary.
 
 mod agent;
+mod cache;
 mod checks;
 mod cli;
 mod command_sarif;

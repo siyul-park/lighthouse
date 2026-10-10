@@ -16,6 +16,7 @@ mod directives;
 mod fixes;
 mod go;
 mod layout;
+mod reach;
 mod rules;
 mod rust;
 mod support;
