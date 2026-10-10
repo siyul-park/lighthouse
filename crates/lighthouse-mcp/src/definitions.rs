@@ -18,7 +18,8 @@ pub fn all() -> Vec<Tool> {
                 "diff": { "type": "string", "description": "Report only files changed since the merge base with this git ref." },
                 "rules": { "type": "array", "items": { "type": "string" }, "description": format!("Run only these rules; {FORMATS}.") },
                 "limit": { "type": "integer", "minimum": 1, "description": "Most findings to return, errors first, then larger groups (default 25); `omitted` says what was left out." },
-                "detail": { "type": "string", "enum": ["compact", "full"], "description": "Default `compact`. `full` returns one self-contained record per finding (requirement, context, evidence, expected structure, resolve command)." }
+                "detail": { "type": "string", "enum": ["compact", "full"], "description": "Default `compact`. `full` returns one self-contained record per finding (requirement, context, evidence, expected structure, resolve command)." },
+                "noCache": { "type": "boolean", "description": "Run every rule instead of reusing the findings of earlier runs kept in `.lighthouse/cache`. The findings are the same either way." }
             }),
             &[],
         ),

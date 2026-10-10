@@ -9,6 +9,7 @@ test = false
 doctest = false
 
 [dependencies]
+lighthouse-cache.workspace = true
 lighthouse-checks.workspace = true
 lighthouse-engine.workspace = true
 lighthouse-model.workspace = true

@@ -33,6 +33,8 @@ struct CheckArgs {
     rules: Vec<String>,
     limit: Option<usize>,
     detail: Option<Detail>,
+    #[serde(default, rename = "noCache")]
+    no_cache: bool,
 }
 
 #[derive(Deserialize)]
@@ -123,6 +125,7 @@ fn check(args: CheckArgs) -> Outcome {
         diff: args.diff,
         rules: args.rules,
         store: true,
+        cache: !args.no_cache,
     };
     let checked = lighthouse_session::check(session, &request).map_err(fail)?;
     let outcome = &checked.outcome;

@@ -91,6 +91,11 @@ enum Command {
         /// judgment hides them stay out of the report.
         #[arg(long)]
         no_store: bool,
+        /// Run every rule instead of reusing the findings of earlier runs,
+        /// which are kept in `.lighthouse/cache`. The findings, their
+        /// fingerprints and the exit code are the same either way.
+        #[arg(long)]
+        no_cache: bool,
         /// Fail on warnings too.
         #[arg(long)]
         strict: bool,
@@ -129,6 +134,11 @@ enum Command {
         /// Use this config file; the project root is then the current directory.
         #[arg(long)]
         config: Option<PathBuf>,
+    },
+    /// Manage the result cache in `.lighthouse/cache`.
+    Cache {
+        #[command(subcommand)]
+        command: CacheCommand,
     },
     /// Review the findings `check` remembers and record judgments on them.
     ///
@@ -225,6 +235,13 @@ enum HookAgent {
 }
 
 #[derive(Subcommand)]
+enum CacheCommand {
+    /// Delete the result cache, and whatever the language plugins keep in it.
+    /// Nothing but time is lost: the next check fills it again.
+    Clean,
+}
+
+#[derive(Subcommand)]
 enum DecisionCommand {
     /// List the decisions that have a rule.
     List {
@@ -305,6 +322,7 @@ fn run(cli: Cli) -> Result<u8> {
             limit,
             detail,
             no_store,
+            no_cache,
             strict,
             max_warnings,
             allow_incomplete,
@@ -325,6 +343,7 @@ fn run(cli: Cli) -> Result<u8> {
                 only: &rules,
                 config: config.as_deref(),
                 store: !no_store,
+                cache: !no_cache,
             },
             &check::Output {
                 format,
@@ -343,6 +362,9 @@ fn run(cli: Cli) -> Result<u8> {
                 fixer,
             }),
         ),
+        Command::Cache {
+            command: CacheCommand::Clean,
+        } => cache_clean(),
         Command::Review { command } => review::run(command),
         Command::Decision {
             command: DecisionCommand::List { all },
@@ -378,6 +400,22 @@ fn run(cli: Cli) -> Result<u8> {
                 },
         } => Ok(hook::run(event, allow_incomplete)),
     }
+}
+
+fn cache_clean() -> Result<u8> {
+    let root = lighthouse_session::project_root()?;
+    let dir = lighthouse_session::cache_dir(&root);
+    let had = lighthouse_session::clean_cache(&root)?;
+    println!(
+        "{} {}",
+        if had {
+            "deleted"
+        } else {
+            "nothing to delete at"
+        },
+        dir.display()
+    );
+    Ok(0)
 }
 
 fn trust(revoke: bool, yes: bool) -> Result<u8> {

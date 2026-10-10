@@ -5,6 +5,7 @@
 //! the agent hooks only parse their own input and print the results of these.
 
 mod authoring;
+mod cache;
 mod check;
 mod decisions;
 mod docs;
@@ -22,6 +23,7 @@ mod validate;
 use std::error::Error;
 
 pub use authoring::{Authored, create_decision, update_decision};
+pub use cache::{LIMIT_VAR, cache_dir, clean_cache};
 pub use check::{CheckRequest, Checked, RunStatus, Summary, check};
 pub use decisions::{
     DecisionRow, DecisionTest, active_decisions, bundled_decision_rows, catalog_index,

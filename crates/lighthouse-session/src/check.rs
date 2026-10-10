@@ -12,7 +12,11 @@ use lighthouse_report::{Briefing, Detail, FixFile, ProposedFix};
 use lighthouse_spec::Catalog;
 use serde::Serialize;
 
-use crate::{Remembered, Result, Session, findings, scope};
+use crate::{
+    Remembered, Result, Session,
+    cache::{cache_dir, cache_limit},
+    findings, scope,
+};
 
 /// What to report on. The whole project is always analyzed.
 #[derive(Default)]
@@ -27,6 +31,10 @@ pub struct CheckRequest {
     pub rules: Vec<String>,
     /// Record the run and apply judgments.
     pub store: bool,
+    /// Take the findings of rules from the result cache in
+    /// `.lighthouse/cache` when the code they read has not changed, and keep
+    /// new ones there. The findings are the same either way.
+    pub cache: bool,
 }
 
 /// How a run ended. `Incomplete` wins over everything: "not checked" is never
@@ -211,12 +219,14 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     let trusted = session.trusted();
     let root = session.root.clone();
     let catalog = session.catalog()?;
-    let mut engine = Engine::new(registry, session.config, &catalog, &root)?
+    let engine = Engine::new(registry, session.config, &catalog, &root)?
         .with_incomplete(plugins.incomplete)
         .with_trust(trusted);
-    if !request.store {
-        engine = engine.without_cache();
-    }
+    let engine = if request.cache {
+        engine.with_cache(cache_dir(&root), cache_limit())
+    } else {
+        engine
+    };
     let setup = started.elapsed();
     let mut messages = Vec::new();
     let mut outcome = analyze(&engine, &root, request, &mut messages)?;
