@@ -115,6 +115,18 @@ narrowed to the files a user asked to see; reporting is the host's concern.
 for every language, as JSON; a provider reads its own entry and MUST reject
 unknown keys in it (as an `incomplete` entry, see below).
 
+`context.cache` is `{ "dir": "/abs/root/.lighthouse/cache/<plugin id>" }`, a directory
+the host owns and the provider MAY keep derived results in between runs. It is absent
+when the host runs without a cache. A provider reads and writes only inside it, writes
+atomically (a temporary file and a rename), and answers exactly the same with the
+directory empty, full or absent: the same fragments, the same notices (apart from one
+saying the directory cannot be written), the same `incomplete` entries. An entry is
+used only when its key matches, and a key covers everything the entry was computed
+from: the provider build, the options, the toolchain, and the content of the files and
+of what they depend on. Any doubt is a miss. A result with an `incomplete` entry is
+never written. Conformance indexes every case cold, then warm, and compares the answer
+with an uncached run byte for byte. The protocol version stays 0.1: the field is optional.
+
 Result `{ fragments, notices, incomplete }`:
 
 - `fragments`: one per analyzed file, sorted by path, each
@@ -382,6 +394,21 @@ the declaration without a blank line, and a comment that trails it) and `referen
 Loads packages with `golang.org/x/tools/go/packages` (tests included) and
 type-checks with `go/types`.
 
+- Cache: the unit is a package directory (all its variants, tests included). Its key
+  is a digest of the provider build, the options, `go env` (version, GOOS/GOARCH, flags,
+  workspace), go.mod, go.sum and go.work, the content of every file of the directory,
+  the *API* of every project directory it imports, directly or not, and the interface
+  declarations of the whole project. A file's API is its text without function and
+  method bodies, so a body edit leaves every other unit's key unchanged (early cutoff,
+  as in rustc's incremental compilation and Go's build action IDs, which hash the
+  export data of dependencies rather than their sources). Only the changed
+  directories are loaded; the rest of the packages come from export data, as with any
+  `go/packages` load without `NeedDeps`. Where the unit's own API and its imports'
+  are unchanged, its old `implements` edges are reused; otherwise the directories that
+  declare interfaces are loaded too, so types are matched against all of them. A
+  `vendor` directory and the targets of local `replace` directives are fingerprinted
+  by file names, sizes and modification times. A unit with an `incomplete` entry is
+  analyzed again on every run.
 - Context: `[languages.go]` accepts `tags` (build tags), `env` (for example
   `GOOS`, `GOARCH`, `GOTOOLCHAIN`), `go` and `small_interfaces`.
   - `go` is the go binary: an absolute path or a name looked up on `PATH`. The
@@ -434,6 +461,13 @@ Rust with a notice.
   (`package = "..."`) and workspace members, resolve through the extern prelude;
   `publish = false` (also inherited from `[workspace.package]`) marks a package
   without outside consumers.
+- Cache: the unit is a file. Parsing, the module tree and name resolution always run
+  (a parse is about half of a run, name resolution about 2%); the symbols, edges and
+  summaries of a file come from the cache when its text and its context are unchanged.
+  The context is a digest of the options, of every `Cargo.toml` above the requested files
+  and of every source file the module tree reached, without the bodies of its functions.
+  A body edit therefore analyzes one file; any other edit analyzes all of them again. A
+  tree with a parse error or a missing file is not cached.
 - Modules follow `mod` declarations: `name.rs`, `name/mod.rs`, `#[path]`, nested
   inline modules, with the directory rules of mod-rs and non-mod-rs files. Every
   `cfg` branch is followed. A `mod` with no file, or a file that does not parse,
