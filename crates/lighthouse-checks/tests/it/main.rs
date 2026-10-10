@@ -9,6 +9,7 @@ mod core_pack;
 mod cycle;
 mod design_architecture;
 mod design_layout;
+mod design_placement;
 mod design_rules;
 mod directives;
 mod fixes;

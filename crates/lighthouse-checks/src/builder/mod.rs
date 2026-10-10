@@ -266,18 +266,7 @@ impl<'a> Builder<'a> {
                 self.receiver_affinity(symbol),
             );
         }
-        if needs.mentions("envy") {
-            map.insert("envy".to_owned(), self.envy(symbol));
-        }
-        if needs.mentions("owner_home") {
-            map.insert("owner_home".to_owned(), self.owner_home(symbol));
-        }
-        if needs.mentions("homonyms") {
-            map.insert("homonyms".to_owned(), self.homonyms(symbol));
-        }
-        if needs.mentions("hidden_targets") {
-            map.insert("hidden_targets".to_owned(), self.hidden_targets(symbol));
-        }
+        self.placement_facts(map, symbol);
         if needs.mentions("local_callers") {
             map.insert("local_callers".to_owned(), self.local_callers(symbol));
         }
@@ -315,6 +304,24 @@ impl<'a> Builder<'a> {
         }
         if needs.mentions("helper_user") {
             map.insert("helper_user".to_owned(), self.helper_user(symbol));
+        }
+    }
+
+    /// The facts about where a symbol sits among the types, modules and tests
+    /// of the project.
+    fn placement_facts(&self, map: &mut Map<String, Value>, symbol: &Symbol) {
+        let needs = self.needs;
+        if needs.mentions("envy") {
+            map.insert("envy".to_owned(), self.envy(symbol));
+        }
+        if needs.mentions("owner_home") {
+            map.insert("owner_home".to_owned(), self.owner_home(symbol));
+        }
+        if needs.mentions("homonyms") {
+            map.insert("homonyms".to_owned(), self.homonyms(symbol));
+        }
+        if needs.mentions("hidden_targets") {
+            map.insert("hidden_targets".to_owned(), self.hidden_targets(symbol));
         }
     }
 

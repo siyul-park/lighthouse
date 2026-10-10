@@ -58,8 +58,7 @@ spec:
       - name: affinity
         expr: func.receiver_affinity
     where: >-
-      (func.kind == 'function' || func.kind == 'method')
-      && func.kind == 'function' && func.visibility == 'private'
+      func.kind == 'function' && func.visibility == 'private'
       && func.name != 'main' && func.name != 'init' && !func.constructor_named
       && func.references == 0 && size(affinity) > 0
       && (affinity.takes_owner_param || affinity.uses_owner)

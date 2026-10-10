@@ -1,0 +1,189 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/feature-envy
+  uid: 12b3bc32-3d58-4eec-a202-728c95622ffe
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: functions
+    lighthouse/preset: strict
+spec:
+  title: A function that wants another type's members
+  context: >-
+    A function that spends its body on the members of one type is that type's
+    behavior wearing another name. This is Fowler's Feature Envy (Refactoring,
+    2nd ed.) with the access count of Lanza and Marinescu's detection strategy
+    (2006: ATFD, LAA, FDP). Sonar has no rule for it, and PMD's design rules
+    have a God Class (the same authors' strategy) but no feature-envy rule.
+
+    A free function is reported when it uses at least `minMembers` distinct
+    members of one type of its own module (fields, and methods that it calls;
+    the variants of an enum are not members) and no member of any other type, and nothing uses it as a value. Passing a
+    value of the type on is not envy: parameters are not counted, only the
+    members the body reaches. A function that is generic over the type cannot
+    be told apart in the code model, so none is skipped for that.
+
+    Go: A package function and the methods and fields of a type of its package.
+
+    Rust: A free function and the methods and fields of a type of its module.
+    Members the provider resolves only by name are not counted.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    A function that uses only the members of one type SHOULD be a method of
+    that type.
+  severity: info
+  options:
+    type: object
+    properties:
+      minMembers:
+        type: integer
+        default: 2
+        description: Fewest distinct members of the type the function must use.
+      includeExported:
+        type: boolean
+        default: false
+        description: >-
+          Also judge exported functions, whose callers outside the module would
+          have to change.
+      constructorPrefixes:
+        type: array
+        default: [New, new]
+        description: >-
+          A function named like one of these, or one of these followed by a
+          word, is a constructor and has no receiver yet.
+    additionalProperties: false
+  languages:
+    rust:
+      options:
+        constructorPrefixes: [new]
+  check:
+    type: cel
+    select: function
+    with:
+      - name: envy
+        expr: func.envy
+    where: >-
+      func.kind == 'function' && func.name != 'main' && func.name != 'init'
+      && (func.visibility == 'private' || options.includeExported)
+      && !func.constructor_named && func.references == 0
+      && size(envy) > 0 && envy.count >= options.minMembers
+      && size(envy.others) == 0 && envy.same_module && !envy.generic
+    message: >-
+      {{ func.name }} depends on {{ envy.target_name }}'s members
+      ({{ envy.member_names.join(', ') }}) only; consider a method of
+      {{ envy.target_name }}
+    evidence:
+      target: envy.target
+      members: envy.member_names
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+      - "Fowler, Refactoring 2nd ed., Feature Envy"
+      - "Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006"
+  examples:
+    - name: go-uses-two-fields-of-one-type
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Store struct {
+            	items []int
+            	total int
+            }
+
+            func (s *Store) Reset() { s.items = nil }
+
+            func summary(s *Store) int {
+            	return len(s.items) + s.total
+            }
+      expect:
+        - line: 10
+    - name: go-uses-members-of-two-types
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Store struct {
+            	items []int
+            	total int
+            }
+
+            type Cache struct{ hits int }
+
+            func summary(s *Store, c *Cache) int {
+            	return len(s.items) + s.total + c.hits
+            }
+    - name: go-passes-the-value-on
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Store struct {
+            	items []int
+            	total int
+            }
+
+            func (s *Store) Total() int { return s.total }
+
+            func report(s *Store) int {
+            	return s.total + format(s)
+            }
+
+            func format(s *Store) int { return len(s.items) }
+    - name: rust-uses-two-fields-of-one-type
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store {
+                items: Vec<i32>,
+                total: i32,
+            }
+
+            impl Store {
+                pub fn reset(&mut self) {
+                    self.items.clear();
+                }
+            }
+
+            fn summary(store: &Store) -> i32 {
+                store.items.len() as i32 + store.total
+            }
+      expect:
+        - line: 12
+    - name: rust-uses-one-member
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store {
+                items: Vec<i32>,
+                total: i32,
+            }
+
+            impl Store {
+                pub fn reset(&mut self) {
+                    self.items.clear();
+                }
+            }
+
+            fn count(store: &Store) -> usize {
+                store.items.len()
+            }

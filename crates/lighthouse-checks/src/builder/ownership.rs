@@ -39,10 +39,13 @@ impl Builder<'_> {
     /// private free function belong to, and the file that type is declared in.
     pub(super) fn owner_home(&self, symbol: &Symbol) -> Value {
         let project = self.project;
+        // A helper belongs to the type it works on, not to every type whose
+        // methods happen to be its only callers.
         let owner = match symbol.kind {
             SymbolKind::Method => symbol.owner.clone(),
             _ => self
                 .caller_owner(symbol)
+                .filter(|owner| uses_owner(project, symbol, owner))
                 .and_then(|owner| SymbolId::parse(&owner)),
         };
         let Some(owner) = owner
@@ -70,14 +73,17 @@ impl Builder<'_> {
         let mut modules: BTreeMap<&str, BTreeSet<&SymbolId>> = BTreeMap::new();
         let mut own = 0;
         for id in used {
+            // The state and behavior of a type are its fields and methods; the
+            // variants of an enum, which a conversion names, are not.
             if let Some(owner) = owner_type(project, id)
                 && let Some(member) = project.symbol(id)
+                && matches!(member.kind, SymbolKind::Field | SymbolKind::Method)
             {
                 members.entry(&owner.id).or_default().insert(&member.name);
             }
             if id.module() == symbol.id.module() {
                 own += 1;
-            } else {
+            } else if !inside(symbol.id.module(), id.module()) {
                 modules.entry(id.module()).or_default().insert(id);
             }
         }
@@ -88,10 +94,17 @@ impl Builder<'_> {
         let outside = (modules.len() == 1)
             .then(|| modules.iter().next())
             .flatten();
-        let names_of = |ids: &BTreeSet<&SymbolId>| -> Vec<&str> {
+        // Behavior ties a function to a module: calling its functions and
+        // methods, reading its fields. Naming its constants and types does not.
+        let behavior = |ids: &BTreeSet<&SymbolId>| -> Vec<&Symbol> {
             ids.iter()
                 .filter_map(|id| project.symbol(id))
-                .map(|s| s.name.as_str())
+                .filter(|s| {
+                    matches!(
+                        s.kind,
+                        SymbolKind::Function | SymbolKind::Method | SymbolKind::Field
+                    )
+                })
                 .collect()
         };
         json!({
@@ -104,8 +117,8 @@ impl Builder<'_> {
             // A type parameter bound to the target is not read from the code model.
             "generic": false,
             "module_target": outside.map_or("", |(module, _)| *module),
-            "module_uses": outside.map(|(_, ids)| ids.iter().map(|id| id.as_str()).collect::<Vec<_>>()).unwrap_or_default(),
-            "module_use_names": outside.map(|(_, ids)| names_of(ids)).unwrap_or_default(),
+            "module_uses": outside.map(|(_, ids)| behavior(ids).iter().map(|s| s.id.as_str()).collect::<Vec<_>>()).unwrap_or_default(),
+            "module_use_names": outside.map(|(_, ids)| behavior(ids).iter().map(|s| s.name.as_str()).collect::<Vec<_>>()).unwrap_or_default(),
             "own_uses": own,
         })
     }
@@ -142,6 +155,15 @@ fn sole_owner(callers: &[&Symbol]) -> Option<String> {
     owners
         .all(|o| o.as_deref() == Some(first.as_str()))
         .then_some(first)
+}
+
+/// Whether `inner` lies inside `outer`: a submodule uses its parent's types
+/// as a matter of course, so that use says nothing about where a function
+/// belongs.
+fn inside(inner: &str, outer: &str) -> bool {
+    inner
+        .strip_prefix(outer)
+        .is_some_and(|rest| rest.starts_with('/'))
 }
 
 /// The type whose member `id` is: not an interface, whose methods any type

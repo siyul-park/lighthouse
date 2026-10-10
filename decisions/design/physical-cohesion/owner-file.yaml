@@ -12,11 +12,144 @@ spec:
   context: >-
     A reader finds an owner and everything it owns in one place.
 
-    Go: All methods of a receiver type stay in one file.
+    A method is reported when it is declared in another file than its type. A
+    private free function is reported the same way when every production
+    caller of it is a method of one type that is declared in another file and
+    the function calls or references that type or one of its members. A
+    function named like a constructor is not reported.
+
+    Go: All methods of a receiver type stay in the file of the type.
+
+    Rust: The methods of an inherent `impl` stay in the file of the type. A
+    method of a trait impl is exempt, because the trait decides where it is
+    written; the code model marks it by an id that carries the trait. A type
+    that the project does not declare has no file to keep to.
   scope:
     domain: code
     subject: symbol
   requirement: Symbols with one owner and cohesive responsibility MUST share a file.
   severity: warn
+  options:
+    type: object
+    properties:
+      constructorPrefixes:
+        type: array
+        default: [New, new]
+        description: >-
+          A function named like one of these, or one of these followed by a
+          word, is a constructor: it builds the type and sits where the
+          constructors are.
+    additionalProperties: false
+  languages:
+    rust:
+      options:
+        constructorPrefixes: [new]
   check:
-    type: model
+    type: cel
+    with:
+      - name: home
+        expr: symbol.owner_home
+    where: >-
+      (symbol.kind == 'method' || symbol.kind == 'function')
+      && size(home) > 0 && home.owner_file != symbol.file
+      && !symbol.implements_trait && !symbol.constructor_named
+    message: >-
+      {{ symbol.name }} belongs to {{ home.owner_name }} (declared in
+      {{ home.owner_file }}); keep it in that file
+    evidence:
+      owner: home.owner
+      owner_file: home.owner_file
+    identity:
+      subject: symbol.id
+  examples:
+    - name: go-method-in-another-file
+      language: go
+      kind: invalid
+      files:
+        - path: store.go
+          body: "package sample\n\ntype Store struct{ items []int }\n"
+        - path: total.go
+          body: "package sample\n\nfunc (s *Store) Total() int { return len(s.items) }\n"
+      expect:
+        - line: 3
+    - name: go-helper-in-another-file
+      language: go
+      kind: invalid
+      files:
+        - path: store.go
+          body: "package sample\n\ntype Store struct{ items []int }\n\nfunc (s *Store) Total() int { return count(s) }\n"
+        - path: count.go
+          body: "package sample\n\nfunc count(s *Store) int { return len(s.items) }\n"
+      expect:
+        - line: 3
+    - name: go-methods-with-the-type
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: store.go
+          body: "package sample\n\ntype Store struct{ items []int }\n\nfunc (s *Store) Total() int { return count(s) }\n\nfunc count(s *Store) int { return len(s.items) }\n"
+    - name: rust-impl-in-another-file
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            mod store;
+            mod total;
+        - path: src/store.rs
+          body: |-
+            pub struct Store {
+                pub items: Vec<i32>,
+            }
+        - path: src/total.rs
+          body: |-
+            use crate::store::Store;
+
+            impl Store {
+                pub fn total(&self) -> usize {
+                    self.items.len()
+                }
+            }
+      expect:
+        - line: 4
+    - name: rust-impl-with-the-type
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            mod store;
+        - path: src/store.rs
+          body: |-
+            pub struct Store {
+                pub items: Vec<i32>,
+            }
+
+            impl Store {
+                pub fn total(&self) -> usize {
+                    self.items.len()
+                }
+            }
+    - name: rust-trait-impl-in-another-file
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            mod store;
+            mod display;
+        - path: src/store.rs
+          body: |-
+            pub struct Store;
+        - path: src/display.rs
+          body: |-
+            use crate::store::Store;
+            use std::fmt;
+
+            impl fmt::Display for Store {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    write!(f, "store")
+                }
+            }

@@ -31,7 +31,7 @@ impl Builder<'_> {
         for helper in project
             .callees(&test.id)
             .iter()
-            .filter(|id| is_helper(self, id))
+            .filter(|id| self.is_helper(id))
         {
             let hidden = project
                 .callees(helper)
@@ -68,14 +68,14 @@ impl Builder<'_> {
             .min()
             .unwrap_or(0)
     }
-}
 
-/// Whether `id` is a function of test code that is not a test case itself.
-fn is_helper(builder: &Builder, id: &SymbolId) -> bool {
-    let project = builder.project;
-    project.in_test(id)
-        && project.test(id).is_none()
-        && project
-            .symbol(id)
-            .is_some_and(|s| s.kind == SymbolKind::Function)
+    /// Whether `id` is a function of test code that is not a test case itself.
+    fn is_helper(&self, id: &SymbolId) -> bool {
+        let project = self.project;
+        project.in_test(id)
+            && project.test(id).is_none()
+            && project
+                .symbol(id)
+                .is_some_and(|s| s.kind == SymbolKind::Function)
+    }
 }

@@ -102,11 +102,91 @@ Physical layout should make ownership and collaboration visible while preserving
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/owner-file` | One owner, one file | warn · model |  | Symbols with one owner and cohesive responsibility MUST share a file. |
+| [`design/owner-file`](#one-owner-one-file) | One owner, one file | warn · cel |  |  |
+| [`design/misplaced-symbol`](#a-function-lives-with-what-it-uses) | A function lives with what it uses | info · cel |  |  |
 | [`design/tiny-modules`](#a-module-earns-its-boundary) | A module earns its boundary | info · cel |  |  |
 | [`design/contiguity`](#collaborators-stay-close) | Collaborators stay close | warn · proximity | suggested |  |
 | `design/layout` | Layout shows ownership | info · model |  | Files and declaration order MUST make ownership, responsibility, and relationships easy to read. |
 | `design/meaningful-separation` | Separation marks a boundary | info · model |  | Physical separation MUST represent a real responsibility, ownership, or abstraction boundary. |
+
+### One owner, one file
+
+`design/owner-file` · symbol · warn · cel
+
+*A reader finds an owner and everything it owns in one place. A method is reported when it is declared in another file than its type. A private free function is reported the same way when every production caller of it is a method of one type that is declared in another file and the function calls or references that type or one of its members. A function named like a constructor is not reported. Go: All methods of a receiver type stay in the file of the type. Rust: The methods of an inherent `impl` stay in the file of the type. A method of a trait impl is exempt, because the trait decides where it is written; the code model marks it by an id that carries the trait. A type that the project does not declare has no file to keep to.*
+
+Symbols with one owner and cohesive responsibility MUST share a file.
+
+| option | default | meaning |
+| --- | --- | --- |
+| `constructorPrefixes` | `["New","new"]`; rust: `["new"]` | A function named like one of these, or one of these followed by a word, is a constructor: it builds the type and sits where the constructors are. |
+
+```go invalid store.go
+package sample
+
+type Store struct{ items []int }
+```
+
+```go invalid total.go
+package sample
+
+func (s *Store) Total() int { return len(s.items) }
+```
+
+```go valid
+package sample
+
+type Store struct{ items []int }
+
+func (s *Store) Total() int { return count(s) }
+
+func count(s *Store) int { return len(s.items) }
+```
+
+Also: rust
+
+### A function lives with what it uses
+
+`design/misplaced-symbol` · symbol · info · cel · strict
+
+*A function whose every use lies in one other module is that module's code, kept here by accident of history. This is Fowler's Move Function (Refactoring, 2nd ed.). No tool checks it: Sonar and PMD judge coupling of a class, not where a function belongs. A free function is reported when everything it calls or references in the project lies in one other module, at least `minUses` distinct functions, methods or fields of it (naming its constants and types ties nothing), and nothing in its own module, and nothing uses it as a value (a function that fills a table of handlers lives where the table is). Symbols outside the project are not counted, and neither is a module that contains the function's module: a submodule uses its parent as a matter of course. Types are not judged: the code model states no uses of a type. Go: A package function that uses only another package. Rust: A free function that uses only another module of the crate or another crate of the workspace.*
+
+A function SHOULD live in the module whose symbols it uses.
+
+Derived from: Fowler, Refactoring 2nd ed., Move Function
+
+| option | default | meaning |
+| --- | --- | --- |
+| `includeExported` | `false` | Also judge exported functions, whose callers would have to change. |
+| `minUses` | `3` | Fewest distinct symbols of the other module the function must use. |
+
+```go invalid app/app.go
+package app
+
+import "example.com/app/store"
+
+func Run() int { return load() }
+
+func load() int {
+	return store.Read() + store.Count() + store.Scan()
+}
+```
+
+```go valid app/app.go
+package app
+
+import "example.com/app/store"
+
+func Run() int { return load() }
+
+func load() int {
+	return store.Read() + store.Count() + store.Scan() + local()
+}
+
+func local() int { return 0 }
+```
+
+Also: rust
 
 ### A module earns its boundary
 
@@ -342,6 +422,7 @@ Function structure should make meaningful behavior reusable and readable, not me
 | [`design/private-helper-callers`](#private-helpers-have-two-callers) | Private helpers have two callers | info · cel |  |  |
 | [`design/no-single-use-wrapper`](#inline-single-use-wrappers) | Inline single-use wrappers | warn · cel |  |  |
 | [`design/prefer-method`](#behavior-lives-with-its-owner) | Behavior lives with its owner | warn · cel |  |  |
+| [`design/feature-envy`](#a-function-that-wants-another-types-members) | A function that wants another type's members | info · cel |  |  |
 | `design/single-abstraction-level` | One abstraction level per function | info · model |  | One function MUST stay at one abstraction level. |
 | [`design/callers-before-callees`](#callers-before-callees) | Callers before callees | warn · cel | suggested |  |
 
@@ -456,6 +537,56 @@ type Store struct{ items []int }
 func (s *Store) Reset() *Store { return newStore() }
 
 func newStore() *Store { return &Store{items: []int{}} }
+```
+
+Also: rust
+
+### A function that wants another type's members
+
+`design/feature-envy` · symbol · info · cel · strict
+
+*A function that spends its body on the members of one type is that type's behavior wearing another name. This is Fowler's Feature Envy (Refactoring, 2nd ed.) with the access count of Lanza and Marinescu's detection strategy (2006: ATFD, LAA, FDP). Sonar has no rule for it, and PMD's design rules have a God Class (the same authors' strategy) but no feature-envy rule. A free function is reported when it uses at least `minMembers` distinct members of one type of its own module (fields, and methods that it calls; the variants of an enum are not members) and no member of any other type, and nothing uses it as a value. Passing a value of the type on is not envy: parameters are not counted, only the members the body reaches. A function that is generic over the type cannot be told apart in the code model, so none is skipped for that. Go: A package function and the methods and fields of a type of its package. Rust: A free function and the methods and fields of a type of its module. Members the provider resolves only by name are not counted.*
+
+A function that uses only the members of one type SHOULD be a method of that type.
+
+Derived from: Fowler, Refactoring 2nd ed., Feature Envy; Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006
+
+| option | default | meaning |
+| --- | --- | --- |
+| `constructorPrefixes` | `["New","new"]`; rust: `["new"]` | A function named like one of these, or one of these followed by a word, is a constructor and has no receiver yet. |
+| `includeExported` | `false` | Also judge exported functions, whose callers outside the module would have to change. |
+| `minMembers` | `2` | Fewest distinct members of the type the function must use. |
+
+```go invalid
+package sample
+
+type Store struct {
+	items []int
+	total int
+}
+
+func (s *Store) Reset() { s.items = nil }
+
+func summary(s *Store) int {
+	return len(s.items) + s.total
+}
+```
+
+```go valid
+package sample
+
+type Store struct {
+	items []int
+	total int
+}
+
+func (s *Store) Total() int { return s.total }
+
+func report(s *Store) int {
+	return s.total + format(s)
+}
+
+func format(s *Store) int { return len(s.items) }
 ```
 
 Also: rust

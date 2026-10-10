@@ -38,6 +38,7 @@ spec:
         preserving real structural boundaries.
       decisions:
         - owner-file
+        - misplaced-symbol
         - tiny-modules
         - contiguity
         - layout
@@ -71,6 +72,7 @@ spec:
         - private-helper-callers
         - no-single-use-wrapper
         - prefer-method
+        - feature-envy
         - single-abstraction-level
         - callers-before-callees
     - name: naming

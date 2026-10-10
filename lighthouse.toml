@@ -27,6 +27,8 @@ formatter = { argv = ["rustfmt", "--edition", "2024", "--emit", "stdout"], stdin
 "design/max-name-words" = { level = "warn", options = { max = 4 } }
 "design/unique-type-names" = "info"
 "design/tiny-modules" = "info"
+"design/feature-envy" = "info"
+"design/misplaced-symbol" = "info"
 
 # The workspace layers, top down: a crate imports crates of the layers below
 # it and never a peer of its own layer. The crate labels of binaries carry
@@ -44,6 +46,20 @@ options.layers = [
   ["plugins/lang-go/provider/**"],
   ["plugins/lang-go/sdk/**"],
 ]
+
+# One owner is split over files by concern on purpose: the fact families of
+# the checks builder, the fix half of the engine, the log encoding of a
+# judgment and the Go provider's unit by what it extracts.
+[[spec.overrides]]
+files = [
+  "crates/lighthouse-checks/src/builder/**",
+  "crates/lighthouse-engine/src/fix/**",
+  "crates/lighthouse-store/src/log.rs",
+  "plugins/lang-go/provider/comments.go",
+  "plugins/lang-go/provider/extent.go",
+  "plugins/lang-go/provider/uses.go",
+]
+rules = { "design/owner-file" = "off" }
 
 # Fixtures and their goldens describe code on purpose; they are not the
 # project's own design.
