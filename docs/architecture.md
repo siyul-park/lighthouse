@@ -683,6 +683,36 @@ fix:
   fires and that applying the fix again changes nothing. `decision_create` and `decision_update`
   run the same examples in their gate.
 
+## Crates
+
+Dependencies point down; the only exceptions are marked and go away with the
+move of the project model into `spec` (`spec` → `plugin`, `plugin` → `config`).
+
+```
+L5  cli, mcp                  -> session, report            (nothing else: no store, registry or engine)
+L4  session                   -> every layer below          (composition root; owns every legacy reader: `migrate`)
+    report                    -> model, spec
+L3  store                     -> model, resource            (findings, verdicts, the decision log)
+L2  engine                    -> plugin, config, spec, model, process   (analysis, fix orchestration, rule tester)
+    checks                    -> plugin, spec, model, process, resource (declarative checks, metrics, order keys,
+                                                                       the bundled registry derived from the catalog's packs)
+    rpc                       -> plugin, config, protocol, process, model, resource  (language plugins as processes)
+L1  plugin                    -> model, config, resource    (SPI and Registry)
+    spec                      -> model, plugin, resource    (decision kinds, Catalog, local layer)
+    config                    -> model, resource            (Project, rule levels, overrides)
+L0  model, resource, protocol, process   (no workspace dependencies)
+```
+
+`lighthouse-checks` holds everything the bundled plugins run: the declarative
+compilation of a decision's `check` and `fix`, the `metrics/*` analyzers, the
+order keys of the `design` pack and the text fallback and annotation rules of
+`core`. `checks::registry()` builds one `Declarative` plugin per pack of the
+bundled catalog and adds those; plugin ids and rule ids are the packs' own.
+`lighthouse-test-support` is the dev-only helper of the test suites (plugin
+builds, project documents, catalog files). Each crate has one integration-test
+binary, `tests/it/main.rs` with a module per area, and no lib test binary unless
+it has unit tests.
+
 ## Frontends
 
 The CLI, the MCP server and the agent hooks are frontends over one shared layer,
@@ -697,7 +727,7 @@ Hooks never fix.
 ```
  lighthouse-cli ── check [--fix], review, decision, spec, schema, docs, init --agent, hook claude-code
  lighthouse-mcp ── `lighthouse mcp`: tools and resources over stdio (rmcp)
-        └── lighthouse-session ── engine, store, spec, declarative, rpc, report
+        └── lighthouse-session ── engine, store, spec, checks, rpc, report
 ```
 
 Rule authoring is gated: `decision_create` and `decision_update` build the candidate
