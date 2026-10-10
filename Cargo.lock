@@ -713,6 +713,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lighthouse-cache"
+version = "0.1.0"
+dependencies = [
+ "lighthouse-model",
+ "rayon",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "lighthouse-checks"
 version = "0.1.0"
 dependencies = [
@@ -761,6 +773,7 @@ version = "0.1.0"
 dependencies = [
  "globset",
  "ignore",
+ "lighthouse-cache",
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-process",
@@ -875,6 +888,7 @@ dependencies = [
 name = "lighthouse-session"
 version = "0.1.0"
 dependencies = [
+ "lighthouse-cache",
  "lighthouse-checks",
  "lighthouse-engine",
  "lighthouse-model",
