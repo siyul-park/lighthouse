@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"encoding/json"
 	"fmt"
 	"go/token"
 	"go/types"
@@ -33,6 +34,10 @@ type run struct {
 	excluded        int
 	excludedExample string
 	result          sdk.IndexResult
+	// failed counts, per batch the go command could not list, its files.
+	failed map[string]int
+	// encoded holds fragments that are already JSON, from the cache.
+	encoded map[string]json.RawMessage
 }
 
 // batch is the set of files that one go.mod governs. Files with no go.mod form
@@ -79,6 +84,8 @@ func newRun(params sdk.IndexParams, opts options) *run {
 		claimed:       map[string]bool{},
 		problems:      map[string]string{},
 		excludedFiles: map[string]bool{},
+		failed:        map[string]int{},
+		encoded:       map[string]json.RawMessage{},
 		result:        emptyResult(),
 	}
 	for _, f := range params.Files {
@@ -120,6 +127,9 @@ func (r *run) finish() sdk.IndexResult {
 	sort.Strings(paths)
 	for _, path := range paths {
 		r.result.Fragments = append(r.result.Fragments, *r.fragments[path])
+	}
+	for path, data := range r.encoded {
+		r.result.Encoded = append(r.result.Encoded, sdk.EncodedFragment{Path: path, JSON: data})
 	}
 	for path, reason := range r.problems {
 		r.result.Incomplete = append(r.result.Incomplete, sdk.Incomplete{Path: path, Reason: reason})
@@ -213,6 +223,7 @@ func (r *run) unpack(b *batch, l loaded) ([]*packages.Package, bool) {
 	if !inside {
 		dir = b.dir
 	}
+	r.failed[b.dir] = len(b.files)
 	r.result.Incomplete = append(r.result.Incomplete, sdk.Incomplete{
 		Reason: fmt.Sprintf("go list failed in %s, %d file(s) not analyzed: %v", dir, len(b.files), l.err),
 	})
@@ -454,6 +465,7 @@ func (r *run) unclaimed(rel string) {
 }
 
 func (r *run) fileOnly(rel string) {
+	delete(r.encoded, rel)
 	r.fragments[rel] = emptyFragment(sdk.FileInfo{Path: rel})
 }
 

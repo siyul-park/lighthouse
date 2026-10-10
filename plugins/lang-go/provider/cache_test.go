@@ -74,6 +74,9 @@ func TestProviderCache(t *testing.T) {
 			}, []string{"a", "b"}},
 			{"a file added", func() { writeFile(t, root, "c/c2.go", "package c\n\nfunc C2() {}\n") }, []string{"c"}},
 			{"a file removed", func() { require.NoError(t, os.Remove(filepath.Join(root, "c/c2.go"))) }, []string{"c"}},
+			{"a type that starts to implement an interface", func() {
+				writeFile(t, root, "c/c.go", "package c\n\nfunc C() int { return 3 }\n\ntype X struct{}\n\nfunc (X) M() int { return 0 }\n\nfunc (X) N() int { return 0 }\n")
+			}, []string{"c"}},
 			{"an interface changed", func() {
 				writeFile(t, root, "d/d.go", "package d\n\ntype I interface {\n\tM() int\n\tN() int\n\tO()\n}\n")
 			}, []string{"a", "b", "c", "d", "e"}},

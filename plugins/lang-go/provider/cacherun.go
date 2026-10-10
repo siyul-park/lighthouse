@@ -15,13 +15,6 @@ type RunStats struct {
 	Misses []string
 }
 
-// unitRecord is what the cache keeps of a unit: the fragments of its requested
-// files, and which of them the build constraints excluded.
-type unitRecord struct {
-	Fragments []sdk.Fragment `json:"fragments"`
-	Excluded  []string       `json:"excluded"`
-}
-
 // factsRecord is the cached facts of source files by content hash.
 type factsRecord struct {
 	Version string               `json:"version"`
@@ -33,6 +26,9 @@ type cachePlan struct {
 	units  []*cacheUnit
 	hits   map[*cacheUnit]unitRecord
 	misses []*cacheUnit
+	// previous holds, for a missed unit, the record it replaces when only the
+	// unit's own text changed.
+	previous map[*cacheUnit]unitRecord
 	// interfaces are the hit units that declare interfaces: the analysis of the
 	// misses needs them loaded to match types against them.
 	interfaces []*cacheUnit
@@ -118,9 +114,10 @@ func (p *Provider) plan(pl *planner, store *cacheStore, env string, candidates [
 	sort.Slice(pl.requestedUnits, func(i, j int) bool { return pl.requestedUnits[i].rel < pl.requestedUnits[j].rel })
 	options := string(params.Context.Options[language])
 	base := digest(cacheSchema, executableHash(), p.id, p.version, options, env, pl.interfaceDigest())
-	plan := &cachePlan{units: pl.requestedUnits, hits: map[*cacheUnit]unitRecord{}}
+	plan := &cachePlan{units: pl.requestedUnits, hits: map[*cacheUnit]unitRecord{}, previous: map[*cacheUnit]unitRecord{}}
 	for _, u := range plan.units {
-		u.key = unitKey(base, u)
+		u.apiKey = unitAPIKey(base, u)
+		u.key = digest(u.apiKey, u.content)
 		var rec unitRecord
 		if store.read(unitName(u.rel, u.key), &rec) && rec.covers(u) {
 			plan.hits[u] = rec
@@ -130,14 +127,17 @@ func (p *Provider) plan(pl *planner, store *cacheStore, env string, candidates [
 			continue
 		}
 		plan.misses = append(plan.misses, u)
+		if old, ok := store.previous(u); ok {
+			plan.previous[u] = old
+		}
 	}
 	return plan, true
 }
 
-// unitKey is the key of u under base: its own files and the API of everything
-// it imports.
-func unitKey(base string, u *cacheUnit) string {
-	parts := []string{base, u.rel, u.content}
+// unitAPIKey is the key of u under base without the bodies of its functions:
+// its own API and the API of everything it imports.
+func unitAPIKey(base string, u *cacheUnit) string {
+	parts := []string{base, u.rel, u.api}
 	for _, d := range closure(u) {
 		parts = append(parts, d.rel, d.api)
 	}
@@ -154,19 +154,6 @@ func (pl *planner) interfaceDigest() string {
 	return digest(parts...)
 }
 
-// covers reports whether the record holds exactly the requested files of u.
-func (rec unitRecord) covers(u *cacheUnit) bool {
-	if len(rec.Fragments) != len(u.requested) {
-		return false
-	}
-	for _, f := range rec.Fragments {
-		if !slices.Contains(u.requested, f.File.Path) {
-			return false
-		}
-	}
-	return true
-}
-
 // analyzeMisses runs the uncached analysis over the missed units, plus the
 // units that declare interfaces so that types are matched against all of them.
 // It returns false when that run failed as a whole, which the cold run would
@@ -175,8 +162,12 @@ func analyzeMisses(r *run, params sdk.IndexParams, plan *cachePlan) (*run, bool)
 	if len(plan.misses) == 0 {
 		return nil, true
 	}
+	units := plan.misses
+	if len(plan.previous) < len(plan.misses) {
+		units = slices.Concat(plan.misses, plan.interfaces)
+	}
 	wanted := map[string]bool{}
-	for _, u := range slices.Concat(plan.misses, plan.interfaces) {
+	for _, u := range units {
 		for _, rel := range u.requested {
 			wanted[rel] = true
 		}
@@ -190,81 +181,28 @@ func analyzeMisses(r *run, params sdk.IndexParams, plan *cachePlan) (*run, bool)
 	}
 	sub := newRun(subParams, r.opts)
 	sub.index()
-	return sub, len(sub.result.Incomplete) == 0
+	if !sameFailures(r, sub) {
+		return sub, false
+	}
+	if len(plan.previous) == len(plan.misses) {
+		reuseImplements(sub, plan)
+	}
+	return sub, true
 }
 
-// install puts the cached fragments and the analysis of the misses into r.
-func install(r *run, plan *cachePlan, sub *run) {
-	for _, rec := range plan.hits {
-		excluded := map[string]bool{}
-		for _, rel := range rec.Excluded {
-			excluded[rel] = true
-		}
-		for i := range rec.Fragments {
-			frag := rec.Fragments[i]
-			rel := frag.File.Path
-			r.fragments[rel] = &frag
-			if excluded[rel] {
-				r.excludedFiles[rel] = true
-			} else {
-				r.claimed[rel] = true
-			}
+// sameFailures reports whether the analysis of the missed units failed the way
+// a full one would have. A batch the go command cannot list is reported with
+// its number of files, so the analysis must have seen all of them; any other
+// request-wide problem makes it differ.
+func sameFailures(r, sub *run) bool {
+	if len(sub.result.Incomplete) != len(sub.failed) {
+		return false
+	}
+	candidates, _ := r.candidates()
+	for _, b := range r.batches(candidates) {
+		if n, failed := sub.failed[b.dir]; failed && n != len(b.files) {
+			return false
 		}
 	}
-	for _, u := range plan.misses {
-		for _, rel := range u.requested {
-			r.fragments[rel] = sub.fragments[rel]
-			r.claimed[rel] = sub.claimed[rel]
-			r.excludedFiles[rel] = sub.excludedFiles[rel]
-			if reason, bad := sub.problems[rel]; bad {
-				r.problems[rel] = reason
-			}
-		}
-	}
-}
-
-// record stores the units the analysis completed without a problem, and drops
-// what the cache holds of units that changed or are gone.
-func (p *Provider) record(store *cacheStore, plan *cachePlan, sub *run) {
-	current := map[string]string{}
-	for _, u := range plan.units {
-		current[unitStem(u.rel)] = u.key
-	}
-	for _, u := range plan.misses {
-		if rec, ok := recordOf(u, sub); ok {
-			store.write(unitName(u.rel, u.key), rec)
-		}
-	}
-	store.sweep(current)
-}
-
-// recordOf is the record of an analyzed unit; none when any of its files had a
-// problem, as only complete results are cached.
-func recordOf(u *cacheUnit, sub *run) (unitRecord, bool) {
-	rec := unitRecord{Fragments: []sdk.Fragment{}, Excluded: []string{}}
-	for _, rel := range u.requested {
-		if _, bad := sub.problems[rel]; bad || sub.fragments[rel] == nil {
-			return unitRecord{}, false
-		}
-		rec.Fragments = append(rec.Fragments, *sub.fragments[rel])
-		if !sub.claimed[rel] {
-			if !sub.excludedFiles[rel] {
-				return unitRecord{}, false
-			}
-			rec.Excluded = append(rec.Excluded, rel)
-		}
-	}
-	return rec, true
-}
-
-func (plan *cachePlan) stats() RunStats {
-	var s RunStats
-	for _, u := range plan.units {
-		if _, hit := plan.hits[u]; hit {
-			s.Hits = append(s.Hits, u.rel)
-		} else {
-			s.Misses = append(s.Misses, u.rel)
-		}
-	}
-	return s
+	return true
 }

@@ -86,6 +86,22 @@ func unitName(unit, key string) string {
 
 func unitStem(unit string) string { return digest(unit)[:16] }
 
+// previous is the record a unit had before its text changed, if one is kept.
+func (s *cacheStore) previous(u *cacheUnit) (unitRecord, bool) {
+	entries, err := os.ReadDir(s.dir)
+	if err != nil {
+		return unitRecord{}, false
+	}
+	prefix := unitPrefix + unitStem(u.rel) + "-"
+	for _, e := range entries {
+		var rec unitRecord
+		if strings.HasPrefix(e.Name(), prefix) && s.read(e.Name(), &rec) && rec.API == u.apiKey && rec.covers(u) {
+			return rec, true
+		}
+	}
+	return unitRecord{}, false
+}
+
 // sweep removes the records of units that are gone or have a newer record, and
 // then the oldest records while the directory is over its limit.
 func (s *cacheStore) sweep(current map[string]string) {

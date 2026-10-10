@@ -88,6 +88,9 @@ type IndexResult struct {
 	Fragments  []Fragment   `json:"fragments"`
 	Notices    []string     `json:"notices"`
 	Incomplete []Incomplete `json:"incomplete"`
+	// Encoded are fragments that are already JSON, merged in by path when the
+	// result is encoded; Fragments and Encoded never hold the same path.
+	Encoded []EncodedFragment `json:"-"`
 }
 
 // Incomplete reports why a file, or the whole request when Path is empty, was

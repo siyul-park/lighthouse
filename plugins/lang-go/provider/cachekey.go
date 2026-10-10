@@ -2,6 +2,7 @@ package provider
 
 import (
 	"encoding/json"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,7 +27,9 @@ type cacheUnit struct {
 	ifaces    string
 	imports   []string
 	deps      []*cacheUnit
-	key       string
+	// apiKey covers everything but the unit's own text; key covers that too.
+	apiKey string
+	key    string
 }
 
 // moduleRoot is a module that holds project code: its import path and the
@@ -88,14 +91,11 @@ func (pl *planner) environment(batches []*batch) (string, []moduleRoot, bool) {
 		if b.synthetic {
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(b.dir, "vendor")); err == nil {
-			return "", nil, false
-		}
 		text, ok := moduleFiles(b.dir, "go.mod", "go.sum")
 		if !ok {
 			return "", nil, false
 		}
-		parts = append(parts, text)
+		parts = append(parts, text, stamp(filepath.Join(b.dir, "vendor")))
 	}
 	work, extra, ok := workspaceOf(env)
 	if !ok {
@@ -124,8 +124,8 @@ func (pl *planner) goEnv(dir string) (string, error) {
 	return string(out), nil
 }
 
-// moduleFiles digests a module's go.mod, refusing a replace to a local path,
-// and its go.sum.
+// moduleFiles digests a module's go.mod and go.sum, and stamps the directories
+// its replace directives point to.
 func moduleFiles(dir, mod, sum string) (string, bool) {
 	data, err := os.ReadFile(filepath.Join(dir, mod))
 	if err != nil {
@@ -135,13 +135,41 @@ func moduleFiles(dir, mod, sum string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	for _, rep := range file.Replace {
-		if rep.New.Version == "" {
-			return "", false
-		}
-	}
 	sums, _ := os.ReadFile(filepath.Join(dir, sum))
-	return digest(string(data), string(sums)), true
+	return digest(string(data), string(sums), localReplaces(dir, file.Replace)), true
+}
+
+// localReplaces stamps the directories that replace directives point to.
+func localReplaces(dir string, replaces []*modfile.Replace) string {
+	var stamps []string
+	for _, rep := range replaces {
+		if rep.New.Version != "" {
+			continue
+		}
+		target := filepath.FromSlash(rep.New.Path)
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(dir, target)
+		}
+		stamps = append(stamps, stamp(target))
+	}
+	return digest(stamps...)
+}
+
+// stamp fingerprints a directory tree by the names, sizes and modification
+// times of its files, without reading them: code the project does not own is
+// too large to hash on every run, and a touched file is only a miss.
+func stamp(root string) string {
+	var parts []string
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info, err := d.Info(); err == nil && !d.IsDir() {
+			parts = append(parts, path, strconv.FormatInt(info.Size(), 10), strconv.FormatInt(info.ModTime().UnixNano(), 10))
+		}
+		return nil
+	})
+	return digest(parts...)
 }
 
 // workspaceOf digests go.work, when the environment names one, and returns its
@@ -173,13 +201,8 @@ func workspaceOf(env string) (string, []moduleRoot, bool) {
 		}
 		modules = append(modules, moduleRoot{parsed.Module.Mod.Path, dir})
 	}
-	for _, rep := range file.Replace {
-		if rep.New.Version == "" {
-			return "", nil, false
-		}
-	}
 	sums, _ := os.ReadFile(path + ".sum")
-	return digest(string(data), string(sums)), modules, true
+	return digest(string(data), string(sums), localReplaces(filepath.Dir(path), file.Replace)), modules, true
 }
 
 // unit returns the unit of an absolute directory, reading it once. A directory
