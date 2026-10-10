@@ -120,13 +120,20 @@ and earns a deterministic check through measured evidence.
   judgments and refinement proposals.
 - **Evaluation:** labels come from history. Recall@k, nDCG@10 and MRR are measured
   against the R3 baseline.
-- **Bias control for those labels.** History over-represents decisions with
-  deterministic checks and files that already have findings, and it holds positives
-  only. So:
-  - results are reported per stratum (check type, decision, language);
-  - judgments of `model` decisions and recorded `notApplicable` answers are included;
-  - sampled negatives are added;
-  - the split is by time and by project, never tuned on the test split.
+- **Evaluation labels.**
+  - **History labels are weak.** A finding or judgment marks a decision as relevant to
+    a file. A missing record is unlabelled, never "irrelevant": history keeps only the
+    cases someone judged.
+  - **A verified subset is the final measure.** It uses TREC-style pooling: the top
+    results of every ranker are pooled and the pool is judged by hand.
+  - **Splits:** by repository and by commit time. Data used to tune the rankers (fusion
+    constant, boosts, k) is never used for the final evaluation.
+  - **Strata:** results are reported per check type, decision and language, because
+    history over-represents decisions with deterministic checks and files that already
+    have findings. Judgments of `model` decisions and recorded `notApplicable` answers are
+    included.
+  - **Baseline:** FTS5 BM25 alone is measured first. The embedding model is adopted only
+    if it improves the verified-subset metrics.
 
 ### Adoption
 Public adoption waits until the decision loop has been shown working.
