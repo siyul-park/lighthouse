@@ -3,7 +3,7 @@
 
 use std::{
     collections::BTreeMap,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 use super::log::ArtifactLocation;
@@ -13,51 +13,23 @@ const BASE_DEPTH: usize = 4;
 
 /// The path a location names, absolute or relative to the project root; the
 /// tools that write relative paths without a base mean the directory they ran
-/// in, which is the root. `None` when the location has no `uri`.
+/// in, which is the root. `.` and `..` segments are folded. `None` when the
+/// location has no `uri`.
 pub(super) fn path_of(
     location: &ArtifactLocation,
     bases: &BTreeMap<String, ArtifactLocation>,
 ) -> Option<PathBuf> {
-    resolve(location, bases, BASE_DEPTH)
+    resolve(location, bases, BASE_DEPTH).map(|path| fold(&path))
 }
 
-/// `path` relative to `root`, without `.` components.
+/// `path` relative to `root`.
 pub(super) fn relative(path: &Path, root: &Path) -> PathBuf {
-    path.strip_prefix(root)
-        .unwrap_or(path)
-        .components()
-        .filter(|c| !matches!(c, std::path::Component::CurDir))
-        .collect()
+    path.strip_prefix(root).unwrap_or(path).to_path_buf()
 }
 
-fn resolve(
-    location: &ArtifactLocation,
-    bases: &BTreeMap<String, ArtifactLocation>,
-    depth: usize,
-) -> Option<PathBuf> {
-    let own = file_path(location.uri.as_deref()?);
-    if own.is_absolute() {
-        return Some(own);
-    }
-    let base = location
-        .uri_base_id
-        .as_ref()
-        .and_then(|id| bases.get(id))
-        .filter(|_| depth > 0)
-        .and_then(|base| resolve(base, bases, depth - 1));
-    Some(base.map_or(own.clone(), |base| base.join(&own)))
-}
-
-/// A `file://` URI as the path it names; any other reference is a relative
-/// path, with its percent-escapes decoded.
-fn file_path(uri: &str) -> PathBuf {
-    let rest = uri
-        .strip_prefix("file://")
-        .map(|r| r.strip_prefix("localhost").unwrap_or(r));
-    PathBuf::from(decode(rest.unwrap_or(uri)))
-}
-
-fn decode(text: &str) -> String {
+/// `text` with its `%XX` escapes decoded; an escape that is not hexadecimal
+/// stays as written.
+pub fn decode(text: &str) -> String {
     let bytes = text.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut at = 0;
@@ -78,4 +50,55 @@ fn decode(text: &str) -> String {
         }
     }
     String::from_utf8_lossy(&out).into_owned()
+}
+
+fn resolve(
+    location: &ArtifactLocation,
+    bases: &BTreeMap<String, ArtifactLocation>,
+    depth: usize,
+) -> Option<PathBuf> {
+    let own = file_path(location.uri.as_deref()?);
+    if own.is_absolute() {
+        return Some(own);
+    }
+    let base = location
+        .uri_base_id
+        .as_ref()
+        .and_then(|id| bases.get(id))
+        .filter(|_| depth > 0)
+        .and_then(|base| resolve(base, bases, depth - 1));
+    Some(base.map_or(own.clone(), |base| base.join(&own)))
+}
+
+/// A `file:` URI as the path it names (`file:///a`, `file://localhost/a` and
+/// `file:/a` alike); any other reference is a relative path. A query or a
+/// fragment is not part of the path, and percent-escapes are decoded.
+fn file_path(uri: &str) -> PathBuf {
+    let uri = uri.split(['#', '?']).next().unwrap_or_default();
+    let path = match uri.strip_prefix("file:") {
+        Some(rest) => match rest.strip_prefix("//") {
+            Some(authority) => authority.find('/').map_or("", |at| &authority[at..]),
+            None => rest,
+        },
+        None => uri,
+    };
+    PathBuf::from(decode(path))
+}
+
+/// `path` without `.` segments and with each `..` folded into the segment
+/// before it; a `..` that leads a relative path stays, so it names nothing
+/// inside the project.
+fn fold(path: &Path) -> PathBuf {
+    let mut out: Vec<Component> = Vec::new();
+    for part in path.components() {
+        match part {
+            Component::CurDir => {}
+            Component::ParentDir if matches!(out.last(), Some(Component::Normal(_))) => {
+                out.pop();
+            }
+            Component::ParentDir if matches!(out.last(), Some(Component::RootDir)) => {}
+            other => out.push(other),
+        }
+    }
+    out.iter().collect()
 }

@@ -1,5 +1,6 @@
 mod fix;
 mod memo;
+mod notices;
 mod registry;
 
 use std::{collections::BTreeMap, path::PathBuf};
@@ -17,6 +18,7 @@ pub use fix::{
     OrderKeys,
 };
 pub use memo::Memo;
+pub use notices::Notices;
 pub use registry::{Registry, plugin_of};
 
 /// Why registering a plugin, resolving analyzers, reading facts or running a
@@ -104,6 +106,9 @@ pub struct Ctx<'a> {
     pub trusted: bool,
     /// Values the rules of this run share, so that each is computed once.
     pub memo: &'a Memo,
+    /// Where the rule says what it left out or could not read; drained after
+    /// each rule into the notices of the run.
+    pub notices: &'a Notices,
     /// What code the rule being run may report on: its decision's scope as
     /// the project's configuration left it. The engine drops the files that
     /// are out before the rule runs; a rule drops the symbols that are.

@@ -72,6 +72,8 @@ pub enum ColumnUnit {
     Utf16,
     /// Unicode code points.
     CodePoints,
+    /// Bytes, as the tools that do not process text as UTF-16 count.
+    Bytes,
 }
 
 /// `at` with its byte column turned into a count of UTF-16 code units of the
@@ -104,6 +106,7 @@ pub fn byte_position(text: &str, at: Position, unit: ColumnUnit) -> Position {
         counted += match unit {
             ColumnUnit::Utf16 => ch.len_utf16(),
             ColumnUnit::CodePoints => 1,
+            ColumnUnit::Bytes => ch.len_utf8(),
         };
     }
     Position {

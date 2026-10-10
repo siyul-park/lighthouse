@@ -5,17 +5,21 @@
 //! suppression, never dropped.
 
 mod log;
-mod place;
-mod words;
+pub mod place;
+mod tally;
+pub mod words;
 
 use std::path::{Path, PathBuf};
 
-use lighthouse_model::{ColumnUnit, Diagnostic, Position, Span, byte_position};
+use lighthouse_model::{ColumnUnit, Diagnostic, Position, Span, Suppression, byte_position};
 use lighthouse_plugin::{Ctx, RuleManifest};
-use lighthouse_spec::SarifSelect;
+use lighthouse_spec::{SarifColumns, SarifSelect};
 use serde_json::{Map, Value, json};
 
-use self::log::{Log, Run, SarifResult, VERSION};
+use self::{
+    log::{Log, Run, SarifResult, VERSION},
+    tally::Tally,
+};
 use crate::glob;
 
 /// What a result with no `level` has, in SARIF.
@@ -26,6 +30,8 @@ pub(super) struct Reading<'a> {
     pub ctx: &'a Ctx<'a>,
     pub meta: &'a RuleManifest,
     pub select: Option<&'a SarifSelect>,
+    /// The decision's column unit, which wins over the log's `columnKind`.
+    pub columns: Option<SarifColumns>,
     /// The exit code said the program found something.
     pub found: bool,
 }
@@ -40,19 +46,13 @@ enum Place {
 }
 
 impl Reading<'_> {
-    /// The findings of the log on `stdout`. A log that cannot be read, or an
-    /// exit code that says it found something over a log with no result, is
-    /// an error: the analysis is incomplete, never clean.
+    /// The findings of the log on `stdout`. No log, a log that cannot be
+    /// read, or an exit code that says it found something over a log with no
+    /// result, is an error: the analysis is incomplete, never clean. Only a
+    /// log that was read and holds no result is clean.
     pub(super) fn diagnostics(&self, stdout: &str) -> Result<Vec<Diagnostic>, String> {
         if stdout.trim().is_empty() {
-            return if self.found {
-                Err(
-                    "exited with a code that says it found something, but printed no SARIF log"
-                        .to_owned(),
-                )
-            } else {
-                Ok(Vec::new())
-            };
+            return Err("printed no SARIF log".to_owned());
         }
         let log: Log = serde_json::from_str(stdout)
             .map_err(|e| format!("printed output that is not a SARIF log: {e}"))?;
@@ -70,9 +70,11 @@ impl Reading<'_> {
         }
         let mut found = Vec::new();
         for run in &log.runs {
+            let mut tally = Tally::default();
             for result in run.results.iter().filter(|r| self.selected(run, r)) {
-                found.extend(self.diagnostic(run, result));
+                found.extend(self.diagnostic(run, result, &mut tally));
             }
+            tally.tell(self.ctx.notices, &run.tool.driver.name);
         }
         Ok(found)
     }
@@ -91,8 +93,8 @@ impl Reading<'_> {
     }
 
     /// The finding for one result; `None` for a result outside the project.
-    fn diagnostic(&self, run: &Run, result: &SarifResult) -> Option<Diagnostic> {
-        let (path, span) = match self.place(run, result) {
+    fn diagnostic(&self, run: &Run, result: &SarifResult, tally: &mut Tally) -> Option<Diagnostic> {
+        let (path, span) = match self.place(run, result, tally) {
             Place::Outside => return None,
             Place::Project => (PathBuf::from("."), at(Position { line: 1, col: 1 })),
             Place::File(path, span) => (path, span),
@@ -111,19 +113,11 @@ impl Reading<'_> {
             self.meta.fingerprint(&subject, &snippet),
         );
         diagnostic.evidence = evidence(run, result, &id, rule.and_then(|r| r.help_uri.as_deref()));
-        let reasons: Vec<&str> = result
-            .suppressions
-            .iter()
-            .filter(|s| s.in_force())
-            .map(|s| s.justification.as_deref().unwrap_or_default())
-            .collect();
-        if reasons.is_empty() {
-            return Some(diagnostic);
-        }
-        Some(diagnostic.suppressed_by_tool(&reasons.join("; ")))
+        diagnostic.suppression = suppression(result);
+        Some(diagnostic)
     }
 
-    fn place(&self, run: &Run, result: &SarifResult) -> Place {
+    fn place(&self, run: &Run, result: &SarifResult, tally: &mut Tally) -> Place {
         let physical = result
             .locations
             .first()
@@ -136,6 +130,7 @@ impl Reading<'_> {
         };
         let path = place::relative(&path, &self.ctx.ws.root);
         if self.ctx.project.file(&path).is_none() {
+            tally.left_out(&path);
             return Place::Outside;
         }
         let region = physical.and_then(|p| p.region.as_ref());
@@ -149,17 +144,30 @@ impl Reading<'_> {
                     .map(|col| (r.end_line.unwrap_or(start.line), col))
             })
             .map_or(start, |(line, col)| Position { line, col });
-        let unit = match run.column_kind.as_deref() {
-            Some("unicodeCodePoints") => ColumnUnit::CodePoints,
-            _ => ColumnUnit::Utf16,
+        let unit = self.unit(run);
+        let text = tally.text(self.ctx, &path);
+        // Without the text a column cannot be converted: start the line.
+        let bytes = |p: Position| match text {
+            Some(text) => byte_position(text, p, unit),
+            None => Position { col: 1, ..p },
         };
-        let text = super::read(self.ctx, &path).ok();
-        let bytes = |p: Position| text.as_ref().map_or(p, |t| byte_position(t, p, unit));
         let span = Span {
             start: bytes(start),
             end: bytes(end),
         };
         Place::File(path, span)
+    }
+
+    /// The unit columns are counted in: the decision's, else the log's, else
+    /// UTF-16 code units, which SARIF's own `columnKind` names first.
+    fn unit(&self, run: &Run) -> ColumnUnit {
+        match (self.columns, run.column_kind.as_deref()) {
+            (Some(SarifColumns::Bytes), _) => ColumnUnit::Bytes,
+            (Some(SarifColumns::UnicodeCodePoints), _) | (None, Some("unicodeCodePoints")) => {
+                ColumnUnit::CodePoints
+            }
+            _ => ColumnUnit::Utf16,
+        }
     }
 
     /// What the finding is about, for its identity: the innermost symbol of
@@ -176,6 +184,17 @@ impl Reading<'_> {
             .max_by_key(|s| s.extent.unwrap_or(s.span).start)
             .map_or_else(|| super::slashed(path), |s| s.id.as_str().to_owned())
     }
+}
+
+/// The tool's own suppression of a result, if one is in force: its first
+/// entry that is `accepted` or has no status.
+fn suppression(result: &SarifResult) -> Option<Suppression> {
+    let entry = result.suppressions.iter().find(|s| s.in_force())?;
+    let why = entry.justification.clone().unwrap_or_default();
+    Some(match entry.kind.as_deref() {
+        Some("external") => Suppression::external(why),
+        _ => Suppression::in_source(why),
+    })
 }
 
 fn at(position: Position) -> Span {

@@ -6,7 +6,7 @@
 //! never clean. stderr is for people and only ever explains an error. With
 //! `output: sarif` stdout is a SARIF log instead of lines (see [`sarif`]).
 
-mod sarif;
+pub mod sarif;
 
 use std::{
     env, fs,
@@ -143,6 +143,7 @@ impl Run<'_> {
                     ctx: self.ctx,
                     meta: self.meta,
                     select: self.rule.spec.select.as_ref(),
+                    columns: self.rule.spec.columns,
                     found: ran.found,
                 };
                 read.diagnostics(&ran.stdout).map_err(|e| {

@@ -24,7 +24,9 @@ pub use check::{
     Identity, ModelCheck, NamedRule, OrderClause, OrderReport, OrderScope, RpcCheck, Select,
     TemplatePart, parse_template,
 };
-pub use command::{Batch, CheckOutput, CheckStdin, CommandCheck, ExitCodes, SarifSelect};
+pub use command::{
+    Batch, CheckOutput, CheckStdin, CommandCheck, ExitCodes, SarifColumns, SarifSelect,
+};
 pub use decision::{
     Decision, DecisionSpec, LanguageSpec, PACK_LABEL, PRESET_LABEL, Provenance, SECTION_LABEL,
     STRICT,

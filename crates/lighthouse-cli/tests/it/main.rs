@@ -10,5 +10,6 @@ mod judgments;
 mod mcp;
 mod preview;
 mod review;
+mod sarif_places;
 mod skill;
 mod spec;

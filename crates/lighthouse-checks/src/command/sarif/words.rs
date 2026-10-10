@@ -20,38 +20,9 @@ pub(super) fn message(
         .unwrap_or_else(|| rule_id.to_owned())
 }
 
-/// The message without what changes when code moves or is renamed around
-/// it: runs of digits become `#` and quoted text becomes `_`. A message that
-/// says the same thing about another line or another name is the same
-/// finding.
-pub(super) fn identifying(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut chars = text.char_indices().peekable();
-    let mut previous = ' ';
-    while let Some((at, ch)) = chars.next() {
-        if ch.is_ascii_digit() {
-            while chars.next_if(|(_, c)| c.is_ascii_digit()).is_some() {}
-            out.push('#');
-        } else if is_quote(ch) && !previous.is_alphanumeric() {
-            match text[at + 1..].find(closing(ch)) {
-                Some(len) => {
-                    out.extend([ch, '_', closing(ch)]);
-                    let skip = text[at + 1..at + 1 + len].chars().count() + 1;
-                    chars.nth(skip - 1);
-                }
-                None => out.push(ch),
-            }
-        } else {
-            out.push(ch);
-        }
-        previous = out.chars().last().unwrap_or(' ');
-    }
-    out
-}
-
 /// `template` with each `{n}` replaced by argument `n`; a placeholder with no
 /// argument stays as written.
-fn fill(template: &str, arguments: &[String]) -> String {
+pub fn fill(template: &str, arguments: &[String]) -> String {
     let mut out = String::with_capacity(template.len());
     let mut rest = template;
     while let Some(open) = rest.find('{') {
@@ -75,14 +46,19 @@ fn fill(template: &str, arguments: &[String]) -> String {
     out
 }
 
-fn is_quote(ch: char) -> bool {
-    matches!(ch, '`' | '"' | '\'' | '‘' | '“')
-}
-
-fn closing(ch: char) -> char {
-    match ch {
-        '‘' => '’',
-        '“' => '”',
-        other => other,
+/// The message without the numbers in it, which move when code does: each run
+/// of digits becomes `#`. Names stay, so two findings of one rule about
+/// different callees are different findings.
+pub fn identifying(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch.is_ascii_digit() {
+            while chars.next_if(char::is_ascii_digit).is_some() {}
+            out.push('#');
+        } else {
+            out.push(ch);
+        }
     }
+    out
 }

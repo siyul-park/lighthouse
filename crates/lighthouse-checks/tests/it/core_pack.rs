@@ -43,6 +43,7 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
         keys: &lighthouse_plugin::NoKeys,
         trusted: false,
         memo: &lighthouse_plugin::Memo::default(),
+        notices: &lighthouse_plugin::Notices::default(),
         applies: lighthouse_model::Applicability::default(),
     };
     registry

@@ -87,6 +87,7 @@ impl<'de> Deserialize<'de> for Check {
                 "env",
                 "exitCodes",
                 "output",
+                "columns",
                 "select",
             ],
             Some("rpc") => &["params"],

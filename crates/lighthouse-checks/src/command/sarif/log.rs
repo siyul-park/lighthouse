@@ -63,7 +63,7 @@ pub(super) struct MessageString {
 #[serde(rename_all = "camelCase")]
 pub(super) struct SarifResult {
     pub rule_id: Option<String>,
-    pub rule_index: Option<usize>,
+    pub rule_index: Option<i64>,
     pub level: Option<String>,
     #[serde(default)]
     pub message: Message,
@@ -112,6 +112,7 @@ pub(super) struct Region {
 
 #[derive(Debug, Default, Deserialize)]
 pub(super) struct Suppression {
+    pub kind: Option<String>,
     pub status: Option<String>,
     pub justification: Option<String>,
 }
@@ -124,10 +125,15 @@ impl Suppression {
 }
 
 impl Run {
-    /// The rule a result is about: by `ruleIndex`, else by `ruleId`.
+    /// The rule a result is about: by `ruleIndex` (-1 means none), else by
+    /// `ruleId`.
     pub(super) fn rule(&self, result: &SarifResult) -> Option<&ReportingDescriptor> {
         let rules = &self.tool.driver.rules;
-        result.rule_index.and_then(|at| rules.get(at)).or_else(|| {
+        let indexed = result
+            .rule_index
+            .and_then(|at| usize::try_from(at).ok())
+            .and_then(|at| rules.get(at));
+        indexed.or_else(|| {
             rules
                 .iter()
                 .find(|r| Some(&r.id) == result.rule_id.as_ref())

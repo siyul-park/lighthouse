@@ -9,15 +9,15 @@ use tempfile::TempDir;
 use super::checks::{lighthouse, project, trust, write};
 
 /// The decision that wraps the tool, once over the project.
-fn wrapping(select: &str) -> String {
+pub(crate) fn wrapping(select: &str) -> String {
     format!(
         "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: project }}\n  requirement: The tool MUST find nothing.\n  severity: error\n  check:\n    type: command\n    argv: [sh, tools/lint.sh]\n    batch: all\n    output: sarif\n{select}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: bad.txt, body: hello }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: good.txt, body: bye }}]\n"
     )
 }
 
-const SCRIPT: &str = "sed \"s#@ROOT@#$PWD#g\" tools/log.json\nexit 1\n";
+pub(crate) const SCRIPT: &str = "sed \"s#@ROOT@#$PWD#g\" tools/log.json\nexit 1\n";
 
-fn location(uri: &str, base: Option<&str>, line: u32, col: u32) -> Value {
+pub(crate) fn location(uri: &str, base: Option<&str>, line: u32, col: u32) -> Value {
     let mut artifact = json!({ "uri": uri });
     if let Some(base) = base {
         artifact["uriBaseId"] = json!(base);
@@ -28,7 +28,7 @@ fn location(uri: &str, base: Option<&str>, line: u32, col: u32) -> Value {
     } })
 }
 
-fn result(rule: &str, level: &str, text: &str, at: Value) -> Value {
+pub(crate) fn result(rule: &str, level: &str, text: &str, at: Value) -> Value {
     json!({ "ruleId": rule, "level": level, "message": { "text": text }, "locations": [at] })
 }
 
@@ -79,7 +79,7 @@ fn log(line_of_hello: u32, count: u32) -> Value {
     })
 }
 
-fn wrapped(select: &str, log: &Value) -> TempDir {
+pub(crate) fn wrapped(select: &str, log: &Value) -> TempDir {
     let dir = project(&wrapping(select));
     write(dir.path(), "tools/lint.sh", SCRIPT);
     write(dir.path(), "tools/log.json", &log.to_string());
@@ -91,7 +91,7 @@ fn wrapped(select: &str, log: &Value) -> TempDir {
 }
 
 /// The findings of `lighthouse check --format json`, one object per line.
-fn check(dir: &Path) -> Vec<Value> {
+pub(crate) fn check(dir: &Path) -> Vec<Value> {
     let out = lighthouse(dir)
         .args(["check", "--format", "json"])
         .output()

@@ -7,9 +7,6 @@ use thiserror::Error;
 
 use crate::{Span, Suppression, hash::Hasher};
 
-/// The evidence key a suppression by the reporting tool travels under.
-const TOOL_SUPPRESSION: &str = "toolSuppression";
-
 /// How hard a finding fails a run; serialized and parsed as the lowercase
 /// variant name. Whether a finding also asks for review is not a level: it
 /// follows from the severity its decision authored.
@@ -132,6 +129,10 @@ pub struct Diagnostic {
     pub evidence: Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fix: Option<String>,
+    /// A suppression the tool that reported the finding already carries, such
+    /// as its own `//nolint`: the engine reports the finding as suppressed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suppression: Option<Suppression>,
 }
 
 impl Diagnostic {
@@ -154,24 +155,8 @@ impl Diagnostic {
             symbol: None,
             evidence: Value::Null,
             fix: None,
+            suppression: None,
         }
-    }
-
-    /// Marks the finding as suppressed in the code by the tool that reported
-    /// it, with the reason the tool gave: the engine reports it as an
-    /// `inSource` suppression instead of a finding.
-    pub fn suppressed_by_tool(mut self, justification: &str) -> Self {
-        if !self.evidence.is_object() {
-            self.evidence = Value::Object(serde_json::Map::new());
-        }
-        self.evidence[TOOL_SUPPRESSION] = Value::String(justification.to_owned());
-        self
-    }
-
-    /// Takes off the tool's suppression, if the finding carries one.
-    pub fn take_tool_suppression(&mut self) -> Option<Suppression> {
-        let reason = self.evidence.as_object_mut()?.remove(TOOL_SUPPRESSION)?;
-        Some(Suppression::in_source(reason.as_str().unwrap_or_default()))
     }
 }
 

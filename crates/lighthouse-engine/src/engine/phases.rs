@@ -202,6 +202,7 @@ impl Engine {
                     keys: &self.registry,
                     trusted: self.trusted,
                     memo,
+                    notices: &Notices::default(),
                     applies: Applicability::default(),
                 };
                 let fact = analyzer.run(&ctx)?;
@@ -276,6 +277,7 @@ impl Engine {
                 ));
                 continue;
             }
+            let notices = Notices::default();
             let ctx = Ctx {
                 ws: &self.ws,
                 project: scene.project,
@@ -284,10 +286,12 @@ impl Engine {
                 keys: &self.registry,
                 trusted: self.trusted,
                 memo: scene.memo,
+                notices: &notices,
                 applies,
             };
             let started = Instant::now();
             let checked = rule.check(&ctx, &config.options);
+            gathered.notices.extend(notices.take());
             *gathered.spent.entry(meta.id.clone()).or_default() += started.elapsed();
             let found = unfinished(
                 checked,
@@ -349,6 +353,7 @@ impl Engine {
             ));
             return Ok(gathered);
         }
+        let notices = Notices::default();
         let ctx = Ctx {
             ws: &self.ws,
             project: scene.project,
@@ -357,10 +362,12 @@ impl Engine {
             keys: &self.registry,
             trusted: self.trusted,
             memo: scene.memo,
+            notices: &notices,
             applies: self.applies(meta.applicability, config),
         };
         let started = Instant::now();
         let checked = rule.check(&ctx, &config.options);
+        gathered.notices.extend(notices.take());
         *gathered.spent.entry(meta.id.clone()).or_default() += started.elapsed();
         let found = unfinished(checked, &meta.id, None, &mut gathered.incomplete)?;
         gathered.found.extend(found.into_iter().map(|mut d| {

@@ -10,7 +10,7 @@
 mod builder;
 mod bundled;
 mod cel_rule;
-mod command;
+pub mod command;
 mod eval;
 mod facts;
 mod fix;

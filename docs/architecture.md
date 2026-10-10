@@ -146,7 +146,7 @@ one provider of the union `builtin | cel | command | rpc | model`, with the comm
 - `cel` is an expression over the code model, written in the decision, with the standard function library `metrics callers callees edges owner tests annotations rank exposed limit counted`, the module path helpers `globMatch layerOf` and the text helpers `lines trim join trimPrefixes trimSuffixes trimLeft trimRight leadingRun drop`.
   - A function node has a `role`, computed once for every rule, the first that fits: `test`, `implementation` (it satisfies an interface or trait), `constructor` (named by the language's `constructorPrefixes`, or a Rust associated function returning its owner), `entrypoint` (Go `main`/`init`, Rust `main` of a binary), then `method` or `function`. The test sub-role of a test-file declaration is `test_role`.
   - A limit option is declared `$ref: '#/$defs/limit'`: an integer for every role, or an object with `default` and one entry per role (`function method constructor implementation entrypoint test`), each an integer or null for no limit. `limit(node, max)` gives the value for the node's role, and `counted(node, n, what)` says it (`NewServer needs 9 parameters`, `parse has 9 parameters`).
-- `command` runs a program under the process contract: argv without a shell, `{file}`/`{files}`/`{rule}` filling whole arguments, `batch: file|all`, exit `0` clean, `1` findings (stdout lines, an optional `path:line[:col]: ` prefix), anything else an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script. A command is not sandboxed: it runs with the user's privileges, in the project root, with an environment cleared to `PATH`, `LANG`, `TMPDIR` and the declared `env` (no `HOME`) plus `LIGHTHOUSE_*`. Trust is the only protection; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean. `output: sarif` reads stdout as a SARIF log instead (see "Wrapping a linter").
+- `command` runs a program under the process contract: argv without a shell, `{file}`/`{files}`/`{rule}` filling whole arguments, `batch: file|all`, exit `0` clean, `1` findings (stdout lines, an optional `path:line[:col]: ` prefix), anything else an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script. A command is not sandboxed: it runs with the user's privileges, in the project root, with an environment cleared to `PATH`, `LANG`, `TMPDIR` and the declared `env` (no `HOME`) plus `LIGHTHOUSE_*`. Trust is the only protection; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean. `output: sarif` reads stdout as a SARIF log instead, which is how common linters are wrapped: see [wrapping linters](wrapping-linters.md).
 - `rpc` is reserved until plugin protocol 0.2 and refused at load.
 - `model` hands the decision to agent review (`select` and `prompt` optional); it is not deterministic and caps the severity at `warn`.
 
@@ -179,39 +179,6 @@ plugin the configuration lists.
 Language specifics stay out of the rules: provider facts (symbols, owners,
 visibility, spans, comments) are the same everywhere, and per-language option
 defaults in the decision realize a rule per language; the context says what each language makes of it.
-
-### Wrapping a linter
-
-A linter that writes SARIF 2.1.0 is wrapped, not rewritten: the decision names the program, and Lighthouse turns each result into a finding. No bundled decision wraps a tool, because the tools are installed by the user; the decision lives in the project.
-
-```yaml
-spec:
-  scope: { subject: project }
-  severity: error
-  check:
-    type: command
-    argv: [golangci-lint, run, --output.sarif.path=stdout, --show-stats=false, ./...]
-    batch: all
-    output: sarif
-    env: { HOME: /home/dev }          # the cache directories; Lighthouse passes no HOME
-    exitCodes: { clean: [0], findings: [1] }
-    select: { ruleIds: [errcheck, staticcheck], levels: [error, warning] }
-```
-
-- **Exit codes** are the declared ones, and the log is read after a clean code as well as a findings code, for tools that always exit 0. An unreadable log, a log of another version than 2.1.0, or a findings code with no log or no result leaves the analysis incomplete (exit 3), with the start of stderr; it is never clean.
-- **`select`** (a field of the command check, not the CEL `select`) keeps the results whose `ruleId` matches one of `ruleIds` and whose `level` is one of `levels` (a result without a level is a `warning`). Both default to everything. The globs are those of module paths: `*` is a run of characters inside one segment, `/` and `::` separate segments, `**` spans segments. `select` is refused without `output: sarif`.
-- **Location.** The first location is used. `uri` is resolved against `uriBaseId` and `originalUriBaseIds`, or taken as a `file://` path, or as relative to the project root (what a tool that writes plain relative paths means), and made project-relative. A result without a location is about the project; a result in a file the project does not have is dropped.
-- **Columns** are one-based and converted to byte columns with the run's `columnKind`. SARIF defines the two values, `utf16CodeUnits` and `unicodeCodePoints`, but no default for a log that omits it; Lighthouse assumes `utf16CodeUnits`, and a tool that counts bytes (golangci-lint omits `columnKind`) is only off on a line with non-ASCII text before the finding.
-- **Message** is `message.text`, else the rule's `messageStrings[message.id]` with its `{n}` arguments filled, else the rule id.
-- **Severity** is the decision's; the tool's `level`, `ruleId`, name and `helpUri` are evidence.
-- **Suppressions.** A result with a `suppression` whose `status` is `accepted` or absent is the tool's own (`//nolint`, an attribute): it is reported as an `inSource` suppression, hidden like a directive and visible in SARIF output. Tools that leave such results out of the log, as golangci-lint does, show nothing.
-- **Identity** is the rule, the innermost project symbol that contains the start (else the file) and the message with its numbers and quoted names replaced by placeholders. The tool's `partialFingerprints` are not used: most hash the line text, which moves more often than a symbol does.
-
-Verified against the tools' documentation:
-
-- golangci-lint v2 writes SARIF with `--output.sarif.path=stdout` (or a file path), v1 with `--out-format sarif` (migration guide: "Previously 'sarif'" is `--output.sarif.path`, https://github.com/golangci/golangci-lint/blob/main/docs/content/docs/product/migration-guide.md); it exits `1` when it found issues (`--issues-exit-code`, default 1; a timeout is 4; https://github.com/golangci/golangci-lint/blob/main/pkg/commands/run.go). Run with v2.12.2, a result has `ruleId` (the linter), `level`, `message.text`, a relative `uri` without `uriBaseId` and `startLine`/`startColumn` (bytes), and the stdout holds only the log. It needs `HOME` or `GOLANGCI_LINT_CACHE` and Go's caches, which the cleared environment of a command lacks.
-- Clippy has no SARIF output of its own: `cargo clippy --message-format=json | clippy-sarif` (https://github.com/psastras/sarif-rs). A pipeline needs `argv: [sh, -c, "..."]`; its exit code is that of its last command, which is why a clean code is read too.
-- SARIF 2.1.0 (https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/sarif-v2.1.0-errata01-os-complete.html): `columnKind` §3.14.27, `originalUriBaseIds` §3.14.14, `uriBaseId` resolution §3.4.4, `suppression.kind` and `status` §3.35.
 
 ## Incomplete analysis
 

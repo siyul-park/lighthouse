@@ -5,6 +5,7 @@
 mod analyzers;
 mod annotations;
 mod bundled_fix;
+mod command_sarif;
 mod core_pack;
 mod cycle;
 mod design_architecture;

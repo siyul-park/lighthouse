@@ -81,6 +81,24 @@ pub struct CommandCheck {
     /// Which SARIF results become findings; only with `output: sarif`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub select: Option<SarifSelect>,
+    /// The unit the program counts columns in, when its log does not say or
+    /// says wrongly; only with `output: sarif`. Default: the log's
+    /// `columnKind`, else `utf16CodeUnits`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub columns: Option<SarifColumns>,
+}
+
+/// The unit a SARIF log counts columns in (`columnKind`, plus the bytes that
+/// tools such as golangci-lint count without saying so).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum SarifColumns {
+    /// UTF-16 code units.
+    Utf16CodeUnits,
+    /// Unicode code points.
+    UnicodeCodePoints,
+    /// Bytes.
+    Bytes,
 }
 
 /// How a `command` check reads what the program printed.
@@ -151,6 +169,9 @@ impl CommandCheck {
         }
         if self.select.is_some() && self.output != CheckOutput::Sarif {
             return Some("check: `select` needs `output: sarif`".to_owned());
+        }
+        if self.columns.is_some() && self.output != CheckOutput::Sarif {
+            return Some("check: `columns` needs `output: sarif`".to_owned());
         }
         let bad_level = self
             .select

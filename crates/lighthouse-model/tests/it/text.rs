@@ -12,6 +12,7 @@ fn byte_columns_invert_utf16_columns_and_count_code_points_on_request() {
         let by = |col, unit| byte_position(text, at(2, col), unit);
         assert_eq!(by(units, ColumnUnit::Utf16), at(2, bytes));
         assert_eq!(by(points, ColumnUnit::CodePoints), at(2, bytes));
+        assert_eq!(by(bytes, ColumnUnit::Bytes), at(2, bytes));
         assert_eq!(utf16_position(text, at(2, bytes)), at(2, units));
     }
 }

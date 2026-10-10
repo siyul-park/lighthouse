@@ -173,7 +173,7 @@ pub(crate) fn apply<'g>(
     let mut allowed = Vec::new();
     let mut open = Vec::new();
     for mut diagnostic in found {
-        match diagnostic.take_tool_suppression() {
+        match diagnostic.suppression.take() {
             Some(suppression) => allowed.push(Suppressed {
                 diagnostic,
                 suppression,

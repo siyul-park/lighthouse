@@ -94,6 +94,13 @@ fn command_check_select_belongs_to_sarif_output_and_names_sarif_levels() {
     assert!(load(level).unwrap_err().contains("SARIF levels"));
     let stray = "    output: sarif\n    select: { rules: [x] }\n";
     assert!(load(stray).is_err());
+    for unit in ["utf16CodeUnits", "unicodeCodePoints", "bytes"] {
+        let columns = format!("    output: sarif\n    columns: {unit}\n");
+        assert!(load(&columns).is_ok(), "{unit}");
+    }
+    let lines = load("    columns: bytes\n").unwrap_err();
+    assert!(lines.contains("`columns` needs `output: sarif`"), "{lines}");
+    assert!(load("    output: sarif\n    columns: chars\n").is_err());
 }
 
 #[test]

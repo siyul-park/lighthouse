@@ -12,7 +12,8 @@ use lighthouse_model::{
     Suppressed, hash,
 };
 use lighthouse_plugin::{
-    Ctx, Facts, Indexed, LanguageProvider, Memo, Registry, Rule, RuleManifest, Source, Workspace,
+    Ctx, Facts, Indexed, LanguageProvider, Memo, Notices, Registry, Rule, RuleManifest, Source,
+    Workspace,
 };
 use lighthouse_spec::{
     Catalog, Config, Domain, GeneratedCheck, GlobSet, ProjectError, Projects, RuleConfig, Rules,

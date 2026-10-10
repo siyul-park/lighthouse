@@ -340,6 +340,17 @@
               "$ref": "#/$defs/Batch",
               "default": "file"
             },
+            "columns": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SarifColumns"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The unit the program counts columns in, when its log does not say or\nsays wrongly; only with `output: sarif`. Default: the log's\n`columnKind`, else `utf16CodeUnits`."
+            },
             "env": {
               "additionalProperties": {
                 "type": "string"
@@ -1387,6 +1398,26 @@
         {
           "const": "suggested",
           "description": "Probably right but a judgment call: applied only when asked for.",
+          "type": "string"
+        }
+      ]
+    },
+    "SarifColumns": {
+      "description": "The unit a SARIF log counts columns in (`columnKind`, plus the bytes that\ntools such as golangci-lint count without saying so).",
+      "oneOf": [
+        {
+          "const": "utf16CodeUnits",
+          "description": "UTF-16 code units.",
+          "type": "string"
+        },
+        {
+          "const": "unicodeCodePoints",
+          "description": "Unicode code points.",
+          "type": "string"
+        },
+        {
+          "const": "bytes",
+          "description": "Bytes.",
           "type": "string"
         }
       ]

@@ -32,22 +32,17 @@ fn finding() -> Diagnostic {
 }
 
 #[test]
-fn diagnostic_suppressed_by_tool_keeps_the_evidence_it_had() {
-    let mut finding = finding();
-    finding.evidence = serde_json::json!({ "tool": "fake" });
-    let marked = finding.suppressed_by_tool("known");
-    assert_eq!(marked.evidence["tool"], "fake");
-    assert!(marked.evidence.as_object().unwrap().len() == 2);
-}
-
-#[test]
-fn diagnostic_take_tool_suppression_removes_the_mark_and_reads_it_as_in_source() {
-    let mut marked = finding().suppressed_by_tool("known");
-    let taken = marked.take_tool_suppression().unwrap();
-    assert_eq!(taken, Suppression::in_source("known"));
-    assert!(marked.evidence.as_object().unwrap().is_empty());
-    assert_eq!(marked.take_tool_suppression(), None);
-    assert_eq!(finding().take_tool_suppression(), None);
+fn diagnostic_suppression_round_trips_and_is_left_out_when_absent() {
+    let plain = serde_json::to_value(finding()).unwrap();
+    assert!(plain.get("suppression").is_none());
+    let mut marked = finding();
+    marked.suppression = Some(Suppression::in_source("known"));
+    let json = serde_json::to_value(&marked).unwrap();
+    assert_eq!(json["suppression"]["kind"], "inSource");
+    let back: Diagnostic = serde_json::from_value(json).unwrap();
+    assert_eq!(back, marked);
+    let old: Diagnostic = serde_json::from_value(plain).unwrap();
+    assert_eq!(old.suppression, None);
 }
 
 #[test]
