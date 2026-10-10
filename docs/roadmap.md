@@ -38,95 +38,86 @@ languages and editors are added.
 | Language providers | JSON-RPC protocol; Go provider in Go (`go/packages`, `go/types`); Rust provider; conformance suite |
 | Self-enforcement | layout, test and declarative (CEL) rules; Lighthouse lints itself in `make lint` |
 | Decision memory | SQLite history, committed `decisions.jsonl`, `lighthouse-disable-next-line` directives, expiring judgments, evidence snapshots, `--format agent` |
-| Agent loop | MCP server, Claude Code hooks, generated skill, `init --agent` |
+| Agent loop | MCP server, Claude Code hooks, generated skill, `init --agent`; compact grouped agent output with fix previews |
 | Autofix | one canonical fix per decision (`ops`, `command`), in-memory verification, rollback, atomic writes, user-level trust |
 | Resource model | `apiVersion`/`kind`/`metadata`/`spec` for every spec, JSON Schema per kind, `spec validate`, SARIF, `pattern` renamed to `decision`, severity `error`/`warn`/`info` |
 | Check providers | `check:` as `builtin` (standard ops `order`, `proximity`, `cycle`), `cel` with a standard library, `command`, `rpc` (reserved) or `model` (served by agent review tasks); every bundled decision re-expressed with identical findings; `severity` replaces `enforcement`; meaning version separate from check revision; ADR `status`, `supersedes`, `consequences` |
+| Speed | per-run fact memo, parallel rule and provider runs (rayon), concurrent Go modules, `--timings` |
 | Fewer concepts | `spec::project` replaces config (projects replace presets and overrides); fields cut to requirement/scope/severity/options + context/consequences/status/supersedes + check/fix/examples/provenance; generated and test code handled by each decision's scope; camelCase options; UUID identity; decision ids in the ESLint convention, checked by `core/decision-naming`; ESLint-style `lighthouse-disable` directives; judgments (`pass`/`fail`/`notApplicable`) and SARIF suppressions replace verdicts; `decisions.jsonl` is the only source of truth |
 
 ## Next
 
-### 2d-2b: compact agent output and protocol 0.2
-- Agent output is compact:
-  - MCP `check`, `review_tasks`, `--format agent` and hooks group findings by decision,
-    then by file;
-  - each decision's requirement, expected example and judgment instructions appear once;
-  - one finding is one short line: location, message and fingerprint prefix;
-  - the full per-finding shape is available with `detail: full`.
-- Plugin protocol 0.2 is LSP-shaped:
-  - LSP lifecycle, with Lighthouse capabilities under `experimental`;
-  - text sync replaces overlays;
-  - UTF-8 positions;
-  - `lighthouse/index`, `lighthouse/check` and `lighthouse/fix` methods, which make
-    `rpc` checks real.
+Rule accuracy and checking cost are proven before anything is added on top. The
+precision and timing measured here are the baseline that search and learned checks are
+later judged against.
 
-### Rule completion
-Rule-based checking is finished before any retrieval or learning work.
-- **Self-check and placement:** `layers` (import-linter contracts), `unique-type-names`,
-  `tiny-modules`, `feature-envy`, `misplaced-symbol`, a deterministic `owner-file`, and
+### R2: self-check and placement rules (in review)
+- **Self-check:** `layers` (import-linter contracts), `unique-type-names`, `tiny-modules`.
+- **Placement:** `feature-envy`, `misplaced-symbol`, a deterministic `owner-file`, and
   `no-hidden-target`.
-- **Alignment with established tools:**
-  - `complexity` splits into independent standard limits;
-  - `max-params` and `max-results`, which count fields of single-use parameter structs
-    and set limits per role (constructor, implementation, entrypoint, test);
-  - model checks become deterministic where a tool proves it possible;
-  - missing common rules are added.
-- **Incremental checking:** content-addressed caches with early cutoff.
+- **Gate:** findings of every other rule are identical on four repositories, and each new
+  rule's precision is sampled by hand.
 
-### 3: decision graph and evaluation
-- Queries over the decision graph: decision, finding, judgment with reason and actor,
-  evidence, and revision.
-- Judgments on subjects, not only on findings:
-  - A `model` check takes candidate subjects from the decision's scope, and an agent or model records
-    `pass` or `fail` for each.
-  - A fraction of already decided subjects is sampled and re-judged.
-  - Together these give labels for recall, not just precision.
-- Per-decision precision and estimated recall.
-- An evaluation harness that replays a candidate check against recorded judgments and all
-  examples, and measures agreement with the previous tier. This is the promotion gate
-  used by people and agents alike, via CLI and MCP.
-- Structural similarity (normalized AST and token shingles, MinHash) and an optional
-  `Model` plugin kind (task `embedding`) as retrieval aids, never as deciders.
-- Baseline and ratchet; cycle, clone and stability analyzers.
-- `lighthouse log compact` folds expired and superseded events in `decisions.jsonl`;
-  the full history stays in git.
-- One `search` tool (MCP and CLI) over decisions, judgments, findings, examples, symbols
-  and revisions. It serves decisions that rules cannot capture precisely:
-  - Each kind is first filtered (scope, language, status, target files).
-  - Then lexical (SQLite FTS5 BM25), dense (a local embedding model such as EmbeddingGemma 2,
-    via the `Model` kind) and structural rankings are fused with Reciprocal Rank Fusion.
-  - The dense ranking joins only when it improves the fused result on the evaluation set.
-  - An agent passes a short task frame (task, targets, intent, approach); hooks search
-    decisions only.
-  - Hooks call it when a task starts and before a file's first edit, in shadow mode at
-    first.
-  - The evaluation set comes from history: a finding or judgment of a decision on a file
-    marks that decision as relevant to edits of that file. Recall@k, nDCG@10 and MRR are
-    measured per ranker and for the fused result.
-  - Retrieval never creates findings or blocks; the index is a rebuildable cache.
+### R3: rules aligned with established tools
+- **Limits:**
+  - `complexity` splits into independent standard limits: cyclomatic, cognitive,
+    statements, depth, parameters, function length;
+  - `max-params` and `max-results` count the fields of single-use parameter structs;
+  - one limit shape with values per role (constructor, implementation, entrypoint, test).
+- **Model to deterministic:** model checks become deterministic where a tool shows it can
+  be done (context-first, stored context, error identity, panics, private types in APIs).
+- **Commodity checks are wrapped, not rewritten:** a decision can be enforced by an
+  existing linter (golangci-lint, clippy) through a `command` check. Lighthouse adds the
+  decision, memory and judgments on top of it.
+- **Baseline report:** per-decision precision from sampled findings and from judgments,
+  plus check time per phase on the reference repositories.
 
-### 4: decision evolution
-- Signals are captured from judgments, directives, fix outcomes and decision edits.
-- Signals are grouped into `proposed` decisions.
-- The repository itself is a signal source. Refactor-like commits label the old code
-  as violating and the new code as conforming, and in a cluster of similar code the
-  dominant shape counts as conforming. Changes are grouped by their structural change
-  first and refined with a local embedding model.
-- Proposals narrow, widen or demote a decision, with generated examples.
-- Retrieval feedback:
-  - Agents mark surfaced decisions as applied (`pass`), irrelevant (`notApplicable`) or
-    knowingly not followed (`fail`, with a reason), as judgments on the task.
-  - A decision often surfaced as irrelevant gets a narrowing proposal.
-  - Surfacing is on by default once its measured precision passes.
-- Check revisions (attach a learned model, add a deterministic part, demote) go through
-  the evaluation gate. They are routing by cost and confidence, not a maturity state, and
-  nothing is enabled automatically.
+### Fast on large repositories
+- **Caches:** content-addressed caches with early cutoff, the approach of Go build action
+  IDs, Salsa and ESLint `--cache`:
+  - per-unit index (with plugin protocol 0.2);
+  - per-file results.
+- **Protocol 0.2:** LSP lifecycle, text sync, UTF-8 positions, and `lighthouse/check`
+  for `rpc` checks.
+- **Gate:** a warm run equals a cold run byte for byte, and a one-file edit re-checks only
+  what depends on it.
 
-### 5: adoption
-- Prebuilt release binaries that bundle the Go and Rust providers, and a one-command
-  install.
-- `lighthouse init` detects languages and proposes a starter set of decisions, including
-  decisions mined from the repository's own history and conventions.
+### Adoption
+- Prebuilt binaries that bundle the Go and Rust providers, and a one-command install.
+- `lighthouse init` detects languages and proposes a starter set of decisions.
+- A docs pass: each document holds only what its reader needs.
+
+### The decision loop
+This is the core value: a decision starts as text, is enforced at once by agent review,
+and earns a deterministic check through measured evidence.
+- **Graph queries:** decision, finding, judgment (reason, actor), evidence and revision.
+- **Labels for recall:** judgments on candidate subjects of `model` checks, plus sampled
+  re-judging of decided subjects.
+- **Evaluation harness (the promotion gate, via CLI and MCP):**
+  - replays a candidate check against recorded judgments and every example;
+  - measures precision, estimated recall and agreement with the previous check.
+- **Proposals:** narrow, widen, demote or promote a decision, with generated examples.
+  Nothing is enabled automatically.
+- `lighthouse log compact`.
+
+### Decision search
+- One hybrid `search` tool over decisions, judgments, findings, examples, symbols and
+  revisions, for decisions that rules cannot capture precisely.
+- **Ranking:** a structured filter first, then BM25 (FTS5), a local embedding model and
+  structural signals, fused with Reciprocal Rank Fusion.
+- **Hooks:** they search decisions when a task starts and before a file's first edit,
+  first in shadow mode.
+- **Feedback:** agents' answers (applied, not applicable, knowingly not followed) become
+  judgments and refinement proposals.
+- **Evaluation:** labels come from history. Recall@k, nDCG@10 and MRR are measured
+  against the R3 baseline.
+
+### Learning from history
+- **Repository mining:** refactor-like commits and dominant conventions become weak
+  evidence and `proposed` decisions. Changes are grouped by structural change first, then
+  by embeddings.
+- **Learned routing per decision:** a calibrated classifier decides only when confident,
+  and must beat a statistical baseline and kNN.
 
 ### Later
 | Step | Scope |
@@ -134,7 +125,6 @@ Rule-based checking is finished before any retrieval or learning work.
 | Artifact graph | domain-neutral nodes and edges; a markdown provider as the first non-code domain |
 | Breadth | `lsp-bridge` (any off-the-shelf language server, at lower capability), then native TypeScript and Python providers |
 | Ecosystem | `lighthouse lsp` for editors (diagnostics, fixes, judgments); external rule plugins over RPC that ship their decision specs; `plugin add` with a lockfile |
-| Learning | per-decision routing: a classifier trained on that decision's judgments decides only when confident and passes the rest to a prompted model or an agent. Models are opt-in, cached and budgeted. A model must beat a statistical baseline before use, and a sample of its confident calls is still re-judged. |
 | Session domain | decisions about agent actions; a PreToolUse gate that allows, asks or denies |
 
 ## Known gaps
