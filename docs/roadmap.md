@@ -55,8 +55,10 @@ later judged against.
 - **Self-check:** `layers` (import-linter contracts), `unique-type-names`, `tiny-modules`.
 - **Placement:** `feature-envy`, `misplaced-symbol`, a deterministic `owner-file`, and
   `no-hidden-target`.
-- **Gate:** findings of every other rule are identical on four repositories, and each new
-  rule's precision is sampled by hand.
+- **Gate:** findings of every other rule are identical on four repositories.
+- **Precision review:** each new rule is reviewed with at least 20 sampled findings
+  (or all of them, if fewer), with a Wilson interval reported. False-positive causes are
+  fixed in the code model or the rule's definition, not with ad-hoc exclusions.
 
 ### R3: rules aligned with established tools
 - **Limits:**
@@ -67,8 +69,14 @@ later judged against.
 - **Model to deterministic:** model checks become deterministic where a tool shows it can
   be done (context-first, stored context, error identity, panics, private types in APIs).
 - **Commodity checks are wrapped, not rewritten:** a decision can be enforced by an
-  existing linter (golangci-lint, clippy) through a `command` check. Lighthouse adds the
-  decision, memory and judgments on top of it.
+  existing linter (golangci-lint, clippy, ruff) through a `command` check, and Lighthouse
+  adds the decision, memory and judgments on top.
+- **Wrapped output is normalized:**
+  - SARIF 2.1.0 is read as a standard input format;
+  - each tool rule maps to a decision;
+  - locations use UTF-16 columns per SARIF;
+  - fingerprints come from the tool rule, the location and the normalized message
+    (or the tool's `partialFingerprints`), so they stay stable across tool versions.
 - **Baseline report:** per-decision precision from sampled findings and from judgments,
   plus check time per phase on the reference repositories.
 
@@ -82,10 +90,11 @@ later judged against.
 - **Gate:** a warm run equals a cold run byte for byte, and a one-file edit re-checks only
   what depends on it.
 
-### Adoption
-- Prebuilt binaries that bundle the Go and Rust providers, and a one-command install.
-- `lighthouse init` detects languages and proposes a starter set of decisions.
-- A docs pass: each document holds only what its reader needs.
+### Packaging
+- Prebuilt binaries that bundle the Go and Rust providers, and a one-command install,
+  verified on clean machines early, so real-environment problems surface before the
+  loop work.
+- Not yet a public release.
 
 ### The decision loop
 This is the core value: a decision starts as text, is enforced at once by agent review,
@@ -111,6 +120,20 @@ and earns a deterministic check through measured evidence.
   judgments and refinement proposals.
 - **Evaluation:** labels come from history. Recall@k, nDCG@10 and MRR are measured
   against the R3 baseline.
+- **Bias control for those labels.** History over-represents decisions with
+  deterministic checks and files that already have findings, and it holds positives
+  only. So:
+  - results are reported per stratum (check type, decision, language);
+  - judgments of `model` decisions and recorded `notApplicable` answers are included;
+  - sampled negatives are added;
+  - the split is by time and by project, never tuned on the test split.
+
+### Adoption
+Public adoption waits until the decision loop has been shown working.
+- Public release.
+- `lighthouse init` detects languages and proposes a starter set of decisions, including
+  decisions mined from the repository's history.
+- A docs pass: each document holds only what its reader needs.
 
 ### Learning from history
 - **Repository mining:** refactor-like commits and dominant conventions become weak
