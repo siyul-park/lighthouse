@@ -375,6 +375,7 @@ mod tests {
             doc: None,
             name: "f".to_owned(),
             role: None,
+            optional: false,
         }
     }
 

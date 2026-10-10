@@ -104,6 +104,7 @@ impl World {
             doc: None,
             name: name.to_owned(),
             role: None,
+            optional: false,
         };
         self.symbols.push(symbol.clone());
         symbol
@@ -149,6 +150,7 @@ impl World {
             clone_fingerprint: None,
             forwards_to: None,
             param_types: Vec::new(),
+            result_types: Vec::new(),
             manual_assertions: 0,
             implementation: false,
             constructs: false,

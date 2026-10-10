@@ -476,6 +476,7 @@
           "id": ".::Stack::items#field",
           "kind": "field",
           "name": "items",
+          "optional": true,
           "owner": ".::Stack#type",
           "span": {
             "end": {

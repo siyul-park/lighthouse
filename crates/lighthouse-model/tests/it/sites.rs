@@ -22,6 +22,7 @@ fn symbol(name: &str, file: &str) -> Symbol {
         doc: None,
         name: name.to_owned(),
         role: None,
+        optional: false,
     }
 }
 

@@ -28,6 +28,7 @@ use crate::{
     table::Table,
 };
 
+mod effective;
 mod hidden;
 mod homonyms;
 mod ownership;
@@ -60,6 +61,8 @@ pub(crate) struct Builder<'a> {
     measures: Option<Measures>,
     table: Arc<Table>,
     names: Arc<homonyms::Names>,
+    single: Arc<effective::Single>,
+    allow_suffixes: Vec<String>,
     first_test: OnceCell<Option<Value>>,
 }
 
@@ -94,6 +97,8 @@ impl<'a> Builder<'a> {
             measures,
             table: ctx.memo.slot(),
             names: ctx.memo.slot(),
+            single: ctx.memo.slot(),
+            allow_suffixes: strings(options.get("allowSuffixes")),
             first_test: OnceCell::new(),
         })
     }
@@ -596,6 +601,16 @@ fn documented_by_interface(project: &Project, method: &Symbol) -> bool {
             })
         })
     })
+}
+
+/// The strings of an option that is a list of them; empty when it is not.
+fn strings(option: Option<&Value>) -> Vec<String> {
+    option
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|v| v.as_str().map(str::to_owned))
+        .collect()
 }
 
 fn measures(ctx: &Ctx) -> Result<Measures, Error> {

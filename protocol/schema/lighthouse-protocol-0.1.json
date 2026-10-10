@@ -358,6 +358,13 @@
           "minimum": 0,
           "type": "integer"
         },
+        "result_types": {
+          "description": "Project types named by the results, like `param_types`. Added in 0.1\nbefore 1.0.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "returns": {
           "format": "uint32",
           "minimum": 0,
@@ -745,6 +752,10 @@
         },
         "name": {
           "type": "string"
+        },
+        "optional": {
+          "description": "A field a caller may leave out: a pointer, slice, map, function,\nchannel or interface in Go; an `Option`, a collection or a\n`#[serde(default)]` field in Rust. Added in 0.1 before 1.0.",
+          "type": "boolean"
         },
         "owner": {
           "description": "Id of the enclosing type or interface.",

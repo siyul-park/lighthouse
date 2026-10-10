@@ -17,7 +17,10 @@ spec:
     single value, 0 for `()`), and looks inside a `Result<T, E>` at `T`. A
     constructor that returns its type with a result or an error is not
     counted, nor is a function that implements an interface or trait method,
-    or a test.
+    or a test. A struct that exists only for the function (nothing else
+    takes or returns it, and only the function and its callers touch it or
+    its fields) is a result list in disguise, so its fields count instead of
+    the struct.
   scope:
     domain: code
     subject: symbol
@@ -37,6 +40,16 @@ spec:
           object with `default` and one entry per role (`function`,
           `method`, `constructor`, `implementation`, `entrypoint`, `test`);
           a role left out takes `default`, and null is no limit.
+      allowSuffixes:
+        type: array
+        items: {type: string}
+        default: [Options, Opts, Config]
+        description: >-
+          Name endings of a struct that only carries settings: when a struct
+          used only by one function ends in one of these, only its required
+          fields (not a pointer, slice, map, function, channel or interface in
+          Go; not an `Option`, `Vec` or map, or `#[serde(default)]`, in Rust)
+          count toward the limit.
     additionalProperties: false
   check:
     type: cel
@@ -46,16 +59,24 @@ spec:
         expr: metrics(func)
       - name: cap
         expr: limit(func, options.max)
+      - name: eff
+        expr: func.effective
+      - name: hidden
+        expr: eff.hidden.filter(h, h.side == 'results')
+      - name: note
+        expr: >-
+          size(hidden) == 0 ? '' : ' (' + hidden.map(h, string(h.fields) + ' in ' + h.struct).join(', ') + ' counted from structs used only here)'
     where: >-
       (func.kind == 'function' || func.kind == 'method')
-      && m.measured && cap != null && func.returns > cap
+      && m.measured && cap != null && eff.results > cap
     message: >-
-      {{ counted(func, func.returns, 'results') }} (max {{ cap }}):
+      {{ counted(func, eff.results, 'results') }} (max {{ cap }}){{ note }}:
       split by responsibility
     evidence:
-      value: func.returns
+      value: eff.results
       max: cap
       role: func.role
+      hidden: hidden
     identity:
       subject: func.id
   provenance:
@@ -171,4 +192,72 @@ spec:
                 pub fn new() -> Result<(Self, i32, i32, i32), String> {
                     Ok((Parser, 0, 0, 0))
                 }
+            }
+    - name: single-use-struct-counts-its-fields
+      language: go
+      kind: invalid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type Pair struct{ A, B, C int }
+
+            func split() (int, int, Pair) {
+                return 0, 0, Pair{}
+            }
+      expect:
+        - line: 5
+    - name: struct-shared-by-two-functions
+      language: go
+      kind: valid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type Pair struct{ A, B, C int }
+
+            func split() (int, int, Pair) {
+                return 0, 0, Pair{}
+            }
+
+            func other() Pair {
+                return Pair{}
+            }
+    - name: rust-single-use-struct-counts-its-fields
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Pair {
+                pub a: i32,
+                pub b: i32,
+                pub c: i32,
+            }
+
+            pub fn split() -> (i32, i32, Pair) {
+                (0, 0, Pair { a: 0, b: 0, c: 0 })
+            }
+      expect:
+        - line: 7
+    - name: rust-struct-shared-by-two-functions
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Pair {
+                pub a: i32,
+                pub b: i32,
+                pub c: i32,
+            }
+
+            pub fn split() -> (i32, i32, Pair) {
+                (0, 0, Pair { a: 0, b: 0, c: 0 })
+            }
+
+            pub fn other() -> Pair {
+                Pair { a: 0, b: 0, c: 0 }
             }

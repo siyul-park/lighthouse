@@ -248,6 +248,13 @@ and a constructor by its name.
 excluded, as kind-less symbol ids (`module::Type`), so rules can ask whether a
 function takes a value of some type.
 
+`result_types` (optional) is the same for the results: the project types a function
+returns (in Rust the `Ok` type of a `Result` and each element of a tuple). With
+`param_types` it lets a rule find the struct that exists only for one function.
+A field symbol may carry `optional: true`: a caller may leave it out (Go pointer,
+slice, map, function, channel or interface; Rust `Option`, `Vec`, a map, or a
+`#[serde(default)]` field).
+
 `manual_assertions` (optional, test files only) counts the checks a function
 writes out by hand: an `if` with no `else` whose condition compares or negates
 and whose only effect is to fail the test (in Go, through the `testing`

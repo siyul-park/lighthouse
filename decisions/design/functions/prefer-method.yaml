@@ -19,8 +19,7 @@ spec:
     not judged.
 
     Rust: The same for a private free function and the methods of one
-    `impl` target type. Parameter types are not resolved for Rust, so
-    `takes_owner_param` is always false there.
+    `impl` target type.
   scope:
     domain: code
     subject: symbol

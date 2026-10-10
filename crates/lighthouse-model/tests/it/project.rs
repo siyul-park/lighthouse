@@ -23,6 +23,7 @@ fn symbol(module: &str, name: &str) -> Symbol {
         doc: None,
         name: name.to_owned(),
         role: None,
+        optional: false,
     }
 }
 
@@ -97,6 +98,7 @@ fn summary(symbol: &Symbol, forwards_to: Option<Target>) -> FunctionSummary {
         clone_fingerprint: None,
         forwards_to,
         param_types: Vec::new(),
+        result_types: Vec::new(),
         manual_assertions: 0,
         implementation: false,
         constructs: false,

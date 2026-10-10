@@ -16,6 +16,7 @@ use crate::{
     names::{
         Generics, Index, ModId, Ns, Res, Sym, TyCx, ViaTrait, generics_of, is_test_fn, symbol_id,
     },
+    signature::{optional_field, project_types},
     testcase,
     tree::{SourceFile, Vis, vis},
     util::{constructs, count_tokens, doc_of, extent_of, signature_counts, span_of},
@@ -213,6 +214,7 @@ impl Extractor<'_> {
             doc: d.doc,
             name: d.name,
             role: None,
+            optional: false,
         });
     }
 
@@ -243,6 +245,7 @@ impl Extractor<'_> {
             .filter(|s| !matches!(s, syn::Stmt::Item(_)))
             .count();
         let (params, returns) = signature_counts(sig);
+        let (param_types, result_types) = project_types(self.idx, &home.cx, sig);
         self.frag.functions.push(FunctionSummary {
             symbol: id.to_owned(),
             max_nesting: facts.max_nesting,
@@ -254,7 +257,8 @@ impl Extractor<'_> {
             flow: facts.flow,
             clone_fingerprint: None,
             forwards_to: facts.forwards_to,
-            param_types: Vec::new(),
+            param_types,
+            result_types,
             manual_assertions: 0,
             implementation: false,
             constructs: false,
@@ -359,6 +363,7 @@ impl Extractor<'_> {
             let name = ident.to_string();
             let id = symbol_id(&owner.module, &[&owner.name, &name], SymbolKind::Field);
             let visibility = cap(declared(vis(&field.vis)), owner.visibility);
+            let optional = optional_field(field);
             self.declare(
                 Decl {
                     id,
@@ -372,6 +377,9 @@ impl Extractor<'_> {
                 },
                 Node::Symbol(owner.id.clone()),
             );
+            if optional && let Some(last) = self.frag.symbols.last_mut() {
+                last.optional = true;
+            }
         }
     }
 

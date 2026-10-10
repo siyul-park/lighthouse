@@ -207,6 +207,9 @@ pub struct Symbol {
     pub doc: Option<String>,
     pub name: String,
     pub role: Option<SymbolRole>,
+    /// A field a caller may leave out (an `Option`, a collection, a pointer).
+    #[serde(default)]
+    pub optional: bool,
 }
 
 /// A vertex of the dependency graph: a whole module or one symbol.
@@ -395,6 +398,9 @@ pub struct FunctionSummary {
     /// symbol ids (`module::name`).
     #[serde(default)]
     pub param_types: Vec<String>,
+    /// Project types named by the results, as kind-less symbol ids.
+    #[serde(default)]
+    pub result_types: Vec<String>,
     /// Checks written out by hand in a test file's function: an `if` that
     /// compares and whose only effect is to fail the test.
     #[serde(default)]

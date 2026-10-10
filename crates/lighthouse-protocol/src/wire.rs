@@ -280,6 +280,11 @@ pub struct Symbol {
     /// tell; test entry points are `test` symbols and carry none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub role: Option<SymbolRole>,
+    /// A field a caller may leave out: a pointer, slice, map, function,
+    /// channel or interface in Go; an `Option`, a collection or a
+    /// `#[serde(default)]` field in Rust. Added in 0.1 before 1.0.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub optional: bool,
 }
 
 /// An edge endpoint: a whole module or one symbol.
@@ -387,6 +392,10 @@ pub struct FunctionSummary {
     /// plugin does not resolve parameter types.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub param_types: Vec<String>,
+    /// Project types named by the results, like `param_types`. Added in 0.1
+    /// before 1.0.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub result_types: Vec<String>,
     /// Checks of a test file's function written out by hand: an `if` that
     /// compares and whose only effect is to fail the test. Added in 0.1
     /// before 1.0; zero when the plugin does not count them.

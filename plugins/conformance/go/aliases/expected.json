@@ -271,6 +271,7 @@
           "id": ".::Store::data#field",
           "kind": "field",
           "name": "data",
+          "optional": true,
           "owner": ".::Store#type",
           "span": {
             "end": {

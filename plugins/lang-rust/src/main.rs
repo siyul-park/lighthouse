@@ -9,6 +9,7 @@ mod extract;
 mod macros;
 mod names;
 mod provider;
+mod signature;
 mod testcase;
 mod tree;
 mod util;

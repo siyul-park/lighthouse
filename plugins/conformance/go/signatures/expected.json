@@ -1,0 +1,604 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": ".::Request#type",
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Request is taken by Build only."
+        },
+        {
+          "attached_to": ".::Pair#type",
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "text": "// Pair is returned by Split only."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Request#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Request::ID#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Request::Name#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Request::Tags#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Request::Limit#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Request::Hook#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Request::Next#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Request::Done#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Request::Index#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Pair#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Pair#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Pair::A#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Pair#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Pair::B#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Build#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Build#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 47,
+              "line": 18
+            },
+            "start": {
+              "col": 45,
+              "line": 18
+            }
+          },
+          "to": ".::Request::ID"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Split#function"
+        },
+        {
+          "from": {
+            "symbol": ".::Split#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 41,
+              "line": 20
+            },
+            "start": {
+              "col": 37,
+              "line": 20
+            }
+          },
+          "to": ".::Pair"
+        }
+      ],
+      "file": {
+        "path": "signatures.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "param_types": [
+            ".::Request"
+          ],
+          "params": 2,
+          "returns": 1,
+          "statements": 1,
+          "symbol": ".::Build#function",
+          "tokens": 8,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "result_types": [
+            ".::Pair"
+          ],
+          "returns": 2,
+          "statements": 1,
+          "symbol": ".::Split#function",
+          "tokens": 8,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "signatures",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Request is taken by Build only.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "signatures.go",
+          "id": ".::Request#type",
+          "kind": "type",
+          "name": "Request",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 13
+            },
+            "start": {
+              "col": 6,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 11,
+              "line": 5
+            },
+            "start": {
+              "col": 2,
+              "line": 5
+            }
+          },
+          "file": "signatures.go",
+          "id": ".::Request::ID#field",
+          "kind": "field",
+          "name": "ID",
+          "owner": ".::Request#type",
+          "span": {
+            "end": {
+              "col": 11,
+              "line": 5
+            },
+            "start": {
+              "col": 2,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
+            }
+          },
+          "file": "signatures.go",
+          "id": ".::Request::Name#field",
+          "kind": "field",
+          "name": "Name",
+          "owner": ".::Request#type",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 7
+            },
+            "start": {
+              "col": 2,
+              "line": 7
+            }
+          },
+          "file": "signatures.go",
+          "id": ".::Request::Tags#field",
+          "kind": "field",
+          "name": "Tags",
+          "optional": true,
+          "owner": ".::Request#type",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 7
+            },
+            "start": {
+              "col": 2,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 12,
+              "line": 8
+            },
+            "start": {
+              "col": 2,
+              "line": 8
+            }
+          },
+          "file": "signatures.go",
+          "id": ".::Request::Limit#field",
+          "kind": "field",
+          "name": "Limit",
+          "optional": true,
+          "owner": ".::Request#type",
+          "span": {
+            "end": {
+              "col": 12,
+              "line": 8
+            },
+            "start": {
+              "col": 2,
+              "line": 8
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 9
+            },
+            "start": {
+              "col": 2,
+              "line": 9
+            }
+          },
+          "file": "signatures.go",
+          "id": ".::Request::Hook#field",
+          "kind": "field",
+          "name": "Hook",
+          "optional": true,
+          "owner": ".::Request#type",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 9
+            },
+            "start": {
+              "col": 2,
+              "line": 9
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 11,
+              "line": 10
+            },
+            "start": {
+              "col": 2,
+              "line": 10
+            }
+          },
+          "file": "signatures.go",
+          "id": ".::Request::Next#field",
+          "kind": "field",
+          "name": "Next",
+          "optional": true,
+          "owner": ".::Request#type",
+          "span": {
+            "end": {
+              "col": 11,
+              "line": 10
+            },
+            "start": {
+              "col": 2,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 11
+            },
+            "start": {
+              "col": 2,
+              "line": 11
+            }
+          },
+          "file": "signatures.go",
+          "id": ".::Request::Done#field",
+          "kind": "field",
+          "name": "Done",
+          "optional": true,
+          "owner": ".::Request#type",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 11
+            },
+            "start": {
+              "col": 2,
+              "line": 11
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 22,
+              "line": 12
+            },
+            "start": {
+              "col": 2,
+              "line": 12
+            }
+          },
+          "file": "signatures.go",
+          "id": ".::Request::Index#field",
+          "kind": "field",
+          "name": "Index",
+          "optional": true,
+          "owner": ".::Request#type",
+          "span": {
+            "end": {
+              "col": 22,
+              "line": 12
+            },
+            "start": {
+              "col": 2,
+              "line": 12
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Pair is returned by Split only.",
+          "extent": {
+            "end": {
+              "col": 29,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
+          "file": "signatures.go",
+          "id": ".::Pair#type",
+          "kind": "type",
+          "name": "Pair",
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 16
+            },
+            "start": {
+              "col": 6,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "signatures.go",
+          "id": ".::Pair::A#field",
+          "kind": "field",
+          "name": "A",
+          "owner": ".::Pair#type",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 16
+            },
+            "start": {
+              "col": 19,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "signatures.go",
+          "id": ".::Pair::B#field",
+          "kind": "field",
+          "name": "B",
+          "owner": ".::Pair#type",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 16
+            },
+            "start": {
+              "col": 22,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 53,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "file": "signatures.go",
+          "id": ".::Build#function",
+          "kind": "function",
+          "name": "Build",
+          "span": {
+            "end": {
+              "col": 53,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 50,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "file": "signatures.go",
+          "id": ".::Split#function",
+          "kind": "function",
+          "name": "Split",
+          "span": {
+            "end": {
+              "col": 50,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

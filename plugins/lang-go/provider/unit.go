@@ -157,6 +157,7 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 		Flow:             f.events,
 		ForwardsTo:       forwardTarget(d, u.info(), u.res),
 		ParamTypes:       paramTypes(d.Type, u.info(), u.res),
+		ResultTypes:      resultTypes(d.Type, u.info(), u.res),
 		ManualAssertions: manual,
 	})
 	if isTestCase {
@@ -281,6 +282,7 @@ func (u *unit) fields(t *ast.StructType, owner, ownerID string) {
 			if name != "" && name != "_" {
 				id := symbolID(kindField, u.module, owner, name)
 				u.symbol(kindField, name, ownerID, id, field.Pos(), field.End(), doc, u.extent(field))
+				u.markOptional(field)
 			}
 			continue
 		}
@@ -294,7 +296,21 @@ func (u *unit) fields(t *ast.StructType, owner, ownerID string) {
 				extent = u.extent(field)
 			}
 			u.symbol(kindField, name.Name, ownerID, id, name.Pos(), field.End(), doc, extent)
+			u.markOptional(field)
 		}
+	}
+}
+
+// markOptional flags the field symbol just emitted when its type has a zero
+// value that means "not given".
+func (u *unit) markOptional(field *ast.Field) {
+	t := u.info().TypeOf(field.Type)
+	if t == nil {
+		return
+	}
+	switch t.Underlying().(type) {
+	case *types.Pointer, *types.Slice, *types.Map, *types.Signature, *types.Chan, *types.Interface:
+		u.frag.Symbols[len(u.frag.Symbols)-1].Optional = true
 	}
 }
 

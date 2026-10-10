@@ -535,7 +535,7 @@ Also: rust
 
 `design/max-params` · symbol · warn · cel
 
-*A long parameter list usually hides a missing type, or a function that does several things. The default limit is 6 for a function and 7 for a constructor: Sonar S107 and clippy `too_many_arguments` allow 7, revive `argument-limit` allows 8, detekt `LongParameterList` allows 5 for a function and 6 for a constructor, and ESLint `max-params` allows 3; this is a deliberately high limit between them. A constructor may take one more because it assembles a type. A function that implements an interface or trait method, an entrypoint and a test do not choose their signature, so they have no limit. The receiver is not counted.*
+*A long parameter list usually hides a missing type, or a function that does several things. The default limit is 6 for a function and 7 for a constructor: Sonar S107 and clippy `too_many_arguments` allow 7, revive `argument-limit` allows 8, detekt `LongParameterList` allows 5 for a function and 6 for a constructor, and ESLint `max-params` allows 3; this is a deliberately high limit between them. A constructor may take one more because it assembles a type. A function that implements an interface or trait method, an entrypoint and a test do not choose their signature, so they have no limit. The receiver is not counted. A struct that exists only for the function (nothing else takes or returns it, and only the function and its callers touch it or its fields) is a parameter list in disguise, so its fields count instead of the struct.*
 
 A function SHOULD NOT take more parameters than the limit of its role. The remedy is to split the function by responsibility; a constructor that is over its limit builds a type that should be split.
 
@@ -543,6 +543,7 @@ Derived from: revive argument-limit 8: https://revive.run/r#argument-limit; clip
 
 | option | default | meaning |
 | --- | --- | --- |
+| `allowSuffixes` | `["Options","Opts","Config"]` | Name endings of a struct that only carries settings: when a struct used only by one function ends in one of these, only its required fields (not a pointer, slice, map, function, channel or interface in Go; not an `Option`, `Vec` or map, or `#[serde(default)]`, in Rust) count toward the limit. |
 | `max` | `{"constructor":7,"default":6,"entrypoint":null,"implementation":null,"test":null}` | Most parameters a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
 
 ```go invalid
@@ -567,7 +568,7 @@ Also: rust
 
 `design/max-results` · symbol · warn · cel
 
-*Many results usually mean the function returns a record that was never named. The default (3) is revive's `function-result-limit`; gocritic's `tooManyResultsChecker` allows 5. Go counts every result, a trailing `error` included. Rust counts the arity of the returned tuple (1 for a single value, 0 for `()`), and looks inside a `Result<T, E>` at `T`. A constructor that returns its type with a result or an error is not counted, nor is a function that implements an interface or trait method, or a test.*
+*Many results usually mean the function returns a record that was never named. The default (3) is revive's `function-result-limit`; gocritic's `tooManyResultsChecker` allows 5. Go counts every result, a trailing `error` included. Rust counts the arity of the returned tuple (1 for a single value, 0 for `()`), and looks inside a `Result<T, E>` at `T`. A constructor that returns its type with a result or an error is not counted, nor is a function that implements an interface or trait method, or a test. A struct that exists only for the function (nothing else takes or returns it, and only the function and its callers touch it or its fields) is a result list in disguise, so its fields count instead of the struct.*
 
 A function SHOULD NOT return more results than the limit of its role. The remedy is to split the function by responsibility, or to name what it returns.
 
@@ -575,6 +576,7 @@ Derived from: revive function-result-limit 3: https://revive.run/r#function-resu
 
 | option | default | meaning |
 | --- | --- | --- |
+| `allowSuffixes` | `["Options","Opts","Config"]` | Name endings of a struct that only carries settings: when a struct used only by one function ends in one of these, only its required fields (not a pointer, slice, map, function, channel or interface in Go; not an `Option`, `Vec` or map, or `#[serde(default)]`, in Rust) count toward the limit. |
 | `max` | `{"constructor":null,"default":3,"implementation":null,"test":null}` | Most results a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
 
 ```go invalid
@@ -746,7 +748,7 @@ Also: rust
 
 `design/prefer-method` · symbol · warn · cel
 
-*Where a function lives tells readers who owns the behavior. Go: A private package function with at least one production caller, every caller being a method of one type, never used as a value and not named like a constructor, is reported. Test callers do not count. A function called by any other function, or by methods of two types, is not judged. Rust: The same for a private free function and the methods of one `impl` target type. Parameter types are not resolved for Rust, so `takes_owner_param` is always false there.*
+*Where a function lives tells readers who owns the behavior. Go: A private package function with at least one production caller, every caller being a method of one type, never used as a value and not named like a constructor, is reported. Test callers do not count. A function called by any other function, or by methods of two types, is not judged. Rust: The same for a private free function and the methods of one `impl` target type.*
 
 Methods SHOULD express receiver-owned behavior; free functions SHOULD express construction or behavior with no natural receiver.
 

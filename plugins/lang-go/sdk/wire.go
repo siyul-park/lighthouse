@@ -140,6 +140,9 @@ type Symbol struct {
 	Doc    string `json:"doc,omitempty"`
 	Name   string `json:"name"`
 	Role   string `json:"role,omitempty"`
+	// Optional marks a field a caller may leave out: a pointer, slice, map,
+	// function, channel or interface.
+	Optional bool `json:"optional,omitempty"`
 }
 
 // Node is a module or a symbol: exactly one field is set.
@@ -180,6 +183,7 @@ type FunctionSummary struct {
 	CloneFingerprint string   `json:"clone_fingerprint,omitempty"`
 	ForwardsTo       string   `json:"forwards_to,omitempty"`
 	ParamTypes       []string `json:"param_types,omitempty"`
+	ResultTypes      []string `json:"result_types,omitempty"`
 	ManualAssertions int      `json:"manual_assertions,omitempty"`
 }
 

@@ -377,6 +377,9 @@
         {
           "flow": [],
           "max_nesting": 0,
+          "param_types": [
+            "traits::Shape"
+          ],
           "params": 1,
           "returns": 1,
           "statements": 1,
@@ -387,6 +390,9 @@
         {
           "flow": [],
           "max_nesting": 0,
+          "param_types": [
+            "traits::Shape"
+          ],
           "params": 1,
           "returns": 1,
           "statements": 1,
@@ -397,6 +403,9 @@
         {
           "flow": [],
           "max_nesting": 0,
+          "param_types": [
+            "traits::Shape"
+          ],
           "params": 1,
           "returns": 1,
           "statements": 1,
@@ -407,6 +416,9 @@
         {
           "flow": [],
           "max_nesting": 0,
+          "param_types": [
+            "traits::Shape"
+          ],
           "params": 1,
           "returns": 1,
           "statements": 1,
@@ -418,6 +430,9 @@
           "flow": [],
           "forwards_to": "traits::Shape::area#method",
           "max_nesting": 0,
+          "param_types": [
+            "traits::Circle"
+          ],
           "params": 1,
           "returns": 1,
           "statements": 1,

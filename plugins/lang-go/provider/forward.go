@@ -116,8 +116,20 @@ func passesOn(t *ast.FuncType, args []ast.Expr) bool {
 // paramTypes are the project types the parameters name, as kind-less symbol
 // ids, in order of first appearance.
 func paramTypes(sig *ast.FuncType, info *types.Info, res *resolver) []string {
+	return projectTypes(sig.Params, info, res)
+}
+
+// resultTypes are the project types the results name, like paramTypes.
+func resultTypes(sig *ast.FuncType, info *types.Info, res *resolver) []string {
+	return projectTypes(sig.Results, info, res)
+}
+
+func projectTypes(list *ast.FieldList, info *types.Info, res *resolver) []string {
+	if list == nil {
+		return nil
+	}
 	var out []string
-	for _, field := range sig.Params.List {
+	for _, field := range list.List {
 		t := info.TypeOf(field.Type)
 		if t == nil {
 			continue

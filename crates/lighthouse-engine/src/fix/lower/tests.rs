@@ -37,6 +37,7 @@ fn symbol(text: &str, name: &str, from: u32, to: u32) -> Symbol {
         doc: None,
         name: name.to_owned(),
         role: None,
+        optional: false,
     }
 }
 

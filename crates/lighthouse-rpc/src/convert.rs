@@ -187,6 +187,7 @@ fn symbol(s: wire::Symbol) -> Result<core::Symbol, String> {
         doc: s.doc,
         name: s.name,
         role: s.role.map(role),
+        optional: s.optional,
     })
 }
 
@@ -279,6 +280,7 @@ fn function(f: wire::FunctionSummary) -> Result<core::FunctionSummary, String> {
         clone_fingerprint: f.clone_fingerprint.map(core::Fingerprint::from_raw),
         forwards_to: f.forwards_to.map(core::Target::Path),
         param_types: f.param_types,
+        result_types: f.result_types,
         manual_assertions: f.manual_assertions,
         implementation: f.implementation,
         constructs: f.constructs,

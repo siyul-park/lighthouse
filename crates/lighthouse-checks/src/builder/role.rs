@@ -22,6 +22,9 @@ impl Builder<'_> {
                 json!(self.constructor_named(symbol)),
             );
         }
+        if needs.mentions("effective") {
+            map.insert("effective".to_owned(), self.effective(symbol, summary));
+        }
         if ["role", "limit(", "counted(", "built"]
             .iter()
             .any(|word| needs.mentions(word))

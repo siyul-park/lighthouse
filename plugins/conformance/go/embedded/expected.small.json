@@ -547,6 +547,9 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
+          "result_types": [
+            ".::Service"
+          ],
           "returns": 1,
           "statements": 1,
           "symbol": ".::build#function",
@@ -873,6 +876,7 @@
           "id": ".::Service::Base#field",
           "kind": "field",
           "name": "Base",
+          "optional": true,
           "owner": ".::Service#type",
           "span": {
             "end": {
@@ -901,6 +905,7 @@
           "id": ".::Service::Reader#field",
           "kind": "field",
           "name": "Reader",
+          "optional": true,
           "owner": ".::Service#type",
           "span": {
             "end": {

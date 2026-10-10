@@ -549,6 +549,9 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
+          "result_types": [
+            "calls::Counter"
+          ],
           "returns": 1,
           "statements": 1,
           "symbol": "calls::Counter::new#method",
@@ -652,6 +655,9 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
+          "result_types": [
+            "calls::Counter"
+          ],
           "returns": 1,
           "statements": 2,
           "symbol": "calls::literal#function",
@@ -671,6 +677,9 @@
         {
           "flow": [],
           "max_nesting": 0,
+          "param_types": [
+            "calls::Counter"
+          ],
           "params": 1,
           "returns": 1,
           "statements": 1,

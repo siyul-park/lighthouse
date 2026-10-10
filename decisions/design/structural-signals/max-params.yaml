@@ -18,7 +18,10 @@ spec:
     is a deliberately high limit between them. A constructor may take one
     more because it assembles a type. A function that implements an
     interface or trait method, an entrypoint and a test do not choose their
-    signature, so they have no limit. The receiver is not counted.
+    signature, so they have no limit. The receiver is not counted. A struct
+    that exists only for the function (nothing else takes or returns it, and
+    only the function and its callers touch it or its fields) is a parameter
+    list in disguise, so its fields count instead of the struct.
   scope:
     domain: code
     subject: symbol
@@ -38,6 +41,16 @@ spec:
           an object with `default` and one entry per role (`function`,
           `method`, `constructor`, `implementation`, `entrypoint`, `test`);
           a role left out takes `default`, and null is no limit.
+      allowSuffixes:
+        type: array
+        items: {type: string}
+        default: [Options, Opts, Config]
+        description: >-
+          Name endings of a struct that only carries settings: when a struct
+          used only by one function ends in one of these, only its required
+          fields (not a pointer, slice, map, function, channel or interface in
+          Go; not an `Option`, `Vec` or map, or `#[serde(default)]`, in Rust)
+          count toward the limit.
     additionalProperties: false
   check:
     type: cel
@@ -47,16 +60,24 @@ spec:
         expr: metrics(func)
       - name: cap
         expr: limit(func, options.max)
+      - name: eff
+        expr: func.effective
+      - name: hidden
+        expr: eff.hidden.filter(h, h.side == 'params')
+      - name: note
+        expr: >-
+          size(hidden) == 0 ? '' : ' (' + hidden.map(h, string(h.fields) + ' in ' + h.struct).join(', ') + ' counted from structs used only here)'
     where: >-
       (func.kind == 'function' || func.kind == 'method')
-      && m.measured && cap != null && func.params > cap
+      && m.measured && cap != null && eff.params > cap
     message: >-
-      {{ counted(func, func.params, 'parameters') }} (max {{ cap }}):
+      {{ counted(func, eff.params, 'parameters') }} (max {{ cap }}){{ note }}:
       {{ func.role == 'constructor' ? 'split ' + func.built : 'split by responsibility' }}
     evidence:
-      value: func.params
+      value: eff.params
       max: cap
       role: func.role
+      hidden: hidden
     identity:
       subject: func.id
   provenance:
@@ -221,3 +242,99 @@ spec:
             }
       expect:
         - line: 4
+    - name: single-use-struct-counts-its-fields
+      language: go
+      kind: invalid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type Request struct{ A, B, C int }
+
+            func build(a, b, c, d int, r Request) int {
+                return a + r.A
+            }
+      expect:
+        - line: 5
+    - name: struct-shared-by-two-functions
+      language: go
+      kind: valid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type Request struct{ A, B, C int }
+
+            func build(a, b, c, d int, r Request) int {
+                return a + r.A
+            }
+
+            func other(r Request) int {
+                return r.B
+            }
+    - name: options-struct-of-optional-fields
+      language: go
+      kind: valid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type BuildOptions struct{ A, B, C *int }
+
+            func build(a, b, c, d, e int, o BuildOptions) int {
+                return a + *o.A
+            }
+    - name: rust-single-use-struct-counts-its-fields
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Request {
+                pub a: i32,
+                pub b: i32,
+                pub c: i32,
+            }
+
+            pub fn build(a: i32, b: i32, c: i32, d: i32, r: Request) -> i32 {
+                a + r.a
+            }
+      expect:
+        - line: 7
+    - name: rust-struct-shared-by-two-functions
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Request {
+                pub a: i32,
+                pub b: i32,
+                pub c: i32,
+            }
+
+            pub fn build(a: i32, b: i32, c: i32, d: i32, r: Request) -> i32 {
+                a + r.a
+            }
+
+            pub fn other(r: Request) -> i32 {
+                r.b
+            }
+    - name: rust-options-struct-of-optional-fields
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct BuildOptions {
+                pub a: Option<i32>,
+                pub b: Vec<i32>,
+                pub c: Option<String>,
+            }
+
+            pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, o: BuildOptions) -> i32 {
+                a + o.b.len() as i32
+            }

@@ -476,6 +476,9 @@
         {
           "flow": [],
           "max_nesting": 0,
+          "param_types": [
+            "guesses::A"
+          ],
           "params": 1,
           "returns": 0,
           "statements": 1,

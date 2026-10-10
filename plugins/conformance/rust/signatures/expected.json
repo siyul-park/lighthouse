@@ -1,0 +1,735 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "imports",
+          "resolution": "syntactic",
+          "to": "std"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::Request#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::Request::id#field"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::Request::name#field"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::Request::parent#field"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::Request::tags#field"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::Request::index#field"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Request#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::Request::depth#field"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::Pair#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Pair#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::Pair::a#field"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Pair#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::Pair::b#field"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::build#function"
+        },
+        {
+          "from": {
+            "symbol": "signatures::build#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 9,
+              "line": 19
+            },
+            "start": {
+              "col": 7,
+              "line": 19
+            }
+          },
+          "to": "signatures::Request::id#field"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::split#function"
+        },
+        {
+          "from": {
+            "symbol": "signatures::split#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 13,
+              "line": 23
+            },
+            "start": {
+              "col": 9,
+              "line": 23
+            }
+          },
+          "to": "signatures::Pair#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::split#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 23
+            },
+            "start": {
+              "col": 16,
+              "line": 23
+            }
+          },
+          "to": "signatures::Pair::a#field"
+        },
+        {
+          "from": {
+            "symbol": "signatures::split#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 23
+            },
+            "start": {
+              "col": 22,
+              "line": 23
+            }
+          },
+          "to": "signatures::Pair::b#field"
+        },
+        {
+          "from": {
+            "module": "signatures"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::Server#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Server#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::Server::new#method"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Server::new#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 30
+            },
+            "start": {
+              "col": 9,
+              "line": 30
+            }
+          },
+          "to": "signatures::Server#type"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Server#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "signatures::Server::Default::default#method"
+        },
+        {
+          "from": {
+            "symbol": "signatures::Server::Default::default#method"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 36
+            },
+            "start": {
+              "col": 9,
+              "line": 36
+            }
+          },
+          "to": "signatures::Server#type"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "param_types": [
+            "signatures::Request"
+          ],
+          "params": 2,
+          "returns": 1,
+          "statements": 1,
+          "symbol": "signatures::build#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "result_types": [
+            "signatures::Pair"
+          ],
+          "returns": 2,
+          "statements": 1,
+          "symbol": "signatures::split#function",
+          "tokens": 19,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "result_types": [
+            "signatures::Server"
+          ],
+          "returns": 1,
+          "statements": 1,
+          "symbol": "signatures::Server::new#method",
+          "tokens": 3,
+          "top_level": 1
+        },
+        {
+          "constructs": true,
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "result_types": [
+            "signatures::Server"
+          ],
+          "returns": 1,
+          "statements": 1,
+          "symbol": "signatures::Server::Default::default#method",
+          "tokens": 3,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "signatures",
+          "path": "signatures"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::Request#type",
+          "kind": "type",
+          "name": "Request",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 11
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 4
+            },
+            "start": {
+              "col": 5,
+              "line": 4
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::Request::id#field",
+          "kind": "field",
+          "name": "id",
+          "owner": "signatures::Request#type",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 4
+            },
+            "start": {
+              "col": 5,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 5
+            },
+            "start": {
+              "col": 5,
+              "line": 5
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::Request::name#field",
+          "kind": "field",
+          "name": "name",
+          "owner": "signatures::Request#type",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 5
+            },
+            "start": {
+              "col": 5,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 28,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::Request::parent#field",
+          "kind": "field",
+          "name": "parent",
+          "optional": true,
+          "owner": "signatures::Request#type",
+          "span": {
+            "end": {
+              "col": 28,
+              "line": 6
+            },
+            "start": {
+              "col": 5,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 7
+            },
+            "start": {
+              "col": 5,
+              "line": 7
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::Request::tags#field",
+          "kind": "field",
+          "name": "tags",
+          "optional": true,
+          "owner": "signatures::Request#type",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 7
+            },
+            "start": {
+              "col": 5,
+              "line": 7
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 36,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::Request::index#field",
+          "kind": "field",
+          "name": "index",
+          "optional": true,
+          "owner": "signatures::Request#type",
+          "span": {
+            "end": {
+              "col": 36,
+              "line": 8
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 9
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::Request::depth#field",
+          "kind": "field",
+          "name": "depth",
+          "optional": true,
+          "owner": "signatures::Request#type",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::Pair#type",
+          "kind": "type",
+          "name": "Pair",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 14
+            },
+            "start": {
+              "col": 5,
+              "line": 14
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::Pair::a#field",
+          "kind": "field",
+          "name": "a",
+          "owner": "signatures::Pair#type",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 14
+            },
+            "start": {
+              "col": 5,
+              "line": 14
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 15
+            },
+            "start": {
+              "col": 5,
+              "line": 15
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::Pair::b#field",
+          "kind": "field",
+          "name": "b",
+          "owner": "signatures::Pair#type",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 15
+            },
+            "start": {
+              "col": 5,
+              "line": 15
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::build#function",
+          "kind": "function",
+          "name": "build",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 20
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 24
+            },
+            "start": {
+              "col": 1,
+              "line": 22
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::split#function",
+          "kind": "function",
+          "name": "split",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 24
+            },
+            "start": {
+              "col": 1,
+              "line": 22
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 26
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::Server#type",
+          "kind": "type",
+          "name": "Server",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 26
+            },
+            "start": {
+              "col": 1,
+              "line": 26
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 31
+            },
+            "start": {
+              "col": 5,
+              "line": 29
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::Server::new#method",
+          "kind": "method",
+          "name": "new",
+          "owner": "signatures::Server#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 31
+            },
+            "start": {
+              "col": 5,
+              "line": 29
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 37
+            },
+            "start": {
+              "col": 5,
+              "line": 35
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "signatures::Server::Default::default#method",
+          "kind": "method",
+          "name": "default",
+          "owner": "signatures::Server#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 37
+            },
+            "start": {
+              "col": 5,
+              "line": 35
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

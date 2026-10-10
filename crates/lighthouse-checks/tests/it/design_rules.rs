@@ -374,3 +374,54 @@ fn coupling_flags_a_coordinator_with_many_callees() {
     let found = w.check(COUPLE, options);
     assert_eq!(w.names(&found), ["run"]);
 }
+
+fn takes(w: &mut World, function: &lighthouse_model::Symbol, ty: &str, n: u32) {
+    let summary = w
+        .summaries
+        .iter_mut()
+        .find(|s| s.symbol == function.id)
+        .unwrap();
+    summary.params = n;
+    summary.param_types = vec![ty.to_owned()];
+}
+
+#[test]
+fn a_struct_used_only_by_one_function_counts_its_fields() {
+    let mut w = World::default();
+    let request = w.symbol("m", "Request", SymbolKind::Type, "m/a.ucm");
+    for field in ["a", "b", "c"] {
+        w.member(&request, field, SymbolKind::Field, "m/a.ucm");
+    }
+    let build = w.func("m", "build", "m/a.ucm");
+    takes(&mut w, &build, "m::Request", 5);
+    assert_eq!(
+        w.names(&w.check(PARAMS, json!({}))),
+        ["build"],
+        "4 + 3 fields"
+    );
+
+    let other = w.func("m", "other", "m/a.ucm");
+    takes(&mut w, &other, "m::Request", 1);
+    assert!(
+        w.check(PARAMS, json!({})).is_empty(),
+        "shared by two functions"
+    );
+}
+
+#[test]
+fn an_options_struct_counts_only_its_required_fields() {
+    let mut w = World::default();
+    let options = w.symbol("m", "BuildOptions", SymbolKind::Type, "m/a.ucm");
+    for field in ["a", "b", "c"] {
+        w.member(&options, field, SymbolKind::Field, "m/a.ucm");
+        w.symbols.last_mut().unwrap().optional = true;
+    }
+    let build = w.func("m", "build", "m/a.ucm");
+    takes(&mut w, &build, "m::BuildOptions", 6);
+    assert!(
+        w.check(PARAMS, json!({})).is_empty(),
+        "5 + 0 required fields"
+    );
+    let strict = json!({ "allowSuffixes": [] });
+    assert_eq!(w.names(&w.check(PARAMS, strict)), ["build"], "5 + 3 fields");
+}
