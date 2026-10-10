@@ -9,6 +9,14 @@ import (
 	"strings"
 )
 
+// cacheStore is the directory the host lets the provider keep results in.
+// Every read problem is a miss; the first write problem is remembered and
+// stops further writes.
+type cacheStore struct {
+	dir    string
+	failed error
+}
+
 const (
 	// cacheSchema versions the layout and meaning of everything in the cache
 	// directory; changing it makes every entry a miss.
@@ -19,14 +27,6 @@ const (
 	unitPrefix = "u-"
 	factsFile  = "facts.json"
 )
-
-// cacheStore is the directory the host lets the provider keep results in.
-// Every read problem is a miss; the first write problem is remembered and
-// stops further writes.
-type cacheStore struct {
-	dir    string
-	failed error
-}
 
 func (s *cacheStore) read(name string, into any) bool {
 	data, err := os.ReadFile(filepath.Join(s.dir, name))
@@ -77,14 +77,6 @@ func (s *cacheStore) notice() string {
 	}
 	return fmt.Sprintf("cache directory %s is not writable, results are not cached: %v", s.dir, s.failed)
 }
-
-// unitName is the file of the record of a unit at a key. Records of one unit
-// share a prefix, so a new one can replace the old.
-func unitName(unit, key string) string {
-	return unitPrefix + unitStem(unit) + "-" + key + ".json"
-}
-
-func unitStem(unit string) string { return digest(unit)[:16] }
 
 // previous is the record a unit had before its text changed, if one is kept.
 func (s *cacheStore) previous(u *cacheUnit) (unitRecord, bool) {
@@ -146,3 +138,11 @@ func (s *cacheStore) sweep(current map[string]string) {
 		}
 	}
 }
+
+// unitName is the file of the record of a unit at a key. Records of one unit
+// share a prefix, so a new one can replace the old.
+func unitName(unit, key string) string {
+	return unitPrefix + unitStem(unit) + "-" + key + ".json"
+}
+
+func unitStem(unit string) string { return digest(unit)[:16] }

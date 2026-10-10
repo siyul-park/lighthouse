@@ -294,6 +294,13 @@ impl Engine {
         self
     }
 
+    /// Runs without a cache: the providers get no directory to keep results in,
+    /// and nothing is written under the root.
+    pub fn without_cache(mut self) -> Self {
+        self.ws.cache_dir = None;
+        self
+    }
+
     /// Adds gaps found while assembling the plugins; every run reports them.
     pub fn with_incomplete(mut self, gaps: Vec<Incomplete>) -> Self {
         self.startup.extend(gaps);

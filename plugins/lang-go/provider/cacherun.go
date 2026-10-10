@@ -42,23 +42,9 @@ func (p *Provider) indexCached(r *run, params sdk.IndexParams) bool {
 		return false
 	}
 	store := &cacheStore{dir: params.Context.Cache.Dir}
-	candidates, ignored := r.candidates()
-	batches := r.batches(candidates)
-	if len(batches) == 0 {
-		return false
-	}
-	version := digest(cacheSchema, executableHash())
 	pl := &planner{r: r, used: map[string]fileFacts{}, units: map[string]*cacheUnit{}}
-	var stored factsRecord
-	if store.read(factsFile, &stored) && stored.Version == version {
-		pl.facts = stored.Files
-	}
-	env, modules, ok := pl.environment(batches)
-	if !ok {
-		return false
-	}
-	pl.modules = modules
-	plan, ok := p.plan(pl, store, env, candidates, params)
+	version := digest(cacheSchema, executableHash())
+	plan, ok := p.prepare(pl, store, version, params)
 	if !ok {
 		return false
 	}
@@ -66,37 +52,47 @@ func (p *Provider) indexCached(r *run, params sdk.IndexParams) bool {
 	if !ok {
 		return false
 	}
-	for _, rel := range ignored {
-		r.fileOnly(rel)
-	}
+	p.finish(r, store, plan, sub, pl)
+	p.last = plan.stats()
+	return true
+}
+
+// finish installs the answer into r and keeps what the analysis learned.
+func (p *Provider) finish(r *run, store *cacheStore, plan *cachePlan, sub *run, pl *planner) {
 	install(r, plan, sub)
 	p.record(store, plan, sub)
-	store.write(factsFile, factsRecord{Version: version, Files: pl.used})
+	store.write(factsFile, factsRecord{Version: digest(cacheSchema, executableHash()), Files: pl.used})
 	if notice := store.notice(); notice != "" {
 		r.result.Notices = append(r.result.Notices, notice)
+	}
+	candidates, ignored := r.candidates()
+	for _, rel := range ignored {
+		r.fileOnly(rel)
 	}
 	for _, rel := range candidates {
 		if !r.claimed[rel] {
 			r.unclaimed(rel)
 		}
 	}
-	p.last = plan.stats()
-	return true
 }
 
-// candidates are the requested files a provider analyzes, sorted, and the
-// ignored ones.
-func (r *run) candidates() (candidates, ignored []string) {
-	for rel := range r.requested {
-		if ignoredPath(rel) {
-			ignored = append(ignored, rel)
-			continue
-		}
-		candidates = append(candidates, rel)
+// prepare reads the environment and the cached facts and plans the units.
+func (p *Provider) prepare(pl *planner, store *cacheStore, version string, params sdk.IndexParams) (*cachePlan, bool) {
+	candidates, _ := pl.r.candidates()
+	batches := pl.r.batches(candidates)
+	if len(batches) == 0 {
+		return nil, false
 	}
-	sort.Strings(candidates)
-	sort.Strings(ignored)
-	return candidates, ignored
+	var stored factsRecord
+	if store.read(factsFile, &stored) && stored.Version == version {
+		pl.facts = stored.Files
+	}
+	env, modules, ok := pl.environment(batches)
+	if !ok {
+		return nil, false
+	}
+	pl.modules = modules
+	return p.plan(pl, store, env, candidates, params)
 }
 
 // plan keys every unit of the candidates and looks it up.
@@ -132,6 +128,21 @@ func (p *Provider) plan(pl *planner, store *cacheStore, env string, candidates [
 		}
 	}
 	return plan, true
+}
+
+// candidates are the requested files a provider analyzes, sorted, and the
+// ignored ones.
+func (r *run) candidates() (candidates, ignored []string) {
+	for rel := range r.requested {
+		if ignoredPath(rel) {
+			ignored = append(ignored, rel)
+			continue
+		}
+		candidates = append(candidates, rel)
+	}
+	sort.Strings(candidates)
+	sort.Strings(ignored)
+	return candidates, ignored
 }
 
 // unitAPIKey is the key of u under base without the bodies of its functions:

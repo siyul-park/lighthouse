@@ -334,19 +334,6 @@ func (r *run) implements(units []*unit) {
 	}
 }
 
-// declaredBefore orders types by where they are declared, which does not
-// depend on the order in which the go command's packages were parsed.
-func declaredBefore(a, b declaredType) bool {
-	pa, pb := a.unit.fset.PositionFor(a.obj.Pos(), false), b.unit.fset.PositionFor(b.obj.Pos(), false)
-	if pa.Filename != pb.Filename {
-		return pa.Filename < pb.Filename
-	}
-	if pa.Offset != pb.Offset {
-		return pa.Offset < pb.Offset
-	}
-	return a.obj.Id() < b.obj.Id()
-}
-
 // declaredTypes splits the types the units declare into interfaces worth
 // matching and concrete types. Interfaces of one method are skipped unless
 // asked for: nearly every type satisfies them by accident.
@@ -627,4 +614,17 @@ func emptyFragment(file sdk.FileInfo) *sdk.Fragment {
 		Tests:     []sdk.TestCase{},
 		Comments:  []sdk.Comment{},
 	}
+}
+
+// declaredBefore orders types by where they are declared, which does not
+// depend on the order in which the go command's packages were parsed.
+func declaredBefore(a, b declaredType) bool {
+	pa, pb := a.unit.fset.PositionFor(a.obj.Pos(), false), b.unit.fset.PositionFor(b.obj.Pos(), false)
+	if pa.Filename != pb.Filename {
+		return pa.Filename < pb.Filename
+	}
+	if pa.Offset != pb.Offset {
+		return pa.Offset < pb.Offset
+	}
+	return a.obj.Id() < b.obj.Id()
 }

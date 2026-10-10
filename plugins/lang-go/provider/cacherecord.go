@@ -24,17 +24,20 @@ type recordFile struct {
 	Fragment json.RawMessage `json:"fragment"`
 }
 
-// covers reports whether the record holds exactly the requested files of u.
-func (rec unitRecord) covers(u *cacheUnit) bool {
-	if len(rec.Files) != len(u.requested) {
-		return false
-	}
-	for _, f := range rec.Files {
-		if !slices.Contains(u.requested, f.Path) {
-			return false
+// reuseImplements puts the `implements` edges of the replaced records where the
+// analysis, which saw only the missed units, found some of its own. The
+// declarations of the unit and of everything it imports are unchanged, so
+// the old edges are the ones a full analysis would give.
+func reuseImplements(sub *run, plan *cachePlan) {
+	for _, u := range plan.misses {
+		old := plan.previous[u].implementsOf()
+		for _, rel := range u.requested {
+			if frag := sub.fragments[rel]; frag != nil {
+				edges := slices.DeleteFunc(slices.Clone(frag.Edges), func(e sdk.Edge) bool { return e.Kind == edgeImplements })
+				frag.Edges = append(edges, old[rel]...)
+			}
 		}
 	}
-	return true
 }
 
 // implementsOf decodes the `implements` edges of each file of the record.
@@ -52,20 +55,17 @@ func (rec unitRecord) implementsOf() map[string][]sdk.Edge {
 	return out
 }
 
-// reuseImplements puts the `implements` edges of the replaced records where the
-// analysis, which saw only the missed units, found some of its own. The
-// declarations of the unit and of everything it imports are unchanged, so
-// the old edges are the ones a full analysis would give.
-func reuseImplements(sub *run, plan *cachePlan) {
-	for _, u := range plan.misses {
-		old := plan.previous[u].implementsOf()
-		for _, rel := range u.requested {
-			if frag := sub.fragments[rel]; frag != nil {
-				edges := slices.DeleteFunc(slices.Clone(frag.Edges), func(e sdk.Edge) bool { return e.Kind == edgeImplements })
-				frag.Edges = append(edges, old[rel]...)
-			}
+// covers reports whether the record holds exactly the requested files of u.
+func (rec unitRecord) covers(u *cacheUnit) bool {
+	if len(rec.Files) != len(u.requested) {
+		return false
+	}
+	for _, f := range rec.Files {
+		if !slices.Contains(u.requested, f.Path) {
+			return false
 		}
 	}
+	return true
 }
 
 // install puts the cached fragments and the analysis of the misses into r.
