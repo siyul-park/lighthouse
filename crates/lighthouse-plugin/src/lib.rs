@@ -7,7 +7,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use lighthouse_model::{
     Applicability, Capability, Diagnostic, File, Fingerprint, Fragment, Incomplete, Options,
-    Project, RunScope, Severity,
+    Project, Reach, RunScope, Severity,
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -70,8 +70,10 @@ pub struct Workspace {
     /// what a provider must read instead of the disk. Empty for a normal run;
     /// a fix run checks candidate edits this way before anything is written.
     pub overlays: BTreeMap<PathBuf, String>,
-    /// The directory the providers keep derived results in, one subdirectory
-    /// per plugin; `None` runs without a cache.
+    /// The directory the host keeps derived data in between runs
+    /// (`.lighthouse/cache`), exactly when its result cache is on; a provider
+    /// may keep its own under a directory named by its plugin. `None` when the
+    /// run must not use a cache.
     pub cache_dir: Option<PathBuf>,
 }
 
@@ -255,12 +257,28 @@ impl RuleManifest {
     }
 }
 
+/// What lets the host reuse a rule's findings instead of running it again.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Caching {
+    /// How much of the project the findings about one subject depend on.
+    pub reach: Reach,
+    /// Changes whenever the way the rule judges changes (its check, as the
+    /// decision wrote it), so that stored findings of the old way are not used.
+    pub revision: String,
+}
+
 /// A check that turns facts into diagnostics. `validate` rejects bad options
 /// before any run; `check` must report only for the scope in `manifest()`.
 pub trait Rule: Send + Sync {
     fn manifest(&self) -> &RuleManifest;
     fn validate(&self, options: &Options) -> Result<(), Error>;
     fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, Error>;
+    /// What the findings of this rule depend on, when the host may store and
+    /// reuse them; `None` (the default) when it must run every time, such as a
+    /// rule that reads more than the code model.
+    fn caching(&self) -> Option<Caching> {
+        None
+    }
 }
 
 /// A bundle of language providers, analyzers, rules and fixers, all of whose

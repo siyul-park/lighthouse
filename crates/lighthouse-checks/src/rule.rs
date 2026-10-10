@@ -7,10 +7,11 @@
 use std::sync::Arc;
 
 use lighthouse_model::{
-    Diagnostic, Options,
+    Diagnostic, Options, Reach,
     annotation::{ANNOTATION_REASON, UNUSED_ALLOW},
+    hash,
 };
-use lighthouse_plugin::{Ctx, Error as PluginError, Rule, RuleManifest};
+use lighthouse_plugin::{Caching, Ctx, Error as PluginError, Rule, RuleManifest};
 use lighthouse_spec::{BuiltinCheck, BuiltinOp, CheckKind, Decision};
 use serde_json::{Map, Value};
 
@@ -31,6 +32,9 @@ const ANNOTATION_RULES: [&str; 2] = [ANNOTATION_REASON, UNUSED_ALLOW];
 pub(crate) struct DeclarativeRule {
     meta: RuleManifest,
     decision: Decision,
+    /// A hash of the decision as written: the check and everything it is
+    /// judged with. Stored findings of another one are not reused.
+    revision: String,
     kind: Arc<Kind>,
 }
 
@@ -93,9 +97,13 @@ impl DeclarativeRule {
             .ok_or_else(|| Error::invalid(id, "the decision has no severity or check"))?;
         meta.analyzers = analyzers;
         meta.capabilities.clone_from(&check.requires);
+        let revision = serde_json::to_vec(decision)
+            .map(hash::sha256)
+            .map_err(|e| Error::invalid(id, format!("the decision cannot be hashed: {e}")))?;
         Ok(Some(Self {
             meta,
             decision: decision.clone(),
+            revision,
             kind: Arc::new(kind),
         }))
     }
@@ -131,5 +139,21 @@ impl Rule for DeclarativeRule {
             Kind::Command(rule) => rule.check(meta, ctx, &resolved),
             Kind::Annotation => Ok(Vec::new()),
         }
+    }
+
+    /// The findings of a program that reads the code model are stored; those
+    /// of a command, which reads whatever the program reads, are not.
+    fn caching(&self) -> Option<Caching> {
+        let reach = match self.kind.as_ref() {
+            Kind::Cel(rule) => rule.reach(self.meta.scope),
+            Kind::Order(rule) => rule.reach(),
+            Kind::Proximity(rule) => rule.reach(),
+            Kind::Cycle(_) => Reach::Global,
+            Kind::Command(_) | Kind::Annotation => return None,
+        };
+        Some(Caching {
+            reach,
+            revision: self.revision.clone(),
+        })
     }
 }

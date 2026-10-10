@@ -23,6 +23,7 @@ mod modules;
 mod naming;
 mod ops;
 mod order;
+pub mod reach;
 mod rule;
 mod table;
 mod text;

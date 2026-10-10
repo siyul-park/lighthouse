@@ -145,6 +145,11 @@ impl Registry {
         self.plugins.iter().map(|m| m.id.as_str())
     }
 
+    /// The manifests of the registered plugins, in registration order.
+    pub fn manifests(&self) -> &[PluginManifest] {
+        &self.plugins
+    }
+
     /// Whether a plugin with this id is registered.
     pub fn has_plugin(&self, id: &str) -> bool {
         self.plugins.iter().any(|m| m.id == id)

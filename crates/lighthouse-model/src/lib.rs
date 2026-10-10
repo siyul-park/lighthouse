@@ -17,7 +17,7 @@ pub use review::{
     AgentKind, Attribution, Judgment, Label, Suppressed, Suppression, SuppressionKind,
     SuppressionStatus, UnknownTerm,
 };
-pub use scope::{Applicability, RunScope, TestScope};
+pub use scope::{Applicability, Reach, RunScope, TestScope};
 pub use text::{ColumnUnit, LineIndex, byte_position, utf16_position};
 pub use ucm::{
     Capability, Comment, Edge, EdgeKind, Event, EventKind, File, Flow, FlowKind, Fragment,

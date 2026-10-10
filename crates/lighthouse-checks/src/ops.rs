@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cel::Program;
-use lighthouse_model::{Diagnostic, EdgeKind, Node, Project, Symbol, SymbolId, Target};
+use lighthouse_model::{Diagnostic, EdgeKind, Node, Project, Reach, Symbol, SymbolId, Target};
 use lighthouse_plugin::{Ctx, Error as PluginError, KeyCtx, OrderKey, RuleManifest};
 use lighthouse_spec::{BuiltinOp, CycleLevel, OrderReport, OrderScope};
 use serde_json::{Map, Value, json};
@@ -18,6 +18,7 @@ use crate::{
     eval::{Frame, Template, compile, compile_all},
     layout::declarations,
     library::{self, Needs},
+    reach,
 };
 
 /// `order`: declarations follow the order of registered order keys.
@@ -83,6 +84,12 @@ impl OrderRule {
 
     pub(crate) fn analyzers(&self) -> Vec<String> {
         Vec::new()
+    }
+
+    /// The declarations of a file are ordered by what the file says of them,
+    /// besides what the messages mention.
+    pub(crate) fn reach(&self) -> Reach {
+        reach::of(&self.needs)
     }
 
     pub(crate) fn check(
@@ -254,6 +261,11 @@ impl ProximityRule {
 
     pub(crate) fn analyzers(&self) -> Vec<String> {
         Vec::new()
+    }
+
+    /// Declarations that belong together stay together within a file.
+    pub(crate) fn reach(&self) -> Reach {
+        reach::of(&self.needs)
     }
 
     pub(crate) fn check(
