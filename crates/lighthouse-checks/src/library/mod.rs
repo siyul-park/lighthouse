@@ -15,6 +15,8 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::glob;
+
+mod limits;
 use cel::{
     Context, ExecutionError, FunctionContext, ResolveResult, Value,
     common::{
@@ -37,9 +39,6 @@ pub(crate) const FUNCTIONS: [(&str, &str); 8] = [
     ("edges", "__edges"),
     ("rank", "__ranks"),
 ];
-
-/// The key of a limit map that covers every role it does not name.
-const FALLBACK_ROLE: &str = "default";
 
 /// What the expressions of a check ask for, found from their source text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -67,9 +66,10 @@ impl Needs {
         self.names.contains(&name)
     }
 
-    /// Whether some expression mentions `word`, such as a fact field.
+    /// Whether some expression mentions `word`, such as a fact field: as a
+    /// whole identifier, so `role` is not found in `test_role`.
     pub(crate) fn mentions(&self, word: &str) -> bool {
-        self.sources.iter().any(|source| source.contains(word))
+        self.sources.iter().any(|source| names(source, word))
     }
 
     /// The single-quoted or double-quoted string literals of the expressions
@@ -94,7 +94,7 @@ impl Needs {
 /// A library function as the runtime calls it, over arguments it has already
 /// resolved. Reading a field of the node argument in place spares converting
 /// the whole node, with its lists of related nodes, on every call.
-type Builtin = Box<dyn Fn(&mut FunctionContext) -> ResolveResult + Send + Sync>;
+pub(super) type Builtin = Box<dyn Fn(&mut FunctionContext) -> ResolveResult + Send + Sync>;
 
 /// A context with the library installed.
 pub(crate) fn context() -> Context<'static> {
@@ -108,8 +108,7 @@ pub(crate) fn context() -> Context<'static> {
     context.add_function("edges", keyed_reader("edges", "__edges", empty_list));
     context.add_function("rank", keyed_reader("rank", "__ranks", unranked));
     context.add_function("exposed", exposed());
-    context.add_function("limit", limit());
-    context.add_function("counted", counted());
+    limits::install(&mut context);
     context.add_function("globMatch", |path: Arc<String>, glob: Arc<String>| {
         glob::matches(&path, &glob)
     });
@@ -172,71 +171,6 @@ fn keyed_reader(name: &'static str, field: &'static str, absent: fn() -> Value) 
     })
 }
 
-/// `limit(node, max)`: the integer a limit option gives the node's role, else
-/// null for no limit. `max` is an integer (every role), or a map from a role
-/// or `default` to an integer or null; a role the map leaves out falls back to
-/// its `default`, and a map without one has no limit there.
-fn limit() -> Builtin {
-    Box::new(|ftx| {
-        let [node, max] = arguments(ftx)?;
-        let role = match member(node, "role", "limit")? {
-            Some(value) => text(&Value::try_from(value)?),
-            None => String::new(),
-        };
-        if let Some(map) = max.downcast_ref::<CelMap>() {
-            let at = |key: &str| {
-                map.inner()
-                    .get(&CelMapKey::String(CelString::from(key)))
-                    .map(|v| Value::try_from(v.as_ref()))
-            };
-            return match at(&role).or_else(|| at(FALLBACK_ROLE)) {
-                Some(found) => Ok(whole(found?)),
-                None => Ok(Value::Null),
-            };
-        }
-        Ok(whole(Value::try_from(max)?))
-    })
-}
-
-/// An integer as an integer, anything else (null) as no limit.
-fn whole(value: Value) -> Value {
-    match value {
-        Value::Int(i) => Value::Int(i),
-        Value::UInt(u) => Value::Int(i64::try_from(u).unwrap_or(i64::MAX)),
-        _ => Value::Null,
-    }
-}
-
-/// `counted(node, n, what)`: how a limit finding says what a function has: a
-/// constructor names the type it builds and needs `n` things, any other
-/// function has them (`NewServer needs 9 parameters`, `parse has 9
-/// parameters`).
-fn counted() -> Builtin {
-    Box::new(|ftx| {
-        let [node, n, what] = arguments(ftx)?;
-        let field = |name: &str| -> Result<String, ExecutionError> {
-            Ok(match member(node, name, "counted")? {
-                Some(value) => text(&Value::try_from(value)?),
-                None => String::new(),
-            })
-        };
-        let n = match Value::try_from(n)? {
-            Value::Int(i) => i,
-            Value::UInt(u) => i64::try_from(u).unwrap_or(i64::MAX),
-            _ => 0,
-        };
-        let what = text(&Value::try_from(what)?);
-        let (subject, verb) = if field("role")? == "constructor" {
-            (field("built")?, "needs")
-        } else {
-            (field("name")?, "has")
-        };
-        Ok(Value::String(Arc::new(format!(
-            "{subject} {verb} {n} {what}"
-        ))))
-    })
-}
-
 /// `exposed(node, internal)`: whether the node is public, or internal as well
 /// when `internal` says so.
 fn exposed() -> Builtin {
@@ -257,7 +191,7 @@ fn exposed() -> Builtin {
 }
 
 /// The `N` arguments of a call.
-fn arguments<'a, const N: usize>(
+pub(super) fn arguments<'a, const N: usize>(
     ftx: &'a FunctionContext,
 ) -> Result<[&'a dyn Val; N], ExecutionError> {
     let args: Vec<&dyn Val> = ftx.args.iter().map(AsRef::as_ref).collect();
@@ -267,7 +201,7 @@ fn arguments<'a, const N: usize>(
 
 /// The field `field` of `node`; `None` when the node has no such field and
 /// an error when it is no node.
-fn member<'a>(
+pub(super) fn member<'a>(
     node: &'a dyn Val,
     field: &str,
     function: &str,
@@ -279,6 +213,18 @@ fn member<'a>(
         .inner()
         .get(&CelMapKey::String(CelString::from(field)))
         .map(AsRef::as_ref))
+}
+
+/// Whether `source` contains `word` not as part of a longer identifier.
+fn names(source: &str, word: &str) -> bool {
+    let ident = |c: char| c.is_alphanumeric() || c == '_';
+    source.match_indices(word).any(|(at, _)| {
+        let before = source[..at].chars().next_back();
+        let after = source[at + word.len()..].chars().next();
+        let starts = !word.starts_with(ident) || !before.is_some_and(ident);
+        let ends = !word.ends_with(ident) || !after.is_some_and(ident);
+        starts && ends
+    })
 }
 
 /// Whether `source` calls the function whose name and `(` are `call`, as a
@@ -371,7 +317,7 @@ fn empty() -> Value {
     Value::Map(Map::from(HashMap::<String, Value>::new()))
 }
 
-fn text(value: &Value) -> String {
+pub(super) fn text(value: &Value) -> String {
     match value {
         Value::String(s) => s.to_string(),
         _ => String::new(),

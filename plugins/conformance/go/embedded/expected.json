@@ -467,6 +467,7 @@
       "functions": [
         {
           "flow": [],
+          "implementation": true,
           "max_nesting": 0,
           "params": 1,
           "returns": 0,
@@ -477,6 +478,7 @@
         },
         {
           "flow": [],
+          "implementation": true,
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
@@ -512,12 +514,10 @@
           "top_level": 1
         },
         {
+          "constructs": true,
           "flow": [],
           "max_nesting": 0,
           "params": 0,
-          "result_types": [
-            ".::Service"
-          ],
           "returns": 1,
           "statements": 1,
           "symbol": ".::build#function",

@@ -230,12 +230,83 @@ fn statements_are_limited_per_role() {
     );
     let by_role = json!({ "max": { "default": 10, "function": 20 } });
     assert!(w.check(STATEMENTS, by_role).is_empty());
-    let falls_back = json!({ "max": { "default": 10, "method": 1 } });
-    assert_eq!(w.names(&w.check(STATEMENTS, falls_back)), ["long"]);
-    let no_default = json!({ "max": { "method": 1 } });
+    let no_default = json!({ "max": { "default": -1, "method": 1 } });
     assert!(
         w.check(STATEMENTS, no_default).is_empty(),
-        "no default, no limit"
+        "no limit for a function"
+    );
+    assert!(
+        w.check(STATEMENTS, json!({ "max": -1 })).is_empty(),
+        "-1 is no limit"
+    );
+}
+
+#[test]
+fn an_object_limit_keeps_the_roles_of_the_default() {
+    let mut w = World::default();
+    let plain = w.func("m", "build", "m/a.ucm");
+    params(&mut w, &plain, 9);
+    let ctor = w.func("m", "NewServer", "m/a.ucm");
+    params(&mut w, &ctor, 10);
+    let found = w.check(PARAMS, json!({ "max": { "constructor": 12 } }));
+    assert_eq!(w.names(&found), ["build"], "the default of 8 still applies");
+    let only_default = w.check(PARAMS, json!({ "max": { "default": 20 } }));
+    assert_eq!(
+        w.names(&only_default),
+        ["NewServer"],
+        "the constructor keeps its 9"
+    );
+}
+
+fn flag(
+    w: &mut World,
+    symbol: &lighthouse_model::Symbol,
+    set: impl Fn(&mut lighthouse_model::FunctionSummary),
+) {
+    set(w
+        .summaries
+        .iter_mut()
+        .find(|s| s.symbol == symbol.id)
+        .unwrap());
+}
+
+#[test]
+fn a_role_is_the_first_flag_that_fits() {
+    let mut w = World::default();
+    let plain = w.func("m", "plain", "m/a.ucm");
+    let owner = w.symbol("m", "Server", SymbolKind::Type, "m/a.ucm");
+    let method = w.member(&owner, "serve", SymbolKind::Method, "m/a.ucm");
+    let ctor = w.func("m", "NewThing", "m/a.ucm");
+    let built = w.func("m", "make", "m/a.ucm");
+    let both = w.func("m", "NewBoth", "m/a.ucm");
+    for symbol in [&plain, &method, &ctor, &built, &both] {
+        w.summarize(symbol, 10, &[]);
+    }
+    flag(&mut w, &built, |s| s.constructs = true);
+    flag(&mut w, &both, |s| {
+        s.constructs = true;
+        s.implementation = true;
+    });
+    // One limit per role, each below the 10 statements: every role is told
+    // apart by the limit it gets.
+    let limits = |role: &str| {
+        let mut all = serde_json::Map::new();
+        all.insert("default".to_owned(), json!(100));
+        all.insert(role.to_owned(), json!(5));
+        json!({ "max": all })
+    };
+    let flagged = |w: &World, role: &str| w.names(&w.check(STATEMENTS, limits(role)));
+    assert_eq!(flagged(&w, "function"), ["plain"]);
+    assert_eq!(flagged(&w, "method"), ["serve"]);
+    assert_eq!(
+        flagged(&w, "constructor"),
+        ["NewThing", "make"],
+        "by name or by flag"
+    );
+    assert_eq!(
+        flagged(&w, "implementation"),
+        ["NewBoth"],
+        "implementation beats constructor"
     );
 }
 
@@ -266,11 +337,11 @@ fn params(w: &mut World, symbol: &lighthouse_model::Symbol, n: u32) {
 fn a_constructor_may_take_one_more_parameter_and_an_implementation_any() {
     let mut w = World::default();
     let plain = w.func("m", "build", "m/a.ucm");
-    params(&mut w, &plain, 7);
+    params(&mut w, &plain, 9);
     let ctor = w.func("m", "NewServer", "m/a.ucm");
-    params(&mut w, &ctor, 8);
+    params(&mut w, &ctor, 10);
     let fine = w.func("m", "NewClient", "m/a.ucm");
-    params(&mut w, &fine, 7);
+    params(&mut w, &fine, 9);
     let object = w.symbol("m", "Object", SymbolKind::Type, "m/a.ucm");
     let hook = w.member(&object, "fmt", SymbolKind::Method, "m/a.ucm");
     params(&mut w, &hook, 9);
@@ -302,10 +373,11 @@ fn results_are_counted_except_for_a_constructor() {
 fn a_limit_refuses_what_is_not_a_limit() {
     let w = World::default();
     for bad in [
-        json!(-1),
+        json!(-2),
         json!("3"),
+        json!(null),
         json!({ "closure": 3 }),
-        json!({ "default": -1 }),
+        json!({ "default": -2 }),
     ] {
         let result = std::panic::catch_unwind(|| w.check(PARAMS, json!({ "max": bad })));
         assert!(result.is_err(), "{bad}");
@@ -393,11 +465,11 @@ fn a_struct_used_only_by_one_function_counts_its_fields() {
         w.member(&request, field, SymbolKind::Field, "m/a.ucm");
     }
     let build = w.func("m", "build", "m/a.ucm");
-    takes(&mut w, &build, "m::Request", 5);
+    takes(&mut w, &build, "m::Request", 7);
     assert_eq!(
         w.names(&w.check(PARAMS, json!({}))),
         ["build"],
-        "4 + 3 fields"
+        "6 + 3 fields"
     );
 
     let other = w.func("m", "other", "m/a.ucm");
@@ -417,11 +489,67 @@ fn an_options_struct_counts_only_its_required_fields() {
         w.symbols.last_mut().unwrap().optional = true;
     }
     let build = w.func("m", "build", "m/a.ucm");
-    takes(&mut w, &build, "m::BuildOptions", 6);
+    takes(&mut w, &build, "m::BuildOptions", 7);
     assert!(
         w.check(PARAMS, json!({})).is_empty(),
-        "5 + 0 required fields"
+        "6 + 0 required fields"
     );
     let strict = json!({ "allowSuffixes": [] });
-    assert_eq!(w.names(&w.check(PARAMS, strict)), ["build"], "5 + 3 fields");
+    assert_eq!(w.names(&w.check(PARAMS, strict)), ["build"], "6 + 3 fields");
+}
+
+/// A `build` of 7 parameters whose last one is a 3-field `Request` that only
+/// it takes: 6 + 3 = 9 parameters, over the limit of 8.
+fn requested() -> (World, lighthouse_model::Symbol, lighthouse_model::Symbol) {
+    let mut w = World::default();
+    let request = w.symbol("m", "Request", SymbolKind::Type, "m/a.ucm");
+    for field in ["a", "b", "c"] {
+        w.member(&request, field, SymbolKind::Field, "m/a.ucm");
+    }
+    let build = w.func("m", "build", "m/a.ucm");
+    takes(&mut w, &build, "m::Request", 7);
+    (w, request, build)
+}
+
+#[test]
+fn a_reference_from_a_caller_or_a_test_keeps_the_struct_single_use() {
+    let (mut w, request, build) = requested();
+    let caller = w.func("m", "main_loop", "m/a.ucm");
+    w.edge(EdgeKind::Calls, &caller, &build);
+    w.edge(EdgeKind::References, &caller, &request);
+    let test = w.func("m", "TestRequest", "m/a_test.ucm");
+    w.edge(EdgeKind::References, &test, &request);
+    assert_eq!(w.names(&w.check(PARAMS, json!({}))), ["build"]);
+}
+
+#[test]
+fn a_reference_from_anywhere_else_makes_the_struct_shared() {
+    let (mut w, request, _) = requested();
+    let other = w.func("m", "elsewhere", "m/a.ucm");
+    w.edge(EdgeKind::References, &other, &request);
+    assert!(w.check(PARAMS, json!({})).is_empty());
+
+    let (mut w, request, _) = requested();
+    let field = w.symbols.iter().find(|s| s.name == "b").unwrap().clone();
+    let other = w.func("m", "elsewhere", "m/a.ucm");
+    w.edge(EdgeKind::References, &other, &field);
+    assert!(w.check(PARAMS, json!({})).is_empty(), "a field counts too");
+    let _ = request;
+}
+
+#[test]
+fn a_struct_counts_once_per_parameter_that_takes_it() {
+    let (mut w, _, build) = requested();
+    let summary = w
+        .summaries
+        .iter_mut()
+        .find(|s| s.symbol == build.id)
+        .unwrap();
+    summary.params = 5;
+    summary.param_types = vec!["m::Request".to_owned(), "m::Request".to_owned()];
+    assert_eq!(
+        w.names(&w.check(PARAMS, json!({}))),
+        ["build"],
+        "3 + 2 * 3 = 9"
+    );
 }

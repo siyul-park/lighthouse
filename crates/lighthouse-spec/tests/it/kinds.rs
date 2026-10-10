@@ -135,8 +135,8 @@ fn shape_of() {
 }
 
 #[test]
-fn shape_limit() {
-    let limit = lighthouse_spec::Shape::limit();
+fn definitions_name_the_limit_shape() {
+    let limit = lighthouse_spec::definitions()["limit"].clone();
     assert_eq!(limit.one_of.len(), 2);
     let object = &limit.one_of[1];
     for role in lighthouse_spec::LIMIT_ROLES.into_iter().chain(["default"]) {
@@ -144,27 +144,27 @@ fn shape_limit() {
     }
     assert!(
         limit
-            .check(&json!({ "test": null, "default": 1 }), "x")
+            .check(&json!({ "test": -1, "default": 1 }), "x")
             .is_ok()
     );
 }
 
 #[test]
-fn option_schema_shape() {
+fn option_schema_holds_its_shape() {
     let option = OptionSchema::new(OptionType::Integer, json!(3), "Limit.");
-    assert_eq!(option.shape().kind, Some(OptionType::Integer));
-    assert!(option.shape().one_of.is_empty());
+    assert_eq!(option.shape.kind, Some(OptionType::Integer));
+    assert!(option.shape.one_of.is_empty());
 }
 
 #[test]
 fn shape_check() {
-    let limit = lighthouse_spec::Shape::limit();
+    let limit = lighthouse_spec::definitions()["limit"].clone();
     assert!(limit.check(&json!(3), "x").is_ok());
     assert!(
         limit
-            .check(&json!(-1), "x")
+            .check(&json!(-2), "x")
             .unwrap_err()
-            .contains("at least 0")
+            .contains("at least -1")
     );
 }
 

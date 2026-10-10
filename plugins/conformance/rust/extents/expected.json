@@ -326,9 +326,6 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
-          "result_types": [
-            "extents::Limit"
-          ],
           "returns": 1,
           "statements": 1,
           "symbol": "extents::Limit::new#method",

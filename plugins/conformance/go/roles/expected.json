@@ -401,12 +401,10 @@
       },
       "functions": [
         {
+          "constructs": true,
           "flow": [],
           "max_nesting": 0,
           "params": 0,
-          "result_types": [
-            ".::fixture"
-          ],
           "returns": 1,
           "statements": 1,
           "symbol": ".::newFixture#function",

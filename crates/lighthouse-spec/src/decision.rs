@@ -202,11 +202,17 @@ impl Decision {
         let overrides = language.and_then(|l| spec.languages.get(l));
         let mut resolved = Map::new();
         for (key, property) in &schema.properties {
-            let value = configured
-                .get(key)
-                .or_else(|| overrides.and_then(|l| l.options.get(key)))
-                .unwrap_or(&property.default);
-            resolved.insert(key.clone(), value.clone());
+            let layers = [
+                overrides.and_then(|l| l.options.get(key)),
+                configured.get(key),
+            ];
+            let value = layers
+                .into_iter()
+                .flatten()
+                .fold(property.default.clone(), |base, over| {
+                    crate::options::merge(&base, over)
+                });
+            resolved.insert(key.clone(), value);
         }
         Ok(resolved)
     }
@@ -307,7 +313,7 @@ pub(crate) fn squash(text: &str) -> String {
 fn option_content(property: &crate::OptionSchema) -> Value {
     let mut content = json!({ "type": property.kind, "default": property.default });
     if !property.one_of.is_empty() || property.reference.is_some() {
-        content["shape"] = json!(property.shape());
+        content["shape"] = json!(property.shape);
     }
     content
 }

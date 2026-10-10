@@ -245,12 +245,9 @@ reads a Go method that an interface of its module declares as an implementation,
 and a constructor by its name.
 
 `param_types` (optional) lists the project types the parameters name, receiver
-excluded, as kind-less symbol ids (`module::Type`), so rules can ask whether a
-function takes a value of some type.
-
-`result_types` (optional) is the same for the results: the project types a function
-returns (in Rust the `Ok` type of a `Result` and each element of a tuple). With
-`param_types` it lets a rule find the struct that exists only for one function.
+excluded, as kind-less symbol ids (`module::Type`), one per parameter in order (a
+type taken twice appears twice), so rules can ask whether a function takes a value
+of some type and find the struct that exists only for one function.
 A field symbol may carry `optional: true`: a caller may leave it out (Go pointer,
 slice, map, function, channel or interface; Rust `Option`, `Vec`, a map, or a
 `#[serde(default)]` field).

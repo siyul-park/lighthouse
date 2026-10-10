@@ -358,13 +358,6 @@
           "minimum": 0,
           "type": "integer"
         },
-        "result_types": {
-          "description": "Project types named by the results, like `param_types`. Added in 0.1\nbefore 1.0.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
         "returns": {
           "format": "uint32",
           "minimum": 0,

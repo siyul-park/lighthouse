@@ -615,9 +615,6 @@
           "forwards_to": ".::Tree::child",
           "max_nesting": 0,
           "params": 0,
-          "result_types": [
-            ".::Tree"
-          ],
           "returns": 1,
           "statements": 1,
           "symbol": ".::Tree::left0#method",
@@ -628,9 +625,6 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
-          "result_types": [
-            ".::Tree"
-          ],
           "returns": 1,
           "statements": 1,
           "symbol": ".::Tree::child#method",

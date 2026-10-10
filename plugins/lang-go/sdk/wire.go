@@ -183,8 +183,11 @@ type FunctionSummary struct {
 	CloneFingerprint string   `json:"clone_fingerprint,omitempty"`
 	ForwardsTo       string   `json:"forwards_to,omitempty"`
 	ParamTypes       []string `json:"param_types,omitempty"`
-	ResultTypes      []string `json:"result_types,omitempty"`
-	ManualAssertions int      `json:"manual_assertions,omitempty"`
+	// Implementation marks a method that satisfies an interface; Constructs a
+	// function without a receiver that returns a type of its package.
+	Implementation   bool `json:"implementation,omitempty"`
+	Constructs       bool `json:"constructs,omitempty"`
+	ManualAssertions int  `json:"manual_assertions,omitempty"`
 }
 
 // TestCase describes how a test entry point is written and what it targets.

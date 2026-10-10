@@ -68,10 +68,8 @@ impl Builder<'_> {
             .map_or(self.language.as_str(), |f| f.lang.as_str())
     }
 
-    /// What a function is for, the first that fits: `test`, `implementation`
-    /// (it satisfies an interface or trait, so its signature is not its own),
-    /// `constructor`, `entrypoint`, then `method` or `function`. Empty for
-    /// anything that is not a function.
+    /// What a function is for: the first role its flags give (see
+    /// [`precedence`]). Empty for anything that is not a function.
     pub(super) fn role(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> &'static str {
         if !matches!(
             symbol.kind,
@@ -79,23 +77,13 @@ impl Builder<'_> {
         ) {
             return "";
         }
-        if symbol.kind == SymbolKind::Test || self.project.in_test(&symbol.id) {
-            return "test";
-        }
-        if summary.is_some_and(|s| s.implementation) || satisfies_interface(self.project, symbol) {
-            return "implementation";
-        }
-        if self.constructor_named(symbol) || summary.is_some_and(|s| s.constructs) {
-            return "constructor";
-        }
-        if self.entrypoint(symbol) {
-            return "entrypoint";
-        }
-        if symbol.kind == SymbolKind::Method {
-            "method"
-        } else {
-            "function"
-        }
+        precedence(Flags {
+            test: symbol.kind == SymbolKind::Test || self.project.in_test(&symbol.id),
+            implementation: summary.is_some_and(|s| s.implementation),
+            constructor: summary.is_some_and(|s| s.constructs) || self.constructor_named(symbol),
+            entrypoint: self.entrypoint(symbol),
+            method: symbol.kind == SymbolKind::Method,
+        })
     }
 
     /// Go `main` and `init` in `package main` (`init` in any package), Rust
@@ -122,4 +110,30 @@ impl Builder<'_> {
 pub(super) fn satisfies_interface(project: &Project, wrapper: &Symbol) -> bool {
     wrapper.kind == SymbolKind::Method
         && project.declared_by_interface(wrapper.id.module(), &wrapper.name)
+}
+
+/// What a function is, as the providers and the project's conventions say.
+#[derive(Clone, Copy, Default)]
+pub(super) struct Flags {
+    pub test: bool,
+    pub implementation: bool,
+    pub constructor: bool,
+    pub entrypoint: bool,
+    pub method: bool,
+}
+
+/// The role of a function: `test`, `implementation` (an interface or trait
+/// fixes its signature), `constructor`, `entrypoint`, then `method` or
+/// `function`; the first flag set wins.
+pub(super) fn precedence(flags: Flags) -> &'static str {
+    let ordered = [
+        (flags.test, "test"),
+        (flags.implementation, "implementation"),
+        (flags.constructor, "constructor"),
+        (flags.entrypoint, "entrypoint"),
+    ];
+    ordered
+        .into_iter()
+        .find_map(|(set, role)| set.then_some(role))
+        .unwrap_or(if flags.method { "method" } else { "function" })
 }

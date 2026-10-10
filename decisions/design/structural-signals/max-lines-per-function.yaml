@@ -31,7 +31,8 @@ spec:
           Most lines a function may have: an integer for every role, or an
           object with `default` and one entry per role (`function`,
           `method`, `constructor`, `implementation`, `entrypoint`, `test`);
-          a role left out takes `default`, and null is no limit.
+          a role left out takes `default`, and -1 is no limit. A project
+          that sets an object keeps the roles it does not name.
     additionalProperties: false
   languages:
     rust:
@@ -47,7 +48,7 @@ spec:
         expr: limit(func, options.max)
     where: >-
       (func.kind == 'function' || func.kind == 'method')
-      && m.measured && cap != null && m.lines > cap
+      && m.measured && cap >= 0 && m.lines > cap
     message: >-
       {{ counted(func, m.lines, 'lines') }} (max {{ cap }}):
       split by responsibility

@@ -16,7 +16,7 @@ use crate::{
     names::{
         Generics, Index, ModId, Ns, Res, Sym, TyCx, ViaTrait, generics_of, is_test_fn, symbol_id,
     },
-    signature::{optional_field, project_types},
+    signature::{optional_field, project_types, serde_default},
     testcase,
     tree::{SourceFile, Vis, vis},
     util::{constructs, count_tokens, doc_of, extent_of, signature_counts, span_of},
@@ -197,7 +197,7 @@ impl Extractor<'_> {
             &home,
             &f.sig,
             &f.block,
-            test.then_some(f.attrs.as_slice()),
+            (test.then_some(f.attrs.as_slice()), Role::default()),
         );
     }
 
@@ -226,7 +226,7 @@ impl Extractor<'_> {
         home: &Home,
         sig: &syn::Signature,
         block: &Block,
-        test: Option<&[Attribute]>,
+        (test, role): (Option<&[Attribute]>, Role),
     ) {
         let facts = body::analyze(self.idx, self.src, home, sig, block);
         self.stats.unread += facts.unread_macros;
@@ -245,7 +245,7 @@ impl Extractor<'_> {
             .filter(|s| !matches!(s, syn::Stmt::Item(_)))
             .count();
         let (params, returns) = signature_counts(sig);
-        let (param_types, result_types) = project_types(self.idx, &home.cx, sig);
+        let param_types = project_types(self.idx, &home.cx, sig);
         self.frag.functions.push(FunctionSummary {
             symbol: id.to_owned(),
             max_nesting: facts.max_nesting,
@@ -258,10 +258,9 @@ impl Extractor<'_> {
             clone_fingerprint: None,
             forwards_to: facts.forwards_to,
             param_types,
-            result_types,
             manual_assertions: 0,
-            implementation: false,
-            constructs: false,
+            implementation: role.implementation,
+            constructs: role.constructs,
         });
         if let Some(attrs) = test {
             self.frag.tests.push(TestCase {
@@ -310,7 +309,7 @@ impl Extractor<'_> {
                 generics: generics_of(&f.sig.generics, None),
             },
         };
-        self.summarize(&id, &inner, &f.sig, &f.block, None);
+        self.summarize(&id, &inner, &f.sig, &f.block, (None, Role::default()));
     }
 
     fn type_item(
@@ -346,13 +345,13 @@ impl Extractor<'_> {
             visibility,
         };
         match shape {
-            Shape::Struct(fields) => self.fields(&owner, fields),
+            Shape::Struct(fields) => self.fields(&owner, fields, serde_default(attrs)),
             Shape::Enum(e) => self.variants(&owner, e),
             Shape::Plain => {}
         }
     }
 
-    fn fields(&mut self, owner: &Owner, fields: &syn::Fields) {
+    fn fields(&mut self, owner: &Owner, fields: &syn::Fields, container_default: bool) {
         let syn::Fields::Named(named) = fields else {
             return;
         };
@@ -363,7 +362,7 @@ impl Extractor<'_> {
             let name = ident.to_string();
             let id = symbol_id(&owner.module, &[&owner.name, &name], SymbolKind::Field);
             let visibility = cap(declared(vis(&field.vis)), owner.visibility);
-            let optional = optional_field(field);
+            let optional = optional_field(field, container_default);
             self.declare(
                 Decl {
                     id,
@@ -516,7 +515,7 @@ impl Extractor<'_> {
                     generics: generics_of(&f.sig.generics, Some(&outer)),
                 },
             };
-            self.summarize(&method_id, &home, &f.sig, block, None);
+            self.summarize(&method_id, &home, &f.sig, block, (None, Role::default()));
         }
     }
 
@@ -639,16 +638,14 @@ impl Extractor<'_> {
                 generics: generics_of(&f.sig.generics, Some(&ctx.generics)),
             },
         };
-        self.summarize(&id, &home, &f.sig, &f.block, None);
-        let constructs = ctx
-            .owner
-            .as_ref()
-            .is_some_and(|o| constructs(&f.sig, &o.name));
-        let implementation = ctx.via.is_some();
-        if let Some(summary) = self.frag.functions.iter_mut().find(|s| s.symbol == id) {
-            summary.implementation = implementation;
-            summary.constructs = constructs;
-        }
+        let role = Role {
+            implementation: ctx.via.is_some(),
+            constructs: ctx
+                .owner
+                .as_ref()
+                .is_some_and(|o| constructs(&f.sig, &o.name)),
+        };
+        self.summarize(&id, &home, &f.sig, &f.block, (None, role));
     }
 
     /// A trait impl method without docs of its own shows the documentation of
@@ -682,6 +679,14 @@ impl Extractor<'_> {
             self.stats.unread += 1;
         }
     }
+}
+
+/// What a function is for, as far as the language says: a method of a trait
+/// impl, or an associated function that builds its owner.
+#[derive(Clone, Copy, Default)]
+struct Role {
+    implementation: bool,
+    constructs: bool,
 }
 
 /// A symbol to report.

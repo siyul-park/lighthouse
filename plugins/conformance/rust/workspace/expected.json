@@ -219,9 +219,6 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
-          "result_types": [
-            "core_lib::Thing"
-          ],
           "returns": 1,
           "statements": 1,
           "symbol": "core_lib::make#function",

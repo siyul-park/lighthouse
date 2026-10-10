@@ -38,7 +38,7 @@ pub use model::{
     authored_severity,
 };
 pub use options::{
-    LIMIT_ROLES, ObjectType, OptionSchema, OptionType, OptionsSchema, Shape, ShapeRef,
+    LIMIT_ROLES, NO_LIMIT, ObjectType, OptionSchema, OptionType, OptionsSchema, Shape, definitions,
 };
 pub use pack::{Pack, PackSpec, Section, SectionSpec};
 pub use project::{
@@ -59,10 +59,12 @@ pub fn descriptors() -> Vec<Descriptor> {
         .get_mut("$defs")
         .and_then(serde_json::Value::as_object_mut)
     {
-        defs.insert(
-            "limit".to_owned(),
-            serde_json::to_value(Shape::limit()).expect("a shape serializes"),
-        );
+        for (name, shape) in options::definitions() {
+            defs.insert(
+                name.clone(),
+                serde_json::to_value(shape).expect("a shape serializes"),
+            );
+        }
     }
     vec![
         decision,

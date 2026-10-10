@@ -243,6 +243,12 @@ fn options(decision: &Decision) -> Result<(), Error> {
         ));
     }
     for (key, property) in &schema.properties {
+        if property.reference.is_some() && property.target().is_none() {
+            return Err(Error::invalid(
+                id,
+                format!("option `{key}` refers to a shape the spec does not define"),
+            ));
+        }
         if property.check(&property.default, "default").is_err() {
             return Err(Error::invalid(
                 id,

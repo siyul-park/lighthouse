@@ -11,10 +11,11 @@ spec:
   title: Functions have a bounded number of statements
   context: >-
     A long run of statements usually covers several responsibilities. The
-    default (40) is funlen's `statements`; ESLint `max-statements` (10) is
-    far stricter and does not fit a deliberately high limit. Statements are
-    the provider's count: every statement of the body, nested blocks and
-    case clauses included.
+    default (40) is funlen's `statements`, the dominant Go linter's; clippy
+    has no statement limit, so Rust has none (-1) unless a project sets one.
+    ESLint `max-statements` (10) is far stricter and does not fit a
+    deliberately high limit. Statements are the provider's count: every
+    statement of the body, nested blocks and case clauses included.
   scope:
     domain: code
     subject: symbol
@@ -32,8 +33,13 @@ spec:
           Most statements a function may have: an integer for every role, or
           an object with `default` and one entry per role (`function`,
           `method`, `constructor`, `implementation`, `entrypoint`, `test`);
-          a role left out takes `default`, and null is no limit.
+          a role left out takes `default`, and -1 is no limit. A project
+          that sets an object keeps the roles it does not name.
     additionalProperties: false
+  languages:
+    rust:
+      options:
+        max: -1
   check:
     type: cel
     select: function
@@ -44,7 +50,7 @@ spec:
         expr: limit(func, options.max)
     where: >-
       (func.kind == 'function' || func.kind == 'method')
-      && m.measured && cap != null && m.statements > cap
+      && m.measured && cap >= 0 && m.statements > cap
     message: >-
       {{ counted(func, m.statements, 'statements') }} (max {{ cap }}):
       split by responsibility
@@ -113,6 +119,30 @@ spec:
       canonical: true
       options:
         max: 3
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn total(a: i32, b: i32) -> i32 {
+                let mut sum = a;
+                sum += b;
+                sum
+            }
+    - name: rust-has-no-default-limit
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn total(a: i32, b: i32) -> i32 {
+                let mut sum = a;
+                sum += b;
+                sum
+            }
+    - name: rust-negative-one-is-no-limit
+      language: rust
+      kind: valid
+      options:
+        max: -1
       files:
         - path: src/lib.rs
           body: |-

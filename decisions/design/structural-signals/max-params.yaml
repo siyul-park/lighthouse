@@ -11,15 +11,14 @@ spec:
   title: Functions take a bounded number of parameters
   context: >-
     A long parameter list usually hides a missing type, or a function that
-    does several things. The default limit is 6 for a function and 7 for a
-    constructor: Sonar S107 and clippy `too_many_arguments` allow 7, revive
-    `argument-limit` allows 8, detekt `LongParameterList` allows 5 for a
-    function and 6 for a constructor, and ESLint `max-params` allows 3; this
-    is a deliberately high limit between them. A constructor may take one
-    more because it assembles a type. A function that implements an
-    interface or trait method, an entrypoint and a test do not choose their
-    signature, so they have no limit. The receiver is not counted. A struct
-    that exists only for the function (nothing else takes or returns it, and
+    does several things. Each language uses its dominant linter's default:
+    revive `argument-limit` allows 8 in Go, clippy `too_many_arguments`
+    allows 7 in Rust. A constructor may take one more because it assembles a
+    type. A function that implements an interface or trait method, an
+    entrypoint and a test do not choose their signature, so they have no
+    limit. Sonar S107 allows 7, detekt `LongParameterList` 5 (6 for a
+    constructor) and ESLint `max-params` 3. The receiver is not counted. A
+    struct that exists only for the function (nothing else takes it, and
     only the function and its callers touch it or its fields) is a parameter
     list in disguise, so its fields count instead of the struct.
   scope:
@@ -35,12 +34,13 @@ spec:
     properties:
       max:
         $ref: '#/$defs/limit'
-        default: {default: 6, constructor: 7, implementation: null, entrypoint: null, test: null}
+        default: {default: 8, constructor: 9, implementation: -1, entrypoint: -1, test: -1}
         description: >-
           Most parameters a function may have: an integer for every role, or
           an object with `default` and one entry per role (`function`,
           `method`, `constructor`, `implementation`, `entrypoint`, `test`);
-          a role left out takes `default`, and null is no limit.
+          a role left out takes `default`, and -1 is no limit. A project
+          that sets an object keeps the roles it does not name.
       allowSuffixes:
         type: array
         items: {type: string}
@@ -52,6 +52,10 @@ spec:
           Go; not an `Option`, `Vec` or map, or `#[serde(default)]`, in Rust)
           count toward the limit.
     additionalProperties: false
+  languages:
+    rust:
+      options:
+        max: {default: 7, constructor: 8}
   check:
     type: cel
     select: function
@@ -63,13 +67,13 @@ spec:
       - name: eff
         expr: func.effective
       - name: hidden
-        expr: eff.hidden.filter(h, h.side == 'params')
+        expr: eff.hidden
       - name: note
         expr: >-
           size(hidden) == 0 ? '' : ' (' + hidden.map(h, string(h.fields) + ' in ' + h.struct).join(', ') + ' counted from structs used only here)'
     where: >-
       (func.kind == 'function' || func.kind == 'method')
-      && m.measured && cap != null && eff.params > cap
+      && m.measured && cap >= 0 && eff.params > cap
     message: >-
       {{ counted(func, eff.params, 'parameters') }} (max {{ cap }}){{ note }}:
       {{ func.role == 'constructor' ? 'split ' + func.built : 'split by responsibility' }}
@@ -94,7 +98,7 @@ spec:
           body: |-
             package sample
 
-            func build(a, b, c, d, e, f, g int) int {
+            func build(a, b, c, d, e, f, g, h, i int) int {
                 return a
             }
       expect:
@@ -108,7 +112,7 @@ spec:
           body: |-
             package sample
 
-            func build(a, b, c, d, e, f int) int {
+            func build(a, b, c, d, e, f, g, h int) int {
                 return a
             }
     - name: constructor-at-its-limit
@@ -121,7 +125,7 @@ spec:
 
             type Server struct{}
 
-            func NewServer(a, b, c, d, e, f, g int) *Server {
+            func NewServer(a, b, c, d, e, f, g, h, i int) *Server {
                 return &Server{}
             }
     - name: constructor-over-its-limit
@@ -134,7 +138,7 @@ spec:
 
             type Server struct{}
 
-            func NewServer(a, b, c, d, e, f, g, h int) *Server {
+            func NewServer(a, b, c, d, e, f, g, h, i, j int) *Server {
                 return &Server{}
             }
       expect:
@@ -148,100 +152,12 @@ spec:
             package sample
 
             type Writer interface {
-                Write(a, b, c, d, e, f, g int)
+                Write(a, b, c, d, e, f, g, h, i int)
             }
 
             type file struct{}
 
-            func (file) Write(a, b, c, d, e, f, g int) {}
-    - name: rust-too-many-parameters
-      language: rust
-      kind: invalid
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) -> i32 {
-                a
-            }
-      expect:
-        - line: 1
-    - name: rust-within-the-limit
-      language: rust
-      kind: valid
-      canonical: true
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) -> i32 {
-                a
-            }
-    - name: rust-constructor-at-its-limit
-      language: rust
-      kind: valid
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub struct Server;
-
-            impl Server {
-                pub fn new(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) -> Self {
-                    Server
-                }
-            }
-    - name: rust-constructor-over-its-limit
-      language: rust
-      kind: invalid
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub struct Server;
-
-            impl Server {
-                pub fn new(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32) -> Self {
-                    Server
-                }
-            }
-      expect:
-        - line: 4
-    - name: rust-trait-implementation
-      language: rust
-      kind: valid
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub trait Sink {
-                fn write(&mut self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32);
-            }
-
-            pub struct File;
-
-            impl Sink for File {
-                fn write(&mut self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) {}
-            }
-    - name: rust-the-receiver-is-not-counted
-      language: rust
-      kind: valid
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub struct Server;
-
-            impl Server {
-                pub fn handle(&self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) {}
-            }
-    - name: rust-method-over-the-limit
-      language: rust
-      kind: invalid
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub struct Server;
-
-            impl Server {
-                pub fn handle(&self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) {}
-            }
-      expect:
-        - line: 4
+            func (file) Write(a, b, c, d, e, f, g, h, i int) {}
     - name: single-use-struct-counts-its-fields
       language: go
       kind: invalid
@@ -252,7 +168,7 @@ spec:
 
             type Request struct{ A, B, C int }
 
-            func build(a, b, c, d int, r Request) int {
+            func build(a, b, c, d, e, f int, r Request) int {
                 return a + r.A
             }
       expect:
@@ -267,13 +183,28 @@ spec:
 
             type Request struct{ A, B, C int }
 
-            func build(a, b, c, d int, r Request) int {
+            func build(a, b, c, d, e, f int, r Request) int {
                 return a + r.A
             }
 
             func other(r Request) int {
                 return r.B
             }
+    - name: single-use-struct-counts-once-per-parameter
+      language: go
+      kind: invalid
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type Request struct{ A, B, C int }
+
+            func build(a, b, c int, x, y Request) int {
+                return a + x.A + y.B
+            }
+      expect:
+        - line: 5
     - name: options-struct-of-optional-fields
       language: go
       kind: valid
@@ -284,9 +215,97 @@ spec:
 
             type BuildOptions struct{ A, B, C *int }
 
-            func build(a, b, c, d, e int, o BuildOptions) int {
+            func build(a, b, c, d, e, f, g int, o BuildOptions) int {
                 return a + *o.A
             }
+    - name: rust-too-many-parameters
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32) -> i32 {
+                a
+            }
+      expect:
+        - line: 1
+    - name: rust-within-the-limit
+      language: rust
+      kind: valid
+      canonical: true
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) -> i32 {
+                a
+            }
+    - name: rust-constructor-at-its-limit
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Server;
+
+            impl Server {
+                pub fn new(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32) -> Self {
+                    Server
+                }
+            }
+    - name: rust-constructor-over-its-limit
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Server;
+
+            impl Server {
+                pub fn new(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32) -> Self {
+                    Server
+                }
+            }
+      expect:
+        - line: 4
+    - name: rust-trait-implementation
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub trait Sink {
+                fn write(&mut self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32);
+            }
+
+            pub struct File;
+
+            impl Sink for File {
+                fn write(&mut self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32) {}
+            }
+    - name: rust-the-receiver-is-not-counted
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Server;
+
+            impl Server {
+                pub fn handle(&self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) {}
+            }
+    - name: rust-method-over-the-limit
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Server;
+
+            impl Server {
+                pub fn handle(&self, a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32) {}
+            }
+      expect:
+        - line: 4
     - name: rust-single-use-struct-counts-its-fields
       language: rust
       kind: invalid
@@ -299,7 +318,7 @@ spec:
                 pub c: i32,
             }
 
-            pub fn build(a: i32, b: i32, c: i32, d: i32, r: Request) -> i32 {
+            pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, r: Request) -> i32 {
                 a + r.a
             }
       expect:
@@ -316,13 +335,30 @@ spec:
                 pub c: i32,
             }
 
-            pub fn build(a: i32, b: i32, c: i32, d: i32, r: Request) -> i32 {
+            pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, r: Request) -> i32 {
                 a + r.a
             }
 
             pub fn other(r: Request) -> i32 {
                 r.b
             }
+    - name: rust-single-use-struct-counts-once-per-parameter
+      language: rust
+      kind: invalid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Request {
+                pub a: i32,
+                pub b: i32,
+                pub c: i32,
+            }
+
+            pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, x: Request, y: Request) -> i32 {
+                a + x.a + y.b
+            }
+      expect:
+        - line: 7
     - name: rust-options-struct-of-optional-fields
       language: rust
       kind: valid
@@ -335,6 +371,52 @@ spec:
                 pub c: Option<String>,
             }
 
-            pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, o: BuildOptions) -> i32 {
+            pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, o: BuildOptions) -> i32 {
                 a + o.b.len() as i32
+            }
+    - name: rust-options-struct-with-a-default-container
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            #[serde(default)]
+            pub struct BuildOptions {
+                pub a: i32,
+                pub b: i32,
+                pub c: i32,
+            }
+
+            pub fn build(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, o: BuildOptions) -> i32 {
+                a + o.b
+            }
+    - name: role-limits-merge-with-the-default
+      language: go
+      kind: invalid
+      options:
+        max: {default: 5}
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            type Server struct{}
+
+            func NewServer(a, b, c, d, e, f, g, h, i, j int) *Server {
+                return &Server{}
+            }
+      expect:
+        - line: 5
+    - name: negative-one-is-no-limit
+      language: go
+      kind: valid
+      options:
+        max: -1
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func build(a, b, c, d, e, f, g, h, i, j, k, l int) int {
+                return a
             }

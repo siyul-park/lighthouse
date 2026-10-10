@@ -323,7 +323,7 @@ Derived from: McCabe 1976, A Complexity Measure; gocyclo min-complexity 30: http
 | option | default | meaning |
 | --- | --- | --- |
 | `ignoreDispatch` | `true` | Leave out a function that is a table in code form or a flat dispatch (see the context); `false` counts them like any other function. |
-| `max` | `30` | Most cyclomatic complexity (paths) a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
+| `max` | `30` | Most cyclomatic complexity (paths) a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and -1 is no limit. A project that sets an object keeps the roles it does not name. |
 
 ```go invalid
 package sample
@@ -371,7 +371,7 @@ Derived from: Campbell 2018, Cognitive Complexity (SonarSource); gocognit min-co
 | option | default | meaning |
 | --- | --- | --- |
 | `ignoreDispatch` | `true` | Leave out a function that is a table in code form (one switch or match whose arms are single values); `false` counts it. |
-| `max` | `30`; rust: `25` | Most cognitive complexity a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
+| `max` | `30`; rust: `25` | Most cognitive complexity a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and -1 is no limit. A project that sets an object keeps the roles it does not name. |
 
 ```go invalid
 package sample
@@ -411,7 +411,7 @@ Also: rust
 
 `design/max-statements` · symbol · warn · cel
 
-*A long run of statements usually covers several responsibilities. The default (40) is funlen's `statements`; ESLint `max-statements` (10) is far stricter and does not fit a deliberately high limit. Statements are the provider's count: every statement of the body, nested blocks and case clauses included.*
+*A long run of statements usually covers several responsibilities. The default (40) is funlen's `statements`, the dominant Go linter's; clippy has no statement limit, so Rust has none (-1) unless a project sets one. ESLint `max-statements` (10) is far stricter and does not fit a deliberately high limit. Statements are the provider's count: every statement of the body, nested blocks and case clauses included.*
 
 A function SHOULD NOT have more statements than the limit of its role. The remedy is to split it by responsibility.
 
@@ -419,7 +419,7 @@ Derived from: funlen statements 40: https://golangci-lint.run/usage/linters/#fun
 
 | option | default | meaning |
 | --- | --- | --- |
-| `max` | `40` | Most statements a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
+| `max` | `40`; rust: `-1` | Most statements a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and -1 is no limit. A project that sets an object keeps the roles it does not name. |
 
 ```go invalid
 package sample
@@ -455,7 +455,7 @@ Derived from: funlen lines 60: https://golangci-lint.run/usage/linters/#funlen; 
 
 | option | default | meaning |
 | --- | --- | --- |
-| `max` | `60`; rust: `100` | Most lines a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
+| `max` | `60`; rust: `100` | Most lines a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and -1 is no limit. A project that sets an object keeps the roles it does not name. |
 
 ```go invalid
 package sample
@@ -487,7 +487,7 @@ Also: rust
 
 `design/max-depth` · symbol · warn · cel
 
-*Deeply nested blocks hide the path a reader follows. The default (4) is ESLint's `max-depth`; Sonar S134 (3) is lower, and Go's nestif measures the complexity of nested `if`s, not their depth. The depth is the deepest level of nested constructs (`if`, loops, `switch`, `match`, `try`) in the body: a flat body is 0, and a nested function counts as a level. ESLint counts the same blocks, so an ESLint `max` of 4 is a `max` of 4 here.*
+*Deeply nested blocks hide the path a reader follows. The default (4) is ESLint's `max-depth`; Sonar S134 (3) is lower, and Go's nestif measures the complexity of nested `if`s, not their depth. The depth is the deepest level of nested constructs (`if`, loops, `switch`, `match`, `try`) in the body: a flat body is 0, and a nested function (a closure) counts as a level here, unlike ESLint, and an `else if` chain is one level, not one per branch.*
 
 A function SHOULD NOT nest control flow deeper than the limit of its role. The remedy is to extract the nested block or return early.
 
@@ -495,7 +495,7 @@ Derived from: ESLint max-depth 4: https://eslint.org/docs/latest/rules/max-depth
 
 | option | default | meaning |
 | --- | --- | --- |
-| `max` | `4` | Deepest nesting a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
+| `max` | `4` | Deepest nesting a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and -1 is no limit. A project that sets an object keeps the roles it does not name. |
 
 ```go invalid
 package sample
@@ -535,7 +535,7 @@ Also: rust
 
 `design/max-params` · symbol · warn · cel
 
-*A long parameter list usually hides a missing type, or a function that does several things. The default limit is 6 for a function and 7 for a constructor: Sonar S107 and clippy `too_many_arguments` allow 7, revive `argument-limit` allows 8, detekt `LongParameterList` allows 5 for a function and 6 for a constructor, and ESLint `max-params` allows 3; this is a deliberately high limit between them. A constructor may take one more because it assembles a type. A function that implements an interface or trait method, an entrypoint and a test do not choose their signature, so they have no limit. The receiver is not counted. A struct that exists only for the function (nothing else takes or returns it, and only the function and its callers touch it or its fields) is a parameter list in disguise, so its fields count instead of the struct.*
+*A long parameter list usually hides a missing type, or a function that does several things. Each language uses its dominant linter's default: revive `argument-limit` allows 8 in Go, clippy `too_many_arguments` allows 7 in Rust. A constructor may take one more because it assembles a type. A function that implements an interface or trait method, an entrypoint and a test do not choose their signature, so they have no limit. Sonar S107 allows 7, detekt `LongParameterList` 5 (6 for a constructor) and ESLint `max-params` 3. The receiver is not counted. A struct that exists only for the function (nothing else takes it, and only the function and its callers touch it or its fields) is a parameter list in disguise, so its fields count instead of the struct.*
 
 A function SHOULD NOT take more parameters than the limit of its role. The remedy is to split the function by responsibility; a constructor that is over its limit builds a type that should be split.
 
@@ -544,12 +544,12 @@ Derived from: revive argument-limit 8: https://revive.run/r#argument-limit; clip
 | option | default | meaning |
 | --- | --- | --- |
 | `allowSuffixes` | `["Options","Opts","Config"]` | Name endings of a struct that only carries settings: when a struct used only by one function ends in one of these, only its required fields (not a pointer, slice, map, function, channel or interface in Go; not an `Option`, `Vec` or map, or `#[serde(default)]`, in Rust) count toward the limit. |
-| `max` | `{"constructor":7,"default":6,"entrypoint":null,"implementation":null,"test":null}` | Most parameters a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
+| `max` | `{"constructor":9,"default":8,"entrypoint":-1,"implementation":-1,"test":-1}`; rust: `{"constructor":8,"default":7}` | Most parameters a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and -1 is no limit. A project that sets an object keeps the roles it does not name. |
 
 ```go invalid
 package sample
 
-func build(a, b, c, d, e, f, g int) int {
+func build(a, b, c, d, e, f, g, h, i int) int {
     return a
 }
 ```
@@ -557,7 +557,7 @@ func build(a, b, c, d, e, f, g int) int {
 ```go valid
 package sample
 
-func build(a, b, c, d, e, f int) int {
+func build(a, b, c, d, e, f, g, h int) int {
     return a
 }
 ```
@@ -568,7 +568,7 @@ Also: rust
 
 `design/max-results` · symbol · warn · cel
 
-*Many results usually mean the function returns a record that was never named. The default (3) is revive's `function-result-limit`; gocritic's `tooManyResultsChecker` allows 5. Go counts every result, a trailing `error` included. Rust counts the arity of the returned tuple (1 for a single value, 0 for `()`), and looks inside a `Result<T, E>` at `T`. A constructor that returns its type with a result or an error is not counted, nor is a function that implements an interface or trait method, or a test. A struct that exists only for the function (nothing else takes or returns it, and only the function and its callers touch it or its fields) is a result list in disguise, so its fields count instead of the struct.*
+*Many results usually mean the function returns a record that was never named. The default (3) is revive's `function-result-limit`; gocritic's `tooManyResultsChecker` allows 5. Go counts every result, a trailing `error` included. Rust counts the arity of the returned tuple (1 for a single value, 0 for `()`), and looks inside a `Result<T, E>` at `T`. Returning a named struct is one result, which is the remedy the finding asks for. A constructor that returns its type with more values is not counted, nor is a function that implements an interface or trait method, or a test.*
 
 A function SHOULD NOT return more results than the limit of its role. The remedy is to split the function by responsibility, or to name what it returns.
 
@@ -576,8 +576,7 @@ Derived from: revive function-result-limit 3: https://revive.run/r#function-resu
 
 | option | default | meaning |
 | --- | --- | --- |
-| `allowSuffixes` | `["Options","Opts","Config"]` | Name endings of a struct that only carries settings: when a struct used only by one function ends in one of these, only its required fields (not a pointer, slice, map, function, channel or interface in Go; not an `Option`, `Vec` or map, or `#[serde(default)]`, in Rust) count toward the limit. |
-| `max` | `{"constructor":null,"default":3,"implementation":null,"test":null}` | Most results a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and null is no limit. |
+| `max` | `{"constructor":-1,"default":3,"implementation":-1,"test":-1}` | Most results a function may have: an integer for every role, or an object with `default` and one entry per role (`function`, `method`, `constructor`, `implementation`, `entrypoint`, `test`); a role left out takes `default`, and -1 is no limit. A project that sets an object keeps the roles it does not name. |
 
 ```go invalid
 package sample

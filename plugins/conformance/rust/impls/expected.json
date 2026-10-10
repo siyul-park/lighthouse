@@ -560,9 +560,6 @@
           "flow": [],
           "max_nesting": 0,
           "params": 1,
-          "result_types": [
-            "impls::Stack"
-          ],
           "returns": 1,
           "statements": 1,
           "symbol": "impls::Stack::new#method",
@@ -649,9 +646,6 @@
           "implementation": true,
           "max_nesting": 0,
           "params": 1,
-          "result_types": [
-            "impls::Meters"
-          ],
           "returns": 1,
           "statements": 1,
           "symbol": "impls::Meters::From<f64>::from#method",
@@ -664,9 +658,6 @@
           "implementation": true,
           "max_nesting": 0,
           "params": 1,
-          "result_types": [
-            "impls::Meters"
-          ],
           "returns": 1,
           "statements": 1,
           "symbol": "impls::Meters::From<u32>::from#method",
@@ -710,9 +701,6 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
-          "result_types": [
-            "impls::Stack"
-          ],
           "returns": 1,
           "statements": 3,
           "symbol": "impls::build#function",

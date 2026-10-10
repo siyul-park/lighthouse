@@ -550,3 +550,27 @@ fn config_constructor_prefixes() {
     assert!(!config.constructor_prefixes().contains_key("rust"));
     assert!(!config.languages()["go"].contains_key("constructorPrefixes"));
 }
+
+#[test]
+fn object_options_merge_per_key_across_layers_in_toml() {
+    let limits = RuleConfig {
+        level: Some(Severity::Warn),
+        options: serde_json::from_value(serde_json::json!({ "max": { "default": 5, "test": -1 } }))
+            .unwrap(),
+        generated: None,
+    };
+    let layers = Projects::new([shared(
+        "base/limits",
+        &[],
+        Rules::from([("core/a".to_owned(), limits)]),
+    )])
+    .unwrap();
+    let text = "extends = [\"base/limits\"]\n[rules]\n\"core/a\" = { level = \"warn\", options = { max = { default = 8 } } }\n";
+    let rules = Config::parse_inline(text)
+        .unwrap()
+        .resolve(Path::new("a.rs"), "rust", &layers)
+        .unwrap();
+    let max = &rules["core/a"].options["max"];
+    assert_eq!(max["default"], 8, "the later layer wins per key");
+    assert_eq!(max["test"], -1, "and keeps the keys it does not name");
+}

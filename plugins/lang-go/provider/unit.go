@@ -115,7 +115,7 @@ func (u *unit) function(d *ast.FuncDecl) {
 			idName = "init:" + path.Base(u.rel) + ":" + strconv.Itoa(position(u.fset, d.Pos()).Line)
 		}
 		id := symbolID(kind, u.module, idName)
-		u.symbol(kind, name, "", id, d.Pos(), d.End(), doc, u.extent(d))
+		u.symbol(sdk.Symbol{ID: id, Kind: kind, Name: name, Owner: "", Doc: doc}, d.Pos(), d.End(), u.extent(d))
 		if u.test && kind == kindFunction {
 			u.frag.Symbols[len(u.frag.Symbols)-1].Role = u.functionRole(d)
 		}
@@ -127,7 +127,7 @@ func (u *unit) function(d *ast.FuncDecl) {
 		return
 	}
 	id := symbolID(kindMethod, u.module, owner, name)
-	u.symbol(kindMethod, name, symbolID(kindType, u.module, owner), id, d.Pos(), d.End(), doc, u.extent(d))
+	u.symbol(sdk.Symbol{ID: id, Kind: kindMethod, Name: name, Owner: symbolID(kindType, u.module, owner), Doc: doc}, d.Pos(), d.End(), u.extent(d))
 	u.summarize(d, id, false)
 }
 
@@ -157,7 +157,8 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 		Flow:             f.events,
 		ForwardsTo:       forwardTarget(d, u.info(), u.res),
 		ParamTypes:       paramTypes(d.Type, u.info(), u.res),
-		ResultTypes:      resultTypes(d.Type, u.info(), u.res),
+		Implementation:   u.implementation(d),
+		Constructs:       u.constructs(d),
 		ManualAssertions: manual,
 	})
 	if isTestCase {
@@ -231,7 +232,7 @@ func (u *unit) general(d *ast.GenDecl) {
 					continue
 				}
 				id := symbolID(kind, u.module, name.Name)
-				u.symbol(kind, name.Name, "", id, name.Pos(), s.End(), docText(s.Doc, d.Doc), extent)
+				u.symbol(sdk.Symbol{ID: id, Kind: kind, Name: name.Name, Owner: "", Doc: docText(s.Doc, d.Doc)}, name.Pos(), s.End(), extent)
 				if kind == kindVar {
 					u.initializer(id, initializersOf(s, i))
 				}
@@ -265,7 +266,7 @@ func (u *unit) typeSpec(s *ast.TypeSpec, d *ast.GenDecl) {
 		kind = kindInterface
 	}
 	id := symbolID(kind, u.module, name)
-	u.symbol(kind, name, "", id, s.Pos(), s.End(), docText(s.Doc, d.Doc), u.specExtent(d, s))
+	u.symbol(sdk.Symbol{ID: id, Kind: kind, Name: name, Owner: "", Doc: docText(s.Doc, d.Doc)}, s.Pos(), s.End(), u.specExtent(d, s))
 	switch t := s.Type.(type) {
 	case *ast.StructType:
 		u.fields(t, name, id)
@@ -277,12 +278,12 @@ func (u *unit) typeSpec(s *ast.TypeSpec, d *ast.GenDecl) {
 func (u *unit) fields(t *ast.StructType, owner, ownerID string) {
 	for _, field := range t.Fields.List {
 		doc := docText(field.Doc)
+		optional := u.optional(field)
 		if len(field.Names) == 0 {
 			name := baseName(field.Type)
 			if name != "" && name != "_" {
 				id := symbolID(kindField, u.module, owner, name)
-				u.symbol(kindField, name, ownerID, id, field.Pos(), field.End(), doc, u.extent(field))
-				u.markOptional(field)
+				u.symbol(sdk.Symbol{ID: id, Kind: kindField, Name: name, Owner: ownerID, Doc: doc, Optional: optional}, field.Pos(), field.End(), u.extent(field))
 			}
 			continue
 		}
@@ -295,22 +296,8 @@ func (u *unit) fields(t *ast.StructType, owner, ownerID string) {
 			if len(field.Names) == 1 {
 				extent = u.extent(field)
 			}
-			u.symbol(kindField, name.Name, ownerID, id, name.Pos(), field.End(), doc, extent)
-			u.markOptional(field)
+			u.symbol(sdk.Symbol{ID: id, Kind: kindField, Name: name.Name, Owner: ownerID, Doc: doc, Optional: optional}, name.Pos(), field.End(), extent)
 		}
-	}
-}
-
-// markOptional flags the field symbol just emitted when its type has a zero
-// value that means "not given".
-func (u *unit) markOptional(field *ast.Field) {
-	t := u.info().TypeOf(field.Type)
-	if t == nil {
-		return
-	}
-	switch t.Underlying().(type) {
-	case *types.Pointer, *types.Slice, *types.Map, *types.Signature, *types.Chan, *types.Interface:
-		u.frag.Symbols[len(u.frag.Symbols)-1].Optional = true
 	}
 }
 
@@ -322,7 +309,7 @@ func (u *unit) interfaceMethods(t *ast.InterfaceType, owner, ownerID string) {
 			if len(method.Names) == 1 {
 				extent = u.extent(method)
 			}
-			u.symbol(kindMethod, name.Name, ownerID, id, name.Pos(), method.End(), docText(method.Doc), extent)
+			u.symbol(sdk.Symbol{ID: id, Kind: kindMethod, Name: name.Name, Owner: ownerID, Doc: docText(method.Doc)}, name.Pos(), method.End(), extent)
 		}
 	}
 }
@@ -338,24 +325,20 @@ func (u *unit) functionRole(d *ast.FuncDecl) string {
 	return roleFixture
 }
 
-func (u *unit) symbol(kind, name, owner, id string, from, to token.Pos, doc string, extent *sdk.Span) {
-	u.frag.Symbols = append(u.frag.Symbols, sdk.Symbol{
-		ID:         id,
-		Kind:       kind,
-		Visibility: u.visibility(name),
-		Owner:      owner,
-		File:       u.rel,
-		Span:       span(u.fset, from, to),
-		Extent:     extent,
-		Doc:        doc,
-		Name:       name,
-		Role:       u.declarationRole(kind, owner),
-	})
+// symbol records a declaration: sym carries what the caller knows (identity,
+// kind, name, owner, doc, optional); the rest is the unit's.
+func (u *unit) symbol(sym sdk.Symbol, from, to token.Pos, extent *sdk.Span) {
+	sym.Visibility = u.visibility(sym.Name)
+	sym.File = u.rel
+	sym.Span = span(u.fset, from, to)
+	sym.Extent = extent
+	sym.Role = u.declarationRole(sym.Kind, sym.Owner)
+	u.frag.Symbols = append(u.frag.Symbols, sym)
 	container := sdk.Node{Module: u.module}
-	if owner != "" {
-		container = sdk.Node{Symbol: owner}
+	if sym.Owner != "" {
+		container = sdk.Node{Symbol: sym.Owner}
 	}
-	u.edge(edgeContains, container, id)
+	u.edge(edgeContains, container, sym.ID)
 }
 
 // declarationRole is the role of a type, constant or variable of a test
@@ -441,4 +424,22 @@ func initializersOf(s *ast.ValueSpec, i int) []ast.Expr {
 		return s.Values
 	}
 	return nil
+}
+
+// optional reports whether a caller may leave the field out: its zero value is
+// nil (a pointer, slice, map, function, channel or interface). A field typed
+// by a type parameter is not: its constraint says nothing about the value.
+func (u *unit) optional(field *ast.Field) bool {
+	t := u.info().TypeOf(field.Type)
+	if t == nil {
+		return false
+	}
+	if _, generic := types.Unalias(t).(*types.TypeParam); generic {
+		return false
+	}
+	switch t.Underlying().(type) {
+	case *types.Pointer, *types.Slice, *types.Map, *types.Signature, *types.Chan, *types.Interface:
+		return true
+	}
+	return false
 }

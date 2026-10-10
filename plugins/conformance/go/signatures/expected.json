@@ -199,12 +199,10 @@
           "top_level": 1
         },
         {
+          "constructs": true,
           "flow": [],
           "max_nesting": 0,
           "params": 0,
-          "result_types": [
-            ".::Pair"
-          ],
           "returns": 2,
           "statements": 1,
           "symbol": ".::Split#function",

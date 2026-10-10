@@ -261,9 +261,6 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
-          "result_types": [
-            "signatures::Pair"
-          ],
           "returns": 2,
           "statements": 1,
           "symbol": "signatures::split#function",
@@ -275,9 +272,6 @@
           "flow": [],
           "max_nesting": 0,
           "params": 0,
-          "result_types": [
-            "signatures::Server"
-          ],
           "returns": 1,
           "statements": 1,
           "symbol": "signatures::Server::new#method",
@@ -290,9 +284,6 @@
           "implementation": true,
           "max_nesting": 0,
           "params": 0,
-          "result_types": [
-            "signatures::Server"
-          ],
           "returns": 1,
           "statements": 1,
           "symbol": "signatures::Server::Default::default#method",

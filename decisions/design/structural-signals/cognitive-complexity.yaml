@@ -35,8 +35,9 @@ spec:
           Most cognitive complexity a function may have: an integer for
           every role, or an object with `default` and one entry per role
           (`function`, `method`, `constructor`, `implementation`,
-          `entrypoint`, `test`); a role left out takes `default`, and null
-          is no limit.
+          `entrypoint`, `test`); a role left out takes `default`, and -1 is
+          no limit. A project that sets an object keeps the roles it does
+          not name.
       ignoreDispatch:
         type: boolean
         default: true
@@ -57,7 +58,7 @@ spec:
         expr: limit(func, options.max)
     where: >-
       (func.kind == 'function' || func.kind == 'method')
-      && m.measured && cap != null && m.cognitive > cap
+      && m.measured && cap >= 0 && m.cognitive > cap
       && !(options.ignoreDispatch && m.dispatcher)
     message: >-
       {{ counted(func, m.cognitive, 'cognitive complexity points') }} (max {{ cap }}):

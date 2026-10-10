@@ -6,21 +6,35 @@ import (
 )
 
 // isGenerated reports whether a Go file is generated code. The standard marker
-// (`// Code generated ... DO NOT EDIT.` on one line) is go/ast's; code
+// (`// Code generated ... DO NOT EDIT.` on one line) is go/ast's. Code
 // generators that word it differently, such as protoc-gen-gogo's three-line
-// header, also say "Code generated" and "DO NOT EDIT" in the comments above
-// the package clause.
+// header, also start a line of a comment above the package clause with "Code
+// generated" and say "DO NOT EDIT" on that line or a later line of the same
+// comment. The package documentation is not a header: it may mention both.
 func isGenerated(file *ast.File) bool {
 	if ast.IsGenerated(file) {
 		return true
 	}
-	var header strings.Builder
 	for _, group := range file.Comments {
 		if group.Pos() > file.Package {
 			break
 		}
-		header.WriteString(group.Text())
+		if group != file.Doc && marksGenerated(group.Text()) {
+			return true
+		}
 	}
-	text := strings.ToLower(header.String())
-	return strings.Contains(text, "code generated") && strings.Contains(text, "do not edit")
+	return false
+}
+
+// marksGenerated reports whether a comment has a line that starts with "Code
+// generated" and says "DO NOT EDIT" on it or on a later line.
+func marksGenerated(text string) bool {
+	started := false
+	for line := range strings.SplitSeq(text, "\n") {
+		started = started || strings.HasPrefix(line, "Code generated")
+		if started && strings.Contains(strings.ToUpper(line), "DO NOT EDIT") {
+			return true
+		}
+	}
+	return false
 }

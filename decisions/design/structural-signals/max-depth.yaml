@@ -14,9 +14,9 @@ spec:
     ESLint's `max-depth`; Sonar S134 (3) is lower, and Go's nestif measures
     the complexity of nested `if`s, not their depth. The depth is the
     deepest level of nested constructs (`if`, loops, `switch`, `match`,
-    `try`) in the body: a flat body is 0, and a nested function counts as a
-    level. ESLint counts the same blocks, so an ESLint `max` of 4 is a `max`
-    of 4 here.
+    `try`) in the body: a flat body is 0, and a nested function (a closure)
+    counts as a level here, unlike ESLint, and an `else if` chain is one
+    level, not one per branch.
   scope:
     domain: code
     subject: symbol
@@ -34,7 +34,8 @@ spec:
           Deepest nesting a function may have: an integer for every role, or
           an object with `default` and one entry per role (`function`,
           `method`, `constructor`, `implementation`, `entrypoint`, `test`);
-          a role left out takes `default`, and null is no limit.
+          a role left out takes `default`, and -1 is no limit. A project
+          that sets an object keeps the roles it does not name.
     additionalProperties: false
   check:
     type: cel
@@ -46,7 +47,7 @@ spec:
         expr: limit(func, options.max)
     where: >-
       (func.kind == 'function' || func.kind == 'method')
-      && m.measured && cap != null && m.nesting > cap
+      && m.measured && cap >= 0 && m.nesting > cap
     message: >-
       {{ counted(func, m.nesting, 'levels of nesting') }} (max {{ cap }}):
       extract nested blocks or return early
@@ -147,3 +148,86 @@ spec:
                 }
                 total
             }
+    - name: else-if-is-one-level
+      language: go
+      kind: valid
+      options:
+        max: 1
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func grade(n int) string {
+                if n < 0 {
+                    return "negative"
+                } else if n == 0 {
+                    return "zero"
+                } else if n < 10 {
+                    return "small"
+                } else if n < 100 {
+                    return "medium"
+                }
+                return "large"
+            }
+    - name: closure-is-a-level
+      language: go
+      kind: invalid
+      options:
+        max: 1
+      files:
+        - path: sample.go
+          body: |-
+            package sample
+
+            func run(items []int) {
+                each := func(f func(int)) {
+                    for _, i := range items {
+                        f(i)
+                    }
+                }
+                each(func(int) {})
+            }
+      expect:
+        - line: 3
+    - name: rust-else-if-is-one-level
+      language: rust
+      kind: valid
+      options:
+        max: 1
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn grade(n: i32) -> &'static str {
+                if n < 0 {
+                    "negative"
+                } else if n == 0 {
+                    "zero"
+                } else if n < 10 {
+                    "small"
+                } else if n < 100 {
+                    "medium"
+                } else {
+                    "large"
+                }
+            }
+    - name: rust-closure-is-a-level
+      language: rust
+      kind: invalid
+      options:
+        max: 1
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub fn run(items: &[i32]) -> i32 {
+                let each = |f: &dyn Fn(i32) -> i32| {
+                    let mut total = 0;
+                    for i in items {
+                        total += f(*i);
+                    }
+                    total
+                };
+                each(&|x| x)
+            }
+      expect:
+        - line: 1

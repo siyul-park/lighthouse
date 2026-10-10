@@ -129,13 +129,20 @@ impl From<RuleSetting> for RuleConfig {
     }
 }
 
-/// Later level replaces the earlier one; options merge per key, later wins.
+/// Later level replaces the earlier one; options merge per key, later wins,
+/// and an object-valued option (a limit per role) merges per key too.
 pub(crate) fn merge(into: &mut Rules, from: &Rules) {
     for (id, next) in from {
         match into.get_mut(id) {
             Some(prev) => {
                 prev.level = next.level;
-                prev.options.extend(next.options.clone());
+                for (key, value) in &next.options {
+                    let merged = match prev.options.get(key) {
+                        Some(before) => crate::options::merge(before, value),
+                        None => value.clone(),
+                    };
+                    prev.options.insert(key.clone(), merged);
+                }
                 prev.generated = next.generated.or(prev.generated);
             }
             None => {

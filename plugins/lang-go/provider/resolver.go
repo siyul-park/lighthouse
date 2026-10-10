@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -18,6 +19,8 @@ type resolver struct {
 	// local places import paths of packages that did not load, such as a
 	// directory that fails to build, under the module that would hold them.
 	local *goModule
+	// interfaces caches, per package, the interfaces its code names.
+	interfaces sync.Map
 }
 
 // goModule is the module of a go.mod: its import path and its directory

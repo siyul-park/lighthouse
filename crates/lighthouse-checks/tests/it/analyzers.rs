@@ -43,7 +43,6 @@ fn summary(symbol: &Symbol, nesting: u32, statements: u32, flow: &[Flow]) -> Fun
         clone_fingerprint: None,
         forwards_to: None,
         param_types: Vec::new(),
-        result_types: Vec::new(),
         manual_assertions: 0,
         implementation: false,
         constructs: false,

@@ -537,15 +537,16 @@ mod validation {
     }
 
     #[test]
-    fn a_limit_is_an_integer_or_an_object_of_integers_and_nulls() {
+    fn a_limit_is_an_integer_or_an_object_of_integers() {
         let decision = limit_decision();
         let max = |v| Map::from_iter([("max".to_owned(), v)]);
         for ok in [
+            json!(-1),
             json!(0),
             json!(7),
             json!({}),
-            json!({ "default": 6, "constructor": 7, "test": null }),
-            json!({ "default": null, "function": 3 }),
+            json!({ "default": 6, "constructor": 7, "test": -1 }),
+            json!({ "default": -1, "function": 3 }),
         ] {
             assert!(
                 decision.resolve_options(&max(ok.clone()), None).is_ok(),
@@ -553,11 +554,11 @@ mod validation {
             );
         }
         for (bad, needle) in [
-            (json!(-1), "at least 0"),
+            (json!(-2), "at least -1"),
             (json!("3"), "matches none of the allowed shapes"),
             (json!(null), "matches none of the allowed shapes"),
             (json!(1.5), "matches none of the allowed shapes"),
-            (json!({ "default": -2 }), "at least 0"),
+            (json!({ "default": -2 }), "at least -1"),
             (
                 json!({ "default": "x" }),
                 "matches none of the allowed shapes",
@@ -937,4 +938,36 @@ fn with_uid_gives_a_decision_the_identity_it_keeps_across_renames() {
     let decision = bundled("core/allow-annotation").clone();
     let uid = "5d6b1c1e-2b0e-4a43-9a3e-0f1b6f5d2a11";
     assert_eq!(decision.with_uid(uid).uid(), Some(uid));
+}
+
+#[test]
+fn an_object_limit_merges_over_the_default_and_the_language() {
+    let decision = bundled("design/max-params");
+    let none = Map::new();
+    let go = decision.resolve_options(&none, Some("go")).unwrap();
+    assert_eq!(go["max"]["default"], 8);
+    assert_eq!(go["max"]["constructor"], 9);
+    assert_eq!(go["max"]["test"], -1);
+    let rust = decision.resolve_options(&none, Some("rust")).unwrap();
+    assert_eq!(rust["max"]["default"], 7);
+    assert_eq!(rust["max"]["constructor"], 8);
+    assert_eq!(rust["max"]["entrypoint"], -1, "kept from the default");
+
+    let partial = Map::from_iter([("max".to_owned(), json!({ "default": 5 }))]);
+    let merged = decision.resolve_options(&partial, Some("rust")).unwrap();
+    assert_eq!(merged["max"]["default"], 5);
+    assert_eq!(merged["max"]["constructor"], 8, "the language's role stays");
+
+    let whole = Map::from_iter([("max".to_owned(), json!(3))]);
+    let single = decision.resolve_options(&whole, None).unwrap();
+    assert_eq!(single["max"], 3, "an integer replaces the object");
+    let off = Map::from_iter([("max".to_owned(), json!(-1))]);
+    assert_eq!(decision.resolve_options(&off, None).unwrap()["max"], -1);
+}
+
+#[test]
+fn an_option_schema_refuses_keys_it_does_not_know() {
+    let text = "type: integer\ndefault: 1\ndescription: d\nminmum: 0\n";
+    let parsed: Result<lighthouse_spec::OptionSchema, _> = serde_norway::from_str(text);
+    assert!(parsed.is_err(), "a misspelled keyword is refused");
 }
