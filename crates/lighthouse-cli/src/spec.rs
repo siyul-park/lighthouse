@@ -6,9 +6,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_config::Config;
-use lighthouse_resource::schema_file;
-use lighthouse_session::{Session, migrate_paths, schema_of, schemas, validate_paths};
+use lighthouse_session::{
+    Session, config_file, migrate_paths, schema_file, schema_of, schemas, validate_paths,
+};
 
 use crate::Result;
 
@@ -107,7 +107,7 @@ pub fn schema(kind: Option<&str>, write: Option<&Path>) -> Result<u8> {
 /// The project's configuration file and the given directories, as far as they
 /// exist.
 fn defaults(root: &Path, dirs: &[&str]) -> Vec<PathBuf> {
-    let mut paths: Vec<PathBuf> = Config::file_in(root).into_iter().collect();
+    let mut paths: Vec<PathBuf> = config_file(root).into_iter().collect();
     paths.extend(dirs.iter().map(|d| root.join(d)).filter(|d| d.is_dir()));
     paths
 }

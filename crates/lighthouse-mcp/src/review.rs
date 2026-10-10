@@ -1,9 +1,10 @@
 //! The review tools: what waits for a judgment, recording verdicts, history.
 
-use lighthouse_model::{Reason, ReviewerKind, Severity, Verdict};
 use lighthouse_report::{Detail, Entry, GroupOptions, Grouped};
-use lighthouse_session::{catalog_at, existing_store, head, project_root, record_verdict};
-use lighthouse_store::{Filter, FindingRecord, NewReview, ReviewEvent, StatusFilter, Store};
+use lighthouse_session::{
+    FindingRecord, NewReview, Reason, ReviewEvent, ReviewerKind, Severity, StatusFilter, TaskQuery,
+    Verdict, catalog_at, head, project_root, record_verdict, review_history, review_tasks,
+};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
@@ -54,23 +55,19 @@ pub fn tasks(args: TasksArgs) -> Outcome {
     };
     let root = project_root().map_err(fail)?;
     let detail = args.detail.unwrap_or_default();
-    let Some(store) = Store::open_existing(&root).map_err(fail)? else {
+    let query = TaskQuery {
+        rule: args.rule,
+        status,
+        all_tiers,
+    };
+    let Some(tasks) = review_tasks(&root, &query).map_err(fail)? else {
         let empty = match detail {
             Detail::Compact => "groups",
             Detail::Full => "tasks",
         };
         return Ok(json!({ empty: [], "note": "no findings recorded yet: run `check` first" }));
     };
-    let found = store
-        .list(&Filter {
-            rule: args.rule,
-            status,
-        })
-        .map_err(fail)?;
-    let wanted: Vec<&FindingRecord> = found
-        .iter()
-        .filter(|f| all_tiers || f.needs_verdict())
-        .collect();
+    let wanted: Vec<&FindingRecord> = tasks.findings.iter().collect();
     let limit = args.limit.unwrap_or(DEFAULT_TASKS);
     if detail == Detail::Compact {
         let entries = wanted.iter().map(|f| entry(f)).collect();
@@ -108,8 +105,7 @@ pub fn resolve(args: ResolveArgs, reviewer: &str) -> Outcome {
         expect_seen: args.seen,
         lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
     };
-    let mut store = existing_store(&root).map_err(fail)?;
-    let recorded = record_verdict(&root, &mut store, &review).map_err(fail)?;
+    let recorded = record_verdict(&root, &review).map_err(fail)?;
     let event = &recorded.event;
     Ok(json!({
         "recorded": {
@@ -127,8 +123,7 @@ pub fn resolve(args: ResolveArgs, reviewer: &str) -> Outcome {
 
 pub fn history(args: HistoryArgs) -> Outcome {
     let root = project_root().map_err(fail)?;
-    let store = existing_store(&root).map_err(fail)?;
-    let events = store.history(&args.fingerprint).map_err(fail)?;
+    let events = review_history(&root, &args.fingerprint).map_err(fail)?;
     let events: Vec<Value> = events.iter().map(ReviewEvent::to_json).collect();
     Ok(json!({ "fingerprint": args.fingerprint, "events": events }))
 }

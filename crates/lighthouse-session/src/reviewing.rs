@@ -1,10 +1,13 @@
-//! Review verdicts: who is reviewing, and recording a verdict on a finding.
+//! Review verdicts: who is reviewing, which findings wait for one, and
+//! recording a verdict on a finding. The store stays behind these functions.
 
 use std::{env, path::Path};
 
 use lighthouse_model::ReviewerKind;
 use lighthouse_spec::{Catalog, Decision};
-use lighthouse_store::{FindingRecord, NewReview, ReviewEvent, Stamp, Standing, State, Store};
+use lighthouse_store::{
+    Filter, FindingRecord, NewReview, ReviewEvent, Stamp, Standing, State, StatusFilter, Store,
+};
 use serde_json::Value;
 
 use crate::{Result, project::catalog_at};
@@ -48,15 +51,68 @@ pub struct Recorded {
     pub catalog_error: Option<String>,
 }
 
+/// Which remembered findings [`review_tasks`] lists.
+pub struct TaskQuery {
+    /// Only this fully qualified rule id.
+    pub rule: Option<String>,
+    pub status: StatusFilter,
+    /// Also the findings that do not ask for a verdict (mechanical decisions).
+    pub all_tiers: bool,
+}
+
+/// The remembered findings that wait for a verdict.
+pub struct Tasks {
+    pub findings: Vec<FindingRecord>,
+    /// What opening the store had to say, such as a log line it skipped.
+    pub notices: Vec<String>,
+}
+
+/// The findings the store remembers that match `query`; `None` when no check
+/// has recorded anything yet.
+pub fn review_tasks(root: &Path, query: &TaskQuery) -> Result<Option<Tasks>> {
+    let Some(store) = Store::open_existing(root)? else {
+        return Ok(None);
+    };
+    let found = store.list(&Filter {
+        rule: query.rule.clone(),
+        status: query.status,
+    })?;
+    Ok(Some(Tasks {
+        findings: found
+            .into_iter()
+            .filter(|f| query.all_tiers || f.needs_verdict())
+            .collect(),
+        notices: store.notices().to_vec(),
+    }))
+}
+
+/// The finding whose fingerprint starts with `fingerprint`, as remembered.
+pub fn review_finding(root: &Path, fingerprint: &str) -> Result<FindingRecord> {
+    Ok(existing_store(root)?.finding(fingerprint)?)
+}
+
+/// Every verdict recorded on a finding, oldest first.
+pub fn review_history(root: &Path, fingerprint: &str) -> Result<Vec<ReviewEvent>> {
+    Ok(existing_store(root)?.history(fingerprint)?)
+}
+
+/// Deletes the resolved and inactive findings nobody reviewed, only those that
+/// have been for `older_than` days when given; returns how many.
+pub fn review_prune(root: &Path, older_than: Option<u32>) -> Result<usize> {
+    Ok(existing_store(root)?.prune(older_than)?)
+}
+
 /// The store, which must already exist: nothing is remembered before a check.
-pub fn existing_store(root: &Path) -> Result<Store> {
+fn existing_store(root: &Path) -> Result<Store> {
     Store::open_existing(root)?
         .ok_or_else(|| "no findings recorded yet (run `lighthouse check`)".into())
 }
 
 /// Records the verdict, stamping it with the versions of the finding's rule
 /// when the catalog can be read; a broken catalog is reported, not fatal.
-pub fn record_verdict(root: &Path, store: &mut Store, review: &NewReview) -> Result<Recorded> {
+pub fn record_verdict(root: &Path, review: &NewReview) -> Result<Recorded> {
+    let mut store = existing_store(root)?;
+    let store = &mut store;
     let (catalog, catalog_error) = match catalog_at(root) {
         Ok(catalog) => (Some(catalog), None),
         Err(e) => (None, Some(e.to_string())),

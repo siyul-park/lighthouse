@@ -8,10 +8,8 @@ use std::{
 };
 
 use clap::{Parser, Subcommand, ValueEnum};
-use lighthouse_config::FILE_NAME;
-use lighthouse_engine::FailOn;
 use lighthouse_report::{Briefing, Detail, Format, render_with};
-use lighthouse_session::{CheckRequest, DEFAULT_CONFIG, FixRequest, Session};
+use lighthouse_session::{CheckRequest, DEFAULT_CONFIG, FILE_NAME, FailOn, FixRequest, Session};
 use review::ReviewCommand;
 
 mod decisions;

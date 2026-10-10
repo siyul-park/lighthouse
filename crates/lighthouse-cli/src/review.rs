@@ -4,10 +4,10 @@
 use std::{fmt::Write, path::Path};
 
 use clap::{Subcommand, ValueEnum};
-use lighthouse_model::{Reason, ReviewerKind, Verdict};
-use lighthouse_session::{Recorded, Reviewer, existing_store, head, project_root, record_verdict};
-use lighthouse_store::{
-    Filter, FindingRecord, NewReview, ReviewEvent, Standing, StatusFilter, Store,
+use lighthouse_session::{
+    FindingRecord, NewReview, Reason, Recorded, ReviewEvent, Reviewer, ReviewerKind, Standing,
+    StatusFilter, TaskQuery, Verdict, head, project_root, record_verdict, review_finding,
+    review_history, review_prune, review_tasks,
 };
 use serde_json::Value;
 
@@ -119,13 +119,13 @@ pub fn run(command: ReviewCommand) -> Result<u8> {
             rule,
             status,
             format,
-        } => match Store::open_existing(&root)? {
-            Some(store) => {
-                store
-                    .notices()
+        } => match review_tasks(&root, &query(rule, status, all))? {
+            Some(tasks) => {
+                tasks
+                    .notices
                     .iter()
                     .for_each(|n| eprintln!("lighthouse: {n}"));
-                list(&store, rule, status, all, format)
+                list(&tasks.findings, format)
             }
             None => {
                 eprintln!("lighthouse: no findings recorded yet (run `lighthouse check`)");
@@ -135,12 +135,12 @@ pub fn run(command: ReviewCommand) -> Result<u8> {
         ReviewCommand::Show {
             fingerprint,
             format,
-        } => show(&existing_store(&root)?, &fingerprint, format),
+        } => show(&review_finding(&root, &fingerprint)?, format),
         ReviewCommand::History {
             fingerprint,
             format,
-        } => history(&existing_store(&root)?, &fingerprint, format),
-        ReviewCommand::Prune { older_than } => prune(&mut existing_store(&root)?, older_than),
+        } => history(&review_history(&root, &fingerprint)?, &fingerprint, format),
+        ReviewCommand::Prune { older_than } => prune(review_prune(&root, older_than)?),
         ReviewCommand::Resolve {
             fingerprint,
             verdict,
@@ -162,18 +162,13 @@ pub fn run(command: ReviewCommand) -> Result<u8> {
                 expect_seen: seen,
                 lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
             };
-            resolve(&root, &mut existing_store(&root)?, &review)
+            resolve(&root, &review)
         }
     }
 }
 
-fn list(
-    store: &Store,
-    rule: Option<String>,
-    status: Status,
-    all: bool,
-    format: Format,
-) -> Result<u8> {
+/// What `list` asks the session for.
+fn query(rule: Option<String>, status: Status, all_tiers: bool) -> TaskQuery {
     let status = match status {
         Status::Open => StatusFilter::Open,
         Status::Suppressed => StatusFilter::Suppressed,
@@ -182,8 +177,15 @@ fn list(
         Status::Resolved => StatusFilter::Resolved,
         Status::All => StatusFilter::All,
     };
-    let findings = store.list(&Filter { rule, status })?;
-    for finding in findings.iter().filter(|f| all || f.needs_verdict()) {
+    TaskQuery {
+        rule,
+        status,
+        all_tiers,
+    }
+}
+
+fn list(findings: &[FindingRecord], format: Format) -> Result<u8> {
+    for finding in findings {
         match format {
             Format::Text => println!("{}", row(finding)),
             Format::Json => println!("{}", serde_json::to_string(finding)?),
@@ -192,43 +194,40 @@ fn list(
     Ok(0)
 }
 
-fn show(store: &Store, fingerprint: &str, format: Format) -> Result<u8> {
-    let finding = store.finding(fingerprint)?;
+fn show(finding: &FindingRecord, format: Format) -> Result<u8> {
     match format {
-        Format::Text => print!("{}", detail(&finding)),
-        Format::Json => println!("{}", serde_json::to_string(&finding)?),
+        Format::Text => print!("{}", detail(finding)),
+        Format::Json => println!("{}", serde_json::to_string(finding)?),
     }
     Ok(0)
 }
 
-fn history(store: &Store, fingerprint: &str, format: Format) -> Result<u8> {
-    let events = store.history(fingerprint)?;
+fn history(events: &[ReviewEvent], fingerprint: &str, format: Format) -> Result<u8> {
     if events.is_empty() {
         eprintln!("lighthouse: no reviews recorded for {fingerprint}");
     }
     for event in events {
         match format {
-            Format::Text => println!("{}", event_row(&event)),
+            Format::Text => println!("{}", event_row(event)),
             Format::Json => println!("{}", event.to_json()),
         }
     }
     Ok(0)
 }
 
-fn prune(store: &mut Store, older_than: Option<u32>) -> Result<u8> {
-    let removed = store.prune(older_than)?;
+fn prune(removed: usize) -> Result<u8> {
     println!("removed {removed} unreviewed finding(s) that are resolved or inactive");
     Ok(0)
 }
 
-fn resolve(root: &Path, store: &mut Store, review: &NewReview) -> Result<u8> {
+fn resolve(root: &Path, review: &NewReview) -> Result<u8> {
     let Recorded {
         event,
         warnings,
         standing,
         catalog_error,
         ..
-    } = record_verdict(root, store, review)?;
+    } = record_verdict(root, review)?;
     if let Some(e) = catalog_error {
         eprintln!(
             "lighthouse: the catalog cannot be read ({e}); rule and catalog versions are not recorded"

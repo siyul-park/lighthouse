@@ -739,16 +739,11 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "clap",
- "lighthouse-checks",
- "lighthouse-config",
  "lighthouse-engine",
  "lighthouse-mcp",
- "lighthouse-model",
  "lighthouse-report",
  "lighthouse-resource",
  "lighthouse-session",
- "lighthouse-spec",
- "lighthouse-store",
  "lighthouse-test-support",
  "predicates",
  "serde_json",
@@ -792,13 +787,8 @@ dependencies = [
 name = "lighthouse-mcp"
 version = "0.1.0"
 dependencies = [
- "lighthouse-config",
- "lighthouse-engine",
- "lighthouse-model",
  "lighthouse-report",
  "lighthouse-session",
- "lighthouse-spec",
- "lighthouse-store",
  "rmcp",
  "serde",
  "serde_json",

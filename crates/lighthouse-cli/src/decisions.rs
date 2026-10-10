@@ -1,7 +1,6 @@
 use std::path::Path;
 
-use lighthouse_session::{DecisionRow, Session};
-use lighthouse_spec::Catalog;
+use lighthouse_session::{DecisionRow, Session, bundled_decision_rows, explain_bundled};
 
 use crate::Result;
 
@@ -25,13 +24,12 @@ pub fn test(ids: &[String], language: Option<&str>, config: Option<&Path>) -> Re
 }
 
 pub fn list(all: bool) -> Result<u8> {
-    let registry = lighthouse_checks::registry();
     for DecisionRow {
         id,
         status,
         severity,
         title,
-    } in lighthouse_session::decision_rows(Catalog::bundled(), &registry, all)
+    } in bundled_decision_rows(all)
     {
         if all {
             println!("{id}\t{status}\t{severity}\t{title}");
@@ -43,10 +41,6 @@ pub fn list(all: bool) -> Result<u8> {
 }
 
 pub fn explain(id: &str) -> Result<u8> {
-    let registry = lighthouse_checks::registry();
-    print!(
-        "{}",
-        lighthouse_session::explain(Catalog::bundled(), &registry, id)?
-    );
+    print!("{}", explain_bundled(id)?);
     Ok(0)
 }

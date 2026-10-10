@@ -7,6 +7,7 @@
 mod authoring;
 mod check;
 mod decisions;
+mod docs;
 mod findings;
 mod fix;
 mod git;
@@ -23,14 +24,26 @@ use std::error::Error;
 
 pub use authoring::{Authored, create_decision, update_decision};
 pub use check::{CheckRequest, Checked, Status, Summary, check};
-pub use decisions::{DecisionRow, DecisionTest, decision_rows, explain, test_decisions};
+pub use decisions::{
+    DecisionRow, DecisionTest, active_decisions, bundled_decision_rows, catalog_index,
+    decision_rows, decision_text, explain, explain_bundled, test_decisions,
+};
+pub use docs::bundled_docs;
 pub use findings::Remembered;
 pub use fix::{AppliedRow, DeclinedRow, FixRequest, Fixed, fix, fix_plan};
 pub use git::head;
-pub use lighthouse_spec::write_atomic;
+pub use lighthouse_config::FILE_NAME;
+pub use lighthouse_engine::{FailOn, Timings};
+pub use lighthouse_model::{Reason, ReviewerKind, Severity, Verdict};
+pub use lighthouse_resource::schema_file;
+pub use lighthouse_spec::{DOCS_DIR, write_atomic};
+pub use lighthouse_store::{FindingRecord, NewReview, ReviewEvent, Standing, StatusFilter};
 pub use migrate::{Migrated, migrate_paths};
-pub use project::{DEFAULT_CONFIG, Session, catalog_at, project_root};
-pub use reviewing::{Recorded, Reviewer, existing_store, record_verdict};
+pub use project::{DEFAULT_CONFIG, Session, catalog_at, config_file, project_root};
+pub use reviewing::{
+    Recorded, Reviewer, TaskQuery, Tasks, record_verdict, review_finding, review_history,
+    review_prune, review_tasks,
+};
 pub use schema::{schema_of, schemas};
 pub use scope::{changed, since};
 pub use skill::{SKILL_MARKER, skill, skill_for};

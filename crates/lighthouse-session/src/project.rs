@@ -165,6 +165,11 @@ pub fn project_root() -> Result<PathBuf> {
     Ok(found.map_or(here.clone(), Path::to_owned))
 }
 
+/// The configuration file in `root`, if it has one.
+pub fn config_file(root: &Path) -> Option<PathBuf> {
+    Config::file_in(root)
+}
+
 /// The catalog of the project at `root`: the bundled one with the project's
 /// layer on top. Fails when the project's layer is broken.
 pub fn catalog_at(root: &Path) -> Result<Catalog> {

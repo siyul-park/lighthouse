@@ -1,10 +1,8 @@
 //! Resources: the catalog index, one rendered decision, the effective config.
 
-use std::{fmt::Write, fs};
+use std::fs;
 
-use lighthouse_engine::active_rules;
-use lighthouse_session::Session;
-use lighthouse_spec::decision_markdown;
+use lighthouse_session::{Session, active_decisions, catalog_index, config_file, decision_text};
 use rmcp::model::{Resource, ResourceTemplate};
 use serde_json::json;
 
@@ -39,7 +37,9 @@ pub fn templates() -> Vec<ResourceTemplate> {
 pub fn read(uri: &str) -> Result<(String, &'static str), String> {
     let session = Session::load_or_default(None).map_err(|e| e.to_string())?;
     if uri == CATALOG {
-        return catalog(&session).map(|text| (text, "text/plain"));
+        return catalog_index(&session)
+            .map(|text| (text, "text/plain"))
+            .map_err(|e| e.to_string());
     }
     if uri == CONFIG {
         return config(&session).map(|text| (text, "application/json"));
@@ -47,43 +47,20 @@ pub fn read(uri: &str) -> Result<(String, &'static str), String> {
     let Some(id) = uri.strip_prefix(DECISION_PREFIX) else {
         return Err(format!("unknown resource `{uri}`"));
     };
-    let catalog = session.catalog().map_err(|e| e.to_string())?;
-    let decision = catalog
-        .decision(id)
-        .ok_or_else(|| format!("unknown decision `{id}`"))?;
-    Ok((decision_markdown(decision, 1), MARKDOWN))
-}
-
-fn catalog(session: &Session) -> Result<String, String> {
-    let catalog = session.catalog().map_err(|e| e.to_string())?;
-    let mut out = String::new();
-    for decision in catalog.decisions() {
-        let tier = decision.severity().map_or_else(
-            || "doc".to_owned(),
-            |s| lighthouse_spec::authored_severity(s, Some(decision)).to_string(),
-        );
-        let _ = writeln!(
-            out,
-            "{}\t{tier}\t{}\t{}",
-            decision.id(),
-            decision.status,
-            decision.title
-        );
-    }
-    Ok(out)
+    decision_text(&session, id)
+        .map(|text| (text, MARKDOWN))
+        .map_err(|e| e.to_string())
 }
 
 fn config(session: &Session) -> Result<String, String> {
-    let registry = session.in_process_registry().map_err(|e| e.to_string())?;
-    let active = active_rules(&registry, &session.config).map_err(|e| e.to_string())?;
+    let active = active_decisions(session).map_err(|e| e.to_string())?;
     let plugins: Vec<&str> = session
         .config
         .plugins()
         .iter()
         .map(|p| p.id.as_str())
         .collect();
-    let file = lighthouse_config::Config::file_in(&session.root)
-        .and_then(|path| fs::read_to_string(path).ok());
+    let file = config_file(&session.root).and_then(|path| fs::read_to_string(path).ok());
     Ok(serde_json::to_string_pretty(&json!({
         "root": session.root.display().to_string(),
         "plugins": plugins,

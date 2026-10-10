@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use lighthouse_engine::Timings;
+use lighthouse_session::Timings;
 
 /// How many rules the breakdown names, longest first.
 const TOP_RULES: usize = 5;

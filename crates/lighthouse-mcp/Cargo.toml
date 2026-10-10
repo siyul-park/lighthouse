@@ -9,13 +9,8 @@ test = false
 doctest = false
 
 [dependencies]
-lighthouse-config.workspace = true
-lighthouse-engine.workspace = true
-lighthouse-model.workspace = true
 lighthouse-report.workspace = true
 lighthouse-session.workspace = true
-lighthouse-spec.workspace = true
-lighthouse-store.workspace = true
 rmcp.workspace = true
 serde.workspace = true
 serde_json.workspace = true

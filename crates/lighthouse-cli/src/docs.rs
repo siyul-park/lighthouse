@@ -4,15 +4,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_session::{Session, skill_for};
-use lighthouse_spec::Catalog;
+use lighthouse_session::{DOCS_DIR, Session, bundled_docs, skill_for};
 
 use crate::Result;
 
-const DECISIONS_DIR: &str = lighthouse_spec::DOCS_DIR;
-
 pub fn generate(out: &Path, skill: &Path) -> Result<u8> {
-    let docs = generated();
+    let docs = bundled_docs();
     for orphan in orphans(out, &docs)? {
         fs::remove_file(&orphan)?;
         println!("removed {}", orphan.display());
@@ -33,31 +30,13 @@ pub fn generate(out: &Path, skill: &Path) -> Result<u8> {
     Ok(0)
 }
 
-/// Every generated page: one per pack, and the fix operations with the order
-/// keys the bundled plugins register.
-fn generated() -> BTreeMap<String, String> {
-    let mut docs = lighthouse_spec::docs(Catalog::bundled());
-    let keys: Vec<(String, String)> = lighthouse_checks::registry()
-        .order_keys()
-        .map(|k| {
-            let manifest = k.manifest();
-            (manifest.id.clone(), manifest.description.clone())
-        })
-        .collect();
-    docs.insert(
-        format!("{DECISIONS_DIR}/fix-operations.md"),
-        lighthouse_spec::fix_operations_markdown(&keys),
-    );
-    docs
-}
-
 /// The agent skill of this project: its catalog and configuration.
 fn skill_text() -> Result<String> {
     skill_for(&Session::load_or_default(None)?)
 }
 
 pub fn check(out: &Path, skill: &Path) -> Result<u8> {
-    let docs = generated();
+    let docs = bundled_docs();
     let mut problems = Vec::new();
     for (path, text) in &docs {
         let target = out.join(path);
@@ -92,7 +71,7 @@ pub fn check(out: &Path, skill: &Path) -> Result<u8> {
 
 /// Files in the generated directory that no pack produces.
 fn orphans(out: &Path, docs: &BTreeMap<String, String>) -> Result<Vec<PathBuf>> {
-    let dir = out.join(DECISIONS_DIR);
+    let dir = out.join(DOCS_DIR);
     let entries = match fs::read_dir(&dir) {
         Ok(entries) => entries,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
@@ -105,7 +84,7 @@ fn orphans(out: &Path, docs: &BTreeMap<String, String>) -> Result<Vec<PathBuf>> 
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or_default();
-        if !docs.contains_key(&format!("{DECISIONS_DIR}/{name}")) {
+        if !docs.contains_key(&format!("{DOCS_DIR}/{name}")) {
             found.push(path);
         }
     }

@@ -4,7 +4,7 @@ use std::{cell::RefCell, collections::BTreeSet, fmt::Write};
 
 use lighthouse_engine::RuleTester;
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Catalog, Decision};
+use lighthouse_spec::{Catalog, Decision, authored_severity};
 use serde::Serialize;
 
 use crate::{Result, Session};
@@ -60,6 +60,53 @@ pub fn decision_rows(catalog: &Catalog, registry: &Registry, all: bool) -> Vec<D
         });
     }
     rows
+}
+
+/// [`decision_rows`] over the bundled catalog and plugins.
+pub fn bundled_decision_rows(all: bool) -> Vec<DecisionRow> {
+    decision_rows(Catalog::bundled(), &lighthouse_checks::registry(), all)
+}
+
+/// [`explain`] over the bundled catalog and plugins.
+pub fn explain_bundled(id: &str) -> Result<String> {
+    explain(Catalog::bundled(), &lighthouse_checks::registry(), id)
+}
+
+/// The rules the project's configuration enables for at least one file: the
+/// presets it extends and the entries it sets, resolved over the registry of
+/// the in-process plugins.
+pub fn active_decisions(session: &Session) -> Result<BTreeSet<String>> {
+    let registry = session.in_process_registry()?;
+    Ok(lighthouse_engine::active_rules(&registry, &session.config)?)
+}
+
+/// The index of the project's catalog, one decision per line: id, authored
+/// severity, status and title, tab-separated.
+pub fn catalog_index(session: &Session) -> Result<String> {
+    let mut out = String::new();
+    for decision in session.catalog()?.decisions() {
+        let tier = decision.severity().map_or_else(
+            || "doc".to_owned(),
+            |s| authored_severity(s, Some(decision)).to_string(),
+        );
+        let _ = writeln!(
+            out,
+            "{}\t{tier}\t{}\t{}",
+            decision.id(),
+            decision.status,
+            decision.title
+        );
+    }
+    Ok(out)
+}
+
+/// One decision of the project's catalog rendered as Markdown.
+pub fn decision_text(session: &Session, id: &str) -> Result<String> {
+    let catalog = session.catalog()?;
+    let decision = catalog
+        .decision(id)
+        .ok_or_else(|| format!("unknown decision `{id}`"))?;
+    Ok(lighthouse_spec::decision_markdown(decision, 1))
 }
 
 /// The text that explains a decision or rule: intent, requirement, examples and

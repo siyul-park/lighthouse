@@ -3,9 +3,8 @@
 
 use std::path::{Path, PathBuf};
 
-use lighthouse_engine::active_rules;
 use lighthouse_report::{Briefing, Detail, agent_report};
-use lighthouse_session::{CheckRequest, Session, decision_rows, explain};
+use lighthouse_session::{CheckRequest, Session, active_decisions, decision_rows, explain};
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
@@ -174,7 +173,7 @@ fn decision_list(args: DecisionListArgs) -> Outcome {
     let session = Session::load_or_default(None).map_err(fail)?;
     let catalog = session.catalog().map_err(fail)?;
     let registry = session.in_process_registry().map_err(fail)?;
-    let enabled = active_rules(&registry, &session.config).map_err(fail)?;
+    let enabled = active_decisions(&session).map_err(fail)?;
     let rows: Vec<Value> = decision_rows(&catalog, &registry, args.all)
         .into_iter()
         .map(|row| {
