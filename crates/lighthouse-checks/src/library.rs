@@ -1,8 +1,10 @@
 //! The standard functions of CEL expressions over the code model:
 //! `metrics(n)`, `callers(n)`, `callees(n)`, `edges(n, kind)`, `owner(n)`,
 //! `tests(n)`, `annotations(n)`, `rank(n, key)` and `exposed(n, internal)`,
-//! and the text helpers `lines`, `trim`, `trimPrefixes`, `trimSuffixes`,
-//! `trimLeft`, `trimRight`, `leadingRun`, `drop` and `words`.
+//! the module path helpers `globMatch(path, glob)` and
+//! `layerOf(module, layers)`, and the text helpers `join`, `lines`, `trim`,
+//! `trimPrefixes`, `trimSuffixes`, `trimLeft`, `trimRight`, `leadingRun`,
+//! `drop` and `words`.
 //!
 //! A function reads a fact that was computed for the value `n` before the
 //! expression ran, so an expression is pure and the facts are the same however
@@ -11,12 +13,14 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use crate::glob;
 use cel::{
     Context, ExecutionError, FunctionContext, ResolveResult, Value,
     common::{
         types::{CelBool, CelMap, CelMapKey, CelString},
         value::Val,
     },
+    extractors::This,
     objects::Map,
 };
 
@@ -100,8 +104,36 @@ pub(crate) fn context() -> Context<'static> {
     context.add_function("edges", keyed_reader("edges", "__edges", empty_list));
     context.add_function("rank", keyed_reader("rank", "__ranks", unranked));
     context.add_function("exposed", exposed());
+    context.add_function("globMatch", |path: Arc<String>, glob: Arc<String>| {
+        glob::matches(&path, &glob)
+    });
+    context.add_function("layerOf", layer_of);
     text_helpers(&mut context);
     context
+}
+
+/// `layerOf(module, layers)`: the index of the first of the layers, each a
+/// list of module globs, that holds a glob matching the module; -1 when none.
+fn layer_of(module: Arc<String>, layers: Arc<Vec<Value>>) -> i64 {
+    let globs: Vec<Vec<String>> = layers.iter().map(strings).collect();
+    glob::layer_of(
+        &module,
+        globs.iter().map(|layer| layer.iter().map(String::as_str)),
+    )
+}
+
+/// The strings of a list value; anything else in it is skipped.
+fn strings(value: &Value) -> Vec<String> {
+    match value {
+        Value::List(items) => items
+            .iter()
+            .filter_map(|item| match item {
+                Value::String(s) => Some(s.to_string()),
+                _ => None,
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 /// `name(node)`: the hidden field `field` of the node.
@@ -199,6 +231,16 @@ fn text_helpers(context: &mut Context<'static>) {
         )
     });
     context.add_function("trim", |s: Arc<String>| s.trim().to_owned());
+    context.add_function(
+        "join",
+        |This(items): This<Arc<Vec<Value>>>, separator: Arc<String>| {
+            items
+                .iter()
+                .map(text)
+                .collect::<Vec<_>>()
+                .join(separator.as_str())
+        },
+    );
     context.add_function("trimPrefixes", |s: Arc<String>, p: Arc<String>| {
         let mut rest = s.as_str();
         while !p.is_empty() {

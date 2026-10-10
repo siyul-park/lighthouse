@@ -27,7 +27,7 @@ spec:
         Dependency direction keeps stable, general code independent from
         specific policy and context.
       decisions:
-        - no-upward-dependency
+        - layers
         - general-lower-levels
         - no-caller-dependency
         - general-extraction
@@ -38,6 +38,7 @@ spec:
         preserving real structural boundaries.
       decisions:
         - owner-file
+        - tiny-modules
         - contiguity
         - layout
         - meaningful-separation
@@ -79,6 +80,7 @@ spec:
         vocabulary that preserves the required distinction.
       decisions:
         - terminology
+        - unique-type-names
         - minimal-names
         - max-name-words
         - no-redundant-qualifiers

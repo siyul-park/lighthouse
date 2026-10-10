@@ -11,6 +11,7 @@ use lighthouse_model::{
 
 use crate::{
     layout::{is_declaration, owner_key},
+    modules::Stats,
     text,
 };
 use lighthouse_spec::{PACK_LABEL, SECTION_LABEL};
@@ -180,13 +181,16 @@ pub(crate) fn document(d: &Document) -> Value {
     })
 }
 
-pub(crate) fn module(m: &Module, files: usize, symbols: usize) -> Value {
+pub(crate) fn module(m: &Module, files: usize, symbols: usize, stats: &Stats) -> Value {
     json!({
         "path": m.path,
         "name": m.name.clone().unwrap_or_else(|| m.path.clone()),
         "test_of": m.test_of.clone().unwrap_or_default(),
         "files": files,
         "symbols": symbols,
+        "lines": stats.lines,
+        "dependents": stats.dependents,
+        "declares": stats.declares,
     })
 }
 

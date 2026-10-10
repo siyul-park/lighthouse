@@ -73,7 +73,7 @@ Do not memorize decision text; ask for it when a finding names a rule.
 - `lighthouse://config` is the effective configuration.
 - `review_history` shows every judgment recorded on a finding.
 
-## Active decisions (21)
+## Active decisions (24)
 
 A decision declares the severity of its findings: `error` is definitive, so it needs no review and only a directive in the code suppresses it; `warn` and `info` are review tasks, and a judgment can hide them whatever level the configuration reports them at. `fixable: safe|suggested` marks a decision with a fixer.
 
@@ -86,12 +86,15 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 
 ### design
 
+- `design/layers` (warn) Dependencies point down the layers
+- `design/tiny-modules` (info) A module earns its boundary
 - `design/contiguity` (warn, fixable: suggested) Collaborators stay close
 - `design/complexity` (warn) Complexity is a review signal
 - `design/coupling` (warn) Coupling is a review signal
 - `design/no-single-use-wrapper` (warn) Inline single-use wrappers
 - `design/prefer-method` (warn) Behavior lives with its owner
 - `design/callers-before-callees` (warn, fixable: suggested) Callers before callees
+- `design/unique-type-names` (info) One type name, one concept
 - `design/max-name-words` (warn) Names have at most a few words
 - `design/no-redundant-qualifiers` (warn) No redundant qualifiers
 - `design/no-mutable-globals` (warn) No exported mutable global

@@ -22,20 +22,69 @@ Dependency direction keeps stable, general code independent from specific policy
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/no-upward-dependency`](#depend-toward-the-stable-and-general) | Depend toward the stable and general | warn · model |  |  |
+| [`design/layers`](#dependencies-point-down-the-layers) | Dependencies point down the layers | warn · cel |  |  |
 | `design/general-lower-levels` | Lower-level code is general | info · model |  | Lower-level or reusable symbols MUST express their responsibility in the most general form that fully fits it and MUST NOT depend on caller-specific policy, types, lifecycle, or semantics. |
 | [`design/no-caller-dependency`](#lower-level-code-does-not-depend-on-its-callers) | Lower-level code does not depend on its callers | warn · model |  |  |
 | `design/general-extraction` | Generalize when extracting | info · model |  | Shared functionality MUST be generalized when extracted; it MUST NOT be moved downward merely to relocate complexity. |
 
-### Depend toward the stable and general
+### Dependencies point down the layers
 
-`design/no-upward-dependency` · module · warn · model
+`design/layers` · project · warn · cel
 
-*Stable, general code must not break when specific code changes.*
+*Stable, general code must not break when specific code changes. The project says which modules are higher and which are lower; an import that points up, between peers of one layer, or across a forbidden line is reported. It follows import-linter's `layers`, `independence` and `forbidden` contracts (`layers`, `forbidden`, `ignore` with its `reason`) and ArchUnit's `layeredArchitecture`. Nothing is reported until `layers` or `forbidden` is configured: the layers belong to the project. A layer is a list of module globs, and `layers` lists them from the top down. In a glob `*` stands for characters inside one path segment and `**` for any number of segments, none included, so `app/**` also matches `app`. `::` and `/` both separate segments. A module that no layer names is not judged. Only imports between modules of the project count; an external module is ignored. An import is reported when it points to a higher layer, when `independent` is on and it joins two modules of one layer that match different globs (modules under one glob may import each other), or when it matches a `forbidden` entry. An import that matches an `ignore` entry is skipped, and its `reason` says why. A rule judges one import at a time, so an `ignore` entry that matches no import is not reported as stale, as import-linter's `unmatched_ignore_imports_alerting` would. Go: a module is a package, named by its directory relative to the project root (`internal/domain`). Rust: a module is a crate or one of its modules, named by the crate and the `mod` path (`my_crate/domain/order`); the crate root is the crate name.*
 
-A symbol MUST NOT depend on code that is more specific, more context-dependent, or less stable than itself.
+A module MUST NOT depend on a module of a higher layer, and modules of one layer MUST stay independent of each other, as the project's layers state.
 
-Derived from: Martin, Stable Dependencies Principle
+Derived from: import-linter, layers, independence and forbidden contracts; ArchUnit, layeredArchitecture; Martin, Stable Dependencies Principle
+
+| option | default | meaning |
+| --- | --- | --- |
+| `forbidden` | `[]` | Imports that are never allowed, each an object `{from, to}` of the globs of the importing and the imported module. |
+| `ignore` | `[]` | Imports that are allowed although they break a contract, each an object `{from, to, reason}`: the globs of both modules and the reason it stays. |
+| `independent` | `true` | Modules of one layer that match different globs do not import each other. |
+| `layers` | `[]` | The layers from the top down, each a list of module globs, such as `[["app/cli"], ["app/**"], ["app/model"]]`. A module imports only modules of its own layer or below. |
+
+```go invalid go.mod
+module example.com/app
+
+go 1.26
+```
+
+```go invalid domain/domain.go
+package domain
+
+import "example.com/app/infra"
+
+func Load() string { return infra.Read() }
+```
+
+```go invalid infra/infra.go
+package infra
+
+func Read() string { return "" }
+```
+
+```go valid go.mod
+module example.com/app
+
+go 1.26
+```
+
+```go valid domain/domain.go
+package domain
+
+import "example.com/app/infra"
+
+func Load() string { return infra.Read() }
+```
+
+```go valid infra/infra.go
+package infra
+
+func Read() string { return "" }
+```
+
+Also: rust
 
 ### Lower-level code does not depend on its callers
 
@@ -54,9 +103,70 @@ Physical layout should make ownership and collaboration visible while preserving
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | `design/owner-file` | One owner, one file | warn · model |  | Symbols with one owner and cohesive responsibility MUST share a file. |
+| [`design/tiny-modules`](#a-module-earns-its-boundary) | A module earns its boundary | info · cel |  |  |
 | [`design/contiguity`](#collaborators-stay-close) | Collaborators stay close | warn · proximity | suggested |  |
 | `design/layout` | Layout shows ownership | info · model |  | Files and declaration order MUST make ownership, responsibility, and relationships easy to read. |
 | `design/meaningful-separation` | Separation marks a boundary | info · model |  | Physical separation MUST represent a real responsibility, ownership, or abstraction boundary. |
+
+### A module earns its boundary
+
+`design/tiny-modules` · module · info · cel · strict
+
+*A small module with one user is that user's detail, and a module that only forwards others adds a hop without a concept. No tool checks this: Sonar and PMD bound the size of a file or class from above only. A module is reported when it has fewer than `minLines` lines and either exactly one production module imports it or it declares nothing of its own. Lines run from the first to the last declaration of each file of the module, because the code model does not carry the length of a file. Declarations are the types, interfaces, constants, variables and functions at module level, without `init`; a Rust re-export is not one. Tests and generated code are not judged, and a module that tests another is not a dependent. Go: A package is a module. Rust: A crate or a `mod` is a module; a crate root that only declares `mod` and `pub use` is reported when small, as the facade it is.*
+
+A module SHOULD hold enough to justify its boundary: a small module that one other module uses SHOULD be merged into its user, or its boundary justified.
+
+Derived from: Fowler, Refactoring 2nd ed., Inline Class
+
+| option | default | meaning |
+| --- | --- | --- |
+| `minLines` | `300` | Fewer lines than this make a module small. |
+
+```go invalid go.mod
+module example.com/app
+
+go 1.26
+```
+
+```go invalid app/app.go
+package app
+
+import "example.com/app/tiny"
+
+func Run() int { return tiny.One() }
+
+func Other() int { return 2 }
+
+func Third() int { return 3 }
+
+func Fourth() int { return 4 }
+
+func Fifth() int { return 5 }
+```
+
+```go invalid tiny/tiny.go
+package tiny
+
+func One() int { return 1 }
+```
+
+```go valid cli/cli.go
+package cli
+
+import "example.com/app/tiny"
+
+func Run() int { return tiny.One() }
+
+func Other() int { return 2 }
+
+func Third() int { return 3 }
+
+func Fourth() int { return 4 }
+
+func Fifth() int { return 5 }
+```
+
+Also: rust
 
 ### Collaborators stay close
 
@@ -384,6 +494,7 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | `design/terminology` | One term, one concept | info · model |  | One term MUST represent one concept across packages. |
+| [`design/unique-type-names`](#one-type-name-one-concept) | One type name, one concept | info · cel |  |  |
 | `design/minimal-names` | Minimal names | info · model |  | One word SHOULD be the default; a multi-word name MUST add only the minimum qualifier needed to express a distinction. |
 | [`design/max-name-words`](#names-have-at-most-a-few-words) | Names have at most a few words | warn · cel |  |  |
 | [`design/no-redundant-qualifiers`](#no-redundant-qualifiers) | No redundant qualifiers | warn · cel |  |  |
@@ -392,6 +503,34 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 | `design/predicate-names` | Predicate names state their form | warn · model |  | Predicates MUST name their form: `HasX` for containing or registering X, `IsX` for a state predicate, `MatchX` for comparison or validation against X, and a bare `X` for a direct boolean value. `At` MUST be used for position or time predicates. |
 | `design/reserved-verbs` | Action verbs are reserved | info · model |  | Configured action verbs, by default `Build`, `Compile`, `Publish`, `Capture`, and `Use`, MUST be reserved for actions or transitions. |
 | `design/plural-collections` | Singular capabilities, plural collections | info · model |  | Capability names MUST be singular; collections and stores MUST be plural. |
+
+### One type name, one concept
+
+`design/unique-type-names` · symbol · info · cel · strict
+
+*The deterministic companion of `design/terminology`: two public types of one name in different modules make a reader suspect they are the same concept, or hide that they are not. No tool checks this exactly; Sonar's S101 (type names follow a convention) is the nearest naming-consistency rule. A public type of production code is reported when another module of the project declares a public type of the same name, one finding for each declaration. The names in `allow` are idiomatic in every module and are not judged. Types of tests and of generated files are not compared, and only types of one language are: a type mirrored in another language is not a homonym. Go: `Error`, `Result`, `Options` and `Config` are the usual per-package names. Interfaces are not compared. Rust: `Error` and `Result` are idiomatic in every module.*
+
+A public type name SHOULD name one concept in the project; two modules SHOULD NOT export types of the same name.
+
+Derived from: Sonar, S101 naming conventions
+
+| option | default | meaning |
+| --- | --- | --- |
+| `allow` | `["Error","Result","Options","Config"]` | Type names that are idiomatic in every module. |
+
+```go invalid billing/billing.go
+package billing
+
+type Account struct{}
+```
+
+```go valid billing/billing.go
+package billing
+
+type Invoice struct{}
+```
+
+Also: rust
 
 ### Names have at most a few words
 

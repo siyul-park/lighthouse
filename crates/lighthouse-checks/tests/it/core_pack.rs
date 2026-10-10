@@ -270,19 +270,29 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
             "design/coupling",
             "design/declaration-groups",
             "design/exported-doc",
+            "design/layers",
             "design/max-name-words",
             "design/no-banners",
             "design/no-mutable-globals",
             "design/no-redundant-qualifiers",
             "design/no-single-use-wrapper",
             "design/prefer-method",
-            "design/private-helper-callers"
+            "design/private-helper-callers",
+            "design/tiny-modules",
+            "design/unique-type-names"
         ]
     );
     let recommended = preset("design/recommended");
-    assert_eq!(recommended.len(), design.len() - 2);
-    assert!(!recommended.contains_key("design/private-helper-callers"));
-    assert!(!recommended.contains_key("design/max-name-words"));
+    assert_eq!(recommended.len(), design.len() - 4);
+    for strict in [
+        "design/private-helper-callers",
+        "design/max-name-words",
+        "design/unique-type-names",
+        "design/tiny-modules",
+    ] {
+        assert!(!recommended.contains_key(strict), "{strict}");
+    }
+    assert!(recommended.contains_key("design/layers"));
     assert_eq!(preset("design/strict").len(), design.len());
     assert_eq!(preset("testing/recommended").len(), 5);
 }

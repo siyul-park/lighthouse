@@ -1,0 +1,145 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/tiny-modules
+  uid: eb70c68d-4aa7-499d-96e4-8f37fd484705
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: physical-cohesion
+    lighthouse/preset: strict
+spec:
+  title: A module earns its boundary
+  context: >-
+    A small module with one user is that user's detail, and a module that
+    only forwards others adds a hop without a concept. No tool checks this:
+    Sonar and PMD bound the size of a file or class from above only.
+
+    A module is reported when it has fewer than `minLines` lines and either
+    exactly one production module imports it or it declares nothing of its
+    own. Lines run from the first to the last declaration of each file of the
+    module, because the code model does not carry the length of a file.
+    Declarations are the types, interfaces, constants, variables and
+    functions at module level, without `init`; a Rust re-export is not one.
+    Tests and generated code are not judged, and a module that tests another
+    is not a dependent.
+
+    Go: A package is a module.
+
+    Rust: A crate or a `mod` is a module; a crate root that only declares
+    `mod` and `pub use` is reported when small, as the facade it is.
+  scope:
+    domain: code
+    subject: module
+  requirement: >-
+    A module SHOULD hold enough to justify its boundary: a small module that
+    one other module uses SHOULD be merged into its user, or its boundary
+    justified.
+  severity: info
+  options:
+    type: object
+    properties:
+      minLines:
+        type: integer
+        default: 300
+        description: Fewer lines than this make a module small.
+    additionalProperties: false
+  check:
+    type: cel
+    where: >-
+      module.lines < options.minLines
+      && (size(module.dependents) == 1 || module.declares == 0)
+    message: >-
+      module {{ module.path }} has {{ module.lines }} lines and
+      {{ size(module.dependents) }} dependent(s); merge it into its user, or
+      justify the boundary
+    evidence:
+      lines: module.lines
+      dependents: module.dependents
+      declares: module.declares
+    identity:
+      subject: module.path
+  provenance:
+    wasDerivedFrom:
+      - "Fowler, Refactoring 2nd ed., Inline Class"
+  examples:
+    - name: go-small-package-with-one-user
+      language: go
+      kind: invalid
+      options:
+        minLines: 10
+      files:
+        - path: go.mod
+          body: "module example.com/app\n\ngo 1.26\n"
+        - path: app/app.go
+          body: "package app\n\nimport \"example.com/app/tiny\"\n\nfunc Run() int { return tiny.One() }\n\nfunc Other() int { return 2 }\n\nfunc Third() int { return 3 }\n\nfunc Fourth() int { return 4 }\n\nfunc Fifth() int { return 5 }\n"
+        - path: tiny/tiny.go
+          body: "package tiny\n\nfunc One() int { return 1 }\n"
+      expect:
+        - line: 1
+    - name: go-package-used-by-several
+      language: go
+      kind: valid
+      canonical: true
+      options:
+        minLines: 10
+      files:
+        - path: go.mod
+          body: "module example.com/app\n\ngo 1.26\n"
+        - path: app/app.go
+          body: "package app\n\nimport \"example.com/app/tiny\"\n\nfunc Run() int { return tiny.One() }\n\nfunc Other() int { return 2 }\n\nfunc Third() int { return 3 }\n\nfunc Fourth() int { return 4 }\n\nfunc Fifth() int { return 5 }\n"
+        - path: cli/cli.go
+          body: "package cli\n\nimport \"example.com/app/tiny\"\n\nfunc Run() int { return tiny.One() }\n\nfunc Other() int { return 2 }\n\nfunc Third() int { return 3 }\n\nfunc Fourth() int { return 4 }\n\nfunc Fifth() int { return 5 }\n"
+        - path: tiny/tiny.go
+          body: "package tiny\n\nfunc One() int { return 1 }\n"
+    - name: rust-small-module-with-one-user
+      language: rust
+      kind: invalid
+      options:
+        minLines: 10
+      files:
+        - path: src/lib.rs
+          body: |-
+            mod tiny;
+
+            use crate::tiny::one;
+
+            pub fn run() -> i32 {
+                one()
+            }
+
+            pub fn other() -> i32 {
+                2
+            }
+
+            pub fn third() -> i32 {
+                3
+            }
+        - path: src/tiny.rs
+          body: |-
+            pub fn one() -> i32 {
+                1
+            }
+      expect:
+        - line: 1
+    - name: rust-module-larger-than-the-limit
+      language: rust
+      kind: valid
+      canonical: true
+      options:
+        minLines: 2
+      files:
+        - path: src/lib.rs
+          body: |-
+            mod tiny;
+
+            use crate::tiny::one;
+
+            pub fn run() -> i32 {
+                one()
+            }
+        - path: src/tiny.rs
+          body: |-
+            pub fn one() -> i32 {
+                1
+            }

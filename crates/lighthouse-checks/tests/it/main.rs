@@ -7,6 +7,7 @@ mod annotations;
 mod bundled_fix;
 mod core_pack;
 mod cycle;
+mod design_architecture;
 mod design_layout;
 mod design_rules;
 mod directives;
