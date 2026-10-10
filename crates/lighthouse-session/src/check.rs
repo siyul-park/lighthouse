@@ -1,14 +1,14 @@
 //! Running a check: analyze, narrow the report, remember the run.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     time::Instant,
 };
 
 use lighthouse_engine::{Engine, FixPlan, Outcome};
 use lighthouse_model::{Diagnostic, Severity};
-use lighthouse_report::{Briefing, Detail, Fix, FixEdit, FixFile};
+use lighthouse_report::{Briefing, Detail, Fix, FixFile};
 use lighthouse_spec::Catalog;
 use serde::Serialize;
 
@@ -63,8 +63,12 @@ pub struct Checked {
     pub remembered: Remembered,
     /// What the user should know, in the order it happened.
     pub messages: Vec<String>,
-    /// The engine that ran, kept to propose fixes for the findings.
+    /// The engine that ran. A report asks for fix previews after the check,
+    /// when its limit has chosen the findings to show, and a preview needs the
+    /// engine's registry and workspace; the engine is not rebuilt for it.
     engine: Engine,
+    /// The project root, to read the files SARIF columns are measured in.
+    root: PathBuf,
 }
 
 impl Checked {
@@ -119,22 +123,13 @@ impl Checked {
                     .changes
                     .into_iter()
                     .map(|change| {
-                        let edits = preview
-                            .edits
-                            .iter()
-                            .filter(|e| e.file == change.path)
-                            .map(|e| FixEdit {
-                                start: e.start,
-                                end: e.end,
-                                text: e.text.clone(),
-                            })
-                            .collect();
-                        FixFile {
-                            path: change.path.to_string_lossy().replace('\\', "/"),
-                            before: change.before,
-                            after: change.after,
-                            edits,
-                        }
+                        let edits = preview.edits.iter().filter(|e| e.file == change.path);
+                        FixFile::new(
+                            change.path.to_string_lossy().replace('\\', "/"),
+                            &change.before,
+                            &change.after,
+                            edits.map(|e| (e.start, e.end, e.text.clone())),
+                        )
                     })
                     .collect();
                 let fix = Fix {
@@ -143,6 +138,26 @@ impl Checked {
                     files,
                 };
                 (preview.fingerprint.as_str().to_owned(), fix)
+            })
+            .collect()
+    }
+
+    /// The text of the files that have findings and non-ASCII characters,
+    /// by project-relative path: what SARIF needs to count columns in UTF-16
+    /// code units. A file that cannot be read is left out.
+    pub fn sources(&self) -> BTreeMap<String, String> {
+        let files: BTreeSet<&Path> = self
+            .outcome
+            .diagnostics
+            .iter()
+            .map(|d| d.file.as_path())
+            .collect();
+        files
+            .into_iter()
+            .filter_map(|file| {
+                let text = std::fs::read_to_string(self.root.join(file)).ok()?;
+                let key = file.to_string_lossy().replace('\\', "/");
+                (!text.is_ascii()).then_some((key, text))
             })
             .collect()
     }
@@ -172,6 +187,7 @@ impl Checked {
             limit,
             detail: Detail::default(),
             fixes: None,
+            sources: None,
             mcp: false,
         }
     }
@@ -213,6 +229,7 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
         remembered,
         messages,
         engine,
+        root,
     })
 }
 

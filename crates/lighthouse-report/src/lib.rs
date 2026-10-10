@@ -72,7 +72,13 @@ pub fn render_with(
     match format {
         Format::Text => text(diagnostics, incomplete),
         Format::Json => json_lines(diagnostics, incomplete),
-        Format::Sarif => sarif::render(diagnostics, incomplete, briefing.catalog, briefing.fixes),
+        Format::Sarif => sarif::render(
+            diagnostics,
+            incomplete,
+            briefing.catalog,
+            briefing.fixes,
+            briefing.sources,
+        ),
         Format::Agent => agent::text(diagnostics, incomplete, briefing),
         Format::AgentJson => agent::json_lines(diagnostics, incomplete, briefing),
     }

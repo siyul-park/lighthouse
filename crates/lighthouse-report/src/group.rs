@@ -26,7 +26,7 @@ const RESOLVE: &str = "review_resolve {fingerprint, verdict, reason}";
 /// One finding as the compact shape sees it, wherever it comes from: a fresh
 /// diagnostic or a remembered finding.
 #[derive(Debug, Clone)]
-pub struct Entry {
+pub struct Entry<'a> {
     pub rule: String,
     pub severity: Severity,
     /// The severity the decision authored; shown only when it differs.
@@ -48,7 +48,7 @@ pub struct Entry {
     /// structure.
     pub facts: Option<Value>,
     /// The fix proposed for the finding, when one was computed.
-    pub fix: Option<Fix>,
+    pub fix: Option<&'a Fix>,
 }
 
 /// What shapes the groups.
@@ -77,6 +77,8 @@ struct Group {
     rule: String,
     severity: Severity,
     authored: Option<Severity>,
+    /// Some finding of the group asks for a verdict; when only some do,
+    /// their instances say which.
     review: bool,
     requirement: Option<String>,
     /// The expected structure by language, once for all findings of it.
@@ -99,16 +101,18 @@ struct Instance {
     evidence: Map<String, Value>,
     note: Option<String>,
     fix: Option<Shown>,
+    /// Asks for a verdict; set only in a mixed group.
+    review: bool,
 }
 
 impl Grouped {
     /// The groups of `entries`: errors first, then the larger ones. At most
     /// `limit` findings are kept, in that order; what does not fit is counted.
     /// Fingerprint prefixes are unique among all `entries`, shown or not.
-    pub fn of(entries: Vec<Entry>, options: &GroupOptions) -> Self {
+    pub fn of(entries: Vec<Entry<'_>>, options: &GroupOptions) -> Self {
         let limit = options.limit;
         let widths = prefix_widths(&entries);
-        let mut buckets: BTreeMap<(Severity, &str), Vec<(&Entry, usize)>> = BTreeMap::new();
+        let mut buckets: BTreeMap<(Severity, &str), Vec<(&Entry<'_>, usize)>> = BTreeMap::new();
         for (entry, width) in entries.iter().zip(widths) {
             buckets
                 .entry((entry.severity, entry.rule.as_str()))
@@ -145,7 +149,7 @@ impl Grouped {
             .collect()
     }
 
-    /// Whether a shown finding asks for a verdict.
+    /// Whether any shown finding asks for a verdict.
     pub fn asks_review(&self) -> bool {
         self.groups.iter().any(|g| g.review)
     }
@@ -190,10 +194,12 @@ impl Grouped {
 
 impl Group {
     /// The first `take` of `rows` by file and position.
-    fn build(mut rows: Vec<(&Entry, usize)>, take: usize, options: &GroupOptions) -> Self {
+    fn build(mut rows: Vec<(&Entry<'_>, usize)>, take: usize, options: &GroupOptions) -> Self {
         rows.sort_by(|(a, _), (b, _)| (&a.path, a.line, a.col).cmp(&(&b.path, b.line, b.col)));
         rows.truncate(take);
         let first = rows[0].0;
+        let review = rows.iter().any(|(entry, _)| entry.review);
+        let mixed = review && rows.iter().any(|(entry, _)| !entry.review);
         let decision = options.catalog.and_then(|c| c.decision(&first.rule));
         let attributes: Vec<Map<String, Value>> =
             rows.iter().map(|(entry, _)| attributes(entry)).collect();
@@ -230,14 +236,15 @@ impl Group {
                     .to_owned(),
                 evidence: attributes,
                 note: entry.note.clone(),
-                fix: entry.fix.as_ref().map(Shown::of),
+                fix: entry.fix.map(|fix| Shown::of(fix, &entry.path)),
+                review: mixed && entry.review,
             });
         }
         Self {
             rule: first.rule.clone(),
             severity: first.severity,
             authored: (first.authored != first.severity).then_some(first.authored),
-            review: first.review,
+            review,
             requirement: decision.map(|d| one_line(&d.requirement)),
             expected: expecteds,
             apply: decision.and_then(|d| apply_line(d, options.mcp)),
@@ -339,12 +346,18 @@ impl Instance {
             json!(self.message),
             json!(self.fingerprint),
         ];
-        let mut varying = self.evidence.clone();
+        let mut varying = Map::new();
+        if !self.evidence.is_empty() {
+            varying.insert("evidence".to_owned(), Value::Object(self.evidence.clone()));
+        }
         if let Some(note) = &self.note {
             varying.insert("note".to_owned(), json!(note));
         }
         if let Some(fix) = &self.fix {
             varying.insert("fix".to_owned(), fix.json());
+        }
+        if self.review {
+            varying.insert("review".to_owned(), json!(true));
         }
         if !varying.is_empty() {
             row.push(Value::Object(varying));
@@ -358,6 +371,9 @@ impl Instance {
             "  {path}:{}:{} {} {}",
             self.line, self.col, self.message, self.fingerprint
         );
+        if self.review {
+            out.push_str(" [review]");
+        }
         if let Some(varying) = pairs(&self.evidence) {
             let _ = write!(out, " {{{varying}}}");
         }
@@ -439,7 +455,23 @@ fn attributes(entry: &Entry) -> Map<String, Value> {
 fn mentions(message: &str, symbol: &str) -> bool {
     let id = symbol.split('#').next().unwrap_or(symbol);
     let name = id.rsplit(['/', '.', ':']).next().unwrap_or(id);
-    message.contains(symbol) || (name.len() >= NAME_MIN && message.contains(name))
+    contains_word(message, symbol) || (name.len() >= NAME_MIN && contains_word(message, name))
+}
+
+/// Whether `word` occurs in `text` with no identifier character on either
+/// side, so `Foo` is not found in `FooBar`.
+fn contains_word(text: &str, word: &str) -> bool {
+    let identifier = |c: char| c.is_alphanumeric() || c == '_';
+    text.match_indices(word).any(|(at, _)| {
+        text[..at]
+            .chars()
+            .next_back()
+            .is_none_or(|c| !identifier(c))
+            && text[at + word.len()..]
+                .chars()
+                .next()
+                .is_none_or(|c| !identifier(c))
+    })
 }
 
 /// For each entry, how many characters of its fingerprint tell it apart from

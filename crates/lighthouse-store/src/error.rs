@@ -31,8 +31,15 @@ pub enum Error {
     },
     #[error("no recorded finding matches `{0}`")]
     UnknownFinding(String),
-    #[error("`{0}` matches several recorded findings; give more of the fingerprint")]
-    AmbiguousFinding(String),
+    #[error(
+        "`{prefix}` matches several recorded findings; retry with a longer prefix. Candidates: {}",
+        candidates.join(", ")
+    )]
+    AmbiguousFinding {
+        prefix: String,
+        /// At most five full fingerprints that start with the prefix.
+        candidates: Vec<String>,
+    },
     #[error(
         "the finding was seen again at {actual}, after {expected}; read it again before judging"
     )]

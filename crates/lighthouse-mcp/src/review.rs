@@ -136,7 +136,7 @@ pub fn history(args: HistoryArgs) -> Outcome {
 /// A remembered finding as a compact entry: where the finding is in its life
 /// (`state` unless open, the latest `verdict`) and its `seen` time, which
 /// `review_resolve` takes, ride along as evidence.
-fn entry(f: &FindingRecord) -> Entry {
+fn entry(f: &FindingRecord) -> Entry<'_> {
     let severity: Severity = f.severity.parse().unwrap_or(Severity::Warn);
     let authored = f
         .authored_severity

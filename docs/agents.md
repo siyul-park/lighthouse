@@ -83,10 +83,16 @@ Findings are grouped by decision and severity, errors first, then larger groups:
  "resolve":"review_resolve {fingerprint, verdict, reason}","reasons":{}}
 ```
 
-An instance is `[line:col, message, fingerprint prefix]` plus, when present, the
-evidence that varies within the group and a `note` (why a verdict did not hide
-the finding). The prefix is the shortest unique one, at least 7 characters;
-`review_resolve`, `fix` and `lighthouse review resolve` accept it. The symbol
+An instance is `[line:col, message, fingerprint prefix]` plus, when anything
+applies, a fourth object with separate slots: `evidence` (what varies within the
+group), `note` (why a verdict did not hide the finding), `fix` and `review`
+(true on an instance that asks for a verdict, only in a group where some do and
+some do not; the group's own `review` is true when any does). The prefix is the
+shortest unique one among the findings of the report, at least 7 characters;
+`review_resolve`, `fix` and `lighthouse review resolve` accept it. Recorded
+findings the report did not show can share the prefix: an ambiguous prefix is
+refused with a message to retry with a longer prefix, listing up to five
+candidate full fingerprints. The symbol
 is evidence unless the message names it; `authored` appears on a group only when
 it differs from the severity; `intent` is left to `explain`. `limit` counts
 findings and what is cut is in `omitted`. The agent text prints a header per
@@ -114,6 +120,11 @@ trust and are slow; their group carries only `apply`.
 - A group of a fixable decision has `apply`: `lighthouse check --fix --rules
   <id>` (with `--unsafe-fixes` for suggested fixes), or the `fix` tool call
   through MCP.
+- A diff gets `--- a/<path>` / `+++ b/<path>` headers when the fix edits a file
+  other than the finding's.
+- SARIF columns count UTF-16 code units, as SARIF defines them, so locations
+  and fix regions on lines with multibyte characters are converted from the
+  byte columns of the code model.
 - SARIF: `result.fixes[]` with the proposal's `description` and
   `artifactChanges[{artifactLocation, replacements[{deletedRegion,
   insertedContent}]}]`, for up to 200 findings.

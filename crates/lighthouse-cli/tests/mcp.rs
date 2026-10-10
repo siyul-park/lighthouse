@@ -291,7 +291,7 @@ fn a_verdict_recorded_through_mcp_is_an_agent_review_that_later_checks_honor() {
     assert_eq!(prefix.len(), 7, "{path} {instance}");
     let seen = group["evidence"]["seen"]
         .as_str()
-        .or_else(|| instance[3]["seen"].as_str())
+        .or_else(|| instance[3]["evidence"]["seen"].as_str())
         .unwrap();
     assert!(tasks["resolve"].is_string() && tasks["reasons"].is_object());
 

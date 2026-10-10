@@ -3,10 +3,10 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Diagnostic, Incomplete, Severity};
+use lighthouse_model::{Diagnostic, Incomplete, Position, Severity};
 use lighthouse_spec::{Catalog, Decision, help_path};
 
-use crate::fix::{Fix, FixEdit};
+use crate::fix::{Fix, FixEdit, utf16_position};
 use serde::Serialize;
 
 const SCHEMA: &str = "https://json.schemastore.org/sarif-2.1.0.json";
@@ -193,6 +193,7 @@ pub fn render(
     incomplete: &[Incomplete],
     catalog: Option<&Catalog>,
     fixes: Option<&BTreeMap<String, Fix>>,
+    sources: Option<&BTreeMap<String, String>>,
 ) -> String {
     let ids: BTreeSet<&str> = diagnostics.iter().map(|d| d.rule_id.as_str()).collect();
     let rules: Vec<&str> = ids.into_iter().collect();
@@ -224,7 +225,10 @@ pub fn render(
             },
             results: diagnostics
                 .iter()
-                .map(|d| result(d, &rules, fixes.and_then(|f| f.get(d.fingerprint.as_str()))))
+                .map(|d| {
+                    let fix = fixes.and_then(|f| f.get(d.fingerprint.as_str()));
+                    result(d, &rules, fix, sources)
+                })
                 .collect(),
         }],
     };
@@ -281,7 +285,12 @@ fn rule_ref<'a>(id: &'a str, decision: Option<&'a Decision>) -> RuleRef<'a> {
     }
 }
 
-fn result<'a>(d: &'a Diagnostic, rules: &[&str], fix: Option<&'a Fix>) -> SarifResult<'a> {
+fn result<'a>(
+    d: &'a Diagnostic,
+    rules: &[&str],
+    fix: Option<&'a Fix>,
+    sources: Option<&BTreeMap<String, String>>,
+) -> SarifResult<'a> {
     SarifResult {
         rule_id: &d.rule_id,
         rule_index: rules
@@ -293,16 +302,26 @@ fn result<'a>(d: &'a Diagnostic, rules: &[&str], fix: Option<&'a Fix>) -> SarifR
         locations: [Location {
             physical_location: Physical {
                 artifact_location: artifact(&d.file),
-                region: Region {
-                    start_line: d.span.start.line,
-                    start_column: d.span.start.col,
-                    end_line: d.span.end.line,
-                    end_column: d.span.end.col,
-                },
+                region: region(d, sources),
             },
         }],
         partial_fingerprints: BTreeMap::from([(FINGERPRINT_KEY, d.fingerprint.as_str())]),
         fixes: fix.map(sarif_fix).into_iter().collect(),
+    }
+}
+
+/// The region of a finding. SARIF columns count UTF-16 code units, so with
+/// the text of the file the byte columns of the span are converted.
+fn region(d: &Diagnostic, sources: Option<&BTreeMap<String, String>>) -> Region {
+    let key = d.file.to_string_lossy().replace('\\', "/");
+    let text = sources.and_then(|s| s.get(&key));
+    let at = |p: Position| text.map_or(p, |t| utf16_position(t, p));
+    let (start, end) = (at(d.span.start), at(d.span.end));
+    Region {
+        start_line: start.line,
+        start_column: start.col,
+        end_line: end.line,
+        end_column: end.col,
     }
 }
 

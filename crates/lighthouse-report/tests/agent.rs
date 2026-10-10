@@ -1,9 +1,7 @@
 use std::collections::BTreeMap;
 
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Position, Severity, Span};
-use lighthouse_report::{
-    Briefing, Detail, Entry, Format, GroupOptions, Grouped, render, render_with, shown,
-};
+use lighthouse_report::{Briefing, Detail, Format, render, render_with, shown};
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 
@@ -762,108 +760,6 @@ fn format_and_detail_parse_by_name() {
     assert_eq!("full".parse::<Detail>().unwrap(), Detail::Full);
     assert!("verbose".parse::<Detail>().is_err());
     assert_eq!(Detail::default(), Detail::Compact);
-}
-
-fn entry(rule: &str, severity: Severity, path: &str, line: u32, fingerprint: &str) -> Entry {
-    Entry {
-        rule: rule.to_owned(),
-        severity,
-        authored: severity,
-        review: severity != Severity::Error,
-        path: path.to_owned(),
-        line,
-        col: 1,
-        message: format!("finding at {line}"),
-        symbol: None,
-        evidence: Value::Null,
-        attributes: serde_json::Map::new(),
-        note: None,
-        fingerprint: fingerprint.to_owned(),
-        facts: None,
-        fix: None,
-    }
-}
-
-/// A fingerprint that starts with `n`, so short prefixes tell them apart.
-fn spread(n: u32) -> String {
-    format!("{n:x}{}", "0".repeat(63))
-}
-
-fn grouped_entries() -> Vec<Entry> {
-    let fingerprint = |n: u32| spread(n);
-    vec![
-        entry("acme/a", Severity::Warn, "x.go", 3, &fingerprint(1)),
-        entry("acme/a", Severity::Warn, "x.go", 1, &fingerprint(2)),
-        entry("acme/b", Severity::Error, "y.go", 9, &fingerprint(3)),
-    ]
-}
-
-#[test]
-fn grouped_of_orders_errors_first_and_cuts_at_the_limit() {
-    let all = Grouped::of(grouped_entries(), &GroupOptions::default());
-    let rules: Vec<_> = all.fields()["groups"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|g| g["rule"].as_str().unwrap().to_owned())
-        .collect();
-    assert_eq!(rules, ["acme/b", "acme/a"]);
-
-    let cut = Grouped::of(
-        grouped_entries(),
-        &GroupOptions {
-            limit: Some(2),
-            ..GroupOptions::default()
-        },
-    );
-    assert_eq!(
-        cut.fields()["omitted"],
-        json!({ "groups": 0, "findings": 1 })
-    );
-    let rows = &cut.fields()["groups"][1]["files"]["x.go"];
-    assert_eq!(rows[0][0], "1:1", "findings are in file order");
-}
-
-#[test]
-fn grouped_fields_say_how_to_resolve_once_when_a_finding_asks_for_review() {
-    let grouped = Grouped::of(grouped_entries(), &GroupOptions::default());
-    let fields = grouped.fields();
-    assert!(fields["resolve"].is_string() && fields["reasons"].is_object());
-    let errors_only = Grouped::of(
-        vec![entry("acme/b", Severity::Error, "y.go", 9, &spread(3))],
-        &GroupOptions::default(),
-    );
-    assert!(errors_only.fields().get("resolve").is_none());
-}
-
-#[test]
-fn grouped_asks_review_when_a_shown_finding_does() {
-    assert!(Grouped::of(grouped_entries(), &GroupOptions::default()).asks_review());
-    let only_error = vec![entry("acme/b", Severity::Error, "y.go", 9, &spread(3))];
-    assert!(!Grouped::of(only_error, &GroupOptions::default()).asks_review());
-}
-
-#[test]
-fn grouped_fingerprints_are_the_full_ones_of_the_findings_kept() {
-    let cut = Grouped::of(
-        grouped_entries(),
-        &GroupOptions {
-            limit: Some(1),
-            ..GroupOptions::default()
-        },
-    );
-    let kept: Vec<_> = cut.fingerprints().into_iter().collect();
-    assert_eq!(kept, [spread(3)]);
-}
-
-#[test]
-fn grouped_text_prints_a_header_and_a_line_per_finding() {
-    let text = Grouped::of(grouped_entries(), &GroupOptions::default()).text();
-    assert!(
-        text.starts_with("acme/b error\n  y.go:9:1 finding at 9 3000000\n"),
-        "{text}"
-    );
-    assert!(text.contains("acme/a warn [review]\n  x.go:1:1"), "{text}");
 }
 
 #[test]

@@ -475,6 +475,11 @@ fn check(
         Format::Text | Format::Json => BTreeMap::new(),
     };
     let reporting = Instant::now();
+    let sources = if options.format == Format::Sarif {
+        checked.sources()
+    } else {
+        BTreeMap::new()
+    };
     print!(
         "{}",
         render_with(
@@ -484,6 +489,7 @@ fn check(
             &Briefing {
                 detail: options.detail,
                 fixes: Some(&fixes),
+                sources: Some(&sources),
                 ..checked.briefing(options.limit)
             }
         )

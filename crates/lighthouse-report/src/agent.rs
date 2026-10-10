@@ -43,6 +43,9 @@ pub struct Briefing<'a> {
     /// The fixes proposed for findings, by fingerprint: shown with the
     /// finding, and as `fixes` in SARIF.
     pub fixes: Option<&'a BTreeMap<String, Fix>>,
+    /// The text of the files of findings, by project-relative path, for
+    /// formats whose columns count characters and not bytes (SARIF).
+    pub sources: Option<&'a BTreeMap<String, String>>,
     /// The report is read through MCP, so fixing is the `fix` tool.
     pub mcp: bool,
 }
@@ -247,7 +250,7 @@ fn compact_text(
 }
 
 /// The diagnostics as entries of the compact shape.
-fn entries(diagnostics: &[Diagnostic], briefing: &Briefing) -> Vec<Entry> {
+fn entries<'a>(diagnostics: &[Diagnostic], briefing: &Briefing<'a>) -> Vec<Entry<'a>> {
     diagnostics
         .iter()
         .map(|d| {
@@ -267,10 +270,7 @@ fn entries(diagnostics: &[Diagnostic], briefing: &Briefing) -> Vec<Entry> {
                 note: briefing.notes.and_then(|n| n.get(&d.fingerprint)).cloned(),
                 fingerprint: d.fingerprint.as_str().to_owned(),
                 facts: briefing.facts.and_then(|f| f.get(&d.fingerprint)).cloned(),
-                fix: briefing
-                    .fixes
-                    .and_then(|f| f.get(d.fingerprint.as_str()))
-                    .cloned(),
+                fix: briefing.fixes.and_then(|f| f.get(d.fingerprint.as_str())),
             }
         })
         .collect()
@@ -479,7 +479,7 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
         fix: briefing
             .fixes
             .and_then(|f| f.get(diagnostic.fingerprint.as_str()))
-            .map(|fix| Shown::of(fix).json()),
+            .map(|fix| Shown::of(fix, &diagnostic.file.display().to_string()).json()),
         resolve: briefing
             .needs_verdict(diagnostic)
             .then(|| resolve(diagnostic, width)),

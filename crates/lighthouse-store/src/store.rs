@@ -40,16 +40,8 @@ const EVENT_COLUMNS: &str = "event_id, fingerprint, rule_id, rule_version, check
      reviewer_kind, reviewer_id, language, scope, evidence_digest, feature_snapshot, git_commit, \
      timestamp";
 
-/// The quality store of one project. Findings and their sightings live in a
-/// SQLite file that is a local cache; verdicts live in the committed decision
-/// log, which the cache is synchronized from whenever the store is opened, so
-/// that anyone with the log reaches the same suppressions. Safe to share
-/// between processes.
-pub struct Store {
-    conn: Connection,
-    log: Option<PathBuf>,
-    notices: Vec<String>,
-}
+/// Most fingerprints an ambiguous prefix error lists.
+const MAX_CANDIDATES: usize = 5;
 
 impl Store {
     /// Where a project's cache lives: `<root>/.lighthouse/lighthouse.db`.
@@ -365,6 +357,17 @@ impl Store {
     }
 }
 
+/// The quality store of one project. Findings and their sightings live in a
+/// SQLite file that is a local cache; verdicts live in the committed decision
+/// log, which the cache is synchronized from whenever the store is opened, so
+/// that anyone with the log reaches the same suppressions. Safe to share
+/// between processes.
+pub struct Store {
+    conn: Connection,
+    log: Option<PathBuf>,
+    notices: Vec<String>,
+}
+
 fn retry_busy<T>(mut attempt: impl FnMut() -> Result<T, Error>) -> Result<T, Error> {
     let mut tries = 0;
     loop {
@@ -552,15 +555,21 @@ fn expand(conn: &Connection, prefix: &str) -> Result<String, Error> {
     let mut stmt = conn.prepare(
         "SELECT fingerprint FROM findings WHERE substr(fingerprint, 1, length(?1)) = ?1 \
          UNION SELECT fingerprint FROM review_events WHERE substr(fingerprint, 1, length(?1)) = ?1 \
-         LIMIT 2",
+         ORDER BY 1 LIMIT 6",
     )?;
     let mut found: Vec<String> = stmt
         .query_map(params![prefix], |row| row.get(0))?
         .collect::<Result<_, _>>()?;
-    match (found.pop(), found.pop()) {
-        (Some(only), None) => Ok(only),
-        (None, _) => Err(Error::UnknownFinding(prefix.to_owned())),
-        _ => Err(Error::AmbiguousFinding(prefix.to_owned())),
+    match found.len() {
+        0 => Err(Error::UnknownFinding(prefix.to_owned())),
+        1 => Ok(found.remove(0)),
+        _ => {
+            found.truncate(MAX_CANDIDATES);
+            Err(Error::AmbiguousFinding {
+                prefix: prefix.to_owned(),
+                candidates: found,
+            })
+        }
     }
 }
 

@@ -272,10 +272,15 @@ fn finding_expands_unique_prefixes_and_rejects_the_rest() {
     ]);
     assert_eq!(store.finding("abc1").unwrap().fingerprint, "abc1");
     assert_eq!(store.finding("xy").unwrap().fingerprint, "xyz");
-    assert!(matches!(
-        store.finding("abc"),
-        Err(Error::AmbiguousFinding(_))
-    ));
+    let Err(Error::AmbiguousFinding { candidates, .. }) = store.finding("abc") else {
+        panic!("abc is ambiguous");
+    };
+    assert_eq!(candidates, ["abc1", "abc2"]);
+    let message = store.finding("abc").unwrap_err().to_string();
+    assert!(
+        message.contains("longer prefix") && message.contains("abc2"),
+        "{message}"
+    );
     assert!(matches!(
         store.finding("nope"),
         Err(Error::UnknownFinding(_))
