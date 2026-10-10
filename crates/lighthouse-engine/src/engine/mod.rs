@@ -41,6 +41,9 @@ use config::{constructors, io_error, load_languages, validate_config};
 /// analysis altogether, such as fixtures that are broken on purpose.
 pub const IGNORE_FILE: &str = ".lighthouseignore";
 
+/// Where providers keep derived results, relative to the root.
+const CACHE_DIR: &str = ".lighthouse/cache";
+
 /// Process exit code of a run whose analysis was incomplete.
 pub const EXIT_INCOMPLETE: u8 = 3;
 
@@ -252,6 +255,7 @@ impl Engine {
         let (attributes, found) = Attributes::of(&root);
         notices.extend(found);
         let ws = Workspace {
+            cache_dir: Some(root.join(CACHE_DIR)),
             root,
             languages: config.languages().clone(),
             constructors: constructors(&registry, &config),

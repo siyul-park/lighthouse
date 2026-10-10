@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc, time::Duration};
+use std::{fs, path::Path, sync::Arc, time::Duration};
 
 use lighthouse_model::Incomplete;
 use lighthouse_plugin::{
@@ -154,8 +154,27 @@ impl Provider {
                     .map(|(id, options)| (id.clone(), Value::Object(options.clone())))
                     .collect(),
                 overlays: overlays_of(ws, files),
+                cache: self.cache_of(ws),
             },
         }
+    }
+}
+
+impl Provider {
+    /// The directory of this plugin's cache, created on demand and kept out of
+    /// version control; none when the run has no cache or the directory cannot
+    /// be made.
+    fn cache_of(&self, ws: &Workspace) -> Option<wire::CacheRef> {
+        let base = ws.cache_dir.as_ref()?;
+        let dir = base.join(&self.plugin);
+        fs::create_dir_all(&dir).ok()?;
+        let ignore = base.join(".gitignore");
+        if !ignore.exists() {
+            fs::write(&ignore, "*\n").ok()?;
+        }
+        Some(wire::CacheRef {
+            dir: dir.to_string_lossy().into_owned(),
+        })
     }
 }
 

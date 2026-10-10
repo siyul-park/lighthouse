@@ -70,6 +70,9 @@ pub struct Workspace {
     /// what a provider must read instead of the disk. Empty for a normal run;
     /// a fix run checks candidate edits this way before anything is written.
     pub overlays: BTreeMap<PathBuf, String>,
+    /// The directory the providers keep derived results in, one subdirectory
+    /// per plugin; `None` runs without a cache.
+    pub cache_dir: Option<PathBuf>,
 }
 
 /// Fact key: analyzer id and scope key (file path, or empty for project scope).
@@ -83,6 +86,7 @@ impl Workspace {
             languages: BTreeMap::new(),
             constructors: BTreeMap::new(),
             overlays: BTreeMap::new(),
+            cache_dir: None,
         }
     }
 

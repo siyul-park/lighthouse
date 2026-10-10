@@ -154,6 +154,7 @@ fn index_overlaid(
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect::<BTreeMap<_, _>>(),
             overlays,
+            cache: None,
         },
     };
     plugin.call::<Value>(wire::INDEX, params)
@@ -338,6 +339,7 @@ fn framing_survives_bodies_larger_than_one_read_and_mixed_case_headers() {
             context: wire::Context {
                 options,
                 overlays: None,
+                cache: None,
             },
         };
         let result: wire::IndexResult = plugin.call(wire::INDEX, params);

@@ -112,6 +112,15 @@ pub struct Overlay {
     pub text: String,
 }
 
+/// The directory a provider may keep derived results in between runs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct CacheRef {
+    /// Absolute path of a directory the host owns, `.lighthouse/cache/<plugin
+    /// id>/`. The provider reads and writes only inside it and its results are
+    /// the same with or without it.
+    pub dir: String,
+}
+
 /// Host-side settings that accompany an index request.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Context {
@@ -122,6 +131,10 @@ pub struct Context {
     /// are none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overlays: Option<Vec<Overlay>>,
+    /// Where the provider may cache derived results; absent when the host runs
+    /// without a cache.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache: Option<CacheRef>,
 }
 
 /// Index request. A provider receives every file of one language in one

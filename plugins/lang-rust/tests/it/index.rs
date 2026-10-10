@@ -51,6 +51,7 @@ fn index(dir: &Path, options: serde_json::Value) -> IndexResult {
         context: wire::Context {
             options: serde_json::from_value(options).unwrap(),
             overlays: None,
+            cache: None,
         },
     };
     let request = Message::request(1, wire::INDEX, params).unwrap();
