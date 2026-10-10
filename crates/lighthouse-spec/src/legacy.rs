@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 
 use crate::{
     CheckKind, Decision, DecisionSpec, OptionType,
-    decision::{MIGRATED_FROM, WAS_BUILTIN, snake_case, squash},
+    decision::{MIGRATED_FROM, WAS_BUILTIN, squash},
 };
 
 /// The names the pattern format gave the option types, with their types.
@@ -71,10 +71,10 @@ impl Decision {
                 let option = LegacyOption {
                     kind: legacy_type(p.kind),
                     default: &p.default,
-                    description: earlier_description(&p.description, &names),
+                    description: self.earlier_description(&p.description, &names),
                     per_language,
                 };
-                (snake_case(name), option)
+                (self.earlier_option_name(name), option)
             })
             .collect();
         let decision = json!({
@@ -101,9 +101,14 @@ fn legacy_type(kind: OptionType) -> &'static str {
         .expect("every option type has a legacy name")
 }
 
-/// A description with the option names it mentions as they were spelled then.
-fn earlier_description(text: &str, names: &[&String]) -> String {
-    names.iter().fold(text.to_owned(), |text, name| {
-        text.replace(&format!("`{name}`"), &format!("`{}`", snake_case(name)))
-    })
+impl Decision {
+    /// A description with the option names it mentions as they were spelled then.
+    fn earlier_description(&self, text: &str, names: &[&String]) -> String {
+        names.iter().fold(text.to_owned(), |text, name| {
+            text.replace(
+                &format!("`{name}`"),
+                &format!("`{}`", self.earlier_option_name(name)),
+            )
+        })
+    }
 }

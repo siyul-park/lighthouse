@@ -54,8 +54,14 @@ impl Fold {
 
     /// Sets the rule in the `Project` document: the level of the override,
     /// else the one the project has, else the decision's authored severity;
-    /// the options merge over the project's.
-    pub fn apply(&self, project: &mut Value) -> Result<(), String> {
+    /// the options merge over the project's, and what else the rule says
+    /// (`generated`) stays. Options are named as `declared` spells them.
+    pub fn apply(
+        &self,
+        project: &mut Value,
+        declared: &super::modern::Declared,
+        notes: &mut Vec<String>,
+    ) -> Result<(), String> {
         let spec = project
             .get_mut("spec")
             .and_then(Value::as_object_mut)
@@ -65,22 +71,18 @@ impl Fold {
             .or_insert_with(|| Value::Object(Map::new()))
             .as_object_mut()
             .ok_or("`rules` is a table")?;
-        let (current_level, mut options) = match rules.get(&self.id) {
-            Some(Value::String(level)) => (Some(level.clone()), Map::new()),
-            Some(Value::Object(table)) => (
-                table
-                    .get("level")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned),
-                table
-                    .get("options")
-                    .and_then(Value::as_object)
-                    .cloned()
-                    .unwrap_or_default(),
-            ),
-            _ => (None, Map::new()),
+        let mut rule = match rules.remove(&self.id) {
+            Some(Value::String(level)) => json!({ "level": level }),
+            Some(table @ Value::Object(_)) => table,
+            _ => json!({}),
         };
-        let level = match self.level.clone().or(current_level) {
+        let table = rule.as_object_mut().ok_or("a rule is a table")?;
+        let level = match self.level.clone().or_else(|| {
+            table
+                .get("level")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        }) {
             Some(level) => level,
             None => Catalog::bundled()
                 .decision(&self.id)
@@ -90,15 +92,38 @@ impl Fold {
                     format!("`{}` is not a bundled decision with a severity", self.id)
                 })?,
         };
-        options.extend(self.options.clone());
-        let rule = if options.is_empty() {
-            Value::String(level)
-        } else {
-            json!({ "level": level, "options": options })
-        };
+        table.insert("level".to_owned(), Value::String(level));
+        if !self.options.is_empty() {
+            let options = table
+                .entry("options")
+                .or_insert_with(|| Value::Object(Map::new()))
+                .as_object_mut()
+                .ok_or("`options` is a table")?;
+            options.extend(self.options.clone());
+        }
+        if table.len() == 1 {
+            rule = table.remove("level").unwrap_or(Value::Null);
+        }
         rules.insert(self.id.clone(), rule);
-        super::modern::rename_rule_options(rules);
+        super::modern::rename_rule_options(rules, declared, notes);
         Ok(())
+    }
+
+    /// Where this fold and `earlier`, of the same decision, say different
+    /// things: a level or an option set to two values.
+    pub fn conflicts_with(&self, earlier: &Self) -> Option<String> {
+        if self.id != earlier.id {
+            return None;
+        }
+        if let (Some(a), Some(b)) = (&self.level, &earlier.level)
+            && a != b
+        {
+            return Some(format!("its level is `{a}` here and `{b}` there"));
+        }
+        self.options
+            .iter()
+            .find(|(key, value)| earlier.options.get(*key).is_some_and(|v| v != *value))
+            .map(|(key, _)| format!("option `{key}` has another value there"))
     }
 }
 

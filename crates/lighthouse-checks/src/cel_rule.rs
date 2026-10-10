@@ -228,6 +228,9 @@ impl Run<'_> {
                     let Some((anchor, count)) = first_file.get(module.path.as_str()) else {
                         continue;
                     };
+                    if !admits_module(ctx, &files_of, module) {
+                        continue;
+                    }
                     let files = files_of.get(module.path.as_str()).map_or(0, BTreeSet::len);
                     let value = cel_fact(&facts::module(module, files, *count));
                     let place = Place {
@@ -245,6 +248,17 @@ impl Run<'_> {
                         Node::Module(m) => first_file.get(m.as_str()).map(|(s, _)| *s),
                     };
                     let Some(anchor) = anchor else { continue };
+                    let admitted = match &edge.from {
+                        Node::Symbol(id) => project
+                            .symbol(id)
+                            .is_none_or(|s| ctx.applies.admits_symbol(project, s)),
+                        Node::Module(m) => project
+                            .module(m)
+                            .is_none_or(|module| admits_module(ctx, &files_of, module)),
+                    };
+                    if !admitted {
+                        continue;
+                    }
                     let value = cel_fact(&facts::edge(project, edge));
                     let key = format!("{:?}->{:?}", edge.from, edge.to);
                     let place = Place {
@@ -390,6 +404,21 @@ fn files_by_module(project: &Project) -> BTreeMap<&str, BTreeSet<&std::path::Pat
             .insert(symbol.file.as_path());
     }
     files
+}
+
+/// Whether a module is a subject of the decision, by the files that declare it.
+fn admits_module(
+    ctx: &Ctx,
+    files_of: &BTreeMap<&str, BTreeSet<&std::path::Path>>,
+    module: &lighthouse_model::Module,
+) -> bool {
+    let files: Vec<&File> = files_of
+        .get(module.path.as_str())
+        .into_iter()
+        .flatten()
+        .filter_map(|path| ctx.project.file(path))
+        .collect();
+    ctx.applies.admits_module(module, &files)
 }
 
 /// The start of a file, where findings that belong to a whole file go.

@@ -6,7 +6,7 @@ use std::{
 };
 
 use lighthouse_engine::{Engine, Error};
-use lighthouse_model::{Applicability, RunScope};
+use lighthouse_model::{Applicability, RunScope, TestScope};
 use lighthouse_model::{
     Capability, Diagnostic, Fingerprint, Fragment, Incomplete, Options, Position, Severity, Span,
 };
@@ -163,6 +163,15 @@ impl Plugin for FakePlugin {
             }),
             Box::new(Fake {
                 meta: meta("fake/all", RunScope::Project, &["fake/count-files"], &[]),
+            }),
+            Box::new(Fake {
+                meta: RuleManifest {
+                    applicability: Applicability {
+                        tests: TestScope::Only,
+                        ..Applicability::default()
+                    },
+                    ..meta("fake/tests", RunScope::File, &[], &[])
+                },
             }),
             Box::new(Fake {
                 meta: meta(
@@ -822,5 +831,40 @@ fn the_project_decides_whether_generated_code_is_checked() {
         reported(&dir, skip_over_rule),
         all,
         "a rule's own setting wins over the project's"
+    );
+}
+
+#[test]
+fn a_rule_about_test_code_runs_on_test_files_only() {
+    let dir = project(&[("a/x.txt", b"1"), ("tests/t.txt", b"2")]);
+    let toml = "plugins = [\"fake\"]\n[rules]\n\"fake/tests\" = \"error\"\n";
+    let out = engine(&dir, toml)
+        .unwrap()
+        .check(&[], &["fake/tests".to_owned()])
+        .unwrap();
+
+    let files: Vec<_> = out.diagnostics.iter().map(|d| d.file.clone()).collect();
+
+    assert_eq!(
+        files,
+        [PathBuf::from("tests/t.txt"), PathBuf::from("tests/t.txt")]
+    );
+}
+
+#[test]
+fn a_pattern_of_gitattributes_that_is_not_a_glob_is_a_notice_not_silence() {
+    let dir = project(&[
+        ("a/x.txt", b"1"),
+        (".gitattributes", b"[unclosed linguist-generated\n"),
+    ]);
+
+    let out = engine(&dir, ALL).unwrap().check(&[], &[]).unwrap();
+
+    assert!(
+        out.notices
+            .iter()
+            .any(|n| n.contains(".gitattributes") && n.contains("[unclosed")),
+        "{:?}",
+        out.notices
     );
 }

@@ -26,6 +26,11 @@ spec:
     files of `tests/`: fixtures and builders first, then the `#[test]`
     functions, then the helpers that check. It is not enforced for Rust,
     whose provider does not tell fixtures from helpers.
+
+    Scope: the decision is about test code (`tests: only`), which is a symbol
+    of a test file or of a module that exists to test another, such as a
+    `#[cfg(test)]` module in a production file; the Rust example below has
+    one.
   scope:
     domain: code
     subject: test

@@ -245,7 +245,6 @@ fn migrate_rewrites_the_fields_revision_28_removed_and_camel_cases_options() {
         "strict:",
         "tuning:",
         "select:",
-        "max_lines",
     ] {
         assert!(!text.contains(gone), "{gone} survived:\n{text}");
     }
@@ -286,6 +285,168 @@ fn migrate_renames_the_options_a_project_sets_to_camel_case() {
     let text = fs::read_to_string(dir.path().join("lighthouse.yaml")).unwrap();
     assert!(text.contains("hubFanIn"), "{text}");
     assert!(!text.contains("hub_fan_in"), "{text}");
+}
+
+/// A local decision in the shape before Revision 28 with the option names
+/// that `camel` and `snake_case` do not map back and forth: `p_95`, a name
+/// that is camelCase already and `a_b` next to `a_b_c`.
+const SNAKY: &str = "apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/snaky
+spec:
+  title: Snaky
+  context: Options with awkward names.
+  scope: { subject: file }
+  requirement: A file MUST have few lines.
+  severity: warn
+  options:
+    type: object
+    properties:
+      p_95:
+        type: integer
+        default: 3
+        description: The `p_95` limit.
+      fooBar:
+        type: integer
+        default: 1
+        description: Left as it is.
+      a_b:
+        type: integer
+        default: 1
+        description: Short name.
+      a_b_c:
+        type: integer
+        default: 2
+        description: Long name.
+    additionalProperties: false
+  check:
+    type: cel
+    where: 'file.lines > options.p_95 + options.fooBar + options.a_b + options.a_b_c + options[\"a_b\"]'
+    message: too long
+  examples:
+    - name: long
+      language: text
+      kind: invalid
+      files: [{ path: a.txt, body: \"1\\n2\\n3\\n4\\n5\\n6\\n7\\n8\\n9\" }]
+      expect: [{ line: 1 }]
+    - name: short
+      language: text
+      kind: valid
+      files: [{ path: a.txt, body: \"1\" }]
+";
+
+#[test]
+fn migrating_option_names_keeps_the_meaning_version_of_a_local_decision() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "lighthouse.yaml", PROJECT);
+    let path = ".lighthouse/decisions/snaky.yaml";
+    write(dir.path(), path, SNAKY);
+    let before = |text: &str| {
+        let layer = lighthouse_spec::Catalog::from_local(
+            [("snaky.yaml".to_owned(), text.to_owned())].into(),
+        )
+        .unwrap();
+        layer.decision("local/snaky").unwrap().clone()
+    };
+    let old = before(SNAKY).meaning_version();
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate"])
+        .assert()
+        .success();
+
+    let text = fs::read_to_string(dir.path().join(path)).unwrap();
+    let migrated = before(&text);
+    assert_eq!(migrated.earlier_meaning_version(), old, "{text}");
+    assert_ne!(migrated.meaning_version(), old);
+    for renamed in [
+        "p95",
+        "aB:",
+        "aBC:",
+        "options.aBC",
+        "options[\"aB\"]",
+        "fooBar",
+    ] {
+        assert!(text.contains(renamed), "{renamed} missing:\n{text}");
+    }
+    let spec = text.split("\nspec:").nth(1).unwrap();
+    assert!(!spec.contains("a_b"), "{text}");
+    assert!(text.contains("`p95` limit"), "{text}");
+    lighthouse(dir.path())
+        .args(["spec", "validate", "--examples"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn migrate_renames_the_options_a_project_sets_for_its_local_decisions() {
+    let dir = tempfile::tempdir().unwrap();
+    let project = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: demo\nspec:\n  plugins: [core, local]\n  rules:\n    local/snaky: { level: warn, options: { p_95: 7, a_b_c: 4 } }\n    core/max-file-lines: { level: warn, options: { max: 9, mAx: 1 } }\n    design/coupling-signal: { level: warn, options: { hub_fan_in: 1, hubFanIn: 2 } }\n    other/unknown: { level: warn, options: { some_thing: 1 } }\n";
+    write(dir.path(), "lighthouse.yaml", project);
+    write(dir.path(), ".lighthouse/decisions/snaky.yaml", SNAKY);
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "sets both `hub_fan_in` and `hubFanIn`",
+        ))
+        .stderr(predicate::str::contains("no decision of that id is known"));
+
+    let text = fs::read_to_string(dir.path().join("lighthouse.yaml")).unwrap();
+    assert!(text.contains("p95: 7") && text.contains("aBC: 4"), "{text}");
+    assert!(
+        text.contains("hubFanIn: 2") && !text.contains("hub_fan_in"),
+        "{text}"
+    );
+    assert!(text.contains("some_thing"), "{text}");
+}
+
+#[test]
+fn migrate_converts_the_options_of_a_preset() {
+    let dir = tempfile::tempdir().unwrap();
+    let preset = "apiVersion: lighthouse/v1alpha1\nkind: Preset\nmetadata:\n  name: team/strict\nspec:\n  rules:\n    design/coupling-signal: { level: warn, options: { hub_fan_in: 3 } }\n";
+    write(dir.path(), "presets/strict.yaml", preset);
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate", "presets/strict.yaml"])
+        .assert()
+        .success();
+
+    let text = fs::read_to_string(dir.path().join("presets/strict.yaml")).unwrap();
+    assert!(
+        text.contains("kind: Project") && text.contains("hubFanIn: 3"),
+        "{text}"
+    );
+}
+
+#[test]
+fn folding_an_override_keeps_what_the_rule_already_says_and_reports_disagreement() {
+    let dir = tempfile::tempdir().unwrap();
+    let project = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: demo\nspec:\n  plugins: [core]\n  rules:\n    core/max-file-lines: { level: warn, generated: true }\n";
+    write(dir.path(), "lighthouse.yaml", project);
+    write(
+        dir.path(),
+        ".lighthouse/decisions/one.yaml",
+        &override_of("  extends: core/max-file-lines\n  options: { max: 300 }\n"),
+    );
+    write(
+        dir.path(),
+        ".lighthouse/decisions/two.yaml",
+        &override_of("  extends: core/max-file-lines\n  options: { max: 400 }\n"),
+    );
+
+    lighthouse(dir.path())
+        .args(["spec", "migrate"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("disagree"));
+
+    let text = fs::read_to_string(dir.path().join("lighthouse.yaml")).unwrap();
+    assert!(text.contains("generated: true"), "{text}");
+    assert!(text.contains("max: 400"), "{text}");
 }
 
 #[test]

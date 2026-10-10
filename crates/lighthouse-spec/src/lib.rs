@@ -26,7 +26,7 @@ pub use check::{
 };
 pub use decision::{
     Decision, DecisionSpec, LanguageSpec, MIGRATED_FROM, PACK_LABEL, PRESET_LABEL, Provenance,
-    SECTION_LABEL, STRICT, WAS_BUILTIN, WAS_ENFORCEMENT, WAS_EXCEPTIONS,
+    SECTION_LABEL, STRICT, WAS_BUILTIN, WAS_ENFORCEMENT, WAS_EXCEPTIONS, WAS_OPTION_NAMES,
 };
 pub use error::Error;
 pub use fix::{

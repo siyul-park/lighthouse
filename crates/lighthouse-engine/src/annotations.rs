@@ -4,6 +4,7 @@ use lighthouse_model::{
     Comment, Diagnostic, Fingerprint, Position, Project, Severity, Span,
     annotation::{self, ANNOTATION_REASON, Allow, UNUSED_ALLOW},
 };
+use lighthouse_spec::ProjectError;
 use serde_json::json;
 
 /// A finding that a source annotation allows: it is not reported and does not
@@ -15,11 +16,15 @@ pub struct Allowed {
     pub reason: String,
 }
 
+/// The level the configuration gives a rule at a file of a language.
+pub(crate) type LevelAt<'a> =
+    dyn Fn(&str, &Path, &str) -> Result<Option<Severity>, ProjectError> + 'a;
+
 /// What the run knows about rules, which annotations need to judge whether
 /// they are used.
 pub(crate) struct Gate<'a> {
     /// The level a rule has at a file and language, `None` when it is off.
-    pub level: &'a dyn Fn(&str, &Path, &str) -> Option<Severity>,
+    pub level: &'a LevelAt<'a>,
     /// Rules enabled by the configuration.
     pub active: &'a BTreeSet<String>,
     /// Rules that ran in this run.
@@ -35,7 +40,7 @@ pub(crate) fn apply(
     found: Vec<Diagnostic>,
     project: &Project,
     gate: &Gate,
-) -> (Vec<Diagnostic>, Vec<Allowed>) {
+) -> Result<(Vec<Diagnostic>, Vec<Allowed>), ProjectError> {
     let mut found: Vec<Option<Diagnostic>> = found.into_iter().map(Some).collect();
     let mut allowed = Vec::new();
     let mut extra = Vec::new();
@@ -52,7 +57,7 @@ pub(crate) fn apply(
                     ANNOTATION_REASON,
                     "`lighthouse:allow` needs a reason: write `lighthouse:allow <rule> -- <why>`; the annotation is ignored".to_owned(),
                     &allow,
-                ));
+                )?);
                 continue;
             };
             for rule in &allow.rules {
@@ -62,7 +67,7 @@ pub(crate) fn apply(
                         UNUSED_ALLOW,
                         format!("`lighthouse:allow {rule}` suppresses nothing here; remove it"),
                         &allow,
-                    ));
+                    )?);
                 }
                 allowed.extend(taken.into_iter().map(|diagnostic| Allowed {
                     diagnostic,
@@ -73,7 +78,7 @@ pub(crate) fn apply(
     }
     let mut kept: Vec<Diagnostic> = found.into_iter().flatten().collect();
     kept.extend(extra);
-    (kept, allowed)
+    Ok((kept, allowed))
 }
 
 /// Removes and returns the findings of `rule` that `comment` is attached to.
@@ -117,11 +122,13 @@ fn finding(
     rule: &str,
     message: String,
     allow: &Allow,
-) -> Option<Diagnostic> {
+) -> Result<Option<Diagnostic>, ProjectError> {
     if !gate.selected.contains(rule) {
-        return None;
+        return Ok(None);
     }
-    let severity = (gate.level)(rule, &comment.file, lang)?;
+    let Some(severity) = (gate.level)(rule, &comment.file, lang)? else {
+        return Ok(None);
+    };
     let text: String = comment
         .text
         .split_whitespace()
@@ -140,7 +147,7 @@ fn finding(
         "reason": allow.reason,
         "annotation": annotation_span(comment),
     });
-    Some(d)
+    Ok(Some(d))
 }
 
 /// The span of the comment's line that holds the annotation: from the

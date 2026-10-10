@@ -338,9 +338,6 @@ fn kind_of_file(path: &Path) -> FileKind {
 }
 
 fn project(path: &Path, plan: &mut Plan) -> Result<usize> {
-    if let Some(unchanged) = project::modernize_file(path, plan)? {
-        return Ok(unchanged);
-    }
     let name = path
         .canonicalize()
         .ok()
@@ -350,8 +347,13 @@ fn project(path: &Path, plan: &mut Plan) -> Result<usize> {
                 .map(|n| n.to_string_lossy().into_owned())
         })
         .unwrap_or_else(|| "project".to_owned());
-    legacy_config(path, plan, project::is_legacy, |old| {
+    let unchanged = legacy_config(path, plan, project::is_legacy, |old| {
         project::migrate(old, &name)
+    })?;
+    Ok(if project::modernize_file(path, plan)? {
+        0
+    } else {
+        unchanged
     })
 }
 
@@ -512,7 +514,8 @@ fn plan_item(
         }
         Shape::OverrideDoc => fold::plan(plan, path, doc)?,
         Shape::Preset | Shape::Enforcement | Shape::Outdated => {
-            write(plan, path, &rewritten(doc, &shape)?);
+            let migrated = rewritten(doc, &shape, path, &mut plan.kept)?;
+            write(plan, path, &migrated);
         }
         Shape::Pattern => {
             let (migrated, rule) = decision(item, rule_files)?;
@@ -546,13 +549,22 @@ fn plan_pack(
 
 /// A document of an older shape as it is written now: a `Preset` as a
 /// `Project`, a decision with `enforcement` or with fields Revision 28 removed.
-fn rewritten(doc: &Value, shape: &Shape) -> std::result::Result<Value, String> {
+fn rewritten(
+    doc: &Value,
+    shape: &Shape,
+    path: &Path,
+    notes: &mut Vec<String>,
+) -> std::result::Result<Value, String> {
     let mut migrated = doc.clone();
     match shape {
         Shape::Preset => {
             let json = serde_json::to_value(doc).map_err(|e| e.to_string())?;
-            migrated = serde_norway::to_value(retired::preset_to_project(json))
-                .map_err(|e| e.to_string())?;
+            let mut project = retired::preset_to_project(json);
+            if let Some(spec) = project.get_mut("spec") {
+                let declared = modern::Declared::near(path);
+                modern::rename_project_options(spec, &declared, notes);
+            }
+            migrated = serde_norway::to_value(project).map_err(|e| e.to_string())?;
         }
         Shape::Enforcement => {
             catalog::convert_enforcement(&mut migrated)?;

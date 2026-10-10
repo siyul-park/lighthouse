@@ -13,9 +13,14 @@ use serde_json::json;
 /// A local decision `local/probe` over `scope` with the CEL check `check`: the
 /// lines of its `select`, `where`, `message` and `evidence`.
 fn local(scope: &str, check: &str) -> Result<Declarative, String> {
+    scoped(&format!("{{ subject: {scope}, tests: include }}"), check)
+}
+
+/// Like [`local`], with the whole `scope` written out.
+fn scoped(scope: &str, check: &str) -> Result<Declarative, String> {
     let indented: String = check.lines().map(|l| format!("    {l}\n")).collect();
     let text = format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: {scope}, tests: include }}\n  requirement: A probe MUST hold.\n  severity: error\n  check:\n    type: cel\n{indented}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {scope}\n  requirement: A probe MUST hold.\n  severity: error\n  check:\n    type: cel\n{indented}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
     );
     let layer = Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)]))
         .map_err(|e| e.to_string())?;
@@ -228,4 +233,25 @@ fn declarative_bundled_rules() {
     };
     assert!(!rules("design").is_empty());
     assert!(rules("elsewhere").is_empty());
+}
+
+#[test]
+fn a_module_of_test_code_is_a_subject_only_as_the_scope_says() {
+    let check = "select: module\nwhere: 'true'\nmessage: '{{ module.path }}'";
+    let mut w = World::default();
+    w.module("prod", None, None);
+    w.module("prod_tests", None, Some("prod"));
+    w.func("prod", "A", "prod/a.ucm");
+    w.func("prod_tests", "B", "prod_tests/a.ucm");
+    let at = |scope: &str| -> Vec<String> {
+        let plugin = scoped(scope, check).unwrap();
+        found(&plugin, &w)
+            .into_iter()
+            .map(|(file, _)| file)
+            .collect()
+    };
+
+    assert_eq!(at("{ subject: module }"), ["prod/a.ucm"]);
+    assert_eq!(at("{ subject: module, tests: only }"), ["prod_tests/a.ucm"]);
+    assert_eq!(at("{ subject: module, tests: include }").len(), 2);
 }

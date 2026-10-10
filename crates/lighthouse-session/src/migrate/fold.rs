@@ -54,8 +54,18 @@ pub(super) fn apply(plan: &mut Plan) -> Result<()> {
             return Err(several_documents(&label, docs.len()).into());
         }
         let mut project = docs.remove(0);
+        let declared = super::modern::Declared::near(&config);
+        let mut seen: Vec<&retired::Fold> = Vec::new();
         for (file, fold) in &folds {
-            fold.apply(&mut project)
+            if let Some(why) = seen.iter().find_map(|earlier| fold.conflicts_with(earlier)) {
+                plan.kept.push(format!(
+                    "{}: overrides `{}` of the same project disagree, {why}; the later file wins",
+                    file.display(),
+                    fold.id
+                ));
+            }
+            seen.push(fold);
+            fold.apply(&mut project, &declared, &mut plan.kept)
                 .map_err(|e| format!("{}: {e}", file.display()))?;
             plan.actions.insert(file.clone(), Action::Remove);
         }

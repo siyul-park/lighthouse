@@ -691,8 +691,7 @@ fix:
 
 ## Crates
 
-Dependencies point down; the only exceptions are marked and go away with the
-move of the project model into `spec` (`spec` → `plugin`, `plugin` → `config`), and `lighthouse-config` is now `spec::project`.
+Dependencies point down only; the project model (`Project`, rule levels, overrides) is `spec::project`.
 
 ```
 L5  cli, mcp                  -> session, report            (nothing else: no store, registry or engine)

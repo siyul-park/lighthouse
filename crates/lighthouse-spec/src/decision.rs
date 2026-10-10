@@ -27,6 +27,10 @@ pub const WAS_ENFORCEMENT: &str = "lighthouse/was-enforcement";
 /// requirement: the text that was appended. Verdicts recorded under the
 /// requirement without it keep applying while the rest is unchanged.
 pub const WAS_EXCEPTIONS: &str = "lighthouse/was-exceptions";
+/// Annotation of a decision whose option names were renamed to camelCase: a
+/// JSON map from each new name to the name it had. Verdicts recorded under
+/// the old names keep applying while the meaning is unchanged.
+pub const WAS_OPTION_NAMES: &str = "lighthouse/was-option-names";
 /// Label that says which preset a decision joins beyond `recommended`; the
 /// only value is `strict`.
 pub const PRESET_LABEL: &str = "lighthouse/preset";
@@ -237,16 +241,29 @@ impl Decision {
 
     /// What [`DecisionSpec::meaning_version`] hashed before a decision's
     /// exceptions were part of its requirement, its scope said which code it
-    /// applies to, and its option names were camelCase: the same meaning, so
-    /// the verdicts recorded under it keep applying.
+    /// applies to (`generated`, `tests`), and its option names were camelCase:
+    /// the same meaning, so the verdicts recorded under it keep applying.
     pub fn earlier_meaning_version(&self) -> String {
         let content = json!({
             "requirement": squash(&self.earlier_requirement()),
             "severity": self.severity,
             "scope": { "domain": self.scope.domain, "subject": self.scope.subject },
-            "options": self.options_content(true),
+            "options": self.options_content(&|n| self.earlier_option_name(n)),
         });
         hash::short(&content.to_string(), 8)
+    }
+
+    /// The name an option had before the options were camelCase: what the
+    /// annotation `lighthouse/was-option-names` recorded when the decision was
+    /// migrated (a map from the new name to the old), else the snake_case of
+    /// the name, which is what every bundled decision had.
+    pub(crate) fn earlier_option_name(&self, name: &str) -> String {
+        self.metadata()
+            .annotations
+            .get(WAS_OPTION_NAMES)
+            .and_then(|text| serde_json::from_str::<BTreeMap<String, String>>(text).ok())
+            .and_then(|recorded| recorded.get(name).cloned())
+            .unwrap_or_else(|| snake_case(name))
     }
 
     /// The `enforcement` this decision had before severities replaced it:
@@ -281,7 +298,7 @@ impl Decision {
             "enforcement": self.was_enforcement(),
             "scope": { "domain": self.scope.domain, "subject": self.scope.subject },
             "check": check,
-            "options": self.options_content(true),
+            "options": self.options_content(&|n| self.earlier_option_name(n)),
         });
         hash::short(&content.to_string(), 8)
     }
@@ -344,22 +361,15 @@ impl DecisionSpec {
             "requirement": squash(&self.requirement),
             "severity": self.severity,
             "scope": self.scope,
-            "options": self.options_content(false),
+            "options": self.options_content(&str::to_owned),
         })
     }
 
-    /// The options, by name; with `snake`, by the names they had before they
-    /// were camelCase.
-    pub(crate) fn options_content(&self, snake: bool) -> Value {
+    /// The options, by the names `name` gives them: their own, or the names
+    /// they had before they were camelCase.
+    pub(crate) fn options_content(&self, name: &dyn Fn(&str) -> String) -> Value {
         let empty = OptionsSchema::default();
         let schema = self.options.as_ref().unwrap_or(&empty);
-        let name = |name: &str| {
-            if snake {
-                snake_case(name)
-            } else {
-                name.to_owned()
-            }
-        };
         let properties: Map<String, Value> = schema
             .properties
             .iter()

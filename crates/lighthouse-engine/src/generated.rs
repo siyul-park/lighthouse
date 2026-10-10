@@ -21,23 +21,39 @@ pub(crate) struct Attributes {
 }
 
 impl Attributes {
-    /// The attributes of the project at `root`; none when it has no file.
-    pub(crate) fn of(root: &Path) -> Self {
-        let text = fs::read_to_string(root.join(ATTRIBUTES_FILE)).unwrap_or_default();
-        Self::parse(&text)
+    /// The attributes of the project at `root`, and what the user should know
+    /// about them; none when it has no file. A file that cannot be read and a
+    /// pattern that is not a glob are notices: the attribute is not applied.
+    pub(crate) fn of(root: &Path) -> (Self, Vec<String>) {
+        match fs::read_to_string(root.join(ATTRIBUTES_FILE)) {
+            Ok(text) => Self::parse(&text),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (Self::default(), Vec::new()),
+            Err(e) => (
+                Self::default(),
+                vec![format!("{ATTRIBUTES_FILE}: not read, {e}")],
+            ),
+        }
     }
 
-    pub(crate) fn parse(text: &str) -> Self {
-        let rules = text
-            .lines()
-            .filter_map(|line| {
-                let mut parts = line.split_whitespace();
-                let pattern = parts.next().filter(|p| !p.starts_with('#'))?;
-                let on = parts.filter_map(setting).next_back()?;
-                Some((matcher(pattern)?, on))
-            })
-            .collect();
-        Self { rules }
+    pub(crate) fn parse(text: &str) -> (Self, Vec<String>) {
+        let mut rules = Vec::new();
+        let mut notices = Vec::new();
+        for line in text.lines() {
+            let mut parts = line.split_whitespace();
+            let Some(pattern) = parts.next().filter(|p| !p.starts_with('#')) else {
+                continue;
+            };
+            let Some(on) = parts.filter_map(setting).next_back() else {
+                continue;
+            };
+            match matcher(pattern) {
+                Ok(glob) => rules.push((glob, on)),
+                Err(e) => notices.push(format!(
+                    "{ATTRIBUTES_FILE}: `{pattern}` is not a usable pattern, {e}"
+                )),
+            }
+        }
+        (Self { rules }, notices)
     }
 
     /// Whether the last line that names `path` marks it generated.
@@ -62,12 +78,12 @@ fn setting(token: &str) -> Option<bool> {
     }
 }
 
-fn matcher(pattern: &str) -> Option<GlobMatcher> {
+fn matcher(pattern: &str) -> Result<GlobMatcher, globset::Error> {
     let anchored = pattern.trim_start_matches('/');
     let glob = if pattern.starts_with('/') || anchored.contains('/') {
         GlobBuilder::new(anchored).literal_separator(true).build()
     } else {
         Glob::new(&format!("**/{anchored}"))
     };
-    glob.ok().map(|g| g.compile_matcher())
+    glob.map(|g| g.compile_matcher())
 }

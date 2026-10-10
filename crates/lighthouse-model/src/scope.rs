@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{File, Project, Symbol};
+use crate::{File, Module, Project, Symbol};
 
 /// What a rule or an analyzer looks at in one run; a decision's subject maps
 /// onto it.
@@ -50,6 +50,18 @@ impl Applicability {
         (!self.generated && file.generated) || (self.tests == TestScope::Exclude && file.test)
     }
 
+    /// Whether no subject of `file` can be a subject of the decision, the
+    /// project's symbols considered: besides `excludes_file`, a production
+    /// file without test code is out of a decision that is only about tests.
+    pub fn excludes(&self, project: &Project, file: &File) -> bool {
+        self.excludes_file(file)
+            || (self.tests == TestScope::Only
+                && !file.test
+                && !project
+                    .symbols_in(&file.path)
+                    .any(|symbol| project.in_test(&symbol.id)))
+    }
+
     /// Whether a file is a subject of a decision about files.
     pub fn admits_file(&self, file: &File) -> bool {
         if !self.generated && file.generated {
@@ -67,6 +79,22 @@ impl Applicability {
     /// model does not know counts as generated.
     pub fn admits_comment(&self, file: Option<&File>) -> bool {
         self.generated || file.is_some_and(|f| !f.generated)
+    }
+
+    /// Whether a module is a subject, given the files that declare its
+    /// symbols: a module of generated files is generated, and a module that
+    /// exists to test another (`test_of`) or has only test files is test code.
+    pub fn admits_module(&self, module: &Module, files: &[&File]) -> bool {
+        let all = |flag: fn(&File) -> bool| !files.is_empty() && files.iter().all(|f| flag(f));
+        if !self.generated && all(|f| f.generated) {
+            return false;
+        }
+        let test = module.test_of.is_some() || all(|f| f.test);
+        match self.tests {
+            TestScope::Include => true,
+            TestScope::Exclude => !test,
+            TestScope::Only => test,
+        }
     }
 
     /// Whether a symbol is a subject: it is not in generated code the

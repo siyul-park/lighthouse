@@ -210,6 +210,8 @@ pub struct Engine {
     unenforced: BTreeSet<String>,
     /// The `linguist-generated` attributes of the project.
     attributes: Attributes,
+    /// What assembling the engine found worth telling; every run reports it.
+    notices: Vec<String>,
     pub(crate) ws: Workspace,
     /// Providers from listed plugins; indexes into `languages`.
     providers: Vec<usize>,
@@ -235,7 +237,7 @@ impl Engine {
         validate_config(&registry, &config, &projects)?;
         let (providers, languages) = load_languages(&registry, &config)?;
         let root = root.canonicalize().map_err(io_error(root))?;
-        let attributes = Attributes::of(&root);
+        let (attributes, notices) = Attributes::of(&root);
         let ws = Workspace {
             root,
             languages: config.languages().clone(),
@@ -251,6 +253,7 @@ impl Engine {
                 .map(|d| d.id().to_owned())
                 .collect(),
             attributes,
+            notices,
             ws,
             providers,
             languages,
@@ -326,6 +329,7 @@ impl Engine {
             .collect();
 
         let mut outcome = Outcome::default();
+        outcome.notices.extend(self.notices.iter().cloned());
         let mut timings = Timings::default();
         let mut incomplete = self.startup.clone();
         let scopes = match reported {
@@ -367,7 +371,7 @@ impl Engine {
             active: &self.active,
             selected: &ran,
         };
-        let (mut found, allowed) = annotations::apply(found, &project, &gate);
+        let (mut found, allowed) = annotations::apply(found, &project, &gate)?;
         found.retain(|d| scopes.iter().any(|s| d.file.starts_with(s)));
         outcome.allowed = allowed
             .into_iter()
@@ -403,9 +407,14 @@ impl Engine {
     }
 
     /// The level the configuration gives a rule at a file; `None` when off.
-    fn level_at(&self, rule: &str, file: &Path, lang: &str) -> Option<Severity> {
-        let rules = self.config.resolve(file, lang, &self.projects).ok()?;
-        rules.get(rule)?.level
+    fn level_at(
+        &self,
+        rule: &str,
+        file: &Path,
+        lang: &str,
+    ) -> Result<Option<Severity>, ProjectError> {
+        let rules = self.config.resolve(file, lang, &self.projects)?;
+        Ok(rules.get(rule).and_then(|config| config.level))
     }
 
     /// The options the configuration resolves for each finding's rule at its
@@ -721,7 +730,7 @@ impl Engine {
             };
             let Some(level) = config.level else { continue };
             let applies = self.applies(meta.applicability, config);
-            if applies.excludes_file(file) {
+            if applies.excludes(scene.project, file) {
                 continue;
             }
             if let Some(missing) = meta
@@ -816,7 +825,7 @@ impl Engine {
             keys: &self.registry,
             trusted: self.trusted,
             memo: scene.memo,
-            applies: meta.applicability,
+            applies: self.applies(meta.applicability, config),
         };
         let started = Instant::now();
         let checked = rule.check(&ctx, &config.options);
