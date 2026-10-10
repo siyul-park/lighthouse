@@ -1,3 +1,4 @@
+# retained: yes
 # R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run
 fingerprint	repo	location	verdict	reason
 a4f8771123d4156203cf6b9882abafd3f3657c681f47586c8b352bc52ba86633	qlbridge	exec/projection.go:113 projectionEvaluator	TP	200 lines over the limit of its role

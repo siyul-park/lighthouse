@@ -1,6 +1,31 @@
 {
   "commit": "a492a702877fee0079ad2863d58b53e5ac79d1da",
   "config": "strict-go",
+  "diffSha256": "a576495a331393346fb66fce08247d64515db5613af77691c041df4331b3b3d9",
+  "dirtyFiles": [
+    "go.mod",
+    "go.sum",
+    "internal/",
+    "interpreter/interpreter.go",
+    "interpreter/vm_control.go",
+    "interpreter/vm_control_test.go",
+    "interpreter/vm_fallback.go",
+    "interpreter/vm_fallback_test.go",
+    "interpreter/vm_host.go",
+    "interpreter/vm_host_test.go",
+    "interpreter/vm_inventory_test.go",
+    "interpreter/vm_ir.go",
+    "interpreter/vm_program.go",
+    "interpreter/vm_program_test.go",
+    "scripts/minivm-api-manifest.sh",
+    "scripts/minivm-baseline.sh",
+    "scripts/minivm-compat.sh",
+    "scripts/minivm-conformance.sh",
+    "scripts/minivm-differential.sh",
+    "semantic-review/",
+    "vendor/github.com/siyul-park/",
+    "vendor/modules.txt"
+  ],
   "exitCode": 3,
   "findings": {
     "core/max-lines": 60,
@@ -48,23 +73,22 @@
   },
   "timingsMs": {
     "median": {
-      "analyzer metrics/cognitive": 2.1,
-      "analyzer metrics/cyclomatic": 1.8,
-      "analyzer metrics/fan": 5.1,
+      "analyzer metrics/cognitive": 2.2,
+      "analyzer metrics/cyclomatic": 1.9,
+      "analyzer metrics/fan": 5.2,
       "analyzer metrics/nesting": 1.9,
-      "analyzer metrics/size": 2.2,
-      "identity": 24.5,
-      "index go": 619.3,
+      "analyzer metrics/size": 2.3,
+      "identity": 25.3,
+      "index go": 633.9,
       "index text": 0.0,
-      "merge": 59.7,
-      "read": 36.6,
-      "report": 2.8,
-      "rules": 608.2,
-      "setup": 8.1,
+      "merge": 60.8,
+      "read": 38.3,
+      "report": 3.1,
+      "rules": 639.4,
+      "setup": 8.5,
       "store": 0.0,
-      "total": 1421.3
+      "total": 1476.2
     },
     "runs": 3
-  },
-  "uncommittedFiles": 22
+  }
 }

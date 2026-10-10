@@ -1,3 +1,4 @@
+# retained: partial
 # R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -
 fingerprint	repo	location	verdict	reason
 3f71a323d1300f743b54f175f73b8406ed4289c4b36a88033231d38b0dad839c	cel	checker/options.go:25 Option	TP	two different option types in checker and parser

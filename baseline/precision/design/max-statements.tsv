@@ -1,3 +1,4 @@
+# retained: yes
 # R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run
 fingerprint	repo	location	verdict	reason
 7f8e5e9f1804a11b68b7f4e33d5a2dee31933461e6a4a8135bb114b3e3e0af2d	qlbridge	expr/builtins/filter.go:212 FilterMatchEval	TP	57 statements over the limit of its role

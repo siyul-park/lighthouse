@@ -1,3 +1,4 @@
+# retained: yes
 # R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run
 fingerprint	repo	location	verdict	reason
 fdafff7cd1af920532c8b16ae79a4fe59a6cf75e54f4acd574e2e01f1bb03eaf	minivm	internal/vigil/declarations.go:531 privateType	TP	41 cognitive complexity points over the limit of its role

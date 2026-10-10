@@ -18,7 +18,7 @@ make -s plugins
 cargo build -q --release -p lighthouse-cli
 
 python3 - "$root" "$@" <<'PY'
-import json, os, statistics, subprocess, sys, re
+import hashlib, json, os, statistics, subprocess, sys, re
 
 root, repos = sys.argv[1], sys.argv[2:]
 binary = f"{root}/target/release/lighthouse"
@@ -44,13 +44,17 @@ def sources(path):
 
 
 def commit(path):
+    """The commit, and what differs from it: the files and a hash of the diff."""
     git = lambda *a: subprocess.run(["git", "-C", path, *a], capture_output=True, text=True)
     head = git("rev-parse", "HEAD")
     if head.returncode:
         # A copy without history names its commit in a file of its own.
         marker = f"{path}/.baseline-commit"
-        return (open(marker).read().strip() if os.path.exists(marker) else None), None
-    return head.stdout.strip(), len(git("status", "--short").stdout.splitlines())
+        return (open(marker).read().strip() if os.path.exists(marker) else None), [], None
+    dirty = sorted(line[3:] for line in git("status", "--short").stdout.splitlines())
+    # Tracked changes by content; untracked files are named in the list.
+    diff = hashlib.sha256(git("diff", "HEAD").stdout.encode()).hexdigest()
+    return head.stdout.strip(), dirty, diff
 
 
 def config(path, directory):
@@ -95,11 +99,12 @@ with tempfile.TemporaryDirectory() as scratch:
             sys.exit(f"{name}: the runs disagree on exit code or findings")
         code, counts, incomplete, _ = results[0]
         phases = {p: round(statistics.median(r[3][p] for r in results), 1) for p in results[0][3]}
-        head, dirty = commit(path)
+        head, dirty, diff = commit(path)
         report = {
             "repo": name,
             "commit": head,
-            "uncommittedFiles": dirty,
+            "dirtyFiles": dirty,
+            "diffSha256": diff,
             "config": cfg_name,
             "sources": sources(path),
             "exitCode": code,

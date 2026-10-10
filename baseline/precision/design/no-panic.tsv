@@ -1,0 +1,3 @@
+# retained: no
+# R3b review: 20 of 104 Go findings and 21 of 41 Rust findings were read and every one was a real panic site; about 1 in 20 Go sites was worth changing and none of the Rust ones. Only the summary survives
+fingerprint	repo	location	verdict	reason

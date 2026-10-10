@@ -1,6 +1,8 @@
 {
   "commit": "81b286d29932dc9c116a522972df9ac540aeb40c",
   "config": "strict-root",
+  "diffSha256": null,
+  "dirtyFiles": [],
   "exitCode": 0,
   "findings": {
     "core/decision-naming": 29,
@@ -35,19 +37,18 @@
       "analyzer metrics/fan": 2.6,
       "analyzer metrics/nesting": 0.9,
       "analyzer metrics/size": 1.1,
-      "identity": 5.8,
-      "index go": 143.0,
-      "index rust": 359.9,
+      "identity": 6.2,
+      "index go": 154.3,
+      "index rust": 362.4,
       "index text": 0.0,
-      "merge": 25.2,
-      "read": 16.1,
+      "merge": 26.3,
+      "read": 16.9,
       "report": 0.7,
-      "rules": 264.4,
-      "setup": 10.1,
+      "rules": 276.0,
+      "setup": 10.0,
       "store": 0.0,
-      "total": 734.0
+      "total": 760.9
     },
     "runs": 3
-  },
-  "uncommittedFiles": null
+  }
 }

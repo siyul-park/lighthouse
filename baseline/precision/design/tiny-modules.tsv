@@ -1,3 +1,4 @@
+# retained: partial
 # R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -
 fingerprint	repo	location	verdict	reason
 ec88fab3d70e363b21e10fc97b292aa2207226b67d344a57e3cb1463a51a8f3c	cel	cel/async/async.go:1 cel/async	TP	205 lines, one dependent

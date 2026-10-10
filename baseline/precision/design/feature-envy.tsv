@@ -1,3 +1,4 @@
+# retained: partial
 # R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -
 fingerprint	repo	location	verdict	reason
 3f3599a1d1e9a41358a4061e38d1d61df281fdac23d1ccf7865c93379e45b700	cel	interpreter/decorators.go:198 maybeBuildMapLiteral	TP	

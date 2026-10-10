@@ -1,3 +1,4 @@
+# retained: yes
 # R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run
 fingerprint	repo	location	verdict	reason
 a7648c8ac53fe0a93a0f9616dfe9ffb0cb4b9290701eac1c19267a0c554c7ef9	cel	interpreter/attributes.go:951 qualifyInternal	TP	43 decision paths over the limit of its role

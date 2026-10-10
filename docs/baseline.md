@@ -21,7 +21,8 @@ All four run with the strict preset (`baseline/strict-root.toml` for the Cargo w
   more (cel's vendored modules). Symbol counts are not reported by any command yet; see Known limits.
 - cel exits 3 because 40 incomplete notices remain (for example a vendored `.binpb` that is not UTF-8); the
   findings stand.
-- The working trees of cel, qlbridge and minivm are the author's checkouts, so their numbers move with them. The
+- The working trees of cel, qlbridge and minivm are the author's checkouts, so their numbers move with them;
+  each `baseline/<repo>.json` lists the dirty files and the SHA-256 of `git diff HEAD` that were measured. The
   strict-root copy is fixed: it is `81b286d`, the Lighthouse tree the R2 gates started from. Findings per decision
   are in `baseline/<repo>.json`.
 
@@ -57,15 +58,18 @@ Sample files are `baseline/precision/<decision>.tsv` (fingerprint, repo, locatio
 | design/error-identity | R3b | 34 / 35 | 97% | 85.5-99.5 | retained (all findings) |
 | design/no-private-types | R3b | 8 / 8 | 100% | 67.6-100 | retained (all findings) |
 | design/no-stored-context | R3b | 1 / 2 | 50% | 9.5-90.5 | retained (one debatable) |
-| design/no-panic (Go) | R3b | 20 / 20 | 100% | 83.9-100 | not retained; 20 of 104 |
-| design/no-panic (Rust) | R3b | 21 / 21 | 100% | 84.5-100 | not retained; 21 of 41 |
+| design/no-panic (Go) | R3b | 20 / 20 | 100% | 83.9-100 (not comparable) | not retained; 20 of 104 |
+| design/no-panic (Rust) | R3b | 21 / 21 | 100% | 84.5-100 (not comparable) | not retained; 21 of 41 |
 | design/feature-envy | R2 | 12 / 15 | 80% | 54.8-93.0 | retained by name |
 | design/misplaced-symbol | R2 | 13 / 15 | 87% | 62.1-96.3 | retained by name |
-| design/owner-file | R2 | 15 / 15 | 100% | 79.6-100 | 4 of 15 named |
+| design/owner-file | R2 | 15 / 15 | 100% | 79.6-100 (not comparable) | 4 of 15 named |
 | design/unique-type-names | R2 | 5 / 5 | 100% | 56.6-100 | retained by name |
 | design/tiny-modules | R2 | 5 / 5 | 100% | 56.6-100 | retained by name |
 | testing/no-hidden-target | R2 | 0 / 5 | 0% | 0-43.4 | retained by name |
 
+- "Not comparable" marks an interval whose samples are not retained: a later review cannot be set against it
+  sample by sample, and it counts "real panic site" or "violation of the definition" as the reviewer then meant it.
+  Each TSV starts with `# retained: yes|partial|no`; `no-panic.tsv` holds only its summary.
 - `no-panic` is info: the review checked that each finding is a real panic site (all were), and that about one in
   twenty of the Go sites is worth changing; the rest are invariants and recovered hot paths. Rust: none of the 21.
 - `no-hidden-target` is wrong on a pattern: a helper builds an environment with the target passed as an argument,

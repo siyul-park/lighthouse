@@ -1,3 +1,4 @@
+# retained: partial
 # R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -; 15 of 15 reviewed, only the named ones are listed
 fingerprint	repo	location	verdict	reason
 -	cel	QualifierValueEquals	TP	method kept away from its type file (five samples)

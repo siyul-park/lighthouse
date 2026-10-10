@@ -1,3 +1,4 @@
+# retained: yes
 # R3b review: every finding of the final run (35); verdicts from the review report
 fingerprint	repo	location	verdict	reason
 f72b5c238609946c58509adc85b1b51ea4db51f60995b1c727febd333aa5c86b	cel	cel/options.go:435	TP	comparison or assertion against an error, as errorlint reports

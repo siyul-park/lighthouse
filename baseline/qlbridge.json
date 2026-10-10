@@ -1,6 +1,10 @@
 {
   "commit": "dbc85609ca044c8f4b7144503bf31ac79b087ed2",
   "config": "strict-go",
+  "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "dirtyFiles": [
+    ".idea/"
+  ],
   "exitCode": 1,
   "findings": {
     "core/max-lines": 12,
@@ -44,22 +48,21 @@
   "timingsMs": {
     "median": {
       "analyzer metrics/cognitive": 1.0,
-      "analyzer metrics/cyclomatic": 0.8,
-      "analyzer metrics/fan": 2.3,
+      "analyzer metrics/cyclomatic": 0.9,
+      "analyzer metrics/fan": 2.4,
       "analyzer metrics/nesting": 0.8,
       "analyzer metrics/size": 1.0,
-      "identity": 18.5,
-      "index go": 383.8,
+      "identity": 19.2,
+      "index go": 386.1,
       "index text": 0.0,
-      "merge": 30.4,
-      "read": 17.5,
+      "merge": 30.7,
+      "read": 17.7,
       "report": 2.3,
-      "rules": 338.2,
+      "rules": 376.9,
       "setup": 8.4,
       "store": 0.0,
-      "total": 832.5
+      "total": 886.0
     },
     "runs": 3
-  },
-  "uncommittedFiles": 1
+  }
 }

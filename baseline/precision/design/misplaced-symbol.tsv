@@ -1,3 +1,4 @@
+# retained: partial
 # R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -
 fingerprint	repo	location	verdict	reason
 81eaa385c460c761c046b2128fa0049c42b3555d6b77fd77d4a56b64a63711d6	cel	common/decls/decls.go:1158 collectParamNames	TP	

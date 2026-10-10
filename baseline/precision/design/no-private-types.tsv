@@ -1,3 +1,4 @@
+# retained: yes
 # R3b review: every finding of the final run (8)
 fingerprint	repo	location	verdict	reason
 40945d9d7650174fc131b2255a6fa16d677356abe5b9679a704ebaa71d9c85b1	cel	interpreter/interpreter.go:85	TP	exported function returns an unexported type

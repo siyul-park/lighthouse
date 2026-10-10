@@ -1,3 +1,4 @@
+# retained: partial
 # R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -; 5 of 7 cel findings reviewed
 fingerprint	repo	location	verdict	reason
 f809a8742cd7c0f205d2db576841e5a500cddc8d6e69d5387e7c11362340256b	cel	ext/math_test.go:196 TestMath	FP	helper builds an env with the extension passed as an argument

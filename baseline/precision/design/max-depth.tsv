@@ -1,3 +1,4 @@
+# retained: yes
 # R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run
 fingerprint	repo	location	verdict	reason
 07779c2e0f2110db1ab0ee791b9f8ed0d4ba0557efc5a71c627f93796038fb5a	qlbridge	lex/lexer.go:834 LexStatement	TP	7 levels of nesting over the limit of its role

@@ -45,32 +45,12 @@ languages and editors are added.
 | Speed | per-run fact memo, parallel rule and provider runs (rayon), concurrent Go modules, `--timings` |
 | Fewer concepts | `spec::project` replaces config (projects replace presets and overrides); fields cut to requirement/scope/severity/options + context/consequences/status/supersedes + check/fix/examples/provenance; generated and test code handled by each decision's scope; camelCase options; UUID identity; decision ids in the ESLint convention, checked by `core/decision-naming`; ESLint-style `lighthouse-disable` directives; judgments (`pass`/`fail`/`notApplicable`) and SARIF suppressions replace verdicts; `decisions.jsonl` is the only source of truth |
 | Self-check and placement | `layers` (import-linter contracts), `unique-type-names`, `tiny-modules`, `feature-envy` and `misplaced-symbol` (Lanza & Marinescu thresholds), `owner-file` (file in Go, module tree in Rust), `no-hidden-target`; enum variants as a symbol kind; option shapes validated |
+| Rules aligned with established tools | independent standard limits (cyclomatic, cognitive, statements, depth, params, results, function length) with one limit shape per role and `-1` for none; params and results count the fields of single-use structs; model checks made deterministic where a linter proves it (context-first, stored context, error identity, panics, private types in APIs); `command` checks read SARIF 2.1.0 (`output: sarif`, `select`, `columns`) so common linters are [wrapped](wrapping-linters.md); the [baseline](baseline.md): precision per decision, timings and findings on the reference repositories |
 
 ## Next
 
-Rule accuracy and checking cost are proven before anything is added on top. The
-precision and timing measured here are the baseline that search and learned checks are
-later judged against.
-
-### R3: rules aligned with established tools
-- **Limits:**
-  - `complexity` splits into independent standard limits: cyclomatic, cognitive,
-    statements, depth, parameters, function length;
-  - `max-params` and `max-results` count the fields of single-use parameter structs;
-  - one limit shape with values per role (constructor, implementation, entrypoint, test).
-- **Model to deterministic:** model checks become deterministic where a tool shows it can
-  be done (context-first, stored context, error identity, panics, private types in APIs).
-- **Commodity checks are wrapped, not rewritten:** a decision can be enforced by an
-  existing linter (golangci-lint, clippy, ruff) through a `command` check, and Lighthouse
-  adds the decision, memory and judgments on top.
-- **Wrapped output is normalized:**
-  - SARIF 2.1.0 is read as a standard input format;
-  - each tool rule maps to a decision;
-  - locations use UTF-16 columns per SARIF;
-  - fingerprints come from the tool rule, the location and the normalized message
-    (or the tool's `partialFingerprints`), so they stay stable across tool versions.
-- **Baseline report:** per-decision precision from sampled findings and from judgments,
-  plus check time per phase on the reference repositories.
+Rule accuracy and checking cost are proven; the [baseline](baseline.md) is what search and
+learned checks are later judged against. Checking cost comes first.
 
 ### Fast on large repositories
 - **Caches:** content-addressed caches with early cutoff, the approach of Go build action
