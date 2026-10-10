@@ -113,7 +113,7 @@ Physical layout should make ownership and collaboration visible while preserving
 
 `design/owner-file` · symbol · info · cel
 
-*A reader finds an owner and everything it owns in one place. This is a review signal: most findings are deliberate splits of an owner by concern, which the code model cannot tell from accidents, and no tool backs the Go convention of one file per receiver type. A method is reported when it is declared outside the unit of its type: its file, or its module and the modules below it (option `unit`). A private free function is reported the same way when every production caller of it is a method of one type that is declared outside the unit and the function calls or references that type or one of its members. A function named like a constructor is not reported. Go: All methods of a receiver type stay in the file of the type (`unit: file`). Rust: The methods of an inherent `impl` stay in the module of the type or in a module below it (`unit: module-tree`): a type with a child module for its impls keeps them together. The code model names the module of a method after its type, not after the `impl`, so the module tree is read from files: `m.rs` holds `m/`, a crate root or `mod.rs` the directory it is in. An impl in a sibling or parent module is reported. A method of a trait impl is exempt, because the trait decides where it is written; the code model marks it by an id that carries the trait. A type that the project does not declare has no module to keep to.*
+*A reader finds an owner and everything it owns in one place. This is a review signal: most findings are deliberate splits of an owner by concern, which the code model cannot tell from accidents, and no tool backs the Go convention of one file per receiver type. A method is reported when it is declared outside the unit of its type: its file, or its module and the modules below it (option `unit`). A private free function is reported the same way when every production caller of it is a method of one type that is declared outside the unit and the function calls or references that type or one of its members. A function named like a constructor is not reported. Go: All methods of a receiver type stay in the file of the type (`unit: file`). A method that implements an interface method is exempt, as a trait impl method is in Rust: the interface decides where it is written. Rust: The methods of an inherent `impl` stay in the module of the type or in a module below it (`unit: module-tree`): a type with a child module for its impls keeps them together. The code model names the module of a method after its type, not after the `impl`, so the module tree is read from files: `m.rs` holds `m/`, a crate root or `mod.rs` the directory it is in. An impl in a sibling or parent module is reported. A method of a trait impl is exempt, because the trait decides where it is written; the code model marks it by an id that carries the trait. A type that the project does not declare has no module to keep to.*
 
 Symbols with one owner and cohesive responsibility MUST share a file.
 
@@ -675,7 +675,7 @@ Function structure should make meaningful behavior reusable and readable, not me
 
 `design/private-helper-callers` · symbol · info · cel · strict
 
-*A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count, and neither does a package variable that calls the helper in its initializer: it is a table of handlers, not a caller to compare the helper with. Forwarding wrappers are reported by `design/no-single-use-wrapper`, and a function used as a value is not judged. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.*
+*A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count, and neither does a package variable that calls the helper in its initializer: it is a table of handlers, not a caller to compare the helper with. Forwarding wrappers are reported by `design/no-single-use-wrapper`, and a function used as a value is not judged. A method that implements an interface method is not judged either: its callers reach it through the interface. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.*
 
 A private helper SHOULD have at least two callers.
 
@@ -845,7 +845,7 @@ Also: rust
 
 `design/callers-before-callees` · file · warn · cel · fix: suggested
 
-*Readers follow behavior from intent to mechanics. Rust: Applies to private free functions and private methods. A function that some call may reach through a receiver of unknown type is not judged. A declaration-group order that places the callee before its caller (a type's methods precede the free functions of a Rust file) fixes the callee's position, so such a pair is not judged. Neither is a private method of an inherent impl called by a method of a trait impl: inherent impls come first.*
+*Readers follow behavior from intent to mechanics. Rust: Applies to private free functions and private methods. A function that some call may reach through a receiver of unknown type is not judged. A declaration-group order that places the callee before its caller (a type's methods precede the free functions of a Rust file) fixes the callee's position, so such a pair is not judged. Neither is a private method of an inherent impl called by a method of a trait impl (a method the provider marks as `implementation`): inherent impls come first. Go: no such order exists. A private method declared before the interface-implementing method that calls it is reported like any other.*
 
 Declarations MUST be ordered for reading: callers before callees, related symbols adjacent, and cohesive implementations together. Callers MUST precede their exclusive helpers, and shared leaves MUST follow the code that uses them.
 
@@ -973,7 +973,7 @@ Public APIs are stable contracts: expose the minimum caller-facing abstraction a
 | --- | --- | --- | --- | --- |
 | `design/consumer-interfaces` | Interfaces live at the consumer | warn · model |  | Interfaces MUST be used only when callers supply behavior and MUST be defined where that behavior is consumed. |
 | `design/narrow-inputs` | Narrow inputs, concrete outputs | info · model |  | Public inputs SHOULD use the narrowest reusable abstraction that fully expresses the contract; public outputs SHOULD use the most concrete public type unless polymorphism is itself the contract. |
-| [`design/no-private-types`](#public-apis-do-not-expose-private-types) | Public APIs do not expose private types | warn · model |  |  |
+| [`design/no-private-types`](#public-apis-do-not-expose-private-types) | Public APIs do not expose private types | warn · cel |  |  |
 | `design/no-exposed-state` | Exported types expose contract, not state | info · model |  | Exported types SHOULD expose contract rather than mutable implementation state; data-only values and ABI bridge types MAY expose their fields. |
 | `design/validated-constructors` | Constructors validate | info · model |  | Constructors MUST require inputs with no safe default and MUST validate required dependencies and shape; `Build` MUST validate a complete builder. |
 | `design/optional-options` | Required arguments, optional options | info · model |  | Required constructor values MUST be passed as arguments; optional values MUST be injected through options. |
@@ -981,23 +981,31 @@ Public APIs are stable contracts: expose the minimum caller-facing abstraction a
 
 ### Public APIs do not expose private types
 
-`design/no-private-types` · symbol · warn · model
+`design/no-private-types` · symbol · warn · cel
 
-*Callers must be able to use an API without naming private types.*
+*Callers must be able to use an API without naming private types. Go: An exported function, or an exported method of an exported type, whose parameters or results name a project type that is not exported is reported (revive `unexported-return` for results, golint's "exported func returns unexported type"; parameters follow the same reasoning). An alias that exports the type (`type Option = option`) is the remedy and passes; the type behind pointers is what counts, a slice or map of it is not looked into. Whether callers could use the API without the type, say through an interface it satisfies, stays with review. Rust: the compiler already rejects a private type in a public interface (`private_interfaces`, `private_bounds`), so no check is needed.*
 
 Public APIs MUST be usable without callers naming private types.
 
+Derived from: revive unexported-return: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-return; rustc private_interfaces: https://doc.rust-lang.org/rustc/lints/listing/warn-by-default.html#private-interfaces
+
 ```go invalid
+package sample
+
 type config struct{}
 
 func New() config { return config{} }
 ```
 
 ```go valid
+package sample
+
 type Config struct{}
 
 func New() Config { return Config{} }
 ```
+
+Also: rust
 
 ## Ownership
 
@@ -1047,24 +1055,73 @@ Concurrency rules prevent races and leaks by making shared state and shutdown ow
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | `design/explicit-shutdown` | Long-lived tasks can be stopped | warn · model |  | Long-lived concurrent tasks MUST have an explicit shutdown path. |
-| [`design/context-first`](#cancellation-context-comes-first) | Cancellation context comes first | warn · model |  |  |
-| `design/no-stored-context` | Request contexts are not stored | warn · model |  | Request contexts MUST NOT be stored in long-lived objects. |
+| [`design/context-first`](#cancellation-context-comes-first) | Cancellation context comes first | warn · cel |  |  |
+| [`design/no-stored-context`](#request-contexts-are-not-stored) | Request contexts are not stored | warn · cel |  |  |
 
 ### Cancellation context comes first
 
-`design/context-first` · symbol · warn · model
+`design/context-first` · symbol · warn · cel
 
-*A uniform position makes cancellation visible and checkable. Go: `ctx context.Context` is the first parameter.*
+*A uniform position makes cancellation visible and checkable. Go: `ctx context.Context` is the first parameter. The position is checked (revive `context-as-argument`): a function with a body that takes a `context.Context` after another parameter is reported, unless every parameter before it is one of `allowTypesBefore`. Whether the operation is blocking, does I/O or crosses a process boundary, and so needs a context at all, stays with review. Rust has no such convention and is judged by review only.*
 
 Blocking, I/O, and process-boundary operations MUST take the cancellation context as their first parameter.
 
+Derived from: revive context-as-argument, option allow-types-before: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#context-as-argument
+
+| option | default | meaning |
+| --- | --- | --- |
+| `allowTypesBefore` | `[]` | Types, as written with their full package path (`*testing.T`), that may come before the context. |
+
 ```go invalid
-func Fetch(url string, ctx context.Context) ([]byte, error)
+package sample
+
+import "context"
+
+func Fetch(url string, ctx context.Context) ([]byte, error) { return nil, ctx.Err() }
 ```
 
 ```go valid
-func Fetch(ctx context.Context, url string) ([]byte, error)
+package sample
+
+import "context"
+
+func Fetch(ctx context.Context, url string) ([]byte, error) { return nil, ctx.Err() }
 ```
+
+Also: rust
+
+### Request contexts are not stored
+
+`design/no-stored-context` · symbol · warn · cel
+
+*A request context outliving its request carries stale cancellation. Go: A struct field of type `context.Context` is reported (containedctx). Whether the struct is long-lived, and whether the context is a request context at all, stays with review: a struct that is itself the request is the usual exception. Rust has no request context type and is judged by review only.*
+
+Request contexts MUST NOT be stored in long-lived objects.
+
+Derived from: containedctx: https://github.com/sivchari/containedctx
+
+```go invalid
+package sample
+
+import "context"
+
+type Worker struct {
+  ctx  context.Context
+  name string
+}
+```
+
+```go valid
+package sample
+
+import "context"
+
+type Worker struct{ name string }
+
+func (w *Worker) Run(ctx context.Context) error { return ctx.Err() }
+```
+
+Also: rust
 
 ## Errors
 
@@ -1073,26 +1130,89 @@ Errors are contracts: callers should be able to classify failures, preserve caus
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | `design/error-categories` | Stable error categories | warn · model |  | Semantic errors MUST use stable, named error values or types, and semantic categories MUST NOT be created from ad hoc formatted messages alone. |
-| [`design/error-identity`](#preserve-error-identity) | Preserve error identity | warn · model |  |  |
+| [`design/error-identity`](#preserve-error-identity) | Preserve error identity | warn · cel |  |  |
 | `design/error-translation` | Translate errors at their boundary | info · model |  | Error categories MUST be translated only at their owning boundary. |
 | `design/no-state-in-errors` | Errors do not leak state | info · model |  | Errors MUST NOT expose private or sensitive process state. |
-| `design/no-panic` | Return errors, do not panic | info · model |  | Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors. |
+| [`design/no-panic`](#return-errors-do-not-panic) | Return errors, do not panic | info · cel |  |  |
 
 ### Preserve error identity
 
-`design/error-identity` · symbol · warn · model
+`design/error-identity` · symbol · warn · cel
 
-*Adding context must not hide the cause callers depend on. Go: Wrap with `%w` when adding context.*
+*Adding context must not hide the cause callers depend on. Go: Wrap with `%w` when adding context. The three ways code stops working once an error is wrapped are reported, one finding each at the place (go-errorlint): an error compared with `==` or `!=`, or switched on (`comparison`); a type assertion or type switch on an error (`asserts`); a `fmt.Errorf` that formats an error without `%w` (`errorf`). Comparing with `nil`, `io.EOF` or `sql.ErrNoRows`, and the body of an `Is(error) bool` method are not reported. go-errorlint lets these and a longer list of standard library sentinels through only when the error comes straight from the function that documents returning it; this check does not follow that flow, and reports the other sentinels. Whether callers depend on the cause, and whether a cause is to be hidden on purpose, stays with review. Rust has no such convention and is judged by review only.*
 
 Dependency identity MUST be preserved when callers depend on it; context added to an error MUST keep the cause reachable.
 
+Derived from: go-errorlint comparison, asserts, errorf: https://github.com/polyfloyd/go-errorlint#readme; golangci-lint errorlint: https://golangci-lint.run/usage/linters/#errorlint
+
+| option | default | meaning |
+| --- | --- | --- |
+| `asserts` | `true` | Report type assertions and type switches on errors. |
+| `comparison` | `true` | Report errors compared with `==`, `!=` or a `switch`. |
+| `errorf` | `true` | Report `fmt.Errorf` formatting an error without `%w`. |
+
 ```go invalid
-return fmt.Errorf("load %s: %v", name, err)
+package sample
+
+import "fmt"
+
+func Load(name string, err error) error {
+    return fmt.Errorf("load %s: %v", name, err)
+}
 ```
 
 ```go valid
-return fmt.Errorf("load %s: %w", name, err)
+package sample
+
+import "fmt"
+
+func Load(name string, err error) error {
+    return fmt.Errorf("load %s: %w", name, err)
+}
 ```
+
+Also: rust
+
+### Return errors, do not panic
+
+`design/no-panic` · symbol · info · cel
+
+*Panics bypass the caller's control flow. Every place production code can panic is reported, one finding each (forbidigo `^panic$`; clippy's restriction lints `panic`, `unwrap_used`, `expect_used`, `todo`, `unimplemented`, `unreachable`): Go reports a call of `panic`; Rust reports the `panic!`, `unreachable!`, `todo!` and `unimplemented!` macros and any `.unwrap()` or `.expect(..)` call (syntactically, on any receiver, as clippy does). The findings are candidates, not violations: impossible programmer errors, `Must*`-style APIs and documented hot-path invariants are allowed by the requirement and stay with review. Test code, entrypoints (`main`, `init`) and functions whose name starts with one of `allowPrefixes` are not reported. Clippy's restriction lints are opt-in for the same reason.*
+
+Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
+
+Derived from: forbidigo patterns: https://github.com/ashanbrown/forbidigo#readme; clippy panic: https://rust-lang.github.io/rust-clippy/master/index.html#panic; clippy unwrap_used: https://rust-lang.github.io/rust-clippy/master/index.html#unwrap_used; clippy expect_used: https://rust-lang.github.io/rust-clippy/master/index.html#expect_used; clippy todo, unimplemented, unreachable: https://rust-lang.github.io/rust-clippy/master/index.html#todo
+
+| option | default | meaning |
+| --- | --- | --- |
+| `allowPrefixes` | `["Must","must"]` | Name prefixes of functions that may panic. |
+| `kinds` | `["panic","unwrap","expect","todo","unimplemented","unreachable"]` | What to report: a Go call of `panic`, a Rust macro (`panic`, `todo`, `unimplemented`, `unreachable`) or method (`unwrap`, `expect`). |
+
+```go invalid
+package sample
+
+func Read(n int) int {
+    if n < 0 {
+        panic("negative")
+    }
+    return n
+}
+```
+
+```go valid
+package sample
+
+import "errors"
+
+func Read(n int) (int, error) {
+    if n < 0 {
+        return 0, errors.New("negative")
+    }
+    return n, nil
+}
+```
+
+Also: rust
 
 ## File Order
 

@@ -1,29 +1,9 @@
-//! Relations read off a merged fragment: the interface methods, the edges
-//! that start at each symbol and the interfaces each type implements.
+//! Relations read off a merged fragment: the edges that start at each symbol
+//! and the interfaces each type implements.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
-use super::{EdgeKind, Fragment, Node, Symbol, SymbolId, SymbolKind, Target};
-
-/// `(module, name)` of every method an interface declares.
-pub(super) fn interface_methods(
-    all: &Fragment,
-    positions: &BTreeMap<SymbolId, usize>,
-) -> BTreeSet<(String, String)> {
-    let declared_by_interface = |symbol: &Symbol| {
-        symbol.kind == SymbolKind::Method
-            && symbol
-                .owner
-                .as_ref()
-                .and_then(|o| positions.get(o))
-                .is_some_and(|at| all.symbols[*at].kind == SymbolKind::Interface)
-    };
-    all.symbols
-        .iter()
-        .filter(|s| declared_by_interface(s))
-        .map(|s| (s.id.module().to_owned(), s.name.clone()))
-        .collect()
-}
+use super::{EdgeKind, Fragment, Node, SymbolId, Target};
 
 /// Positions in `all.edges` of the edges that start at each symbol.
 pub(super) fn edges_from(all: &Fragment) -> BTreeMap<SymbolId, Vec<usize>> {

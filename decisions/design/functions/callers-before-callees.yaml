@@ -18,7 +18,11 @@ spec:
     its caller (a type's methods precede the free functions of a Rust
     file) fixes the callee's position, so such a pair is not judged.
     Neither is a private method of an inherent impl called by a method of
-    a trait impl: inherent impls come first.
+    a trait impl (a method the provider marks as `implementation`):
+    inherent impls come first.
+
+    Go: no such order exists. A private method declared before the
+    interface-implementing method that calls it is reported like any other.
   scope:
     domain: code
     subject: file
@@ -53,8 +57,8 @@ spec:
       && size(local) > 0 && func.pos <= anchor.pos
       && !(rank(func, 'design/group') >= 0 && rank(anchor, 'design/group') >= 0
            && rank(func, 'design/group') < rank(anchor, 'design/group'))
-      && !(func.kind == 'method' && !func.implements_trait
-           && anchor.kind == 'method' && anchor.implements_trait)
+      && !(func.lang == 'rust' && func.kind == 'method' && !func.implementation
+           && anchor.kind == 'method' && anchor.implementation)
     message: >-
       private {{ func.kind }} {{ func.name }} is declared before its caller
       {{ anchor.name }}; callers come first
@@ -269,3 +273,20 @@ spec:
                     self.step();
                 }
             }
+    - name: go-helper-before-an-interface-implementation
+      language: go
+      kind: invalid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type runner interface{ Run() int }
+
+            type job struct{}
+
+            func (j job) helper() int { return 1 }
+
+            func (j job) Run() int { return j.helper() }
+      expect:
+        - line: 7

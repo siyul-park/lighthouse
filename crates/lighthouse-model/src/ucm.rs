@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     Document, Fingerprint,
     merge::{resolve_all, sites_of, sorted_union},
-    relations::{edges_from, implements, interface_methods},
+    relations::{edges_from, implements},
 };
 
 /// 1-based line and column.
@@ -544,8 +544,6 @@ struct Index {
     edges_from: BTreeMap<SymbolId, Vec<usize>>,
     /// The interfaces a type implements, by resolved `implements` edges.
     implements: BTreeMap<SymbolId, Vec<SymbolId>>,
-    /// `(module, name)` of every method an interface declares.
-    interface_methods: BTreeSet<(String, String)>,
 }
 
 /// One place that refers to a symbol, from an edge with a `site`.
@@ -724,13 +722,6 @@ impl Project {
         self.index.implements.get(id).map_or(&[], Vec::as_slice)
     }
 
-    /// Whether some interface of `module` declares a method called `name`.
-    pub fn declared_by_interface(&self, module: &str, name: &str) -> bool {
-        self.index
-            .interface_methods
-            .contains(&(module.to_owned(), name.to_owned()))
-    }
-
     /// Distinct symbols `id` has a resolved, non-heuristic `calls` edge to,
     /// excluding itself.
     pub fn callees(&self, id: &SymbolId) -> &[SymbolId] {
@@ -756,7 +747,6 @@ impl Index {
                 .or_default()
                 .push(at);
         }
-        index.interface_methods = interface_methods(all, &index.symbols);
         index.edges_from = edges_from(all);
         index.implements = implements(all);
         for (at, function) in all.functions.iter().enumerate() {

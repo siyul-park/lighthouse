@@ -56,10 +56,9 @@ pub(crate) fn node(project: &Project, s: &Symbol) -> Value {
         "generated": file.is_some_and(|f| f.generated),
         "owner_key": owner_key(s).unwrap_or_default(),
         "declaration": is_declaration(project, s),
-        // A trait impl method has the trait in its id. Go has no such id, so
-        // its interface implementations stay unexempt here; the `role` fact
-        // uses the provider's `implementation` flag instead.
-        "implements_trait": s.kind == SymbolKind::Method && s.id.as_str().matches("::").count() > 2,
+        // The method implements one a trait or interface declares elsewhere:
+        // its placement and ownership are that declaration's, as the provider says.
+        "implementation": project.function(&s.id).is_some_and(|f| f.implementation),
     })
 }
 

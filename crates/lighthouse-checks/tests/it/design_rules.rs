@@ -158,13 +158,14 @@ fn single_use_wrapper_ignores_interface_methods_docs_and_shared_targets() {
     {
         symbol.kind = SymbolKind::Method;
     }
-    let iface = w.symbol("m", "loader", SymbolKind::Interface, "m/a.ucm");
-    let mut member = w.symbol("m", "load", SymbolKind::Method, "m/a.ucm");
-    member.owner = Some(iface.id);
-    w.symbols.last_mut().unwrap().owner = member.owner;
+    w.summaries
+        .iter_mut()
+        .find(|s| s.symbol == load.id)
+        .unwrap()
+        .implementation = true;
     assert!(
         w.check(WRAP, json!({})).is_empty(),
-        "named like an interface method"
+        "implements an interface method"
     );
 }
 

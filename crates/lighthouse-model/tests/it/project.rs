@@ -470,7 +470,7 @@ fn project_edges_from_lists_the_edges_that_start_at_a_symbol() {
 }
 
 #[test]
-fn project_implements_and_declared_by_interface_follow_the_interfaces_of_a_type() {
+fn project_implements_follows_the_interfaces_of_a_type() {
     let store = typed("m", "Store", SymbolKind::Type, None);
     let reader = typed("m", "Reader", SymbolKind::Interface, None);
     let read = typed("m", "Read", SymbolKind::Method, Some(&reader));
@@ -486,9 +486,6 @@ fn project_implements_and_declared_by_interface_follow_the_interfaces_of_a_type(
         std::slice::from_ref(&reader.id)
     );
     assert!(project.implements(&reader.id).is_empty());
-    assert!(project.declared_by_interface("m", "Read"));
-    assert!(!project.declared_by_interface("m", "Write"));
-    assert!(!project.declared_by_interface("other", "Read"));
 }
 
 fn file_of(symbol: &Symbol) -> File {

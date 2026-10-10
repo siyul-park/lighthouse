@@ -19,7 +19,8 @@ spec:
     helper in its initializer: it is a table of handlers, not a caller to
     compare the helper with. Forwarding wrappers are reported by
     `design/no-single-use-wrapper`, and a function used as a value is not
-    judged.
+    judged. A method that implements an interface method is not judged
+    either: its callers reach it through the interface.
 
     Rust: Private free functions and methods that have exactly one caller
     outside test code and are never named as a value. A method that some
@@ -38,7 +39,7 @@ spec:
     where: >-
       (func.kind == 'function' || func.kind == 'method')
       && func.visibility == 'private' && func.name != 'main' && func.name != 'init'
-      && func.references == 0 && !func.satisfies_interface && !func.forwards_only
+      && func.references == 0 && !func.implementation && !func.forwards_only
       && size(production) == 1 && production[0].kind != 'var'
     message: >-
       private {{ func.kind }} {{ func.name }} has one caller ({{ production[0].name }});
@@ -104,3 +105,18 @@ spec:
             fn clamp(x: u8) -> u8 {
                 if x > 10 { 10 } else { x }
             }
+    - name: go-interface-implementation
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type runner interface{ run() int }
+
+            type job struct{}
+
+            func (j job) run() int { return 1 }
+
+            func Use(j job) int { return j.run() }

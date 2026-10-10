@@ -24,7 +24,8 @@ spec:
     function named like a constructor is not reported.
 
     Go: All methods of a receiver type stay in the file of the type (`unit:
-    file`).
+    file`). A method that implements an interface method is exempt, as a
+    trait impl method is in Rust: the interface decides where it is written.
 
     Rust: The methods of an inherent `impl` stay in the module of the type or
     in a module below it (`unit: module-tree`): a type with a child module for
@@ -61,7 +62,7 @@ spec:
     where: >-
       (symbol.kind == 'method' || symbol.kind == 'function')
       && size(home) > 0
-      && !symbol.implements_trait && !symbol.constructor_named
+      && !symbol.implementation && !symbol.constructor_named
       && home.owner_file != symbol.file
       && !(options.unit == 'module-tree' && home.owner_tree != ''
            && symbol.file.startsWith(home.owner_tree))
@@ -191,3 +192,11 @@ spec:
                     write!(f, "store")
                 }
             }
+    - name: go-interface-implementation-in-another-file
+      language: go
+      kind: valid
+      files:
+        - path: store.go
+          body: "package sample\n\ntype Store struct{ items []int }\n\ntype totaler interface{ Total() int }\n"
+        - path: total.go
+          body: "package sample\n\nfunc (s *Store) Total() int { return len(s.items) }\n"

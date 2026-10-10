@@ -1,6 +1,6 @@
 //! The `role` fact of a function and the constructor facts beside it.
 
-use lighthouse_model::{FunctionSummary, Project, Symbol, SymbolKind};
+use lighthouse_model::{FunctionSummary, Symbol, SymbolKind};
 use serde_json::{Map, Value, json};
 
 use super::Builder;
@@ -113,13 +113,6 @@ impl Builder<'_> {
             _ => false,
         }
     }
-}
-
-/// Whether a method named like one an interface of its module declares may be
-/// reached through that interface.
-pub(super) fn satisfies_interface(project: &Project, wrapper: &Symbol) -> bool {
-    wrapper.kind == SymbolKind::Method
-        && project.declared_by_interface(wrapper.id.module(), &wrapper.name)
 }
 
 /// The role of a function: `test`, `implementation` (an interface or trait

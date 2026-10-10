@@ -37,7 +37,6 @@ mod role;
 
 use forward::{cyclic, forwarded};
 use measures::{Measures, measures};
-use role::satisfies_interface;
 
 /// The analyzers a check needs when its expressions call `metrics`.
 pub(crate) const METRIC_ANALYZERS: [&str; 5] = [SIZE, CYCLOMATIC, COGNITIVE, NESTING, FAN];
@@ -247,12 +246,6 @@ impl<'a> Builder<'a> {
             map.insert(
                 "forward_target".to_owned(),
                 json!(target.map_or("", |t| t.as_str())),
-            );
-        }
-        if needs.mentions("satisfies_interface") {
-            map.insert(
-                "satisfies_interface".to_owned(),
-                json!(satisfies_interface(project, symbol)),
             );
         }
         if needs.mentions("documented_by_interface") {

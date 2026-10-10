@@ -5,22 +5,22 @@ use std::collections::BTreeSet;
 
 use lighthouse_model::{Node, Project, Symbol, SymbolId, Target, Visibility};
 
-use super::role::satisfies_interface;
-
 /// The private target a private undocumented wrapper only forwards to. The
 /// wrapper must have exactly one caller, test callers included, and no use as
-/// a value; a method named like an interface method may be reached through
-/// that interface, so it is left alone.
+/// a value; a method that implements a trait or interface method may be
+/// reached through it, so it is left alone.
 pub(super) fn forwarded<'p>(project: &'p Project, wrapper: &Symbol) -> Option<&'p SymbolId> {
     if wrapper.visibility != Visibility::Private
         || wrapper.doc.is_some()
         || project.callers(&wrapper.id).len() != 1
         || !project.references(&wrapper.id).is_empty()
-        || satisfies_interface(project, wrapper)
     {
         return None;
     }
     let summary = project.function(&wrapper.id)?;
+    if summary.implementation {
+        return None;
+    }
     let Some(Target::Resolved(Node::Symbol(target))) = &summary.forwards_to else {
         return None;
     };

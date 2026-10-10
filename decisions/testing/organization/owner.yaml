@@ -17,7 +17,8 @@ spec:
     `TestType_Method`. A symbol that no test names and no test code calls
     or references is reported; a type counts as tested when one of its
     members is. Only modules that have tests are judged. Types without
-    methods and interfaces are not required to have one.
+    methods and interfaces are not required to have one, nor are methods
+    that implement an interface method.
 
     Rust: The owner of a function or type is the test named after it in
     snake case (`get`, `store`), of a method `type_method`. A public item
@@ -124,7 +125,7 @@ spec:
       (symbol.kind == 'method'
           ? (owner.kind == 'type' && exposed(owner, options.includeInternal))
           : owner.kind == '')
-      && !symbol.implements_trait
+      && !symbol.implementation
       && (options.includeDataTypes || !symbol.data_only)
       && exposed(symbol, options.includeInternal)
       && options.kinds.exists(k, k == symbol.kind)
@@ -291,3 +292,23 @@ spec:
                 let registry = unknown::build();
                 registry.register();
             }
+    - name: go-interface-implementation
+      language: go
+      kind: valid
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/store
+
+            go 1.26
+        - path: store.go
+          body: |-
+            package store
+
+            type getter interface{ Get() int }
+
+            type Store struct{}
+
+            func (Store) Get() int { return 1 }
+        - path: store_test.go
+          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc TestStore(t *testing.T) {\n\tif (store.Store{}) != (store.Store{}) {\n\t\tt.Fatal(\"store\")\n\t}\n}"
