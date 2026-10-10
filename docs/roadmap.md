@@ -43,6 +43,7 @@ languages and editors are added.
 | Resource model | `apiVersion`/`kind`/`metadata`/`spec` for every spec, JSON Schema per kind, `spec validate`, SARIF, `pattern` renamed to `decision`, severity `error`/`warn`/`info` |
 | Check providers | `check:` as `builtin` (standard ops `order`, `proximity`, `cycle`), `cel` with a standard library, `command`, `rpc` (reserved) or `model` (served by agent review tasks); every bundled decision re-expressed with identical findings; `severity` replaces `enforcement`; meaning version separate from check revision; ADR `status`, `supersedes`, `consequences` |
 | Speed | per-run fact memo, parallel rule and provider runs (rayon), concurrent Go modules, `--timings` |
+| Self-check and placement | `layers` (import-linter contracts), `unique-type-names`, `tiny-modules`, `feature-envy` and `misplaced-symbol` (Lanza & Marinescu thresholds), `owner-file` (file in Go, module tree in Rust), `no-hidden-target`; enum variants as a symbol kind; option shapes validated |
 | Fewer concepts | `spec::project` replaces config (projects replace presets and overrides); fields cut to requirement/scope/severity/options + context/consequences/status/supersedes + check/fix/examples/provenance; generated and test code handled by each decision's scope; camelCase options; UUID identity; decision ids in the ESLint convention, checked by `core/decision-naming`; ESLint-style `lighthouse-disable` directives; judgments (`pass`/`fail`/`notApplicable`) and SARIF suppressions replace verdicts; `decisions.jsonl` is the only source of truth |
 
 ## Next
@@ -50,15 +51,6 @@ languages and editors are added.
 Rule accuracy and checking cost are proven before anything is added on top. The
 precision and timing measured here are the baseline that search and learned checks are
 later judged against.
-
-### R2: self-check and placement rules (in review)
-- **Self-check:** `layers` (import-linter contracts), `unique-type-names`, `tiny-modules`.
-- **Placement:** `feature-envy`, `misplaced-symbol`, a deterministic `owner-file`, and
-  `no-hidden-target`.
-- **Gate:** findings of every other rule are identical on four repositories.
-- **Precision review:** each new rule is reviewed with at least 20 sampled findings
-  (or all of them, if fewer), with a Wilson interval reported. False-positive causes are
-  fixed in the code model or the rule's definition, not with ad-hoc exclusions.
 
 ### R3: rules aligned with established tools
 - **Limits:**
