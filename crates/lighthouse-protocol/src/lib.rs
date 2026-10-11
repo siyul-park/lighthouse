@@ -1,16 +1,19 @@
 mod frame;
+mod jobs;
 mod model;
 mod prompt;
 mod serve;
 mod wire;
 
 pub use frame::{ErrorObject, FrameError, Id, Message, read_message, write_message};
+pub use jobs::{
+    Capabilities, FineTuningJob, FineTuningJobRequest, JobError, JobStatus, Method, ModelEntry,
+    ModelList, Supervised, Supports, TrainLine, TrainResponse, training_file,
+};
 pub use model::{
-    Capabilities, ClassifyParams, ClassifyResult, Criteria, Criterion, DecisionRef, Example,
-    FineTuningJob, FineTuningJobRequest, Instructions, JobError, JobStatus, LabelSource, Method,
-    ModelEntry, ModelList, ModelManifest, ModelMethods, Neighbor, Question, QuestionAnswer,
-    ResultKind, Shot, State, Subject, SubjectContext, Supervised, Supports, TrainLine, TrainParams,
-    TrainResponse, TrainSubject, training_file,
+    ClassifyParams, ClassifyResult, Criteria, Criterion, DecisionRef, Example, Instructions,
+    LabelSource, ModelManifest, ModelMethods, Neighbor, Question, QuestionAnswer, ResultKind, Shot,
+    State, Subject, SubjectContext, TrainParams, TrainSubject,
 };
 pub use prompt::{
     json_in, noul_of, prompt, response_schema, subject as subject_text, system as system_text,

@@ -4,6 +4,7 @@
 //! the agent skill. The CLI, the MCP server and
 //! the agent hooks only parse their own input and print the results of these.
 
+mod assemble;
 mod authoring;
 mod cache;
 mod check;

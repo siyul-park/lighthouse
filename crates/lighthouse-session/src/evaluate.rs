@@ -15,16 +15,18 @@ use std::{
 
 use lighthouse_model::Severity;
 use lighthouse_plugin::ResultKind;
-use lighthouse_spec::{Catalog, Evaluation, Tolerate, local_files};
+use lighthouse_spec::{Catalog, Evaluation, local_files};
 use serde::Serialize;
 
 use crate::{
-    CheckRequest, ModelFlags, Result, Session, check,
+    CheckRequest, ModelFlags, Result, Session,
+    assemble::{Gathered, Part, Usage},
+    check,
     labels::{Baseline, Label, collect},
-    metrics::{Metrics, Outcome, Rate, Truth, agreement, evaluate},
+    metrics::{Metrics, Outcome, Rate, Truth},
 };
 
-const CAVEAT: &str = "labelled positives come mostly from flagged findings, so recall is an upper bound; sample unflagged subjects for a person to label";
+pub(crate) const CAVEAT: &str = "labelled positives come mostly from flagged findings, so recall is an upper bound; sample unflagged subjects for a person to label";
 
 /// A repository whose findings the labels are about.
 pub struct Repo {
@@ -86,125 +88,18 @@ pub struct EvalReport {
 
 /// What one run of a check found, by subject.
 #[derive(Default)]
-struct Found {
-    by_fingerprint: BTreeMap<String, Outcome>,
+pub(crate) struct Found {
+    pub(crate) by_fingerprint: BTreeMap<String, Outcome>,
     /// The subject a fingerprint is about: its file and symbol.
-    place: BTreeMap<String, String>,
-    by_place: BTreeMap<String, Outcome>,
-    model_decided: usize,
-    reviews: usize,
-    calls: usize,
-    cost: f64,
+    pub(crate) place: BTreeMap<String, String>,
+    pub(crate) by_place: BTreeMap<String, Outcome>,
+    pub(crate) model_decided: usize,
+    pub(crate) reviews: usize,
+    pub(crate) calls: usize,
+    pub(crate) cost: f64,
     /// Selected subjects the check did not flag, for an audit, with the
     /// place each is at.
-    unflagged: Vec<(String, String)>,
-}
-
-/// What one repository gave.
-struct Part {
-    policy: Evaluation,
-    current: Vec<(Truth, Outcome)>,
-    candidate: Vec<(Truth, Outcome)>,
-    pairs: Vec<(Outcome, Outcome)>,
-    decided: Usage,
-    candidate_decided: Usage,
-    audit: Vec<String>,
-    check: String,
-    candidate_check: Option<String>,
-}
-
-/// What a check asked of models.
-#[derive(Clone, Copy, Default)]
-struct Usage {
-    decided: usize,
-    reviews: usize,
-    calls: usize,
-    cost: f64,
-}
-
-impl Usage {
-    fn of(found: &Found) -> Self {
-        Self {
-            decided: found.model_decided,
-            reviews: found.reviews,
-            calls: found.calls,
-            cost: found.cost,
-        }
-    }
-
-    fn plus(self, other: Self) -> Self {
-        Self {
-            decided: self.decided + other.decided,
-            reviews: self.reviews + other.reviews,
-            calls: self.calls + other.calls,
-            cost: self.cost + other.cost,
-        }
-    }
-}
-
-#[derive(Default)]
-struct Gathered {
-    parts: Vec<Part>,
-}
-
-impl Gathered {
-    fn add(&mut self, part: Part) {
-        self.parts.push(part);
-    }
-
-    fn finish(self, request: &EvalRequest, with_candidate: bool) -> Result<EvalReport> {
-        let first = self.parts.first().ok_or("nothing to evaluate")?;
-        let policy = first.policy;
-        let pool = |pick: fn(&Part) -> &Vec<(Truth, Outcome)>| -> Vec<(Truth, Outcome)> {
-            self.parts.iter().flat_map(|p| pick(p).clone()).collect()
-        };
-        let current = pool(|p| &p.current);
-        let side = |check: String, pairs: &[(Truth, Outcome)], used: Usage| Side {
-            check,
-            metrics: evaluate(pairs),
-            model_decided: used.decided,
-            reviews: used.reviews,
-            calls: used.calls,
-            cost: used.cost,
-        };
-        let sum = |pick: fn(&Part) -> Usage| {
-            self.parts
-                .iter()
-                .fold(Usage::default(), |a, p| a.plus(pick(p)))
-        };
-        let current_side = side(first.check.clone(), &current, sum(|p| p.decided));
-        let candidate_side = with_candidate.then(|| {
-            let pairs = pool(|p| &p.candidate);
-            side(
-                first.candidate_check.clone().unwrap_or_default(),
-                &pairs,
-                sum(|p| p.candidate_decided),
-            )
-        });
-        let judged = candidate_side.as_ref().unwrap_or(&current_side);
-        let meets_policy = match policy.tolerate {
-            Tolerate::Fn => judged.metrics.precision,
-            Tolerate::Fp => judged.metrics.recall,
-        }
-        .map(|rate| rate.low >= policy.precision);
-        let audit = write_audit(
-            request,
-            self.parts.iter().flat_map(|p| p.audit.clone()).collect(),
-        )?;
-        let pairs: Vec<(Outcome, Outcome)> =
-            self.parts.iter().flat_map(|p| p.pairs.clone()).collect();
-        Ok(EvalReport {
-            decision: request.decision.clone(),
-            labelled: current.len(),
-            policy,
-            agreement: with_candidate.then(|| agreement(&pairs)).flatten(),
-            current: current_side,
-            candidate: candidate_side,
-            meets_policy,
-            caveat: CAVEAT,
-            audit,
-        })
-    }
+    pub(crate) unflagged: Vec<(String, String)>,
 }
 
 /// A candidate decision to run beside the project's.
@@ -272,6 +167,22 @@ pub fn eval(request: &EvalRequest) -> Result<EvalReport> {
     env::set_current_dir(&start)?;
     outcome?;
     gathered.finish(request, candidate.is_some())
+}
+
+/// Writes the audit table, when one was asked for and there is something to
+/// label: a person fills in the `verdict` column (`TP` or `FP`).
+pub(crate) fn write_audit(request: &EvalRequest, rows: Vec<String>) -> Result<Option<PathBuf>> {
+    if request.audit.is_none() || rows.is_empty() {
+        return Ok(None);
+    }
+    let path = PathBuf::from(format!("{}.audit.tsv", request.decision.replace('/', "-")));
+    let mut text = String::from("fingerprint\trepo\tlocation\tverdict\treason\n");
+    for row in rows {
+        text.push_str(&row);
+        text.push('\n');
+    }
+    std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok(Some(path))
 }
 
 fn one(
@@ -366,22 +277,6 @@ fn audit_rows(request: &EvalRequest, repo: &Repo, found: &Found) -> Vec<String> 
             )
         })
         .collect()
-}
-
-/// Writes the audit table, when one was asked for and there is something to
-/// label: a person fills in the `verdict` column (`TP` or `FP`).
-fn write_audit(request: &EvalRequest, rows: Vec<String>) -> Result<Option<PathBuf>> {
-    if request.audit.is_none() || rows.is_empty() {
-        return Ok(None);
-    }
-    let path = PathBuf::from(format!("{}.audit.tsv", request.decision.replace('/', "-")));
-    let mut text = String::from("fingerprint\trepo\tlocation\tverdict\treason\n");
-    for row in rows {
-        text.push_str(&row);
-        text.push('\n');
-    }
-    std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
-    Ok(Some(path))
 }
 
 fn run(
