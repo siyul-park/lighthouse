@@ -13,6 +13,7 @@ mod evaluate;
 mod findings;
 mod fix;
 mod git;
+mod judged;
 mod models;
 mod project;
 mod reviewing;

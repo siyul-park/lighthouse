@@ -36,7 +36,7 @@ level = "warn"
 options.layers = [
   ["lighthouse_cli*/**", "lang_rust*/**"],
   ["lighthouse_session/**"],
-  ["lighthouse_report/**", "lighthouse_store/**"],
+  ["lighthouse_report/**", "lighthouse_store/**", "lighthouse_ml/**"],
   ["lighthouse_engine/**", "lighthouse_checks/**", "lighthouse_rpc/**"],
   ["lighthouse_plugin/**", "lighthouse_spec/**"],
   ["lighthouse_model/**", "lighthouse_resource/**", "lighthouse_protocol/**", "lighthouse_process/**"],

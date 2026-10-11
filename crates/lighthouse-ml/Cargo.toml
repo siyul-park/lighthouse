@@ -13,7 +13,6 @@ lighthouse-engine.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-spec.workspace = true
-lighthouse-store.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 

@@ -12,7 +12,6 @@ use std::{collections::BTreeMap, fs, path::Path};
 use lighthouse_model::{AgentKind, Attribution, Judgment, Role};
 use lighthouse_plugin::Subject;
 use lighthouse_spec::Decision;
-use lighthouse_store::Records;
 use serde_json::{Value, json};
 
 use crate::{
@@ -115,10 +114,21 @@ pub struct Shown {
     pub subject: Option<Subject>,
 }
 
+/// A judgment on a subject, as the store records it.
+pub struct Judged {
+    pub fingerprint: String,
+    /// The name the decision had when the judgment was given.
+    pub decision_name: String,
+    pub decision_uid: Option<String>,
+    pub meaning_version: Option<String>,
+    pub judgment: Judgment,
+    pub by: Attribution,
+}
+
 /// What to collect the labels of.
 pub struct Collect<'a> {
-    /// The project root, whose store holds the judgments.
-    pub root: &'a Path,
+    /// The judgments of the project, of every decision.
+    pub judgments: Vec<Judged>,
     pub decision: &'a Decision,
     pub baseline: Option<&'a Baseline<'a>>,
     /// `<provider>/<model>`, any version: its own labels are left out.
@@ -147,11 +157,10 @@ impl Collect<'_> {
     }
 
     fn judged(&self) -> Result<Vec<Label>> {
-        let records = Records::read(self.root)?;
         let decision = self.decision;
         let meaning = decision.meaning_version();
         let mut labels = Vec::new();
-        for event in &records.judgments {
+        for event in &self.judgments {
             let ours = event.decision_uid.as_deref() == decision.uid() && decision.uid().is_some()
                 || event.decision_name == decision.id();
             if !ours || event.meaning_version.as_deref() != Some(meaning.as_str()) {
@@ -162,7 +171,7 @@ impl Collect<'_> {
                 Judgment::Pass => Truth::Pass,
                 Judgment::NotApplicable => Truth::NotApplicable,
             };
-            let attributed = &event.was_attributed_to;
+            let attributed = &event.by;
             let id = attributed.id.as_deref().unwrap_or_default();
             if self
                 .exclude_model

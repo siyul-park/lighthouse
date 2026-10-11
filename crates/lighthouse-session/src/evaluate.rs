@@ -13,7 +13,7 @@ use lighthouse_ml::{
 };
 use lighthouse_model::Severity;
 
-use crate::{CheckRequest, ModelFlags, Result, Session, check, samples};
+use crate::{CheckRequest, ModelFlags, Result, Session, check, judged::judged, samples};
 
 /// What one repository is evaluated with.
 struct Inputs<'a> {
@@ -77,7 +77,7 @@ fn one(request: &EvalRequest, repo: &Repo, inputs: &Inputs) -> Result<Part> {
     // Only labels a person gave, a reviewed table holds or an example shows
     // grade a check; weak labels (an agent's, a model's) never do.
     let labels: Vec<Label> = Collect {
-        root: &session.root,
+        judgments: judged(&session.root)?,
         decision: &decision,
         baseline: table.as_ref(),
         exclude_model: None,

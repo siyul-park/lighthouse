@@ -1,60 +1,23 @@
 use std::fs;
 
 use lighthouse_ml::{
-    labels::{Baseline, Collect, Label, Source},
+    labels::{Baseline, Collect, Judged, Label, Source},
     metrics::Truth,
 };
-use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};
+use lighthouse_model::{AgentKind, Attribution, Judgment};
 use lighthouse_spec::Catalog;
-use lighthouse_store::{NewJudgment, Observed, Run, Stamp, Store, Unchecked};
-use serde_json::json;
 
 const RULE: &str = "core/max-lines";
 
-fn observed(fingerprint: &str) -> Observed {
-    Observed {
+fn judged(fingerprint: &str, judgment: Judgment, by: Attribution, meaning: &str) -> Judged {
+    Judged {
         fingerprint: fingerprint.to_owned(),
-        rule_id: RULE.to_owned(),
+        decision_name: RULE.to_owned(),
         decision_uid: None,
-        severity: Severity::Warn,
-        authored_severity: Severity::Warn,
-        path: "a.rs".to_owned(),
-        locator: json!({}),
-        symbol: None,
-        message: "m".to_owned(),
-        evidence: json!({}),
-        facts: json!({}),
-        options: json!({}),
-        meaning_version: None,
-        check_revision: None,
-        decision_hash: None,
-    }
-}
-
-fn judge(
-    store: &mut Store,
-    fingerprint: &str,
-    judgment: Judgment,
-    who: Attribution,
-    meaning: &str,
-) {
-    let review = NewJudgment {
-        fingerprint: fingerprint.to_owned(),
+        meaning_version: Some(meaning.to_owned()),
         judgment,
-        reason: None,
-        suppress: None,
-        attribution: who,
-        commit: None,
-        expect_seen: None,
-        lighthouse_version: "test".to_owned(),
-    };
-    let meaning = meaning.to_owned();
-    store
-        .resolve(&review, move |_| Stamp {
-            meaning_version: Some(meaning.clone()),
-            ..Stamp::default()
-        })
-        .unwrap();
+        by,
+    }
 }
 
 fn who(kind: AgentKind, id: &str) -> Attribution {
@@ -66,14 +29,14 @@ fn model(id: &str) -> Attribution {
 }
 
 fn collect(
-    root: &std::path::Path,
+    judgments: Vec<Judged>,
     baseline: Option<&Baseline>,
     exclude: Option<&str>,
 ) -> Vec<Label> {
     let catalog = Catalog::bundled().clone();
     let decision = catalog.decision(RULE).unwrap().clone();
     Collect {
-        root,
+        judgments,
         decision: &decision,
         baseline,
         exclude_model: exclude,
@@ -88,95 +51,53 @@ fn labels_weigh_by_who_gave_them_and_skip_other_meanings_and_the_model_itself() 
     let dir = tempfile::tempdir().unwrap();
     let decision = Catalog::bundled().decision(RULE).unwrap().clone();
     let meaning = decision.meaning_version();
-    let mut store = Store::open(dir.path()).unwrap();
-    let names = ["p", "a", "m", "self", "old", "na", "zz", "b1"];
-    store
-        .record(&Run {
-            observed: names.iter().map(|n| observed(n)).collect(),
-            reported: vec![String::new()],
-            rules: vec![RULE.to_owned()],
-            configured: vec![RULE.to_owned()],
-            unchecked: Unchecked::Nothing,
-            commit: None,
-            dirty: false,
-            catalog_version: None,
-            lighthouse_version: "test".to_owned(),
-        })
-        .unwrap();
-    judge(
-        &mut store,
-        "p",
-        Judgment::Fail,
-        who(AgentKind::Person, "kim"),
-        &meaning,
-    );
-    judge(
-        &mut store,
-        "a",
-        Judgment::Pass,
-        who(AgentKind::SoftwareAgent, "claude"),
-        &meaning,
-    );
-    judge(
-        &mut store,
-        "m",
-        Judgment::Fail,
-        model("openai/gpt@v1"),
-        &meaning,
-    );
-    judge(
-        &mut store,
-        "self",
-        Judgment::Fail,
-        model("local/x@v2"),
-        &meaning,
-    );
-    judge(
-        &mut store,
-        "old",
-        Judgment::Fail,
-        who(AgentKind::Person, "kim"),
-        "another-meaning",
-    );
-    judge(
-        &mut store,
-        "na",
-        Judgment::NotApplicable,
-        who(AgentKind::Person, "kim"),
-        &meaning,
-    );
-    // One subject judged by a person, then a coding agent, then a model: the
-    // person's label stands, whoever spoke last.
-    judge(
-        &mut store,
-        "zz",
-        Judgment::Fail,
-        who(AgentKind::Person, "kim"),
-        &meaning,
-    );
-    judge(
-        &mut store,
-        "zz",
-        Judgment::Pass,
-        who(AgentKind::SoftwareAgent, "claude"),
-        &meaning,
-    );
-    judge(
-        &mut store,
-        "zz",
-        Judgment::Pass,
-        model("openai/gpt@v1"),
-        &meaning,
-    );
-    // A reviewed table outranks a coding agent.
-    judge(
-        &mut store,
-        "b1",
-        Judgment::Pass,
-        who(AgentKind::SoftwareAgent, "claude"),
-        &meaning,
-    );
-    drop(store);
+    let judge =
+        |fingerprint, judgment, by, meaning: &str| judged(fingerprint, judgment, by, meaning);
+    let judgments = vec![
+        judge("p", Judgment::Fail, who(AgentKind::Person, "kim"), &meaning),
+        judge(
+            "a",
+            Judgment::Pass,
+            who(AgentKind::SoftwareAgent, "claude"),
+            &meaning,
+        ),
+        judge("m", Judgment::Fail, model("openai/gpt@v1"), &meaning),
+        judge("self", Judgment::Fail, model("local/x@v2"), &meaning),
+        judge(
+            "old",
+            Judgment::Fail,
+            who(AgentKind::Person, "kim"),
+            "another-meaning",
+        ),
+        judge(
+            "na",
+            Judgment::NotApplicable,
+            who(AgentKind::Person, "kim"),
+            &meaning,
+        ),
+        // One subject judged by a person, then a coding agent, then a model:
+        // the person's label stands, whoever spoke last.
+        judge(
+            "zz",
+            Judgment::Fail,
+            who(AgentKind::Person, "kim"),
+            &meaning,
+        ),
+        judge(
+            "zz",
+            Judgment::Pass,
+            who(AgentKind::SoftwareAgent, "claude"),
+            &meaning,
+        ),
+        judge("zz", Judgment::Pass, model("openai/gpt@v1"), &meaning),
+        // A reviewed table outranks a coding agent.
+        judge(
+            "b1",
+            Judgment::Pass,
+            who(AgentKind::SoftwareAgent, "claude"),
+            &meaning,
+        ),
+    ];
 
     let table = dir.path().join("t.tsv");
     fs::write(
@@ -188,7 +109,7 @@ fn labels_weigh_by_who_gave_them_and_skip_other_meanings_and_the_model_itself() 
         file: &table,
         repo: Some("cel"),
     };
-    let labels = collect(dir.path(), Some(&baseline), Some("local/x"));
+    let labels = collect(judgments, Some(&baseline), Some("local/x"));
     let by = |key: &str| labels.iter().find(|l| l.key == key);
 
     let p = by("p").unwrap();

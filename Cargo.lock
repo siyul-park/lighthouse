@@ -1519,7 +1519,6 @@ dependencies = [
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-spec",
- "lighthouse-store",
  "serde",
  "serde_json",
  "tempfile",

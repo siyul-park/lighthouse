@@ -15,7 +15,7 @@ use lighthouse_ml::{
 };
 use lighthouse_plugin::DecisionRef;
 
-use crate::{CheckRequest, Checked, ModelFlags, Result, Session, check, samples};
+use crate::{CheckRequest, Checked, ModelFlags, Result, Session, check, judged::judged, samples};
 
 /// What one repository gave to a training run.
 struct Gathered {
@@ -124,7 +124,7 @@ fn gather(
         Vec::new()
     };
     let labels = Collect {
-        root: &labelling.root,
+        judgments: judged(&labelling.root)?,
         decision: &decision,
         baseline: table.as_ref(),
         exclude_model: reference.as_deref(),
