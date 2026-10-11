@@ -13,6 +13,30 @@ pub enum RunScope {
     Project,
 }
 
+/// How much of the project a rule's findings about one subject depend on,
+/// which is what a stored result may be reused across. The order is the order
+/// of reach: a rule's reach is the greatest of what it reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Reach {
+    /// The subject's own symbol, file text and summary.
+    Local,
+    /// Symbols one edge, one owner or one member away from the subject.
+    Neighbors,
+    /// Anything in the project.
+    Global,
+}
+
+impl Reach {
+    /// The name of the reach, as keys and tables spell it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Local => "local",
+            Self::Neighbors => "neighbors",
+            Self::Global => "global",
+        }
+    }
+}
+
 /// Which test code a decision applies to.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]

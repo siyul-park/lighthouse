@@ -21,6 +21,12 @@ pub struct Timings {
     pub merge: Duration,
     /// Each analyzer, over all files, in the order they ran.
     pub analyzers: Vec<(String, Duration)>,
+    /// Hashing the merged project for the keys of the result cache; zero
+    /// without one.
+    pub hashing: Duration,
+    /// Rule runs whose findings the result cache had, and those it did not.
+    pub cache_hits: usize,
+    pub cache_misses: usize,
     /// All the rules together, on the wall clock.
     pub rules_wall: Duration,
     /// Each rule, summed over its runs, longest first.

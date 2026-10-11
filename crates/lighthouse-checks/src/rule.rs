@@ -7,10 +7,11 @@
 use std::sync::Arc;
 
 use lighthouse_model::{
-    Diagnostic, Options,
+    Diagnostic, Options, Reach,
     annotation::{ANNOTATION_REASON, UNUSED_ALLOW},
+    hash,
 };
-use lighthouse_plugin::{Ctx, Error as PluginError, Rule, RuleManifest};
+use lighthouse_plugin::{Caching, Ctx, Error as PluginError, Rule, RuleManifest};
 use lighthouse_spec::{BuiltinCheck, BuiltinOp, CheckKind, Decision};
 use serde_json::{Map, Value};
 
@@ -93,6 +94,34 @@ impl DeclarativeRule {
             .ok_or_else(|| Error::invalid(id, "the decision has no severity or check"))?;
         meta.analyzers = analyzers;
         meta.capabilities.clone_from(&check.requires);
+        let revision = serde_json::to_vec(&(
+            decision.uid(),
+            &decision.check,
+            &decision.scope,
+            decision.severity(),
+            &decision.options,
+            &decision.languages,
+        ))
+        .map(hash::sha256)
+        .map_err(|e| Error::invalid(id, format!("the decision cannot be hashed: {e}")))?;
+        let (reach, positions) = match &kind {
+            Kind::Cel(rule) => rule.reach(meta.scope),
+            Kind::Order(rule) => rule.reach(),
+            Kind::Proximity(rule) => rule.reach(),
+            Kind::Cycle(_) => (Reach::Global, false),
+            Kind::Command(_) | Kind::Annotation => (Reach::Global, false),
+        };
+        // The findings of a program that reads the code model are stored;
+        // those of a command, which reads whatever the program reads, and the
+        // annotation rules, which the engine reports itself, are not.
+        meta.caching = match kind {
+            Kind::Command(_) | Kind::Annotation => None,
+            _ => Some(Caching {
+                reach,
+                positions,
+                revision,
+            }),
+        };
         Ok(Some(Self {
             meta,
             decision: decision.clone(),

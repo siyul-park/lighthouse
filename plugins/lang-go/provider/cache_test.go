@@ -93,6 +93,21 @@ func TestProviderCache(t *testing.T) {
 		}
 	})
 
+	t.Run("a replace that names a directory that is not there is no reason to fail", func(t *testing.T) {
+		root, cache := t.TempDir(), t.TempDir()
+		files := map[string]string{}
+		for name, text := range cacheFixture {
+			files[name] = text
+		}
+		files["go.mod"] = cacheModule + "\nrequire example.com/gone v0.0.0\n\nreplace example.com/gone => ../gone\n"
+		writeTree(t, root, files)
+
+		got, _ := indexWith(t, provider.New("lang-go", "test"), root, cache, nil)
+		want, _ := indexWith(t, provider.New("lang-go", "test"), root, "", nil)
+
+		require.JSONEq(t, want, got)
+	})
+
 	t.Run("a different option or build tag misses everything", func(t *testing.T) {
 		root, cache := t.TempDir(), t.TempDir()
 		writeTree(t, root, cacheFixture)

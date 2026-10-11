@@ -133,6 +133,19 @@ fn plugins_are_listed_in_registration_order() {
     assert_eq!(registry.plugins().collect::<Vec<_>>(), ["b", "a"]);
 }
 
+#[test]
+fn registry_manifests_carry_the_version_of_each_plugin_in_registration_order() {
+    let mut registry = Registry::default();
+    registry.register(&Graph::new("b", &[])).unwrap();
+    registry.register(&Graph::new("a", &[])).unwrap();
+    let listed: Vec<_> = registry
+        .manifests()
+        .iter()
+        .map(|m| (m.id.as_str(), m.version.as_str()))
+        .collect();
+    assert_eq!(listed, [("b", "0"), ("a", "0")]);
+}
+
 struct Lang(ProviderManifest);
 
 impl LanguageProvider for Lang {
@@ -232,6 +245,7 @@ fn rule_manifest_fingerprints_are_seeded_by_the_uid_so_a_rename_moves_none() {
         analyzers: Vec::new(),
         capabilities: Vec::new(),
         applicability: lighthouse_model::Applicability::default(),
+        caching: None,
     };
     let by_name = meta.fingerprint("pkg::f#function", "snippet");
     assert_eq!(

@@ -20,6 +20,7 @@ pub(crate) fn rule_manifest(decision: &Decision) -> Option<RuleManifest> {
         analyzers: Vec::new(),
         capabilities: Vec::new(),
         applicability: decision.scope.applicability(),
+        caching: None,
     })
 }
 

@@ -20,6 +20,7 @@ pub struct Scope<'a> {
     pub only: &'a [String],
     pub config: Option<&'a Path>,
     pub store: bool,
+    pub cache: bool,
 }
 
 /// How a check reports.
@@ -81,6 +82,7 @@ fn select(scope: &Scope) -> Result<Checked> {
         diff: scope.reported.diff.map(str::to_owned),
         rules: scope.only.to_vec(),
         store: scope.store,
+        cache: scope.cache,
     };
     let checked = lighthouse_session::check(Session::load(scope.config)?, &request)?;
     for message in &checked.messages {

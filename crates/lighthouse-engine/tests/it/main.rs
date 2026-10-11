@@ -1,5 +1,6 @@
 //! The engine, its fix orchestration and the decision tester over fixture plugins, one binary.
 
+mod cache;
 mod engine;
 mod fix;
 mod fix_safety;

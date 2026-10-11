@@ -308,7 +308,7 @@ fn a_run_resolves_only_findings_inside_its_report_scope() {
 fn no_store_neither_records_nor_applies_judgments() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path())
-        .args(["check", "--no-store"])
+        .args(["check", "--no-store", "--no-cache"])
         .assert()
         .success();
     assert!(!dir.path().join(".lighthouse").exists());

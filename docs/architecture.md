@@ -243,6 +243,32 @@ a package without function bodies, so a body edit re-indexes one unit.
 analyzer, the rules (wall clock, then the five slowest rules summed over the
 files they ran on), identity, store, report and the total.
 
+### Result cache
+
+The model is that of Go's build cache, rustc's incremental compilation (Salsa's
+early cutoff), ESLint `--cache` and Bazel's action cache: a result is kept under
+a key of everything it was computed from, and any doubt is a miss. The cache is
+`.lighthouse/cache/` (derived, never committed); `lighthouse-cache` (L0: rusqlite
+and model) owns `results.db`, a WAL SQLite table of findings and notices by key,
+capped at 256 MB (`LIGHTHOUSE_CACHE_LIMIT_MB`), least recently used pruned at the
+end of a run. `check --no-cache` (MCP `noCache`) bypasses it; `lighthouse cache
+clean` deletes the whole directory, providers' subdirectories included.
+
+A rule declares its **reach** (`checks::reach`, next to the facts and functions it
+describes; a test fails for a fact or function without one): `local` (the
+subject's own symbol, file and summary), `neighbors` (one edge, owner or member
+away) or `global` (indexes and walks over the project). A rule's reach is the
+greatest of what its expressions mention; project-scope rules, `cycle` and rules
+that report at another symbol are global; command, annotation and plugin rules
+are not cached. A key holds the build, plugins and language conventions, the rule
+id, its check revision (a hash of the decision), the resolved options and
+applicability, then by reach the file path and its slice digest (local), plus its
+neighbor digest (neighbors), or the digest of the whole merged project (global).
+The digests are computed once per run, in parallel per file, after the merge. A
+hit returns the stored findings and notices; failed or incomplete rule runs are
+never stored. Identity, suppression and reporting run afterwards on the full set,
+so a warm run prints what a cold one does, byte for byte.
+
 ## Memory: findings, judgments and the feedback loop
 
 Memory has two parts with different owners. **Sightings** (what `check` saw, when, with
@@ -720,6 +746,7 @@ L2  engine                    -> plugin, spec, model, process   (analysis, fix o
 L1  plugin                    -> model                      (SPI and Registry)
     spec                      -> model, resource            (decision kinds, Catalog, local layer, `spec::project`)
 L0  model, resource, protocol, process   (no workspace dependencies)
+    cache                     -> model                      (the host result cache; rusqlite)
 ```
 
 `lighthouse-checks` holds everything the bundled plugins run: the declarative

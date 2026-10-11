@@ -7,7 +7,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use lighthouse_model::{
     Applicability, Capability, Diagnostic, File, Fingerprint, Fragment, Incomplete, Options,
-    Project, RunScope, Severity,
+    Project, Reach, RunScope, Severity,
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -70,8 +70,10 @@ pub struct Workspace {
     /// what a provider must read instead of the disk. Empty for a normal run;
     /// a fix run checks candidate edits this way before anything is written.
     pub overlays: BTreeMap<PathBuf, String>,
-    /// The directory the providers keep derived results in, one subdirectory
-    /// per plugin; `None` runs without a cache.
+    /// The directory the host keeps derived data in between runs
+    /// (`.lighthouse/cache`), exactly when its result cache is on; a provider
+    /// may keep its own under a directory named by its plugin. `None` when the
+    /// run must not use a cache.
     pub cache_dir: Option<PathBuf>,
 }
 
@@ -240,6 +242,10 @@ pub struct RuleManifest {
     pub capabilities: Vec<Capability>,
     /// What code the rule's subjects may be in, from its decision's scope.
     pub applicability: Applicability,
+    /// What the findings depend on, when the host may store and reuse them;
+    /// `None` when it must run the rule every time, such as one that reads
+    /// more than the code model.
+    pub caching: Option<Caching>,
 }
 
 impl RuleManifest {
@@ -253,6 +259,20 @@ impl RuleManifest {
             snippet,
         )
     }
+}
+
+/// What lets the host reuse a rule's findings instead of running it again.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Caching {
+    /// How much of the project the findings about one subject depend on.
+    pub reach: Reach,
+    /// Whether the findings read the place of the symbols one edge away (their
+    /// lines and columns), not only what they are.
+    pub positions: bool,
+    /// Changes whenever the way the rule judges changes (its check, scope,
+    /// severity and option defaults, as the decision wrote them), so that
+    /// stored findings of the old way are not used.
+    pub revision: String,
 }
 
 /// A check that turns facts into diagnostics. `validate` rejects bad options

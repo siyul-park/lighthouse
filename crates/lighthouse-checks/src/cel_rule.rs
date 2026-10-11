@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cel::Program;
-use lighthouse_model::{Diagnostic, File, Node, Position, Project, Span, Symbol, SymbolId};
+use lighthouse_model::{Diagnostic, File, Node, Position, Project, Reach, Span, Symbol, SymbolId};
 use lighthouse_plugin::{Ctx, Error as PluginError, RuleManifest};
 use lighthouse_spec::{CelCheck, Decision, Select};
 use serde_json::{Map, Value};
@@ -15,7 +15,7 @@ use crate::{
     eval::{Fact, Frame, Template, cel_fact, compile, compile_all},
     facts,
     library::{self, Needs},
-    modules,
+    modules, reach,
 };
 
 /// A CEL check with every expression compiled.
@@ -119,6 +119,17 @@ impl CelRule {
         } else {
             Vec::new()
         }
+    }
+
+    /// How far the findings about one subject reach: a project decision reads
+    /// the whole project, and so does one that reports at a symbol other than
+    /// its subject; else what the expressions read.
+    pub(crate) fn reach(&self, scope: lighthouse_model::RunScope) -> (Reach, bool) {
+        let elsewhere = self.at.as_ref().is_some_and(|at| at.symbol.is_some());
+        if scope == lighthouse_model::RunScope::Project || elsewhere {
+            return (Reach::Global, false);
+        }
+        reach::of(&self.needs)
     }
 
     pub(crate) fn check(

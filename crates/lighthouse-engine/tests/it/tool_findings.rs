@@ -69,6 +69,7 @@ impl Plugin for Tool {
             analyzers: Vec::new(),
             capabilities: Vec::new(),
             applicability: Applicability::default(),
+            caching: None,
         }))]
     }
 }

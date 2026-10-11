@@ -145,6 +145,7 @@ impl Plugin for Fake {
                 analyzers: Vec::new(),
                 capabilities: Vec::new(),
                 applicability: Applicability::default(),
+                caching: None,
             },
         })]
     }

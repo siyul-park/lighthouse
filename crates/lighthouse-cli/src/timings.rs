@@ -18,6 +18,14 @@ pub fn lines(timings: &Timings, report: Duration, total: Duration) -> Vec<String
             .map(|(language, spent)| line(&format!("index {language}"), *spent)),
     );
     out.push(line("merge", timings.merge));
+    if timings.hashing > Duration::ZERO {
+        out.push(format!(
+            "{} ({} cache hit(s), {} miss(es))",
+            line("hashing", timings.hashing),
+            timings.cache_hits,
+            timings.cache_misses
+        ));
+    }
     out.extend(
         timings
             .analyzers

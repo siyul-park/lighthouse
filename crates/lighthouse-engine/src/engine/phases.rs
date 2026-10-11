@@ -290,7 +290,7 @@ impl Engine {
                 applies,
             };
             let started = Instant::now();
-            let checked = rule.check(&ctx, &config.options);
+            let checked = self.run_rule(scene, *rule, &ctx, &config.options);
             gathered.notices.extend(notices.take());
             *gathered.spent.entry(meta.id.clone()).or_default() += started.elapsed();
             let found = unfinished(
@@ -366,7 +366,7 @@ impl Engine {
             applies: self.applies(meta.applicability, config),
         };
         let started = Instant::now();
-        let checked = rule.check(&ctx, &config.options);
+        let checked = self.run_rule(scene, rule, &ctx, &config.options);
         gathered.notices.extend(notices.take());
         *gathered.spent.entry(meta.id.clone()).or_default() += started.elapsed();
         let found = unfinished(checked, &meta.id, None, &mut gathered.incomplete)?;

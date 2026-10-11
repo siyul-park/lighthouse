@@ -30,19 +30,18 @@ use crate::{
     timings::{Timings, in_pool},
 };
 
+mod cached;
 mod config;
 mod phases;
 mod run;
 
+use cached::RunCache;
 pub use config::active_rules;
 use config::{constructors, io_error, load_languages, validate_config};
 
 /// Name of the file, in `.gitignore` syntax, that keeps files out of the
 /// analysis altogether, such as fixtures that are broken on purpose.
 pub const IGNORE_FILE: &str = ".lighthouseignore";
-
-/// Where providers keep derived results, relative to the root.
-const CACHE_DIR: &str = ".lighthouse/cache";
 
 /// Process exit code of a run whose analysis was incomplete.
 pub const EXIT_INCOMPLETE: u8 = 3;
@@ -184,6 +183,9 @@ struct Scene<'a> {
     project: &'a Project,
     facts: &'a Facts,
     memo: &'a Memo,
+    /// Where findings of an earlier run are looked up and kept, if the run has
+    /// a cache.
+    cache: Option<&'a RunCache>,
 }
 
 /// What some rule runs found and noted.
@@ -206,6 +208,12 @@ impl Gathered {
             *self.spent.entry(rule).or_default() += time;
         }
     }
+}
+
+/// Where the engine keeps the findings of its runs, and how much.
+struct CacheSettings {
+    dir: PathBuf,
+    limit: u64,
 }
 
 /// A configured set of plugins that analyzes one project root. Running it does
@@ -235,6 +243,8 @@ pub struct Engine {
     /// Gaps known before the run, such as a plugin that failed to start.
     startup: Vec<Incomplete>,
     trusted: bool,
+    /// The result cache; `None` runs every rule every time.
+    cache: Option<CacheSettings>,
 }
 
 impl Engine {
@@ -255,11 +265,11 @@ impl Engine {
         let (attributes, found) = Attributes::of(&root);
         notices.extend(found);
         let ws = Workspace {
-            cache_dir: Some(root.join(CACHE_DIR)),
             root,
             languages: config.languages().clone(),
             constructors: constructors(&registry, &config),
             overlays: BTreeMap::new(),
+            cache_dir: None,
         };
         let mut engine = Self {
             registry,
@@ -283,6 +293,7 @@ impl Engine {
             active: BTreeSet::new(),
             startup: Vec::new(),
             trusted: false,
+            cache: None,
         };
         engine.active = active_rules(&engine.config, &engine.projects)?;
         Ok(engine)
@@ -294,10 +305,13 @@ impl Engine {
         self
     }
 
-    /// Runs without a cache: the providers get no directory to keep results in,
-    /// and nothing is written under the root.
-    pub fn without_cache(mut self) -> Self {
-        self.ws.cache_dir = None;
+    /// Keeps what rules find in `dir`, at most `limit` bytes of it, so that a
+    /// later run over code that did not change what a rule reads takes the
+    /// findings instead of running the rule. The findings are the same either
+    /// way. Providers may keep their own data under the directory too.
+    pub fn with_cache(mut self, dir: PathBuf, limit: u64) -> Self {
+        self.ws.cache_dir = Some(dir.clone());
+        self.cache = Some(CacheSettings { dir, limit });
         self
     }
 

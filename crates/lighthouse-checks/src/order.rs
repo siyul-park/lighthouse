@@ -12,6 +12,10 @@ use crate::layout::{exposed, has_word_prefix, is_declaration, owner_key};
 
 const ID: &str = "design/declaration-groups";
 
+/// The ids of the order keys of this crate. They rank a declaration by what
+/// its own file says of it; a key of any other plugin may read anything.
+pub(crate) const CORE_KEYS: [&str; 2] = ["design/group", "design/constructor-first"];
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Options {

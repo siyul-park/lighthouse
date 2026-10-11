@@ -61,6 +61,30 @@ impl Needs {
         Self { names, sources }
     }
 
+    /// Whether some expression calls a function `name`, as a function or as a
+    /// method of its first argument.
+    pub(crate) fn calls(&self, name: &str) -> bool {
+        let call = format!("{name}(");
+        self.sources.iter().any(|source| {
+            source.match_indices(&call).any(|(at, _)| {
+                source[..at]
+                    .chars()
+                    .next_back()
+                    .is_none_or(|c| !(c.is_alphanumeric() || c == '_'))
+            })
+        })
+    }
+
+    /// Whether some expression mentions the fact `word`; the one way the
+    /// builder asks, so that a fact without a declared reach is caught.
+    pub(crate) fn fact(&self, word: &'static str) -> bool {
+        debug_assert!(
+            crate::reach::fact_declared(word),
+            "fact `{word}` has no declared reach"
+        );
+        self.mentions(word)
+    }
+
     /// Whether some expression calls library function `name`.
     pub(crate) fn function(&self, name: &str) -> bool {
         self.names.contains(&name)

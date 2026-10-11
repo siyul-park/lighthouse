@@ -140,6 +140,7 @@ fn request(paths: Vec<PathBuf>, changed: bool) -> CheckRequest {
         diff: None,
         rules: Vec::new(),
         store: true,
+        cache: true,
     }
 }
 

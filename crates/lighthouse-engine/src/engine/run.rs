@@ -16,6 +16,7 @@ struct Progress {
 struct Loaded {
     inputs: Vec<Input>,
     project: Project,
+    cache: Option<RunCache>,
 }
 
 impl Engine {
@@ -43,8 +44,12 @@ impl Engine {
             project: &loaded.project,
             facts: &facts,
             memo: &memo,
+            cache: loaded.cache.as_ref(),
         };
         let found = self.collect(&scene, &mut progress)?;
+        if let Some(cache) = scene.cache {
+            self.close_cache(cache, &mut progress.timings, &mut progress.outcome.notices);
+        }
         let started = Instant::now();
         let found = self.suppress(found, &scene, &mut progress)?;
         self.identify(found, &scene, &mut progress)?;
@@ -140,7 +145,14 @@ impl Engine {
         } else {
             project
         };
-        Loaded { inputs, project }
+        let started = Instant::now();
+        let cache = self.open_cache(&project, selected, &mut progress.outcome.notices);
+        progress.timings.hashing = started.elapsed();
+        Loaded {
+            inputs,
+            project,
+            cache,
+        }
     }
 
     /// Applies the rules and keeps what they found, noticed and could not
