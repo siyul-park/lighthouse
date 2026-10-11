@@ -2,7 +2,6 @@
 
 mod catalog;
 mod checks;
-mod docs;
 mod fixes;
 mod kinds;
 mod local;

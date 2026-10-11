@@ -44,8 +44,9 @@ pub use fix::{AppliedRow, DeclinedRow, FixSelection, FixTargets, Fixed, fix, fix
 pub use git::head;
 pub use lighthouse_engine::{FailOn, Timings};
 pub use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};
+pub use lighthouse_report::docs::DOCS_DIR;
 pub use lighthouse_resource::schema_file;
-pub use lighthouse_spec::{DOCS_DIR, FILE_NAME};
+pub use lighthouse_spec::FILE_NAME;
 pub use lighthouse_store::{
     FindingRecord, JudgmentEvent, NewJudgment, Standing, StatusFilter, SuppressionEvent,
 };

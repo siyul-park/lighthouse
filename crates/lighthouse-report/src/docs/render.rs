@@ -2,20 +2,22 @@ use std::{collections::BTreeMap, fmt::Write};
 
 use serde_json::Value;
 
-use crate::{Catalog, Decision, Example, Fix, FixKind, OpSpec, OptionsSchema, pack_docs};
+use lighthouse_spec::{Catalog, Decision, Example, Fix, FixKind, OpSpec, OptionsSchema};
+
+use super::pack;
 
 /// Where the generated decision pages live, relative to the docs root.
 pub const DOCS_DIR: &str = "decisions";
 
 /// Markdown for every pack, keyed by path relative to the docs root.
-pub fn docs(catalog: &Catalog) -> BTreeMap<String, String> {
+pub fn pages(catalog: &Catalog) -> BTreeMap<String, String> {
     catalog
         .packs
         .iter()
         .map(|pack| {
             (
                 format!("{DOCS_DIR}/{}.md", pack.id),
-                pack_docs::pack_markdown(pack),
+                pack::pack_markdown(pack),
             )
         })
         .collect()
@@ -26,10 +28,10 @@ pub fn docs(catalog: &Catalog) -> BTreeMap<String, String> {
 /// is relative to the repository root.
 pub fn help_path(decision: &Decision) -> String {
     let page = format!("docs/{DOCS_DIR}/{}.md", decision.pack());
-    if pack_docs::is_row(decision) {
+    if pack::is_row(decision) {
         page
     } else {
-        format!("{page}#{}", pack_docs::anchor(&decision.title))
+        format!("{page}#{}", pack::anchor(&decision.title))
     }
 }
 

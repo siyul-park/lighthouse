@@ -1,6 +1,7 @@
 //! The renderers of a run, one binary.
 
 mod agent;
+mod docs;
 mod group;
 mod render;
 

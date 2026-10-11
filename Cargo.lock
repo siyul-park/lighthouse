@@ -1567,8 +1567,10 @@ dependencies = [
  "insta",
  "lighthouse-model",
  "lighthouse-spec",
+ "lighthouse-test-support",
  "serde",
  "serde_json",
+ "similar",
 ]
 
 [[package]]
@@ -1641,7 +1643,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_norway",
- "similar",
  "tempfile",
  "thiserror",
  "toml",

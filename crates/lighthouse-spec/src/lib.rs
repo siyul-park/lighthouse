@@ -4,16 +4,13 @@ mod command;
 mod decision;
 mod error;
 mod fix;
-mod fix_docs;
 mod load;
 mod local;
 mod model;
 mod model_check;
 mod options;
 mod pack;
-mod pack_docs;
 mod project;
-mod render;
 mod sources;
 mod validate;
 
@@ -36,7 +33,6 @@ pub use error::Error;
 pub use fix::{
     CommandOutput, CommandScope, CommandSpec, CommandStdin, Fix, FixKind, OpSpec, ReorderScope,
 };
-pub use fix_docs::{OPERATIONS, Operation, Param, fix_operations_markdown};
 pub use local::{load_local, local_dir, local_files};
 pub use model::{
     Content, DecisionStatus, Domain, Example, ExampleFile, ExampleKind, Expect, Scope, Subject,
@@ -55,7 +51,6 @@ pub use project::{
     ProjectSpec, Projects, ProviderSpec, RESERVED as RESERVED_PROVIDERS, RuleConfig, RuleDetail,
     RuleSetting, Rules, Specs, glob_set,
 };
-pub use render::{DOCS_DIR, decision_markdown, docs, help_path};
 pub use sources::{SourceLine, SourceMapSpec};
 
 /// The JSON Schema of every kind this crate defines.

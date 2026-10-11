@@ -7,7 +7,9 @@ use lighthouse_model::{
     Diagnostic, Incomplete, Position, Preview, PreviewEdit, Severity, Suppressed, Suppression,
     utf16_position,
 };
-use lighthouse_spec::{Catalog, Decision, help_path};
+use lighthouse_spec::{Catalog, Decision};
+
+use crate::docs::help_path;
 use serde::Serialize;
 
 const SCHEMA: &str = "https://json.schemastore.org/sarif-2.1.0.json";

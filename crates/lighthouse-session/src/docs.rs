@@ -2,12 +2,13 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_spec::{Catalog, DOCS_DIR, docs, fix_operations_markdown};
+use lighthouse_report::docs::{DOCS_DIR, fix_operations_markdown, pages};
+use lighthouse_spec::Catalog;
 
 /// Every generated page by path under the docs directory: one per pack, and
 /// the fix operations with the order keys the bundled plugins register.
 pub fn bundled_docs() -> BTreeMap<String, String> {
-    let mut pages = docs(Catalog::bundled());
+    let mut pages = pages(Catalog::bundled());
     let keys: Vec<(String, String)> = lighthouse_checks::registry()
         .order_keys()
         .map(|k| {

@@ -11,8 +11,10 @@ doctest = false
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+similar.workspace = true
 lighthouse-model.workspace = true
 lighthouse-spec.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+lighthouse-test-support = { path = "../lighthouse-test-support" }

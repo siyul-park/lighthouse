@@ -105,7 +105,7 @@ pub fn decision_text(session: &Session, id: &str) -> Result<String> {
     let decision = catalog
         .decision(id)
         .ok_or_else(|| format!("unknown decision `{id}`"))?;
-    Ok(lighthouse_spec::decision_markdown(decision, 1))
+    Ok(lighthouse_report::docs::decision_markdown(decision, 1))
 }
 
 /// The text that explains a decision or rule: context, requirement, examples and
@@ -116,7 +116,7 @@ pub fn explain(catalog: &Catalog, registry: &Registry, id: &str) -> Result<Strin
     let mut out = String::new();
     match (decision, rule) {
         (Some(decision), _) => {
-            out.push_str(&lighthouse_spec::decision_markdown(decision, 1));
+            out.push_str(&lighthouse_report::docs::decision_markdown(decision, 1));
             let _ = writeln!(out, "Status: {}", status(decision, registry));
         }
         (None, Some(rule)) => {

@@ -1,4 +1,5 @@
 mod agent;
+pub mod docs;
 mod evidence;
 mod expected;
 mod fix;
