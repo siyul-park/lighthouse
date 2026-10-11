@@ -457,8 +457,9 @@ pub struct CelCheck {
     /// decision's requirement.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
-    /// The least confidence at which a model's answer decides, from 0 to 1;
-    /// below it the next model is asked. Default: 0.7.
+    /// P(fail), from 0 to 1, at or above which a model's answer is a `fail`;
+    /// below it the subject is left to review. Default: 0.9 (an uncalibrated
+    /// model never clears a subject).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub threshold: Option<f64>,
 }
@@ -583,7 +584,7 @@ impl CelCheck {
         compile("review", self.review.as_deref()?)
     }
 
-    /// The confidence at which a model's answer decides.
+    /// P(fail) at which a model's answer is a `fail`.
     pub fn confidence(&self) -> f64 {
         self.threshold.unwrap_or(crate::DEFAULT_THRESHOLD)
     }

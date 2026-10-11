@@ -10,47 +10,31 @@ use serde_json::{Value, json};
 
 use crate::serve::{Endpoint, Prompt, Transport};
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn prompt() -> Prompt {
-        Prompt {
-            system: "s".to_owned(),
-            user: "u".to_owned(),
-            schema: json!({"type": "object"}),
-        }
-    }
-
-    #[test]
-    fn the_request_asks_for_the_schema_only_when_it_is_structured() {
-        let with = request("m", &prompt(), true);
-        assert_eq!(with["response_format"]["type"], "json_schema");
-        assert_eq!(with["response_format"]["json_schema"]["strict"], true);
-        assert_eq!(with["messages"][0]["role"], "system");
-        assert!(
-            request("m", &prompt(), false)
-                .get("response_format")
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn the_text_is_the_first_choice_and_an_error_body_is_reported() {
-        let ok = json!({"choices": [{"message": {"content": "hi"}}]});
-        assert_eq!(text_of(&ok).unwrap(), "hi");
-        let err = json!({"error": {"message": "rate limited"}});
-        assert!(text_of(&err).unwrap_err().contains("rate limited"));
-    }
-}
-
 /// How long a request may take.
 const TIMEOUT: Duration = Duration::from_secs(120);
+/// How many times a busy service is asked again.
+const RETRIES: usize = 3;
 
 /// Chat Completions over HTTP.
 pub struct Http;
 
 impl Http {
+    /// Posts, and tries again after a pause when the service is busy (429,
+    /// 503) or overloaded (529).
+    fn retrying(&self, endpoint: &Endpoint, body: &Value) -> Result<Value, ureq::Error> {
+        let mut pause = Duration::from_secs(1);
+        for _ in 0..RETRIES {
+            match self.post(endpoint, body) {
+                Err(ureq::Error::StatusCode(429 | 503 | 529)) => {
+                    std::thread::sleep(pause);
+                    pause *= 2;
+                }
+                other => return other,
+            }
+        }
+        self.post(endpoint, body)
+    }
+
     fn post(&self, endpoint: &Endpoint, body: &Value) -> Result<Value, ureq::Error> {
         let url = format!(
             "{}/chat/completions",
@@ -81,10 +65,10 @@ impl Transport for Http {
             return Err(format!("${name} is not set"));
         }
         let structured = request(&endpoint.model, prompt, true);
-        let response = match self.post(endpoint, &structured) {
+        let response = match self.retrying(endpoint, &structured) {
             Ok(response) => response,
             Err(ureq::Error::StatusCode(400 | 404 | 422)) => self
-                .post(endpoint, &request(&endpoint.model, prompt, false))
+                .retrying(endpoint, &request(&endpoint.model, prompt, false))
                 .map_err(|e| e.to_string())?,
             Err(e) => return Err(e.to_string()),
         };
@@ -120,4 +104,38 @@ pub fn text_of(response: &Value) -> Result<String, String> {
             Some(message) => format!("the provider answered with an error: {message}"),
             None => "the provider's response has no message".to_owned(),
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn prompt() -> Prompt {
+        Prompt {
+            system: "s".to_owned(),
+            user: "u".to_owned(),
+            schema: json!({"type": "object"}),
+        }
+    }
+
+    #[test]
+    fn the_request_asks_for_the_schema_only_when_it_is_structured() {
+        let with = request("m", &prompt(), true);
+        assert_eq!(with["response_format"]["type"], "json_schema");
+        assert_eq!(with["response_format"]["json_schema"]["strict"], true);
+        assert_eq!(with["messages"][0]["role"], "system");
+        assert!(
+            request("m", &prompt(), false)
+                .get("response_format")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn the_text_is_the_first_choice_and_an_error_body_is_reported() {
+        let ok = json!({"choices": [{"message": {"content": "hi"}}]});
+        assert_eq!(text_of(&ok).unwrap(), "hi");
+        let err = json!({"error": {"message": "rate limited"}});
+        assert!(text_of(&err).unwrap_err().contains("rate limited"));
+    }
 }

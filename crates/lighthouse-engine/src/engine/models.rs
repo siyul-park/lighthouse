@@ -12,10 +12,11 @@ use std::{
 use lighthouse_cache::{Cache, DEFAULT_LIMIT, KeyBuilder};
 use lighthouse_model::hash;
 use lighthouse_plugin::{
-    Answer, Ask, Classifier, ClassifyParams, Decided, Judged, ModelManifest, ModelRef, Models,
-    Open, ResultKind, Subject,
+    Ask, Classifier, ClassifyParams, Decided, Judged, ModelManifest, Models, Open, Question,
+    ResultKind, Subject, decide,
 };
 use lighthouse_spec::ModelBinding;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::instance::Host;
@@ -38,13 +39,11 @@ pub(super) struct RunModels<'a> {
     seen: std::sync::Mutex<BTreeMap<String, Subject>>,
 }
 
-/// What is kept of an answer: the model that gave it is in the key.
+/// What is kept of an answer: the probability of failing. The model that gave
+/// it is in the key.
 #[derive(Serialize, Deserialize)]
 struct Kept {
-    kind: ResultKind,
-    confidence: f64,
-    reason: String,
-    version: String,
+    noul: f64,
 }
 
 impl super::Engine {
@@ -147,26 +146,24 @@ impl<'a> RunModels<'a> {
         found
     }
 
-    /// The answers of one model to the subjects at `at`, kept ones first.
+    /// What one model says about the subjects at `at`: P(fail), or why there
+    /// is none. Kept answers first; the rest asked one subject at a time,
+    /// concurrently.
     fn ask(
         &self,
         model: &dyn Classifier,
         ask: &Ask,
         at: &[usize],
-    ) -> Vec<(usize, Result<Answer, Open>, String)> {
+    ) -> Vec<(usize, Result<f64, Open>)> {
         let manifest = model.manifest();
         let mut out = Vec::new();
-        let mut missing = Vec::new();
-        for &i in at {
-            let subject = &ask.params.subjects[i];
-            match self.recall(manifest, ask, subject) {
-                Some(kept) => out.push((i, Ok(kept.0), kept.1)),
-                None => missing.push(i),
-            }
-        }
         let mut sent = Vec::new();
-        for i in missing {
-            let subject = &ask.params.subjects[i];
+        for &i in at {
+            let subject = &ask.subjects[i];
+            if let Some(noul) = self.recall(manifest, ask, subject) {
+                out.push((i, Ok(noul)));
+                continue;
+            }
             let allowed = if manifest.cost > 0.0 {
                 self.spend(subject)
             } else {
@@ -174,47 +171,36 @@ impl<'a> RunModels<'a> {
             };
             match allowed {
                 Ok(()) => sent.push(i),
-                Err(open) => out.push((i, Err(open), String::new())),
+                Err(open) => out.push((i, Err(open))),
             }
         }
-        for batch in sent.chunks(self.binding.batch) {
-            out.extend(self.send(model, ask, batch));
-        }
+        out.extend(
+            sent.par_iter()
+                .map(|&i| (i, self.send(model, ask, i)))
+                .collect::<Vec<_>>(),
+        );
         out
     }
 
-    fn send(
-        &self,
-        model: &dyn Classifier,
-        ask: &Ask,
-        batch: &[usize],
-    ) -> Vec<(usize, Result<Answer, Open>, String)> {
+    /// One subject, one question: the decision.
+    fn send(&self, model: &dyn Classifier, ask: &Ask, at: usize) -> Result<f64, Open> {
+        let subject = &ask.subjects[at];
         let params = ClassifyParams {
-            decision: ask.params.decision.clone(),
-            subjects: batch
-                .iter()
-                .map(|&i| ask.params.subjects[i].clone())
-                .collect(),
-            options: ask.params.options.clone(),
+            state: subject.state(),
+            model: String::new(),
+            questions: BTreeMap::from([(ask.decision.id.clone(), Question::of(&ask.decision))]),
+            options: serde_json::Map::new(),
         };
-        match model.classify(&params) {
-            Ok(result) => {
-                let version = result.model.version;
-                batch
-                    .iter()
-                    .filter_map(|&i| {
-                        let key = &ask.params.subjects[i].key;
-                        let answer = result.results.iter().find(|a| &a.key == key)?;
-                        self.keep(model.manifest(), &version, ask, i, answer);
-                        Some((i, Ok(answer.clone()), version.clone()))
-                    })
-                    .collect()
-            }
-            Err(e) => batch
-                .iter()
-                .map(|&i| (i, Err(Open::Failed(e.to_string())), String::new()))
-                .collect(),
-        }
+        let result = model
+            .classify(&params)
+            .map_err(|e| Open::Failed(e.to_string()))?;
+        let noul = result
+            .answers
+            .get(&ask.decision.id)
+            .map(|a| a.noul)
+            .ok_or(Open::Undecided)?;
+        self.keep(model.manifest(), ask, subject, noul);
+        Ok(noul)
     }
 
     /// Whether a subject is asked of a model that costs: it lies in the files
@@ -248,48 +234,24 @@ impl<'a> RunModels<'a> {
             .part(model)
             .part(version)
             .part(&ask.revision)
+            .part(&ask.decision.id)
             .part(hash::sha256(&subject.text))
             .part(hash::sha256(subject.context.facts.to_string()));
         key.finish()
     }
 
-    fn recall(
-        &self,
-        manifest: &ModelManifest,
-        ask: &Ask,
-        subject: &Subject,
-    ) -> Option<(Answer, String)> {
+    fn recall(&self, manifest: &ModelManifest, ask: &Ask, subject: &Subject) -> Option<f64> {
         let kept: Kept =
             self.answers
                 .as_ref()?
                 .get(&self.key(&manifest.id, &manifest.version, ask, subject))?;
-        let answer = Answer {
-            key: subject.key.clone(),
-            kind: kept.kind,
-            confidence: kept.confidence,
-            reason: kept.reason,
-            span: None,
-        };
-        Some((answer, kept.version))
+        Some(kept.noul)
     }
 
-    fn keep(&self, manifest: &ModelManifest, version: &str, ask: &Ask, at: usize, answer: &Answer) {
+    fn keep(&self, manifest: &ModelManifest, ask: &Ask, subject: &Subject, noul: f64) {
         let Some(answers) = &self.answers else { return };
-        let key = self.key(
-            &manifest.id,
-            &manifest.version,
-            ask,
-            &ask.params.subjects[at],
-        );
-        answers.put(
-            key,
-            &Kept {
-                kind: answer.kind,
-                confidence: answer.confidence,
-                reason: answer.reason.clone(),
-                version: version.to_owned(),
-            },
-        );
+        let key = self.key(&manifest.id, &manifest.version, ask, subject);
+        answers.put(key, &Kept { noul });
     }
 }
 
@@ -314,7 +276,6 @@ impl Models for RunModels<'_> {
 
     fn classify(&self, ask: &Ask) -> Vec<Judged> {
         let mut judged: Vec<Judged> = ask
-            .params
             .subjects
             .iter()
             .map(|_| Judged::Open(Open::Unbound))
@@ -322,19 +283,16 @@ impl Models for RunModels<'_> {
         let mut open: Vec<usize> = (0..judged.len()).collect();
         for model in self.cascade(&ask.rule) {
             let model = model.as_ref();
-            let id = model.manifest().id.clone();
+            let manifest = model.manifest();
             let mut still = Vec::new();
-            for (i, answer, version) in self.ask(model, ask, &open) {
-                match answer {
-                    Ok(a) if a.kind != ResultKind::Review && a.confidence >= ask.threshold => {
+            for (i, answer) in self.ask(model, ask, &open) {
+                match answer.map(|noul| decide(noul, ask.upper)) {
+                    Ok((ResultKind::Fail, confidence)) => {
                         judged[i] = Judged::Decided(Decided {
-                            kind: a.kind,
-                            confidence: a.confidence,
-                            reason: a.reason,
-                            model: ModelRef {
-                                id: id.clone(),
-                                version,
-                            },
+                            kind: ResultKind::Fail,
+                            confidence,
+                            model: manifest.id.clone(),
+                            version: manifest.version.clone(),
                         });
                     }
                     Ok(_) => {

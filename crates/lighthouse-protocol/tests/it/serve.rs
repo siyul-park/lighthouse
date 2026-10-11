@@ -17,7 +17,7 @@ impl Handler for Stub {
             version: "1".to_owned(),
             protocol_version: params.protocol_version,
             languages: Vec::new(),
-            models: Vec::new(),
+            models: lighthouse_protocol::ModelList::default(),
         })
     }
 

@@ -1,98 +1,103 @@
-//! The text a language model is given to classify subjects, and the shape it
-//! must answer in. Shared by the host (for a `command` model, which reads a
-//! prompt) and by the plugins that talk to a language model. The shots are a
-//! parameter: the decision's own examples, or the nearest judged subjects.
+//! The text a language model is given to answer a System One question, and
+//! the shape it must answer in. Shared by the host (for a `command` model
+//! that reads a prompt) and by the plugins that talk to a language model.
 
 use serde_json::{Value, json};
 
-use crate::{ClassifyParams, DecisionRef, ResultKind, Shot, Subject};
+use crate::{ClassifyParams, Question, State};
 
-/// What the model is told about its job, before the decision.
+/// What the model is told about its job.
 const INSTRUCTIONS: &str = "You judge one design decision about source code. \
-For each subject decide whether it violates the requirement (fail), complies with it (pass), \
-or whether the code shown is not enough to tell (review). \
+You are given a subject and a question: does the subject violate the requirement \
+(the criterion `true`) or comply with it (the criterion `false`)? \
 Answer only from the code shown. Never take a name alone as evidence. \
-Give a confidence from 0 to 1 that your answer is right, and one sentence of reason. \
-Reply with JSON only, no other text: \
-{\"results\":[{\"key\":\"<the subject's key>\",\"kind\":\"fail|pass|review\",\"confidence\":0.0,\"reason\":\"...\"}]} \
-with exactly one result for each subject.";
+Reply with JSON only, no other text: {\"noul\": p}, where p is the probability, \
+from 0 to 1, that the subject violates the requirement.";
 
-/// The system part: the instructions, the requirement and the shots.
-pub fn system(decision: &DecisionRef, shots: &[Shot]) -> String {
+/// The system part for one question: the instructions, the requirement and
+/// the examples of both criteria.
+pub fn system(id: &str, question: &Question) -> String {
     let mut out = format!(
-        "{INSTRUCTIONS}\n\nDecision: {}\nRequirement: {}\n",
-        decision.id, decision.prompt
+        "{INSTRUCTIONS}\n\nDecision: {id}\nRequirement: {}\n",
+        question.instructions.prompt
     );
-    for shot in shots {
-        let kind = if shot.kind == ResultKind::Fail {
-            "fail"
-        } else {
-            "pass"
-        };
-        out.push_str(&format!(
-            "\nExample ({kind}{}):\n```{}\n{}\n```\n",
-            if shot.note.is_empty() {
+    for (criterion, side) in [
+        ("true", &question.criteria.fail),
+        ("false", &question.criteria.pass),
+    ] {
+        out.push_str(&format!("\nCriterion {criterion}: {}\n", side.meaning));
+        for example in &side.examples {
+            let note = if example.note.is_empty() {
                 String::new()
             } else {
-                format!(", {}", shot.note)
-            },
-            shot.language,
-            shot.code
-        ));
+                format!(" ({})", example.note)
+            };
+            out.push_str(&format!(
+                "Example{note}:\n```{}\n{}\n```\n",
+                example.language, example.code
+            ));
+        }
     }
     out
 }
 
-/// The user part: the subjects, each with its key, place, facts and source.
-pub fn subjects(subjects: &[Subject]) -> String {
-    let mut out = String::new();
-    for subject in subjects {
-        out.push_str(&format!(
-            "\nSubject key={} kind={} id={} file={}\n",
-            subject.key, subject.kind, subject.id, subject.file
-        ));
-        if !subject.context.facts.is_null() {
-            out.push_str(&format!("facts: {}\n", subject.context.facts));
-        }
-        for near in &subject.context.neighbors {
-            out.push_str(&format!(
-                "{} {} {}\n{}\n",
-                near.relation, near.kind, near.id, near.text
-            ));
-        }
-        out.push_str(&format!("```{}\n{}\n```\n", subject.language, subject.text));
+/// The user part: the subject's place, facts, neighbors and source.
+pub fn subject(state: &State) -> String {
+    let mut out = format!("Subject in {}\n", state.file);
+    if !state.facts.is_null() {
+        out.push_str(&format!("facts: {}\n", state.facts));
     }
+    for near in &state.neighbors {
+        out.push_str(&format!(
+            "{} {} {}\n{}\n",
+            near.relation, near.kind, near.id, near.text
+        ));
+    }
+    out.push_str(&format!("```{}\n{}\n```\n", state.language, state.text));
     out
 }
 
 /// One text with everything, for a program that reads a prompt on stdin.
 pub fn prompt(params: &ClassifyParams) -> String {
-    let mut out = system(&params.decision, &params.decision.examples);
-    out.push_str(&subjects(&params.subjects));
+    let mut out = String::new();
+    for (id, question) in &params.questions {
+        out.push_str(&system(id, question));
+    }
+    out.push_str(&subject(&params.state));
     out
 }
 
-/// The JSON Schema of the answer: what a structured-output API is asked for.
+/// The JSON Schema of one answer: what a structured-output API is asked for.
 pub fn response_schema() -> Value {
     json!({
         "type": "object",
-        "properties": {
-            "results": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "key": {"type": "string"},
-                        "kind": {"type": "string", "enum": ["fail", "pass", "review"]},
-                        "confidence": {"type": "number"},
-                        "reason": {"type": "string"}
-                    },
-                    "required": ["key", "kind", "confidence", "reason"],
-                    "additionalProperties": false
-                }
-            }
-        },
-        "required": ["results"],
+        "properties": {"noul": {"type": "number"}},
+        "required": ["noul"],
         "additionalProperties": false
     })
+}
+
+/// The probability of yes that a program printed for question `id`: the
+/// System One body (`answers.<id>.noul`), or just `{"noul": p}`. Anything
+/// else, or a value outside 0 to 1, is no answer.
+pub fn noul_of(printed: &Value, id: &str) -> Option<f64> {
+    let p = printed
+        .get("answers")
+        .and_then(|answers| answers.get(id))
+        .and_then(|answer| answer.get("noul"))
+        .or_else(|| printed.get("noul"))?
+        .as_f64()?;
+    (0.0..=1.0).contains(&p).then_some(p)
+}
+
+/// The JSON in a model's text: the text itself, or what a fenced block holds.
+pub fn json_in(text: &str) -> Option<Value> {
+    let trimmed = text.trim();
+    let unfenced = trimmed
+        .strip_prefix("```json")
+        .or_else(|| trimmed.strip_prefix("```"))
+        .map_or(trimmed, |rest| {
+            rest.trim_end().trim_end_matches("```").trim()
+        });
+    serde_json::from_str(unfenced).ok()
 }

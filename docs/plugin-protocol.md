@@ -151,35 +151,46 @@ and tolerated by hosts.
 
 ### Model methods
 
-A plugin may offer models instead of, or besides, languages. `initialize` then lists them in
-`models`, each a `Model` resource: `name` (the plugin's id), `tasks` (`classification`),
-`version` (changes whenever the answers for the same input may), `cost` (0 for a model that
-runs locally for free), `deterministic`, `abstains` and `trains`. The manifest lists the same
-ids in `provides.models`. The host keys behaviour off these capabilities, never off names.
+Lighthouse defines no model API of its own: each method takes the body of a published API,
+verbatim, with that API's own field names.
 
-`lighthouse/classify` takes `{decision, subjects, options}` and answers
-`{results: [{key, kind, confidence, reason}], model: {id, version}}`.
-- `decision` is `{id, requirement, prompt, examples: [{kind: pass|fail, language, code, note}]}`;
-  the examples are the shots.
-- A subject is `{key, kind, id, language, file, text, context: {facts, neighbors}}`: its source by
-  extent, the facts the check computed, and a few callers and callees.
-- `options` are the `options` of the project's provider, with `model` set to the part of the
-  reference after the provider (`openrouter/qwen/qwen3-coder:free` sends `qwen/qwen3-coder:free`).
-- `kind` is `pass`, `fail` or `review` (the SARIF result kinds; `review` is an abstention).
-  `confidence` is from 0 to 1.
-- Every `key` asked MUST be answered exactly once. Any other answer is an error for the batch;
-  the subjects stay for review.
+A plugin may offer models instead of, or besides, languages. `initialize` lists them in
+`models`, OpenAI's list object `{object: "list", data: [{id, object: "model", created, owned_by,
+capabilities: {classification | embedding | fine_tuning: {supported}}}]}`, with what Lighthouse
+adds to each entry: `version` (changes whenever the answers for the same input may), `cost` (0
+for a model that runs locally for free), `deterministic` and `abstains`. The manifest lists the
+same ids in `provides.models`. The host keys behaviour off these capabilities, never off names.
 
-`lighthouse/train` takes `{requestId?, decision, subjects, options, dir}`, where each subject is a
-classify subject with `label` (`pass` or `fail`), `weight` (0 to 1) and `source` (`example`,
-`baseline`, `person` or `model`), and `dir` is a directory the host owns for the artifact. It
-answers an AIP-151 `Operation {name, done, metadata?, error?, response?}`; over stdio it is
-`done`, and `response` is `{artifact: "sha256:<hex>", metrics}`. A retry with the same
-`requestId` MUST NOT start a second job.
+`lighthouse/classify` takes the body of TypeSafe's System One API (`POST /v1/systemone`),
+https://docs.typesafe.ai/api, for one subject: `{state, model, questions}`.
+- `state` is `{language, file, text, facts, neighbors}`: the subject's source by extent, the facts
+  the check computed, and a few callers and callees.
+- `questions` is keyed by decision id; each is `{type: "noul", instructions: {requirement, prompt},
+  criteria: {true: {meaning, examples}, false: {meaning, examples}}}`. `true` means the subject
+  fails the decision, and its examples are the decision's invalid examples; `false` means it
+  passes, with the valid ones.
+- `model` is the part of the reference after the provider (`openrouter/qwen/qwen3-coder:free`
+  sends `qwen/qwen3-coder:free`). Lighthouse adds `options`, the provider's `options`, for a
+  plugin that needs them (`spec`, `baseUrl`, `keyEnv`); a remote server ignores it.
 
-Errors are JSON-RPC errors with a canonical AIP-193 status in `data.status`
-(`INVALID_ARGUMENT`, `UNIMPLEMENTED`, `UNAVAILABLE`, `RESOURCE_EXHAUSTED`, ...). All of these
-types are in `lighthouse-protocol` and in the checked-in JSON Schema.
+It answers `{model, answers: {<decision id>: {type: "noul", noul}}, usage}`: `noul` is the
+probability that the subject fails. There is no reason. The host maps it, the same for every
+model: at or above the band (`threshold`, default 0.9) the subject fails; otherwise it is left to
+review. A model that has not been calibrated never clears a subject. The confidence is
+max(p, 1 - p).
+
+`lighthouse/train` takes OpenAI's fine-tuning job body (`POST /v1/fine_tuning/jobs`):
+`{model, training_file, validation_file?, method: {type: "supervised", supervised:
+{hyperparameters}}, seed, suffix?, metadata}`, and answers the final `FineTuningJob`. Here
+`training_file` is the path of a JSON Lines file, one `{state, questions, label, weight, source}`
+per line (`label` is `pass` or `fail`, `source` is `example`, `baseline`, `person` or `model`);
+`metadata` carries the `decision` and the `dir` the host owns for the artifact. A successful job
+has `status: "succeeded"`, `fine_tuned_model: "sha256:<hex>"` (the artifact) and, as its first
+`result_files` entry, a JSON file of the metrics. The same `seed` is the same request.
+
+Errors are JSON-RPC errors; `data` carries the error body of the API reused (OpenAI's
+`{error: {message, type, param, code}}`, or TypeSafe's status code). Calls are retried with
+backoff on 429, 503 and 529. A model that fails leaves its subjects to review.
 
 ## Errors and failure handling
 
@@ -580,11 +591,14 @@ Rust with a notice.
 ## `model-http`
 
 Models behind the standard HTTP APIs, as a provider in `lighthouse.toml`
-(`spec = "openai"`, `baseUrl`, `keyEnv`; see [rule-pipeline.md](rule-pipeline.md#models)).
-The `openai` spec posts to `{baseUrl}/chat/completions` with `Authorization: Bearer <key>`,
-`temperature` 0, and `response_format` of type `json_schema` (strict) so that the answer has the
-shape of `lighthouse/classify`; a service that refuses `response_format` (HTTP 400, 404 or 422) is
-asked again without it and its text is parsed as strict JSON, in a fenced block too. Text that
-does not fit leaves the subject to review. The version of an answer is `<model>@<prompt version>`.
-The API shapes are those of OpenAI's Chat Completions as documented by OpenRouter
+(`spec = "openai"` or a list such as `["openai", "typesafe"]`, `baseUrl`, `keyEnv`; see
+[rule-pipeline.md](rule-pipeline.md#models)). Each operation uses the spec that covers it:
+classification uses `typesafe` when listed, else `openai`. Only `openai` is served so far.
+
+For `openai`, each question is rendered as a prompt that asks for the probability of yes, and
+sent to `{baseUrl}/chat/completions` with `Authorization: Bearer <key>`, `temperature` 0 and
+`response_format` of type `json_schema` (strict, `{noul}`). A service that refuses
+`response_format` (HTTP 400, 404 or 422) is asked again without it and its text is parsed as
+strict JSON, in a fenced block too. Text that does not fit is no answer: the subject stays for
+review. The API shapes are those of OpenAI's Chat Completions as documented by OpenRouter
 (https://openrouter.ai/docs/quickstart, https://openrouter.ai/docs/features/structured-outputs).

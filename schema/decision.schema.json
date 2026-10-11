@@ -310,7 +310,7 @@
               "description": "What the check looks at. Default: what the decision's `scope.subject`\nis about; a decision about the project says which it looks at."
             },
             "threshold": {
-              "description": "The least confidence at which a model's answer decides, from 0 to 1;\nbelow it the next model is asked. Default: 0.7.",
+              "description": "P(fail), from 0 to 1, at or above which a model's answer is a `fail`;\nbelow it the subject is left to review. Default: 0.9 (an uncalibrated\nmodel never clears a subject).",
               "format": "double",
               "type": [
                 "number",
@@ -507,7 +507,7 @@
               ]
             },
             "threshold": {
-              "description": "The least confidence at which a model's answer decides, from 0 to 1;\nbelow it the next model is asked. Default: 0.7.",
+              "description": "P(fail), from 0 to 1, at or above which a model's answer is a `fail`;\nbelow it the subject is left to review. Default: 0.9.",
               "format": "double",
               "type": [
                 "number",

@@ -27,8 +27,8 @@
           ]
         },
         "spec": {
-          "description": "The API: `openai` (Chat Completions, which OpenRouter, Ollama, vLLM\nand LM Studio also speak). Others will join.",
-          "type": "string"
+          "$ref": "#/$defs/Specs",
+          "description": "The API: `openai` (Chat Completions, which OpenRouter, Ollama, vLLM\nand LM Studio also speak). Others will join."
         }
       },
       "required": [
@@ -331,15 +331,6 @@
       "additionalProperties": false,
       "description": "The `models` table of a project: its bindings and limits, and its own\nproviders.",
       "properties": {
-        "batch": {
-          "description": "Subjects in one request to a model. Default: 20.",
-          "format": "uint",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
         "budget": {
           "description": "Subjects a run may put to models that cost something; the rest are\nleft to review. Default: 200.",
           "format": "uint",
@@ -571,6 +562,20 @@
         }
       ],
       "description": "How a rule is written in a spec: `warn`, `off`, or\n`{ level: warn, options: { max: 10 } }`."
+    },
+    "Specs": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ],
+      "description": "One standard API, or several a provider speaks: each operation uses the\none that covers it (classification: `typesafe`, else `openai`)."
     },
     "Tolerate": {
       "description": "Which error an evaluation tolerates when it cannot have both.",

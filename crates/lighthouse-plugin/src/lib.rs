@@ -20,9 +20,9 @@ pub use fix::{
 };
 pub use memo::Memo;
 pub use models::{
-    Answer, Ask, Classifier, ClassifyParams, ClassifyResult, Decided, DecisionRef, Judged,
-    LabelSource, ModelManifest, ModelRef, Models, Neighbor, NoModels, Open, ResultKind, Shot,
-    Subject, SubjectContext, TrainParams, TrainResponse, TrainSubject,
+    Ask, Classifier, ClassifyParams, ClassifyResult, Decided, DecisionRef, Judged, LabelSource,
+    ModelManifest, Models, Neighbor, NoModels, Open, Question, QuestionAnswer, ResultKind, Shot,
+    State, Subject, SubjectContext, TrainParams, TrainResponse, TrainSubject, UPPER, decide,
 };
 pub use notices::Notices;
 pub use registry::{Registry, plugin_of};

@@ -763,15 +763,15 @@ it has unit tests.
 
 A model is a plugin kind beside language providers: a process (`rpc`) that answers
 `lighthouse/classify` (and `lighthouse/train` when it learns), or any program (`command`).
-The wire types are one serde module of `lighthouse-protocol` with a JSON Schema
-(`protocol/schema/lighthouse-protocol-0.1.json`): `Model` (`name`, `tasks`, `cost`,
-`deterministic`, `abstains`, `trains`), `Subject`, `Answer {key, kind, confidence, reason}`,
-and, for training, an AIP-151 `Operation` whose `response` is `{artifact: "sha256:…", metrics}`.
-Errors are JSON-RPC errors with an AIP-193 status in `data.status`. No HTTP server is
-built: the same types could be served by one later.
+Lighthouse defines no API of its own. The wire types are one serde module of `lighthouse-protocol`
+with a JSON Schema (`protocol/schema/lighthouse-protocol-0.1.json`), and each is a published
+body used verbatim: TypeSafe System One for classification (`{state, model, questions}` to
+`{model, answers, usage}`), OpenAI's fine-tuning job for training, OpenAI's model list for the
+manifest. Errors are JSON-RPC errors whose `data` is the reused API's own error body. No HTTP
+server is built: a server that speaks these bodies could be declared as a provider later.
 
 At run time a rule hands the subjects it suspects (`review`) to `Ctx::models`. The engine
-resolves the decision's bindings (Revision, rule, project default), asks each model in turn for
+resolves the decision's bindings (Revision, rule, project default), asks each model in turn, one subject and one question per request (subjects concurrently), for
 the subjects the previous one left open, applies the budget and the report scope to models
 that cost, keeps every answer in the result cache under the model's reference and version,
 and returns for each subject a decision or the reason it stays open. Open subjects come back

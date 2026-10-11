@@ -6,8 +6,8 @@
 use cel::Program;
 use lighthouse_model::{Diagnostic, Position, Span, SymbolId, hash};
 use lighthouse_plugin::{
-    Ask, ClassifyParams, Ctx, DecisionRef, Judged, Neighbor, Open, ResultKind, RuleManifest, Shot,
-    Subject, SubjectContext,
+    Ask, Ctx, DecisionRef, Judged, Neighbor, Open, ResultKind, RuleManifest, Shot, Subject,
+    SubjectContext,
 };
 use lighthouse_spec::{CelCheck, Decision, ExampleKind, Select};
 use serde_json::{Value, json};
@@ -30,7 +30,7 @@ pub(crate) struct Review {
     fact: Program,
     select: Select,
     decision: DecisionRef,
-    threshold: f64,
+    upper: f64,
     revision: String,
 }
 
@@ -67,7 +67,7 @@ impl Review {
             fact: compile(id, "review", select.variable())?,
             select,
             decision: decision_ref,
-            threshold: check.confidence(),
+            upper: check.confidence(),
             revision,
         }))
     }
@@ -126,12 +126,9 @@ impl Review {
             ctx.models.classify(&Ask {
                 rule: rule.id.clone(),
                 revision: self.revision.clone(),
-                threshold: self.threshold,
-                params: ClassifyParams {
-                    decision: self.decision.clone(),
-                    subjects,
-                    options: serde_json::Map::new(),
-                },
+                upper: self.upper,
+                decision: self.decision.clone(),
+                subjects,
             })
         } else {
             candidates
@@ -222,7 +219,7 @@ pub fn decision_ref(decision: &Decision) -> DecisionRef {
 }
 
 /// What a model's judgment makes of a candidate: the finding it confirms,
-/// with the model and its reason in the evidence; a review task for a subject
+/// with the model and its confidence in the evidence; a review task for a subject
 /// left open; nothing for a `pass`.
 fn outcome(judged: Judged, candidate: Candidate, decision: &DecisionRef) -> Option<Diagnostic> {
     let mut diagnostic = candidate.diagnostic;
@@ -234,16 +231,15 @@ fn outcome(judged: Judged, candidate: Candidate, decision: &DecisionRef) -> Opti
         Judged::Decided(decided) if decided.kind == ResultKind::Pass => return None,
         Judged::Decided(decided) => {
             if diagnostic.message.is_empty() {
-                diagnostic.message.clone_from(&decided.reason);
+                diagnostic.message.clone_from(&decision.requirement);
             }
             evidence.insert("source".to_owned(), json!("model"));
             if let Some(kind) = candidate.kind {
                 evidence.insert("kind".to_owned(), json!(kind));
             }
-            evidence.insert("model".to_owned(), json!(decided.model.id));
-            evidence.insert("version".to_owned(), json!(decided.model.version));
+            evidence.insert("model".to_owned(), json!(decided.model));
+            evidence.insert("version".to_owned(), json!(decided.version));
             evidence.insert("confidence".to_owned(), json!(decided.confidence));
-            evidence.insert("reason".to_owned(), json!(decided.reason));
         }
         Judged::Open(open) => {
             if diagnostic.message.is_empty() {

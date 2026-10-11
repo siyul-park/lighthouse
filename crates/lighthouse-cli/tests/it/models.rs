@@ -36,21 +36,16 @@ spec:
       files: [{ path: src/lib.rs, body: "pub fn fine() {}\n" }]
 "#;
 
-/// Answers by the id of each subject: `maybe_bad` fails, `maybe_good` passes,
-/// anything else is left to review. It counts its runs in `calls`.
+/// Answers System One questions by the source of the subject: `maybe_bad`
+/// is surely a violation, `maybe_good` surely not, anything else unsure. It
+/// counts its runs in `calls`.
 const SCRIPT: &str = r#"import json, sys
 request = json.load(sys.stdin)
 open("calls", "a").write("x")
-out = []
-for s in request["subjects"]:
-    if "maybe_bad" in s["id"]:
-        kind = "fail"
-    elif "maybe_good" in s["id"]:
-        kind = "pass"
-    else:
-        kind = "review"
-    out.append({"key": s["key"], "kind": kind, "confidence": 0.9, "reason": "scripted"})
-print(json.dumps({"results": out}))
+text = request["state"]["text"]
+p = 0.95 if "maybe_bad" in text else 0.05 if "maybe_good" in text else 0.5
+answers = {id: {"type": "noul", "noul": p} for id in request["questions"]}
+print(json.dumps({"model": request["model"], "answers": answers}))
 "#;
 
 const LIB: &str = "pub fn bad_one() {}\npub fn maybe_bad() {}\npub fn maybe_good() {}\npub fn maybe_unsure() {}\npub fn fine() {}\n";
@@ -120,14 +115,14 @@ fn calls(dir: &Path) -> usize {
 }
 
 #[test]
-fn a_bound_model_decides_what_review_abstains_on_and_the_rest_is_left_to_review() {
+fn a_bound_model_fails_what_it_is_sure_of_and_the_rest_is_left_to_review() {
     let dir = project(BOUND);
     let (code, log) = check(dir.path(), &["--no-cache"]);
     let found = results(&log);
     assert_eq!(count(&found, "fail"), 2, "{found:?}");
     assert!(found.iter().any(|r| r.0 == "bad_one is banned"));
     assert!(found.iter().any(|r| r.0 == "maybe_bad is banned"));
-    assert_eq!(count(&found, "review"), 1, "{found:?}");
+    assert_eq!(count(&found, "review"), 2, "{found:?}");
     assert!(
         found
             .iter()
@@ -173,7 +168,7 @@ fn the_budget_caps_what_a_model_that_costs_is_asked() {
 fn answers_are_cached_and_a_warm_run_prints_what_a_cold_run_prints() {
     let dir = project(BOUND);
     let (_, cold) = check(dir.path(), &["--no-cache"]);
-    assert_eq!(calls(dir.path()), 1);
+    assert_eq!(calls(dir.path()), 3);
     let (_, first) = check(dir.path(), &[]);
     let after_first = calls(dir.path());
     let (_, warm) = check(dir.path(), &[]);

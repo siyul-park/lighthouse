@@ -6,10 +6,11 @@ use std::{path::PathBuf, time::Duration};
 
 use lighthouse_model::hash;
 use lighthouse_plugin::{
-    Answer, Classifier, ClassifyParams, ClassifyResult, Error, ModelManifest, ModelRef, Registry,
-    ResultKind, TrainParams, TrainResponse,
+    Classifier, ClassifyParams, ClassifyResult, Error, ModelManifest, QuestionAnswer, Registry,
+    TrainParams, TrainResponse,
 };
 use lighthouse_process::{MAX_OUTPUT, Spec};
+use lighthouse_protocol::{json_in, noul_of};
 use lighthouse_resource::parse_duration;
 use lighthouse_spec::{ModelInput, ModelProvider};
 use serde_json::{Map, Value};
@@ -44,10 +45,10 @@ impl<'a> Host<'a> {
                 cost,
             } => match self.registry.model(plugin) {
                 Some(inner) => {
-                    let mut options = options.clone();
-                    options.insert("model".to_owned(), Value::from(model));
+                    let options = options.clone();
                     Box::new(Rpc {
-                        manifest: rpc_manifest(name, inner.manifest(), &options, *cost),
+                        manifest: rpc_manifest(name, inner.manifest(), model, &options, *cost),
+                        name: model.to_owned(),
                         model: inner,
                         options,
                     })
@@ -67,6 +68,7 @@ impl<'a> Host<'a> {
                 timeout,
                 ..
             } => Box::new(Command {
+                model: model.to_owned(),
                 manifest: ModelManifest {
                     id: name.to_owned(),
                     tasks: tasks.clone(),
@@ -118,6 +120,8 @@ impl Classifier for Refused {
 /// A model of a plugin process, named and configured by the instance.
 struct Rpc<'a> {
     manifest: ModelManifest,
+    /// The part of the reference after the provider.
+    name: String,
     model: &'a dyn Classifier,
     options: Map<String, Value>,
 }
@@ -129,10 +133,9 @@ impl Classifier for Rpc<'_> {
 
     fn classify(&self, params: &ClassifyParams) -> Result<ClassifyResult, Error> {
         let mut asked = params.clone();
+        asked.model.clone_from(&self.name);
         asked.options.clone_from(&self.options);
-        let mut result = self.model.classify(&asked)?;
-        result.model.id.clone_from(&self.manifest.id);
-        Ok(result)
+        self.model.classify(&asked)
     }
 
     fn train(&self, params: &TrainParams) -> Result<TrainResponse, Error> {
@@ -145,6 +148,7 @@ impl Classifier for Rpc<'_> {
 /// Any program that reads a request on stdin and prints JSON.
 struct Command {
     manifest: ModelManifest,
+    model: String,
     argv: Vec<String>,
     stdin: ModelInput,
     pointer: Option<String>,
@@ -158,13 +162,15 @@ impl Classifier for Command {
     }
 
     /// Whatever the program prints that does not fit the shape of an answer is
-    /// an abstention for the subject it concerns.
+    /// no answer for the question it concerns.
     fn classify(&self, params: &ClassifyParams) -> Result<ClassifyResult, Error> {
         let failed =
             |reason: String| Error::Failed(format!("model `{}`: {reason}", self.manifest.id));
+        let mut asked = params.clone();
+        asked.model.clone_from(&self.model);
         let input = match self.stdin {
-            ModelInput::Request => serde_json::to_vec(params).map_err(|e| failed(e.to_string()))?,
-            ModelInput::Prompt => lighthouse_protocol::prompt(params).into_bytes(),
+            ModelInput::Request => serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?,
+            ModelInput::Prompt => lighthouse_protocol::prompt(&asked).into_bytes(),
         };
         let output = lighthouse_process::run(&Spec {
             argv: &self.argv,
@@ -181,24 +187,25 @@ impl Classifier for Command {
             let shown: String = stderr.chars().take(400).collect();
             return Err(failed(format!("exited with {:?}: {shown}", output.code)));
         }
-        let given = answers(&output.stdout, self.pointer.as_deref());
-        let results = params
-            .subjects
-            .iter()
-            .map(|subject| {
-                given
-                    .iter()
-                    .find(|a| a.key == subject.key)
-                    .cloned()
-                    .unwrap_or_else(|| abstain(&subject.key))
+        let printed = printed_answer(&output.stdout, self.pointer.as_deref());
+        let answers = params
+            .questions
+            .keys()
+            .filter_map(|id| {
+                let noul = noul_of(printed.as_ref()?, id)?;
+                Some((
+                    id.clone(),
+                    QuestionAnswer {
+                        kind: "noul".to_owned(),
+                        noul,
+                    },
+                ))
             })
             .collect();
         Ok(ClassifyResult {
-            results,
-            model: ModelRef {
-                id: self.manifest.id.clone(),
-                version: self.manifest.version.clone(),
-            },
+            model: self.manifest.id.clone(),
+            answers,
+            usage: Value::Null,
         })
     }
 
@@ -213,13 +220,14 @@ impl Classifier for Command {
 fn rpc_manifest(
     name: &str,
     inner: &ModelManifest,
+    model: &str,
     options: &Map<String, Value>,
     cost: Option<f64>,
 ) -> ModelManifest {
     let version = format!(
         "{}+{}",
         inner.version,
-        hash::short(&Value::Object(options.clone()).to_string(), 4)
+        hash::short(&format!("{model}{}", Value::Object(options.clone())), 4)
     );
     ModelManifest {
         id: name.to_owned(),
@@ -244,54 +252,16 @@ fn refused<'a>(name: &str, reason: String) -> Box<dyn Classifier + 'a> {
     })
 }
 
-fn abstain(key: &str) -> Answer {
-    Answer {
-        key: key.to_owned(),
-        kind: ResultKind::Review,
-        confidence: 0.0,
-        reason: "the model's answer did not fit the expected shape".to_owned(),
-        span: None,
-    }
-}
-
-/// The answers in what a program printed: JSON, or text holding JSON, at the
-/// pointer if there is one; either `{"results": [...]}` or the array itself.
-/// Entries that do not fit are left out.
-fn answers(stdout: &[u8], pointer: Option<&str>) -> Vec<Answer> {
-    let Ok(printed) = serde_json::from_slice::<Value>(stdout) else {
-        return Vec::new();
-    };
+/// The answer in what a program printed: JSON, at the pointer if there is
+/// one, and text holding JSON when the pointer leads to a string.
+fn printed_answer(stdout: &[u8], pointer: Option<&str>) -> Option<Value> {
+    let printed = serde_json::from_slice::<Value>(stdout).ok()?;
     let inner = match pointer {
-        Some(pointer) => printed.pointer(pointer).cloned(),
-        None => Some(printed),
+        Some(pointer) => printed.pointer(pointer).cloned()?,
+        None => printed,
     };
-    let inner = match inner {
-        Some(Value::String(text)) => json_in(&text),
-        other => other,
-    };
-    let list = match inner {
-        Some(Value::Array(list)) => list,
-        Some(Value::Object(mut map)) => match map.remove("results") {
-            Some(Value::Array(list)) => list,
-            _ => Vec::new(),
-        },
-        _ => Vec::new(),
-    };
-    list.into_iter()
-        .filter_map(|entry| serde_json::from_value::<Answer>(entry).ok())
-        .map(|mut answer| {
-            answer.confidence = answer.confidence.clamp(0.0, 1.0);
-            answer
-        })
-        .collect()
-}
-
-/// The JSON in a model's text, which may be wrapped in a fenced block.
-fn json_in(text: &str) -> Option<Value> {
-    let trimmed = text.trim();
-    let unfenced = trimmed
-        .strip_prefix("```json")
-        .or_else(|| trimmed.strip_prefix("```"))
-        .map_or(trimmed, |rest| rest.trim_end_matches("```").trim());
-    serde_json::from_str(unfenced).ok()
+    match inner {
+        Value::String(text) => json_in(&text),
+        other => Some(other),
+    }
 }

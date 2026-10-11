@@ -9,8 +9,8 @@ use std::{
 };
 
 use lighthouse_plugin::{
-    Classifier, ClassifyParams, LabelSource, ResultKind, Subject, TrainParams, TrainResponse,
-    TrainSubject,
+    Classifier, ClassifyParams, LabelSource, Question, ResultKind, Subject, TrainParams,
+    TrainResponse, TrainSubject, UPPER, decide,
 };
 use serde::Serialize;
 
@@ -169,31 +169,33 @@ fn examples(decision: &lighthouse_plugin::DecisionRef) -> Vec<TrainSubject> {
         .collect()
 }
 
-/// What a teacher model decides about subjects nobody labelled.
+/// What a teacher model decides about subjects nobody labelled: a `fail` at
+/// the uncalibrated band; what it is unsure of teaches nothing.
 fn taught(
     teacher: &dyn Classifier,
     decision: &lighthouse_plugin::DecisionRef,
     unlabelled: Vec<Subject>,
 ) -> Result<Vec<TrainSubject>> {
-    let answers = teacher.classify(&ClassifyParams {
-        decision: decision.clone(),
-        subjects: unlabelled.clone(),
-        options: serde_json::Map::new(),
-    })?;
-    Ok(answers
-        .results
-        .into_iter()
-        .filter(|answer| answer.kind != ResultKind::Review)
-        .filter_map(|answer| {
-            let subject = unlabelled.iter().find(|s| s.key == answer.key)?;
-            Some(TrainSubject {
-                subject: subject.clone(),
-                label: answer.kind,
+    let question = Question::of(decision);
+    let mut labelled = Vec::new();
+    for subject in unlabelled {
+        let answered = teacher.classify(&ClassifyParams {
+            state: subject.state(),
+            model: String::new(),
+            questions: std::collections::BTreeMap::from([(decision.id.clone(), question.clone())]),
+            options: serde_json::Map::new(),
+        })?;
+        let noul = answered.answers.get(&decision.id).map(|a| a.noul);
+        if let Some((ResultKind::Fail, _)) = noul.map(|p| decide(p, UPPER)) {
+            labelled.push(TrainSubject {
+                subject,
+                label: ResultKind::Fail,
                 weight: WEIGHT_MODEL,
                 source: LabelSource::Model,
-            })
-        })
-        .collect())
+            });
+        }
+    }
+    Ok(labelled)
 }
 
 /// Where a model keeps what it learned for a decision:

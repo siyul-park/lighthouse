@@ -48,12 +48,12 @@ pub use options::{
 };
 pub use pack::{Pack, PackSpec, Section, SectionSpec};
 pub use project::{
-    ApiProvider, Config, DEFAULT_BATCH, DEFAULT_BUDGET, DEFAULT_PRECISION, Evaluation, FILE_NAME,
-    FILE_NAMES, Formatter, FormatterOutput, FormatterSpec, FormatterStdin, GeneratedCheck,
-    GeneratedSpec, GlobSet, Layer, Level, ModelBinding, ModelInput, ModelOutput, ModelProvider,
-    ModelsSpec, OverrideSpec, PluginEntry, PluginRef, PluginRefSpec, ProjectError, ProjectLanguage,
+    ApiProvider, Config, DEFAULT_BUDGET, DEFAULT_PRECISION, Evaluation, FILE_NAME, FILE_NAMES,
+    Formatter, FormatterOutput, FormatterSpec, FormatterStdin, GeneratedCheck, GeneratedSpec,
+    GlobSet, Layer, Level, ModelBinding, ModelInput, ModelOutput, ModelProvider, ModelsSpec,
+    OverrideSpec, PluginEntry, PluginRef, PluginRefSpec, ProjectError, ProjectLanguage,
     ProjectSpec, Projects, ProviderSpec, RESERVED as RESERVED_PROVIDERS, RuleConfig, RuleDetail,
-    RuleSetting, Rules, Tolerate, glob_set,
+    RuleSetting, Rules, Specs, Tolerate, glob_set,
 };
 pub use render::{DOCS_DIR, decision_markdown, docs, help_path};
 pub use sources::{SourceLine, SourceMapSpec};

@@ -1,10 +1,15 @@
 //! The plugin as the protocol sees it: the handshake, and `classify` over a
-//! transport that turns a prompt into text.
+//! transport that turns a prompt into text. The request is TypeSafe System
+//! One's body; for a chat API each question is rendered as a prompt that asks
+//! for the probability of yes, and the answers come back in System One's
+//! shape.
+
+use std::collections::BTreeMap;
 
 use lighthouse_protocol::{
-    Answer, ClassifyParams, ClassifyResult, Handler, IndexParams, IndexResult, InitializeParams,
-    InitializeResult, ModelManifest, ModelRef, ResultKind, VERSION, response_schema, subjects_text,
-    system_text,
+    ClassifyParams, ClassifyResult, Handler, IndexParams, IndexResult, InitializeParams,
+    InitializeResult, ModelList, ModelManifest, QuestionAnswer, VERSION, json_in, noul_of,
+    response_schema, subject_text, system_text,
 };
 use serde_json::{Map, Value};
 
@@ -12,9 +17,10 @@ use serde_json::{Map, Value};
 pub const ID: &str = "model-http";
 /// Changes with the prompt, so that cached answers of another prompt are not
 /// used.
-const PROMPT_VERSION: &str = "1";
+const PROMPT_VERSION: &str = "2";
 
-/// How a provider is reached, from the `options` of its declaration.
+/// How a provider is reached, from the `options` of its declaration and the
+/// model of the request.
 #[derive(Debug, PartialEq)]
 pub struct Endpoint {
     pub spec: String,
@@ -24,16 +30,33 @@ pub struct Endpoint {
 }
 
 impl Endpoint {
-    /// Reads the options of a request; the model is the part of the reference
-    /// after the provider.
-    pub fn of(options: &Map<String, Value>) -> Result<Self, String> {
+    /// Reads the options of a provider and the model of a request.
+    pub fn of(options: &Map<String, Value>, model: &str) -> Result<Self, String> {
         let text = |key: &str| options.get(key).and_then(Value::as_str).map(str::to_owned);
+        if model.is_empty() {
+            return Err("the request names no model".to_owned());
+        }
         Ok(Self {
-            spec: text("spec").ok_or("the provider declares no `spec`")?,
+            spec: spec_for_classification(options.get("spec"))?,
             base_url: text("baseUrl").ok_or("the provider declares no `baseUrl`")?,
             key_env: text("keyEnv"),
-            model: text("model").ok_or("the request names no model")?,
+            model: model.to_owned(),
         })
+    }
+}
+
+/// The spec that covers classification: `typesafe` when the provider speaks
+/// it, else `openai`. Only `openai` is served so far.
+fn spec_for_classification(declared: Option<&Value>) -> Result<String, String> {
+    let names: Vec<&str> = match declared {
+        Some(Value::String(name)) => vec![name.as_str()],
+        Some(Value::Array(list)) => list.iter().filter_map(Value::as_str).collect(),
+        _ => return Err("the provider declares no `spec`".to_owned()),
+    };
+    if names.contains(&"openai") {
+        Ok("openai".to_owned())
+    } else {
+        Err(format!("no served spec among {names:?} (openai is)"))
     }
 }
 
@@ -70,7 +93,7 @@ impl Handler for Plugin {
             version: env!("CARGO_PKG_VERSION").to_owned(),
             protocol_version: VERSION.to_owned(),
             languages: Vec::new(),
-            models: vec![ModelManifest {
+            models: ModelList::of(&[ModelManifest {
                 id: ID.to_owned(),
                 tasks: vec!["classification".to_owned()],
                 version: PROMPT_VERSION.to_owned(),
@@ -78,7 +101,7 @@ impl Handler for Plugin {
                 deterministic: false,
                 abstains: true,
                 cost: 1.0,
-            }],
+            }]),
         })
     }
 
@@ -87,73 +110,36 @@ impl Handler for Plugin {
     }
 
     fn classify(&mut self, params: ClassifyParams) -> Result<ClassifyResult, String> {
-        let endpoint = Endpoint::of(&params.options)?;
-        let prompt = Prompt {
-            system: system_text(&params.decision, &params.decision.examples),
-            user: subjects_text(&params.subjects),
-            schema: response_schema(),
-        };
-        let text = self.transport.complete(&endpoint, &prompt)?;
+        let endpoint = Endpoint::of(&params.options, &params.model)?;
+        let mut answers = BTreeMap::new();
+        for (id, question) in &params.questions {
+            let prompt = Prompt {
+                system: system_text(id, question),
+                user: subject_text(&params.state),
+                schema: response_schema(),
+            };
+            let text = self.transport.complete(&endpoint, &prompt)?;
+            if let Some(noul) = json_in(&text).and_then(|value| noul_of(&value, id)) {
+                answers.insert(
+                    id.clone(),
+                    QuestionAnswer {
+                        kind: "noul".to_owned(),
+                        noul,
+                    },
+                );
+            }
+        }
         Ok(ClassifyResult {
-            results: answers(&text, &params),
-            model: ModelRef {
-                id: ID.to_owned(),
-                version: format!("{}@{PROMPT_VERSION}", endpoint.model),
-            },
+            model: format!("{}@{PROMPT_VERSION}", endpoint.model),
+            answers,
+            usage: Value::Null,
         })
     }
 }
 
-/// One answer per subject: what the model said where it fits the shape, a
-/// `review` where it did not say or said nonsense.
-fn answers(text: &str, params: &ClassifyParams) -> Vec<Answer> {
-    let given: Vec<Answer> = json_in(text)
-        .map(|value| match value {
-            Value::Object(mut map) => map.remove("results").unwrap_or(Value::Null),
-            other => other,
-        })
-        .and_then(|list| serde_json::from_value::<Vec<Value>>(list).ok())
-        .unwrap_or_default()
-        .into_iter()
-        .filter_map(|entry| serde_json::from_value::<Answer>(entry).ok())
-        .collect();
-    params
-        .subjects
-        .iter()
-        .map(|subject| {
-            given
-                .iter()
-                .find(|a| a.key == subject.key)
-                .map(|a| Answer {
-                    confidence: a.confidence.clamp(0.0, 1.0),
-                    ..a.clone()
-                })
-                .unwrap_or_else(|| Answer {
-                    key: subject.key.clone(),
-                    kind: ResultKind::Review,
-                    confidence: 0.0,
-                    reason: "the model gave no usable answer".to_owned(),
-                    span: None,
-                })
-        })
-        .collect()
-}
-
-/// The JSON in a model's text: the text itself, or what a fenced block holds.
-pub fn json_in(text: &str) -> Option<Value> {
-    let trimmed = text.trim();
-    let unfenced = trimmed
-        .strip_prefix("```json")
-        .or_else(|| trimmed.strip_prefix("```"))
-        .map_or(trimmed, |rest| {
-            rest.trim_end().trim_end_matches("```").trim()
-        });
-    serde_json::from_str(unfenced).ok()
-}
-
 #[cfg(test)]
 mod tests {
-    use lighthouse_protocol::{DecisionRef, Subject, SubjectContext};
+    use lighthouse_protocol::{Criteria, Criterion, Instructions, Question, State};
     use serde_json::json;
 
     use super::*;
@@ -168,62 +154,67 @@ mod tests {
         }
     }
 
-    fn subject(key: &str) -> Subject {
-        Subject {
-            key: key.to_owned(),
-            kind: "function".to_owned(),
-            id: key.to_owned(),
-            language: "go".to_owned(),
-            file: "a.go".to_owned(),
-            text: "func f() {}".to_owned(),
-            context: SubjectContext::default(),
-        }
-    }
-
     fn params() -> ClassifyParams {
         let options = json!({
             "spec": "openai", "baseUrl": "https://openrouter.ai/api/v1",
-            "keyEnv": "OPENROUTER_API_KEY", "model": "qwen/qwen3-coder:free"
+            "keyEnv": "OPENROUTER_API_KEY"
         });
+        let side = || Criterion {
+            meaning: "m".to_owned(),
+            examples: Vec::new(),
+        };
         ClassifyParams {
-            decision: DecisionRef {
-                id: "d/x".to_owned(),
-                requirement: "r".to_owned(),
-                prompt: "r".to_owned(),
-                examples: Vec::new(),
+            state: State {
+                language: "go".to_owned(),
+                file: "a.go".to_owned(),
+                text: "func f() {}".to_owned(),
+                facts: Value::Null,
+                neighbors: Vec::new(),
             },
-            subjects: vec![subject("a"), subject("b")],
+            model: "qwen/qwen3-coder:free".to_owned(),
+            questions: BTreeMap::from([(
+                "d/x".to_owned(),
+                Question {
+                    kind: "noul".to_owned(),
+                    instructions: Instructions {
+                        requirement: "r".to_owned(),
+                        prompt: "r".to_owned(),
+                    },
+                    criteria: Criteria {
+                        fail: side(),
+                        pass: side(),
+                    },
+                },
+            )]),
             options: options.as_object().unwrap().clone(),
         }
     }
 
-    fn classify(text: &'static str) -> Vec<Answer> {
+    fn classify(text: &'static str) -> ClassifyResult {
         Plugin::new(Box::new(Fixed(text)))
             .classify(params())
             .unwrap()
-            .results
     }
 
     #[test]
-    fn a_fenced_answer_is_read_and_a_missing_one_is_left_to_review() {
-        let fenced = "```json\n{\"results\":[{\"key\":\"a\",\"kind\":\"fail\",\"confidence\":1.7,\"reason\":\"r\"}]}\n```";
-        let results = classify(fenced);
-        assert_eq!(results[0].kind, ResultKind::Fail);
-        assert_eq!(results[0].confidence, 1.0);
-        assert_eq!(results[1].key, "b");
-        assert_eq!(results[1].kind, ResultKind::Review);
+    fn a_fenced_probability_is_the_answer_in_system_ones_shape() {
+        let result = classify("```json\n{\"noul\": 0.93}\n```");
+        assert_eq!(result.answers["d/x"].noul, 0.93);
+        assert_eq!(result.answers["d/x"].kind, "noul");
+        assert!(result.model.starts_with("qwen/qwen3-coder:free@"));
     }
 
     #[test]
-    fn text_that_is_not_json_leaves_every_subject_to_review() {
-        let results = classify("I think a is bad");
-        assert!(results.iter().all(|a| a.kind == ResultKind::Review));
+    fn text_that_is_not_a_probability_is_no_answer() {
+        assert!(classify("I think it is bad").answers.is_empty());
+        assert!(classify("{\"noul\": 7}").answers.is_empty());
     }
 
     #[test]
     fn the_endpoint_needs_a_spec_a_base_url_and_a_model() {
-        assert!(Endpoint::of(&Map::new()).is_err());
-        let endpoint = Endpoint::of(&params().options).unwrap();
+        assert!(Endpoint::of(&Map::new(), "m").is_err());
+        assert!(Endpoint::of(&params().options, "").is_err());
+        let endpoint = Endpoint::of(&params().options, "m").unwrap();
         assert_eq!(endpoint.key_env.as_deref(), Some("OPENROUTER_API_KEY"));
     }
 }

@@ -1,42 +1,5 @@
 {
   "$defs": {
-    "Answer": {
-      "description": "The answer for one subject.",
-      "properties": {
-        "confidence": {
-          "description": "0 to 1.",
-          "format": "double",
-          "type": "number"
-        },
-        "key": {
-          "type": "string"
-        },
-        "kind": {
-          "$ref": "#/$defs/ResultKind"
-        },
-        "reason": {
-          "default": "",
-          "description": "One sentence.",
-          "type": "string"
-        },
-        "span": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Span"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "key",
-        "kind",
-        "confidence"
-      ],
-      "type": "object"
-    },
     "CacheRef": {
       "description": "The directory a provider may keep derived results in between runs.",
       "properties": {
@@ -82,46 +45,91 @@
       ],
       "type": "object"
     },
-    "ClassifyParams": {
-      "description": "Params of `lighthouse/classify`.",
+    "Capabilities": {
+      "description": "The capabilities of a model.",
       "properties": {
-        "decision": {
-          "$ref": "#/$defs/DecisionRef"
+        "classification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Supports"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "embedding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Supports"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fine_tuning": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Supports"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "ClassifyParams": {
+      "description": "Params of `lighthouse/classify`: the body of TypeSafe's System One API\n(`POST /v1/systemone`), for one subject and the decisions judged on it,\nkeyed by decision id.",
+      "properties": {
+        "model": {
+          "description": "The model asked: the part of the reference after the provider.",
+          "type": "string"
         },
         "options": {
           "additionalProperties": true,
-          "description": "The `options` of the project's model instance: which of the plugin's\nmodels is asked, and how.",
+          "description": "The `options` of the project's provider, for a plugin that needs them\n(`spec`, `baseUrl`, `keyEnv`). Not part of System One's body.",
           "type": "object"
         },
-        "subjects": {
-          "items": {
-            "$ref": "#/$defs/Subject"
+        "questions": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Question"
           },
-          "type": "array"
+          "type": "object"
+        },
+        "state": {
+          "$ref": "#/$defs/State"
         }
       },
       "required": [
-        "decision",
-        "subjects"
+        "state",
+        "model",
+        "questions"
       ],
       "type": "object"
     },
     "ClassifyResult": {
-      "description": "Result of `lighthouse/classify`: every requested key is answered once; an\nunknown or missing key makes the batch an error.",
+      "description": "Result of `lighthouse/classify`: System One's response. Every question\nasked is answered; a missing answer is an abstention.",
       "properties": {
-        "model": {
-          "$ref": "#/$defs/ModelRef"
-        },
-        "results": {
-          "items": {
-            "$ref": "#/$defs/Answer"
+        "answers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/QuestionAnswer"
           },
-          "type": "array"
+          "type": "object"
+        },
+        "model": {
+          "description": "The model that answered, with its version when it has one.",
+          "type": "string"
+        },
+        "usage": {
+          "default": null
         }
       },
       "required": [
-        "results",
-        "model"
+        "model",
+        "answers"
       ],
       "type": "object"
     },
@@ -220,31 +228,38 @@
       },
       "type": "object"
     },
-    "DecisionRef": {
-      "description": "The decision the subjects are judged against.",
+    "Criteria": {
+      "description": "The two sides of a yes/no question: `true` is that the subject fails the\ndecision, `false` that it passes.",
+      "properties": {
+        "false": {
+          "$ref": "#/$defs/Criterion"
+        },
+        "true": {
+          "$ref": "#/$defs/Criterion"
+        }
+      },
+      "required": [
+        "true",
+        "false"
+      ],
+      "type": "object"
+    },
+    "Criterion": {
+      "description": "What a criterion means, and what it looks like.",
       "properties": {
         "examples": {
-          "default": [],
           "items": {
-            "$ref": "#/$defs/Shot"
+            "$ref": "#/$defs/Example"
           },
           "type": "array"
         },
-        "id": {
-          "type": "string"
-        },
-        "prompt": {
-          "description": "What the model is told; the requirement unless the check says more.",
-          "type": "string"
-        },
-        "requirement": {
+        "meaning": {
           "type": "string"
         }
       },
       "required": [
-        "id",
-        "requirement",
-        "prompt"
+        "meaning",
+        "examples"
       ],
       "type": "object"
     },
@@ -348,6 +363,25 @@
         }
       ]
     },
+    "Example": {
+      "description": "An example under a criterion.",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "language",
+        "code"
+      ],
+      "type": "object"
+    },
     "FileInfo": {
       "description": "Identity and classification of an indexed file.",
       "properties": {
@@ -379,6 +413,106 @@
       "required": [
         "path",
         "hash"
+      ],
+      "type": "object"
+    },
+    "FineTuningJob": {
+      "description": "OpenAI's `FineTuningJob`. Over stdio `lighthouse/train` answers with the\nfinal one: `fine_tuned_model` is the artifact (`sha256:<hex>`) and the\nfirst of `result_files` is a JSON file of the metrics.",
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JobError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "fine_tuned_model": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "object": {
+          "description": "`fine_tuning.job`.",
+          "type": "string"
+        },
+        "result_files": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/JobStatus"
+        }
+      },
+      "required": [
+        "id",
+        "object",
+        "model",
+        "status"
+      ],
+      "type": "object"
+    },
+    "FineTuningJobRequest": {
+      "description": "The body of OpenAI's fine-tuning job creation (`POST /v1/fine_tuning/jobs`),\nwhich `lighthouse/train` takes verbatim. `training_file` is the path of a\nJSON Lines file of [`TrainLine`]s; `metadata` names the `decision` and the\n`dir` the artifact goes to.",
+      "properties": {
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "type": "object"
+        },
+        "method": {
+          "$ref": "#/$defs/Method"
+        },
+        "model": {
+          "type": "string"
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "The `options` of the project's provider. Not part of OpenAI's body.",
+          "type": "object"
+        },
+        "seed": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "suffix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "training_file": {
+          "type": "string"
+        },
+        "validation_file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "model",
+        "training_file",
+        "method",
+        "seed"
       ],
       "type": "object"
     },
@@ -700,11 +834,8 @@
           "type": "array"
         },
         "models": {
-          "description": "The models the plugin offers; empty for a language plugin.",
-          "items": {
-            "$ref": "#/$defs/ModelManifest"
-          },
-          "type": "array"
+          "$ref": "#/$defs/ModelList",
+          "description": "The models the plugin offers, as OpenAI's list object; empty for a\nlanguage plugin."
         },
         "protocolVersion": {
           "description": "Must equal the host's protocol version.",
@@ -722,67 +853,104 @@
       ],
       "type": "object"
     },
-    "LabelSource": {
-      "description": "Where a training label came from.",
-      "enum": [
-        "example",
-        "baseline",
-        "person",
-        "model"
-      ],
-      "type": "string"
-    },
-    "ModelManifest": {
-      "description": "What a model plugin offers: one entry of `models` in its `initialize` result.",
+    "Instructions": {
+      "description": "What a question is about.",
       "properties": {
-        "abstains": {
-          "description": "The model may answer `abstain`, and the subject then goes on to the\nnext binding.",
-          "type": "boolean"
-        },
-        "cost": {
-          "description": "What one answer costs, in any unit the project budgets; 0 for a model\nthat runs locally for free. The run's budget and its report scope\nlimit only the models with a cost above 0.",
-          "format": "double",
-          "type": "number"
-        },
-        "deterministic": {
-          "description": "The same input always gets the same answer.",
-          "type": "boolean"
-        },
-        "name": {
-          "description": "The `Model` resource's name; for a plugin's model, the plugin's id.",
+        "prompt": {
+          "description": "What the model is told; the requirement unless the check says more.",
           "type": "string"
         },
-        "tasks": {
-          "description": "The tasks it can do: `classification` (a subject of a decision is a\nviolation or not); later ones may join.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "trains": {
-          "default": false,
-          "description": "The model learns from labels: it answers `lighthouse/train`.",
-          "type": "boolean"
-        },
-        "version": {
-          "description": "Changes whenever the answers for the same input may change (the model\nname, the prompt template, the trained artifact).",
+        "requirement": {
           "type": "string"
         }
       },
       "required": [
-        "name",
-        "tasks",
-        "version",
-        "deterministic",
-        "abstains",
-        "cost"
+        "requirement",
+        "prompt"
       ],
       "type": "object"
     },
-    "ModelRef": {
-      "description": "Which model answered, and which version of it.",
+    "JobError": {
+      "description": "Why a job failed, in OpenAI's words.",
       "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "param": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "JobStatus": {
+      "description": "How far a fine-tuning job is.",
+      "enum": [
+        "validating_files",
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "type": "string"
+    },
+    "Method": {
+      "description": "The method of a fine-tuning job.",
+      "properties": {
+        "supervised": {
+          "$ref": "#/$defs/Supervised"
+        },
+        "type": {
+          "description": "`supervised`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "supervised"
+      ],
+      "type": "object"
+    },
+    "ModelEntry": {
+      "description": "One model of the list: OpenAI's model object, with what Lighthouse adds\n(`version`, `cost`, `deterministic`, `abstains`).",
+      "properties": {
+        "abstains": {
+          "type": "boolean"
+        },
+        "capabilities": {
+          "$ref": "#/$defs/Capabilities"
+        },
+        "cost": {
+          "format": "double",
+          "type": "number"
+        },
+        "created": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "deterministic": {
+          "type": "boolean"
+        },
         "id": {
+          "type": "string"
+        },
+        "object": {
+          "description": "`model`.",
+          "type": "string"
+        },
+        "owned_by": {
           "type": "string"
         },
         "version": {
@@ -791,7 +959,34 @@
       },
       "required": [
         "id",
-        "version"
+        "object",
+        "created",
+        "owned_by",
+        "capabilities",
+        "version",
+        "cost",
+        "deterministic",
+        "abstains"
+      ],
+      "type": "object"
+    },
+    "ModelList": {
+      "description": "OpenAI's list object of models: how a plugin says which it offers.",
+      "properties": {
+        "data": {
+          "items": {
+            "$ref": "#/$defs/ModelEntry"
+          },
+          "type": "array"
+        },
+        "object": {
+          "description": "`list`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "object",
+        "data"
       ],
       "type": "object"
     },
@@ -874,46 +1069,6 @@
           "type": "object"
         }
       ]
-    },
-    "Operation": {
-      "description": "A long-running operation (AIP-151). Over stdio `lighthouse/train` answers\nwith one that is `done`.",
-      "properties": {
-        "done": {
-          "type": "boolean"
-        },
-        "error": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Status"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Set when the operation failed."
-        },
-        "metadata": true,
-        "name": {
-          "description": "`operations/{id}`.",
-          "type": "string"
-        },
-        "response": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/TrainResponse"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Set when it succeeded."
-        }
-      },
-      "required": [
-        "name",
-        "done"
-      ],
-      "type": "object"
     },
     "Overlay": {
       "description": "The text that stands in for a file: a provider reads it instead of the\nfile on disk, and must not read the disk for that path. Hosts send overlays\nfor requested files only, as a fix run verifies edits before writing them.",
@@ -1009,6 +1164,46 @@
       ],
       "type": "object"
     },
+    "Question": {
+      "description": "One yes/no question: System One's `noul`, the probability of yes.",
+      "properties": {
+        "criteria": {
+          "$ref": "#/$defs/Criteria"
+        },
+        "instructions": {
+          "$ref": "#/$defs/Instructions"
+        },
+        "type": {
+          "description": "`noul`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "instructions",
+        "criteria"
+      ],
+      "type": "object"
+    },
+    "QuestionAnswer": {
+      "description": "The answer to a question: P(fail).",
+      "properties": {
+        "noul": {
+          "description": "The probability that the subject fails the decision, from 0 to 1.",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "description": "`noul`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "noul"
+      ],
+      "type": "object"
+    },
     "Resolution": {
       "description": "How reliable an edge's target is.",
       "oneOf": [
@@ -1028,47 +1223,6 @@
           "type": "string"
         }
       ]
-    },
-    "ResultKind": {
-      "description": "How a subject came out, in the words of SARIF result kinds.",
-      "oneOf": [
-        {
-          "enum": [
-            "fail",
-            "pass"
-          ],
-          "type": "string"
-        },
-        {
-          "const": "review",
-          "description": "The code shown is not enough to tell: someone else must look.",
-          "type": "string"
-        }
-      ]
-    },
-    "Shot": {
-      "description": "An example of a decision, shown to the model as a few shots.",
-      "properties": {
-        "code": {
-          "type": "string"
-        },
-        "kind": {
-          "$ref": "#/$defs/ResultKind",
-          "description": "`fail` for an invalid example, `pass` for a valid one."
-        },
-        "language": {
-          "type": "string"
-        },
-        "note": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "kind",
-        "language",
-        "code"
-      ],
-      "type": "object"
     },
     "Signature": {
       "description": "The parameter and result types of a function, receiver excluded. A Rust\ntuple result is one `results` entry.",
@@ -1106,50 +1260,22 @@
       ],
       "type": "object"
     },
-    "Status": {
-      "description": "An error in the words of AIP-193: a canonical status and a message.",
+    "State": {
+      "description": "The part of a subject a model reads: TypeSafe System One's `state`.",
       "properties": {
-        "message": {
-          "type": "string"
-        },
-        "status": {
-          "description": "`INVALID_ARGUMENT`, `UNAVAILABLE`, `RESOURCE_EXHAUSTED`, ...",
-          "type": "string"
-        }
-      },
-      "required": [
-        "status",
-        "message"
-      ],
-      "type": "object"
-    },
-    "Subject": {
-      "description": "One thing to judge.",
-      "properties": {
-        "context": {
-          "$ref": "#/$defs/SubjectContext",
-          "default": {
-            "facts": null,
-            "neighbors": []
-          }
-        },
+        "facts": true,
         "file": {
           "description": "Project-relative, `/`-separated.",
           "type": "string"
         },
-        "id": {
-          "type": "string"
-        },
-        "key": {
-          "description": "Identifies the subject within the request; answers repeat it.",
-          "type": "string"
-        },
-        "kind": {
-          "description": "`symbol`, `function`, `file`, `test`, `comment` or `event`.",
-          "type": "string"
-        },
         "language": {
           "type": "string"
+        },
+        "neighbors": {
+          "items": {
+            "$ref": "#/$defs/Neighbor"
+          },
+          "type": "array"
         },
         "text": {
           "description": "The subject's source by extent.",
@@ -1157,30 +1283,35 @@
         }
       },
       "required": [
-        "key",
-        "kind",
-        "id",
         "language",
         "file",
-        "text"
+        "text",
+        "facts",
+        "neighbors"
       ],
       "type": "object"
     },
-    "SubjectContext": {
-      "description": "What the host knows about a subject besides its text.",
+    "Supervised": {
+      "description": "The supervised method of a fine-tuning job.",
       "properties": {
-        "facts": {
-          "default": null,
-          "description": "The select's facts for the subject, as the builder made them."
-        },
-        "neighbors": {
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/Neighbor"
-          },
-          "type": "array"
+        "hyperparameters": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
         }
       },
+      "type": "object"
+    },
+    "Supports": {
+      "description": "What a model can do, as OpenAI's model object lists it.",
+      "properties": {
+        "supported": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "supported"
+      ],
       "type": "object"
     },
     "Symbol": {
@@ -1335,117 +1466,6 @@
         "scenario"
       ],
       "type": "string"
-    },
-    "TrainParams": {
-      "description": "Params of `lighthouse/train`.",
-      "properties": {
-        "decision": {
-          "$ref": "#/$defs/DecisionRef"
-        },
-        "dir": {
-          "description": "A directory the host owns for this model and decision\n(`.lighthouse/models/<plugin>/<decision>/`); the artifact goes there.",
-          "type": "string"
-        },
-        "options": {
-          "additionalProperties": true,
-          "description": "The `options` of the project's model instance.",
-          "type": "object"
-        },
-        "requestId": {
-          "description": "Names the request, so that a retry starts no second job.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "subjects": {
-          "items": {
-            "$ref": "#/$defs/TrainSubject"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "decision",
-        "subjects",
-        "dir"
-      ],
-      "type": "object"
-    },
-    "TrainResponse": {
-      "description": "What a finished training gives: the artifact, content-addressed\n(`sha256:<hex>`), and the numbers the trainer measured, such as\nout-of-fold precision and recall.",
-      "properties": {
-        "artifact": {
-          "type": "string"
-        },
-        "metrics": {
-          "additionalProperties": true,
-          "default": {},
-          "type": "object"
-        }
-      },
-      "required": [
-        "artifact"
-      ],
-      "type": "object"
-    },
-    "TrainSubject": {
-      "description": "A labelled subject.",
-      "properties": {
-        "context": {
-          "$ref": "#/$defs/SubjectContext",
-          "default": {
-            "facts": null,
-            "neighbors": []
-          }
-        },
-        "file": {
-          "description": "Project-relative, `/`-separated.",
-          "type": "string"
-        },
-        "id": {
-          "type": "string"
-        },
-        "key": {
-          "description": "Identifies the subject within the request; answers repeat it.",
-          "type": "string"
-        },
-        "kind": {
-          "description": "`symbol`, `function`, `file`, `test`, `comment` or `event`.",
-          "type": "string"
-        },
-        "label": {
-          "$ref": "#/$defs/ResultKind",
-          "description": "`fail` or `pass`."
-        },
-        "language": {
-          "type": "string"
-        },
-        "source": {
-          "$ref": "#/$defs/LabelSource"
-        },
-        "text": {
-          "description": "The subject's source by extent.",
-          "type": "string"
-        },
-        "weight": {
-          "description": "0 to 1: how much the label is trusted.",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "key",
-        "kind",
-        "id",
-        "language",
-        "file",
-        "text",
-        "label",
-        "weight",
-        "source"
-      ],
-      "type": "object"
     },
     "TypeRef": {
       "description": "A type as a signature or a field writes it.",

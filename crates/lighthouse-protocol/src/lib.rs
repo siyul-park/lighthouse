@@ -6,11 +6,15 @@ mod wire;
 
 pub use frame::{ErrorObject, FrameError, Id, Message, read_message, write_message};
 pub use model::{
-    Answer, ClassifyParams, ClassifyResult, DecisionRef, LabelSource, ModelManifest, ModelMethods,
-    ModelRef, Neighbor, Operation, ResultKind, Shot, Status, Subject, SubjectContext, TrainParams,
+    Capabilities, ClassifyParams, ClassifyResult, Criteria, Criterion, DecisionRef, Example,
+    FineTuningJob, FineTuningJobRequest, Instructions, JobError, JobStatus, LabelSource, Method,
+    ModelEntry, ModelList, ModelManifest, ModelMethods, Neighbor, Question, QuestionAnswer,
+    ResultKind, Shot, State, Subject, SubjectContext, Supervised, Supports, TrainLine, TrainParams,
     TrainResponse, TrainSubject,
 };
-pub use prompt::{prompt, response_schema, subjects as subjects_text, system as system_text};
+pub use prompt::{
+    json_in, noul_of, prompt, response_schema, subject as subject_text, system as system_text,
+};
 pub use serve::{Handler, ServeError, serve};
 pub use wire::{
     CacheRef, Call, ClientInfo, Comment, Context, Conventions, Edge, EdgeKind, Event, EventKind,

@@ -89,8 +89,7 @@ That is the whole check for a decision the model should evaluate:
 - **Question:** the decision's `requirement`. An optional `prompt` replaces it when the requirement reads badly as a question.
 - **Shots:** the decision's examples.
 - **Candidates:** the subjects in the decision's `scope`. An optional `select` (CEL) narrows them. Only subjects of a file (a symbol, function, file, test, comment or event) can be judged: a model needs their source.
-- **Output:** fixed by the task, so there is nothing to configure: `kind` (`pass`, `fail` or `review`, the SARIF result kinds), a `confidence` and a one-sentence `reason`.
-- **`threshold`** (default 0.7): the least confidence at which an answer decides; below it the answer is an abstention.
+- **Output:** fixed by the task, so there is nothing to configure: the probability that the subject fails (TypeSafe System One's `noul`). The host maps it to `fail` or `review` (the SARIF result kinds) with one band, `threshold` (default 0.9); a model that has not been calibrated never clears a subject. There is no reason.
 
 `type: model` is the same runtime as a `cel` check whose `where` is `false` and whose `review` is the `select`. A `cel` check that can prove part of a decision says so in the same place:
 
@@ -102,7 +101,7 @@ check:
   message: "{{ func.name }} depends on {{ func.envy.target_name }}'s members only"
 ```
 
-`where` true is a `fail`; `where` false and `review` true (or a kind string) is an **abstention**; anything else is a `pass`. Abstained subjects fall through the bindings below like a model's own abstention. A `fail` from a model is a finding with the check's own message, evidence, identity and fix, plus `evidence.source: model`, the model, its version, its confidence and its reason. Its level is at most `warn`.
+`where` true is a `fail`; `where` false and `review` true (or a kind string) is an **abstention**; anything else is a `pass`. Abstained subjects fall through the bindings below like a model's own abstention. A `fail` from a model is a finding with the check's own message, evidence, identity and fix, plus `evidence.source: model`, the model, its version and its confidence. Its level is at most `warn`.
 
 Models are one plugin kind, `Model`, with tasks (`tasks` in the manifest),
 because each task has its own call shape:
@@ -133,10 +132,10 @@ A model is named `<provider>/<model>`, split at the first `/`. The standard API 
 ```toml
 [models]
 classification = "openrouter/qwen/qwen3-coder:free"
-budget = 200                      # calls per run to models that cost; the rest stay `review`
+budget = 200                      # subjects per run put to models that cost; the rest stay `review`
 
 [models.providers.openrouter]     # a recipe: any OpenAI-compatible service
-spec = "openai"
+spec = "openai"                   # or a list: ["openai", "typesafe"]
 baseUrl = "https://openrouter.ai/api/v1"
 keyEnv = "OPENROUTER_API_KEY"
 
@@ -148,7 +147,7 @@ cost = 0
 [models.providers.claude]         # any program that reads a request and prints JSON
 type = "command"
 argv = ["claude", "-p", "--model", "{model}", "--output-format", "json"]
-stdin = "prompt"                  # `prompt` (text with the answer's shape) or `request` (JSON)
+stdin = "prompt"                  # `prompt` (text asking for {noul}) or `request` (TypeSafe's body)
 pointer = "/result"               # RFC 6901 pointer to the answer inside an envelope
 
 [rules."design/naming-result"]
@@ -157,7 +156,7 @@ model = "ollama/qwen3-coder:30b"  # a cheaper model for this decision only
 evaluation = { precision = 0.9, tolerate = "fn" }
 ```
 
-- The `spec` providers are served by the `model-http` plugin, which must be listed in `plugins`. A `command` provider reuses the command contract (no shell, its own process group, a time limit, a cap on output, project trust) and its program is part of what trust covers. An answer that does not fit the shape is an abstention.
+- The `spec` providers are served by the `model-http` plugin, which must be listed in `plugins`. A `command` provider reuses the command contract (no shell, its own process group, a time limit, a cap on output, project trust) and its program is part of what trust covers. An answer that does not fit the shape is no answer, and the subject stays for review.
 - The engine keys off the capabilities a model declares, never its name: `deterministic`, `abstains` and `cost`. The budget and the report scope (changed files, or everything with `--all-models`) limit only the models with a `cost` above 0; an answer is cached under the model, its version, the check's revision and the subject. A model that fails never makes a run incomplete (exit 3): its subjects stay for review.
 - Subjects nothing decided (an abstention, an unsure answer, no bound model, the budget spent, a failed model, `--no-models`) are reported as SARIF results of kind `review`, in the report scope only, and as review tasks in the agent output, grouped. They never change the exit code.
 - `--record-model-labels` records what models fail as `Judgment`s attributed to the model (`<provider>/<model>@<version>`), so that training can reproduce them from `decisions.jsonl`. A person's judgment still wins.

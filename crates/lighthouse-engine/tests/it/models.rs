@@ -1,10 +1,10 @@
 //! Models as the engine offers them: a model of a plugin, named by a
-//! provider of the project, answering with the options the provider sets.
+//! provider of the project, answering for the model the reference names.
 
 use lighthouse_engine::{Engine, ModelOptions};
 use lighthouse_plugin::{
-    Answer, Classifier, ClassifyParams, ClassifyResult, DecisionRef, Error, ModelManifest,
-    ModelRef, Open, Plugin, PluginManifest, Registry, ResultKind, TrainParams, TrainResponse,
+    Classifier, ClassifyParams, ClassifyResult, DecisionRef, Error, ModelManifest, Open, Plugin,
+    PluginManifest, QuestionAnswer, Registry, State, TrainParams, TrainResponse,
 };
 use lighthouse_spec::{Catalog, Config};
 
@@ -17,23 +17,20 @@ impl Classifier for Echo {
     }
 
     fn classify(&self, params: &ClassifyParams) -> Result<ClassifyResult, Error> {
-        let asked = params.options["model"].as_str().unwrap_or_default();
         Ok(ClassifyResult {
-            results: params
-                .subjects
-                .iter()
-                .map(|s| Answer {
-                    key: s.key.clone(),
-                    kind: ResultKind::Pass,
-                    confidence: 1.0,
-                    reason: asked.to_owned(),
-                    span: None,
+            model: params.model.clone(),
+            answers: params
+                .questions
+                .keys()
+                .map(|id| {
+                    let answer = QuestionAnswer {
+                        kind: "noul".to_owned(),
+                        noul: 0.25,
+                    };
+                    (id.clone(), answer)
                 })
                 .collect(),
-            model: ModelRef {
-                id: self.0.id.clone(),
-                version: "1".to_owned(),
-            },
+            usage: serde_json::Value::Null,
         })
     }
 
@@ -103,13 +100,25 @@ fn a_reference_names_a_provider_and_the_model_it_is_asked_for() {
     let model = engine.model("work/some/model:free").unwrap();
     let answer = model
         .classify(&ClassifyParams {
-            decision: decision(),
-            subjects: Vec::new(),
+            state: State {
+                language: "go".to_owned(),
+                file: "a.go".to_owned(),
+                text: String::new(),
+                facts: serde_json::Value::Null,
+                neighbors: Vec::new(),
+            },
+            model: String::new(),
+            questions: std::collections::BTreeMap::from([(
+                "d/x".to_owned(),
+                lighthouse_plugin::Question::of(&decision()),
+            )]),
             options: serde_json::Map::new(),
         })
         .unwrap();
 
-    assert_eq!(answer.model.id, "work/some/model:free");
+    // The provider names the model the request is for.
+    assert_eq!(answer.model, "some/model:free");
+    assert_eq!(answer.answers["d/x"].noul, 0.25);
     assert!(engine.model("nowhere/m").is_err());
     assert!(engine.model("no-slash").is_err());
 }

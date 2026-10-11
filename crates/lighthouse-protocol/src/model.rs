@@ -9,7 +9,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{Call, Span};
+use crate::Call;
 
 /// The model methods with their params and result. Exists to anchor the schema.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -17,7 +17,7 @@ pub struct ModelMethods {
     #[serde(rename = "lighthouse/classify")]
     pub classify: Call<ClassifyParams, ClassifyResult>,
     #[serde(rename = "lighthouse/train")]
-    pub train: Call<TrainParams, Operation>,
+    pub train: Call<FineTuningJobRequest, FineTuningJob>,
 }
 
 /// What a model plugin offers: one entry of `models` in its `initialize` result.
@@ -118,44 +118,152 @@ pub enum ResultKind {
     Review,
 }
 
-/// Params of `lighthouse/classify`.
+/// The part of a subject a model reads: TypeSafe System One's `state`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct State {
+    pub language: String,
+    /// Project-relative, `/`-separated.
+    pub file: String,
+    /// The subject's source by extent.
+    pub text: String,
+    pub facts: Value,
+    pub neighbors: Vec<Neighbor>,
+}
+
+/// An example under a criterion.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Example {
+    pub language: String,
+    pub code: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub note: String,
+}
+
+/// What a criterion means, and what it looks like.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Criterion {
+    pub meaning: String,
+    pub examples: Vec<Example>,
+}
+
+/// The two sides of a yes/no question: `true` is that the subject fails the
+/// decision, `false` that it passes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Criteria {
+    #[serde(rename = "true")]
+    pub fail: Criterion,
+    #[serde(rename = "false")]
+    pub pass: Criterion,
+}
+
+/// What a question is about.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Instructions {
+    pub requirement: String,
+    /// What the model is told; the requirement unless the check says more.
+    pub prompt: String,
+}
+
+/// One yes/no question: System One's `noul`, the probability of yes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Question {
+    /// `noul`.
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub instructions: Instructions,
+    pub criteria: Criteria,
+}
+
+/// The answer to a question: P(fail).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct QuestionAnswer {
+    /// `noul`.
+    #[serde(rename = "type")]
+    pub kind: String,
+    /// The probability that the subject fails the decision, from 0 to 1.
+    pub noul: f64,
+}
+
+/// Params of `lighthouse/classify`: the body of TypeSafe's System One API
+/// (`POST /v1/systemone`), for one subject and the decisions judged on it,
+/// keyed by decision id.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ClassifyParams {
-    pub decision: DecisionRef,
-    pub subjects: Vec<Subject>,
-    /// The `options` of the project's model instance: which of the plugin's
-    /// models is asked, and how.
+    pub state: State,
+    /// The model asked: the part of the reference after the provider.
+    pub model: String,
+    pub questions: BTreeMap<String, Question>,
+    /// The `options` of the project's provider, for a plugin that needs them
+    /// (`spec`, `baseUrl`, `keyEnv`). Not part of System One's body.
     #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
     pub options: serde_json::Map<String, Value>,
 }
 
-/// The answer for one subject.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct Answer {
-    pub key: String,
-    pub kind: ResultKind,
-    /// 0 to 1.
-    pub confidence: f64,
-    /// One sentence.
-    #[serde(default)]
-    pub reason: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub span: Option<Span>,
-}
-
-/// Which model answered, and which version of it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct ModelRef {
-    pub id: String,
-    pub version: String,
-}
-
-/// Result of `lighthouse/classify`: every requested key is answered once; an
-/// unknown or missing key makes the batch an error.
+/// Result of `lighthouse/classify`: System One's response. Every question
+/// asked is answered; a missing answer is an abstention.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ClassifyResult {
-    pub results: Vec<Answer>,
-    pub model: ModelRef,
+    /// The model that answered, with its version when it has one.
+    pub model: String,
+    pub answers: BTreeMap<String, QuestionAnswer>,
+    #[serde(default)]
+    pub usage: Value,
+}
+
+impl Question {
+    /// The question a decision asks: it fails when `true`, its invalid
+    /// examples show what that looks like, its valid examples the other side.
+    pub fn of(decision: &DecisionRef) -> Self {
+        let side = |kind: ResultKind, meaning: String| Criterion {
+            meaning,
+            examples: decision
+                .examples
+                .iter()
+                .filter(|shot| shot.kind == kind)
+                .map(|shot| Example {
+                    language: shot.language.clone(),
+                    code: shot.code.clone(),
+                    note: shot.note.clone(),
+                })
+                .collect(),
+        };
+        Self {
+            kind: "noul".to_owned(),
+            instructions: Instructions {
+                requirement: decision.requirement.clone(),
+                prompt: decision.prompt.clone(),
+            },
+            criteria: Criteria {
+                fail: side(
+                    ResultKind::Fail,
+                    format!(
+                        "The subject violates the requirement: {}",
+                        decision.requirement
+                    ),
+                ),
+                pass: side(
+                    ResultKind::Pass,
+                    format!(
+                        "The subject complies with the requirement: {}",
+                        decision.requirement
+                    ),
+                ),
+            },
+        }
+    }
+}
+
+impl Subject {
+    /// What a model reads of the subject.
+    pub fn state(&self) -> State {
+        State {
+            language: self.language.clone(),
+            file: self.file.clone(),
+            text: self.text.clone(),
+            facts: self.context.facts.clone(),
+            neighbors: self.context.neighbors.clone(),
+        }
+    }
 }
 
 /// Where a training label came from.
@@ -197,7 +305,7 @@ pub struct TrainParams {
     pub dir: String,
 }
 
-/// What a finished training gives: the artifact, content-addressed
+/// What a finished training gives the host: the artifact, content-addressed
 /// (`sha256:<hex>`), and the numbers the trainer measured, such as
 /// out-of-fold precision and recall.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -207,27 +315,196 @@ pub struct TrainResponse {
     pub metrics: BTreeMap<String, Value>,
 }
 
-/// A long-running operation (AIP-151). Over stdio `lighthouse/train` answers
-/// with one that is `done`.
+/// One line of a training file: what a model is asked, and the answer the
+/// labels give.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct Operation {
-    /// `operations/{id}`.
-    pub name: String,
-    pub done: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<Value>,
-    /// Set when the operation failed.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error: Option<Status>,
-    /// Set when it succeeded.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub response: Option<TrainResponse>,
+pub struct TrainLine {
+    pub state: State,
+    pub questions: BTreeMap<String, Question>,
+    /// `fail` or `pass`.
+    pub label: ResultKind,
+    pub weight: f64,
+    pub source: LabelSource,
 }
 
-/// An error in the words of AIP-193: a canonical status and a message.
+/// The supervised method of a fine-tuning job.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Supervised {
+    #[serde(default)]
+    pub hyperparameters: serde_json::Map<String, Value>,
+}
+
+/// The method of a fine-tuning job.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Status {
-    /// `INVALID_ARGUMENT`, `UNAVAILABLE`, `RESOURCE_EXHAUSTED`, ...
-    pub status: String,
+pub struct Method {
+    /// `supervised`.
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub supervised: Supervised,
+}
+
+/// The body of OpenAI's fine-tuning job creation (`POST /v1/fine_tuning/jobs`),
+/// which `lighthouse/train` takes verbatim. `training_file` is the path of a
+/// JSON Lines file of [`TrainLine`]s; `metadata` names the `decision` and the
+/// `dir` the artifact goes to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct FineTuningJobRequest {
+    pub model: String,
+    pub training_file: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validation_file: Option<String>,
+    pub method: Method,
+    pub seed: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suffix: Option<String>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+    /// The `options` of the project's provider. Not part of OpenAI's body.
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub options: serde_json::Map<String, Value>,
+}
+
+/// How far a fine-tuning job is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum JobStatus {
+    ValidatingFiles,
+    Queued,
+    Running,
+    Succeeded,
+    Failed,
+    Cancelled,
+}
+
+/// Why a job failed, in OpenAI's words.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct JobError {
+    pub code: String,
     pub message: String,
+    #[serde(default)]
+    pub param: Option<String>,
+}
+
+/// OpenAI's `FineTuningJob`. Over stdio `lighthouse/train` answers with the
+/// final one: `fine_tuned_model` is the artifact (`sha256:<hex>`) and the
+/// first of `result_files` is a JSON file of the metrics.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct FineTuningJob {
+    pub id: String,
+    /// `fine_tuning.job`.
+    pub object: String,
+    pub model: String,
+    pub status: JobStatus,
+    #[serde(default)]
+    pub fine_tuned_model: Option<String>,
+    #[serde(default)]
+    pub result_files: Vec<String>,
+    #[serde(default)]
+    pub error: Option<JobError>,
+}
+
+/// What a model can do, as OpenAI's model object lists it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Supports {
+    pub supported: bool,
+}
+
+/// The capabilities of a model.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Capabilities {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub classification: Option<Supports>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedding: Option<Supports>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fine_tuning: Option<Supports>,
+}
+
+/// One model of the list: OpenAI's model object, with what Lighthouse adds
+/// (`version`, `cost`, `deterministic`, `abstains`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ModelEntry {
+    pub id: String,
+    /// `model`.
+    pub object: String,
+    pub created: u64,
+    pub owned_by: String,
+    pub capabilities: Capabilities,
+    pub version: String,
+    pub cost: f64,
+    pub deterministic: bool,
+    pub abstains: bool,
+}
+
+/// OpenAI's list object of models: how a plugin says which it offers.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ModelList {
+    /// `list`.
+    pub object: String,
+    pub data: Vec<ModelEntry>,
+}
+
+impl Default for ModelList {
+    fn default() -> Self {
+        Self {
+            object: "list".to_owned(),
+            data: Vec::new(),
+        }
+    }
+}
+
+impl ModelList {
+    /// The list of these models.
+    pub fn of(models: &[ModelManifest]) -> Self {
+        let supports = |on: bool| on.then_some(Supports { supported: true });
+        Self {
+            object: "list".to_owned(),
+            data: models
+                .iter()
+                .map(|m| ModelEntry {
+                    id: m.id.clone(),
+                    object: "model".to_owned(),
+                    created: 0,
+                    owned_by: m.id.clone(),
+                    capabilities: Capabilities {
+                        classification: supports(m.tasks.iter().any(|t| t == "classification")),
+                        embedding: supports(m.tasks.iter().any(|t| t == "embedding")),
+                        fine_tuning: supports(m.trains),
+                    },
+                    version: m.version.clone(),
+                    cost: m.cost,
+                    deterministic: m.deterministic,
+                    abstains: m.abstains,
+                })
+                .collect(),
+        }
+    }
+
+    /// Whether the list has no model.
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    /// The models as the host handles them.
+    pub fn manifests(&self) -> Vec<ModelManifest> {
+        self.data
+            .iter()
+            .map(|e| ModelManifest {
+                id: e.id.clone(),
+                tasks: [
+                    ("classification", e.capabilities.classification),
+                    ("embedding", e.capabilities.embedding),
+                ]
+                .into_iter()
+                .filter(|(_, on)| on.is_some_and(|s| s.supported))
+                .map(|(task, _)| task.to_owned())
+                .collect(),
+                version: e.version.clone(),
+                trains: e.capabilities.fine_tuning.is_some_and(|s| s.supported),
+                deterministic: e.deterministic,
+                abstains: e.abstains,
+                cost: e.cost,
+            })
+            .collect()
+    }
 }

@@ -41,19 +41,26 @@ while True:
     method, params, id = message.get("method"), message.get("params", {}), message.get("id")
     if method == "initialize":
         send(id, {"id": "fake-model", "version": "1", "protocolVersion": "0.1", "languages": [],
-                  "models": [{"name": "fake-model", "tasks": ["classification"], "version": "1",
-                              "trains": True, "deterministic": True,
-                              "abstains": True, "cost": 0}]})
+                  "models": {"object": "list", "data": [{
+                      "id": "fake-model", "object": "model", "created": 0, "owned_by": "fake",
+                      "capabilities": {"classification": {"supported": True},
+                                       "fine_tuning": {"supported": True}},
+                      "version": "1", "cost": 0, "deterministic": True, "abstains": True}]}})
     elif method == "lighthouse/classify":
-        out = []
-        for s in params["subjects"]:
-            kind = "fail" if "maybe_bad" in s["id"] else "pass" if "maybe_good" in s["id"] else "review"
-            out.append({"key": s["key"], "kind": kind, "confidence": 0.95, "reason": params["options"].get("model", "")})
-        send(id, {"results": out, "model": {"id": "fake-model", "version": "1"}})
+        text = params["state"]["text"]
+        p = 0.95 if "maybe_bad" in text else 0.05 if "maybe_good" in text else 0.5
+        send(id, {"model": params["model"],
+                  "answers": {q: {"type": "noul", "noul": p} for q in params["questions"]}})
     elif method == "lighthouse/train":
-        with open(params["dir"] + "/subjects.json", "w") as f:
-            json.dump(params["subjects"], f)
-        send(id, {"name": "operations/1", "done": True, "response": {"artifact": "sha256:abc", "metrics": {"n": len(params["subjects"])}}})
+        with open(params["training_file"]) as f:
+            lines = [json.loads(l) for l in f]
+        with open(params["metadata"]["dir"] + "/subjects.json", "w") as f:
+            json.dump(lines, f)
+        with open(params["metadata"]["dir"] + "/metrics.json", "w") as f:
+            json.dump({"n": len(lines)}, f)
+        send(id, {"id": "ftjob-1", "object": "fine_tuning.job", "model": params["model"],
+                  "status": "succeeded", "fine_tuned_model": "sha256:abc",
+                  "result_files": [params["metadata"]["dir"] + "/metrics.json"]})
     elif method == "shutdown":
         send(id, None)
 "#;
@@ -148,7 +155,7 @@ fn a_model_plugin_bound_to_the_project_decides_the_abstentions() {
     );
     let found = results(&json(&out));
     assert_eq!(count(&found, "fail"), 2, "{found:?}");
-    assert_eq!(count(&found, "review"), 1);
+    assert_eq!(count(&found, "review"), 2);
 }
 
 #[test]
@@ -196,6 +203,7 @@ fn learn_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
     let trained = json(&out);
     assert_eq!(trained["model"], "fake/m1");
     assert_eq!(trained["result"]["artifact"], "sha256:abc");
+    assert_eq!(trained["result"]["metrics"]["n"], 5);
     assert_eq!(trained["unresolved"], 0);
     // Three baseline rows and two examples.
     assert_eq!(trained["subjects"], 5);

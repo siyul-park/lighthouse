@@ -1,69 +1,117 @@
+use std::collections::BTreeMap;
+
 use lighthouse_protocol::{
-    ClassifyParams, DecisionRef, Message, ResultKind, Shot, Subject, SubjectContext, prompt,
-    response_schema, subjects_text, system_text,
+    ClassifyParams, DecisionRef, ModelList, ModelManifest, Question, ResultKind, Shot, State,
+    noul_of, prompt, response_schema, subject_text, system_text,
 };
+use serde_json::json;
 
 fn decision() -> DecisionRef {
     DecisionRef {
         id: "design/x".to_owned(),
         requirement: "A function SHOULD be small.".to_owned(),
         prompt: "Is it small?".to_owned(),
-        examples: vec![Shot {
-            kind: ResultKind::Fail,
-            language: "go".to_owned(),
-            code: "func big() {}".to_owned(),
-            note: "big".to_owned(),
-        }],
+        examples: vec![
+            Shot {
+                kind: ResultKind::Fail,
+                language: "go".to_owned(),
+                code: "func big() {}".to_owned(),
+                note: "big".to_owned(),
+            },
+            Shot {
+                kind: ResultKind::Pass,
+                language: "go".to_owned(),
+                code: "func ok() {}".to_owned(),
+                note: String::new(),
+            },
+        ],
     }
 }
 
-fn subject() -> Subject {
-    Subject {
-        key: "k1".to_owned(),
-        kind: "function".to_owned(),
-        id: "m::f#function".to_owned(),
+fn state() -> State {
+    State {
         language: "go".to_owned(),
         file: "a.go".to_owned(),
         text: "func f() {}".to_owned(),
-        context: SubjectContext::default(),
+        facts: serde_json::Value::Null,
+        neighbors: Vec::new(),
     }
 }
 
 #[test]
-fn the_system_text_carries_the_instructions_the_decision_and_its_shots() {
-    let decision = decision();
-    let text = system_text(&decision, &decision.examples);
+fn a_question_puts_invalid_examples_under_true_and_valid_ones_under_false() {
+    let question = Question::of(&decision());
+    let wire = serde_json::to_value(&question).unwrap();
+
+    assert_eq!(wire["type"], "noul");
+    assert_eq!(
+        wire["criteria"]["true"]["examples"][0]["code"],
+        "func big() {}"
+    );
+    assert_eq!(
+        wire["criteria"]["false"]["examples"][0]["code"],
+        "func ok() {}"
+    );
+    assert_eq!(wire["instructions"]["prompt"], "Is it small?");
+}
+
+#[test]
+fn the_system_text_carries_the_instructions_the_decision_and_its_examples() {
+    let text = system_text("design/x", &Question::of(&decision()));
     assert!(text.contains("Is it small?") && text.contains("design/x"));
-    assert!(text.contains("Example (fail, big)") && text.contains("func big() {}"));
-    assert!(text.contains("review"));
-    assert!(!system_text(&decision, &[]).contains("Example"));
+    assert!(text.contains("Criterion true") && text.contains("func big() {}"));
+    assert!(text.contains("noul"));
 }
 
 #[test]
-fn the_subjects_text_names_each_key_and_shows_its_source() {
-    let text = subjects_text(&[subject()]);
-    assert!(text.contains("key=k1") && text.contains("func f() {}"));
+fn the_subject_text_shows_the_file_and_the_source() {
+    let text = subject_text(&state());
+    assert!(text.contains("a.go") && text.contains("func f() {}"));
 }
 
 #[test]
-fn a_prompt_holds_both_and_the_schema_asks_for_kinds_and_confidence() {
+fn a_prompt_holds_both_and_the_schema_asks_for_a_probability() {
     let params = ClassifyParams {
-        decision: decision(),
-        subjects: vec![subject()],
+        state: state(),
+        model: "m".to_owned(),
+        questions: BTreeMap::from([("design/x".to_owned(), Question::of(&decision()))]),
         options: serde_json::Map::new(),
     };
     let text = prompt(&params);
-    assert!(text.contains("Is it small?") && text.contains("key=k1"));
-    let schema = response_schema();
-    let kinds = &schema["properties"]["results"]["items"]["properties"]["kind"]["enum"];
-    assert_eq!(kinds, &serde_json::json!(["fail", "pass", "review"]));
+    assert!(text.contains("Is it small?") && text.contains("func f() {}"));
+    assert_eq!(response_schema()["properties"]["noul"]["type"], "number");
 }
 
 #[test]
-fn an_error_carries_its_canonical_status() {
-    let failure = Message::failure(None, -32602, "bad").with_status("INVALID_ARGUMENT");
+fn a_probability_is_read_from_a_system_one_body_or_a_bare_answer() {
+    let body = json!({"model": "m", "answers": {"d": {"type": "noul", "noul": 0.25}}});
+    assert_eq!(noul_of(&body, "d"), Some(0.25));
+    assert_eq!(noul_of(&json!({"noul": 0.5}), "d"), Some(0.5));
+    assert_eq!(noul_of(&json!({"noul": 1.5}), "d"), None);
+    assert_eq!(noul_of(&body, "other"), None);
+}
+
+#[test]
+fn a_model_list_is_openais_list_object_and_reads_back_to_the_same_models() {
+    let model = ModelManifest {
+        id: "m".to_owned(),
+        tasks: vec!["classification".to_owned()],
+        version: "1".to_owned(),
+        trains: true,
+        deterministic: false,
+        abstains: true,
+        cost: 2.0,
+    };
+    let list = ModelList::of(std::slice::from_ref(&model));
+    let wire = serde_json::to_value(&list).unwrap();
+
+    assert_eq!(wire["object"], "list");
+    assert_eq!(wire["data"][0]["object"], "model");
     assert_eq!(
-        failure.error.unwrap().data.unwrap()["status"],
-        "INVALID_ARGUMENT"
+        wire["data"][0]["capabilities"]["fine_tuning"]["supported"],
+        true
     );
+    assert!(wire["data"][0]["capabilities"].get("embedding").is_none());
+    assert_eq!(list.manifests(), [model]);
+    assert!(ModelList::default().is_empty());
 }

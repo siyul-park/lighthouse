@@ -14,7 +14,7 @@ use crate::{client::Client, convert, manifest::Found, model::Model};
 pub struct RpcPlugin {
     manifest: PluginManifest,
     languages: Vec<wire::ProviderManifest>,
-    models: Vec<wire::ModelManifest>,
+    models: Vec<lighthouse_plugin::ModelManifest>,
     client: Arc<Client>,
 }
 
@@ -68,7 +68,8 @@ impl RpcPlugin {
                 reported.join(", ")
             )));
         }
-        let mut offered: Vec<&str> = result.models.iter().map(|m| m.id.as_str()).collect();
+        let models = result.models.manifests();
+        let mut offered: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
         offered.sort_unstable();
         let mut named: Vec<&str> = found
             .manifest
@@ -91,7 +92,7 @@ impl RpcPlugin {
                 version: result.version,
             },
             languages: result.languages,
-            models: result.models,
+            models,
             client: Arc::new(client),
         })
     }

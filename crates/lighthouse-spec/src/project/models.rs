@@ -12,8 +12,6 @@ use super::{RuleSetting, spec::ProjectSpec};
 
 /// Calls a run may spend on models unless the project says.
 pub const DEFAULT_BUDGET: usize = 200;
-/// Subjects sent to a model in one request unless the project says.
-pub const DEFAULT_BATCH: usize = 20;
 /// The precision a check must reach unless the project says.
 pub const DEFAULT_PRECISION: f64 = 0.9;
 
@@ -99,7 +97,7 @@ pub enum ModelProvider {
 pub struct ApiProvider {
     /// The API: `openai` (Chat Completions, which OpenRouter, Ollama, vLLM
     /// and LM Studio also speak). Others will join.
-    pub spec: String,
+    pub spec: Specs,
     /// Where requests go. Default: the spec's own service.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_url: Option<String>,
@@ -110,6 +108,25 @@ pub struct ApiProvider {
     /// What one answer costs. Default: 1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost: Option<f64>,
+}
+
+/// One standard API, or several a provider speaks: each operation uses the
+/// one that covers it (classification: `typesafe`, else `openai`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum Specs {
+    One(String),
+    Many(Vec<String>),
+}
+
+impl Specs {
+    /// The names, in the order written.
+    pub fn names(&self) -> Vec<&str> {
+        match self {
+            Self::One(name) => vec![name.as_str()],
+            Self::Many(names) => names.iter().map(String::as_str).collect(),
+        }
+    }
 }
 
 /// A provider as the project writes it.
@@ -126,12 +143,18 @@ impl ProviderSpec {
         match self {
             Self::Provider(provider) => Ok(provider.clone()),
             Self::Api(api) => {
+                let names = api.spec.names();
                 let (_, base, key) = SPECS
                     .iter()
-                    .find(|(spec, ..)| *spec == api.spec)
-                    .ok_or_else(|| format!("spec `{}` is not supported (openai is)", api.spec))?;
+                    .find(|(spec, ..)| names.contains(spec))
+                    .ok_or_else(|| {
+                        format!("none of the specs {names:?} is supported (openai is)")
+                    })?;
                 let mut options = Map::new();
-                options.insert("spec".to_owned(), Value::from(api.spec.as_str()));
+                options.insert(
+                    "spec".to_owned(),
+                    serde_json::to_value(&api.spec).unwrap_or_default(),
+                );
                 options.insert(
                     "baseUrl".to_owned(),
                     Value::from(api.base_url.as_deref().unwrap_or(base)),
@@ -162,9 +185,6 @@ pub struct ModelsSpec {
     /// left to review. Default: 200.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub budget: Option<usize>,
-    /// Subjects in one request to a model. Default: 20.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub batch: Option<usize>,
     /// The providers the project defines, by name; a name that is built in
     /// overrides it.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -226,7 +246,6 @@ pub struct ModelBinding {
     /// The evaluation policy a rule sets, by decision id.
     pub evaluation: BTreeMap<String, Evaluation>,
     pub budget: usize,
-    pub batch: usize,
 }
 
 impl ModelBinding {
@@ -261,7 +280,6 @@ impl ModelBinding {
             invalid,
             evaluation,
             budget: models.budget.unwrap_or(DEFAULT_BUDGET),
-            batch: models.batch.unwrap_or(DEFAULT_BATCH).max(1),
         }
     }
 
@@ -297,7 +315,7 @@ impl ModelBinding {
 pub fn builtin(name: &str) -> Option<ModelProvider> {
     SPECS.iter().find(|(spec, ..)| *spec == name)?;
     ProviderSpec::Api(ApiProvider {
-        spec: name.to_owned(),
+        spec: Specs::One(name.to_owned()),
         base_url: None,
         key_env: None,
         cost: None,

@@ -4,8 +4,9 @@
 //! on what it is later asked about.
 
 pub use lighthouse_protocol::{
-    Answer, ClassifyParams, ClassifyResult, DecisionRef, LabelSource, ModelManifest, ModelRef,
-    Neighbor, ResultKind, Shot, Subject, SubjectContext, TrainParams, TrainResponse, TrainSubject,
+    ClassifyParams, ClassifyResult, DecisionRef, LabelSource, ModelManifest, Neighbor, Question,
+    QuestionAnswer, ResultKind, Shot, State, Subject, SubjectContext, TrainParams, TrainResponse,
+    TrainSubject,
 };
 
 use crate::Error;
@@ -20,6 +21,10 @@ pub trait Classifier: Send + Sync {
     fn train(&self, params: &TrainParams) -> Result<TrainResponse, Error>;
 }
 
+/// The probability at which an uncalibrated model's answer is a `fail`; a
+/// model that has not been calibrated never clears a subject.
+pub const UPPER: f64 = 0.9;
+
 /// Subjects of one decision to be judged.
 #[derive(Debug, Clone)]
 pub struct Ask {
@@ -28,10 +33,11 @@ pub struct Ask {
     /// Changes whenever the way the rule judges changes; cached answers of
     /// another revision are not used.
     pub revision: String,
-    /// The least confidence at which an answer decides; below it, or abstaining,
-    /// the next model of the cascade is asked.
-    pub threshold: f64,
-    pub params: ClassifyParams,
+    /// P(fail) at or above which a model's answer is a `fail`; below it the
+    /// subject is left for review.
+    pub upper: f64,
+    pub decision: DecisionRef,
+    pub subjects: Vec<Subject>,
 }
 
 /// A subject a model decided.
@@ -39,10 +45,22 @@ pub struct Ask {
 pub struct Decided {
     /// `Fail` or `Pass`, never `Review`.
     pub kind: ResultKind,
+    /// max(p, 1 - p) of the probability the model gave.
     pub confidence: f64,
-    pub reason: String,
-    /// The model that decided.
-    pub model: ModelRef,
+    /// The model that decided, `<provider>/<model>`, and its version.
+    pub model: String,
+    pub version: String,
+}
+
+/// What a probability of failing makes of a subject, and how confident that
+/// is: `fail` from `upper` up, otherwise left for review.
+pub fn decide(noul: f64, upper: f64) -> (ResultKind, f64) {
+    let kind = if noul >= upper {
+        ResultKind::Fail
+    } else {
+        ResultKind::Review
+    };
+    (kind, noul.max(1.0 - noul))
 }
 
 /// Why a subject was left undecided: it is a candidate for agent review.
@@ -99,8 +117,7 @@ impl Models for NoModels {
     }
 
     fn classify(&self, ask: &Ask) -> Vec<Judged> {
-        ask.params
-            .subjects
+        ask.subjects
             .iter()
             .map(|_| Judged::Open(Open::Unbound))
             .collect()
