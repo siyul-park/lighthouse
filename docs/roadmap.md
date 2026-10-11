@@ -158,6 +158,7 @@ Public adoption waits until the loop has been shown working.
 | Ecosystem | `lighthouse lsp` for editors (diagnostics, fixes, judgments); external rule plugins over RPC that ship their decision specs; `plugin add` with a lockfile |
 | Session domain | decisions about agent actions; a PreToolUse gate that allows, asks or denies |
 | More API specs | Anthropic Messages API; session-domain models |
+| Remote models | Lighthouse's Model API over HTTP (classify, train jobs, artifacts; OpenAPI), so training and classification can run on a server declared by base URL; one conformance suite for in-process, stdio and HTTP; local stays the default |
 
 ## Known gaps
 - A per-language check, `spec.languages.<id>.check`, does not exist. A decision whose
