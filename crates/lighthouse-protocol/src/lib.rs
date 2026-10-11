@@ -1,30 +1,30 @@
-mod frame;
-mod jobs;
+mod language;
 mod model;
-mod prompt;
-mod serve;
-mod wire;
 
-pub use frame::{ErrorObject, FrameError, Id, Message, read_message, write_message};
-pub use jobs::{
-    Capabilities, ChatMessage, CreateFineTuningJobRequest, FineTuneJobError, FineTuneMethod,
-    FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
-    FineTuningJobStatus, LineKeys, ListModelResponse, Model, Supports, TrainingLine,
+pub use language::{
+    frame::{ErrorObject, FrameError, Id, Message, read_message, write_message},
+    serve::{Handler, HandlerError, ServeError, serve},
+    wire::{
+        CacheRef, Call, ClientInfo, Comment, Context, Conventions, Edge, EdgeKind, Event,
+        EventKind, FileInfo, FileRef, Flow, FlowKind, Fragment, FunctionSummary, Incomplete,
+        IndexParams, IndexResult, InitializeParams, InitializeResult, Methods, Module, Node,
+        Overlay, Position, ProjectRef, ProviderManifest, Resolution, Signature, Span, Symbol,
+        SymbolKind, SymbolRole, TestCase, TestStyle, TypeRef, Visibility,
+    },
 };
 pub use model::{
-    Answer, Criteria, Criterion, DecisionRef, Example, Instructions, ModelMethods, Neighbor,
-    Question, ResultKind, State, Subject, SubjectContext, SystemOneRequest, SystemOneResponse,
-};
-pub use prompt::{
-    json_in, noul_of, prompt, response_schema, subject as subject_text, system as system_text,
-};
-pub use serve::{Handler, HandlerError, ServeError, serve};
-pub use wire::{
-    CacheRef, Call, ClientInfo, Comment, Context, Conventions, Edge, EdgeKind, Event, EventKind,
-    FileInfo, FileRef, Flow, FlowKind, Fragment, FunctionSummary, Incomplete, IndexParams,
-    IndexResult, InitializeParams, InitializeResult, Methods, Module, Node, Overlay, Position,
-    ProjectRef, ProviderManifest, Resolution, Signature, Span, Symbol, SymbolKind, SymbolRole,
-    TestCase, TestStyle, TypeRef, Visibility,
+    jobs::{
+        Capabilities, ChatMessage, CreateFineTuningJobRequest, FineTuneJobError, FineTuneMethod,
+        FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
+        FineTuningJobStatus, LineKeys, ListModelResponse, Model, Supports, TrainingLine,
+    },
+    methods::{
+        Answer, Criteria, Criterion, DecisionRef, Example, Instructions, ModelMethods, Neighbor,
+        Question, ResultKind, State, Subject, SubjectContext, SystemOneRequest, SystemOneResponse,
+    },
+    prompt::{
+        json_in, noul_of, prompt, response_schema, subject as subject_text, system as system_text,
+    },
 };
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.
