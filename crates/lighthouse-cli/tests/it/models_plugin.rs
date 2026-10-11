@@ -151,7 +151,7 @@ fn learn_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
     let digest = trained["training_file"].as_str().unwrap();
     assert!(digest.starts_with("sha256:"), "{digest}");
     assert_eq!(trained["result"]["status"], "succeeded");
-    assert_eq!(trained["result"]["fine_tuned_model"], "sha256:abc");
+    assert_eq!(trained["result"]["fine_tuned_model"], "learned@sha256:abc");
     assert_eq!(trained["unresolved"], 0);
     // Three reviewed rows and one example.
     assert_eq!(trained["subjects"], 4);

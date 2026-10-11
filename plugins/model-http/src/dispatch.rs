@@ -67,10 +67,12 @@ mod tests {
                     id: "d/x".to_owned(),
                     requirement: "r".to_owned(),
                     prompt: "r".to_owned(),
-                    examples: Vec::new(),
+                    valid: Vec::new(),
+                    invalid: Vec::new(),
                 }),
             )]
             .into(),
+            options: Default::default(),
         };
         let _ = classify(&endpoint).unwrap()(&client, &endpoint, &request);
         client.asked()[0].0.clone()

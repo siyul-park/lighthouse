@@ -126,6 +126,7 @@ mod tests {
                 .iter()
                 .map(|id| ((*id).to_owned(), question()))
                 .collect(),
+            options: Default::default(),
         }
     }
 

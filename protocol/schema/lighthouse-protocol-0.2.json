@@ -100,34 +100,6 @@
       },
       "type": "object"
     },
-    "ClassifyParams": {
-      "description": "Params of `lighthouse/classify`: System One's body, and beside it the\n`options` of the project's provider, for a plugin that needs them\n(`spec`, `baseUrl`, `keyEnv`). The options are never part of the body.",
-      "properties": {
-        "model": {
-          "description": "The model asked: the part of the reference after the provider.",
-          "type": "string"
-        },
-        "options": {
-          "additionalProperties": true,
-          "type": "object"
-        },
-        "questions": {
-          "additionalProperties": {
-            "$ref": "#/$defs/Question"
-          },
-          "type": "object"
-        },
-        "state": {
-          "$ref": "#/$defs/State"
-        }
-      },
-      "required": [
-        "state",
-        "model",
-        "questions"
-      ],
-      "type": "object"
-    },
     "ClientInfo": {
       "description": "Name and version of the host, for the plugin's diagnostics only.",
       "properties": {
@@ -221,6 +193,56 @@
           "type": "array"
         }
       },
+      "type": "object"
+    },
+    "CreateFineTuningJobRequest": {
+      "description": "The body of OpenAI's fine-tuning job creation (`POST /v1/fine_tuning/jobs`),\nwhich `lighthouse/train` takes verbatim. `training_file` is the digest\n(`sha256:<hex>`) of a JSON Lines file of [`TrainingLine`]s in the host's\ndataset store; `metadata` names the `decision`, the `datasets` directory\nthe file is in (`<hex>.jsonl` under `sha256/`) and the `dir` the artifact\ngoes to.",
+      "properties": {
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "type": "object"
+        },
+        "method": {
+          "$ref": "#/$defs/FineTuneMethod"
+        },
+        "model": {
+          "type": "string"
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "The `options` of the project's provider. Not part of OpenAI's body.",
+          "type": "object"
+        },
+        "seed": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "suffix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "training_file": {
+          "type": "string"
+        },
+        "validation_file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "model",
+        "training_file",
+        "method",
+        "seed"
+      ],
       "type": "object"
     },
     "Criteria": {
@@ -359,7 +381,7 @@
       ]
     },
     "Example": {
-      "description": "An example under a criterion.",
+      "description": "One valid or invalid example of a decision.",
       "properties": {
         "code": {
           "type": "string"
@@ -411,19 +433,88 @@
       ],
       "type": "object"
     },
-    "FineTuningJob": {
-      "description": "OpenAI's `FineTuningJob`. Over stdio `lighthouse/train` answers with the\nfinal one: `fine_tuned_model` is the artifact (`sha256:<hex>`) and the\nfirst of `result_files` is a JSON file of the metrics.",
+    "FineTuneJobError": {
+      "description": "Why a job failed, in OpenAI's words.",
       "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "param": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "FineTuneMethod": {
+      "description": "The method of a fine-tuning job.",
+      "properties": {
+        "supervised": {
+          "$ref": "#/$defs/FineTuneSupervisedMethod"
+        },
+        "type": {
+          "description": "`supervised`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "supervised"
+      ],
+      "type": "object"
+    },
+    "FineTuneSupervisedHyperparameters": {
+      "additionalProperties": true,
+      "description": "Provider-specific supervised fine-tuning parameters.",
+      "type": "object"
+    },
+    "FineTuneSupervisedMethod": {
+      "description": "OpenAI's supervised fine-tuning method, with optional OpenAI parameters.",
+      "properties": {
+        "hyperparameters": {
+          "$ref": "#/$defs/FineTuneSupervisedHyperparameters",
+          "default": {}
+        }
+      },
+      "type": "object"
+    },
+    "FineTuningJob": {
+      "description": "OpenAI's `FineTuningJob`. Over stdio `lighthouse/train` answers with the\nfinal one: `fine_tuned_model` is the reference (`learned@sha256:<hex>`) and the\nfirst of `result_files` is a JSON file of the metrics.",
+      "properties": {
+        "created_at": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "error": {
           "anyOf": [
             {
-              "$ref": "#/$defs/JobError"
+              "$ref": "#/$defs/FineTuneJobError"
             },
             {
               "type": "null"
             }
           ],
           "default": null
+        },
+        "estimated_finish": {
+          "default": null,
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "fine_tuned_model": {
           "default": null,
@@ -432,14 +523,58 @@
             "null"
           ]
         },
+        "finished_at": {
+          "default": null,
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "hyperparameters": {
+          "default": null
+        },
         "id": {
           "type": "string"
+        },
+        "integrations": {
+          "default": null,
+          "items": true,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": null,
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "method": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FineTuneMethod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "model": {
           "type": "string"
         },
         "object": {
           "description": "`fine_tuning.job`.",
+          "type": "string"
+        },
+        "organization_id": {
           "type": "string"
         },
         "result_files": {
@@ -449,47 +584,20 @@
           },
           "type": "array"
         },
-        "status": {
-          "$ref": "#/$defs/JobStatus"
-        }
-      },
-      "required": [
-        "id",
-        "object",
-        "model",
-        "status"
-      ],
-      "type": "object"
-    },
-    "FineTuningJobRequest": {
-      "description": "The body of OpenAI's fine-tuning job creation (`POST /v1/fine_tuning/jobs`),\nwhich `lighthouse/train` takes verbatim. `training_file` is the digest\n(`sha256:<hex>`) of a JSON Lines file of [`TrainingLine`]s in the host's\ndataset store; `metadata` names the `decision`, the `datasets` directory\nthe file is in (`<hex>.jsonl` under `sha256/`) and the `dir` the artifact\ngoes to.",
-      "properties": {
-        "metadata": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "default": {},
-          "type": "object"
-        },
-        "method": {
-          "$ref": "#/$defs/Method"
-        },
-        "model": {
-          "type": "string"
-        },
-        "options": {
-          "additionalProperties": true,
-          "description": "The `options` of the project's provider. Not part of OpenAI's body.",
-          "type": "object"
-        },
         "seed": {
-          "format": "uint64",
+          "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },
-        "suffix": {
+        "status": {
+          "$ref": "#/$defs/FineTuningJobStatus"
+        },
+        "trained_tokens": {
+          "default": null,
+          "format": "uint32",
+          "minimum": 0,
           "type": [
-            "string",
+            "integer",
             "null"
           ]
         },
@@ -497,6 +605,7 @@
           "type": "string"
         },
         "validation_file": {
+          "default": null,
           "type": [
             "string",
             "null"
@@ -504,12 +613,28 @@
         }
       },
       "required": [
+        "id",
+        "created_at",
+        "object",
         "model",
+        "status",
+        "organization_id",
         "training_file",
-        "method",
         "seed"
       ],
       "type": "object"
+    },
+    "FineTuningJobStatus": {
+      "description": "How far a fine-tuning job is.",
+      "enum": [
+        "validating_files",
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "type": "string"
     },
     "Flow": {
       "description": "A control-flow construct and the number of enclosing nesting constructs,\nnested functions included, around it.",
@@ -829,7 +954,7 @@
           "type": "array"
         },
         "models": {
-          "$ref": "#/$defs/ModelList",
+          "$ref": "#/$defs/ListModelResponse",
           "description": "The models the plugin offers, as OpenAI's list object; empty for a\nlanguage plugin."
         },
         "protocolVersion": {
@@ -865,60 +990,28 @@
       ],
       "type": "object"
     },
-    "JobError": {
-      "description": "Why a job failed, in OpenAI's words.",
+    "ListModelResponse": {
+      "description": "OpenAI's list object of models: how a plugin says which it offers.",
       "properties": {
-        "code": {
-          "type": "string"
+        "data": {
+          "items": {
+            "$ref": "#/$defs/Model"
+          },
+          "type": "array"
         },
-        "message": {
-          "type": "string"
-        },
-        "param": {
-          "default": null,
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "code",
-        "message"
-      ],
-      "type": "object"
-    },
-    "JobStatus": {
-      "description": "How far a fine-tuning job is.",
-      "enum": [
-        "validating_files",
-        "queued",
-        "running",
-        "succeeded",
-        "failed",
-        "cancelled"
-      ],
-      "type": "string"
-    },
-    "Method": {
-      "description": "The method of a fine-tuning job.",
-      "properties": {
-        "supervised": {
-          "$ref": "#/$defs/Supervised"
-        },
-        "type": {
-          "description": "`supervised`.",
+        "object": {
+          "description": "`list`.",
           "type": "string"
         }
       },
       "required": [
-        "type",
-        "supervised"
+        "object",
+        "data"
       ],
       "type": "object"
     },
-    "ModelEntry": {
-      "description": "One model of the list: OpenAI's model object, with what Lighthouse adds\n(`version`, `cost`, `deterministic`, `abstains`).",
+    "Model": {
+      "description": "One model: OpenAI's model object, with what Lighthouse adds\n(`version`, `cost`, `deterministic`, `abstains`).",
       "properties": {
         "abstains": {
           "type": "boolean"
@@ -931,7 +1024,7 @@
           "type": "number"
         },
         "created": {
-          "format": "uint64",
+          "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },
@@ -962,26 +1055,6 @@
         "cost",
         "deterministic",
         "abstains"
-      ],
-      "type": "object"
-    },
-    "ModelList": {
-      "description": "OpenAI's list object of models: how a plugin says which it offers.",
-      "properties": {
-        "data": {
-          "items": {
-            "$ref": "#/$defs/ModelEntry"
-          },
-          "type": "array"
-        },
-        "object": {
-          "description": "`list`.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "object",
-        "data"
       ],
       "type": "object"
     },
@@ -1267,17 +1340,6 @@
       ],
       "type": "object"
     },
-    "Supervised": {
-      "description": "The supervised method of a fine-tuning job.",
-      "properties": {
-        "hyperparameters": {
-          "additionalProperties": true,
-          "default": {},
-          "type": "object"
-        }
-      },
-      "type": "object"
-    },
     "Supports": {
       "description": "What a model can do, as OpenAI's model object lists it.",
       "properties": {
@@ -1403,6 +1465,35 @@
           "type": "string"
         }
       ]
+    },
+    "SystemOneRequest": {
+      "description": "The body of TypeSafe's System One API (`POST /v1/systemone`), for one\nsubject and the decisions judged on it, keyed by decision id.",
+      "properties": {
+        "model": {
+          "description": "The model asked: the part of the reference after the provider.",
+          "type": "string"
+        },
+        "options": {
+          "additionalProperties": true,
+          "description": "Provider options, omitted when empty and stripped by HTTP providers.",
+          "type": "object"
+        },
+        "questions": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Question"
+          },
+          "type": "object"
+        },
+        "state": {
+          "$ref": "#/$defs/State"
+        }
+      },
+      "required": [
+        "state",
+        "model",
+        "questions"
+      ],
+      "type": "object"
     },
     "SystemOneResponse": {
       "description": "Result of `lighthouse/classify`: System One's response. Every question\nasked is answered; a missing answer is an abstention.",

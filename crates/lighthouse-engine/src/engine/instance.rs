@@ -6,8 +6,8 @@ use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
 use lighthouse_model::hash;
 use lighthouse_plugin::{
-    Answer, Classifier, ClassifyParams, Error, FineTuningJob, FineTuningJobRequest, ModelManifest,
-    Registry, SystemOneResponse,
+    Answer, Capabilities, Classifier, CreateFineTuningJobRequest, Error, FineTuningJob, Model,
+    Registry, Supports, SystemOneRequest, SystemOneResponse,
 };
 use lighthouse_process::{MAX_OUTPUT, Spec};
 use lighthouse_protocol::{json_in, noul_of};
@@ -71,9 +71,22 @@ impl<'a> Host<'a> {
                 ..
             } => Box::new(Command {
                 model: model.to_owned(),
-                manifest: ModelManifest {
+                manifest: Model {
                     id: name.to_owned(),
-                    tasks: tasks.clone(),
+                    object: "model".to_owned(),
+                    created: 0,
+                    owned_by: name.to_owned(),
+                    capabilities: Capabilities {
+                        classification: tasks
+                            .iter()
+                            .any(|t| t == "classification")
+                            .then_some(Supports { supported: true }),
+                        embedding: tasks
+                            .iter()
+                            .any(|t| t == "embedding")
+                            .then_some(Supports { supported: true }),
+                        fine_tuning: None,
+                    },
                     version: hash::short(
                         &format!(
                             "{argv:?}{model}{stdin:?}{pointer:?}{env:?}{key_env:?}{}",
@@ -81,7 +94,6 @@ impl<'a> Host<'a> {
                         ),
                         6,
                     ),
-                    trains: false,
                     deterministic: false,
                     abstains: true,
                     cost: *cost,
@@ -120,13 +132,13 @@ impl Host<'_> {
 
 /// An instance that cannot run, kept so that its failure is reported.
 struct Refused {
-    manifest: ModelManifest,
+    manifest: Model,
     reason: String,
 }
 
 /// A model of a plugin process, named and configured by the instance.
 struct Rpc<'a> {
-    manifest: ModelManifest,
+    manifest: Model,
     /// The part of the reference after the provider.
     name: String,
     model: &'a dyn Classifier,
@@ -134,18 +146,18 @@ struct Rpc<'a> {
 }
 
 impl Classifier for Refused {
-    fn manifest(&self) -> &ModelManifest {
+    fn manifest(&self) -> &Model {
         &self.manifest
     }
 
-    fn classify(&self, _: &ClassifyParams) -> Result<SystemOneResponse, Error> {
+    fn classify(&self, _: &SystemOneRequest) -> Result<SystemOneResponse, Error> {
         Err(Error::Failed(format!(
             "model `{}`: {}",
             self.manifest.id, self.reason
         )))
     }
 
-    fn train(&self, _: &FineTuningJobRequest) -> Result<FineTuningJob, Error> {
+    fn train(&self, _: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {
         Err(Error::Failed(format!(
             "model `{}`: {}",
             self.manifest.id, self.reason
@@ -155,7 +167,7 @@ impl Classifier for Refused {
 
 /// Any program that reads a request on stdin and prints JSON.
 struct Command {
-    manifest: ModelManifest,
+    manifest: Model,
     model: String,
     argv: Vec<String>,
     stdin: ModelInput,
@@ -166,18 +178,18 @@ struct Command {
 }
 
 impl Classifier for Rpc<'_> {
-    fn manifest(&self) -> &ModelManifest {
+    fn manifest(&self) -> &Model {
         &self.manifest
     }
 
-    fn classify(&self, params: &ClassifyParams) -> Result<SystemOneResponse, Error> {
+    fn classify(&self, params: &SystemOneRequest) -> Result<SystemOneResponse, Error> {
         let mut asked = params.clone();
-        asked.request.model.clone_from(&self.name);
+        asked.model.clone_from(&self.name);
         asked.options.clone_from(&self.options);
         self.model.classify(&asked)
     }
 
-    fn train(&self, request: &FineTuningJobRequest) -> Result<FineTuningJob, Error> {
+    fn train(&self, request: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {
         let mut asked = request.clone();
         asked.model.clone_from(&self.name);
         asked.options.clone_from(&self.options);
@@ -186,21 +198,19 @@ impl Classifier for Rpc<'_> {
 }
 
 impl Classifier for Command {
-    fn manifest(&self) -> &ModelManifest {
+    fn manifest(&self) -> &Model {
         &self.manifest
     }
 
     /// Output that does not fit the shape of an answer is a provider error.
-    fn classify(&self, params: &ClassifyParams) -> Result<SystemOneResponse, Error> {
+    fn classify(&self, params: &SystemOneRequest) -> Result<SystemOneResponse, Error> {
         let failed =
             |reason: String| Error::Failed(format!("model `{}`: {reason}", self.manifest.id));
         let mut asked = params.clone();
-        asked.request.model.clone_from(&self.model);
+        asked.model.clone_from(&self.model);
         let input = match self.stdin {
-            ModelInput::Request => {
-                serde_json::to_vec(&asked.request).map_err(|e| failed(e.to_string()))?
-            }
-            ModelInput::Prompt => lighthouse_protocol::prompt(&asked.request).into_bytes(),
+            ModelInput::Request => serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?,
+            ModelInput::Prompt => lighthouse_protocol::prompt(&asked).into_bytes(),
         };
         let output = lighthouse_process::run(&Spec {
             argv: &self.argv,
@@ -219,7 +229,6 @@ impl Classifier for Command {
         }
         let printed = printed_answer(&output.stdout, self.pointer.as_deref());
         let answers = params
-            .request
             .questions
             .keys()
             .map(|id| {
@@ -241,7 +250,7 @@ impl Classifier for Command {
         })
     }
 
-    fn train(&self, _: &FineTuningJobRequest) -> Result<FineTuningJob, Error> {
+    fn train(&self, _: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {
         Err(Error::Failed(format!(
             "model `{}`: a command model does not train",
             self.manifest.id
@@ -266,17 +275,17 @@ fn command_env(
 
 fn rpc_manifest(
     name: &str,
-    inner: &ModelManifest,
+    inner: &Model,
     model: &str,
     options: &Map<String, Value>,
     cost: Option<f64>,
-) -> ModelManifest {
+) -> Model {
     let version = format!(
         "{}+{}",
         inner.version,
         hash::short(&format!("{model}{}", Value::Object(options.clone())), 4)
     );
-    ModelManifest {
+    Model {
         id: name.to_owned(),
         version,
         cost: cost.unwrap_or(inner.cost),
@@ -286,11 +295,17 @@ fn rpc_manifest(
 
 fn refused<'a>(name: &str, reason: String) -> Box<dyn Classifier + 'a> {
     Box::new(Refused {
-        manifest: ModelManifest {
+        manifest: Model {
             id: name.to_owned(),
-            tasks: vec!["classification".to_owned()],
+            object: "model".to_owned(),
+            created: 0,
+            owned_by: name.to_owned(),
+            capabilities: Capabilities {
+                classification: Some(Supports { supported: true }),
+                embedding: None,
+                fine_tuning: None,
+            },
             version: String::new(),
-            trains: false,
             deterministic: false,
             abstains: true,
             cost: 0.0,

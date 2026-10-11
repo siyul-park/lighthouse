@@ -7,13 +7,13 @@ mod wire;
 
 pub use frame::{ErrorObject, FrameError, Id, Message, read_message, write_message};
 pub use jobs::{
-    Capabilities, ChatMessage, FineTuningJob, FineTuningJobRequest, JobError, JobStatus, LineKeys,
-    Method, ModelEntry, ModelList, Supervised, Supports, TrainingLine,
+    Capabilities, ChatMessage, CreateFineTuningJobRequest, FineTuneJobError, FineTuneMethod,
+    FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
+    FineTuningJobStatus, LineKeys, ListModelResponse, Model, Supports, TrainingLine,
 };
 pub use model::{
-    Answer, ClassifyParams, Criteria, Criterion, DecisionRef, Example, Instructions, ModelManifest,
-    ModelMethods, Neighbor, Question, ResultKind, Shot, State, Subject, SubjectContext,
-    SystemOneRequest, SystemOneResponse,
+    Answer, Criteria, Criterion, DecisionRef, Example, Instructions, ModelMethods, Neighbor,
+    Question, ResultKind, State, Subject, SubjectContext, SystemOneRequest, SystemOneResponse,
 };
 pub use prompt::{
     json_in, noul_of, prompt, response_schema, subject as subject_text, system as system_text,
@@ -28,7 +28,7 @@ pub use wire::{
 };
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.
-pub const VERSION: &str = "0.1";
+pub const VERSION: &str = "0.2";
 
 /// Request: handshake; the first message of a session.
 pub const INITIALIZE: &str = "initialize";

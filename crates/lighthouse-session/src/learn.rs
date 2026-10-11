@@ -11,8 +11,8 @@ use std::{
 
 use lighthouse_engine::ModelOptions;
 use lighthouse_plugin::{
-    Classifier, ClassifyParams, FineTuningJob, FineTuningJobRequest, Method, Question, ResultKind,
-    Subject, Supervised, SystemOneRequest, UPPER, decide,
+    Classifier, CreateFineTuningJobRequest, FineTuneMethod, FineTuneSupervisedMethod,
+    FineTuningJob, Question, ResultKind, Subject, SystemOneRequest, UPPER, decide,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -136,7 +136,13 @@ pub fn train(request: &TrainRequest) -> Result<Trained> {
         .as_deref()
         .map(|r| first.checked.model(r))
         .transpose()?;
-    let result = match learner.filter(|model| model.manifest().trains) {
+    let result = match learner.filter(|model| {
+        model
+            .manifest()
+            .capabilities
+            .fine_tuning
+            .is_some_and(|capability| capability.supported)
+    }) {
         Some(model) => Some(model.train(&job(
             reference.as_deref().unwrap_or_default(),
             &written.digest,
@@ -282,12 +288,10 @@ fn taught(
     let attribution = json!({"type": "SoftwareAgent", "hadRole": "model"});
     let mut labelled = Vec::new();
     for (key, subject) in unlabelled {
-        let answered = teacher.classify(&ClassifyParams {
-            request: SystemOneRequest {
-                state: subject.state(),
-                model: String::new(),
-                questions: BTreeMap::from([(decision.id.clone(), question.clone())]),
-            },
+        let answered = teacher.classify(&SystemOneRequest {
+            state: subject.state(),
+            model: String::new(),
+            questions: BTreeMap::from([(decision.id.clone(), question.clone())]),
             options: serde_json::Map::new(),
         })?;
         let Some(noul) = answered.answers.get(&decision.id).map(|a| a.noul) else {
@@ -316,16 +320,21 @@ fn taught(
 
 /// OpenAI's fine-tuning job creation for the dataset: the same dataset for the
 /// same base model is the same job (its seed comes from the digest).
-fn job(reference: &str, training_file: &str, root: &Path, decision: &str) -> FineTuningJobRequest {
+fn job(
+    reference: &str,
+    training_file: &str,
+    root: &Path,
+    decision: &str,
+) -> CreateFineTuningJobRequest {
     let model = reference.split_once('/').map_or(reference, |(_, m)| m);
-    let seed = u64::from_str_radix(&training_file["sha256:".len()..][..15], 16).unwrap_or(0);
-    FineTuningJobRequest {
+    let seed = u32::from_str_radix(&training_file["sha256:".len()..][..8], 16).unwrap_or(0);
+    CreateFineTuningJobRequest {
         model: model.to_owned(),
         training_file: training_file.to_owned(),
         validation_file: None,
-        method: Method {
+        method: FineTuneMethod {
             kind: "supervised".to_owned(),
-            supervised: Supervised::default(),
+            supervised: FineTuneSupervisedMethod::default(),
         },
         seed,
         suffix: None,

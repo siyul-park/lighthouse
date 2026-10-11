@@ -132,7 +132,7 @@ func TestReadMessage(t *testing.T) {
 func TestServe(t *testing.T) {
 	t.Run("answers requests and stops after shutdown and exit", func(t *testing.T) {
 		var in strings.Builder
-		in.WriteString(request(t, 1, "initialize", sdk.InitializeParams{Root: "/r", ProtocolVersion: "0.1"}))
+		in.WriteString(request(t, 1, "initialize", sdk.InitializeParams{Root: "/r", ProtocolVersion: "0.2"}))
 		in.WriteString(request(t, 2, "index", sdk.IndexParams{Project: sdk.ProjectRef{Root: "/r"}, Language: "go"}))
 		in.WriteString(request(t, 3, "nope", struct{}{}))
 		in.WriteString(request(t, 4, "index", sdk.IndexParams{Language: "panic"}))

@@ -3,24 +3,24 @@
 
 use lighthouse_engine::{Engine, ModelOptions};
 use lighthouse_plugin::{
-    Answer, Classifier, ClassifyParams, DecisionRef, Error, FineTuningJob, FineTuningJobRequest,
-    ModelManifest, Open, Plugin, PluginManifest, Registry, State, SystemOneResponse,
+    Answer, Capabilities, Classifier, CreateFineTuningJobRequest, DecisionRef, Error,
+    FineTuningJob, Model, Open, Plugin, PluginManifest, Registry, State, SystemOneRequest,
+    SystemOneResponse,
 };
 use lighthouse_spec::{Catalog, Config};
 
 /// A model that echoes the model it was asked for, taken from the options.
-struct Echo(ModelManifest);
+struct Echo(Model);
 
 impl Classifier for Echo {
-    fn manifest(&self) -> &ModelManifest {
+    fn manifest(&self) -> &Model {
         &self.0
     }
 
-    fn classify(&self, params: &ClassifyParams) -> Result<SystemOneResponse, Error> {
+    fn classify(&self, params: &SystemOneRequest) -> Result<SystemOneResponse, Error> {
         Ok(SystemOneResponse {
-            model: params.request.model.clone(),
+            model: params.model.clone(),
             answers: params
-                .request
                 .questions
                 .keys()
                 .map(|id| {
@@ -35,7 +35,7 @@ impl Classifier for Echo {
         })
     }
 
-    fn train(&self, _: &FineTuningJobRequest) -> Result<FineTuningJob, Error> {
+    fn train(&self, _: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {
         Err(Error::Failed("no".to_owned()))
     }
 }
@@ -48,11 +48,16 @@ impl Plugin for Models {
     }
 
     fn models(&self) -> Vec<Box<dyn Classifier>> {
-        vec![Box::new(Echo(ModelManifest {
+        vec![Box::new(Echo(Model {
             id: "echo".to_owned(),
-            tasks: vec!["classification".to_owned()],
+            object: "model".to_owned(),
+            created: 0,
+            owned_by: "echo".to_owned(),
+            capabilities: Capabilities {
+                classification: Some(lighthouse_plugin::Supports { supported: true }),
+                ..Capabilities::default()
+            },
             version: "1".to_owned(),
-            trains: false,
             deterministic: true,
             abstains: false,
             cost: 0.0,
@@ -76,7 +81,8 @@ fn decision() -> DecisionRef {
         id: "d/x".to_owned(),
         requirement: "r".to_owned(),
         prompt: "r".to_owned(),
-        examples: Vec::new(),
+        valid: Vec::new(),
+        invalid: Vec::new(),
     }
 }
 
@@ -100,21 +106,19 @@ fn a_reference_names_a_provider_and_the_model_it_is_asked_for() {
 
     let model = engine.model("work/some/model:free").unwrap();
     let answer = model
-        .classify(&ClassifyParams {
-            request: lighthouse_plugin::SystemOneRequest {
-                state: State {
-                    language: "go".to_owned(),
-                    file: "a.go".to_owned(),
-                    text: String::new(),
-                    facts: serde_json::Value::Null,
-                    neighbors: Vec::new(),
-                },
-                model: String::new(),
-                questions: std::collections::BTreeMap::from([(
-                    "d/x".to_owned(),
-                    lighthouse_plugin::Question::of(&decision()),
-                )]),
+        .classify(&SystemOneRequest {
+            state: State {
+                language: "go".to_owned(),
+                file: "a.go".to_owned(),
+                text: String::new(),
+                facts: serde_json::Value::Null,
+                neighbors: Vec::new(),
             },
+            model: String::new(),
+            questions: std::collections::BTreeMap::from([(
+                "d/x".to_owned(),
+                lighthouse_plugin::Question::of(&decision()),
+            )]),
             options: serde_json::Map::new(),
         })
         .unwrap();

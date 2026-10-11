@@ -6,8 +6,7 @@
 use cel::Program;
 use lighthouse_model::{Diagnostic, Position, Span, SymbolId, hash};
 use lighthouse_plugin::{
-    Ask, Ctx, DecisionRef, Judged, Neighbor, ResultKind, RuleManifest, Shot, Subject,
-    SubjectContext,
+    Ask, Ctx, DecisionRef, Example, Judged, Neighbor, RuleManifest, Subject, SubjectContext,
 };
 use lighthouse_spec::{CelCheck, Decision, ExampleKind, Select};
 use serde_json::{Value, json};
@@ -188,14 +187,26 @@ pub fn decision_ref(decision: &Decision) -> DecisionRef {
         id: decision.id().to_owned(),
         requirement: decision.requirement.clone(),
         prompt: prompt.unwrap_or_else(|| decision.requirement.clone()),
-        examples: decision
+        valid: decision
             .examples
             .iter()
-            .map(|example| Shot {
-                kind: match example.kind {
-                    ExampleKind::Invalid => ResultKind::Fail,
-                    ExampleKind::Valid => ResultKind::Pass,
-                },
+            .filter(|example| example.kind == ExampleKind::Valid)
+            .map(|example| Example {
+                language: example.language.clone(),
+                code: example
+                    .files
+                    .iter()
+                    .map(|f| format!("// {}\n{}", f.path, f.text()))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                note: example.name.clone(),
+            })
+            .collect(),
+        invalid: decision
+            .examples
+            .iter()
+            .filter(|example| example.kind == ExampleKind::Invalid)
+            .map(|example| Example {
                 language: example.language.clone(),
                 code: example
                     .files

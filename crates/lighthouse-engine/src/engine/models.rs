@@ -14,9 +14,7 @@ use std::{
 
 use lighthouse_cache::{Cache, DEFAULT_LIMIT, KeyBuilder};
 use lighthouse_model::{Diagnostic, hash};
-use lighthouse_plugin::{
-    Ask, Classifier, Judged, ModelManifest, Models, Open, Question, Settle, Subject,
-};
+use lighthouse_plugin::{Ask, Classifier, Judged, Model, Models, Open, Question, Settle, Subject};
 use lighthouse_spec::ModelBinding;
 use serde::{Deserialize, Serialize};
 
@@ -198,7 +196,12 @@ impl<'a> RunModels<'a> {
         };
         let model: Arc<dyn Classifier + 'a> =
             Arc::from(self.host.build(reference, model, &provider));
-        if model.manifest().tasks.iter().any(|t| t == "classification") {
+        if model
+            .manifest()
+            .capabilities
+            .classification
+            .is_some_and(|capability| capability.supported)
+        {
             Some(model)
         } else {
             self.note(format!(
@@ -252,12 +255,7 @@ impl<'a> RunModels<'a> {
         key.finish()
     }
 
-    pub(super) fn recall(
-        &self,
-        manifest: &ModelManifest,
-        ask: &Ask,
-        subject: &Subject,
-    ) -> Option<f64> {
+    pub(super) fn recall(&self, manifest: &Model, ask: &Ask, subject: &Subject) -> Option<f64> {
         let kept: Kept =
             self.answers
                 .as_ref()?
@@ -265,7 +263,7 @@ impl<'a> RunModels<'a> {
         Some(kept.noul)
     }
 
-    pub(super) fn keep(&self, manifest: &ModelManifest, ask: &Ask, subject: &Subject, noul: f64) {
+    pub(super) fn keep(&self, manifest: &Model, ask: &Ask, subject: &Subject, noul: f64) {
         let Some(answers) = &self.answers else { return };
         let key = self.key(&manifest.id, &manifest.version, ask, subject);
         answers.put(key, &Kept { noul });
@@ -318,4 +316,100 @@ impl Models for RunModels<'_> {
 pub(super) fn digest_of<T: Serialize>(value: &T) -> String {
     let value = serde_json::to_value(value).unwrap_or_default();
     hash::sha256(lighthouse_model::canonical(&value))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lighthouse_plugin::{
+        Capabilities, CreateFineTuningJobRequest, Error, FineTuningJob, Plugin, PluginManifest,
+        Registry, Supports, SystemOneRequest, SystemOneResponse,
+    };
+    use lighthouse_spec::{Catalog, Config};
+
+    struct Echo(Model);
+
+    impl Classifier for Echo {
+        fn manifest(&self) -> &Model {
+            &self.0
+        }
+
+        fn classify(&self, _: &SystemOneRequest) -> Result<SystemOneResponse, Error> {
+            Ok(SystemOneResponse {
+                model: "echo".to_owned(),
+                answers: BTreeMap::new(),
+                usage: serde_json::Value::Null,
+            })
+        }
+
+        fn train(&self, _: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {
+            Err(Error::Failed("no".to_owned()))
+        }
+    }
+
+    struct Models {
+        manifest: PluginManifest,
+        model: Model,
+    }
+
+    impl Plugin for Models {
+        fn manifest(&self) -> &PluginManifest {
+            &self.manifest
+        }
+
+        fn models(&self) -> Vec<Box<dyn Classifier>> {
+            vec![Box::new(Echo(self.model.clone()))]
+        }
+    }
+
+    #[test]
+    fn run_resolves_only_models_that_declare_classification() {
+        for supported in [true, false] {
+            let dir = tempfile::tempdir().unwrap();
+            let mut registry = Registry::default();
+            registry
+                .register(&Models {
+                    manifest: PluginManifest {
+                        id: "echo".to_owned(),
+                        version: "1".to_owned(),
+                    },
+                    model: Model {
+                        id: "echo".to_owned(),
+                        object: "model".to_owned(),
+                        created: 0,
+                        owned_by: "echo".to_owned(),
+                        capabilities: Capabilities {
+                            classification: Some(Supports { supported }),
+                            ..Capabilities::default()
+                        },
+                        version: "1".to_owned(),
+                        deterministic: true,
+                        abstains: false,
+                        cost: 0.0,
+                    },
+                })
+                .unwrap();
+            let config = Config::parse_inline(
+                "plugins = [\"echo\"]\n[models.providers.work]\ntype = \"rpc\"\nplugin = \"echo\"\n",
+            )
+            .unwrap();
+            let engine =
+                super::super::Engine::new(registry, config, Catalog::bundled(), dir.path())
+                    .unwrap()
+                    .with_models(super::super::ModelOptions::default());
+            let models = engine.run_models(&[]);
+
+            assert_eq!(models.model("work/echo").is_some(), supported);
+            if !supported {
+                assert!(
+                    models
+                        .notes
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .any(|note| { note.contains("does not list `classification`") })
+                );
+            }
+        }
+    }
 }

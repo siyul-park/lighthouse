@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	schemaPath = "../../../protocol/schema/lighthouse-protocol-0.1.json"
+	schemaPath = "../../../protocol/schema/lighthouse-protocol-0.2.json"
 	casesGlob  = "../../conformance/go/*"
 )
 

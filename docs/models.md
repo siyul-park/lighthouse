@@ -2,12 +2,13 @@
 
 A model is a plugin kind beside language providers: a process (`rpc`) that answers
 `lighthouse/classify` (and `lighthouse/train` when it learns), or any program (`command`).
-Lighthouse defines no API of its own. The wire types are one serde module of `lighthouse-protocol`
-with a JSON Schema (`protocol/schema/lighthouse-protocol-0.1.json`), and each is a published
-body used verbatim: TypeSafe System One for classification (`SystemOneRequest`
-`{state, model, questions}` to `SystemOneResponse` `{model, answers, usage}`), OpenAI's
-fine-tuning job for training, OpenAI's model list for the manifest. The provider's `options`
-travel beside the System One body, never inside it. Errors are JSON-RPC errors whose `data` is the
+Lighthouse defines no API of its own. The wire types are in `lighthouse-protocol`, with a JSON
+Schema (`protocol/schema/lighthouse-protocol-0.2.json`). Each request is the published API body
+plus provider `options`, omitted when empty. Classification uses TypeSafe System One
+(`SystemOneRequest` `{state, model, questions, options?}` to `SystemOneResponse`
+`{model, answers, usage}`). HTTP providers remove `options` before posting the body. Training and
+model listing use OpenAI's `CreateFineTuningJobRequest` and `ListModelResponse`; each offered model
+uses one `Model` type. Errors are JSON-RPC errors whose `data` is the
 reused API's own error body. No HTTP server is built: a server that speaks these bodies could be
 declared as a provider later.
 
@@ -35,7 +36,7 @@ functions, one per operation used, named by the API's operation in snake_case, w
 | Module | Operation | Types |
 | --- | --- | --- |
 | `openai` | `create_chat_completion` (`POST /chat/completions`) | `async-openai` (types only, OpenAPI-generated) |
-| `typesafe` | `systemone` (`POST /v1/systemone`) | the protocol's `SystemOneRequest` / `SystemOneResponse` |
+| `typesafe` | `systemone` (`POST /v1/systemone`) | the protocol's `SystemOneRequest` / `SystemOneResponse`; `options` stripped |
 | `chat` | `systemone` over `openai::create_chat_completion` | the adaptation: one rendered prompt per question, `{noul}` by `json_schema` |
 
 `http.rs` holds the one I/O seam, `trait Client { fn post(url, key, body) }`, and `Http` (bearer
@@ -87,5 +88,6 @@ run through the project's own configuration. `eval` grades only on weight 1.0 la
 line, with `weight`, `key` and `attribution` beside the messages) to
 `.lighthouse/datasets/sha256/<hex>.jsonl`, named by the digest of the file, and hands the job
 request, with `training_file = "sha256:<hex>"` and the dataset directory in `metadata`, to the
-model. `--from-model` distils a teacher model's confident answers (fail and pass) into labels of
+model. A successful job identifies its artifact as `learned@sha256:<hex>` or
+`general@sha256:<hex>`. `--from-model` distils a teacher model's confident answers (fail and pass) into labels of
 weight 0.5.

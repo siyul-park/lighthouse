@@ -17,7 +17,7 @@ impl Handler for Stub {
             version: "1".to_owned(),
             protocol_version: params.protocol_version,
             languages: Vec::new(),
-            models: lighthouse_protocol::ModelList::default(),
+            models: lighthouse_protocol::ListModelResponse::default(),
         })
     }
 
@@ -45,7 +45,7 @@ fn replies(output: Vec<u8>) -> Vec<Message> {
 fn initialize_params() -> Value {
     json!({
         "root": "/p",
-        "protocolVersion": "0.1",
+        "protocolVersion": "0.2",
         "clientInfo": { "name": "t", "version": "0" },
     })
 }

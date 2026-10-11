@@ -1,10 +1,10 @@
-# Plugin protocol 0.1
+# Plugin protocol 0.2
 
 Normative contract between Lighthouse (the host) and a language plugin: a
 separate process that analyzes source in its own language with native tools.
 Rules and analyzers stay in the host; a plugin only turns files into
 the code model. The wire types are defined by
-[`protocol/schema/lighthouse-protocol-0.1.json`](../protocol/schema/lighthouse-protocol-0.1.json),
+[`protocol/schema/lighthouse-protocol-0.2.json`](../protocol/schema/lighthouse-protocol-0.2.json),
 generated from the `lighthouse-protocol` crate and checked in; where this text
 and the schema disagree, the schema wins. The wire model is separate from the
 host's internal model: internal changes are not protocol changes.
@@ -27,7 +27,7 @@ Key words MUST, SHOULD and MAY are used as in RFC 2119.
 
 ## Versioning
 
-`protocolVersion` is `"0.1"`. Host and plugin MUST agree exactly; a plugin that
+`protocolVersion` is `"0.2"`. Host and plugin MUST agree exactly; a plugin that
 receives another version answers `initialize` with an error, a host that
 receives another version refuses the plugin. Receivers MUST ignore unknown
 fields. Fields of protocol messages are camelCase (`protocolVersion`,
@@ -36,7 +36,7 @@ fields. Fields of protocol messages are camelCase (`protocolVersion`,
 
 `extent` on symbols, `site` on edges and the capabilities `extent` and
 `reference-sites` were added to 0.1 before 1.0, as optional fields: a plugin that
-sends none of them is still a valid 0.1 plugin, and hosts ignore what they do not
+sends none of them remains valid in 0.2, and hosts ignore what they do not
 know. They make fixes possible (see "Fixing" in [architecture.md](architecture.md)).
 
 `context.overlays` is real: a list of `{ path, text }` that stand in for requested
@@ -46,7 +46,7 @@ run verifies candidate edits this way, and writes only after they pass. `lang-go
 passes them to `go/packages` as its `Overlay`, `lang-rust` reads them in place of the
 files.
 
-Reserved for later versions, not implemented in 0.1: `clone_fingerprint`, and
+Reserved for later versions, not implemented in 0.2: `clone_fingerprint`, and
 further methods for rules and analyzers.
 
 ## Methods
@@ -125,7 +125,7 @@ used only when its key matches, and a key covers everything the entry was comput
 from: the provider build, the options, the toolchain, and the content of the files and
 of what they depend on. Any doubt is a miss. A result with an `incomplete` entry is
 never written. Conformance indexes every case cold, then warm, and compares the answer
-with an uncached run byte for byte. The protocol version stays 0.1: the field is optional.
+with an uncached run byte for byte. The protocol version stays 0.2: the field is optional.
 
 Result `{ fragments, notices, incomplete }`:
 
@@ -155,14 +155,17 @@ Lighthouse defines no model API of its own: each method takes the body of a publ
 verbatim, with that API's own field names.
 
 A plugin may offer models instead of, or besides, languages. `initialize` lists them in
-`models`, OpenAI's list object `{object: "list", data: [{id, object: "model", created, owned_by,
-capabilities: {classification | embedding | fine_tuning: {supported}}}]}`, with what Lighthouse
-adds to each entry: `version` (changes whenever the answers for the same input may), `cost` (0
-for a model that runs locally for free), `deterministic` and `abstains`. The manifest lists the
-same ids in `provides.models`. The host keys behaviour off these capabilities, never off names.
+`models`, a `ListModelResponse` with the OpenAI list shape `{object: "list", data: [Model]}`.
+Each `Model` has OpenAI's `{id, object, created, owned_by}`, capabilities
+`{classification | embedding | fine_tuning: {supported}}`, and Lighthouse's `version` (changes
+whenever answers for the same input may), `cost` (0 for a model that runs locally for free),
+`deterministic` and `abstains`. The manifest lists the same ids in `provides.models`. The host
+keys behaviour off these capabilities, never off names.
 
 `lighthouse/classify` takes the body of TypeSafe's System One API (`POST /v1/systemone`),
-https://docs.typesafe.ai/api, for one subject: `{state, model, questions}`.
+https://docs.typesafe.ai/api, for one subject: `{state, model, questions, options?}`. `options`
+holds provider configuration and is omitted when empty. HTTP clients remove it before sending the
+System One body to the API.
 - `state` is `{language, file, text, facts, neighbors}`: the subject's source by extent, the facts
   the check computed, and a few callers and callees.
 - `questions` is keyed by decision id; each is `{type: "noul", instructions: {requirement, prompt},
@@ -188,7 +191,8 @@ max(p, 1 - p).
 system and user prompts and the assistant's `{type, noul}`), in canonical JSON, with `weight`,
 `group`, `decision`, `key` and `attribution` beside them. `metadata` carries the `decision`, the
 `datasets` directory and the `dir` the host owns for the artifact. A successful job
-has `status: "succeeded"`, `fine_tuned_model: "sha256:<hex>"` (the artifact) and, as its first
+has `status: "succeeded"`, `fine_tuned_model: "learned@sha256:<hex>"` (or
+`general@sha256:<hex>`, the artifact reference) and, as its first
 `result_files` entry, a JSON file of the metrics. The same `seed` is the same request.
 
 Errors are JSON-RPC errors; `data` carries the error body of the API reused (OpenAI's
@@ -392,7 +396,7 @@ kind = "Plugin"
 name = "lang-go"            # must equal the id the process reports
 
 [spec]
-version = "0.1.0"
+version = "0.2.0"
 
 [spec.runtime]
 command = "./lang-go"       # relative path: next to the manifest; bare name: PATH

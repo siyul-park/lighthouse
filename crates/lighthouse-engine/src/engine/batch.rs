@@ -7,8 +7,7 @@ use std::{collections::BTreeMap, sync::Arc, sync::PoisonError, sync::atomic::Ord
 
 use lighthouse_model::Diagnostic;
 use lighthouse_plugin::{
-    Ask, Classifier, ClassifyParams, Decided, Judged, ModelManifest, Open, Question, Settle,
-    SystemOneRequest, decide,
+    Ask, Classifier, Decided, Judged, Model, Open, Question, Settle, SystemOneRequest, decide,
 };
 use rayon::prelude::*;
 
@@ -114,18 +113,16 @@ impl<'a> RunModels<'a> {
             self.over_budget.fetch_add(chunk.len(), Ordering::SeqCst);
             return all(Open::OverBudget);
         }
-        let params = ClassifyParams {
-            request: SystemOneRequest {
-                state: pending[chunk[0].0].ask.subjects[chunk[0].1].state(),
-                model: String::new(),
-                questions: chunk
-                    .iter()
-                    .map(|&(p, _)| {
-                        let decision = &pending[p].ask.decision;
-                        (decision.id.clone(), Question::of(decision))
-                    })
-                    .collect(),
-            },
+        let params = SystemOneRequest {
+            state: pending[chunk[0].0].ask.subjects[chunk[0].1].state(),
+            model: String::new(),
+            questions: chunk
+                .iter()
+                .map(|&(p, _)| {
+                    let decision = &pending[p].ask.decision;
+                    (decision.id.clone(), Question::of(decision))
+                })
+                .collect(),
             options: serde_json::Map::new(),
         };
         self.calls.fetch_add(1, Ordering::SeqCst);
@@ -177,6 +174,6 @@ fn verdict(item: &Pending<'_>, layer: usize, answer: Answer) -> Judged {
 }
 
 /// The model as evidence names it: `<provider>/<model>@<version>`.
-fn named(manifest: &ModelManifest) -> String {
+fn named(manifest: &Model) -> String {
     format!("{}@{}", manifest.id, manifest.version)
 }

@@ -14,7 +14,9 @@ pub fn systemone(
     endpoint: &Endpoint,
     request: &SystemOneRequest,
 ) -> Result<SystemOneResponse, HandlerError> {
-    let body = serde_json::to_value(request).map_err(|e| e.to_string())?;
+    let mut api_request = request.clone();
+    api_request.options.clear();
+    let body = serde_json::to_value(api_request).map_err(|e| e.to_string())?;
     let response = client.post(
         &endpoint.url("v1/systemone"),
         endpoint.key()?.as_deref(),
@@ -69,6 +71,7 @@ mod tests {
                 },
             )]
             .into(),
+            options: Default::default(),
         }
     }
 
@@ -76,10 +79,15 @@ mod tests {
     fn it_posts_the_body_to_the_systemone_path() {
         let client = Recording::replying(vec![serde_json::from_str(WITH_MODEL).unwrap()]);
         let endpoint = Endpoint::at("typesafe", "https://api.typesafe.ai");
-        systemone(&client, &endpoint, &request()).unwrap();
+        let mut request = request();
+        request
+            .options
+            .insert("token".to_owned(), Value::String("secret".to_owned()));
+        systemone(&client, &endpoint, &request).unwrap();
         let asked = client.asked();
         assert_eq!(asked[0].0, "https://api.typesafe.ai/v1/systemone");
         assert_eq!(asked[0].1["model"], "jev-latest");
+        assert!(asked[0].1.get("options").is_none());
         assert_eq!(asked[0].1["questions"]["d/x"]["type"], "noul");
         assert_eq!(
             asked[0].1["questions"]["d/x"]["criteria"]["true"]["meaning"],

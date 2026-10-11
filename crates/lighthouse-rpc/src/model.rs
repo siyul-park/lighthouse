@@ -3,16 +3,16 @@
 use std::sync::Arc;
 
 use lighthouse_plugin::{
-    Classifier, ClassifyParams, Error, FineTuningJob, FineTuningJobRequest, ModelManifest,
-    SystemOneResponse,
+    Classifier, CreateFineTuningJobRequest, Error, FineTuningJob, Model as ModelInfo,
+    SystemOneRequest, SystemOneResponse,
 };
-use lighthouse_protocol::{self as wire, JobStatus};
+use lighthouse_protocol::{self as wire, FineTuningJobStatus};
 
 use crate::client::Client;
 
 /// A model that answers over the connection of its plugin.
 pub(crate) struct Model {
-    pub(crate) manifest: ModelManifest,
+    pub(crate) manifest: ModelInfo,
     pub(crate) client: Arc<Client>,
 }
 
@@ -23,12 +23,12 @@ impl Model {
 }
 
 impl Classifier for Model {
-    fn manifest(&self) -> &ModelManifest {
+    fn manifest(&self) -> &ModelInfo {
         &self.manifest
     }
 
     /// The answer may only name questions that were asked.
-    fn classify(&self, params: &ClassifyParams) -> Result<SystemOneResponse, Error> {
+    fn classify(&self, params: &SystemOneRequest) -> Result<SystemOneResponse, Error> {
         let result: SystemOneResponse = self
             .client
             .call(wire::CLASSIFY, params)
@@ -36,7 +36,7 @@ impl Classifier for Model {
         if let Some(stray) = result
             .answers
             .keys()
-            .find(|id| !params.request.questions.contains_key(*id))
+            .find(|id| !params.questions.contains_key(*id))
         {
             return Err(self.failed(format!("it answers `{stray}`, which was not asked")));
         }
@@ -45,8 +45,13 @@ impl Classifier for Model {
 
     /// Asks for the fine-tuning job; the answer is final, `succeeded` or
     /// `failed`, and a failed job is an error here.
-    fn train(&self, request: &FineTuningJobRequest) -> Result<FineTuningJob, Error> {
-        if !self.manifest.trains {
+    fn train(&self, request: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {
+        if !self
+            .manifest
+            .capabilities
+            .fine_tuning
+            .is_some_and(|capability| capability.supported)
+        {
             return Err(self.failed("it does not train"));
         }
         let job: FineTuningJob = self
@@ -55,7 +60,7 @@ impl Classifier for Model {
             .map_err(|reason| self.failed(reason))?;
         match (&job.error, job.status) {
             (Some(error), _) => Err(self.failed(format!("{}: {}", error.code, error.message))),
-            (None, JobStatus::Succeeded) if job.fine_tuned_model.is_some() => Ok(job),
+            (None, FineTuningJobStatus::Succeeded) if job.fine_tuned_model.is_some() => Ok(job),
             _ => Err(self.failed("the training did not succeed")),
         }
     }

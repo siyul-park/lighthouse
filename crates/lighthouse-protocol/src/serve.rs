@@ -7,9 +7,9 @@ use serde::Serialize;
 use thiserror::Error;
 
 use crate::{
-    CLASSIFY, ClassifyParams, EXIT, FineTuningJob, FineTuningJobRequest, FrameError, INDEX,
-    INITIALIZE, IndexParams, IndexResult, InitializeParams, InitializeResult, Message, SHUTDOWN,
-    SystemOneResponse, TRAIN, read_message, write_message,
+    CLASSIFY, CreateFineTuningJobRequest, EXIT, FineTuningJob, FrameError, INDEX, INITIALIZE,
+    IndexParams, IndexResult, InitializeParams, InitializeResult, Message, SHUTDOWN,
+    SystemOneRequest, SystemOneResponse, TRAIN, read_message, write_message,
 };
 
 const PARSE_ERROR: i64 = -32700;
@@ -62,11 +62,14 @@ pub trait Handler {
     fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, HandlerError>;
     fn index(&mut self, params: IndexParams) -> Result<IndexResult, HandlerError>;
     /// Puts subjects to a model; a language plugin offers no model.
-    fn classify(&mut self, _params: ClassifyParams) -> Result<SystemOneResponse, HandlerError> {
+    fn classify(&mut self, _params: SystemOneRequest) -> Result<SystemOneResponse, HandlerError> {
         Err("this plugin offers no model".into())
     }
     /// Fits a model; only a model that learns from labels offers it.
-    fn train(&mut self, _params: FineTuningJobRequest) -> Result<FineTuningJob, HandlerError> {
+    fn train(
+        &mut self,
+        _params: CreateFineTuningJobRequest,
+    ) -> Result<FineTuningJob, HandlerError> {
         Err("this plugin does not train".into())
     }
 }

@@ -2,5 +2,6 @@
 
 mod frame;
 mod model;
+mod openai;
 mod schema;
 mod serve;

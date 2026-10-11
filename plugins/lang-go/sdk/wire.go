@@ -55,7 +55,7 @@ type FileRef struct {
 	Hash string `json:"hash"`
 }
 
-// Overlay is reserved; hosts do not send overlays in protocol 0.1.
+// Overlay is reserved; hosts do not send overlays in protocol 0.2.
 type Overlay struct {
 	Path string `json:"path"`
 	Text string `json:"text"`
@@ -243,7 +243,7 @@ type Comment struct {
 }
 
 // ProtocolVersion is the wire protocol version this package implements.
-const ProtocolVersion = "0.1"
+const ProtocolVersion = "0.2"
 
 // SemanticEdges names the capability of reporting type-resolved edges.
 const SemanticEdges = "semantic-edges"

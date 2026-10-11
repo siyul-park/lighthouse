@@ -61,7 +61,7 @@ impl Handler for Provider {
                     lighthouse_protocol::OVERLAYS.to_owned(),
                 ],
             }],
-            models: wire::ModelList::default(),
+            models: wire::ListModelResponse::default(),
         })
     }
 

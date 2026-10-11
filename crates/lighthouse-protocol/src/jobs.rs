@@ -7,7 +7,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{ModelManifest, Question, ResultKind, State};
+use crate::{Question, ResultKind, State};
 
 /// One message of a supervised fine-tuning line, in OpenAI's chat format.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -80,20 +80,27 @@ pub struct LineKeys<'a> {
     pub attribution: Value,
 }
 
-/// The supervised method of a fine-tuning job.
+/// Provider-specific supervised fine-tuning parameters.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Supervised {
+#[serde(transparent)]
+pub struct FineTuneSupervisedHyperparameters {
+    pub extra: serde_json::Map<String, Value>,
+}
+
+/// OpenAI's supervised fine-tuning method, with optional OpenAI parameters.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct FineTuneSupervisedMethod {
     #[serde(default)]
-    pub hyperparameters: serde_json::Map<String, Value>,
+    pub hyperparameters: FineTuneSupervisedHyperparameters,
 }
 
 /// The method of a fine-tuning job.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Method {
+pub struct FineTuneMethod {
     /// `supervised`.
     #[serde(rename = "type")]
     pub kind: String,
-    pub supervised: Supervised,
+    pub supervised: FineTuneSupervisedMethod,
 }
 
 /// The body of OpenAI's fine-tuning job creation (`POST /v1/fine_tuning/jobs`),
@@ -102,14 +109,15 @@ pub struct Method {
 /// dataset store; `metadata` names the `decision`, the `datasets` directory
 /// the file is in (`<hex>.jsonl` under `sha256/`) and the `dir` the artifact
 /// goes to.
+// lighthouse-disable-next-line design/max-name-words -- Matches OpenAI request type.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct FineTuningJobRequest {
+pub struct CreateFineTuningJobRequest {
     pub model: String,
     pub training_file: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub validation_file: Option<String>,
-    pub method: Method,
-    pub seed: u64,
+    pub method: FineTuneMethod,
+    pub seed: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suffix: Option<String>,
     #[serde(default)]
@@ -122,7 +130,7 @@ pub struct FineTuningJobRequest {
 /// How far a fine-tuning job is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum JobStatus {
+pub enum FineTuningJobStatus {
     ValidatingFiles,
     Queued,
     Running,
@@ -133,7 +141,7 @@ pub enum JobStatus {
 
 /// Why a job failed, in OpenAI's words.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct JobError {
+pub struct FineTuneJobError {
     pub code: String,
     pub message: String,
     #[serde(default)]
@@ -141,21 +149,41 @@ pub struct JobError {
 }
 
 /// OpenAI's `FineTuningJob`. Over stdio `lighthouse/train` answers with the
-/// final one: `fine_tuned_model` is the artifact (`sha256:<hex>`) and the
+/// final one: `fine_tuned_model` is the reference (`learned@sha256:<hex>`) and the
 /// first of `result_files` is a JSON file of the metrics.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct FineTuningJob {
     pub id: String,
+    pub created_at: u64,
+    #[serde(default)]
+    pub finished_at: Option<u64>,
     /// `fine_tuning.job`.
     pub object: String,
     pub model: String,
-    pub status: JobStatus,
+    pub status: FineTuningJobStatus,
+    #[serde(default)]
+    pub hyperparameters: Value,
+    pub organization_id: String,
+    #[serde(default)]
+    pub trained_tokens: Option<u32>,
+    pub training_file: String,
+    #[serde(default)]
+    pub validation_file: Option<String>,
+    #[serde(default)]
+    pub integrations: Option<Vec<Value>>,
+    pub seed: u32,
+    #[serde(default)]
+    pub estimated_finish: Option<u32>,
+    #[serde(default)]
+    pub method: Option<FineTuneMethod>,
+    #[serde(default)]
+    pub metadata: Option<BTreeMap<String, String>>,
     #[serde(default)]
     pub fine_tuned_model: Option<String>,
     #[serde(default)]
     pub result_files: Vec<String>,
     #[serde(default)]
-    pub error: Option<JobError>,
+    pub error: Option<FineTuneJobError>,
 }
 
 /// What a model can do, as OpenAI's model object lists it.
@@ -175,14 +203,14 @@ pub struct Capabilities {
     pub fine_tuning: Option<Supports>,
 }
 
-/// One model of the list: OpenAI's model object, with what Lighthouse adds
+/// One model: OpenAI's model object, with what Lighthouse adds
 /// (`version`, `cost`, `deterministic`, `abstains`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct ModelEntry {
+pub struct Model {
     pub id: String,
     /// `model`.
     pub object: String,
-    pub created: u64,
+    pub created: u32,
     pub owned_by: String,
     pub capabilities: Capabilities,
     pub version: String,
@@ -193,13 +221,13 @@ pub struct ModelEntry {
 
 /// OpenAI's list object of models: how a plugin says which it offers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct ModelList {
+pub struct ListModelResponse {
     /// `list`.
     pub object: String,
-    pub data: Vec<ModelEntry>,
+    pub data: Vec<Model>,
 }
 
-impl Default for ModelList {
+impl Default for ListModelResponse {
     fn default() -> Self {
         Self {
             object: "list".to_owned(),
@@ -208,58 +236,9 @@ impl Default for ModelList {
     }
 }
 
-impl ModelList {
-    /// The list of these models.
-    pub fn of(models: &[ModelManifest]) -> Self {
-        let supports = |on: bool| on.then_some(Supports { supported: true });
-        Self {
-            object: "list".to_owned(),
-            data: models
-                .iter()
-                .map(|m| ModelEntry {
-                    id: m.id.clone(),
-                    object: "model".to_owned(),
-                    created: 0,
-                    owned_by: m.id.clone(),
-                    capabilities: Capabilities {
-                        classification: supports(m.tasks.iter().any(|t| t == "classification")),
-                        embedding: supports(m.tasks.iter().any(|t| t == "embedding")),
-                        fine_tuning: supports(m.trains),
-                    },
-                    version: m.version.clone(),
-                    cost: m.cost,
-                    deterministic: m.deterministic,
-                    abstains: m.abstains,
-                })
-                .collect(),
-        }
-    }
-
+impl ListModelResponse {
     /// Whether the list has no model.
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
-    }
-
-    /// The models as the host handles them.
-    pub fn manifests(&self) -> Vec<ModelManifest> {
-        self.data
-            .iter()
-            .map(|e| ModelManifest {
-                id: e.id.clone(),
-                tasks: [
-                    ("classification", e.capabilities.classification),
-                    ("embedding", e.capabilities.embedding),
-                ]
-                .into_iter()
-                .filter(|(_, on)| on.is_some_and(|s| s.supported))
-                .map(|(task, _)| task.to_owned())
-                .collect(),
-                version: e.version.clone(),
-                trains: e.capabilities.fine_tuning.is_some_and(|s| s.supported),
-                deterministic: e.deterministic,
-                abstains: e.abstains,
-                cost: e.cost,
-            })
-            .collect()
     }
 }

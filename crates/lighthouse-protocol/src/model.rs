@@ -9,49 +9,20 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{Call, FineTuningJob, FineTuningJobRequest};
+use crate::{Call, CreateFineTuningJobRequest, FineTuningJob};
 
 /// The model methods with their params and result. Exists to anchor the schema.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ModelMethods {
     #[serde(rename = "lighthouse/classify")]
-    pub classify: Call<ClassifyParams, SystemOneResponse>,
+    pub classify: Call<SystemOneRequest, SystemOneResponse>,
     #[serde(rename = "lighthouse/train")]
-    pub train: Call<FineTuningJobRequest, FineTuningJob>,
+    pub train: Call<CreateFineTuningJobRequest, FineTuningJob>,
 }
 
-/// What a model plugin offers: one entry of `models` in its `initialize` result.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ModelManifest {
-    /// The `Model` resource's name; for a plugin's model, the plugin's id.
-    #[serde(rename = "name")]
-    pub id: String,
-    /// The tasks it can do: `classification` (a subject of a decision is a
-    /// violation or not); later ones may join.
-    pub tasks: Vec<String>,
-    /// Changes whenever the answers for the same input may change (the model
-    /// name, the prompt template, the trained artifact).
-    pub version: String,
-    /// The model learns from labels: it answers `lighthouse/train`.
-    #[serde(default)]
-    pub trains: bool,
-    /// The same input always gets the same answer.
-    pub deterministic: bool,
-    /// The model may answer `abstain`, and the subject then goes on to the
-    /// next binding.
-    pub abstains: bool,
-    /// What one answer costs, in any unit the project budgets; 0 for a model
-    /// that runs locally for free. The run's budget and its report scope
-    /// limit only the models with a cost above 0.
-    pub cost: f64,
-}
-
-/// An example of a decision, shown to the model as a few shots.
+/// One valid or invalid example of a decision.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Shot {
-    /// `fail` for an invalid example, `pass` for a valid one.
-    pub kind: ResultKind,
+pub struct Example {
     pub language: String,
     pub code: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -66,7 +37,9 @@ pub struct DecisionRef {
     /// What the model is told; the requirement unless the check says more.
     pub prompt: String,
     #[serde(default)]
-    pub examples: Vec<Shot>,
+    pub valid: Vec<Example>,
+    #[serde(default)]
+    pub invalid: Vec<Example>,
 }
 
 /// A symbol near the subject: a caller or callee.
@@ -130,15 +103,6 @@ pub struct State {
     pub neighbors: Vec<Neighbor>,
 }
 
-/// An example under a criterion.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct Example {
-    pub language: String,
-    pub code: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub note: String,
-}
-
 /// What a criterion means, and what it looks like.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Criterion {
@@ -192,15 +156,7 @@ pub struct SystemOneRequest {
     /// The model asked: the part of the reference after the provider.
     pub model: String,
     pub questions: BTreeMap<String, Question>,
-}
-
-/// Params of `lighthouse/classify`: System One's body, and beside it the
-/// `options` of the project's provider, for a plugin that needs them
-/// (`spec`, `baseUrl`, `keyEnv`). The options are never part of the body.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct ClassifyParams {
-    #[serde(flatten)]
-    pub request: SystemOneRequest,
+    /// Provider options, omitted when empty and stripped by HTTP providers.
     #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
     pub options: serde_json::Map<String, Value>,
 }
@@ -223,16 +179,11 @@ impl Question {
     pub fn of(decision: &DecisionRef) -> Self {
         let side = |kind: ResultKind, meaning: String| Criterion {
             meaning,
-            examples: decision
-                .examples
-                .iter()
-                .filter(|shot| shot.kind == kind)
-                .map(|shot| Example {
-                    language: shot.language.clone(),
-                    code: shot.code.clone(),
-                    note: shot.note.clone(),
-                })
-                .collect(),
+            examples: match kind {
+                ResultKind::Fail => decision.invalid.clone(),
+                ResultKind::Pass => decision.valid.clone(),
+                ResultKind::Review => Vec::new(),
+            },
         };
         Self {
             kind: "noul".to_owned(),

@@ -24,10 +24,12 @@ pub use fix::{
 };
 pub use memo::Memo;
 pub use models::{
-    Answer, Ask, Classifier, ClassifyParams, Decided, DecisionRef, FineTuningJob,
-    FineTuningJobRequest, Judged, LineKeys, Method, ModelManifest, Models, Neighbor, NoModels,
-    Open, Question, ResultKind, Settle, Shot, State, Subject, SubjectContext, Supervised,
-    SystemOneRequest, SystemOneResponse, TrainingLine, UPPER, decide,
+    Answer, Ask, Capabilities, Classifier, CreateFineTuningJobRequest, Decided, DecisionRef,
+    Example, FineTuneJobError, FineTuneMethod, FineTuneSupervisedHyperparameters,
+    FineTuneSupervisedMethod, FineTuningJob, FineTuningJobStatus, Judged, LineKeys,
+    ListModelResponse, Model, Models, Neighbor, NoModels, Open, Question, ResultKind, Settle,
+    State, Subject, SubjectContext, Supports, SystemOneRequest, SystemOneResponse, TrainingLine,
+    UPPER, decide,
 };
 pub use notices::Notices;
 pub use registry::{Registry, plugin_of};

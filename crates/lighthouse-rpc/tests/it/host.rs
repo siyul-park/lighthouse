@@ -42,13 +42,13 @@ mod process {
       body=$(dd bs=1 count="$n" 2>/dev/null)
     }
     languages='[{"id":"fake","globs":["**/*.fake"],"capabilities":["semantic-edges","future-thing"]}]'
-    initialize() { send '{"jsonrpc":"2.0","id":1,"result":{"id":"'"${1:-fake}"'","version":"1.2","protocolVersion":"'"${2:-0.1}"'","languages":'"$languages"'}}'; }
+    initialize() { send '{"jsonrpc":"2.0","id":1,"result":{"id":"'"${1:-fake}"'","version":"1.2","protocolVersion":"'"${2:-0.2}"'","languages":'"$languages"'}}'; }
     fragment='{"file":{"path":"a.fake","generated":true},"modules":[{"path":"m"}],"symbols":[],"edges":[],"functions":[],"tests":[]}'
     recv
     case "$mode" in
       crash_at_init) echo "dying early" >&2; exit 3;;
       version) initialize fake 9.9;;
-      identity) initialize other 0.1;;
+      identity) initialize other;;
       *) initialize;;
     esac
     [ "$mode" = deaf ] && sleep 300
@@ -256,7 +256,7 @@ mod process {
             Err(e) => e.to_string(),
             Ok(_) => panic!("{mode} connected"),
         };
-        assert!(message("version").contains("speaks protocol 9.9, lighthouse speaks 0.1"));
+        assert!(message("version").contains("speaks protocol 9.9, lighthouse speaks 0.2"));
         assert!(message("identity").contains("identifies itself as `other`"));
         let early = message("crash_at_init");
         assert!(early.contains("plugin `fake`"), "{early}");

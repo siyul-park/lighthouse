@@ -4,9 +4,10 @@
 //! on what it is later asked about.
 
 pub use lighthouse_protocol::{
-    Answer, ClassifyParams, DecisionRef, FineTuningJob, FineTuningJobRequest, LineKeys, Method,
-    ModelManifest, Neighbor, Question, ResultKind, Shot, State, Subject, SubjectContext,
-    Supervised, SystemOneRequest, SystemOneResponse, TrainingLine,
+    Answer, Capabilities, CreateFineTuningJobRequest, DecisionRef, Example, FineTuneJobError,
+    FineTuneMethod, FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
+    FineTuningJobStatus, LineKeys, ListModelResponse, Model, Neighbor, Question, ResultKind, State,
+    Subject, SubjectContext, Supports, SystemOneRequest, SystemOneResponse, TrainingLine,
 };
 
 use lighthouse_model::Diagnostic;
@@ -19,12 +20,12 @@ pub const UPPER: f64 = 0.9;
 
 /// A model offered by a plugin.
 pub trait Classifier: Send + Sync {
-    fn manifest(&self) -> &ModelManifest;
+    fn manifest(&self) -> &Model;
     /// Answers every subject of the request, or fails as a whole.
-    fn classify(&self, params: &ClassifyParams) -> Result<SystemOneResponse, Error>;
-    /// Runs a fine-tuning job; only a model whose manifest says `trains` does.
+    fn classify(&self, params: &SystemOneRequest) -> Result<SystemOneResponse, Error>;
+    /// Runs a fine-tuning job; only a model whose manifest supports `fine_tuning` does.
     /// The job is final: `succeeded` or `failed`.
-    fn train(&self, request: &FineTuningJobRequest) -> Result<FineTuningJob, Error>;
+    fn train(&self, request: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error>;
 }
 
 /// Subjects of one decision to be judged.

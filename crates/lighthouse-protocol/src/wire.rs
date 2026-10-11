@@ -49,8 +49,8 @@ pub struct InitializeResult {
     pub languages: Vec<ProviderManifest>,
     /// The models the plugin offers, as OpenAI's list object; empty for a
     /// language plugin.
-    #[serde(default, skip_serializing_if = "crate::ModelList::is_empty")]
-    pub models: crate::ModelList,
+    #[serde(default, skip_serializing_if = "crate::ListModelResponse::is_empty")]
+    pub models: crate::ListModelResponse,
 }
 
 /// What a language provider declares: the language it indexes, how the host

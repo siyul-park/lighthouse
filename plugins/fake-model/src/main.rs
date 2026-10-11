@@ -17,9 +17,9 @@ use std::{
 };
 
 use lighthouse_protocol::{
-    Answer, ClassifyParams, FineTuningJob, FineTuningJobRequest, Handler, HandlerError,
-    IndexParams, IndexResult, InitializeParams, InitializeResult, JobStatus, ModelList,
-    ModelManifest, SystemOneResponse, VERSION, serve,
+    Answer, Capabilities, CreateFineTuningJobRequest, FineTuningJob, FineTuningJobStatus, Handler,
+    HandlerError, IndexParams, IndexResult, InitializeParams, InitializeResult, ListModelResponse,
+    Model, Supports, SystemOneRequest, SystemOneResponse, VERSION, serve,
 };
 use serde_json::{Value, json};
 
@@ -37,15 +37,24 @@ impl Handler for Fake {
             version: "1".to_owned(),
             protocol_version: VERSION.to_owned(),
             languages: Vec::new(),
-            models: ModelList::of(&[ModelManifest {
-                id: ID.to_owned(),
-                tasks: vec!["classification".to_owned()],
-                version: "1".to_owned(),
-                trains: true,
-                deterministic: true,
-                abstains: true,
-                cost: 0.0,
-            }]),
+            models: ListModelResponse {
+                object: "list".to_owned(),
+                data: vec![Model {
+                    id: ID.to_owned(),
+                    object: "model".to_owned(),
+                    created: 0,
+                    owned_by: ID.to_owned(),
+                    capabilities: Capabilities {
+                        classification: Some(Supports { supported: true }),
+                        embedding: None,
+                        fine_tuning: Some(Supports { supported: true }),
+                    },
+                    version: "1".to_owned(),
+                    deterministic: true,
+                    abstains: true,
+                    cost: 0.0,
+                }],
+            },
         })
     }
 
@@ -53,22 +62,29 @@ impl Handler for Fake {
         Err("fake-model indexes no language".into())
     }
 
-    fn classify(&mut self, params: ClassifyParams) -> Result<SystemOneResponse, HandlerError> {
-        let noul = noul_of(&params.request.state.text);
+    fn classify(&mut self, params: SystemOneRequest) -> Result<SystemOneResponse, HandlerError> {
+        let noul = noul_of(&params.state.text);
         Ok(SystemOneResponse {
-            model: params.request.model,
-            answers: answers(params.request.questions.keys(), noul),
+            model: params.model,
+            answers: answers(params.questions.keys(), noul),
             usage: Value::Null,
         })
     }
 
-    fn train(&mut self, request: FineTuningJobRequest) -> Result<FineTuningJob, HandlerError> {
+    fn train(
+        &mut self,
+        request: CreateFineTuningJobRequest,
+    ) -> Result<FineTuningJob, HandlerError> {
         let hex = request
             .training_file
             .strip_prefix("sha256:")
             .ok_or("the training file is not a digest")?;
-        let datasets = request.metadata.get("datasets").ok_or("no datasets")?;
-        let dir = request.metadata.get("dir").ok_or("no dir")?;
+        let datasets = request
+            .metadata
+            .get("datasets")
+            .ok_or("no datasets")?
+            .clone();
+        let dir = request.metadata.get("dir").ok_or("no dir")?.clone();
         let text = fs::read_to_string(format!("{datasets}/sha256/{hex}.jsonl"))
             .map_err(|e| format!("the dataset: {e}"))?;
         let lines: Vec<Value> = text
@@ -76,19 +92,32 @@ impl Handler for Fake {
             .map(serde_json::from_str)
             .collect::<Result<_, _>>()
             .map_err(|e| format!("a training line: {e}"))?;
-        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let write = |name: &str, value: Value| {
             fs::write(format!("{dir}/{name}"), value.to_string()).map_err(|e| e.to_string())
         };
         write("subjects.json", Value::Array(lines.clone()))?;
         write("metrics.json", json!({"n": lines.len()}))?;
+        let result_file = format!("{dir}/metrics.json");
         Ok(FineTuningJob {
             id: "ftjob-1".to_owned(),
+            created_at: 0,
+            finished_at: None,
             object: "fine_tuning.job".to_owned(),
             model: request.model,
-            status: JobStatus::Succeeded,
-            fine_tuned_model: Some("sha256:abc".to_owned()),
-            result_files: vec![format!("{dir}/metrics.json")],
+            status: FineTuningJobStatus::Succeeded,
+            hyperparameters: Value::Null,
+            organization_id: ID.to_owned(),
+            trained_tokens: None,
+            training_file: request.training_file,
+            validation_file: request.validation_file,
+            integrations: None,
+            seed: request.seed,
+            estimated_finish: None,
+            method: Some(request.method),
+            metadata: Some(request.metadata),
+            fine_tuned_model: Some("learned@sha256:abc".to_owned()),
+            result_files: vec![result_file],
             error: None,
         })
     }

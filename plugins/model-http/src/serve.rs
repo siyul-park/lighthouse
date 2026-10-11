@@ -3,8 +3,9 @@
 //! spec by name.
 
 use lighthouse_protocol::{
-    ClassifyParams, Handler, HandlerError, IndexParams, IndexResult, InitializeParams,
-    InitializeResult, ModelList, ModelManifest, SystemOneResponse, VERSION,
+    Capabilities, Handler, HandlerError, IndexParams, IndexResult, InitializeParams,
+    InitializeResult, ListModelResponse, Model, Supports, SystemOneRequest, SystemOneResponse,
+    VERSION,
 };
 
 use crate::{chat::PROMPT_VERSION, dispatch, endpoint::Endpoint, http::Client};
@@ -32,15 +33,24 @@ impl Handler for Plugin {
             version: env!("CARGO_PKG_VERSION").to_owned(),
             protocol_version: VERSION.to_owned(),
             languages: Vec::new(),
-            models: ModelList::of(&[ModelManifest {
-                id: ID.to_owned(),
-                tasks: vec!["classification".to_owned()],
-                version: PROMPT_VERSION.to_owned(),
-                trains: false,
-                deterministic: false,
-                abstains: true,
-                cost: 1.0,
-            }]),
+            models: ListModelResponse {
+                object: "list".to_owned(),
+                data: vec![Model {
+                    id: ID.to_owned(),
+                    object: "model".to_owned(),
+                    created: 0,
+                    owned_by: ID.to_owned(),
+                    capabilities: Capabilities {
+                        classification: Some(Supports { supported: true }),
+                        embedding: None,
+                        fine_tuning: None,
+                    },
+                    version: PROMPT_VERSION.to_owned(),
+                    deterministic: false,
+                    abstains: true,
+                    cost: 1.0,
+                }],
+            },
         })
     }
 
@@ -48,12 +58,12 @@ impl Handler for Plugin {
         Err("model-http indexes no language".into())
     }
 
-    fn classify(&mut self, params: ClassifyParams) -> Result<SystemOneResponse, HandlerError> {
-        if params.request.model.is_empty() {
+    fn classify(&mut self, params: SystemOneRequest) -> Result<SystemOneResponse, HandlerError> {
+        if params.model.is_empty() {
             return Err("the request names no model".into());
         }
         let endpoint = Endpoint::of(&params.options)?;
-        dispatch::classify(&endpoint)?(self.client.as_ref(), &endpoint, &params.request)
+        dispatch::classify(&endpoint)?(self.client.as_ref(), &endpoint, &params)
     }
 }
 
@@ -73,37 +83,35 @@ mod tests {
     use super::*;
     use crate::http::Http;
 
-    fn params(spec: Value, url: &str) -> ClassifyParams {
+    fn params(spec: Value, url: &str) -> SystemOneRequest {
         let side = || Criterion {
             meaning: "m".to_owned(),
             examples: Vec::new(),
         };
-        ClassifyParams {
-            request: SystemOneRequest {
-                state: State {
-                    language: "go".to_owned(),
-                    file: "a.go".to_owned(),
-                    text: "func f() {}".to_owned(),
-                    facts: Value::Null,
-                    neighbors: Vec::new(),
-                },
-                model: "qwen/qwen3-coder:free".to_owned(),
-                questions: [(
-                    "d/x".to_owned(),
-                    Question {
-                        kind: "noul".to_owned(),
-                        instructions: Instructions {
-                            requirement: "r".to_owned(),
-                            prompt: "r".to_owned(),
-                        },
-                        criteria: Criteria {
-                            fail: side(),
-                            pass: side(),
-                        },
-                    },
-                )]
-                .into(),
+        SystemOneRequest {
+            state: State {
+                language: "go".to_owned(),
+                file: "a.go".to_owned(),
+                text: "func f() {}".to_owned(),
+                facts: Value::Null,
+                neighbors: Vec::new(),
             },
+            model: "qwen/qwen3-coder:free".to_owned(),
+            questions: [(
+                "d/x".to_owned(),
+                Question {
+                    kind: "noul".to_owned(),
+                    instructions: Instructions {
+                        requirement: "r".to_owned(),
+                        prompt: "r".to_owned(),
+                    },
+                    criteria: Criteria {
+                        fail: side(),
+                        pass: side(),
+                    },
+                },
+            )]
+            .into(),
             options: json!({ "spec": spec, "baseUrl": url })
                 .as_object()
                 .unwrap()
