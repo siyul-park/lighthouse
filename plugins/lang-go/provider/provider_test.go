@@ -17,7 +17,7 @@ import (
 
 const (
 	schemaPath = "../../../protocol/schema/lighthouse-protocol-0.2.json"
-	casesGlob  = "../../conformance/go/*"
+	casesGlob  = "../../../crates/lighthouse-rpc/tests/conformance/go/*"
 )
 
 func TestProviderInitialize(t *testing.T) {

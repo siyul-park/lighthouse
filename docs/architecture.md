@@ -723,7 +723,7 @@ bundled `core`, `design` and `testing` plugins with their recommended projects (
 the Go and Rust plugins built by `make plugins`, and `make lint` (part of `make ci`)
 ends with `lighthouse check .`, which must exit 0: a finding is either fixed in the code, or it exposes a rule or
 provider that is imprecise, and that is fixed instead of silenced. The only
-overrides are for `plugins/conformance/**`, whose fixtures describe code on
+overrides are for `crates/lighthouse-rpc/tests/conformance/**`, whose fixtures describe code on
 purpose.
 
 The Rust plugin resolves names syntactically, so its edges are a lower bound

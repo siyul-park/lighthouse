@@ -429,7 +429,7 @@ when listed; an unlisted manifest is never executed.
 
 ## Conformance
 
-Every provider passes the golden suite in `plugins/conformance/<language>`: each
+Every provider passes the golden suite in `crates/lighthouse-rpc/tests/conformance/<language>`: each
 case is a project, option variants (`options[.variant].json`) and the exact
 `index` result expected for them (`expected[.variant].json`), covering symbols,
 edges, visibility, ownership, spans, flow, tests, capabilities and a

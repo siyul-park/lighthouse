@@ -1,5 +1,5 @@
 //! Golden conformance of language plugins: every case under
-//! `plugins/conformance/<language>/<case>` is a project plus the exact wire
+//! `tests/conformance/<language>/<case>` is a project plus the exact wire
 //! output the plugin must produce for it, per option variant. The Go plugin's
 //! own tests validate the same results against the JSON Schema. Regenerate with
 //! `UPDATE_GOLDEN=1 cargo test -p lighthouse-rpc --test conformance` and read
@@ -20,6 +20,11 @@ use serde_json::{Value, json};
 
 fn workspace() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+/// The golden cases, one directory per language.
+fn conformance() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/conformance")
 }
 
 struct Lang {
@@ -167,7 +172,7 @@ fn golden(lang: &Lang) {
     let Some(dir) = (lang.plugin)() else {
         return;
     };
-    let cases = workspace().join("plugins/conformance").join(lang.id);
+    let cases = conformance().join(lang.id);
     let update = env::var_os("UPDATE_GOLDEN").is_some();
     let mut names: Vec<_> = fs::read_dir(&cases)
         .unwrap()
@@ -216,7 +221,7 @@ fn cached_runs_equal_uncached(lang: &Lang) {
     let Some(dir) = (lang.plugin)() else {
         return;
     };
-    let cases = workspace().join("plugins/conformance").join(lang.id);
+    let cases = conformance().join(lang.id);
     let mut names: Vec<_> = fs::read_dir(&cases)
         .unwrap()
         .map(|e| e.unwrap().path())
@@ -312,8 +317,7 @@ fn bad_options_are_reported_as_incomplete_and_the_plugin_keeps_serving() {
         let Some(dir) = (lang.plugin)() else {
             continue;
         };
-        let root = workspace()
-            .join("plugins/conformance")
+        let root = conformance()
             .join(lang.id)
             .join("generated/project")
             .canonicalize()
@@ -426,8 +430,7 @@ fn overlays_replace_the_text_a_provider_reads() {
         let Some(dir) = (lang.plugin)() else {
             continue;
         };
-        let root = workspace()
-            .join("plugins/conformance")
+        let root = conformance()
             .join(lang.id)
             .join("extents/project")
             .canonicalize()

@@ -48,7 +48,7 @@ options.layers = [
 # Fixtures and their goldens describe code on purpose; they are not the
 # project's own design.
 [[spec.overrides]]
-files = ["plugins/conformance/**"]
+files = ["crates/lighthouse-rpc/tests/conformance/**"]
 rules = { "core/max-lines" = "off", "design/complexity" = "off", "design/coupling" = "off", "design/exported-doc" = "off", "design/no-single-use-wrapper" = "off", "design/declaration-groups" = "off", "design/contiguity" = "off", "design/callers-before-callees" = "off", "design/no-banners" = "off", "design/no-redundant-qualifiers" = "off", "design/no-mutable-globals" = "off", "testing/external-package" = "off", "testing/owner" = "off", "testing/unique-owner" = "off" }
 
 [[spec.overrides]]
