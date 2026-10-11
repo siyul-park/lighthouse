@@ -47,7 +47,6 @@ pub const FACTS: &[(&str, Reach)] = &[
     // across modules, or an index over every symbol of the project.
     ("forwards_only", Reach::Global),
     ("forward_target", Reach::Global),
-    ("documented_by_interface", Reach::Global),
     ("hidden_target", Reach::Global),
     ("touched_by_tests", Reach::Global),
     ("module_tested", Reach::Global),

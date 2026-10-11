@@ -66,30 +66,23 @@ fn exported_doc_skips_exempt_methods_interface_members_private_owners_and_kinds(
 }
 
 #[test]
-fn exported_doc_can_leave_interface_implementations_to_the_interface() {
+fn exported_doc_leaves_interface_implementations_to_the_interface() {
     let mut w = World::default();
     let ty = w.symbol("m", "T", SymbolKind::Type, "m/a.ucm");
     w.symbols[0].doc = Some("T is documented.".to_owned());
-    let iface = w.symbol("m", "Reader", SymbolKind::Interface, "m/a.ucm");
-    w.symbols[1].doc = Some("Reader reads.".to_owned());
-    let mut member = |owner: &Symbol, name: &str| {
+    for name in ["Read", "Other"] {
         w.symbol("m", name, SymbolKind::Method, "m/a.ucm");
         let added = w.symbols.last_mut().unwrap();
-        added.id = SymbolId::new("m", &[owner.name.as_str()], name, SymbolKind::Method);
-        added.owner = Some(owner.id.clone());
-    };
-    member(&ty, "Read");
-    member(&ty, "Other");
-    member(&iface, "Read");
-    w.edge(EdgeKind::Implements, &ty, &iface);
-    let by_default = w.check(DOC, json!({}));
-    assert_eq!(w.names(&by_default), ["Read", "Other"]);
-    // The interface's own method must carry the documentation.
-    let exempt = w.check(DOC, json!({ "exemptInterfaceMethods": true }));
-    assert_eq!(w.names(&exempt), ["Read", "Other"]);
-    w.symbols.last_mut().unwrap().doc = Some("Read reads.".to_owned());
-    let exempt = w.check(DOC, json!({ "exemptInterfaceMethods": true }));
-    assert_eq!(w.names(&exempt), ["Other"]);
+        added.id = SymbolId::new("m", &["T"], name, SymbolKind::Method);
+        added.owner = Some(ty.id.clone());
+    }
+    let read = w.symbols[1].clone();
+    w.summarize(&read, 1, &[]);
+    w.summaries.last_mut().unwrap().implementation = true;
+    // An implementation is the interface's to document, by default.
+    assert_eq!(w.names(&w.check(DOC, json!({}))), ["Other"]);
+    let strict = w.check(DOC, json!({ "exemptInterfaceMethods": false }));
+    assert_eq!(w.names(&strict), ["Read", "Other"]);
 }
 
 #[test]

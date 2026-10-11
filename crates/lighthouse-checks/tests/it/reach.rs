@@ -94,7 +94,7 @@ const REACHES: &[(&str, Option<(Reach, bool)>)] = &[
     ("design/coupling", Some((Reach::Neighbors, false))),
     ("design/declaration-groups", Some((Reach::Local, false))),
     ("design/error-identity", Some((Reach::Local, false))),
-    ("design/exported-doc", Some((Reach::Global, false))),
+    ("design/exported-doc", Some((Reach::Neighbors, false))),
     ("design/feature-envy", Some((Reach::Neighbors, false))),
     ("design/layers", Some((Reach::Global, false))),
     ("design/max-depth", Some((Reach::Local, false))),

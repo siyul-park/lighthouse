@@ -248,12 +248,6 @@ impl<'a> Builder<'a> {
                 json!(target.map_or("", |t| t.as_str())),
             );
         }
-        if needs.fact("documented_by_interface") {
-            map.insert(
-                "documented_by_interface".to_owned(),
-                json!(documented_by_interface(project, symbol)),
-            );
-        }
         if needs.fact("receiver_affinity") {
             map.insert(
                 "receiver_affinity".to_owned(),
@@ -567,27 +561,6 @@ impl<'a> Builder<'a> {
             "first": at.map_or("", |s| s.id.as_str()),
         })
     }
-}
-
-/// Whether a method implements a documented method of an interface its type
-/// implements: it is documented where the interface declares it.
-fn documented_by_interface(project: &Project, method: &Symbol) -> bool {
-    let Some(owner) = method
-        .owner
-        .as_ref()
-        .filter(|_| method.kind == SymbolKind::Method)
-    else {
-        return false;
-    };
-    project.implements(owner).iter().any(|interface| {
-        project.members(interface).iter().any(|id| {
-            project.symbol(id).is_some_and(|declared| {
-                declared.kind == SymbolKind::Method
-                    && declared.name == method.name
-                    && declared.doc.is_some()
-            })
-        })
-    })
 }
 
 /// The strings of an option that is a list of them; empty when it is not.
