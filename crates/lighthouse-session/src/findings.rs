@@ -31,6 +31,34 @@ pub struct Remembered {
     pub messages: Vec<String>,
 }
 
+impl Remembered {
+    /// Says what the judgments did to the report.
+    fn announce(&mut self) {
+        if self.suppressed > 0 {
+            self.messages.push(format!(
+                "{} finding(s) kept out of the report by judgments (`lighthouse review list --status suppressed`)",
+                self.suppressed
+            ));
+        }
+        let count = |text: &str| self.notes.values().filter(|n| n.contains(text)).count();
+        let mut messages = Vec::new();
+        for (text, what) in [
+            ("decision changed", "judgment expired: decision changed"),
+            ("evidence changed", "judgment expired: evidence changed"),
+            (
+                "definitive",
+                "judged error(s) stay reported: errors are definitive and no judgment hides them; fix the code",
+            ),
+        ] {
+            let found = count(text);
+            if found > 0 {
+                messages.push(format!("{found} finding(s) reported again, {what}"));
+            }
+        }
+        self.messages.extend(messages);
+    }
+}
+
 /// What identifies a decision's wording and check, hashed once per decision
 /// however many findings it has.
 struct Versions {
@@ -153,34 +181,6 @@ fn note(ruling: &Ruling) -> Option<String> {
             "judged {} \u{2014} errors are definitive and no judgment hides them; fix the code or suppress it in the code",
             ruling.judgment
         )),
-    }
-}
-
-impl Remembered {
-    /// Says what the judgments did to the report.
-    fn announce(&mut self) {
-        if self.suppressed > 0 {
-            self.messages.push(format!(
-                "{} finding(s) kept out of the report by judgments (`lighthouse review list --status suppressed`)",
-                self.suppressed
-            ));
-        }
-        let count = |text: &str| self.notes.values().filter(|n| n.contains(text)).count();
-        let mut messages = Vec::new();
-        for (text, what) in [
-            ("decision changed", "judgment expired: decision changed"),
-            ("evidence changed", "judgment expired: evidence changed"),
-            (
-                "definitive",
-                "judged error(s) stay reported: errors are definitive and no judgment hides them; fix the code",
-            ),
-        ] {
-            let found = count(text);
-            if found > 0 {
-                messages.push(format!("{found} finding(s) reported again, {what}"));
-            }
-        }
-        self.messages.extend(messages);
     }
 }
 
