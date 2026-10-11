@@ -25,10 +25,7 @@ pub use check::{
 pub use command::{
     Batch, CheckOutput, CheckStdin, CommandCheck, ExitCodes, SarifColumns, SarifSelect,
 };
-pub use decision::{
-    Decision, DecisionSpec, LanguageSpec, PACK_LABEL, PRESET_LABEL, Provenance, SECTION_LABEL,
-    STRICT,
-};
+pub use decision::{Decision, DecisionSpec, LanguageSpec, PACK_LABEL, Provenance, SECTION_LABEL};
 pub use error::Error;
 pub use fix::{
     CommandOutput, CommandScope, CommandSpec, CommandStdin, Fix, FixKind, OpSpec, ReorderScope,
@@ -42,16 +39,16 @@ pub use model_check::ModelCheck;
 pub use options::{
     LIMIT_ROLES, NO_LIMIT, ObjectType, OptionSchema, OptionType, OptionsSchema, Shape, definitions,
 };
-pub use pack::{Pack, PackSpec, Section, SectionSpec};
+pub use pack::{Pack, Section};
+pub(crate) use pack::{PackSpec, SectionSpec};
 pub use project::{
-    ApiProvider, Config, DEFAULT_BUDGET, DEFAULT_PRECISION, Evaluation, FILE_NAME, FILE_NAMES,
-    Formatter, FormatterOutput, FormatterSpec, FormatterStdin, GeneratedCheck, GeneratedSpec,
-    GlobSet, Layer, Level, ModelBinding, ModelInput, ModelOutput, ModelProvider, ModelsSpec,
-    OverrideSpec, PluginEntry, PluginRef, PluginRefSpec, ProjectError, ProjectLanguage,
-    ProjectSpec, Projects, ProviderSpec, RESERVED as RESERVED_PROVIDERS, RuleConfig, RuleDetail,
-    RuleSetting, Rules, Specs, glob_set,
+    ApiProvider, Config, Evaluation, FILE_NAME, FILE_NAMES, Formatter, FormatterOutput,
+    FormatterSpec, FormatterStdin, GeneratedCheck, GeneratedSpec, GlobSet, Layer, Level,
+    ModelBinding, ModelInput, ModelOutput, ModelProvider, ModelsSpec, OverrideSpec, PluginEntry,
+    PluginRef, PluginRefSpec, ProjectError, ProjectLanguage, ProjectSpec, Projects, ProviderSpec,
+    RESERVED as RESERVED_PROVIDERS, RuleConfig, RuleDetail, RuleSetting, Rules, Specs, glob_set,
 };
-pub use sources::{SourceLine, SourceMapSpec};
+pub(crate) use sources::SourceMapSpec;
 
 /// The JSON Schema of every kind this crate defines.
 pub fn descriptors() -> Vec<Descriptor> {

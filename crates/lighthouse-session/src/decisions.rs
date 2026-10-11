@@ -62,16 +62,6 @@ pub fn decision_rows(catalog: &Catalog, registry: &Registry, all: bool) -> Vec<D
     rows
 }
 
-/// [`decision_rows`] over the bundled catalog and plugins.
-pub fn bundled_decision_rows(all: bool) -> Vec<DecisionRow> {
-    decision_rows(Catalog::bundled(), &lighthouse_checks::registry(), all)
-}
-
-/// [`explain`] over the bundled catalog and plugins.
-pub fn explain_bundled(id: &str) -> Result<String> {
-    explain(Catalog::bundled(), &lighthouse_checks::registry(), id)
-}
-
 /// The rules the project's configuration enables for at least one file: the
 /// projects it extends and the entries it sets, resolved over the catalog.
 pub fn active_decisions(session: &Session) -> Result<BTreeSet<String>> {

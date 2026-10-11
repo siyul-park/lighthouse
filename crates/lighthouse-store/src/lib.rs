@@ -20,7 +20,8 @@ mod store;
 use lighthouse_resource::Descriptor;
 
 pub use error::{Error, MIN_PREFIX};
-pub use log::{Change, JudgmentSpec, RevisionEvent, RevisionSpec, SuppressionSpec};
+pub(crate) use log::SuppressionSpec;
+pub use log::{Change, JudgmentSpec, RevisionEvent, RevisionSpec};
 pub use record::{
     Filter, FindingRecord, FixEvent, JudgmentEvent, NewFix, NewJudgment, Observed, Resolved,
     Ruling, Run, RunSummary, Stamp, Standing, State, StatusFilter, Subject, SuppressionEvent,

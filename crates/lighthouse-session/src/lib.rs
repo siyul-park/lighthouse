@@ -29,16 +29,17 @@ mod validate;
 use std::error::Error;
 
 pub use authoring::{Authored, create_decision, replace_decision};
-pub use cache::{LIMIT_VAR, cache_dir, clean_cache};
-pub use check::{CheckRequest, Checked, ModelFlags, RunStatus, Summary, attached_models, check};
+pub use cache::{cache_dir, clean_cache};
+pub(crate) use check::attached_models;
+pub use check::{CheckRequest, Checked, ModelFlags, RunStatus, Summary, check};
 pub use decisions::{
-    DecisionRow, DecisionTest, active_decisions, bundled_decision_rows, catalog_index,
-    decision_rows, decision_text, explain, explain_bundled, test_decisions,
+    DecisionRow, DecisionTest, active_decisions, catalog_index, decision_rows, decision_text,
+    explain, test_decisions,
 };
 pub use docs::bundled_docs;
 pub use evaluate::eval;
 pub use findings::Remembered;
-pub use fix::{AppliedRow, DeclinedRow, FixSelection, FixTargets, Fixed, fix, fix_plan};
+pub use fix::{AppliedRow, DeclinedRow, FixSelection, FixTargets, Fixed, fix};
 pub use git::head;
 pub use lighthouse_engine::{FailOn, Timings};
 pub use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};
@@ -56,10 +57,11 @@ pub use reviewing::{
 };
 pub use schema::{schema_of, schemas};
 pub use scope::{changed, since};
-pub use select::{Selector, long_enough};
+pub(crate) use select::Selector;
+pub use select::long_enough;
 pub use skill::{SKILL_MARKER, skill, skill_for};
 pub use train::train;
-pub use trust::{Basis, TRUST_VAR, revoke, trust};
+pub use trust::{Basis, revoke, trust};
 pub use validate::{Problem, Validated, validate_paths};
 
 /// Directories no search for files enters.
