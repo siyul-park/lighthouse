@@ -208,6 +208,23 @@ pub fn agent_report(
     AgentReport { fields }
 }
 
+/// The findings to print: all of them, or the first `limit` by severity
+/// (errors first) in their original order, and how many were left out.
+pub(crate) fn select(
+    diagnostics: &[Diagnostic],
+    limit: Option<usize>,
+) -> (Vec<&Diagnostic>, usize) {
+    let Some(limit) = limit.filter(|&l| l < diagnostics.len()) else {
+        return (diagnostics.iter().collect(), 0);
+    };
+    let mut order: Vec<usize> = (0..diagnostics.len()).collect();
+    order.sort_by_key(|&i| diagnostics[i].severity);
+    order.truncate(limit);
+    order.sort_unstable();
+    let shown = order.into_iter().map(|i| &diagnostics[i]).collect();
+    (shown, diagnostics.len() - limit)
+}
+
 /// One header per decision with its requirement and expected structure, one
 /// line per finding under it, then the gaps, how to record a judgment and the
 /// judgments it accepts when a shown finding asks for review, and the summary.
@@ -366,23 +383,6 @@ fn full_report(
             .any(|d| briefing.needs_review(d))
             .then(judgments),
     }
-}
-
-/// The findings to print: all of them, or the first `limit` by severity
-/// (errors first) in their original order, and how many were left out.
-pub(crate) fn select(
-    diagnostics: &[Diagnostic],
-    limit: Option<usize>,
-) -> (Vec<&Diagnostic>, usize) {
-    let Some(limit) = limit.filter(|&l| l < diagnostics.len()) else {
-        return (diagnostics.iter().collect(), 0);
-    };
-    let mut order: Vec<usize> = (0..diagnostics.len()).collect();
-    order.sort_by_key(|&i| diagnostics[i].severity);
-    order.truncate(limit);
-    order.sort_unstable();
-    let shown = order.into_iter().map(|i| &diagnostics[i]).collect();
-    (shown, diagnostics.len() - limit)
 }
 
 /// How many characters of a fingerprint tell the shown findings apart.

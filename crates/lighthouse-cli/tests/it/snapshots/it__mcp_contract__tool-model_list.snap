@@ -1,0 +1,93 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+  },
+  "description": "List the models bound to decisions.\n\nThe classification model, the models rules name and the trained models attached to decisions, with whether asking each reaches a service outside the machine.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`model list`.",
+    "properties": {
+      "decision": {
+        "default": [],
+        "description": "Only the models bound to these decisions: ids or globs.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "limit": {
+        "default": null,
+        "description": "List at most this many models and say how many were left out.",
+        "format": "uint",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    },
+    "type": "object"
+  },
+  "name": "model_list",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/model-list.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "models": {
+        "items": {
+          "properties": {
+            "binding": {
+              "enum": [
+                "classification",
+                "rule",
+                "attached"
+              ]
+            },
+            "decision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "model": {
+              "type": "string"
+            },
+            "remote": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "model",
+            "decision",
+            "binding",
+            "remote"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "omitted": {
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "models",
+      "omitted"
+    ],
+    "title": "ModelList",
+    "type": "object"
+  },
+  "title": "List the models bound to decisions"
+}

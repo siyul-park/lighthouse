@@ -107,8 +107,12 @@ pub fn fix(session: Session, request: &FixSelection) -> Result<Fixed> {
     let skip = suppressed(&engine, &root, &catalog, request.store)?;
     let run = FixRun {
         paths: request.targets.paths.clone(),
-        rules: Selector::new(&request.targets.rules)?
-            .expand(catalog.decisions().map(Decision::id))?,
+        rules: Selector::new(&request.targets.rules)?.expand(
+            catalog
+                .decisions()
+                .map(Decision::id)
+                .filter(|id| engine.is_active(id)),
+        )?,
         fingerprints: request.targets.fingerprints.clone(),
         skip,
         dry_run: request.dry_run,

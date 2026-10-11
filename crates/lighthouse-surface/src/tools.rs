@@ -25,6 +25,148 @@ use crate::{
 const FIX_TITLE: &str = "Fix findings with the fixers their decisions name.";
 const FIX_DESCRIPTION: &str = "Fix findings with the fixers the decisions name (`fixable: safe|suggested` in `decision_list`). Select what to fix with `fingerprints` (findings from `check`, prefixes of at least 7 characters allowed), `paths` or `decision`; at least one is required. A fix is proposed as edits over the code model, applied, formatted, re-checked and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only safe fixes of mechanical rules are applied unless `unsafeFixes` is set. Use `dryRun` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a judgment hides are never fixed.";
 
+const READ: Hints = Hints {
+    read_only: true,
+    destructive: false,
+    idempotent: true,
+    open_world: false,
+};
+
+/// The tools, in the order they are listed.
+pub const TOOLS: [Tool; 14] = [
+    Tool::new(
+        "check",
+        &["check"],
+        "CheckReport",
+        Hints {
+            read_only: false,
+            destructive: false,
+            idempotent: true,
+            open_world: true,
+        },
+        schema::<CheckArgs>,
+    ),
+    Tool::new(
+        "fix",
+        &["check"],
+        "FixReport",
+        Hints {
+            read_only: false,
+            destructive: true,
+            idempotent: true,
+            open_world: false,
+        },
+        schema::<FixArgs>,
+    ),
+    Tool::new(
+        "decision_list",
+        &["decision", "list"],
+        "DecisionList",
+        READ,
+        schema::<DecisionListArgs>,
+    ),
+    Tool::new(
+        "decision_show",
+        &["decision", "show"],
+        "DecisionShow",
+        READ,
+        schema::<DecisionShowArgs>,
+    ),
+    Tool::new(
+        "decision_create",
+        &["decision", "create"],
+        "AuthorReport",
+        Hints {
+            read_only: false,
+            destructive: false,
+            idempotent: false,
+            open_world: false,
+        },
+        schema::<DocumentArgs>,
+    ),
+    Tool::new(
+        "decision_update",
+        &["decision", "update"],
+        "AuthorReport",
+        Hints {
+            read_only: false,
+            destructive: false,
+            idempotent: true,
+            open_world: false,
+        },
+        schema::<DocumentArgs>,
+    ),
+    Tool::new(
+        "decision_test",
+        &["decision", "test"],
+        "TestReport",
+        READ,
+        schema::<DecisionTestArgs>,
+    ),
+    Tool::new(
+        "decision_eval",
+        &["decision", "eval"],
+        "EvalReport",
+        Hints {
+            open_world: true,
+            ..READ
+        },
+        schema::<DecisionEvalArgs>,
+    ),
+    Tool::new(
+        "review_list",
+        &["review", "list"],
+        "ReviewList",
+        READ,
+        schema::<ReviewListArgs>,
+    ),
+    Tool::new(
+        "review_show",
+        &["review", "show"],
+        "Finding",
+        READ,
+        schema::<FingerprintArgs>,
+    ),
+    Tool::new(
+        "review_resolve",
+        &["review", "resolve"],
+        "ResolveReport",
+        Hints {
+            read_only: false,
+            destructive: false,
+            idempotent: true,
+            open_world: false,
+        },
+        schema::<ReviewResolveArgs>,
+    ),
+    Tool::new(
+        "review_history",
+        &["review", "history"],
+        "JudgmentHistory",
+        READ,
+        schema::<FingerprintArgs>,
+    ),
+    Tool::new(
+        "model_list",
+        &["model", "list"],
+        "ModelList",
+        READ,
+        schema::<ModelListArgs>,
+    ),
+    Tool::new(
+        "model_train",
+        &["model", "train"],
+        "TrainReport",
+        Hints {
+            read_only: false,
+            destructive: false,
+            idempotent: false,
+            open_world: true,
+        },
+        schema::<ModelTrainArgs>,
+    ),
+];
+
 /// How a tool may touch the world, in the MCP annotations' terms.
 #[derive(Debug, Clone, Copy)]
 pub struct Hints {
@@ -48,165 +190,24 @@ pub struct Tool {
     input: fn() -> Value,
 }
 
-const READ: Hints = Hints {
-    read_only: true,
-    destructive: false,
-    idempotent: true,
-    open_world: false,
-};
-
-const fn tool(
-    name: &'static str,
-    path: &'static [&'static str],
-    kind: &'static str,
-    hints: Hints,
-    input: fn() -> Value,
-) -> Tool {
-    Tool {
-        name,
-        path,
-        kind,
-        hints,
-        input,
-    }
-}
-
-/// The tools, in the order they are listed.
-pub const TOOLS: [Tool; 14] = [
-    tool(
-        "check",
-        &["check"],
-        "CheckReport",
-        Hints {
-            read_only: false,
-            destructive: false,
-            idempotent: true,
-            open_world: true,
-        },
-        schema::<CheckArgs>,
-    ),
-    tool(
-        "fix",
-        &["check"],
-        "FixReport",
-        Hints {
-            read_only: false,
-            destructive: true,
-            idempotent: true,
-            open_world: false,
-        },
-        schema::<FixArgs>,
-    ),
-    tool(
-        "decision_list",
-        &["decision", "list"],
-        "DecisionList",
-        READ,
-        schema::<DecisionListArgs>,
-    ),
-    tool(
-        "decision_show",
-        &["decision", "show"],
-        "DecisionShow",
-        READ,
-        schema::<DecisionShowArgs>,
-    ),
-    tool(
-        "decision_create",
-        &["decision", "create"],
-        "AuthorReport",
-        Hints {
-            read_only: false,
-            destructive: false,
-            idempotent: false,
-            open_world: false,
-        },
-        schema::<DocumentArgs>,
-    ),
-    tool(
-        "decision_update",
-        &["decision", "update"],
-        "AuthorReport",
-        Hints {
-            read_only: false,
-            destructive: false,
-            idempotent: true,
-            open_world: false,
-        },
-        schema::<DocumentArgs>,
-    ),
-    tool(
-        "decision_test",
-        &["decision", "test"],
-        "TestReport",
-        READ,
-        schema::<DecisionTestArgs>,
-    ),
-    tool(
-        "decision_eval",
-        &["decision", "eval"],
-        "EvalReport",
-        Hints {
-            open_world: true,
-            ..READ
-        },
-        schema::<DecisionEvalArgs>,
-    ),
-    tool(
-        "review_list",
-        &["review", "list"],
-        "ReviewList",
-        READ,
-        schema::<ReviewListArgs>,
-    ),
-    tool(
-        "review_show",
-        &["review", "show"],
-        "Finding",
-        READ,
-        schema::<FingerprintArgs>,
-    ),
-    tool(
-        "review_resolve",
-        &["review", "resolve"],
-        "ResolveReport",
-        Hints {
-            read_only: false,
-            destructive: false,
-            idempotent: true,
-            open_world: false,
-        },
-        schema::<ReviewResolveArgs>,
-    ),
-    tool(
-        "review_history",
-        &["review", "history"],
-        "JudgmentHistory",
-        READ,
-        schema::<FingerprintArgs>,
-    ),
-    tool(
-        "model_list",
-        &["model", "list"],
-        "ModelList",
-        READ,
-        schema::<ModelListArgs>,
-    ),
-    tool(
-        "model_train",
-        &["model", "train"],
-        "TrainReport",
-        Hints {
-            read_only: false,
-            destructive: false,
-            idempotent: false,
-            open_world: true,
-        },
-        schema::<ModelTrainArgs>,
-    ),
-];
-
 impl Tool {
+    /// A tool of the table.
+    const fn new(
+        name: &'static str,
+        path: &'static [&'static str],
+        kind: &'static str,
+        hints: Hints,
+        input: fn() -> Value,
+    ) -> Self {
+        Self {
+            name,
+            path,
+            kind,
+            hints,
+            input,
+        }
+    }
+
     /// The JSON Schema of the arguments, from the struct of the flags.
     pub fn input_schema(&self) -> Value {
         (self.input)()
@@ -255,6 +256,21 @@ pub fn call(ctx: &Context, name: &str, arguments: Value) -> Option<Result<Reply>
     Some(dispatch(ctx, tool, arguments))
 }
 
+/// The long flag `--attributed-to` as the argument `attributedTo`.
+pub fn camel_case(flag: &str) -> String {
+    let mut name = String::new();
+    for (n, word) in flag.split('-').enumerate() {
+        if n == 0 {
+            name.push_str(word);
+        } else {
+            let mut letters = word.chars();
+            name.extend(letters.next().map(|c| c.to_ascii_uppercase()));
+            name.push_str(letters.as_str());
+        }
+    }
+    name
+}
+
 fn dispatch(ctx: &Context, tool: &Tool, arguments: Value) -> Result<Reply> {
     let arguments = if arguments.is_null() {
         Value::Object(Default::default())
@@ -295,21 +311,6 @@ fn dispatch(ctx: &Context, tool: &Tool, arguments: Value) -> Result<Reply> {
         "model_train" => model::train_model(ctx, &parse(arguments)?, json),
         other => Err(format!("unknown tool `{other}`").into()),
     }
-}
-
-/// The long flag `--attributed-to` as the argument `attributedTo`.
-pub fn camel_case(flag: &str) -> String {
-    let mut name = String::new();
-    for (n, word) in flag.split('-').enumerate() {
-        if n == 0 {
-            name.push_str(word);
-        } else {
-            let mut letters = word.chars();
-            name.extend(letters.next().map(|c| c.to_ascii_uppercase()));
-            name.push_str(letters.as_str());
-        }
-    }
-    name
 }
 
 /// The arguments with those the caller left out filled from the environment

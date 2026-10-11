@@ -62,35 +62,6 @@ pub fn list(args: &ReviewListArgs, output: Output) -> Result<Reply> {
     Ok(reply.with_notes(notes))
 }
 
-/// The `ReviewList` kind.
-fn json_list(
-    root: &std::path::Path,
-    findings: &[FindingRecord],
-    notices: &[String],
-    args: &ReviewListArgs,
-) -> Value {
-    let limit = args.limit.unwrap_or(JSON_LIMIT);
-    if args.detail == Detail::Compact {
-        let catalog = catalog_at(root).ok();
-        let options = GroupOptions {
-            catalog: catalog.as_ref(),
-            limit: Some(limit),
-            tool_form: true,
-        };
-        let mut fields = Grouped::of(findings.iter().map(entry).collect(), &options).fields();
-        if !notices.is_empty() {
-            fields.insert("notices".to_owned(), json!(notices));
-        }
-        return Value::Object(fields);
-    }
-    let tasks: Vec<Value> = findings.iter().take(limit).map(task).collect();
-    json!({
-        "tasks": tasks,
-        "omitted": findings.len().saturating_sub(limit),
-        "notices": notices,
-    })
-}
-
 /// `review show`.
 pub fn show(args: &FingerprintArgs, output: Output) -> Result<Reply> {
     long_enough(&args.fingerprint)?;
@@ -176,6 +147,35 @@ pub fn resolve(ctx: &Context, args: &ReviewResolveArgs, output: Output) -> Resul
         Output::Text => Reply::text(resolved_text(&recorded)),
     };
     Ok(reply.with_notes(notes))
+}
+
+/// The `ReviewList` kind.
+fn json_list(
+    root: &std::path::Path,
+    findings: &[FindingRecord],
+    notices: &[String],
+    args: &ReviewListArgs,
+) -> Value {
+    let limit = args.limit.unwrap_or(JSON_LIMIT);
+    if args.detail == Detail::Compact {
+        let catalog = catalog_at(root).ok();
+        let options = GroupOptions {
+            catalog: catalog.as_ref(),
+            limit: Some(limit),
+            tool_form: true,
+        };
+        let mut fields = Grouped::of(findings.iter().map(entry).collect(), &options).fields();
+        if !notices.is_empty() {
+            fields.insert("notices".to_owned(), json!(notices));
+        }
+        return Value::Object(fields);
+    }
+    let tasks: Vec<Value> = findings.iter().take(limit).map(task).collect();
+    json!({
+        "tasks": tasks,
+        "omitted": findings.len().saturating_sub(limit),
+        "notices": notices,
+    })
 }
 
 fn resolved_text(recorded: &lighthouse_session::Recorded) -> String {

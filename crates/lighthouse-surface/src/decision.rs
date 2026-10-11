@@ -142,25 +142,6 @@ pub fn author(ctx: &Context, text: &str, create: bool, output: Output) -> Result
     })
 }
 
-fn authored(done: &Authored) -> AuthorReport {
-    let note = if done.plugin_listed {
-        "the `local` plugin is listed; enable the decision with `extends = [\"local/recommended\"]` or a [rules] entry if it is not on yet"
-    } else {
-        "add \"local\" to `plugins` in lighthouse.toml, and enable the decision, for `check` to run it"
-    };
-    AuthorReport {
-        id: done.id.clone(),
-        path: done.path.display().to_string(),
-        created: done.created,
-        tested: Tested {
-            runs: done.test.runs,
-            languages: done.test.languages,
-        },
-        local_plugin_listed: done.plugin_listed,
-        note: note.to_owned(),
-    }
-}
-
 /// The text of the document a command line names: a file, or `-` for stdin.
 pub fn read_document(source: &str) -> Result<String> {
     if source == "-" {
@@ -199,4 +180,23 @@ pub fn test(ctx: &Context, args: &DecisionTestArgs, output: Output) -> Result<Re
         out
     })?;
     Ok(reply.with_code(code))
+}
+
+fn authored(done: &Authored) -> AuthorReport {
+    let note = if done.plugin_listed {
+        "the `local` plugin is listed; enable the decision with `extends = [\"local/recommended\"]` or a [rules] entry if it is not on yet"
+    } else {
+        "add \"local\" to `plugins` in lighthouse.toml, and enable the decision, for `check` to run it"
+    };
+    AuthorReport {
+        id: done.id.clone(),
+        path: done.path.display().to_string(),
+        created: done.created,
+        tested: Tested {
+            runs: done.test.runs,
+            languages: done.test.languages,
+        },
+        local_plugin_listed: done.plugin_listed,
+        note: note.to_owned(),
+    }
 }

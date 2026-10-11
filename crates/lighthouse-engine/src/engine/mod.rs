@@ -337,6 +337,11 @@ impl Engine {
         Ok(engine)
     }
 
+    /// Whether the configuration enables the rule `id`.
+    pub fn is_active(&self, id: &str) -> bool {
+        self.active.contains(id)
+    }
+
     /// Says whether the user trusts the project to run the commands its checks name.
     pub fn with_trust(mut self, trusted: bool) -> Self {
         self.trusted = trusted;

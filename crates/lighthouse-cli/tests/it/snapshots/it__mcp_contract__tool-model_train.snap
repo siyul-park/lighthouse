@@ -1,0 +1,114 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false,
+    "readOnlyHint": false
+  },
+  "description": "Fit a model on the labels of a decision.\n\nThe labels are its examples, the baseline rows, the judgments recorded under its current meaning version, and optionally the answers of another model. Writes the dataset under `.lighthouse/datasets/` and the artifact under `.lighthouse/models/`; it binds nothing.\n\nExamples:\n  lighthouse model train design/feature-envy\n  lighthouse model train design/feature-envy --model local/general --repo cel=../cel\n  lighthouse model train design/feature-envy --from-model openai/gpt-5 --format json",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`model train`.",
+    "properties": {
+      "baseline": {
+        "default": null,
+        "description": "A table of reviewed findings (`fingerprint repo location verdict`).",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "fromModel": {
+        "default": null,
+        "description": "Also label the subjects nobody labelled with this model's answers\n(weight 0.5): a fail where it is sure of one, a pass where it is sure\nof the other. `<provider>/<model>`.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "id": {
+        "description": "The decision whose labels the model learns, such as\n`design/feature-envy`.",
+        "type": "string"
+      },
+      "model": {
+        "default": null,
+        "description": "The model to train, `<provider>/<model>`. Default: the one bound to\nthe decision.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "repo": {
+        "default": [],
+        "description": "A repository the labels are about, `name=dir`, where `name` is the\nbaseline's `repo` column. Repeatable; default: this project.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "name": "model_train",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/train-report.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "by_source": {
+        "additionalProperties": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": "object"
+      },
+      "dataset": {
+        "type": "string"
+      },
+      "decision": {
+        "type": "string"
+      },
+      "model": {
+        "type": "string"
+      },
+      "result": {
+        "anyOf": [
+          {
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "subjects": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "training_file": {
+        "type": "string"
+      },
+      "unresolved": {
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "decision",
+      "model",
+      "subjects",
+      "unresolved",
+      "dataset",
+      "training_file"
+    ],
+    "title": "TrainReport",
+    "type": "object"
+  },
+  "title": "Fit a model on the labels of a decision"
+}

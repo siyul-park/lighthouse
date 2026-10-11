@@ -81,14 +81,6 @@ pub fn run(ctx: &Context, args: &CheckArgs, printing: &Printing) -> Result<Reply
     Ok(reply)
 }
 
-/// The reply of a dry run: the diff is the data.
-fn report_dry_run(done: &lighthouse_session::Fixed, printing: &Printing) -> Result<Reply> {
-    match printing.format {
-        CheckFormat::Json => Reply::json(serde_json::to_value(fix::report(done))?),
-        _ => Ok(Reply::text(done.diff.clone())),
-    }
-}
-
 /// Analyzes the project and keeps what the arguments report.
 pub fn analyze(ctx: &Context, args: &CheckArgs) -> Result<Checked> {
     let session = Session::load(ctx.config.as_deref())?;
@@ -107,6 +99,50 @@ pub fn analyze(ctx: &Context, args: &CheckArgs) -> Result<Checked> {
         },
     };
     lighthouse_session::check(session, &request)
+}
+
+/// The `CheckReport` kind: the findings grouped by decision for a program,
+/// with the gaps and the counts, and what the run has to say.
+pub fn json_report(checked: &Checked, args: &CheckArgs) -> Value {
+    let outcome = &checked.outcome;
+    let limit = Some(args.limit.unwrap_or(JSON_LIMIT));
+    let detail = args.detail.into();
+    let fixes = checked.shown_fixes(limit, detail);
+    let report = agent_report(
+        &shown(checked),
+        &outcome.incomplete,
+        &Briefing {
+            detail,
+            fixes: Some(&fixes),
+            sources: None,
+            tool_form: true,
+            ..checked.briefing(limit)
+        },
+    );
+    let mut body = report.fields;
+    match args.detail {
+        Detail::Compact => {
+            if !checked.messages.is_empty() {
+                body.insert("messages".to_owned(), json!(checked.messages));
+            }
+        }
+        Detail::Full => {
+            let summary = checked.summary();
+            body.insert("status".to_owned(), json!(summary.status));
+            body.insert("summary".to_owned(), json!(summary));
+            body.insert("messages".to_owned(), json!(checked.messages));
+            body.entry("reasons").or_insert(Value::Null);
+        }
+    }
+    Value::Object(body)
+}
+
+/// The reply of a dry run: the diff is the data.
+fn report_dry_run(done: &lighthouse_session::Fixed, printing: &Printing) -> Result<Reply> {
+    match printing.format {
+        CheckFormat::Json => Reply::json(serde_json::to_value(fix::report(done))?),
+        _ => Ok(Reply::text(done.diff.clone())),
+    }
 }
 
 /// The findings to print: what the check found, then the subjects nothing
@@ -147,40 +183,4 @@ fn sarif(checked: &Checked, args: &CheckArgs) -> String {
             ..checked.briefing(args.limit)
         },
     )
-}
-
-/// The `CheckReport` kind: the findings grouped by decision for a program,
-/// with the gaps and the counts, and what the run has to say.
-pub fn json_report(checked: &Checked, args: &CheckArgs) -> Value {
-    let outcome = &checked.outcome;
-    let limit = Some(args.limit.unwrap_or(JSON_LIMIT));
-    let detail = args.detail.into();
-    let fixes = checked.shown_fixes(limit, detail);
-    let report = agent_report(
-        &shown(checked),
-        &outcome.incomplete,
-        &Briefing {
-            detail,
-            fixes: Some(&fixes),
-            sources: None,
-            tool_form: true,
-            ..checked.briefing(limit)
-        },
-    );
-    let mut body = report.fields;
-    match args.detail {
-        Detail::Compact => {
-            if !checked.messages.is_empty() {
-                body.insert("messages".to_owned(), json!(checked.messages));
-            }
-        }
-        Detail::Full => {
-            let summary = checked.summary();
-            body.insert("status".to_owned(), json!(summary.status));
-            body.insert("summary".to_owned(), json!(summary));
-            body.insert("messages".to_owned(), json!(checked.messages));
-            body.entry("reasons").or_insert(Value::Null);
-        }
-    }
-    Value::Object(body)
 }

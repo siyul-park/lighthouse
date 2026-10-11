@@ -1,0 +1,74 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+  },
+  "description": "Run the examples of checked decisions through the whole engine.\n\nThe bundled catalog and the project's `.lighthouse/decisions`. Examples run in each language whose plugin the config lists (or only in --language); a decision needs an example for every language run. Exits 1 when any example fails.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`decision test`.",
+    "properties": {
+      "decision": {
+        "default": [],
+        "description": "Decisions to test: ids and globs. Default: every checked decision.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "language": {
+        "default": null,
+        "description": "Run the examples in this language only.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "type": "object"
+  },
+  "name": "decision_test",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/test-report.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "decisions": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "failures": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "languages": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "ok": {
+        "type": "boolean"
+      },
+      "runs": {
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "ok",
+      "decisions",
+      "languages",
+      "runs",
+      "failures"
+    ],
+    "title": "TestReport",
+    "type": "object"
+  },
+  "title": "Run the examples of checked decisions through the whole engine"
+}

@@ -8,15 +8,6 @@ use lighthouse_session::{DOCS_DIR, Session, bundled_docs, skill_for};
 
 use crate::{Result, reference};
 
-/// The docs `out` holds, by path under it: the decision docs of the catalog,
-/// and the references of the commands and of the tools.
-fn generated() -> BTreeMap<String, String> {
-    let mut docs = bundled_docs();
-    docs.insert(reference::CLI_DOC.to_owned(), reference::cli());
-    docs.insert(reference::MCP_DOC.to_owned(), reference::mcp());
-    docs
-}
-
 pub fn generate(config: Option<&Path>, out: &Path, skill: &Path) -> Result<u8> {
     let docs = generated();
     for orphan in orphans(out, &docs)? {
@@ -37,6 +28,15 @@ pub fn generate(config: Option<&Path>, out: &Path, skill: &Path) -> Result<u8> {
     fs::write(skill, skill_text(config)?)?;
     println!("wrote {}", skill.display());
     Ok(0)
+}
+
+/// The docs `out` holds, by path under it: the decision docs of the catalog,
+/// and the references of the commands and of the tools.
+fn generated() -> BTreeMap<String, String> {
+    let mut docs = bundled_docs();
+    docs.insert(reference::CLI_DOC.to_owned(), reference::cli());
+    docs.insert(reference::MCP_DOC.to_owned(), reference::mcp());
+    docs
 }
 
 /// The agent skill of this project: its catalog and configuration.

@@ -42,9 +42,21 @@ pub fn cli() -> String {
 }
 
 /// One section per command, depth first, in the order `--help` lists them.
+/// The global options are described once, in the root's section, not under
+/// every command that inherits them.
 fn commands(command: &Command, out: &mut String) {
+    let inherits = command
+        .get_bin_name()
+        .is_some_and(|name| name.contains(' '));
     let help = command
         .clone()
+        .mut_args(|arg| {
+            if inherits && arg.is_global_set() {
+                arg.hide(true)
+            } else {
+                arg
+            }
+        })
         .term_width(WIDTH)
         .max_term_width(WIDTH)
         .render_long_help();

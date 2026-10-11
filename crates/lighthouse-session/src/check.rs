@@ -257,7 +257,11 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     };
     let setup = started.elapsed();
     let mut messages = Vec::new();
-    let rules = Selector::new(&request.rules)?.expand(catalog.decisions().map(Decision::id))?;
+    let enabled = catalog
+        .decisions()
+        .map(Decision::id)
+        .filter(|id| engine.is_active(id));
+    let rules = Selector::new(&request.rules)?.expand(enabled)?;
     let mut outcome = analyze(&engine, &root, request, &rules, &mut messages)?;
     outcome.timings.setup = setup;
     messages.extend(plugins.notices.iter().chain(&outcome.notices).cloned());

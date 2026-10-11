@@ -1,0 +1,150 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false
+  },
+  "description": "Record a judgment on a finding.\n\n`fail` means the finding is right; add --suppress with a justification to leave it in place on purpose (a SARIF `external` suppression). `pass` means the code conforms (a false positive); `notApplicable` means the decision does not apply here, a hint to narrow it. A judgment that is not `fail`, or a `fail` with a suppression, keeps the finding out of later reports while its decision and evidence stay as they are; an error is recorded but never hidden. Judgments are appended to .lighthouse/decisions.jsonl, which is meant to be committed, and never edited: a later one replaces the standing of the finding.\n\n--seen is the `last seen` time of the finding as you read it; the judgment is refused if the finding has been seen again since.\n\nExamples:\n  lighthouse review resolve 3fa9c1e --judgment pass --reason 'the helper is generated'\n  lighthouse review resolve 3fa9c1e --judgment fail --suppress 'tracked in #214'\n  lighthouse review resolve 3fa9c1e --judgment notApplicable --attributed-to agent:claude",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`review resolve`.",
+    "properties": {
+      "attributedTo": {
+        "default": null,
+        "description": "Who the judgment is attributed to: `person` or `agent`, with an id\nafter a colon (`agent:claude`). Default: the person from `git config\nuser.name` on the command line, the client's name through MCP.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "fingerprint": {
+        "description": "A fingerprint, or the start of one (at least 7 characters).",
+        "type": "string"
+      },
+      "judgment": {
+        "description": "`fail`: the finding is right. `pass`: the code conforms. `notApplicable`:\nthe decision does not apply here.",
+        "oneOf": [
+          {
+            "const": "pass",
+            "description": "The code conforms: the finding is a false positive.",
+            "type": "string"
+          },
+          {
+            "const": "fail",
+            "description": "The finding is right.",
+            "type": "string"
+          },
+          {
+            "const": "notApplicable",
+            "description": "The decision does not apply here; a hint to narrow it.",
+            "type": "string"
+          }
+        ]
+      },
+      "reason": {
+        "default": null,
+        "description": "Why, written for the next reader.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "seen": {
+        "default": null,
+        "description": "The `last seen` time of the finding as you read it (its `seen`\nevidence); refuses the judgment if the finding has been seen again\nsince.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "suppress": {
+        "default": null,
+        "description": "With `fail`: why the finding stays, recorded as an external\nsuppression that keeps it out of later reports.",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "fingerprint",
+      "judgment"
+    ],
+    "type": "object"
+  },
+  "name": "review_resolve",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/resolve-report.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "catalogError": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "recorded": {
+        "properties": {
+          "decision": {
+            "type": "string"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "judgment": {
+            "type": "string"
+          },
+          "suppression": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "wasAttributedTo": {}
+        },
+        "required": [
+          "fingerprint",
+          "decision",
+          "judgment"
+        ],
+        "type": "object"
+      },
+      "standing": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "warnings": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "recorded",
+      "warnings"
+    ],
+    "title": "ResolveReport",
+    "type": "object"
+  },
+  "title": "Record a judgment on a finding"
+}

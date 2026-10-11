@@ -705,6 +705,18 @@ fn engine_with_cache_gives_the_providers_a_directory_to_keep_results_in_and_with
 }
 
 #[test]
+fn engine_is_active() {
+    let dir = project(&[("x.txt", b"1")]);
+    let engine = engine(&dir, ALL).unwrap();
+    assert!(engine.is_active("fake/each"));
+    assert!(
+        !engine.is_active("fake/other"),
+        "a rule the config leaves out"
+    );
+    assert!(!engine.is_active("nope/nope"), "a rule nobody registered");
+}
+
+#[test]
 fn engine_with_incomplete() {
     let dir = project(&[("x.txt", b"1")]);
     let gap = Incomplete {

@@ -108,6 +108,7 @@ pub struct CheckCommand {
     pub options: FixOptions,
 }
 
+/// `decision <verb>`.
 #[derive(Debug, Subcommand)]
 pub enum DecisionCommand {
     /// List the decisions that have a rule.
@@ -179,6 +180,7 @@ pub enum DecisionCommand {
     },
 }
 
+/// `review <verb>`.
 #[derive(Debug, Subcommand)]
 pub enum ReviewCommand {
     /// List the findings that ask for review.
@@ -237,6 +239,7 @@ pub enum ReviewCommand {
     },
 }
 
+/// `model <verb>`.
 #[derive(Debug, Subcommand)]
 pub enum ModelCommand {
     /// List the models bound to decisions.
@@ -265,6 +268,13 @@ pub enum ModelCommand {
     },
 }
 
+#[derive(Debug, clap::Parser)]
+#[command(no_binary_name = true)]
+struct Tree {
+    #[command(subcommand)]
+    action: Action,
+}
+
 /// Runs the command.
 pub fn run(ctx: &Context, action: &Action) -> Result<Reply> {
     match action {
@@ -284,44 +294,6 @@ pub fn run(ctx: &Context, action: &Action) -> Result<Reply> {
             ModelCommand::Train { args, output } => model::train_model(ctx, args, output.format),
         },
     }
-}
-
-fn decision_command(ctx: &Context, command: &DecisionCommand) -> Result<Reply> {
-    match command {
-        DecisionCommand::List { args, output } => decision::list(ctx, args, output.format),
-        DecisionCommand::Show { args, output } => decision::show(ctx, args, output.format),
-        DecisionCommand::Create { args, output } => decision::author(
-            ctx,
-            &decision::read_document(&args.document)?,
-            true,
-            output.format,
-        ),
-        DecisionCommand::Update { args, output } => decision::author(
-            ctx,
-            &decision::read_document(&args.document)?,
-            false,
-            output.format,
-        ),
-        DecisionCommand::Test { args, output } => decision::test(ctx, args, output.format),
-        DecisionCommand::Eval { args, output } => eval::run(ctx, args, output.format),
-    }
-}
-
-fn review_command(ctx: &Context, command: &ReviewCommand) -> Result<Reply> {
-    match command {
-        ReviewCommand::List { args, output } => review::list(args, output.format),
-        ReviewCommand::Show { args, output } => review::show(args, output.format),
-        ReviewCommand::Resolve { args, output } => review::resolve(ctx, args, output.format),
-        ReviewCommand::History { args, output } => review::history(args, output.format),
-        ReviewCommand::Prune { older_than } => review::prune(*older_than),
-    }
-}
-
-#[derive(Debug, clap::Parser)]
-#[command(no_binary_name = true)]
-struct Tree {
-    #[command(subcommand)]
-    action: Action,
 }
 
 /// The clap command of the agent-loop commands, to walk by path.
@@ -359,4 +331,35 @@ pub fn help(path: &[&str]) -> (String, String) {
         long = format!("{long}\n\n{examples}");
     }
     (about, long)
+}
+
+fn decision_command(ctx: &Context, command: &DecisionCommand) -> Result<Reply> {
+    match command {
+        DecisionCommand::List { args, output } => decision::list(ctx, args, output.format),
+        DecisionCommand::Show { args, output } => decision::show(ctx, args, output.format),
+        DecisionCommand::Create { args, output } => decision::author(
+            ctx,
+            &decision::read_document(&args.document)?,
+            true,
+            output.format,
+        ),
+        DecisionCommand::Update { args, output } => decision::author(
+            ctx,
+            &decision::read_document(&args.document)?,
+            false,
+            output.format,
+        ),
+        DecisionCommand::Test { args, output } => decision::test(ctx, args, output.format),
+        DecisionCommand::Eval { args, output } => eval::run(ctx, args, output.format),
+    }
+}
+
+fn review_command(ctx: &Context, command: &ReviewCommand) -> Result<Reply> {
+    match command {
+        ReviewCommand::List { args, output } => review::list(args, output.format),
+        ReviewCommand::Show { args, output } => review::show(args, output.format),
+        ReviewCommand::Resolve { args, output } => review::resolve(ctx, args, output.format),
+        ReviewCommand::History { args, output } => review::history(args, output.format),
+        ReviewCommand::Prune { older_than } => review::prune(*older_than),
+    }
 }

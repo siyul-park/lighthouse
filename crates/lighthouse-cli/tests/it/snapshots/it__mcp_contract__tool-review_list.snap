@@ -1,0 +1,156 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+  },
+  "description": "List the findings that ask for review.\n\nBy default the open findings of decisions that authored `warn` or `info` and that no judgment stands for. A finding's `last seen` is the `--seen` evidence `review resolve` takes.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`review list`.",
+    "properties": {
+      "all": {
+        "default": false,
+        "description": "Also list findings that do not ask for review (errors, and judged\nones).",
+        "type": "boolean"
+      },
+      "decision": {
+        "default": [],
+        "description": "Only the findings of these decisions: ids or globs.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "detail": {
+        "default": "compact",
+        "description": "With `--format json`: compact groups findings by decision; full gives\none record per finding with its full fingerprint and `lastSeen`.",
+        "oneOf": [
+          {
+            "const": "compact",
+            "description": "Grouped by decision, a decision's text said once.",
+            "type": "string"
+          },
+          {
+            "const": "full",
+            "description": "One self-contained record per item.",
+            "type": "string"
+          }
+        ]
+      },
+      "limit": {
+        "default": null,
+        "description": "List at most this many findings, errors first, and say how many were\nleft out. Default: 50 with `--format json`, all otherwise.",
+        "format": "uint",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "status": {
+        "default": "open",
+        "description": "Which findings: `open` is still reported and not suppressed.",
+        "oneOf": [
+          {
+            "const": "open",
+            "description": "Still reported and not suppressed.",
+            "type": "string"
+          },
+          {
+            "const": "suppressed",
+            "description": "Kept out of reports by a judgment.",
+            "type": "string"
+          },
+          {
+            "const": "narrowing",
+            "description": "Judged `notApplicable`, so the decision is too broad.",
+            "type": "string"
+          },
+          {
+            "const": "inactive",
+            "description": "Of a rule the configuration no longer enables.",
+            "type": "string"
+          },
+          {
+            "const": "resolved",
+            "description": "No longer reported by a complete run.",
+            "type": "string"
+          },
+          {
+            "const": "all",
+            "description": "Every remembered finding.",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    "type": "object"
+  },
+  "name": "review_list",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/review-list.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "groups": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "judgments": {},
+      "note": {
+        "type": "string"
+      },
+      "notices": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "omitted": {
+        "oneOf": [
+          {
+            "minimum": 0,
+            "type": "integer"
+          },
+          {
+            "properties": {
+              "findings": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "groups": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "groups",
+              "findings"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "resolve": {
+        "type": "string"
+      },
+      "tasks": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      }
+    },
+    "required": [],
+    "title": "ReviewList",
+    "type": "object"
+  },
+  "title": "List the findings that ask for review"
+}

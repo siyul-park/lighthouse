@@ -1,0 +1,270 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false
+  },
+  "description": "Check the project and print findings.\n\nPATHS select which findings are reported, not what is analyzed: the whole project is always analyzed, because decisions and language providers need more than the reported files (callers, packages, build context).\n\nExit codes: 0 clean, 1 an error was found (or warnings fail the run: --strict, --max-warnings; info never does), 2 usage or runtime error, 3 the analysis was incomplete (a file could not be read or loaded, a plugin crashed or timed out). \"Not checked\" is never \"passed\"; --allow-incomplete reports it but does not fail on it.\n\nPlugins named by the config are started and run with your privileges, like build scripts: only check projects whose config you trust. A plugin that cannot start, or that is not the protocol version or identity its entry names, is an error (exit 2); one that starts but crashes, times out or answers badly is reported as incomplete (exit 3).\n\nExamples:\n  lighthouse check\n  lighthouse check src/ --decision 'design/*' --format json --limit 10\n  lighthouse check --changed --strict\n  lighthouse check --fix --dry-run --decision design/exported-doc",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`check`: analyze the project and report. Analysis is always whole-project;\nthe arguments narrow what is reported and how.",
+    "properties": {
+      "allModels": {
+        "default": false,
+        "description": "Ask models that cost about the whole project, not only the files the\nrun reports.",
+        "type": "boolean"
+      },
+      "allowIncomplete": {
+        "default": false,
+        "description": "Exit by findings even when the analysis was incomplete; the\nincompleteness is still reported.",
+        "type": "boolean"
+      },
+      "changed": {
+        "default": false,
+        "description": "Report only files changed in the working tree against HEAD (modified,\nadded, renamed, untracked). A report filter like PATHS.",
+        "type": "boolean"
+      },
+      "decision": {
+        "default": [],
+        "description": "Run only these decisions: ids, comma-separated or repeated, and globs\nsuch as `design/*`.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "detail": {
+        "default": "compact",
+        "description": "With `--format json`: compact groups findings by decision and states a\ndecision's text once; full gives one self-contained record per finding.",
+        "oneOf": [
+          {
+            "const": "compact",
+            "description": "Grouped by decision, a decision's text said once.",
+            "type": "string"
+          },
+          {
+            "const": "full",
+            "description": "One self-contained record per item.",
+            "type": "string"
+          }
+        ]
+      },
+      "diff": {
+        "default": null,
+        "description": "Report only files changed since the merge base of BASE and HEAD,\nincluding the working tree and untracked files. A report filter.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "limit": {
+        "default": null,
+        "description": "Report at most this many findings, errors first, and say how many were\nleft out. Default: 25 with `--format json`, all otherwise.",
+        "format": "uint",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "maxWarnings": {
+        "default": null,
+        "description": "Fail when there are more than N warnings (errors always fail).",
+        "format": "uint",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "noCache": {
+        "default": false,
+        "description": "Run every rule instead of reusing the findings of earlier runs kept in\n`.lighthouse/cache`. The findings and the exit code are the same.",
+        "type": "boolean"
+      },
+      "noModels": {
+        "default": false,
+        "description": "Ask no model: what they would judge is left to review.",
+        "type": "boolean"
+      },
+      "noStore": {
+        "default": false,
+        "description": "Do not record this run in `.lighthouse/lighthouse.db` and do not apply\njudgments. By default a run is recorded: findings it no longer reports\nare marked resolved (never when the analysis was incomplete), and\nfindings whose latest judgment hides them stay out of the report.",
+        "type": "boolean"
+      },
+      "paths": {
+        "default": [],
+        "description": "Where to report findings; the whole project is analyzed anyway.\nDefault: the whole project.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "recordModelLabels": {
+        "default": false,
+        "description": "Record what models fail as judgments attributed to them, so that\ntraining can reproduce them from `decisions.jsonl`.",
+        "type": "boolean"
+      },
+      "strict": {
+        "default": false,
+        "description": "Fail on warnings too.",
+        "type": "boolean"
+      }
+    },
+    "type": "object"
+  },
+  "name": "check",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/check-report.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "counts": {
+        "properties": {
+          "allowed": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "error": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "info": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "review": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "suppressed": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "warn": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "error",
+          "warn",
+          "review"
+        ],
+        "type": "object"
+      },
+      "findings": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "groups": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "incomplete": {
+        "items": {},
+        "type": "array"
+      },
+      "judgments": {},
+      "messages": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "omitted": {
+        "oneOf": [
+          {
+            "minimum": 0,
+            "type": "integer"
+          },
+          {
+            "properties": {
+              "findings": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "groups": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "groups",
+              "findings"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "reasons": {},
+      "resolve": {
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "clean",
+          "findings",
+          "incomplete",
+          "review"
+        ]
+      },
+      "summary": {
+        "properties": {
+          "allowed": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "errors": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "incomplete": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "infos": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "reviews": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "clean",
+              "findings",
+              "incomplete"
+            ]
+          },
+          "suppressed": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "warnings": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "status"
+    ],
+    "title": "CheckReport",
+    "type": "object"
+  },
+  "title": "Check the project and print findings"
+}

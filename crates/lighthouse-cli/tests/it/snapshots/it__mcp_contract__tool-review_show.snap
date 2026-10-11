@@ -1,0 +1,132 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+  },
+  "description": "Show one finding: where it is, its evidence and its latest review",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`review show` and `review history`.",
+    "properties": {
+      "fingerprint": {
+        "description": "A fingerprint, or the start of one (at least 7 characters).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "fingerprint"
+    ],
+    "type": "object"
+  },
+  "name": "review_show",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/finding.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "authoredSeverity": {
+        "type": "string"
+      },
+      "evidence": {},
+      "facts": {},
+      "fingerprint": {
+        "type": "string"
+      },
+      "firstSeen": {
+        "type": "string"
+      },
+      "inactiveAt": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "judgment": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "lastSeen": {
+        "type": "string"
+      },
+      "locator": {
+        "type": "object"
+      },
+      "message": {
+        "type": "string"
+      },
+      "narrowing": {
+        "type": "boolean"
+      },
+      "options": {},
+      "path": {
+        "type": "string"
+      },
+      "reopened": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "resolvedAt": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "ruleId": {
+        "type": "string"
+      },
+      "severity": {
+        "type": "string"
+      },
+      "standing": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "symbol": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "fingerprint",
+      "ruleId",
+      "severity",
+      "path",
+      "message",
+      "lastSeen"
+    ],
+    "title": "Finding",
+    "type": "object"
+  },
+  "title": "Show one finding: where it is, its evidence and its latest review"
+}

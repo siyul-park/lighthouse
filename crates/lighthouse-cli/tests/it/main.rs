@@ -8,6 +8,7 @@ mod cli;
 mod command_sarif;
 mod environment;
 mod fix;
+mod fix_trust;
 mod internal;
 mod judgments;
 mod labels;

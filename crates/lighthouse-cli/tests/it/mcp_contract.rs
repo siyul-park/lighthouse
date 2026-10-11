@@ -47,7 +47,11 @@ fn the_tool_list_is_golden() {
     let mut client = Client::start(dir.path());
     let mut tools = listed(&mut client);
     tools.sort_by_key(|t| t["name"].as_str().unwrap().to_owned());
-    insta::assert_snapshot!(serde_json::to_string_pretty(&tools).unwrap());
+    assert_eq!(tools.len(), 14);
+    for tool in tools {
+        let name = format!("tool-{}", tool["name"].as_str().unwrap());
+        insta::assert_snapshot!(name, serde_json::to_string_pretty(&tool).unwrap());
+    }
 }
 
 #[test]

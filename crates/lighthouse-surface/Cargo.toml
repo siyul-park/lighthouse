@@ -20,3 +20,5 @@ serde_norway.workspace = true
 
 [dev-dependencies]
 jsonschema.workspace = true
+lighthouse-test-support = { path = "../lighthouse-test-support" }
+tempfile.workspace = true

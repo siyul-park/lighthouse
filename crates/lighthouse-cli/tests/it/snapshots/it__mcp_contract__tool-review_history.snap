@@ -1,0 +1,50 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+  },
+  "description": "Show every judgment recorded on a finding, oldest first",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`review show` and `review history`.",
+    "properties": {
+      "fingerprint": {
+        "description": "A fingerprint, or the start of one (at least 7 characters).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "fingerprint"
+    ],
+    "type": "object"
+  },
+  "name": "review_history",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/judgment-history.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "events": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "fingerprint": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "fingerprint",
+      "events"
+    ],
+    "title": "JudgmentHistory",
+    "type": "object"
+  },
+  "title": "Show every judgment recorded on a finding, oldest first"
+}

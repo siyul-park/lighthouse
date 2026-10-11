@@ -49,18 +49,8 @@ fn strings() -> Value {
     json!({ "type": "array", "items": string() })
 }
 
-fn nullable(inner: Value) -> Value {
-    json!({ "anyOf": [inner, { "type": "null" }] })
-}
-
 fn list_of(item: Value) -> Value {
     json!({ "type": "array", "items": item })
-}
-
-/// An object with these properties, all of `required` present, and room for
-/// more: the schema describes what a program may rely on.
-fn object(properties: Value, required: &[&str]) -> Value {
-    json!({ "type": "object", "properties": properties, "required": required })
 }
 
 fn status() -> Value {
@@ -97,6 +87,12 @@ fn check_report() -> Value {
         }),
         &["status"],
     )
+}
+
+/// An object with these properties, all of `required` present, and room for
+/// more: the schema describes what a program may rely on.
+fn object(properties: Value, required: &[&str]) -> Value {
+    json!({ "type": "object", "properties": properties, "required": required })
 }
 
 fn fix_report() -> Value {
@@ -175,6 +171,10 @@ fn rate() -> Value {
                 "low": { "type": "number" }, "high": { "type": "number" } }),
         &["hits", "of", "value", "low", "high"],
     ))
+}
+
+fn nullable(inner: Value) -> Value {
+    json!({ "anyOf": [inner, { "type": "null" }] })
 }
 
 fn side() -> Value {

@@ -15,6 +15,35 @@ use crate::{Result, Selector, git::user_name, project::catalog_at};
 /// Says who is attributed with what is recorded when no flag does.
 const ATTRIBUTED_VAR: &str = "LIGHTHOUSE_ATTRIBUTED_TO";
 
+/// A judgment that was recorded, with what the reviewer should know about it.
+pub struct Recorded {
+    pub event: JudgmentEvent,
+    pub finding: FindingRecord,
+    pub warnings: Vec<String>,
+    /// What the judgment does to the finding now.
+    pub standing: Option<Standing>,
+    /// The catalog could not be read, so rule versions were not recorded.
+    pub catalog_error: Option<String>,
+}
+
+/// Which remembered findings [`review_tasks`] lists.
+pub struct TaskQuery {
+    /// Only these decisions: ids or globs over them; empty for all.
+    pub rules: Vec<String>,
+    pub status: StatusFilter,
+    /// Also the findings that are no task: errors, and open ones a judgment
+    /// stands for.
+    pub all_tiers: bool,
+}
+
+/// The remembered findings that wait for review.
+pub struct Tasks {
+    pub findings: Vec<FindingRecord>,
+    /// What opening the store skipped in the log, such as a last line an
+    /// interrupted write cut short.
+    pub notices: Vec<String>,
+}
+
 /// Who a record is attributed to (PROV `wasAttributedTo`): `spec` is
 /// `person`, `person:<id>`, `agent` or `agent:<id>`; without it
 /// `$LIGHTHOUSE_ATTRIBUTED_TO` says; without that `default` does. A missing id
@@ -52,35 +81,6 @@ pub fn attribute_to(spec: Option<&str>, default: &Attribution) -> Result<Attribu
 pub fn person(root: &Path) -> Attribution {
     let id = user_name(root).or_else(|| env::var("USER").ok());
     Attribution::new(AgentKind::Person, id.filter(|id| !id.is_empty()))
-}
-
-/// A judgment that was recorded, with what the reviewer should know about it.
-pub struct Recorded {
-    pub event: JudgmentEvent,
-    pub finding: FindingRecord,
-    pub warnings: Vec<String>,
-    /// What the judgment does to the finding now.
-    pub standing: Option<Standing>,
-    /// The catalog could not be read, so rule versions were not recorded.
-    pub catalog_error: Option<String>,
-}
-
-/// Which remembered findings [`review_tasks`] lists.
-pub struct TaskQuery {
-    /// Only these decisions: ids or globs over them; empty for all.
-    pub rules: Vec<String>,
-    pub status: StatusFilter,
-    /// Also the findings that are no task: errors, and open ones a judgment
-    /// stands for.
-    pub all_tiers: bool,
-}
-
-/// The remembered findings that wait for review.
-pub struct Tasks {
-    pub findings: Vec<FindingRecord>,
-    /// What opening the store skipped in the log, such as a last line an
-    /// interrupted write cut short.
-    pub notices: Vec<String>,
 }
 
 /// The findings the store remembers that match `query`; `None` when no check

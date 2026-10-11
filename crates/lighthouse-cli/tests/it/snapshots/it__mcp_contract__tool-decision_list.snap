@@ -1,0 +1,83 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+  },
+  "description": "List the decisions that have a rule",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`decision list`.",
+    "properties": {
+      "all": {
+        "default": false,
+        "description": "Include every catalog decision with its implementation status.",
+        "type": "boolean"
+      },
+      "limit": {
+        "default": null,
+        "description": "List at most this many decisions and say how many were left out.",
+        "format": "uint",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    },
+    "type": "object"
+  },
+  "name": "decision_list",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/decision-list.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "decisions": {
+        "items": {
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "id": {
+              "type": "string"
+            },
+            "severity": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "status",
+            "severity",
+            "title",
+            "enabled"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "omitted": {
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "decisions",
+      "omitted"
+    ],
+    "title": "DecisionList",
+    "type": "object"
+  },
+  "title": "List the decisions that have a rule"
+}

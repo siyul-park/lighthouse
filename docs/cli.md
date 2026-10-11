@@ -68,18 +68,6 @@ Options:
       --changed
           Report only files changed in the working tree against HEAD (modified, added, renamed, untracked). A report filter like PATHS
 
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
-
       --diff <BASE>
           Report only files changed since the merge base of BASE and HEAD, including the working tree and untracked files. A report filter
 
@@ -162,7 +150,7 @@ Examples:
 ```text
 Inspect, author, test and evaluate decisions
 
-Usage: lighthouse decision [OPTIONS] <COMMAND>
+Usage: lighthouse decision <COMMAND>
 
 Commands:
   list    List the decisions that have a rule
@@ -174,18 +162,6 @@ Commands:
   help    Print this message or the help of the given subcommand(s)
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
-
   -h, --help
           Print help
 ```
@@ -200,18 +176,6 @@ Usage: lighthouse decision list [OPTIONS]
 Options:
       --all
           Include every catalog decision with its implementation status
-
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
       --limit <N>
           List at most this many decisions and say how many were left out
@@ -241,11 +205,6 @@ Arguments:
           A decision or rule id such as `design/exported-doc`
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --format <FORMAT>
           `text` for people, `json` for programs (its schema: `lighthouse schema`)
 
@@ -254,13 +213,6 @@ Options:
           - json: One JSON document on one line
           
           [default: text]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
   -h, --help
           Print help (see a summary with '-h')
@@ -280,11 +232,6 @@ Arguments:
           A `Decision` document, as YAML or JSON. On the command line this is a file, or `-` for stdin; the tool takes the text or the object. `metadata.name` is the id (`local/<name>`); `spec.examples` needs at least one valid and one invalid example per language the project runs
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --format <FORMAT>
           `text` for people, `json` for programs (its schema: `lighthouse schema`)
 
@@ -293,13 +240,6 @@ Options:
           - json: One JSON document on one line
           
           [default: text]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
   -h, --help
           Print help (see a summary with '-h')
@@ -319,11 +259,6 @@ Arguments:
           A `Decision` document, as YAML or JSON. On the command line this is a file, or `-` for stdin; the tool takes the text or the object. `metadata.name` is the id (`local/<name>`); `spec.examples` needs at least one valid and one invalid example per language the project runs
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --format <FORMAT>
           `text` for people, `json` for programs (its schema: `lighthouse schema`)
 
@@ -332,13 +267,6 @@ Options:
           - json: One JSON document on one line
           
           [default: text]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
   -h, --help
           Print help (see a summary with '-h')
@@ -358,20 +286,8 @@ Arguments:
           Decisions to test: ids and globs. Default: every checked decision
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --language <LANGUAGE>
           Run the examples in this language only
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
       --format <FORMAT>
           `text` for people, `json` for programs (its schema: `lighthouse schema`)
@@ -400,23 +316,11 @@ Arguments:
           The decision, such as `design/feature-envy`
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --repo <NAME=DIR>
           A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project
 
       --baseline <FILE>
           A table of reviewed findings. Default: `baseline/precision/<id>.tsv` when it exists
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
       --check <FILE>
           A decision file whose check is evaluated beside the current one
@@ -449,7 +353,7 @@ Review the findings `check` remembers and record judgments on them.
 
 Exit codes of every subcommand: 0 on success, 2 on a usage or runtime error (unknown or ambiguous fingerprint, a suppression that does not fit the judgment, a finding seen again since --seen, an unusable store).
 
-Usage: lighthouse review [OPTIONS] <COMMAND>
+Usage: lighthouse review <COMMAND>
 
 Commands:
   list     List the findings that ask for review
@@ -460,18 +364,6 @@ Commands:
   help     Print this message or the help of the given subcommand(s)
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
-
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -486,20 +378,8 @@ By default the open findings of decisions that authored `warn` or `info` and tha
 Usage: lighthouse review list [OPTIONS]
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --decision <ID>
           Only the findings of these decisions: ids or globs
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
       --status <STATUS>
           Which findings: `open` is still reported and not suppressed
@@ -554,11 +434,6 @@ Arguments:
           A fingerprint, or the start of one (at least 7 characters)
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --format <FORMAT>
           `text` for people, `json` for programs (its schema: `lighthouse schema`)
 
@@ -567,13 +442,6 @@ Options:
           - json: One JSON document on one line
           
           [default: text]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
   -h, --help
           Print help (see a summary with '-h')
@@ -595,11 +463,6 @@ Arguments:
           A fingerprint, or the start of one (at least 7 characters)
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --judgment <JUDGMENT>
           `fail`: the finding is right. `pass`: the code conforms. `notApplicable`: the decision does not apply here
 
@@ -607,13 +470,6 @@ Options:
           - pass:          The code conforms: the finding is a false positive
           - fail:          The finding is right
           - notApplicable: The decision does not apply here; a hint to narrow it
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
       --suppress <JUSTIFICATION>
           With `fail`: why the finding stays, recorded as an external suppression that keeps it out of later reports
@@ -659,11 +515,6 @@ Arguments:
           A fingerprint, or the start of one (at least 7 characters)
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --format <FORMAT>
           `text` for people, `json` for programs (its schema: `lighthouse schema`)
 
@@ -672,13 +523,6 @@ Options:
           - json: One JSON document on one line
           
           [default: text]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
   -h, --help
           Print help (see a summary with '-h')
@@ -694,20 +538,8 @@ Findings with judgments stay, because the judgments are labels.
 Usage: lighthouse review prune [OPTIONS]
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --older-than <DAYS>
           Only those resolved or inactive for at least this many days
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
   -h, --help
           Print help (see a summary with '-h')
@@ -718,7 +550,7 @@ Options:
 ```text
 List and train the models that judge decisions
 
-Usage: lighthouse model [OPTIONS] <COMMAND>
+Usage: lighthouse model <COMMAND>
 
 Commands:
   list   List the models bound to decisions
@@ -726,18 +558,6 @@ Commands:
   help   Print this message or the help of the given subcommand(s)
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
-
   -h, --help
           Print help
 ```
@@ -752,20 +572,8 @@ The classification model, the models rules name and the trained models attached 
 Usage: lighthouse model list [OPTIONS]
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --decision <ID>
           Only the models bound to these decisions: ids or globs
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
       --limit <N>
           List at most this many models and say how many were left out
@@ -797,20 +605,8 @@ Arguments:
           The decision whose labels the model learns, such as `design/feature-envy`
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --model <REF>
           The model to train, `<provider>/<model>`. Default: the one bound to the decision
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
       --from-model <REF>
           Also label the subjects nobody labelled with this model's answers (weight 0.5): a fail where it is sure of one, a pass where it is sure of the other. `<provider>/<model>`
@@ -844,25 +640,13 @@ Examples:
 ```text
 Manage the result cache in `.lighthouse/cache`
 
-Usage: lighthouse cache [OPTIONS] <COMMAND>
+Usage: lighthouse cache <COMMAND>
 
 Commands:
   clean  Delete the result cache and what the language plugins keep in it
   help   Print this message or the help of the given subcommand(s)
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
-
   -h, --help
           Print help
 ```
@@ -874,21 +658,9 @@ Delete the result cache and what the language plugins keep in it.
 
 Nothing but time is lost: the next check fills it again.
 
-Usage: lighthouse cache clean [OPTIONS]
+Usage: lighthouse cache clean
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
-
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -898,25 +670,13 @@ Options:
 ```text
 Validate spec documents
 
-Usage: lighthouse spec [OPTIONS] <COMMAND>
+Usage: lighthouse spec <COMMAND>
 
 Commands:
   validate  Check every spec document under PATHS against its schema and the rest
   help      Print this message or the help of the given subcommand(s)
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
-
   -h, --help
           Print help
 ```
@@ -935,20 +695,8 @@ Arguments:
           
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --examples
           Also run the examples of the decisions found, through the whole engine
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
   -h, --help
           Print help (see a summary with '-h')
@@ -968,20 +716,8 @@ Arguments:
           A kind such as `Decision` or `CheckReport`, in any letter case
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --write <DIR>
           Write the schema of every kind into this directory instead
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
   -h, --help
           Print help (see a summary with '-h')
@@ -994,7 +730,7 @@ Generate or verify the Markdown docs derived from the code.
 
 The decision docs, the command reference (`cli.md`), the tool reference (`mcp.md`) and the agent skill.
 
-Usage: lighthouse docs [OPTIONS] <COMMAND>
+Usage: lighthouse docs <COMMAND>
 
 Commands:
   generate  Write the decision docs, the command and tool references, and the skill
@@ -1002,18 +738,6 @@ Commands:
   help      Print this message or the help of the given subcommand(s)
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
-
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1026,20 +750,8 @@ Write the decision docs, the command and tool references, and the skill
 Usage: lighthouse docs generate [OPTIONS]
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --out <OUT>
           [default: docs]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
       --skill <SKILL>
           Where the generated agent skill goes
@@ -1058,20 +770,8 @@ Exit 1 when a generated doc or the agent skill is stale
 Usage: lighthouse docs check [OPTIONS]
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --out <OUT>
           [default: docs]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
       --skill <SKILL>
           [default: skills/lighthouse/SKILL.md]
@@ -1085,25 +785,13 @@ Options:
 ```text
 Print the completions of a shell
 
-Usage: lighthouse completions [OPTIONS] <SHELL>
+Usage: lighthouse completions <SHELL>
 
 Arguments:
   <SHELL>
           [possible values: bash, zsh, fish, powershell]
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
-
   -h, --help
           Print help
 ```
@@ -1123,18 +811,6 @@ Options:
           
           [possible values: claude-code]
 
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
-
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1151,20 +827,8 @@ It lists the formatters and fixer commands it would trust and asks for confirmat
 Usage: lighthouse trust [OPTIONS]
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
       --revoke
           Withdraw the trust instead
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
       --yes
           Trust without asking; for scripts, after reading what is listed
@@ -1180,21 +844,9 @@ Serve the Model Context Protocol on stdio, for coding agents.
 
 Tools to check, fix, review and author decisions, and resources for the catalog. Judgments recorded through it are attributed to a `SoftwareAgent` (the id is $LIGHTHOUSE_ATTRIBUTED_TO, else the client's name).
 
-Usage: lighthouse mcp [OPTIONS]
+Usage: lighthouse mcp
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
-
   -h, --help
           Print help (see a summary with '-h')
 ```
@@ -1204,25 +856,13 @@ Options:
 ```text
 Entry points for agent hooks. Reads the hook payload on stdin
 
-Usage: lighthouse hook [OPTIONS] <COMMAND>
+Usage: lighthouse hook <COMMAND>
 
 Commands:
   claude-code  Claude Code hooks (see docs/agents.md)
   help         Print this message or the help of the given subcommand(s)
 
 Options:
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
-
   -h, --help
           Print help
 ```
@@ -1243,18 +883,6 @@ Arguments:
 Options:
       --allow-incomplete
           Say that the analysis was incomplete but do not block on it
-
-      --config <FILE>
-          The project file; the project root is then the current directory
-          
-          [env: LIGHTHOUSE_CONFIG=]
-
-      --color <COLOR>
-          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
-          
-          [env: LIGHTHOUSE_COLOR=]
-          [default: auto]
-          [possible values: auto, always, never]
 
   -h, --help
           Print help (see a summary with '-h')

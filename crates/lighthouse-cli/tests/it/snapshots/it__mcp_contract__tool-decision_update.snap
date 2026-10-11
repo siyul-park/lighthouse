@@ -1,0 +1,80 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false
+  },
+  "description": "Replace a project-local decision with a Decision document.\n\nThe same gate as `decision create` applies, and nothing is written when it fails. A bundled decision is not changed in place: its level and options are the `rules` of lighthouse.toml, and different wording or examples are a local decision.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`decision create` and `decision update`.",
+    "properties": {
+      "document": {
+        "description": "A `Decision` document, as YAML or JSON. On the command line this is a\nfile, or `-` for stdin; the tool takes the text or the object.\n`metadata.name` is the id (`local/<name>`); `spec.examples` needs at\nleast one valid and one invalid example per language the project runs.",
+        "type": [
+          "string",
+          "object"
+        ]
+      }
+    },
+    "required": [
+      "document"
+    ],
+    "type": "object"
+  },
+  "name": "decision_update",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/author-report.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "created": {
+        "type": "boolean"
+      },
+      "id": {
+        "type": "string"
+      },
+      "localPluginListed": {
+        "type": "boolean"
+      },
+      "note": {
+        "type": "string"
+      },
+      "path": {
+        "type": "string"
+      },
+      "tested": {
+        "properties": {
+          "languages": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "runs": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "runs",
+          "languages"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "id",
+      "path",
+      "created",
+      "tested",
+      "localPluginListed",
+      "note"
+    ],
+    "title": "AuthorReport",
+    "type": "object"
+  },
+  "title": "Replace a project-local decision with a Decision document"
+}

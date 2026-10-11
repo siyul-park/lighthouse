@@ -1685,10 +1685,12 @@ dependencies = [
  "lighthouse-report",
  "lighthouse-resource",
  "lighthouse-session",
+ "lighthouse-test-support",
  "schemars",
  "serde",
  "serde_json",
  "serde_norway",
+ "tempfile",
 ]
 
 [[package]]

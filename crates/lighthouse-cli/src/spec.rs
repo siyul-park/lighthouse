@@ -43,25 +43,6 @@ pub fn validate(config: Option<&Path>, paths: &[PathBuf], examples: bool) -> Res
     Ok(u8::from(!report.problems.is_empty()))
 }
 
-/// Every schema the tool serves, by kind: the spec documents and log records,
-/// then what the commands print.
-pub fn all_schemas() -> BTreeMap<String, Value> {
-    let documents = schemas()
-        .into_values()
-        .map(|descriptor| (descriptor.kind.to_owned(), descriptor.schema));
-    let outputs = kinds::kinds()
-        .into_iter()
-        .map(|(kind, schema)| (kind.to_owned(), schema));
-    documents.chain(outputs).collect()
-}
-
-/// The schema of the kind named `name`, in any letter case or by file name.
-fn find(name: &str) -> Option<(String, Value)> {
-    all_schemas()
-        .into_iter()
-        .find(|(kind, _)| kind.eq_ignore_ascii_case(name) || schema_file(kind) == name)
-}
-
 /// Prints one schema, lists the kinds, or with `write` writes every schema
 /// into a directory.
 pub fn schema(kind: Option<&str>, write: Option<&Path>) -> Result<u8> {
@@ -76,7 +57,10 @@ pub fn schema(kind: Option<&str>, write: Option<&Path>) -> Result<u8> {
     }
     match kind {
         Some(name) => {
-            let (_, schema) = find(name).ok_or_else(|| {
+            let found = all_schemas()
+                .into_iter()
+                .find(|(kind, _)| kind.eq_ignore_ascii_case(name) || schema_file(kind) == name);
+            let (_, schema) = found.ok_or_else(|| {
                 let kinds: Vec<String> = all_schemas().into_keys().collect();
                 format!(
                     "unknown kind `{name}` (expected one of {})",
@@ -92,6 +76,18 @@ pub fn schema(kind: Option<&str>, write: Option<&Path>) -> Result<u8> {
         }
     }
     Ok(0)
+}
+
+/// Every schema the tool serves, by kind: the spec documents and log records,
+/// then what the commands print.
+pub fn all_schemas() -> BTreeMap<String, Value> {
+    let documents = schemas()
+        .into_values()
+        .map(|descriptor| (descriptor.kind.to_owned(), descriptor.schema));
+    let outputs = kinds::kinds()
+        .into_iter()
+        .map(|(kind, schema)| (kind.to_owned(), schema));
+    documents.chain(outputs).collect()
 }
 
 /// The project's configuration file and the given directories, as far as they

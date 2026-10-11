@@ -1,0 +1,47 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+  },
+  "description": "Show a decision or rule: context, requirement, examples and status",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`decision show`.",
+    "properties": {
+      "id": {
+        "description": "A decision or rule id such as `design/exported-doc`.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "name": "decision_show",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/decision-show.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "markdown": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "markdown"
+    ],
+    "title": "DecisionShow",
+    "type": "object"
+  },
+  "title": "Show a decision or rule: context, requirement, examples and status"
+}

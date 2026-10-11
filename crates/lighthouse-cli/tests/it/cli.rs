@@ -155,6 +155,24 @@ fn gitignored_files_are_skipped_and_rules_filter_applies() {
 }
 
 #[test]
+fn decision_takes_globs_over_the_enabled_decisions() {
+    let dir = project(6);
+    let expected = "big.txt:7:1: warn core/max-lines: file has 8 lines, limit is 6\nsummary: 0 error, 1 warn, 0 info, 0 incomplete\n";
+    for selector in ["core/*", "core/max-lines", "core/max-lines,core/max-*"] {
+        lighthouse(dir.path())
+            .args(["check", "--decision", selector])
+            .assert()
+            .success()
+            .stdout(expected);
+    }
+    lighthouse(dir.path())
+        .args(["check", "--decision", "design/*"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("no decision matches `design/*`"));
+}
+
+#[test]
 fn override_can_turn_a_rule_off_for_a_file() {
     let dir = project(6);
     let config = dir.path().join("lighthouse.toml");

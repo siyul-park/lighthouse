@@ -223,19 +223,6 @@ pub struct DocumentArgs {
     pub document: String,
 }
 
-/// The text of a document given as text, or an object given as JSON.
-fn text_or_object<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
-    match Value::deserialize(deserializer)? {
-        Value::String(text) => Ok(text),
-        other => Ok(other.to_string()),
-    }
-}
-
-/// A document is YAML or JSON text, or an object.
-fn document_schema(_: &mut SchemaGenerator) -> Schema {
-    json_schema!({ "type": ["string", "object"] })
-}
-
 /// `decision test`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields, default)]
@@ -383,4 +370,17 @@ pub struct ModelTrainArgs {
     #[arg(long, value_name = "NAME=DIR")]
     #[serde(default)]
     pub repo: Vec<String>,
+}
+
+/// The text of a document given as text, or an object given as JSON.
+fn text_or_object<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+    match Value::deserialize(deserializer)? {
+        Value::String(text) => Ok(text),
+        other => Ok(other.to_string()),
+    }
+}
+
+/// A document is YAML or JSON text, or an object.
+fn document_schema(_: &mut SchemaGenerator) -> Schema {
+    json_schema!({ "type": ["string", "object"] })
 }

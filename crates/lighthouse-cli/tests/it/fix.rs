@@ -10,7 +10,7 @@ use tempfile::TempDir;
 
 /// The binary in `dir`, with the user's trust file kept inside the project's
 /// own scratch space and no CI override: nothing leaks between tests.
-fn lighthouse(dir: &Path) -> Command {
+pub(crate) fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
     cmd.current_dir(dir)
         .env("XDG_CONFIG_HOME", dir.join(".home"))
@@ -20,17 +20,17 @@ fn lighthouse(dir: &Path) -> Command {
     cmd
 }
 
-fn trust(dir: &Path) {
+pub(crate) fn trust(dir: &Path) {
     lighthouse(dir).args(["trust", "--yes"]).assert().success();
 }
 
-fn write(dir: &Path, name: &str, text: &str) {
+pub(crate) fn write(dir: &Path, name: &str, text: &str) {
     let path = dir.join(name);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(path, text).unwrap();
 }
 
-fn read(dir: &TempDir, name: &str) -> String {
+pub(crate) fn read(dir: &TempDir, name: &str) -> String {
     fs::read_to_string(dir.path().join(name)).unwrap()
 }
 
@@ -345,7 +345,7 @@ spec:
             func DoNew() int { return 1 }
 "#;
 
-const UPPERCASE: &str = r#"apiVersion: lighthouse/v1alpha1
+pub(crate) const UPPERCASE: &str = r#"apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: local/shout
@@ -389,7 +389,7 @@ spec:
           body: HELLO
 "#;
 
-fn text_project(rule: &str) -> TempDir {
+pub(crate) fn text_project(rule: &str) -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     write(
         dir.path(),
@@ -401,98 +401,6 @@ fn text_project(rule: &str) -> TempDir {
     write(dir.path(), ".lighthouse/decisions/shout.yaml", rule);
     write(dir.path(), "a.txt", "hello\n");
     dir
-}
-
-#[test]
-fn a_command_runs_only_after_the_user_trusts_the_project() {
-    let dir = text_project(UPPERCASE);
-
-    lighthouse(dir.path())
-        .args(["check", "--fix"])
-        .assert()
-        .stderr(predicate::str::contains("not trusted"))
-        .stderr(predicate::str::contains("tr a-z A-Z"));
-    assert_eq!(read(&dir, "a.txt"), "hello\n");
-
-    trust(dir.path());
-    lighthouse(dir.path())
-        .args(["check", "--fix"])
-        .assert()
-        .stderr(predicate::str::contains("fixed local/shout [safe] a.txt"));
-    assert_eq!(read(&dir, "a.txt"), "HELLO\n");
-}
-
-#[test]
-fn a_change_to_the_configuration_or_the_rules_withdraws_trust() {
-    let dir = text_project(UPPERCASE);
-    trust(dir.path());
-    write(dir.path(), "a.txt", "hello\n");
-
-    let config = read(&dir, "lighthouse.toml");
-    write(
-        dir.path(),
-        "lighthouse.toml",
-        &format!("{config}# edited\n"),
-    );
-    lighthouse(dir.path())
-        .args(["check", "--fix", "--dry-run"])
-        .assert()
-        .stderr(predicate::str::contains("not trusted"));
-
-    write(dir.path(), "lighthouse.toml", &config);
-    lighthouse(dir.path())
-        .args(["check", "--fix", "--dry-run"])
-        .assert()
-        .stderr(predicate::str::contains("would fix local/shout"));
-
-    let rule = read(&dir, ".lighthouse/decisions/shout.yaml");
-    write(
-        dir.path(),
-        ".lighthouse/decisions/shout.yaml",
-        &rule.replace("tr a-z A-Z", "tr a-z B-Z"),
-    );
-    lighthouse(dir.path())
-        .args(["check", "--fix", "--dry-run"])
-        .assert()
-        .stderr(predicate::str::contains("not trusted"));
-}
-
-#[test]
-fn trust_can_be_revoked_and_ci_can_override_it() {
-    let dir = text_project(UPPERCASE);
-    trust(dir.path());
-    lighthouse(dir.path())
-        .args(["trust", "--revoke"])
-        .assert()
-        .success();
-
-    lighthouse(dir.path())
-        .args(["check", "--fix", "--dry-run"])
-        .assert()
-        .stderr(predicate::str::contains("not trusted"));
-    lighthouse(dir.path())
-        .env("LIGHTHOUSE_TRUST", "1")
-        .args(["check", "--fix", "--dry-run"])
-        .assert()
-        .stderr(predicate::str::contains("would fix local/shout"));
-}
-
-#[test]
-fn a_fix_table_in_lighthouse_toml_cannot_grant_trust() {
-    let dir = text_project(UPPERCASE);
-    write(
-        dir.path(),
-        "lighthouse.toml",
-        &lighthouse_test_support::project(
-            "plugins = [\"core\", \"local\"]\n[fix]\ncommands = \"allow\"\n[rules]\n\"local/shout\" = \"error\"\n",
-        ),
-    );
-
-    lighthouse(dir.path())
-        .args(["check", "--fix"])
-        .assert()
-        .code(2);
-    assert_eq!(read(&dir, "a.txt"), "hello\n");
 }
 
 #[test]
@@ -811,73 +719,4 @@ fn a_formatter_that_cannot_use_stdin_still_works_on_a_scratch_copy() {
         read(&dir, "src/lib.rs"),
         "pub struct Store;\n\npub fn run() -> u8 {\n    1\n}\n"
     );
-}
-
-#[test]
-fn trust_lists_what_it_trusts_and_needs_a_terminal_or_yes() {
-    let dir = text_project(UPPERCASE);
-    write(
-        dir.path(),
-        "lighthouse.toml",
-        &lighthouse_test_support::project(
-            "plugins = [\"core\", \"local\"]\n[rules]\n\"local/shout\" = \"error\"\n[languages.go]\nformatter = [\"gofmt\"]\n",
-        ),
-    );
-
-    lighthouse(dir.path())
-        .arg("trust")
-        .assert()
-        .code(2)
-        .stdout(predicate::str::contains("formatter for go: gofmt"))
-        .stdout(predicate::str::contains(
-            "fixer of local/shout: sh -c tr a-z A-Z",
-        ))
-        .stderr(predicate::str::contains("--yes"));
-    lighthouse(dir.path())
-        .args(["check", "--fix", "--dry-run"])
-        .assert()
-        .stderr(predicate::str::contains("not trusted"));
-
-    lighthouse(dir.path())
-        .args(["trust", "--yes"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("trusting"));
-}
-
-#[test]
-fn a_program_inside_the_project_is_trusted_by_its_content() {
-    let dir = text_project(UPPERCASE);
-    write(
-        dir.path(),
-        "tools/shout.sh",
-        "#!/bin/sh\ntr a-z A-Z < \"$1\"\n",
-    );
-    let rule = read(&dir, ".lighthouse/decisions/shout.yaml").replace(
-        "argv: [sh, \"-c\", \"tr a-z A-Z < \\\"$1\\\"\", sh, \"{file}\"]",
-        "argv: [\"./tools/shout.sh\", \"{file}\"]",
-    );
-    write(dir.path(), ".lighthouse/decisions/shout.yaml", &rule);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let path = dir.path().join("tools/shout.sh");
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
-    }
-    trust(dir.path());
-    lighthouse(dir.path())
-        .args(["check", "--fix", "--dry-run"])
-        .assert()
-        .stderr(predicate::str::contains("would fix local/shout"));
-
-    write(
-        dir.path(),
-        "tools/shout.sh",
-        "#!/bin/sh\ncat \"$1\"; echo pwned\n",
-    );
-
-    lighthouse(dir.path())
-        .args(["check", "--fix", "--dry-run"])
-        .assert()
-        .stderr(predicate::str::contains("not trusted"));
 }

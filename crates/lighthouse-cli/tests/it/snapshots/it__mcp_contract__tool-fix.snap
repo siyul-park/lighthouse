@@ -1,0 +1,160 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": true,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false
+  },
+  "description": "Fix findings with the fixers the decisions name (`fixable: safe|suggested` in `decision_list`). Select what to fix with `fingerprints` (findings from `check`, prefixes of at least 7 characters allowed), `paths` or `decision`; at least one is required. A fix is proposed as edits over the code model, applied, formatted, re-checked and rolled back for any file that gains an error or stops being analyzed, and repeated until nothing is left (at most 5 rounds). Only safe fixes of mechanical rules are applied unless `unsafeFixes` is set. Use `dryRun` first to see the unified `diff` without changing a file. Returns the `diff`, the `applied` fixes and the `declined` findings with the reason each was left alone; recheck with `check` afterwards. Findings a judgment hides are never fixed.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`fix`, the tool of `check --fix`: which findings, and how to fix them.\nName at least one of `paths`, `decision` and `fingerprints`: a fix through\nMCP never defaults to the whole project.",
+    "properties": {
+      "decision": {
+        "default": [],
+        "description": "Fix the findings of these decisions: ids or globs.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "dryRun": {
+        "default": false,
+        "description": "Print the unified diff and leave every file as it was.",
+        "type": "boolean"
+      },
+      "fingerprints": {
+        "default": [],
+        "description": "Fix these findings: fingerprints or unique prefixes of at least 7\ncharacters.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "fixer": {
+        "default": null,
+        "description": "Use this registered fixer for the selected findings instead of the one\ntheir decision names. Its fixes count as suggested.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "paths": {
+        "default": [],
+        "description": "Fix findings under these paths.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "unsafeFixes": {
+        "default": false,
+        "description": "Also apply suggested fixes, which are judgment calls: review the diff.",
+        "type": "boolean"
+      }
+    },
+    "type": "object"
+  },
+  "name": "fix",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/fix-report.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "applied": {
+        "items": {
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "files": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "fingerprint": {
+              "type": "string"
+            },
+            "fixer": {
+              "type": "string"
+            },
+            "rule": {
+              "type": "string"
+            },
+            "safety": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "fingerprint",
+            "rule",
+            "fixer",
+            "safety"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "declined": {
+        "items": {
+          "properties": {
+            "fingerprint": {
+              "type": "string"
+            },
+            "line": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "rule": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "fingerprint",
+            "rule",
+            "reason"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "diff": {
+        "type": "string"
+      },
+      "dryRun": {
+        "type": "boolean"
+      },
+      "messages": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "rounds": {
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "dryRun",
+      "diff",
+      "applied",
+      "declined",
+      "rounds",
+      "messages"
+    ],
+    "title": "FixReport",
+    "type": "object"
+  },
+  "title": "Fix findings with the fixers their decisions name."
+}

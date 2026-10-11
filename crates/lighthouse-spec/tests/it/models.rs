@@ -117,3 +117,16 @@ fn a_model_check_is_a_cel_check_that_never_fails_and_reviews_what_it_selects() {
     assert_eq!(cel.select, Some(Select::Symbol));
     assert!(ModelCheck::default().as_cel(Subject::Project).is_none());
 }
+
+#[test]
+fn model_provider_remote() {
+    let binding = binding();
+    assert!(
+        binding.provider("openrouter").unwrap().remote(),
+        "a standard API is a service outside the machine"
+    );
+    assert!(
+        !binding.provider("claude").unwrap().remote(),
+        "a program that is given no key stays on the machine"
+    );
+}
