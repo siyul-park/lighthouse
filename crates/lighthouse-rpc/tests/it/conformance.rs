@@ -57,7 +57,7 @@ const GO: Lang = Lang {
 const RUST: Lang = Lang {
     id: "rust",
     ext: ".rs",
-    min_cases: 14,
+    min_cases: 15,
     plugin: || Some(lighthouse_test_support::lang_rust()),
     probe: ("src/plain.rs", || json!({ "rust": { "nope": 1 } })),
     manifest_id: "lang-rust",

@@ -356,12 +356,18 @@ fn module_tree(
 
 fn roots(packages: &[Package], mode: Unpublished) -> Vec<Root> {
     let used = depended_on(packages);
+    let shipped = shipped(packages);
     let mut roots = Vec::new();
     for (at, package) in packages.iter().enumerate() {
         let mut targets: Vec<&Target> = package.targets.iter().collect();
         targets.sort_by(|a, b| (a.kind, &a.name).cmp(&(b.kind, &b.name)));
         let has_lib = targets.iter().any(|t| t.kind == TargetKind::Lib);
         let base = cargo::crate_name(&package.name);
+        // A library only tests link in, and that ships nowhere, is test code.
+        let support = !package.publishable
+            && used.contains(package.name.as_str())
+            && !shipped.contains(package.name.as_str())
+            && !targets.iter().any(|t| t.kind == TargetKind::Bin);
         let exported = package.publishable
             || match mode {
                 Unpublished::Public => true,
@@ -374,7 +380,9 @@ fn roots(packages: &[Package], mode: Unpublished) -> Vec<Root> {
                 kind => format!("{base}[{}:{}]", kind.label(), target.name),
             };
             roots.push(Root {
-                test_of: (target.kind == TargetKind::Test && has_lib).then(|| base.clone()),
+                test_of: ((target.kind == TargetKind::Test && has_lib)
+                    || (target.kind == TargetKind::Lib && support))
+                    .then(|| base.clone()),
                 label,
                 package: at,
                 kind: target.kind,
@@ -384,6 +392,15 @@ fn roots(packages: &[Package], mode: Unpublished) -> Vec<Root> {
         }
     }
     roots
+}
+
+/// Packages another package of the project links into what it ships.
+fn shipped(packages: &[Package]) -> BTreeSet<&str> {
+    packages
+        .iter()
+        .flat_map(|p| p.runtime.iter())
+        .map(String::as_str)
+        .collect()
 }
 
 /// Packages another package of the project depends on.

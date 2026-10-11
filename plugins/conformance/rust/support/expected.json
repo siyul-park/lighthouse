@@ -1,0 +1,267 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "app"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "app::run#function"
+        },
+        {
+          "from": {
+            "module": "app/tests"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "app/tests::adds#test"
+        },
+        {
+          "from": {
+            "symbol": "app/tests::adds#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 30,
+              "line": 9
+            },
+            "start": {
+              "col": 27,
+              "line": 9
+            }
+          },
+          "to": "app::run#function"
+        },
+        {
+          "from": {
+            "symbol": "app/tests::adds#test"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 51,
+              "line": 9
+            },
+            "start": {
+              "col": 45,
+              "line": 9
+            }
+          },
+          "to": "fixtures::sample#function"
+        }
+      ],
+      "file": {
+        "path": "app/src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "u8"
+              }
+            ],
+            "results": [
+              {
+                "text": "u8"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "app::run#function",
+          "tokens": 5,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 1,
+          "symbol": "app/tests::adds#test",
+          "tokens": 19,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "app",
+          "path": "app"
+        },
+        {
+          "name": "tests",
+          "path": "app/tests",
+          "test_of": "app"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "app/src/lib.rs",
+          "id": "app::run#function",
+          "kind": "function",
+          "name": "run",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "internal"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 7
+            }
+          },
+          "file": "app/src/lib.rs",
+          "id": "app/tests::adds#test",
+          "kind": "test",
+          "name": "adds",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 10
+            },
+            "start": {
+              "col": 5,
+              "line": 8
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": [
+        {
+          "nesting": 0,
+          "style": "scenario",
+          "symbol": "app/tests::adds#test",
+          "targets": [
+            "app::run#function",
+            "fixtures::sample#function"
+          ]
+        }
+      ]
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "fixtures"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "fixtures::sample#function"
+        }
+      ],
+      "file": {
+        "path": "fixtures/src/lib.rs"
+      },
+      "functions": [
+        {
+          "events": [
+            {
+              "detail": "unwrap",
+              "kind": "unwrap",
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 2
+                },
+                "start": {
+                  "col": 13,
+                  "line": 2
+                }
+              }
+            }
+          ],
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u8"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "fixtures::sample#function",
+          "tokens": 10,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "fixtures",
+          "path": "fixtures",
+          "test_of": "fixtures"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "fixtures/src/lib.rs",
+          "id": "fixtures::sample#function",
+          "kind": "function",
+          "name": "sample",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}
