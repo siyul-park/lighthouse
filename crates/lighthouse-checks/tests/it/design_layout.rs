@@ -29,6 +29,23 @@ fn groups_flag_the_fewest_declarations_that_break_the_order() {
 }
 
 #[test]
+fn groups_name_the_declaration_a_displaced_one_must_follow() {
+    // A public function between the types it belongs after: it already
+    // follows `Public`, and must follow the private types below it.
+    let mut w = World::default();
+    w.symbol("m", "Public", SymbolKind::Type, "m/a.ucm");
+    w.func("m", "Run", "m/a.ucm");
+    for name in ["hidden", "other"] {
+        let ty = w.symbol("m", name, SymbolKind::Type, "m/a.ucm");
+        w.private(&ty);
+    }
+    let found = w.messages(GROUPS, json!({}));
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].contains("function Run"), "{found:?}");
+    assert!(found[0].contains("must follow hidden"), "{found:?}");
+}
+
+#[test]
 fn groups_accept_a_file_in_order_and_ignore_unlisted_groups() {
     let mut w = World::default();
     w.symbol("m", "A", SymbolKind::Type, "m/a.ucm");

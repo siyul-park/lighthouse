@@ -181,12 +181,9 @@ impl Clause {
                 (0..ranked.len())
                     .filter(|at| !kept[*at])
                     .map(|at| {
-                        let after = ranked[..at]
-                            .iter()
-                            .enumerate()
-                            .rev()
-                            .find(|(i, (_, r))| kept[*i] && *r <= ranked[at].1)
-                            .map(|(i, _)| i);
+                        // The declaration to follow is one of an earlier group
+                        // that still lies below this one: the first such.
+                        let after = (at + 1..ranked.len()).find(|i| ranked[*i].1 < ranked[at].1);
                         (at, after)
                     })
                     .collect()

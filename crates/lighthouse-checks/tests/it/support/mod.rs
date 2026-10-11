@@ -234,6 +234,19 @@ impl World {
             .collect()
     }
 
+    /// The messages of what `rule` reports, in report order.
+    pub fn messages(&self, rule: &str, options: Value) -> Vec<String> {
+        let design = Pack::of("design", Catalog::bundled());
+        let subject = Subject {
+            plugin: &design,
+            id: "design",
+        };
+        self.diagnose_in(&subject, rule, options)
+            .into_iter()
+            .map(|d| d.message)
+            .collect()
+    }
+
     /// The fingerprints of what `rule` reports, in report order.
     pub fn fingerprints(&self, rule: &str, options: Value) -> Vec<String> {
         let design = Pack::of("design", Catalog::bundled());
