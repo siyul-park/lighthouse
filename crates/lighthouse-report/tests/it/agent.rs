@@ -158,7 +158,7 @@ fn full_agent_text_gives_each_finding_everything_needed_to_act() {
 }
 
 #[test]
-fn full_agent_json_is_one_tagged_record_per_line() {
+fn full_agent_json_is_one_object_of_tagged_records() {
     let findings = [coupling(), helper(), unknown_rule()];
     let facts = facts(&findings);
     let briefing = Briefing {
@@ -169,19 +169,17 @@ fn full_agent_json_is_one_tagged_record_per_line() {
         detail: Detail::Full,
         ..Briefing::default()
     };
-    let out = render_with(Format::AgentJson, &findings, &gap(), &briefing);
-    let records: Vec<Value> = out
-        .lines()
-        .map(|l| serde_json::from_str(l).unwrap())
-        .collect();
-    let kinds: Vec<_> = records
-        .iter()
-        .map(|r| r["type"].as_str().unwrap())
-        .collect();
-    assert_eq!(
-        kinds,
-        ["finding", "finding", "finding", "incomplete", "summary"]
-    );
+    let out = crate::agent_json(&findings, &gap(), &briefing);
+    assert_eq!(out.lines().count(), 1, "one object on one line");
+    let report: Value = serde_json::from_str(&out).unwrap();
+    let records = report["findings"].as_array().unwrap();
+    let kinds: Vec<_> = records.iter().map(|r| r["type"].as_str().unwrap()).collect();
+    assert_eq!(kinds, ["finding", "finding", "finding"]);
+    assert_eq!(report["incomplete"].as_array().unwrap().len(), 1);
+    assert_eq!(report["omitted"], 0);
+    assert!(report["judgments"]["fail"].is_string());
+    assert!(report["judgments"]["pass"].is_string());
+    assert!(report["judgments"]["notApplicable"].is_string());
 
     let coupling = &records[0];
     assert_eq!(coupling["rule"], "design/coupling");
@@ -214,17 +212,6 @@ fn full_agent_json_is_one_tagged_record_per_line() {
     );
     assert!(custom.get("requirement").is_none());
     assert!(custom.get("expected").is_none());
-
-    let summary = &records[4];
-    assert_eq!(summary["errors"], 1);
-    assert_eq!(summary["warnings"], 1);
-    assert_eq!(summary["infos"], 1);
-    assert_eq!(summary["reviews"], 2);
-    assert_eq!(summary["suppressed"], 2);
-    assert_eq!(summary["allowed"], 1);
-    assert!(summary["judgments"]["fail"].is_string());
-    assert!(summary["judgments"]["pass"].is_string());
-    assert!(summary["judgments"]["notApplicable"].is_string());
 }
 
 #[test]
@@ -234,7 +221,7 @@ fn agent_formats_state_a_clean_run() {
         text,
         "summary: 0 error, 0 warn, 0 info, 0 review, 0 incomplete, 0 suppressed, 0 allowed\n"
     );
-    let json: Value = serde_json::from_str(render(Format::AgentJson, &[], &[]).trim()).unwrap();
+    let json: Value = serde_json::from_str(crate::agent_json(&[], &[], &Briefing::default()).trim()).unwrap();
     assert_eq!(
         json,
         json!({ "status": "clean", "counts": { "error": 0, "warn": 0, "review": 0 }, "groups": [] })
@@ -243,9 +230,9 @@ fn agent_formats_state_a_clean_run() {
         detail: Detail::Full,
         ..Briefing::default()
     };
-    let json = render_with(Format::AgentJson, &[], &[], &full);
-    let summary: Value = serde_json::from_str(json.trim()).unwrap();
-    assert_eq!(summary["type"], "summary");
+    let json: Value =
+        serde_json::from_str(crate::agent_json(&[], &[], &full).trim()).unwrap();
+    assert_eq!(json, json!({ "findings": [], "incomplete": [], "omitted": 0 }));
 }
 
 #[test]
@@ -257,17 +244,11 @@ fn agent_excerpts_stay_bounded() {
         facts: Some(&facts),
         ..Briefing::default()
     };
-    let out = render_with(Format::AgentJson, &findings, &[], &briefing);
+    let out = crate::agent_json(&findings, &[], &briefing);
     let record: Value = serde_json::from_str(out.lines().next().unwrap()).unwrap();
     let excerpt = record["groups"][0]["expected"].as_str().unwrap();
     assert!(excerpt.lines().count() <= 13, "{excerpt}");
     assert!(excerpt.chars().count() <= 604, "{excerpt}");
-}
-
-#[test]
-fn format_parses_agent_names() {
-    assert_eq!("agent".parse::<Format>().unwrap(), Format::Agent);
-    assert_eq!("agent-json".parse::<Format>().unwrap(), Format::AgentJson);
 }
 
 fn briefed<'a>(
@@ -313,12 +294,16 @@ fn full_limit_keeps_the_most_severe_findings_and_counts_the_rest() {
         "a shown heuristic finding asks for review: {text}"
     );
 
-    let json = records_of(&render_with(Format::AgentJson, &findings, &[], &briefing));
-    let kinds: Vec<_> = json.iter().map(|r| r["type"].as_str().unwrap()).collect();
-    assert_eq!(kinds, ["finding", "finding", "truncated", "summary"]);
-    assert_eq!(json[2]["omitted"], 1);
-    assert_eq!(json[0]["rule"], "design/coupling", "original order is kept");
-    assert!(json[3]["judgments"].is_object());
+    let json = records_of(&crate::agent_json(&findings, &[], &briefing));
+    assert_eq!(json.len(), 1, "the full JSON is one object");
+    let findings = json[0]["findings"].as_array().unwrap();
+    assert_eq!(findings.len(), 2);
+    assert_eq!(json[0]["omitted"], 1);
+    assert_eq!(
+        findings[0]["rule"], "design/coupling",
+        "original order is kept"
+    );
+    assert!(json[0]["judgments"].is_object());
 }
 
 #[test]
@@ -343,7 +328,7 @@ fn limit_counts_findings_and_keeps_errors_then_the_larger_groups() {
     );
     assert!(text.contains("judgments:"), "{text}");
 
-    let json = records_of(&render_with(Format::AgentJson, &findings, &[], &briefing));
+    let json = records_of(&crate::agent_json(&findings, &[], &briefing));
     assert_eq!(json.len(), 1, "the compact JSON is one object");
     let rules: Vec<_> = json[0]["groups"]
         .as_array()
@@ -364,7 +349,7 @@ fn a_limit_inside_a_group_cuts_it_and_leaves_no_group_out() {
         limit: Some(3),
         ..Briefing::default()
     };
-    let out = records_of(&render_with(Format::AgentJson, &findings, &[], &briefing));
+    let out = records_of(&crate::agent_json(&findings, &[], &briefing));
     let files = out[0]["groups"][0]["files"].as_object().unwrap();
     assert_eq!(
         files
@@ -393,7 +378,7 @@ fn notes_say_why_a_finding_is_reported() {
         text.contains("(note: judgment expired: decision changed)"),
         "{text}"
     );
-    let json = records_of(&render_with(Format::AgentJson, &findings, &[], &briefing));
+    let json = records_of(&crate::agent_json(&findings, &[], &briefing));
     let instance = &json[0]["groups"][0]["files"]["a.txt"][0];
     assert_eq!(instance[3]["note"], "judgment expired: decision changed");
 
@@ -401,8 +386,11 @@ fn notes_say_why_a_finding_is_reported() {
         detail: Detail::Full,
         ..briefing
     };
-    let json = records_of(&render_with(Format::AgentJson, &findings, &[], &full));
-    assert_eq!(json[0]["note"], "judgment expired: decision changed");
+    let json = records_of(&crate::agent_json(&findings, &[], &full));
+    assert_eq!(
+        json[0]["findings"][0]["note"],
+        "judgment expired: decision changed"
+    );
 }
 
 #[test]
@@ -419,17 +407,15 @@ fn evidence_leaves_out_the_owner_symbol_and_cuts_long_values() {
         detail: Detail::Full,
         ..b
     });
-    let json = records_of(&render_with(Format::AgentJson, &findings, &[], &briefing));
-    let evidence = &json[0]["evidence"];
+    let json = records_of(&crate::agent_json(&findings, &[], &briefing));
+    let evidence = &json[0]["findings"][0]["evidence"];
     assert!(evidence.get("symbol").is_none());
     assert_eq!(evidence["fan_in"], 2);
     assert!(evidence["callees"].as_str().unwrap().len() < 140);
     let text = render_with(Format::Agent, &findings, &[], &briefing);
     assert!(!text.contains("symbol=jit"), "{text}");
 
-    let compact = records_of(&render_with(
-        Format::AgentJson,
-        &findings,
+    let compact = records_of(&crate::agent_json(&findings,
         &[],
         &briefed(&facts, |b| b),
     ));
@@ -505,8 +491,8 @@ fn expected_basis(catalog: &Catalog, kind: &str) -> Option<(String, String)> {
         detail: Detail::Full,
         ..Briefing::default()
     };
-    let out = render_with(Format::AgentJson, &findings, &[], &briefing);
-    let record = &records_of(&out)[0];
+    let out = crate::agent_json(&findings, &[], &briefing);
+    let record = &records_of(&out)[0]["findings"][0];
     let expected = record.get("expected")?;
     Some((
         expected["basis"].as_str()?.to_owned(),
@@ -678,7 +664,7 @@ fn compact_agent_json_groups_findings_by_decision() {
         allowed: 1,
         ..Briefing::default()
     };
-    let out = render_with(Format::AgentJson, &findings, &gap(), &briefing);
+    let out = crate::agent_json(&findings, &gap(), &briefing);
     assert_eq!(out.lines().count(), 1, "one object on one line");
     insta::assert_snapshot!(out);
 }
@@ -690,7 +676,7 @@ fn each_further_identical_finding_adds_one_short_line_and_one_entry() {
         let facts = go_facts(&findings);
         let briefing = briefed(&facts, |b| b);
         let text = render_with(Format::Agent, &findings, &[], &briefing);
-        let json = records_of(&render_with(Format::AgentJson, &findings, &[], &briefing));
+        let json = records_of(&crate::agent_json(&findings, &[], &briefing));
         (text, json)
     };
     let (small, small_json) = render_n(5);
@@ -726,25 +712,26 @@ fn each_further_identical_finding_adds_one_short_line_and_one_entry() {
 fn compact_output_is_at_most_forty_percent_of_the_full_output() {
     let findings = mixed(50);
     let facts = go_facts(&findings);
-    let bytes = |format: Format, detail: Detail| {
+    let bytes = |json: bool, detail: Detail| {
         let briefing = briefed(&facts, |b| Briefing { detail, ..b });
-        render_with(format, &findings, &[], &briefing).len()
+        if json {
+            crate::agent_json(&findings, &[], &briefing).len()
+        } else {
+            render_with(Format::Agent, &findings, &[], &briefing).len()
+        }
     };
-    for format in [Format::Agent, Format::AgentJson] {
-        let compact = bytes(format, Detail::Compact);
-        let full = bytes(format, Detail::Full);
+    for json in [false, true] {
+        let compact = bytes(json, Detail::Compact);
+        let full = bytes(json, Detail::Full);
         assert!(
             compact * 100 <= full * 40,
-            "{format:?}: compact {compact} bytes vs full {full} bytes"
+            "json {json}: compact {compact} bytes vs full {full} bytes"
         );
     }
 }
 
 #[test]
-fn format_and_detail_parse_by_name() {
-    assert_eq!("compact".parse::<Detail>().unwrap(), Detail::Compact);
-    assert_eq!("full".parse::<Detail>().unwrap(), Detail::Full);
-    assert!("verbose".parse::<Detail>().is_err());
+fn detail_is_compact_by_default() {
     assert_eq!(Detail::default(), Detail::Compact);
 }
 
@@ -771,10 +758,10 @@ fn briefing_group_options_carry_the_limit_and_the_catalog() {
     let briefing = Briefing {
         catalog: Some(Catalog::bundled()),
         limit: Some(4),
-        mcp: true,
+        tool_form: true,
         ..Briefing::default()
     };
     let options = briefing.group_options();
     assert_eq!(options.limit, Some(4));
-    assert!(options.catalog.is_some() && options.mcp);
+    assert!(options.catalog.is_some() && options.tool_form);
 }

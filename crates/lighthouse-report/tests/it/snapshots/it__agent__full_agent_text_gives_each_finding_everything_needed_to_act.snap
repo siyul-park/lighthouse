@@ -22,7 +22,7 @@ design/coupling  warn  internal/jit/compile.go:350:1
                  func a() { hub() }
                  func b() { hub() }
   fingerprint: 5da1c26cc609
-  resolve:     lighthouse review resolve 5da1c26cc609 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent
+  resolve:     lighthouse review resolve 5da1c26cc609 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>
 
 design/no-panic  info  src/lib.rs:7:1
   owner:       m::helper#function
@@ -34,7 +34,7 @@ design/no-panic  info  src/lib.rs:7:1
                      text.parse()
                  }
   fingerprint: f999fb1d4030
-  resolve:     lighthouse review resolve f999fb1d4030 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent
+  resolve:     lighthouse review resolve f999fb1d4030 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>
 
 acme/custom  error  a.txt:1:1
   message:     custom finding

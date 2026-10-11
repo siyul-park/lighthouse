@@ -34,6 +34,6 @@ design/no-panic info [review] — Panic MUST be limited to impossible programmer
     }
   src/lib.rs:7:1 private helper has one caller f999fb1
 broken.go: incomplete: type error
-resolve: lighthouse review resolve <fingerprint> --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent
+resolve: lighthouse review resolve <fingerprint> --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>
 judgments: fail=the finding is right; add `suppress` with a justification to leave it in place; pass=false positive: the code conforms; notApplicable=the decision does not apply here; a hint to narrow it
 summary: 1 error, 3 warn, 1 info, 4 review, 1 incomplete, 2 suppressed, 1 allowed

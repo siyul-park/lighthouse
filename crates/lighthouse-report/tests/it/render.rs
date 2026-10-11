@@ -41,13 +41,6 @@ fn text_is_gofmt_like() {
 }
 
 #[test]
-fn json_is_one_object_per_line() {
-    let out = render(Format::Json, &fixture(), &[]);
-    assert_eq!(out.lines().count(), 2);
-    insta::assert_snapshot!(out);
-}
-
-#[test]
 fn sarif_carries_partial_fingerprints() {
     insta::assert_snapshot!(render(Format::Sarif, &fixture(), &[]));
 }
@@ -55,16 +48,9 @@ fn sarif_carries_partial_fingerprints() {
 #[test]
 fn empty_input_renders_valid_documents() {
     assert_eq!(render(Format::Text, &[], &[]), "");
-    assert_eq!(render(Format::Json, &[], &[]), "");
     let sarif: serde_json::Value = serde_json::from_str(&render(Format::Sarif, &[], &[])).unwrap();
     assert_eq!(sarif["version"], "2.1.0");
     assert_eq!(sarif["runs"][0]["results"], json!([]));
-}
-
-#[test]
-fn format_parses_from_text() {
-    assert_eq!("sarif".parse::<Format>().unwrap(), Format::Sarif);
-    assert!("xml".parse::<Format>().is_err());
 }
 
 fn gaps() -> Vec<Incomplete> {
@@ -81,12 +67,8 @@ fn gaps() -> Vec<Incomplete> {
 }
 
 #[test]
-fn text_and_json_state_what_was_not_analyzed() {
+fn text_states_what_was_not_analyzed() {
     insta::assert_snapshot!(render(Format::Text, &[], &gaps()));
-    let json = render(Format::Json, &[], &gaps());
-    let first: serde_json::Value = serde_json::from_str(json.lines().next().unwrap()).unwrap();
-    assert_eq!(first["incomplete"]["path"], json!(null));
-    assert_eq!(first["incomplete"]["reason"], gaps()[0].reason);
 }
 
 #[test]

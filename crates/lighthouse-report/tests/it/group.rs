@@ -271,7 +271,7 @@ fn a_fix_diff_names_the_files_when_it_edits_one_besides_the_findings() {
             fixes: Some(&fixes),
             ..Briefing::default()
         };
-        let out = render_with(Format::AgentJson, &findings, &[], &briefing);
+        let out = crate::agent_json(&findings, &[], &briefing);
         let report: Value = serde_json::from_str(&out).unwrap();
         report["groups"][0]["files"]["a.txt"][0][3]["fix"]["diff"]
             .as_str()
