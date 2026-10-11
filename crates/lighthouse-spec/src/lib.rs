@@ -4,8 +4,6 @@ mod command;
 mod decision;
 mod error;
 mod fix;
-mod load;
-mod local;
 mod model;
 mod model_check;
 mod options;
@@ -17,6 +15,7 @@ mod validate;
 use lighthouse_resource::Descriptor;
 
 pub use catalog::Catalog;
+pub use catalog::load::{load_local, local_dir, local_files};
 pub use check::{
     At, Binding, BuiltinCheck, BuiltinOp, CelCheck, Check, CheckKind, CycleLevel, DEFAULT_TIMEOUT,
     Identity, NamedRule, OrderClause, OrderReport, OrderScope, RpcCheck, Select, TemplatePart,
@@ -30,7 +29,6 @@ pub use error::Error;
 pub use fix::{
     CommandOutput, CommandScope, CommandSpec, CommandStdin, Fix, FixKind, OpSpec, ReorderScope,
 };
-pub use local::{load_local, local_dir, local_files};
 pub use model::{
     Content, DecisionStatus, Domain, Example, ExampleFile, ExampleKind, Expect, Scope, Subject,
     authored_severity,
