@@ -9,7 +9,6 @@
 //! a suppression is a target of its own, and a finding nobody judged has no
 //! label.
 
-mod digest;
 mod error;
 mod judged;
 mod log;

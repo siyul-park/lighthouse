@@ -24,13 +24,15 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Attribution, Judgment, SuppressionKind, SuppressionStatus, hash};
+use lighthouse_model::{
+    Attribution, Judgment, SuppressionKind, SuppressionStatus, canonical, hash,
+};
 use lighthouse_resource::{API_VERSION, Metadata, Resource, Spec};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{Error, JudgmentEvent, SuppressionEvent, digest};
+use crate::{Error, JudgmentEvent, SuppressionEvent};
 
 /// File name of the log inside the store directory.
 pub(crate) const FILE: &str = "decisions.jsonl";
@@ -327,7 +329,7 @@ pub(crate) fn seal(event: &mut JudgmentEvent) -> Result<(), Error> {
 /// The id of a spec: the hash of its canonical form.
 pub(crate) fn id_of<S: Serialize>(spec: &S) -> Result<String, Error> {
     Ok(hash::short(
-        &digest::canonical(&serde_json::to_value(spec)?),
+        &canonical(&serde_json::to_value(spec)?),
         ID_BYTES,
     ))
 }
@@ -336,7 +338,7 @@ pub(crate) fn id_of<S: Serialize>(spec: &S) -> Result<String, Error> {
 /// that the same record is always the same bytes.
 pub(crate) fn line<S: Spec + Serialize>(id: &str, spec: S) -> Result<String, Error> {
     let record = Resource::new(Metadata::named(id), spec);
-    Ok(digest::canonical(&serde_json::to_value(record)?))
+    Ok(canonical(&serde_json::to_value(record)?))
 }
 
 /// Every record of the log, in file order; none if there is no log. A line
@@ -437,7 +439,7 @@ fn decode(value: Value) -> Result<Record, String> {
     // The id covers the spec as written, fields this build does not know
     // included.
     let written = hash::short(
-        &digest::canonical(value.get("spec").unwrap_or(&Value::Null)),
+        &canonical(value.get("spec").unwrap_or(&Value::Null)),
         ID_BYTES,
     );
     let name = value

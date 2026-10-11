@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 
 use crate::{
     Error, FindingRecord, JudgmentEvent, MIN_PREFIX, NewJudgment, Stamp, Standing, StatusFilter,
-    Subject, SuppressionEvent, digest, judged::Judged, log, log::LoggedSuppression,
+    Subject, SuppressionEvent, judged::Judged, log, log::LoggedSuppression, record,
 };
 use lighthouse_model::{SuppressionKind, SuppressionStatus};
 
@@ -176,7 +176,7 @@ pub(super) fn event_of(
             .and_then(Value::as_str)
             .map(str::to_owned),
         scope: stamp.scope,
-        evidence_digest: Some(digest::evidence(&finding.evidence)),
+        evidence_digest: Some(record::evidence_digest(&finding.evidence)),
         snapshot,
         commit: review.commit.clone(),
         suppressions: Vec::new(),

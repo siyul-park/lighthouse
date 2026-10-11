@@ -2,11 +2,10 @@ use std::fmt;
 
 use lighthouse_model::{
     Attribution, Diagnostic, Judgment, Label, Severity, SuppressionKind, SuppressionStatus,
+    canonical, hash,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
-
-use crate::digest;
 
 /// One finding as a run saw it. The locator and evidence are JSON so that
 /// artifacts other than source code fit the same record.
@@ -80,7 +79,7 @@ impl Observed {
     /// Identifies the evidence for as long as it says the same thing: a hash
     /// of its normalized values.
     pub fn evidence_digest(&self) -> String {
-        digest::evidence(&self.evidence)
+        evidence_digest(&self.evidence)
     }
 }
 
@@ -422,4 +421,23 @@ pub struct FixEvent {
     pub files: Vec<String>,
     pub commit: Option<String>,
     pub timestamp: String,
+}
+
+/// A hash of evidence with whitespace in its strings collapsed, so
+/// reformatting does not change what the evidence says.
+pub(crate) fn evidence_digest(evidence: &Value) -> String {
+    hash::short(&canonical(&normalize_evidence(evidence)), 8)
+}
+
+fn normalize_evidence(value: &Value) -> Value {
+    match value {
+        Value::String(s) => Value::String(s.split_whitespace().collect::<Vec<_>>().join(" ")),
+        Value::Array(items) => Value::Array(items.iter().map(normalize_evidence).collect()),
+        Value::Object(map) => Value::Object(
+            map.iter()
+                .map(|(key, value)| (key.clone(), normalize_evidence(value)))
+                .collect(),
+        ),
+        other => other.clone(),
+    }
 }
