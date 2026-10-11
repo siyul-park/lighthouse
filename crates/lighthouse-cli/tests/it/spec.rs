@@ -74,7 +74,7 @@ fn schema_prints_a_kind_in_any_case_and_lists_them() {
 
 /// The checked-in schemas are what editors validate documents against, so
 /// they must track the Rust types. `UPDATE_SCHEMA=1 cargo test -p
-/// lighthouse-cli --test spec` rewrites them.
+/// lighthouse-cli --test it spec` rewrites them.
 #[test]
 fn checked_in_schemas_match_the_types() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../schema");
@@ -84,8 +84,9 @@ fn checked_in_schemas_match_the_types() {
             .assert()
             .success();
     }
-    let schemas = lighthouse_session::schemas();
-    assert_eq!(schemas.len(), 8);
+    let documents = lighthouse_session::schemas();
+    let outputs = lighthouse_surface::kinds::kinds();
+    let total = documents.len() + outputs.len();
     let on_disk = fs::read_dir(&root)
         .unwrap()
         .filter(|e| {
@@ -93,15 +94,23 @@ fn checked_in_schemas_match_the_types() {
             name.to_string_lossy().ends_with(".schema.json")
         })
         .count();
-    assert_eq!(on_disk, 8, "a schema file nothing generates is stale");
-    for descriptor in schemas.into_values() {
-        let file = root.join(lighthouse_resource::schema_file(descriptor.kind));
-        let mut want = serde_json::to_string_pretty(&descriptor.schema).unwrap();
+    assert_eq!(on_disk, total, "a schema file nothing generates is stale");
+    let wanted = documents
+        .into_values()
+        .map(|d| (d.kind.to_owned(), d.schema))
+        .chain(
+            outputs
+                .into_iter()
+                .map(|(kind, schema)| (kind.to_owned(), schema)),
+        );
+    for (kind, schema) in wanted {
+        let file = root.join(lighthouse_resource::schema_file(&kind));
+        let mut want = serde_json::to_string_pretty(&schema).unwrap();
         want.push('\n');
         let have = fs::read_to_string(&file).unwrap_or_default();
         assert!(
             have == want,
-            "{} is stale; run `UPDATE_SCHEMA=1 cargo test -p lighthouse-cli --test spec`",
+            "{} is stale; run `UPDATE_SCHEMA=1 cargo test -p lighthouse-cli --test it spec`",
             file.display()
         );
     }

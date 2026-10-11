@@ -1,0 +1,109 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Check the project and print findings.
+
+PATHS select which findings are reported, not what is analyzed: the whole project is always analyzed, because decisions and language providers need more than the reported files (callers, packages, build context).
+
+Exit codes: 0 clean, 1 an error was found (or warnings fail the run: --strict, --max-warnings; info never does), 2 usage or runtime error, 3 the analysis was incomplete (a file could not be read or loaded, a plugin crashed or timed out). "Not checked" is never "passed"; --allow-incomplete reports it but does not fail on it.
+
+Plugins named by the config are started and run with your privileges, like build scripts: only check projects whose config you trust. A plugin that cannot start, or that is not the protocol version or identity its entry names, is an error (exit 2); one that starts but crashes, times out or answers badly is reported as incomplete (exit 3).
+
+Usage: lighthouse check [OPTIONS] [PATHS]...
+
+Arguments:
+  [PATHS]...
+          Where to report findings; the whole project is analyzed anyway. Default: the whole project
+
+Options:
+      --changed
+          Report only files changed in the working tree against HEAD (modified, added, renamed, untracked). A report filter like PATHS
+
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+      --diff <BASE>
+          Report only files changed since the merge base of BASE and HEAD, including the working tree and untracked files. A report filter
+
+      --decision <ID>
+          Run only these decisions: ids, comma-separated or repeated, and globs such as `design/*`
+
+      --limit <N>
+          Report at most this many findings, errors first, and say how many were left out. Default: 25 with `--format json`, all otherwise
+
+      --detail <DETAIL>
+          With `--format json`: compact groups findings by decision and states a decision's text once; full gives one self-contained record per finding
+
+          Possible values:
+          - compact: Grouped by decision, a decision's text said once
+          - full:    One self-contained record per item
+          
+          [default: compact]
+
+      --no-store
+          Do not record this run in `.lighthouse/lighthouse.db` and do not apply judgments. By default a run is recorded: findings it no longer reports are marked resolved (never when the analysis was incomplete), and findings whose latest judgment hides them stay out of the report
+
+      --no-cache
+          Run every rule instead of reusing the findings of earlier runs kept in `.lighthouse/cache`. The findings and the exit code are the same
+
+      --no-models
+          Ask no model: what they would judge is left to review
+
+      --all-models
+          Ask models that cost about the whole project, not only the files the run reports
+
+      --record-model-labels
+          Record what models fail as judgments attributed to them, so that training can reproduce them from `decisions.jsonl`
+
+      --strict
+          Fail on warnings too
+
+      --max-warnings <N>
+          Fail when there are more than N warnings (errors always fail)
+
+      --allow-incomplete
+          Exit by findings even when the analysis was incomplete; the incompleteness is still reported
+
+      --format <FORMAT>
+          `text`, `json` (findings grouped by decision) or `sarif`
+
+          Possible values:
+          - text:  `path:line:col: severity id: message`, one finding a line
+          - json:  Findings grouped by decision, as one JSON document on one line
+          - sarif: SARIF 2.1.0
+          
+          [default: text]
+
+      --timings
+          Print where the time went to stderr, phase by phase: reading, each language provider, merging, analyzers, the slowest rules, identity, the store and the report. Findings and exit code do not change
+
+      --fix
+          Fix what the catalog's fixers can fix, then report what is left. Only safe fixes of mechanical rules are applied; each is verified (formatted, re-checked) and a file that gets worse is rolled back. PATHS and --decision select which findings are fixed
+
+      --dry-run
+          Print the unified diff and leave every file as it was
+
+      --unsafe-fixes
+          Also apply suggested fixes, which are judgment calls: review the diff
+
+      --fixer <ID>
+          Use this registered fixer for the selected findings instead of the one their decision names. Its fixes count as suggested
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  lighthouse check
+  lighthouse check src/ --decision 'design/*' --format json --limit 10
+  lighthouse check --changed --strict
+  lighthouse check --fix --dry-run --decision design/exported-doc

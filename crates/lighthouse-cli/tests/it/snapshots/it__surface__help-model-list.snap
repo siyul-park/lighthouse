@@ -1,0 +1,40 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+List the models bound to decisions.
+
+The classification model, the models rules name and the trained models attached to decisions, with whether asking each reaches a service outside the machine.
+
+Usage: lighthouse model list [OPTIONS]
+
+Options:
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --decision <ID>
+          Only the models bound to these decisions: ids or globs
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+      --limit <N>
+          List at most this many models and say how many were left out
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')

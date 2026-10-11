@@ -1,0 +1,38 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Add a project-local decision from a Decision document.
+
+The document is YAML or JSON, from a file or stdin (`-`). Nothing is written unless the candidate validates, compiles and every example passes the whole engine; a rejection leaves the project untouched. The decision also needs the `local` plugin in lighthouse.toml to run in `check`.
+
+Usage: lighthouse decision create [OPTIONS] <FILE|->
+
+Arguments:
+  <FILE|->
+          A `Decision` document, as YAML or JSON. On the command line this is a file, or `-` for stdin; the tool takes the text or the object. `metadata.name` is the id (`local/<name>`); `spec.examples` needs at least one valid and one invalid example per language the project runs
+
+Options:
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+  -h, --help
+          Print help (see a summary with '-h')

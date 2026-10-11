@@ -14,7 +14,7 @@ use tempfile::TempDir;
 const HELPER: &str = "pub fn run(x: Option<u8>) -> u8 {\n    x.unwrap()\n}\n";
 
 /// A `lighthouse mcp` process spoken to in newline-delimited JSON-RPC.
-struct Client {
+pub(crate) struct Client {
     child: Child,
     input: ChildStdin,
     output: BufReader<ChildStdout>,
@@ -22,7 +22,7 @@ struct Client {
 }
 
 impl Client {
-    fn start(dir: &Path) -> Self {
+    pub(crate) fn start(dir: &Path) -> Self {
         let mut child = Command::new(env!("CARGO_BIN_EXE_lighthouse"))
             .arg("mcp")
             .current_dir(dir)
@@ -61,7 +61,7 @@ impl Client {
         self.input.flush().unwrap();
     }
 
-    fn request(&mut self, method: &str, params: Value) -> Value {
+    pub(crate) fn request(&mut self, method: &str, params: Value) -> Value {
         self.next += 1;
         let id = self.next;
         self.send(&json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params }));
@@ -79,7 +79,7 @@ impl Client {
     }
 
     /// The JSON a tool returned, or its error text.
-    fn tool(&mut self, name: &str, arguments: Value) -> Result<Value, String> {
+    pub(crate) fn tool(&mut self, name: &str, arguments: Value) -> Result<Value, String> {
         let reply = self.request(
             "tools/call",
             json!({ "name": name, "arguments": arguments }),
@@ -103,7 +103,7 @@ impl Drop for Client {
     }
 }
 
-fn rust_project() -> TempDir {
+pub(crate) fn rust_project() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     let plugin = lighthouse_test_support::lang_rust();
     fs::write(
@@ -124,7 +124,7 @@ fn rust_project() -> TempDir {
     dir
 }
 
-fn text_project() -> TempDir {
+pub(crate) fn text_project() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),

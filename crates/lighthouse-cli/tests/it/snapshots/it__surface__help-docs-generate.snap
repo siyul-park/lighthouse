@@ -1,0 +1,14 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Write the decision docs, the command and tool references, and the skill
+
+Usage: lighthouse docs generate [OPTIONS]
+
+Options:
+      --config <FILE>  The project file; the project root is then the current directory [env: LIGHTHOUSE_CONFIG=]
+      --out <OUT>      [default: docs]
+      --color <COLOR>  Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE [env: LIGHTHOUSE_COLOR=] [default: auto] [possible values: auto, always, never]
+      --skill <SKILL>  Where the generated agent skill goes [default: skills/lighthouse/SKILL.md]
+  -h, --help           Print help

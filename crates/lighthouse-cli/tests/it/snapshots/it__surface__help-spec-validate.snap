@@ -1,0 +1,32 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Check every spec document under PATHS against its schema and the rest.
+
+Default PATHS: the project's configuration and `.lighthouse/decisions`. Each document is checked against the schema of its kind, and against the others: presets name decisions that exist, fix operations name registered order keys, `extends` names a decision, CEL compiles, examples are well formed. Exits 1 when anything is wrong.
+
+Usage: lighthouse spec validate [OPTIONS] [PATHS]...
+
+Arguments:
+  [PATHS]...
+          
+
+Options:
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --examples
+          Also run the examples of the decisions found, through the whole engine
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+  -h, --help
+          Print help (see a summary with '-h')

@@ -1,0 +1,32 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Claude Code hooks (see docs/agents.md)
+
+Usage: lighthouse hook claude-code [OPTIONS] <EVENT>
+
+Arguments:
+  <EVENT>
+          Possible values:
+          - post-tool-use: After Edit, Write or MultiEdit: report the edited file
+          - stop:          When the agent wants to stop: report the session's changed files
+
+Options:
+      --allow-incomplete
+          Say that the analysis was incomplete but do not block on it
+
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+  -h, --help
+          Print help (see a summary with '-h')

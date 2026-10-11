@@ -1,0 +1,14 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Exit 1 when a generated doc or the agent skill is stale
+
+Usage: lighthouse docs check [OPTIONS]
+
+Options:
+      --config <FILE>  The project file; the project root is then the current directory [env: LIGHTHOUSE_CONFIG=]
+      --out <OUT>      [default: docs]
+      --color <COLOR>  Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE [env: LIGHTHOUSE_COLOR=] [default: auto] [possible values: auto, always, never]
+      --skill <SKILL>  [default: skills/lighthouse/SKILL.md]
+  -h, --help           Print help

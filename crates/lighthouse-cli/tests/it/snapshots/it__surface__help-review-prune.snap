@@ -1,0 +1,28 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Delete resolved and inactive findings that nobody judged.
+
+Findings with judgments stay, because the judgments are labels.
+
+Usage: lighthouse review prune [OPTIONS]
+
+Options:
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --older-than <DAYS>
+          Only those resolved or inactive for at least this many days
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+  -h, --help
+          Print help (see a summary with '-h')

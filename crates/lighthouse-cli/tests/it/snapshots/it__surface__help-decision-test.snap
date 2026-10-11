@@ -1,0 +1,41 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Run the examples of checked decisions through the whole engine.
+
+The bundled catalog and the project's `.lighthouse/decisions`. Examples run in each language whose plugin the config lists (or only in --language); a decision needs an example for every language run. Exits 1 when any example fails.
+
+Usage: lighthouse decision test [OPTIONS] [IDS]...
+
+Arguments:
+  [IDS]...
+          Decisions to test: ids and globs. Default: every checked decision
+
+Options:
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --language <LANGUAGE>
+          Run the examples in this language only
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')

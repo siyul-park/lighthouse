@@ -1,0 +1,30 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Write a default lighthouse.toml in the current directory.
+
+With --agent the project is also wired for a coding agent: the MCP server, the hooks and the skill are merged into the agent's own files without overwriting anything you wrote, and running it again changes nothing. An existing lighthouse.toml is kept in that case.
+
+Usage: lighthouse init [OPTIONS]
+
+Options:
+      --agent <AGENT>
+          Set up this coding agent as well
+          
+          [possible values: claude-code]
+
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+  -h, --help
+          Print help (see a summary with '-h')

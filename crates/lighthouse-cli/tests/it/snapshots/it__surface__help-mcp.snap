@@ -1,0 +1,25 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Serve the Model Context Protocol on stdio, for coding agents.
+
+Tools to check, fix, review and author decisions, and resources for the catalog. Judgments recorded through it are attributed to a `SoftwareAgent` (the id is $LIGHTHOUSE_ATTRIBUTED_TO, else the client's name).
+
+Usage: lighthouse mcp [OPTIONS]
+
+Options:
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+  -h, --help
+          Print help (see a summary with '-h')

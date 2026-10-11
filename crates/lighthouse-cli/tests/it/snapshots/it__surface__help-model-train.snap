@@ -1,0 +1,55 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Fit a model on the labels of a decision.
+
+The labels are its examples, the baseline rows, the judgments recorded under its current meaning version, and optionally the answers of another model. Writes the dataset under `.lighthouse/datasets/` and the artifact under `.lighthouse/models/`; it binds nothing.
+
+Usage: lighthouse model train [OPTIONS] <ID>
+
+Arguments:
+  <ID>
+          The decision whose labels the model learns, such as `design/feature-envy`
+
+Options:
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --model <REF>
+          The model to train, `<provider>/<model>`. Default: the one bound to the decision
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+      --from-model <REF>
+          Also label the subjects nobody labelled with this model's answers (weight 0.5): a fail where it is sure of one, a pass where it is sure of the other. `<provider>/<model>`
+
+      --baseline <FILE>
+          A table of reviewed findings (`fingerprint repo location verdict`)
+
+      --repo <NAME=DIR>
+          A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  lighthouse model train design/feature-envy
+  lighthouse model train design/feature-envy --model local/general --repo cel=../cel
+  lighthouse model train design/feature-envy --from-model openai/gpt-5 --format json

@@ -1,0 +1,67 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Record a judgment on a finding.
+
+`fail` means the finding is right; add --suppress with a justification to leave it in place on purpose (a SARIF `external` suppression). `pass` means the code conforms (a false positive); `notApplicable` means the decision does not apply here, a hint to narrow it. A judgment that is not `fail`, or a `fail` with a suppression, keeps the finding out of later reports while its decision and evidence stay as they are; an error is recorded but never hidden. Judgments are appended to .lighthouse/decisions.jsonl, which is meant to be committed, and never edited: a later one replaces the standing of the finding.
+
+--seen is the `last seen` time of the finding as you read it; the judgment is refused if the finding has been seen again since.
+
+Usage: lighthouse review resolve [OPTIONS] --judgment <JUDGMENT> <FP>
+
+Arguments:
+  <FP>
+          A fingerprint, or the start of one (at least 7 characters)
+
+Options:
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --judgment <JUDGMENT>
+          `fail`: the finding is right. `pass`: the code conforms. `notApplicable`: the decision does not apply here
+
+          Possible values:
+          - pass:          The code conforms: the finding is a false positive
+          - fail:          The finding is right
+          - notApplicable: The decision does not apply here; a hint to narrow it
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+      --suppress <JUSTIFICATION>
+          With `fail`: why the finding stays, recorded as an external suppression that keeps it out of later reports
+
+      --reason <REASON>
+          Why, written for the next reader
+
+      --attributed-to <WHO>
+          Who the judgment is attributed to: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
+          
+          [env: LIGHTHOUSE_ATTRIBUTED_TO=]
+
+      --seen <LAST_SEEN>
+          The `last seen` time of the finding as you read it (its `seen` evidence); refuses the judgment if the finding has been seen again since
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  lighthouse review resolve 3fa9c1e --judgment pass --reason 'the helper is generated'
+  lighthouse review resolve 3fa9c1e --judgment fail --suppress 'tracked in #214'
+  lighthouse review resolve 3fa9c1e --judgment notApplicable --attributed-to agent:claude

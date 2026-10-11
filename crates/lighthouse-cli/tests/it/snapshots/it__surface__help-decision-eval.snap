@@ -1,0 +1,55 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Measure a decision's check against its labels.
+
+Reports precision, FPR, recall, FNR, selector precision, coverage and abstention, each with a Wilson 95% interval, the model calls and their cost, and a verdict against the decision's evaluation policy (`rules."<id>".evaluation`). With --check, a candidate decision file is measured beside it and their agreement is reported. Labelled positives come mostly from flagged findings, so recall is an upper bound; --audit writes unflagged selected subjects for a person to label.
+
+Usage: lighthouse decision eval [OPTIONS] <ID>
+
+Arguments:
+  <ID>
+          The decision, such as `design/feature-envy`
+
+Options:
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --repo <NAME=DIR>
+          A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project
+
+      --baseline <FILE>
+          A table of reviewed findings. Default: `baseline/precision/<id>.tsv` when it exists
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+      --check <FILE>
+          A decision file whose check is evaluated beside the current one
+
+      --audit <N>
+          Write this many selected subjects the check did not flag to a table for a person to label (`TP` or `FP`), to measure recall
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  lighthouse decision eval design/feature-envy
+  lighthouse decision eval design/feature-envy --check candidate.yaml --format json
+  lighthouse decision eval design/feature-envy --repo cel=../cel --audit 50
