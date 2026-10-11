@@ -13,6 +13,7 @@ mod check;
 mod decisions;
 mod docs;
 mod hook;
+mod models;
 mod review;
 mod setup;
 mod spec;
@@ -146,6 +147,37 @@ enum Command {
         /// Use this config file; the project root is then the current directory.
         #[arg(long)]
         config: Option<PathBuf>,
+    },
+    /// Measure a decision's check against its labels: precision, FPR,
+    /// recall, FNR, selector precision, coverage and abstention, with Wilson
+    /// 95% intervals; and, with --check, a candidate check beside it.
+    Eval {
+        /// The decision, such as design/feature-envy.
+        decision: String,
+        /// A repository the labels are about, `name=dir`, where `name` is
+        /// the baseline's `repo` column. Repeatable; default: this project.
+        #[arg(long = "repo", value_name = "NAME=DIR")]
+        repos: Vec<String>,
+        /// A table of reviewed findings. Default:
+        /// baseline/precision/<decision>.tsv when it exists.
+        #[arg(long)]
+        baseline: Option<PathBuf>,
+        /// A decision file whose check is evaluated beside the current one.
+        #[arg(long = "check", value_name = "FILE")]
+        candidate: Option<PathBuf>,
+        /// Ask no model.
+        #[arg(long)]
+        no_models: bool,
+        /// Print the report as JSON.
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        config: Option<PathBuf>,
+    },
+    /// Learn from labels.
+    Learn {
+        #[command(subcommand)]
+        command: models::LearnCommand,
     },
     /// Manage the result cache in `.lighthouse/cache`.
     Cache {
@@ -324,6 +356,12 @@ fn main() -> ExitCode {
     }
 }
 
+/// `baseline/precision/<pack>/<decision>.tsv` when it exists.
+fn default_baseline(decision: &str) -> Option<PathBuf> {
+    let path = PathBuf::from(format!("baseline/precision/{decision}.tsv"));
+    path.is_file().then_some(path)
+}
+
 fn run(cli: Cli) -> Result<u8> {
     match cli.command {
         Command::Check {
@@ -363,6 +401,7 @@ fn run(cli: Cli) -> Result<u8> {
                     off: no_models,
                     all: all_models,
                     record: record_model_labels,
+                    collect: false,
                 },
             },
             &check::Output {
@@ -382,6 +421,24 @@ fn run(cli: Cli) -> Result<u8> {
                 fixer,
             }),
         ),
+        Command::Eval {
+            decision,
+            repos,
+            baseline,
+            candidate,
+            no_models,
+            json,
+            config,
+        } => models::evaluate(models::Eval {
+            baseline: baseline.or_else(|| default_baseline(&decision)),
+            decision,
+            repos,
+            candidate,
+            no_models,
+            json,
+            config,
+        }),
+        Command::Learn { command } => models::learn(command),
         Command::Cache {
             command: CacheCommand::Clean,
         } => cache_clean(),

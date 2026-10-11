@@ -43,7 +43,7 @@ pub enum ModelOutput {
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum ModelProvider {
     /// A plugin process that offers models. The `options` say how to reach
-    /// them (`format`, `baseUrl`, `keyEnv` for `model-llm`); the model part of
+    /// them (`format`, `baseUrl`, `keyEnv` for `model-http`); the model part of
     /// the reference goes with every request.
     Rpc {
         /// A listed plugin that offers models.
@@ -122,7 +122,7 @@ pub enum ProviderSpec {
 const SPECS: [(&str, &str, &str); 1] = [("openai", "https://api.openai.com/v1", "OPENAI_API_KEY")];
 
 /// The plugin that speaks the standard APIs.
-pub const API_PLUGIN: &str = "model-llm";
+pub const API_PLUGIN: &str = "model-http";
 
 /// Names a project may not give a provider: they belong to the providers
 /// Lighthouse will predefine.

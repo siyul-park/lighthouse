@@ -113,6 +113,9 @@ pub struct Outcome {
     /// abstained, was unsure, failed, was over budget, or none is bound.
     /// They are not findings and never change the exit code.
     pub reviews: Vec<Diagnostic>,
+    /// With [`ModelOptions::collect`], the subjects rules put to models, by
+    /// fingerprint: the same payload a model is asked about or trained on.
+    pub subjects: BTreeMap<String, lighthouse_plugin::Subject>,
     /// Findings that source directives suppress, within the report scope.
     /// They are not in `diagnostics` and never fail the run.
     pub suppressed: Vec<Suppressed>,
@@ -270,6 +273,8 @@ pub struct ModelOptions {
     /// Ask models that cost about the whole project, not only the files the
     /// run reports.
     pub all: bool,
+    /// Keep the subjects rules put to models in [`Outcome::subjects`].
+    pub collect: bool,
     /// The model a revision attached to a decision, by decision id.
     pub attached: BTreeMap<String, String>,
 }

@@ -50,6 +50,7 @@ impl Engine {
             models: &models,
         };
         let found = self.collect(&scene, &mut progress)?;
+        progress.outcome.subjects = models.subjects();
         if let Some(notice) = models.finish() {
             progress.outcome.notices.insert(notice);
         }

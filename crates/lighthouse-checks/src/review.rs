@@ -42,6 +42,9 @@ pub(crate) struct Candidate {
     pub(crate) kind: Option<String>,
     /// The facts of the subject, as the builder made them.
     pub(crate) fact: Value,
+    /// `where` already made it a finding: the models are not asked, but a run
+    /// that collects subjects for training keeps it.
+    pub(crate) decided: bool,
 }
 
 impl Review {
@@ -55,33 +58,7 @@ impl Review {
             return Ok(None);
         };
         let id = decision.id();
-        let examples: Vec<Shot> = decision
-            .examples
-            .iter()
-            .map(|example| Shot {
-                kind: match example.kind {
-                    ExampleKind::Invalid => ResultKind::Fail,
-                    ExampleKind::Valid => ResultKind::Pass,
-                },
-                language: example.language.clone(),
-                code: example
-                    .files
-                    .iter()
-                    .map(|f| format!("// {}\n{}", f.path, f.text()))
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-                note: example.name.clone(),
-            })
-            .collect();
-        let decision_ref = DecisionRef {
-            id: id.to_owned(),
-            requirement: decision.requirement.clone(),
-            prompt: check
-                .prompt
-                .clone()
-                .unwrap_or_else(|| decision.requirement.clone()),
-            examples,
-        };
+        let decision_ref = decision_ref(decision);
         let revision = serde_json::to_vec(&(decision.uid(), check, &decision_ref))
             .map(hash::sha256)
             .map_err(|e| Error::invalid(id, format!("the review cannot be hashed: {e}")))?;
@@ -130,6 +107,14 @@ impl Review {
         let Some((_, text)) = ctx.file else {
             return Vec::new();
         };
+        if candidates.is_empty() {
+            return Vec::new();
+        }
+        if ctx.models.collecting() {
+            let seen = candidates.iter().map(|c| self.subject(ctx, text, c));
+            ctx.models.observe(seen.collect());
+        }
+        let candidates: Vec<Candidate> = candidates.into_iter().filter(|c| !c.decided).collect();
         if candidates.is_empty() {
             return Vec::new();
         }
@@ -283,4 +268,37 @@ fn lines(source: &str, span: Span) -> String {
 /// At most `max` characters of `text`.
 fn cut(text: &str, max: usize) -> String {
     text.chars().take(max).collect()
+}
+
+/// The decision as a model is told about it: its requirement, what the check
+/// asks (the `prompt`, else the requirement) and its examples as shots.
+pub fn decision_ref(decision: &Decision) -> DecisionRef {
+    let prompt = decision.check.as_ref().and_then(|check| match &check.kind {
+        lighthouse_spec::CheckKind::Cel(cel) => cel.prompt.clone(),
+        lighthouse_spec::CheckKind::Model(model) => model.prompt.clone(),
+        _ => None,
+    });
+    DecisionRef {
+        id: decision.id().to_owned(),
+        requirement: decision.requirement.clone(),
+        prompt: prompt.unwrap_or_else(|| decision.requirement.clone()),
+        examples: decision
+            .examples
+            .iter()
+            .map(|example| Shot {
+                kind: match example.kind {
+                    ExampleKind::Invalid => ResultKind::Fail,
+                    ExampleKind::Valid => ResultKind::Pass,
+                },
+                language: example.language.clone(),
+                code: example
+                    .files
+                    .iter()
+                    .map(|f| format!("// {}\n{}", f.path, f.text()))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                note: example.name.clone(),
+            })
+            .collect(),
+    }
 }

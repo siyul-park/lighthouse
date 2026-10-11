@@ -48,6 +48,8 @@ pub struct ModelFlags {
     /// Record what models fail as judgments attributed to them
     /// (`--record-model-labels`), so that training can reproduce them.
     pub record: bool,
+    /// Keep the subjects models were put, for training and evaluation.
+    pub collect: bool,
 }
 
 /// How a run ended. `Incomplete` wins over everything: "not checked" is never
@@ -96,6 +98,11 @@ pub struct Checked {
 }
 
 impl Checked {
+    /// The model `reference` (`<provider>/<model>`), from the engine that ran.
+    pub fn model(&self, reference: &str) -> Result<Box<dyn lighthouse_plugin::Classifier + '_>> {
+        Ok(self.engine.model(reference)?)
+    }
+
     /// The status and counts of this run.
     pub fn summary(&self) -> Summary {
         let outcome = &self.outcome;
@@ -239,6 +246,7 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     let engine = engine.with_models(ModelOptions {
         off: request.models.off,
         all: request.models.all,
+        collect: request.models.collect,
         attached,
     });
     let engine = if request.cache {

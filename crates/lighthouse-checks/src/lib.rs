@@ -36,6 +36,7 @@ use lighthouse_plugin::{Fixer, Plugin, PluginManifest, Rule};
 use lighthouse_spec::Catalog;
 
 pub use bundled::{Pack, registry};
+pub use review::decision_ref;
 use rule::DeclarativeRule;
 
 impl Error {

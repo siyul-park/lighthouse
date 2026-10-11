@@ -80,6 +80,12 @@ pub enum Judged {
 pub trait Models: Send + Sync {
     /// Whether any model is bound to the rule's decision and models are on.
     fn bound(&self, rule: &str) -> bool;
+    /// Whether the run keeps the subjects rules put to it, for training.
+    fn collecting(&self) -> bool {
+        false
+    }
+    /// Keeps subjects seen.
+    fn observe(&self, _subjects: Vec<Subject>) {}
     /// One outcome per subject of `ask`, in order.
     fn classify(&self, ask: &Ask) -> Vec<Judged>;
 }

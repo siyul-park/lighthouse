@@ -57,7 +57,7 @@ const LIB: &str = "pub fn bad_one() {}\npub fn maybe_bad() {}\npub fn maybe_good
 
 const BOUND: &str = "[models]\nclassification = \"fake/any\"\n[models.providers.fake]\ntype = \"command\"\nargv = [\"python3\", \"model.py\"]\n";
 
-fn project(models: &str) -> tempfile::TempDir {
+pub(crate) fn project(models: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let plugin = lighthouse_test_support::lang_rust();
     write(
@@ -93,7 +93,7 @@ fn check(dir: &Path, args: &[&str]) -> (i32, Value) {
 }
 
 /// Message, kind and level of the results of the decision, sorted.
-fn results(log: &Value) -> Vec<(String, String, String)> {
+pub(crate) fn results(log: &Value) -> Vec<(String, String, String)> {
     let mut found: Vec<_> = log["runs"][0]["results"]
         .as_array()
         .unwrap()
@@ -111,7 +111,7 @@ fn results(log: &Value) -> Vec<(String, String, String)> {
     found
 }
 
-fn count(found: &[(String, String, String)], kind: &str) -> usize {
+pub(crate) fn count(found: &[(String, String, String)], kind: &str) -> usize {
     found.iter().filter(|r| r.1 == kind).count()
 }
 

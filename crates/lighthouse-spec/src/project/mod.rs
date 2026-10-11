@@ -456,6 +456,24 @@ impl Config {
         self.generated_check
     }
 
+    /// The same configuration with `id` enabled at `level`, and its pack's
+    /// plugin listed: how a candidate decision is run beside the project's.
+    pub fn with_rule(mut self, id: &str, level: lighthouse_model::Severity) -> Self {
+        let plugin = id.split_once('/').map_or(id, |(plugin, _)| plugin);
+        if !self.lists(plugin) {
+            self.plugins.push(PluginRef::new(plugin));
+        }
+        self.layer.rules.insert(
+            id.to_owned(),
+            RuleConfig {
+                level: Some(level),
+                options: Options::new(),
+                generated: None,
+            },
+        );
+        self
+    }
+
     /// The models the project binds to its decisions.
     pub fn models(&self) -> &ModelBinding {
         &self.models

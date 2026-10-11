@@ -34,6 +34,8 @@ pub(super) struct RunModels<'a> {
     answers: Option<Cache>,
     /// Models are not asked: the subjects stay for review.
     off: bool,
+    collect: bool,
+    seen: std::sync::Mutex<BTreeMap<String, Subject>>,
 }
 
 /// What is kept of an answer: the model that gave it is in the key.
@@ -46,6 +48,21 @@ struct Kept {
 }
 
 impl super::Engine {
+    /// The model `reference` (`<provider>/<model>`) as a classifier, for the
+    /// commands that train and evaluate it.
+    pub fn model(&self, reference: &str) -> Result<Box<dyn Classifier + '_>, super::Error> {
+        let binding = self.config.models();
+        let unknown = || super::Error::UnknownModel(reference.to_owned());
+        let (provider, model) = ModelBinding::split(reference).ok_or_else(unknown)?;
+        let provider = binding.provider(provider).ok_or_else(unknown)?;
+        let host = Host {
+            registry: &self.registry,
+            root: self.ws.root.clone(),
+            trusted: self.trusted,
+        };
+        Ok(host.build(reference, model, &provider))
+    }
+
     /// The models of a run that reports `scopes`.
     pub(super) fn run_models<'a>(&'a self, scopes: &'a [PathBuf]) -> RunModels<'a> {
         let binding = self.config.models();
@@ -61,6 +78,7 @@ impl super::Engine {
             self.models.all,
             self.cache.as_ref().map(|c| c.dir.as_path()),
             self.models.off,
+            self.models.collect,
         )
     }
 }
@@ -74,6 +92,7 @@ impl<'a> RunModels<'a> {
         all: bool,
         cache_dir: Option<&std::path::Path>,
         off: bool,
+        collect: bool,
     ) -> Self {
         Self {
             host,
@@ -83,7 +102,17 @@ impl<'a> RunModels<'a> {
             budget: AtomicUsize::new(binding.budget),
             answers: cache_dir.and_then(|dir| Cache::open(dir, DEFAULT_LIMIT).ok()),
             off,
+            collect,
+            seen: std::sync::Mutex::default(),
         }
+    }
+
+    /// The subjects the rules put to the models this run, by fingerprint.
+    pub(super) fn subjects(&self) -> BTreeMap<String, Subject> {
+        self.seen
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     /// Writes the answers kept this run.
@@ -271,6 +300,20 @@ impl<'a> RunModels<'a> {
 }
 
 impl Models for RunModels<'_> {
+    fn collecting(&self) -> bool {
+        self.collect
+    }
+
+    fn observe(&self, subjects: Vec<Subject>) {
+        let mut seen = self
+            .seen
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for subject in subjects {
+            seen.insert(subject.key.clone(), subject);
+        }
+    }
+
     fn bound(&self, rule: &str) -> bool {
         !self.cascade(rule).is_empty()
     }

@@ -11,6 +11,7 @@ mod internal;
 mod judgments;
 mod mcp;
 mod models;
+mod models_plugin;
 mod preview;
 mod review;
 mod sarif_places;

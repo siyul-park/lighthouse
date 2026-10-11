@@ -422,14 +422,17 @@ impl Run<'_> {
         );
         diagnostic.symbol = place.symbol.map(|id| id.as_str().to_owned());
         diagnostic.evidence = evidence;
-        if let (false, Some(review)) = (found, &rule.review) {
+        if let Some(review) = &rule.review {
             let fact = review.fact_of(&frame)?;
             self.candidates.borrow_mut().push(Candidate {
-                diagnostic,
+                diagnostic: diagnostic.clone(),
                 kind,
                 fact,
+                decided: found,
             });
-            return Ok(None);
+            if !found {
+                return Ok(None);
+            }
         }
         Ok(Some(diagnostic))
     }
