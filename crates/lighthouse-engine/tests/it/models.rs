@@ -40,6 +40,23 @@ impl Classifier for Echo {
     }
 }
 
+fn echo() -> Echo {
+    Echo(Model {
+        id: "echo".to_owned(),
+        object: "model".to_owned(),
+        created: 0,
+        owned_by: "echo".to_owned(),
+        capabilities: Capabilities {
+            classification: Some(lighthouse_plugin::Supports { supported: true }),
+            ..Capabilities::default()
+        },
+        version: "1".to_owned(),
+        deterministic: true,
+        abstains: false,
+        cost: 0.0,
+    })
+}
+
 struct Models(PluginManifest);
 
 impl Plugin for Models {
@@ -48,20 +65,7 @@ impl Plugin for Models {
     }
 
     fn models(&self) -> Vec<Box<dyn Classifier>> {
-        vec![Box::new(Echo(Model {
-            id: "echo".to_owned(),
-            object: "model".to_owned(),
-            created: 0,
-            owned_by: "echo".to_owned(),
-            capabilities: Capabilities {
-                classification: Some(lighthouse_plugin::Supports { supported: true }),
-                ..Capabilities::default()
-            },
-            version: "1".to_owned(),
-            deterministic: true,
-            abstains: false,
-            cost: 0.0,
-        }))]
+        vec![Box::new(echo())]
     }
 }
 
@@ -147,4 +151,33 @@ fn a_probability_fails_a_subject_only_at_or_above_the_upper_bound() {
     // Even a model that is sure the subject is fine leaves it for review: the
     // band has no lower bound in M1.
     assert_eq!(decide(0.02, UPPER), None);
+}
+
+#[test]
+fn engine_with_commands_builds_the_command_models_of_a_trusted_project() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = Config::parse_inline(
+        "plugins = []\n[models.providers.prog]\ntype = \"command\"\nargv = [\"run\"]\n",
+    )
+    .unwrap();
+    let engine = |trusted: bool| {
+        let engine = Engine::new(
+            Registry::default(),
+            config.clone(),
+            Catalog::bundled(),
+            dir.path(),
+        )
+        .unwrap()
+        .with_trust(trusted);
+        engine.with_commands(std::sync::Arc::new(|_, _, _| {
+            Some(Box::new(echo()) as Box<dyn Classifier>)
+        }))
+    };
+
+    let trusted = engine(true);
+    assert_eq!(trusted.model("prog/m").unwrap().manifest().id, "echo");
+    // Without trust the project's programs are not run.
+    let untrusted = engine(false);
+    let refused = untrusted.model("prog/m").unwrap();
+    assert_eq!(refused.manifest().id, "prog/m");
 }

@@ -19,6 +19,5 @@ lighthouse-model.workspace = true
 lighthouse-process.workspace = true
 lighthouse-resource.workspace = true
 lighthouse-plugin.workspace = true
-lighthouse-protocol.workspace = true
 lighthouse-spec.workspace = true
 

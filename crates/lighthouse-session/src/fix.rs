@@ -13,7 +13,7 @@ use lighthouse_spec::{Catalog, Decision};
 use lighthouse_store::{NewFix, Store};
 use serde::Serialize;
 
-use crate::{Result, Selector, Session, findings, git, long_enough};
+use crate::{Result, Selector, Session, findings, git, long_enough, models::command_models};
 
 /// Which findings to fix. At least one of `paths`, `fingerprints` and `rules`
 /// narrows a run from the whole project.
@@ -102,7 +102,8 @@ pub fn fix(session: Session, request: &FixSelection) -> Result<Fixed> {
     let plan = fix_plan(&catalog);
     let engine = Engine::new(registry, session.config, &catalog, &root)?
         .with_incomplete(plugins.incomplete)
-        .with_trust(trusted);
+        .with_trust(trusted)
+        .with_commands(command_models(&root));
     let mut messages = plugins.notices.clone();
     let skip = suppressed(&engine, &root, &catalog, request.store)?;
     let run = FixRun {

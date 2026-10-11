@@ -1,7 +1,10 @@
 //! The models a project binds to its decisions.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::Path, sync::Arc};
 
+use lighthouse_engine::CommandModels;
+use lighthouse_plugin::Classifier;
+use lighthouse_rpc::Command;
 use serde::Serialize;
 
 use crate::{Result, Selector, Session, attached_models};
@@ -74,4 +77,14 @@ pub fn bound_models(session: &Session, decisions: &[String]) -> Result<Vec<Bound
 /// machine.
 pub fn remote_bound(session: &Session) -> bool {
     bound_models(session, &[]).is_ok_and(|models| models.iter().any(|m| m.remote))
+}
+
+/// How the engine runs the `command` model providers of the project at
+/// `root`: as programs started from it.
+pub(crate) fn command_models(root: &Path) -> CommandModels {
+    let root = root.to_owned();
+    Arc::new(move |name, model, provider| {
+        Command::new(&root, name, model, provider)
+            .map(|command| Box::new(command) as Box<dyn Classifier>)
+    })
 }

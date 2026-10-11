@@ -1,31 +1,29 @@
 //! A model instance of the project, as the engine asks it: a model of a plugin
-//! process with the options that pick it, or any program that reads a request
-//! and prints an answer. Both are a [`Classifier`] named by the instance.
+//! process with the options that pick it, or a program the host builds a
+//! classifier for. Both are a [`Classifier`] named by the instance.
 
-use std::{collections::BTreeMap, path::PathBuf, time::Duration};
+use std::sync::Arc;
 
 use lighthouse_model::hash;
 use lighthouse_plugin::{
-    Answer, Capabilities, Classifier, CreateFineTuningJobRequest, Error, FineTuningJob, Model,
-    Registry, Supports, SystemOneRequest, SystemOneResponse,
+    Capabilities, Classifier, CreateFineTuningJobRequest, Error, FineTuningJob, Model, Registry,
+    Supports, SystemOneRequest, SystemOneResponse,
 };
-use lighthouse_process::{MAX_OUTPUT, Spec};
-use lighthouse_protocol::{json_in, noul_of};
-use lighthouse_resource::parse_duration;
-use lighthouse_spec::{ModelInput, ModelProvider};
+use lighthouse_spec::ModelProvider;
 use serde_json::{Map, Value};
 
-/// How long a command model may take when the instance says nothing.
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(120);
-/// How long a command that was told to stop may take before it is killed.
-const GRACE: Duration = Duration::from_secs(2);
+/// Builds the classifier of a `command` provider: the whole reference, the
+/// model part of it and the provider. The host supplies it, so that the
+/// engine does not know how a program is run as a model.
+pub type CommandModels =
+    Arc<dyn Fn(&str, &str, &ModelProvider) -> Option<Box<dyn Classifier>> + Send + Sync>;
 
 /// What building an instance needs from the run.
 pub(super) struct Host<'a> {
     pub(super) registry: &'a Registry,
-    pub(super) root: PathBuf,
     /// The project is trusted to run the commands it names.
     pub(super) trusted: bool,
+    pub(super) commands: Option<&'a CommandModels>,
 }
 
 impl<'a> Host<'a> {
@@ -59,74 +57,11 @@ impl<'a> Host<'a> {
                 name,
                 "this project is not trusted to run commands (run `lighthouse trust`)".to_owned(),
             ),
-            ModelProvider::Command {
-                argv,
-                stdin,
-                pointer,
-                tasks,
-                cost,
-                timeout,
-                env,
-                key_env,
-                ..
-            } => Box::new(Command {
-                model: model.to_owned(),
-                manifest: Model {
-                    id: name.to_owned(),
-                    object: "model".to_owned(),
-                    created: 0,
-                    owned_by: name.to_owned(),
-                    capabilities: Capabilities {
-                        classification: tasks
-                            .iter()
-                            .any(|t| t == "classification")
-                            .then_some(Supports { supported: true }),
-                        embedding: tasks
-                            .iter()
-                            .any(|t| t == "embedding")
-                            .then_some(Supports { supported: true }),
-                        fine_tuning: None,
-                    },
-                    version: hash::short(
-                        &format!(
-                            "{argv:?}{model}{stdin:?}{pointer:?}{env:?}{key_env:?}{}",
-                            self.program_hash(argv)
-                        ),
-                        6,
-                    ),
-                    deterministic: false,
-                    abstains: true,
-                    cost: *cost,
-                },
-                argv: argv.iter().map(|a| a.replace("{model}", model)).collect(),
-                stdin: *stdin,
-                pointer: pointer.clone(),
-                dir: self.root.clone(),
-                env: command_env(env, key_env.as_deref()),
-                timeout: timeout
-                    .as_deref()
-                    .and_then(parse_duration)
-                    .unwrap_or(DEFAULT_TIMEOUT),
-            }),
+            ModelProvider::Command { .. } => self
+                .commands
+                .and_then(|build| build(name, model, provider))
+                .unwrap_or_else(|| refused(name, "the host cannot run command models".to_owned())),
         }
-    }
-}
-
-impl Host<'_> {
-    /// The content hash of the program a command runs, so that a changed
-    /// program is a changed model; empty when it cannot be read (a program
-    /// found on the `PATH`).
-    fn program_hash(&self, argv: &[String]) -> String {
-        let Some(program) = argv.first() else {
-            return String::new();
-        };
-        let path = self.root.join(program);
-        let found = if path.is_file() {
-            path
-        } else {
-            std::path::PathBuf::from(program)
-        };
-        std::fs::read(found).map(hash::sha256).unwrap_or_default()
     }
 }
 
@@ -165,18 +100,6 @@ impl Classifier for Refused {
     }
 }
 
-/// Any program that reads a request on stdin and prints JSON.
-struct Command {
-    manifest: Model,
-    model: String,
-    argv: Vec<String>,
-    stdin: ModelInput,
-    pointer: Option<String>,
-    dir: PathBuf,
-    env: Vec<(String, String)>,
-    timeout: Duration,
-}
-
 impl Classifier for Rpc<'_> {
     fn manifest(&self) -> &Model {
         &self.manifest
@@ -195,82 +118,6 @@ impl Classifier for Rpc<'_> {
         asked.options.clone_from(&self.options);
         self.model.train(&asked)
     }
-}
-
-impl Classifier for Command {
-    fn manifest(&self) -> &Model {
-        &self.manifest
-    }
-
-    /// Output that does not fit the shape of an answer is a provider error.
-    fn classify(&self, params: &SystemOneRequest) -> Result<SystemOneResponse, Error> {
-        let failed =
-            |reason: String| Error::Failed(format!("model `{}`: {reason}", self.manifest.id));
-        let mut asked = params.clone();
-        asked.model.clone_from(&self.model);
-        let input = match self.stdin {
-            ModelInput::Request => serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?,
-            ModelInput::Prompt => lighthouse_protocol::prompt(&asked).into_bytes(),
-        };
-        let output = lighthouse_process::run(&Spec {
-            argv: &self.argv,
-            dir: &self.dir,
-            stdin: &input,
-            env: Some(&self.env),
-            limit: self.timeout,
-            grace: GRACE,
-            max_output: MAX_OUTPUT,
-        })
-        .map_err(failed)?;
-        if !output.success {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let shown: String = stderr.chars().take(400).collect();
-            return Err(failed(format!("exited with {:?}: {shown}", output.code)));
-        }
-        let printed = printed_answer(&output.stdout, self.pointer.as_deref());
-        let answers = params
-            .questions
-            .keys()
-            .map(|id| {
-                let noul = printed
-                    .as_ref()
-                    .and_then(|printed| noul_of(printed, id))
-                    .ok_or_else(|| failed(format!("its output has no `noul` for `{id}`")))?;
-                let answer = Answer {
-                    kind: "noul".to_owned(),
-                    noul,
-                };
-                Ok((id.clone(), answer))
-            })
-            .collect::<Result<_, Error>>()?;
-        Ok(SystemOneResponse {
-            model: self.manifest.id.clone(),
-            answers,
-            usage: Value::Null,
-        })
-    }
-
-    fn train(&self, _: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {
-        Err(Error::Failed(format!(
-            "model `{}`: a command model does not train",
-            self.manifest.id
-        )))
-    }
-}
-
-/// The variables a command is given: the allowlist of the command contract,
-/// the declared `env` and the key variable.
-fn command_env(
-    declared: &BTreeMap<String, String>,
-    key_env: Option<&str>,
-) -> Vec<(String, String)> {
-    let mut env: Vec<(String, String)> = ["PATH", "HOME", "LANG", "TMPDIR"]
-        .into_iter()
-        .chain(key_env)
-        .filter_map(|k| std::env::var(k).ok().map(|v| (k.to_owned(), v)))
-        .collect();
-    env.extend(declared.iter().map(|(k, v)| (k.clone(), v.clone())));
-    env
 }
 
 fn rpc_manifest(
@@ -312,18 +159,4 @@ fn refused<'a>(name: &str, reason: String) -> Box<dyn Classifier + 'a> {
         },
         reason,
     })
-}
-
-/// The answer in what a program printed: JSON, at the pointer if there is
-/// one, and text holding JSON when the pointer leads to a string.
-fn printed_answer(stdout: &[u8], pointer: Option<&str>) -> Option<Value> {
-    let printed = serde_json::from_slice::<Value>(stdout).ok()?;
-    let inner = match pointer {
-        Some(pointer) => printed.pointer(pointer).cloned()?,
-        None => printed,
-    };
-    match inner {
-        Value::String(text) => json_in(&text),
-        other => Some(other),
-    }
 }

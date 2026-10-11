@@ -15,7 +15,9 @@ use serde::Serialize;
 use crate::{
     Remembered, Result, Selector, Session,
     cache::{cache_dir, cache_limit},
-    findings, scope,
+    findings,
+    models::command_models,
+    scope,
 };
 
 /// What to report on. The whole project is always analyzed.
@@ -242,7 +244,8 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     let catalog = session.catalog()?;
     let engine = Engine::new(registry, session.config, &catalog, &root)?
         .with_incomplete(plugins.incomplete)
-        .with_trust(trusted);
+        .with_trust(trusted)
+        .with_commands(command_models(&root));
     let attached = attached_models(&root, &catalog);
     let engine = engine.with_models(ModelOptions {
         off: request.models.off,

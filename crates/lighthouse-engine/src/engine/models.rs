@@ -61,23 +61,22 @@ impl super::Engine {
         let unknown = || super::Error::UnknownModel(reference.to_owned());
         let (provider, model) = ModelBinding::split(reference).ok_or_else(unknown)?;
         let provider = binding.provider(provider).ok_or_else(unknown)?;
-        let host = Host {
+        Ok(self.host().build(reference, model, &provider))
+    }
+
+    fn host(&self) -> Host<'_> {
+        Host {
             registry: &self.registry,
-            root: self.ws.root.clone(),
             trusted: self.trusted,
-        };
-        Ok(host.build(reference, model, &provider))
+            commands: self.commands.as_ref(),
+        }
     }
 
     /// The models of a run that reports `scopes`.
     pub(super) fn run_models<'a>(&'a self, scopes: &'a [PathBuf]) -> RunModels<'a> {
         let binding = self.config.models();
         RunModels::new(
-            Host {
-                registry: &self.registry,
-                root: self.ws.root.clone(),
-                trusted: self.trusted,
-            },
+            self.host(),
             binding,
             &self.models,
             scopes,

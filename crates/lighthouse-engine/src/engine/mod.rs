@@ -41,6 +41,7 @@ mod run;
 use cached::RunCache;
 pub use config::active_rules;
 use config::{constructors, io_error, load_languages, validate_config};
+pub use instance::CommandModels;
 
 /// Name of the file, in `.gitignore` syntax, that keeps files out of the
 /// analysis altogether, such as fixtures that are broken on purpose.
@@ -263,6 +264,8 @@ pub struct Engine {
     /// Gaps known before the run, such as a plugin that failed to start.
     startup: Vec<Incomplete>,
     trusted: bool,
+    /// How a `command` model provider is run, when the host knows.
+    commands: Option<CommandModels>,
     /// The result cache; `None` runs every rule every time.
     cache: Option<CacheSettings>,
     /// What the run may do with models.
@@ -330,6 +333,7 @@ impl Engine {
             active: BTreeSet::new(),
             startup: Vec::new(),
             trusted: false,
+            commands: None,
             cache: None,
             models: ModelOptions::default(),
         };
@@ -345,6 +349,13 @@ impl Engine {
     /// Says whether the user trusts the project to run the commands its checks name.
     pub fn with_trust(mut self, trusted: bool) -> Self {
         self.trusted = trusted;
+        self
+    }
+
+    /// Tells the engine how to run the `command` model providers of a trusted
+    /// project: `commands` builds the classifier of one.
+    pub fn with_commands(mut self, commands: CommandModels) -> Self {
+        self.commands = Some(commands);
         self
     }
 

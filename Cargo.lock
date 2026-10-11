@@ -1511,7 +1511,6 @@ dependencies = [
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-process",
- "lighthouse-protocol",
  "lighthouse-resource",
  "lighthouse-spec",
  "rayon",

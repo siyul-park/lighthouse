@@ -1,4 +1,5 @@
 mod client;
+mod command;
 mod convert;
 mod manifest;
 mod model;
@@ -15,6 +16,7 @@ use lighthouse_plugin::{Plugin, Registry};
 use lighthouse_spec::{Config, PluginRef};
 use thiserror::Error;
 
+pub use command::Command;
 pub use manifest::{
     Discovered, FILE_NAME, FILE_NAMES, Found, PluginSpec, ProcessManifest, Provides, Runtime,
     discover, file_in, load, parse,
