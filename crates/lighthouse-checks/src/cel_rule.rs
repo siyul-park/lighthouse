@@ -1,7 +1,10 @@
 //! A `cel` check: a `where` expression that is true for a violation of the
 //! selected values, a message and evidence.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, BTreeSet},
+};
 
 use cel::Program;
 use lighthouse_model::{Diagnostic, File, Node, Position, Project, Reach, Span, Symbol, SymbolId};
@@ -16,6 +19,7 @@ use crate::{
     facts,
     library::{self, Needs},
     modules, reach,
+    review::{Candidate, Review},
 };
 
 /// A CEL check with every expression compiled.
@@ -27,6 +31,7 @@ pub(crate) struct CelRule {
     evidence: Vec<(String, Program)>,
     at: Option<At>,
     identity: Option<Identity>,
+    review: Option<Review>,
     needs: Needs,
     library: cel::Context<'static>,
 }
@@ -66,13 +71,16 @@ impl CelRule {
             sources.push(&identity.subject);
             sources.extend(identity.snippet.as_deref());
         }
+        sources.extend(check.review.as_deref());
+        let select = check
+            .selects(decision.scope.subject)
+            .ok_or_else(|| Error::invalid(id, "a project decision needs a `select`"))?;
         let maybe = |what: &str, source: &Option<String>| {
             source.as_deref().map(|s| compile(id, what, s)).transpose()
         };
         Ok(Self {
-            select: check
-                .selects(decision.scope.subject)
-                .ok_or_else(|| Error::invalid(id, "a project decision needs a `select`"))?,
+            select,
+            review: Review::new(decision, check, select)?,
             bindings: check
                 .bindings
                 .iter()
@@ -112,6 +120,12 @@ impl CelRule {
         })
     }
 
+    /// Whether some subjects are put to the models. A rule that does is not
+    /// stored by the host: a model's answers are kept by the models.
+    pub(crate) fn reviews(&self) -> bool {
+        self.review.is_some()
+    }
+
     /// The analyzers whose facts the expressions read.
     pub(crate) fn analyzers(&self) -> Vec<String> {
         if self.needs.function("metrics") {
@@ -144,11 +158,16 @@ impl CelRule {
             meta,
             builder,
             options: cel_fact(&Value::Object(options.clone())),
+            candidates: RefCell::default(),
         };
-        match meta.scope {
+        let mut found = match meta.scope {
             lighthouse_model::RunScope::File => run.check_file(ctx),
             lighthouse_model::RunScope::Project => run.check_project(ctx),
+        }?;
+        if let Some(review) = &self.review {
+            found.extend(review.settle(ctx, meta, run.candidates.take()));
         }
+        Ok(found)
     }
 }
 
@@ -157,6 +176,8 @@ struct Run<'a> {
     meta: &'a RuleManifest,
     builder: Builder<'a>,
     options: Fact,
+    /// The subjects `review` picked, to be put to the models.
+    candidates: RefCell<Vec<Candidate>>,
 }
 
 impl Run<'_> {
@@ -361,11 +382,24 @@ impl Run<'_> {
             let bound = frame.run(program)?;
             frame.set_cel(name, bound);
         }
-        if !frame.truth(&rule.condition)? {
-            return Ok(None);
-        }
-        let message = frame.text(&rule.message)?;
-        let evidence = frame.evidence(&rule.evidence)?;
+        let found = frame.truth(&rule.condition)?;
+        let kind = match (&rule.review, found) {
+            (_, true) => None,
+            (None, false) => return Ok(None),
+            (Some(review), false) => match review.asks(&frame)? {
+                Some(kind) => kind,
+                None => return Ok(None),
+            },
+        };
+        // The message and evidence of a subject only suspected may read what
+        // the subject does not have: they are then left empty.
+        let message = frame.text(&rule.message);
+        let evidence = frame.evidence(&rule.evidence);
+        let (message, evidence) = if found {
+            (message?, evidence?)
+        } else {
+            (message.unwrap_or_default(), evidence.unwrap_or_default())
+        };
         let place = self.place(&frame, place)?;
         let fingerprint = match &rule.identity {
             Some(identity) => {
@@ -388,6 +422,15 @@ impl Run<'_> {
         );
         diagnostic.symbol = place.symbol.map(|id| id.as_str().to_owned());
         diagnostic.evidence = evidence;
+        if let (false, Some(review)) = (found, &rule.review) {
+            let fact = review.fact_of(&frame)?;
+            self.candidates.borrow_mut().push(Candidate {
+                diagnostic,
+                kind,
+                fact,
+            });
+            return Ok(None);
+        }
         Ok(Some(diagnostic))
     }
 

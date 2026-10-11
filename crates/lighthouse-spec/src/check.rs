@@ -7,7 +7,7 @@ use std::{collections::BTreeMap, time::Duration};
 use cel::Program;
 use lighthouse_model::{Capability, RunScope};
 
-use crate::{CommandCheck, Subject};
+use crate::{CommandCheck, ModelCheck, Subject};
 use lighthouse_resource::parse_duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -78,7 +78,16 @@ impl<'de> Deserialize<'de> for Check {
                 }
             },
             Some("cel") => &[
-                "select", "with", "where", "message", "evidence", "at", "identity",
+                "select",
+                "with",
+                "where",
+                "message",
+                "evidence",
+                "at",
+                "identity",
+                "review",
+                "prompt",
+                "threshold",
             ],
             Some("command") => &[
                 "argv",
@@ -91,7 +100,7 @@ impl<'de> Deserialize<'de> for Check {
                 "select",
             ],
             Some("rpc") => &["params"],
-            Some("model") => &["select", "prompt"],
+            Some("model") => &["over", "with", "select", "prompt", "threshold", "identity"],
             other => {
                 return Err(D::Error::custom(match other {
                     None => {
@@ -410,7 +419,7 @@ impl Select {
 /// the decision's resolved `options`, and the standard function library over
 /// the code model: `metrics(n)`, `callers(n)`, `callees(n)`, `edges(n, kind)`,
 /// `owner(n)`, `tests(n)`, `annotations(n)`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct CelCheck {
     /// What the check looks at. Default: what the decision's `scope.subject`
@@ -436,6 +445,22 @@ pub struct CelCheck {
     /// the default (the selected value) does not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub identity: Option<Identity>,
+    /// CEL over the selected value, evaluated when `where` is false: when it
+    /// is true, or gives a kind (a string), a model is asked and the
+    /// subject is a finding, with this check's message, evidence and
+    /// identity, only if the model says `fail`. An unbound or unsure model
+    /// leaves the subject to agent review. A check that cannot be proven by
+    /// the code model but can be suspected by it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<String>,
+    /// What the model is told about `review`'s subjects. Default: the
+    /// decision's requirement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+    /// The least confidence at which a model's answer decides, from 0 to 1;
+    /// below it the next model is asked. Default: 0.7.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub threshold: Option<f64>,
 }
 
 /// A named CEL value.
@@ -512,6 +537,9 @@ impl CelCheck {
         if let Some(problem) = compile("where", &self.condition) {
             return Some(problem);
         }
+        if let Some(problem) = self.review_problem(&compile) {
+            return Some(problem);
+        }
         for (name, source) in &self.evidence {
             if let Some(problem) = compile(&format!("evidence `{name}`"), source) {
                 return Some(problem);
@@ -540,31 +568,24 @@ impl CelCheck {
         }
         template_problem(&self.message).map(|p| format!("check message: {p}"))
     }
-}
 
-/// A check a model answers: the subjects `select` picks are put to it with
-/// the decision's examples as its few shots. Read and validated only; agent
-/// review tasks serve the decision today.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct ModelCheck {
-    /// CEL over the code model that picks the subjects worth asking about.
-    /// Default: the subjects that match the decision's scope.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub select: Option<String>,
-    /// What the model is told. Default: the decision's requirement.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub prompt: Option<String>,
-}
-
-impl ModelCheck {
-    pub(crate) fn problem(&self) -> Option<String> {
+    /// What is wrong with `review`, `prompt` or `threshold`.
+    fn review_problem(&self, compile: &dyn Fn(&str, &str) -> Option<String>) -> Option<String> {
+        if self.review.is_none() && (self.prompt.is_some() || self.threshold.is_some()) {
+            return Some("check: `prompt` and `threshold` need a `review`".to_owned());
+        }
         if self.prompt.as_deref().is_some_and(|p| p.trim().is_empty()) {
             return Some("check: `prompt` is empty".to_owned());
         }
-        Program::compile(self.select.as_deref()?)
-            .err()
-            .map(|e| format!("check select: {e}"))
+        if self.threshold.is_some_and(|t| !(0.0..=1.0).contains(&t)) {
+            return Some("check: `threshold` is between 0 and 1".to_owned());
+        }
+        compile("review", self.review.as_deref()?)
+    }
+
+    /// The confidence at which a model's answer decides.
+    pub fn confidence(&self) -> f64 {
+        self.threshold.unwrap_or(crate::DEFAULT_THRESHOLD)
     }
 }
 

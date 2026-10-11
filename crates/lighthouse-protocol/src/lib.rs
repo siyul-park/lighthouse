@@ -1,5 +1,6 @@
 mod frame;
 mod model;
+mod prompt;
 mod serve;
 mod wire;
 
@@ -9,6 +10,7 @@ pub use model::{
     ModelRef, Neighbor, Shot, Subject, SubjectContext, TrainParams, TrainResult, TrainSubject,
     Verdict,
 };
+pub use prompt::{prompt, response_schema, subjects as subjects_text, system as system_text};
 pub use serve::{Handler, ServeError, serve};
 pub use wire::{
     CacheRef, Call, ClientInfo, Comment, Context, Conventions, Edge, EdgeKind, Event, EventKind,

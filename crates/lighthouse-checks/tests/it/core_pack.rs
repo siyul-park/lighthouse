@@ -45,6 +45,7 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
         memo: &lighthouse_plugin::Memo::default(),
         notices: &lighthouse_plugin::Notices::default(),
         applies: lighthouse_model::Applicability::default(),
+        models: &lighthouse_plugin::NoModels,
     };
     registry
         .rule("core/max-lines")
@@ -72,9 +73,7 @@ fn a_rule_exists_for_a_decision_a_program_checks() {
     assert_eq!(meta.id, "core/max-lines");
     assert_eq!(meta.severity, Severity::Warn);
     assert_eq!(meta.scope, RunScope::File);
-    for judged in ["design/plural-collections", "design/advisory-signals"] {
-        assert!(registry.rule(judged).is_none(), "{judged}");
-    }
+    assert!(registry.rule("design/advisory-signals").is_none());
     for annotation in ["core/allow-reason", "core/no-unused-allow"] {
         assert!(registry.rule(annotation).is_some(), "{annotation}");
     }
@@ -104,6 +103,8 @@ fn the_standard_projects_hold_exactly_the_rules_the_registry_has() {
             .rules()
             .filter(|r| lighthouse_plugin::plugin_of(&r.manifest().id) == pack.id)
             .map(|r| r.manifest().id.clone())
+            // A model check a project may enable is a rule the presets leave out.
+            .filter(|id| catalog.decision(id).is_some_and(|d| d.automated()))
             .collect();
         let strict = format!("{}/strict", pack.id);
         let widest = if projects.get(&strict).is_some() {
@@ -151,7 +152,7 @@ fn registered_rules_are_exactly_the_automated_catalog_decisions() {
             Some(CheckKind::Builtin(rule)) => {
                 assert!(rule.named().is_none_or(|rule| rule == id), "{id}");
             }
-            Some(CheckKind::Cel(_)) => {}
+            Some(CheckKind::Cel(_) | CheckKind::Model(_)) => {}
             other => panic!("{id} is registered but its decision's check is {other:?}"),
         }
     }
@@ -160,7 +161,16 @@ fn registered_rules_are_exactly_the_automated_catalog_decisions() {
         .filter(|d| d.automated())
         .map(|d| d.id().to_owned())
         .collect();
-    assert_eq!(registered, checked);
+    // Every automated decision has a rule; the others are model checks a
+    // project may enable, which the presets leave off.
+    assert!(checked.is_subset(&registered));
+    for extra in registered.difference(&checked) {
+        let decision = catalog.decision(extra).expect("a decision");
+        assert!(matches!(
+            decision.check.as_ref().map(|c| &c.kind),
+            Some(CheckKind::Model(_))
+        ));
+    }
 }
 
 #[test]
@@ -265,38 +275,83 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
     assert_eq!(
         design,
         [
+            "design/adjacent-siblings",
+            "design/boundary-splits",
             "design/callers-before-callees",
+            "design/clones",
             "design/cognitive-complexity",
+            "design/coherent-responsibility",
             "design/complexity",
+            "design/consumer-interfaces",
             "design/context-first",
             "design/contiguity",
             "design/coupling",
             "design/declaration-groups",
+            "design/encapsulated-state",
+            "design/error-categories",
             "design/error-identity",
+            "design/error-translation",
+            "design/explicit-shutdown",
             "design/exported-doc",
+            "design/factual-comments",
             "design/feature-envy",
+            "design/general-extraction",
+            "design/general-lower-levels",
+            "design/justified-helpers",
+            "design/justified-symbols",
             "design/layers",
+            "design/layout",
             "design/max-depth",
             "design/max-lines-per-function",
             "design/max-name-words",
             "design/max-params",
             "design/max-results",
             "design/max-statements",
+            "design/minimal-names",
             "design/misplaced-symbol",
+            "design/narrow-inputs",
             "design/no-banners",
+            "design/no-exposed-state",
+            "design/no-forced-reuse",
+            "design/no-generated-edits",
             "design/no-mutable-globals",
+            "design/no-narration",
+            "design/no-overlapping-symbols",
             "design/no-panic",
             "design/no-private-types",
             "design/no-redundant-qualifiers",
             "design/no-single-use-wrapper",
+            "design/no-speculative-api",
+            "design/no-state-in-errors",
             "design/no-stored-context",
+            "design/optional-options",
             "design/owner-file",
+            "design/plural-collections",
+            "design/predicate-names",
             "design/prefer-method",
             "design/private-helper-callers",
+            "design/reserved-verbs",
+            "design/resource-owner",
+            "design/scoped-borrows",
+            "design/short-names",
+            "design/single-abstraction-level",
+            "design/standard-abbreviations",
+            "design/state-owner",
+            "design/stateless-layout",
             "design/tiny-modules",
-            "design/unique-type-names"
+            "design/top-down-order",
+            "design/unique-type-names",
+            "design/validated-constructors",
         ]
     );
+    let design: Vec<_> = design
+        .into_iter()
+        .filter(|id| {
+            Catalog::bundled()
+                .decision(id)
+                .is_some_and(|d| d.automated())
+        })
+        .collect();
     let recommended = preset("design/recommended");
     assert_eq!(recommended.len(), design.len() - 7);
     for strict in [

@@ -4,6 +4,7 @@
 //! hold more.
 
 mod formatter;
+mod models;
 mod rules;
 mod spec;
 mod standard;
@@ -21,6 +22,11 @@ use globset::{GlobBuilder, GlobSetBuilder};
 use lighthouse_model::Options;
 pub use lighthouse_resource::{Format, Metadata, Resource};
 use lighthouse_resource::{documents, parse_duration, resource};
+pub use models::{
+    ApiProvider, DEFAULT_BATCH, DEFAULT_BUDGET, DEFAULT_PRECISION, Evaluation, ModelBinding,
+    ModelInput, ModelOutput, ModelProvider, ModelScope, ModelsSpec, ProviderSpec, RESERVED,
+    Tolerate,
+};
 pub use rules::{Level, RuleConfig, RuleDetail, RuleSetting, Rules};
 pub use spec::{
     GeneratedCheck, GeneratedSpec, OverrideSpec, PluginEntry, PluginRefSpec, ProjectLanguage,
@@ -298,6 +304,7 @@ pub struct Config {
     formatters: BTreeMap<String, Formatter>,
     generated: Option<GlobSet>,
     generated_check: Option<GeneratedCheck>,
+    models: ModelBinding,
     layer: Layer,
 }
 
@@ -337,6 +344,7 @@ impl Config {
     pub fn from_resource(project: Resource<ProjectSpec>) -> Result<Self, ProjectError> {
         let Resource { metadata, spec } = project;
         let layer = Layer::of(&spec)?;
+        let models = ModelBinding::of(&spec);
         let generated = globs(&spec.generated.files)?;
         let generated_check = spec.generated.check;
         let mut languages = BTreeMap::new();
@@ -367,6 +375,7 @@ impl Config {
             formatters,
             generated,
             generated_check,
+            models,
             layer,
         })
     }
@@ -446,6 +455,11 @@ impl Config {
     /// generated code, or none does; `None` leaves it to each decision.
     pub fn generated_check(&self) -> Option<GeneratedCheck> {
         self.generated_check
+    }
+
+    /// The models the project binds to its decisions.
+    pub fn models(&self) -> &ModelBinding {
+        &self.models
     }
 
     /// The rules this project sets and the projects it extends.

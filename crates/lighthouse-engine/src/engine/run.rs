@@ -38,6 +38,8 @@ impl Engine {
             &memo,
             &mut progress.timings,
         )?;
+        let scopes = progress.scopes.clone();
+        let models = self.run_models(&scopes);
         let scene = Scene {
             rules: &selected,
             inputs: &loaded.inputs,
@@ -45,8 +47,12 @@ impl Engine {
             facts: &facts,
             memo: &memo,
             cache: loaded.cache.as_ref(),
+            models: &models,
         };
         let found = self.collect(&scene, &mut progress)?;
+        if let Some(notice) = models.finish() {
+            progress.outcome.notices.insert(notice);
+        }
         if let Some(cache) = scene.cache {
             self.close_cache(cache, &mut progress.timings, &mut progress.outcome.notices);
         }
@@ -164,7 +170,9 @@ impl Engine {
         progress.timings.add_rules(applied.spent);
         progress.outcome.notices.extend(applied.notices);
         progress.incomplete.extend(applied.incomplete);
-        Ok(applied.found)
+        let (reviews, found) = applied.found.into_iter().partition(|d| d.review.is_some());
+        progress.outcome.reviews = reviews;
+        Ok(found)
     }
 
     /// Takes out what an `allow` annotation waives and what lies outside the
@@ -199,6 +207,13 @@ impl Engine {
         let scopes = &progress.scopes;
         let mut kept = applied.kept;
         kept.retain(|d| scopes.iter().any(|s| d.file.starts_with(s)));
+        progress
+            .outcome
+            .reviews
+            .retain(|d| scopes.iter().any(|s| d.file.starts_with(s)));
+        progress.outcome.reviews.sort_by(|a, b| {
+            (&a.file, a.span.start, &a.rule_id).cmp(&(&b.file, b.span.start, &b.rule_id))
+        });
         progress.outcome.suppressed = applied
             .allowed
             .into_iter()

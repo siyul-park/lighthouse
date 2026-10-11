@@ -277,12 +277,26 @@
               "description": "Text with `{{ cel }}` holes.",
               "type": "string"
             },
+            "prompt": {
+              "description": "What the model is told about `review`'s subjects. Default: the\ndecision's requirement.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "requires": {
               "description": "Capabilities the language provider must offer; without them the check\nis not run for that language.",
               "items": {
                 "$ref": "#/$defs/Capability"
               },
               "type": "array"
+            },
+            "review": {
+              "description": "CEL over the selected value, evaluated when `where` is false: when it\nis true, or gives a kind (a string), a model is asked and the\nsubject is a finding, with this check's message, evidence and\nidentity, only if the model says `fail`. An unbound or unsure model\nleaves the subject to agent review. A check that cannot be proven by\nthe code model but can be suspected by it.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "select": {
               "anyOf": [
@@ -294,6 +308,14 @@
                 }
               ],
               "description": "What the check looks at. Default: what the decision's `scope.subject`\nis about; a decision about the project says which it looks at."
+            },
+            "threshold": {
+              "description": "The least confidence at which a model's answer decides, from 0 to 1;\nbelow it the next model is asked. Default: 0.7.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
             },
             "timeout": {
               "description": "How long one run of the provider may take, such as `30s` or `2m`.",
@@ -441,6 +463,28 @@
           "additionalProperties": false,
           "description": "Agent review: a model is asked about the candidates. Not\ndeterministic; today's agent review tasks serve it.",
           "properties": {
+            "identity": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Identity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What makes a finding the same one from run to run, as for a `cel` check."
+            },
+            "over": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Select"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What the check ranges over. Default: what the decision's\n`scope.subject` is about. Only subjects of a file can be judged."
+            },
             "prompt": {
               "description": "What the model is told. Default: the decision's requirement.",
               "type": [
@@ -456,9 +500,17 @@
               "type": "array"
             },
             "select": {
-              "description": "CEL over the code model that picks the subjects worth asking about.\nDefault: the subjects that match the decision's scope.",
+              "description": "CEL over the ranged value that picks the subjects worth asking about;\naim for recall. Default: every subject that matches the decision's scope.",
               "type": [
                 "string",
+                "null"
+              ]
+            },
+            "threshold": {
+              "description": "The least confidence at which a model's answer decides, from 0 to 1;\nbelow it the next model is asked. Default: 0.7.",
+              "format": "double",
+              "type": [
+                "number",
                 "null"
               ]
             },
@@ -472,6 +524,13 @@
             "type": {
               "const": "model",
               "type": "string"
+            },
+            "with": {
+              "description": "Named intermediate values for `select`, evaluated in order.",
+              "items": {
+                "$ref": "#/$defs/Binding"
+              },
+              "type": "array"
             }
           },
           "required": [

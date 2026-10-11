@@ -7,12 +7,12 @@
 use std::sync::Arc;
 
 use lighthouse_model::{
-    Diagnostic, Options, Reach,
+    Diagnostic, Options, Reach, RunScope,
     annotation::{ANNOTATION_REASON, UNUSED_ALLOW},
     hash,
 };
 use lighthouse_plugin::{Caching, Ctx, Error as PluginError, Rule, RuleManifest};
-use lighthouse_spec::{BuiltinCheck, BuiltinOp, CheckKind, Decision};
+use lighthouse_spec::{BuiltinCheck, BuiltinOp, CheckKind, Decision, Select};
 use serde_json::{Map, Value};
 
 pub(crate) use crate::eval::{render, to_json};
@@ -84,9 +84,23 @@ impl DeclarativeRule {
             {
                 (Kind::Annotation, Vec::new())
             }
-            CheckKind::Builtin(BuiltinCheck::Named(_))
-            | CheckKind::Rpc(_)
-            | CheckKind::Model(_) => {
+            CheckKind::Model(model) => {
+                // A model check only ranges over subjects of a file; the
+                // others stay with agent review.
+                let Some(cel) = model.as_cel(decision.scope.subject) else {
+                    return Ok(None);
+                };
+                if rule_manifest(decision).is_none() {
+                    return Ok(None);
+                }
+                if cel.selects(decision.scope.subject).map(Select::scope) != Some(RunScope::File) {
+                    return Ok(None);
+                }
+                let rule = CelRule::new(decision, &cel)?;
+                let analyzers = rule.analyzers();
+                (Kind::Cel(Box::new(rule)), analyzers)
+            }
+            CheckKind::Builtin(BuiltinCheck::Named(_)) | CheckKind::Rpc(_) => {
                 return Ok(None);
             }
         };
@@ -116,6 +130,7 @@ impl DeclarativeRule {
         // annotation rules, which the engine reports itself, are not.
         meta.caching = match kind {
             Kind::Command(_) | Kind::Annotation => None,
+            Kind::Cel(ref rule) if rule.reviews() => None,
             _ => Some(Caching {
                 reach,
                 positions,

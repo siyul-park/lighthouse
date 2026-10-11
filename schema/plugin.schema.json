@@ -85,6 +85,13 @@
           },
           "type": "array"
         },
+        "models": {
+          "description": "Model ids; checked against what the process reports when it starts.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "orderKeys": {
           "items": {
             "type": "string"

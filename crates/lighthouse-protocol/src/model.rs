@@ -21,18 +21,28 @@ pub struct ModelMethods {
 }
 
 /// What a model plugin offers: one entry of `models` in its `initialize` result.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ModelManifest {
     /// The model id the project binds in `[models]`; equals the plugin id.
     pub id: String,
-    /// `classification`: a subject of a decision is a violation or not.
-    pub task: String,
+    /// The tasks it can do: `classification` (a subject of a decision is a
+    /// violation or not); later ones may join.
+    pub tasks: Vec<String>,
     /// Changes whenever the answers for the same input may change (the model
     /// name, the prompt template, the trained artifact).
     pub version: String,
     /// `classify`, and `train` when the model learns from labels.
     #[serde(default)]
     pub methods: Vec<String>,
+    /// The same input always gets the same answer.
+    pub deterministic: bool,
+    /// The model may answer `abstain`, and the subject then goes on to the
+    /// next binding.
+    pub abstains: bool,
+    /// What one answer costs, in any unit the project budgets; 0 for a model
+    /// that runs locally for free. The run's budget and its report scope
+    /// limit only the models with a cost above 0.
+    pub cost: f64,
 }
 
 /// An example of a decision, shown to the model as a few shots.
@@ -111,6 +121,10 @@ pub enum Verdict {
 pub struct ClassifyParams {
     pub decision: DecisionRef,
     pub subjects: Vec<Subject>,
+    /// The `options` of the project's model instance: which of the plugin's
+    /// models is asked, and how.
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub options: serde_json::Map<String, Value>,
 }
 
 /// The answer for one subject.
@@ -169,6 +183,9 @@ pub struct TrainSubject {
 pub struct TrainParams {
     pub decision: DecisionRef,
     pub subjects: Vec<TrainSubject>,
+    /// The `options` of the project's model instance.
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub options: serde_json::Map<String, Value>,
     /// A directory the host owns for this model and decision
     /// (`.lighthouse/models/<plugin>/<decision>/`); the artifact goes there.
     pub dir: String,

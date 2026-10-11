@@ -8,7 +8,7 @@ use std::{
 };
 
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Config, Projects, glob_set};
+use lighthouse_spec::{Config, ModelBinding, ModelProvider, Projects, glob_set};
 
 use super::{Error, Language};
 
@@ -38,6 +38,7 @@ pub(super) fn validate_config(
         }
     }
     registry.validate()?;
+    validate_models(registry, config)?;
     let listed = |id: &str| config.lists(lighthouse_plugin::plugin_of(id));
     let entries = config.layer().entries(projects)?;
     for (id, config) in entries {
@@ -48,6 +49,64 @@ pub(super) fn validate_config(
             return Err(Error::PluginNotListed(id.to_owned()));
         }
         rule.validate(&config.options)?;
+    }
+    Ok(())
+}
+
+/// Rejects a binding to a model whose provider is unknown, and a provider that
+/// cannot work.
+fn validate_models(registry: &Registry, config: &Config) -> Result<(), Error> {
+    let binding = config.models();
+    if let Some((name, reason)) = binding.invalid.iter().next() {
+        return Err(Error::Model {
+            name: name.clone(),
+            reason: reason.clone(),
+        });
+    }
+    for reference in binding.ids() {
+        let known = ModelBinding::split(reference)
+            .is_some_and(|(provider, _)| binding.provider(provider).is_some());
+        if !known {
+            return Err(Error::UnknownModel(reference.to_owned()));
+        }
+    }
+    let used = binding
+        .ids()
+        .filter_map(ModelBinding::split)
+        .map(|(provider, _)| provider);
+    let providers: BTreeMap<&str, ModelProvider> = used
+        .filter_map(|name| Some((name, binding.provider(name)?)))
+        .chain(
+            binding
+                .providers
+                .iter()
+                .map(|(n, p)| (n.as_str(), p.clone())),
+        )
+        .collect();
+    for (name, provider) in providers {
+        let reason = match &provider {
+            _ if binding.providers.contains_key(name)
+                && lighthouse_spec::RESERVED_PROVIDERS.contains(&name) =>
+            {
+                Some("the name is reserved".to_owned())
+            }
+            ModelProvider::Rpc { plugin, .. } if !config.lists(plugin) => {
+                Some(format!("plugin `{plugin}` is not listed in `plugins`"))
+            }
+            ModelProvider::Rpc { plugin, .. } if registry.model(plugin).is_none() => {
+                Some(format!("plugin `{plugin}` offers no model"))
+            }
+            ModelProvider::Command { argv, .. } if argv.is_empty() => {
+                Some("`argv` is empty".to_owned())
+            }
+            _ => None,
+        };
+        if let Some(reason) = reason {
+            return Err(Error::Model {
+                name: name.to_owned(),
+                reason,
+            });
+        }
     }
     Ok(())
 }

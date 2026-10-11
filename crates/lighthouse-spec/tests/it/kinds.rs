@@ -115,6 +115,9 @@ fn cel_check_selects() {
         evidence: BTreeMap::new(),
         at: None,
         identity: None,
+        review: None,
+        prompt: None,
+        threshold: None,
     };
 
     assert_eq!(check(None).selects(Subject::File), Some(Select::File));

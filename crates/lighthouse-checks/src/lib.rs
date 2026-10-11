@@ -26,6 +26,7 @@ mod order;
 #[doc(hidden)]
 pub mod probe;
 pub mod reach;
+mod review;
 mod rule;
 mod table;
 mod text;

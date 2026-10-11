@@ -32,6 +32,8 @@ use crate::{
 
 mod cached;
 mod config;
+mod instance;
+mod models;
 mod phases;
 mod run;
 
@@ -61,6 +63,10 @@ pub enum Error {
     UnknownPlugin(String),
     #[error("`{0}` belongs to a plugin not listed in `plugins`")]
     PluginNotListed(String),
+    #[error("unknown model `{0}`: declare it under `[models.<name>]`")]
+    UnknownModel(String),
+    #[error("model `{name}`: {reason}")]
+    Model { name: String, reason: String },
     #[error("unknown rule `{0}`")]
     UnknownRule(String),
     #[error("rule `{0}` is not enabled by the configuration")]
@@ -103,6 +109,10 @@ pub struct Outcome {
     /// Every rule the configuration enables for some file, whether or not it
     /// ran: a remembered finding of any other rule is no longer configured.
     pub configured: Vec<String>,
+    /// The subjects no check decided, within the report scope: a model
+    /// abstained, was unsure, failed, was over budget, or none is bound.
+    /// They are not findings and never change the exit code.
+    pub reviews: Vec<Diagnostic>,
     /// Findings that source directives suppress, within the report scope.
     /// They are not in `diagnostics` and never fail the run.
     pub suppressed: Vec<Suppressed>,
@@ -186,6 +196,8 @@ struct Scene<'a> {
     /// Where findings of an earlier run are looked up and kept, if the run has
     /// a cache.
     cache: Option<&'a RunCache>,
+    /// The models the rules may ask.
+    models: &'a dyn lighthouse_plugin::Models,
 }
 
 /// What some rule runs found and noted.
@@ -245,6 +257,21 @@ pub struct Engine {
     trusted: bool,
     /// The result cache; `None` runs every rule every time.
     cache: Option<CacheSettings>,
+    /// What the run may do with models.
+    models: ModelOptions,
+}
+
+/// Whether and how a run asks models.
+#[derive(Debug, Clone, Default)]
+pub struct ModelOptions {
+    /// Models are asked at all. Off, the subjects they would judge are
+    /// reported for review.
+    pub off: bool,
+    /// Ask about the whole project, or only the files the run reports; the
+    /// project's `models.scope` when unset.
+    pub scope: Option<lighthouse_spec::ModelScope>,
+    /// The model a revision attached to a decision, by decision id.
+    pub attached: BTreeMap<String, String>,
 }
 
 impl Engine {
@@ -294,6 +321,7 @@ impl Engine {
             startup: Vec::new(),
             trusted: false,
             cache: None,
+            models: ModelOptions::default(),
         };
         engine.active = active_rules(&engine.config, &engine.projects)?;
         Ok(engine)
@@ -312,6 +340,12 @@ impl Engine {
     pub fn with_cache(mut self, dir: PathBuf, limit: u64) -> Self {
         self.ws.cache_dir = Some(dir.clone());
         self.cache = Some(CacheSettings { dir, limit });
+        self
+    }
+
+    /// Sets what the run may do with models.
+    pub fn with_models(mut self, models: ModelOptions) -> Self {
+        self.models = models;
         self
     }
 

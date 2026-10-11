@@ -8,6 +8,7 @@ mod fix_docs;
 mod load;
 mod local;
 mod model;
+mod model_check;
 mod options;
 mod pack;
 mod pack_docs;
@@ -21,8 +22,8 @@ use lighthouse_resource::Descriptor;
 pub use catalog::{Catalog, write_atomic, write_atomic_guarded};
 pub use check::{
     At, Binding, BuiltinCheck, BuiltinOp, CelCheck, Check, CheckKind, CycleLevel, DEFAULT_TIMEOUT,
-    Identity, ModelCheck, NamedRule, OrderClause, OrderReport, OrderScope, RpcCheck, Select,
-    TemplatePart, parse_template,
+    Identity, NamedRule, OrderClause, OrderReport, OrderScope, RpcCheck, Select, TemplatePart,
+    parse_template,
 };
 pub use command::{
     Batch, CheckOutput, CheckStdin, CommandCheck, ExitCodes, SarifColumns, SarifSelect,
@@ -41,15 +42,18 @@ pub use model::{
     Content, DecisionStatus, Domain, Example, ExampleFile, ExampleKind, Expect, Scope, Subject,
     authored_severity,
 };
+pub use model_check::{DEFAULT_THRESHOLD, ModelCheck};
 pub use options::{
     LIMIT_ROLES, NO_LIMIT, ObjectType, OptionSchema, OptionType, OptionsSchema, Shape, definitions,
 };
 pub use pack::{Pack, PackSpec, Section, SectionSpec};
 pub use project::{
-    Config, FILE_NAME, FILE_NAMES, Formatter, FormatterOutput, FormatterSpec, FormatterStdin,
-    GeneratedCheck, GeneratedSpec, GlobSet, Layer, Level, OverrideSpec, PluginEntry, PluginRef,
-    PluginRefSpec, ProjectError, ProjectLanguage, ProjectSpec, Projects, RuleConfig, RuleDetail,
-    RuleSetting, Rules, glob_set,
+    ApiProvider, Config, DEFAULT_BATCH, DEFAULT_BUDGET, DEFAULT_PRECISION, Evaluation, FILE_NAME,
+    FILE_NAMES, Formatter, FormatterOutput, FormatterSpec, FormatterStdin, GeneratedCheck,
+    GeneratedSpec, GlobSet, Layer, Level, ModelBinding, ModelInput, ModelOutput, ModelProvider,
+    ModelScope, ModelsSpec, OverrideSpec, PluginEntry, PluginRef, PluginRefSpec, ProjectError,
+    ProjectLanguage, ProjectSpec, Projects, ProviderSpec, RESERVED as RESERVED_PROVIDERS,
+    RuleConfig, RuleDetail, RuleSetting, Rules, Tolerate, glob_set,
 };
 pub use render::{DOCS_DIR, decision_markdown, docs, help_path};
 pub use sources::{SourceLine, SourceMapSpec};

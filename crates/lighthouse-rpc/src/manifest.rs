@@ -61,6 +61,9 @@ pub struct Provides {
     pub decisions: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub order_keys: Vec<String>,
+    /// Model ids; checked against what the process reports when it starts.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub embedders: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

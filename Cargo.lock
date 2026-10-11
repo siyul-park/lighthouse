@@ -779,6 +779,7 @@ dependencies = [
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-process",
+ "lighthouse-protocol",
  "lighthouse-resource",
  "lighthouse-spec",
  "rayon",
@@ -819,6 +820,7 @@ name = "lighthouse-plugin"
 version = "0.1.0"
 dependencies = [
  "lighthouse-model",
+ "lighthouse-protocol",
  "serde",
  "serde_json",
  "thiserror",

@@ -38,7 +38,7 @@ pub struct InitializeParams {
 
 /// A plugin's answer to `initialize`: who it is, which protocol it speaks, and
 /// the languages it indexes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InitializeResult {
     /// Plugin id; must equal the `id` of its `lighthouse-plugin.toml`.

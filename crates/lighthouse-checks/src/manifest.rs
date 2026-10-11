@@ -3,13 +3,18 @@
 
 use lighthouse_model::Options;
 use lighthouse_plugin::{Error, RuleManifest};
-use lighthouse_spec::Decision;
+use lighthouse_spec::{CheckKind, Decision};
 use serde_json::{Map, Value};
 
-/// Rule metadata of a checked decision; `None` while no program checks it.
+/// Rule metadata of a checked decision; `None` while no program checks it. A
+/// `model` check is run by the rule that puts its subjects to the models, so
+/// it has a manifest too, but it is not automated: presets leave it off.
 /// Analyzers and capabilities belong to the check.
 pub(crate) fn rule_manifest(decision: &Decision) -> Option<RuleManifest> {
-    decision.check.as_ref().filter(|c| c.is_automated())?;
+    decision
+        .check
+        .as_ref()
+        .filter(|c| c.is_automated() || matches!(c.kind, CheckKind::Model(_)))?;
     Some(RuleManifest {
         id: decision.id().to_owned(),
         uid: decision.uid().map(str::to_owned),
