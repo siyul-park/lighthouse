@@ -40,6 +40,49 @@ providers (Go type-checks through `go list`, so it is the largest phase on Go re
 
 Phases overlap slightly (rules run while later providers finish), so they do not sum to the total.
 
+## Incremental
+
+What the result cache (host) and the provider unit caches (F2) save. `scripts/fastgate.sh <repo>...` measures
+it on a temporary copy of each repository and fails unless every warm run prints the same JSON and exit code
+as a `--no-cache` run of the same tree, after each of seven edits (a body-only edit, a rename of a called
+function, a new caller in another file, a new exported type with a homonym, a rule option, the check of a
+decision, a deleted file). Apple M4 Pro, 24 GiB, release build, Go build cache warm, `--no-store`, median of 3,
+total ms. The `lighthouse` row is this repository at the commit measured (Rust and Go, strict preset), not the
+frozen `strict-root` copy.
+
+| repo | cold `--no-cache` | cold, empty cache | warm, no change | warm, one-function body edit | edit as share of cold |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| lighthouse | 971 | 1108 (+14%) | 587 | 904 | 93% |
+| cel | 2619 | 3151 (+20%) | 2031 | 2356 | 90% |
+| qlbridge | 964 | 1058 (+10%) | 342 | 800 | 83% |
+| minivm | 1979 | 2374 (+20%) | 1019 | 1877 | 95% |
+
+**The target is not met.** The design asked for a one-file edit under 40% of cold on each Go repository; it
+is at 83–95%. Where the time goes in the edit run (phases, ms; cold `--no-cache` in brackets):
+
+| repo | index | merge | hashing | rules | identity |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| lighthouse | 533 (677) | 38 (37) | 38 (0) | 207 (320) | 9 (9) |
+| cel | 1465 (1489) | 148 (145) | 126 (0) | 423 (801) | 47 (40) |
+| qlbridge | 473 (483) | 31 (31) | 28 (0) | 166 (324) | 22 (20) |
+| minivm | 1385 (1439) | 116 (115) | 103 (0) | 186 (354) | 12 (11) |
+
+- **Index** is most of the time and barely moves on Go after an edit: the provider still runs `go list` over
+  the module graph and loads (type-checks) the changed package and its dependents; only the untouched packages
+  come from the cache. On a warm run with nothing changed it falls to 169 ms on qlbridge and 692 ms on minivm,
+  so the cache works, but a one-function edit invalidates its package, which is what is reloaded.
+- **cel** gains nothing from the provider cache even without a change (index 1476 ms): 40 files of a nested
+  module that needs a newer Go than the toolchain are incomplete, and an incomplete unit is never written to
+  the cache, so that module is analyzed every run. The 40 incomplete files are the same with and without
+  the cache.
+- **Rules** drop by about 40–55% after an edit: local and neighbor rules are answered from the cache, but
+  rules that read the whole project (declared `global`) run again for every file whenever anything changes.
+  Lowering some of them to `neighbors` is the next step.
+- **Hashing** the merged project for the keys costs 3–5% of a cold run (28 ms qlbridge, 38 ms this repository,
+  103 ms minivm, 126 ms cel). **Merge** is unchanged and is not cached.
+- **Writing** the cache on a cold run costs +10–20%: the Go provider writes one record per package and the host
+  one row per file or project state; a warm run pays none of it.
+
 ## Precision per decision
 
 A reviewer read each sampled finding against the decision's requirement and called it true (TP) or false (FP).
