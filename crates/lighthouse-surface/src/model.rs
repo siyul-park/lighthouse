@@ -4,7 +4,7 @@ use std::fmt::Write;
 
 use lighthouse_session::{
     Session, bound_models,
-    learn::{TrainRequest, Trained, train},
+    train::{TrainRequest, Trained, train},
 };
 use serde::Serialize;
 

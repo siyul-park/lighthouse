@@ -16,7 +16,6 @@ mod findings;
 mod fix;
 mod git;
 pub mod labels;
-pub mod learn;
 pub mod metrics;
 mod models;
 mod project;
@@ -26,6 +25,7 @@ mod schema;
 mod scope;
 mod select;
 mod skill;
+pub mod train;
 mod trust;
 mod validate;
 

@@ -130,7 +130,7 @@ fn eval_measures_the_check_with_a_model_plugin_bound() {
 }
 
 #[test]
-fn learn_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics() {
+fn model_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics() {
     let dir = project(RPC);
     with_plugin(dir.path());
     baseline(dir.path());

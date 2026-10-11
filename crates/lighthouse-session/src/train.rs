@@ -1,4 +1,4 @@
-//! `lighthouse learn train`: collects the labelled subjects of a decision the
+//! `lighthouse model train`: collects the labelled subjects of a decision the
 //! way evaluation does, writes them as a dataset (the one writer of training
 //! files), and asks a model that learns from labels for a fine-tuning job on
 //! it.
@@ -56,7 +56,7 @@ pub struct Trained {
     pub dataset: PathBuf,
     /// Its digest, `sha256:<hex>`.
     pub training_file: String,
-    /// The job the learner gave; `None` when no model that learns is bound.
+    /// The job the trainer gave; `None` when no model that learns is bound.
     pub result: Option<FineTuningJob>,
 }
 
@@ -132,11 +132,11 @@ pub fn train(request: &TrainRequest) -> Result<Trained> {
         &decision_ref,
         rows.into_iter().map(|r| r.row).collect(),
     )?;
-    let learner = reference
+    let trainer = reference
         .as_deref()
         .map(|r| first.checked.model(r))
         .transpose()?;
-    let result = match learner.filter(|model| {
+    let result = match trainer.filter(|model| {
         model
             .manifest()
             .capabilities
