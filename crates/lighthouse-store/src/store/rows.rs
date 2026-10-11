@@ -17,8 +17,20 @@ use lighthouse_model::{SuppressionKind, SuppressionStatus};
 
 use super::{JUDGMENT_COLUMNS, MAX_CANDIDATES, SNAPSHOT_VERSION};
 
-/// The full fingerprint that `prefix` names, among findings and judgments.
+/// The full fingerprint that `prefix` names, among findings and judgments: a
+/// whole fingerprint, or a unique prefix of at least [`MIN_PREFIX`] characters.
 pub(super) fn expand(conn: &Connection, prefix: &str) -> Result<String, Error> {
+    let whole = conn
+        .query_row(
+            "SELECT fingerprint FROM findings WHERE fingerprint = ?1 \
+             UNION SELECT fingerprint FROM judgments WHERE fingerprint = ?1",
+            params![prefix],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if let Some(whole) = whole {
+        return Ok(whole);
+    }
     if prefix.len() < MIN_PREFIX {
         return Err(Error::ShortFingerprint(prefix.to_owned()));
     }

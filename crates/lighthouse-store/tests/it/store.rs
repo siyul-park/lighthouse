@@ -271,23 +271,27 @@ fn findings_of_rules_no_longer_configured_go_inactive_and_come_back() {
 #[test]
 fn finding_expands_unique_prefixes_and_rejects_the_rest() {
     let store = memory_with(&[
-        observed("abc1", "design/a", "a.go"),
-        observed("abc2", "design/a", "b.go"),
-        observed("xyz", "design/a", "c.go"),
+        observed("abcdefg1", "design/a", "a.go"),
+        observed("abcdefg2", "design/a", "b.go"),
+        observed("xyzwvut0", "design/a", "c.go"),
     ]);
-    assert_eq!(store.finding("abc1").unwrap().fingerprint, "abc1");
-    assert_eq!(store.finding("xy").unwrap().fingerprint, "xyz");
-    let Err(Error::AmbiguousFinding { candidates, .. }) = store.finding("abc") else {
-        panic!("abc is ambiguous");
+    assert_eq!(store.finding("abcdefg1").unwrap().fingerprint, "abcdefg1");
+    assert_eq!(store.finding("xyzwvut").unwrap().fingerprint, "xyzwvut0");
+    let Err(Error::AmbiguousFinding { candidates, .. }) = store.finding("abcdefg") else {
+        panic!("abcdefg is ambiguous");
     };
-    assert_eq!(candidates, ["abc1", "abc2"]);
-    let message = store.finding("abc").unwrap_err().to_string();
+    assert_eq!(candidates, ["abcdefg1", "abcdefg2"]);
+    let message = store.finding("abcdefg").unwrap_err().to_string();
     assert!(
-        message.contains("longer prefix") && message.contains("abc2"),
+        message.contains("longer prefix") && message.contains("abcdefg2"),
         "{message}"
     );
     assert!(matches!(
-        store.finding("nope"),
+        store.finding("xyz"),
+        Err(Error::ShortFingerprint(_))
+    ));
+    assert!(matches!(
+        store.finding("nopenop"),
         Err(Error::UnknownFinding(_))
     ));
 }
@@ -355,7 +359,7 @@ fn resolve_validates_suppressions_findings_and_the_sighting() {
         );
     }
     assert!(store.history("f1").unwrap().is_empty());
-    let unknown = store.resolve(&review("zz", Judgment::Fail), stamp("sem1"));
+    let unknown = store.resolve(&review("zzzzzzz", Judgment::Fail), stamp("sem1"));
     assert!(matches!(unknown, Err(Error::UnknownFinding(_))));
 
     let seen = store.finding("f1").unwrap().last_seen;
