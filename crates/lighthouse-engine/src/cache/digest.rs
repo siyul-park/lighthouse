@@ -23,7 +23,7 @@ use lighthouse_model::{Document, Project, hash::Hasher};
 use rayon::prelude::*;
 use serde::Serialize;
 
-use crate::{Error, neighbors::Ties};
+use super::{Error, neighbors::Ties};
 
 /// A SHA-256.
 pub type Digest = [u8; 32];

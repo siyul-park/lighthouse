@@ -21,8 +21,8 @@ fn engine_preview_fixes_shows_the_change_and_writes_nothing() {
 
     assert_eq!(previews.len(), 1);
     assert_eq!(previews[0].safety, Safety::Safe);
-    assert_eq!(previews[0].changes[0].after, "fn a\nDONE here\n");
-    assert_eq!(previews[0].edits.len(), 1);
+    assert!(previews[0].files[0].hunks.contains("+DONE here"));
+    assert_eq!(previews[0].files[0].edits.len(), 1);
     assert_eq!(text(&dir), "fn a\nTODO here\n", "nothing was written");
 }
 

@@ -12,7 +12,7 @@ use std::{
     sync::{Mutex, OnceLock, PoisonError},
 };
 
-use lighthouse_cache::{Cache, Digest, Digests, Key, KeyBuilder, Stored};
+use crate::cache::{Cache, Digest, Digests, Key, KeyBuilder, Stored};
 use lighthouse_model::{Reach, TestScope, hash::Hasher};
 use serde::{Deserialize, Serialize};
 
@@ -104,7 +104,7 @@ impl Engine {
             Ok(RunCache {
                 cache,
                 digests: Digests::of(project)?,
-                documents: lighthouse_cache::documents(project.documents())?,
+                documents: crate::cache::documents(project.documents())?,
                 plans: self.plans(selected),
             })
         });
@@ -150,7 +150,7 @@ impl Engine {
             hasher.update((bytes.len() as u64).to_le_bytes());
             hasher.update(bytes);
         };
-        part(lighthouse_cache::build_identity().as_bytes());
+        part(crate::cache::build_identity().as_bytes());
         for plugin in self.registry.manifests() {
             part(plugin.id.as_bytes());
             part(plugin.version.as_bytes());

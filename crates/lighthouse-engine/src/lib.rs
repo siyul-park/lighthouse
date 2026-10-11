@@ -1,4 +1,5 @@
 mod annotations;
+pub mod cache;
 mod documents;
 mod engine;
 mod fix;
@@ -14,8 +15,8 @@ pub use engine::{
     active_rules,
 };
 pub use fix::{
-    AppliedFix, DeclinedFix, FileChange, FixBinding, FixPlan, FixPreview, FixReport, FixRun,
-    MAX_ROUNDS, PreviewEdit, unified_diff,
+    AppliedFix, DeclinedFix, FileChange, FixBinding, FixPlan, FixReport, FixRun, MAX_ROUNDS,
+    unified_diff,
 };
 pub use tester::{ExampleRun, RuleTester};
 pub use timings::Timings;

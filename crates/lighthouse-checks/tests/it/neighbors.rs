@@ -4,8 +4,8 @@
 
 use std::path::Path;
 
-use lighthouse_cache::Digests;
 use lighthouse_checks::probe;
+use lighthouse_engine::cache::Digests;
 use lighthouse_model::{
     Applicability, EdgeKind, File, Project, Symbol, SymbolId, SymbolKind, SymbolRole, Visibility,
 };
@@ -55,7 +55,7 @@ fn ctx_run<R>(project: &Project, file: Option<&File>, run: impl FnOnce(&Ctx) -> 
     run(&ctx)
 }
 
-fn digests(project: &Project, file: &str) -> (lighthouse_cache::FileDigest, Digests) {
+fn digests(project: &Project, file: &str) -> (lighthouse_engine::cache::FileDigest, Digests) {
     let all = Digests::of(project).unwrap();
     (*all.file(Path::new(file)).unwrap(), all)
 }

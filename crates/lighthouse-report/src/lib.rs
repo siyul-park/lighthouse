@@ -10,7 +10,6 @@ use std::fmt::Write;
 use lighthouse_model::{Diagnostic, Incomplete, Severity};
 
 pub use agent::{AgentReport, Briefing, Detail, agent_report, shown};
-pub use fix::{FixEdit, FixFile, ProposedFix};
 pub use group::{Entry, GroupOptions, Grouped};
 
 /// Output format of [`render`]. The JSON report of a check is

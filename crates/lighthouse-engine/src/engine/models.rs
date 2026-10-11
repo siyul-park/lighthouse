@@ -12,7 +12,7 @@ use std::{
     },
 };
 
-use lighthouse_cache::{Cache, DEFAULT_LIMIT, KeyBuilder};
+use crate::cache::{Cache, DEFAULT_LIMIT, KeyBuilder};
 use lighthouse_model::{Diagnostic, hash};
 use lighthouse_plugin::{Ask, Classifier, Judged, Model, Models, Open, Question, Settle, Subject};
 use lighthouse_spec::ModelBinding;
@@ -235,13 +235,7 @@ impl<'a> RunModels<'a> {
             .is_ok()
     }
 
-    fn key(
-        &self,
-        model: &str,
-        version: &str,
-        ask: &Ask,
-        subject: &Subject,
-    ) -> lighthouse_cache::Key {
+    fn key(&self, model: &str, version: &str, ask: &Ask, subject: &Subject) -> crate::cache::Key {
         // The check's revision, the model at its version, what the model reads
         // of the subject and what it is asked. The band is not part of it: the
         // cache holds the raw probability.

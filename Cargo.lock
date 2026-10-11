@@ -1438,24 +1438,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "lighthouse-cache"
-version = "0.1.0"
-dependencies = [
- "lighthouse-model",
- "rayon",
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
-]
-
-[[package]]
 name = "lighthouse-checks"
 version = "0.1.0"
 dependencies = [
  "cel",
- "lighthouse-cache",
  "lighthouse-engine",
  "lighthouse-model",
  "lighthouse-plugin",
@@ -1507,13 +1493,13 @@ version = "0.1.0"
 dependencies = [
  "globset",
  "ignore",
- "lighthouse-cache",
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-process",
  "lighthouse-resource",
  "lighthouse-spec",
  "rayon",
+ "rusqlite",
  "serde",
  "serde_json",
  "similar",
@@ -1541,6 +1527,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "similar",
  "thiserror",
 ]
 
@@ -1582,7 +1569,6 @@ dependencies = [
  "lighthouse-spec",
  "serde",
  "serde_json",
- "similar",
 ]
 
 [[package]]
@@ -1623,7 +1609,6 @@ name = "lighthouse-session"
 version = "0.1.0"
 dependencies = [
  "globset",
- "lighthouse-cache",
  "lighthouse-checks",
  "lighthouse-engine",
  "lighthouse-model",

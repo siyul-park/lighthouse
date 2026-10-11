@@ -3,7 +3,7 @@ use std::{
     fmt::Write,
 };
 
-use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Severity, Suppressed};
+use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Preview, Severity, Suppressed};
 use lighthouse_spec::{Catalog, authored_severity};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
@@ -11,7 +11,7 @@ use serde_json::{Map, Value, json};
 use crate::{
     evidence::{evidence, evidence_line},
     expected::{Expected, Subject, expected, one_line},
-    fix::{ProposedFix, Shown},
+    fix::Shown,
     group::{Entry, GroupOptions, Grouped, judgments, judgments_line},
 };
 
@@ -51,7 +51,7 @@ pub struct Briefing<'a> {
     pub detail: Detail,
     /// The fixes proposed for findings, by fingerprint: shown with the
     /// finding, and as `fixes` in SARIF.
-    pub fixes: Option<&'a BTreeMap<String, ProposedFix>>,
+    pub fixes: Option<&'a BTreeMap<String, Preview>>,
     /// The text of the files of findings, by project-relative path, for
     /// formats whose columns count characters and not bytes (SARIF).
     pub sources: Option<&'a BTreeMap<String, String>>,

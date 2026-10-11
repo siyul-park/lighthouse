@@ -10,7 +10,7 @@ pub const LIMIT_VAR: &str = "LIGHTHOUSE_CACHE_LIMIT_MB";
 
 /// Where the cache of the project at `root` lives: `<root>/.lighthouse/cache`.
 pub fn cache_dir(root: &Path) -> PathBuf {
-    root.join(".lighthouse").join(lighthouse_cache::DIR)
+    root.join(".lighthouse").join(lighthouse_engine::cache::DIR)
 }
 
 /// The size limit of the cache in bytes: `LIGHTHOUSE_CACHE_LIMIT_MB`, else
@@ -19,7 +19,7 @@ pub(crate) fn cache_limit() -> u64 {
     std::env::var(LIMIT_VAR)
         .ok()
         .and_then(|mb| mb.trim().parse::<u64>().ok())
-        .map_or(lighthouse_cache::DEFAULT_LIMIT, |mb| {
+        .map_or(lighthouse_engine::cache::DEFAULT_LIMIT, |mb| {
             mb.saturating_mul(1 << 20)
         })
 }
@@ -27,5 +27,5 @@ pub(crate) fn cache_limit() -> u64 {
 /// Deletes the cache of the project at `root` entirely, including whatever the
 /// language providers keep in it; returns whether there was one.
 pub fn clean_cache(root: &Path) -> Result<bool> {
-    Ok(lighthouse_cache::clean(&cache_dir(root))?)
+    Ok(lighthouse_engine::cache::clean(&cache_dir(root))?)
 }

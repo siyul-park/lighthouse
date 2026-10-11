@@ -3,7 +3,12 @@ use std::{fmt, path::PathBuf, str::FromStr};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{Node, Span, SymbolId};
+use similar::{ChangeTag, TextDiff};
+
+use crate::{Fingerprint, Node, Position, Span, SymbolId, utf16_position};
+
+/// Lines of unchanged text around a change in the hunks of a preview.
+const CONTEXT: usize = 1;
 
 /// How much a proposed fix may be trusted to keep the program's meaning.
 #[derive(
@@ -111,6 +116,80 @@ impl FixOutcome {
     pub fn declined(reason: impl Into<String>) -> Self {
         Self::Declined {
             reason: reason.into(),
+        }
+    }
+}
+
+/// The fix proposed for one finding, computed without writing anything: what
+/// reports show of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Preview {
+    pub fingerprint: Fingerprint,
+    pub description: String,
+    /// `Suggested` when applying the fix needs unsafe fixes, whatever the
+    /// fixer claims: a suggested proposal, a suggested cap or a rule that is
+    /// not mechanical.
+    pub safety: Safety,
+    /// The files it changes, sorted by path.
+    pub files: Vec<PreviewFile>,
+}
+
+/// One file a fix changes. The texts are not kept: the unified hunks and the
+/// replacements are computed once, when the preview is made.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewFile {
+    pub path: String,
+    /// The unified diff hunks (`@@ -l,n +l,n @@`, one line of context), no
+    /// file headers.
+    pub hunks: String,
+    /// Lines the hunks add or remove.
+    pub changed: usize,
+    /// The replacements, as spans of the original text in UTF-16 columns.
+    pub edits: Vec<PreviewEdit>,
+}
+
+/// Replaces the text between `start` and `end` (an insertion when equal);
+/// columns count UTF-16 code units, as SARIF regions do.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewEdit {
+    pub start: Position,
+    pub end: Position,
+    pub text: String,
+}
+
+impl PreviewFile {
+    /// The change of one file from `before` to `after`, with `edits` as
+    /// (start, end, text) in byte columns of `before`.
+    pub fn new(
+        path: String,
+        before: &str,
+        after: &str,
+        edits: impl IntoIterator<Item = (Position, Position, String)>,
+    ) -> Self {
+        let diff = TextDiff::from_lines(before, after);
+        let hunks = diff
+            .unified_diff()
+            .context_radius(CONTEXT)
+            .to_string()
+            .trim_end_matches('\n')
+            .to_owned();
+        let changed = diff
+            .iter_all_changes()
+            .filter(|c| c.tag() != ChangeTag::Equal)
+            .count();
+        let edits = edits
+            .into_iter()
+            .map(|(start, end, text)| PreviewEdit {
+                start: utf16_position(before, start),
+                end: utf16_position(before, end),
+                text,
+            })
+            .collect();
+        Self {
+            path,
+            hunks,
+            changed,
+            edits,
         }
     }
 }

@@ -5,14 +5,14 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Judgment, Safety, Severity};
+use lighthouse_model::{Judgment, Preview, Safety, Severity};
 use lighthouse_spec::{Catalog, Decision, FixKind};
 use serde_json::{Map, Value, json};
 
 use crate::{
     evidence::{bounded, evidence, pairs},
     expected::{Subject, expected, one_line},
-    fix::{ProposedFix, Shown},
+    fix::Shown,
 };
 
 /// Shortest fingerprint prefix shown, as in git; longer when the findings of
@@ -61,7 +61,7 @@ pub struct Entry<'a> {
     /// structure.
     pub facts: Option<Value>,
     /// The fix proposed for the finding, when one was computed.
-    pub fix: Option<&'a ProposedFix>,
+    pub fix: Option<&'a Preview>,
 }
 
 /// What shapes the groups.

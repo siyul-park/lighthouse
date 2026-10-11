@@ -1,84 +1,12 @@
 //! The fix of a finding as reports show it: SARIF replacements and, for the
 //! agent formats, a unified diff or a one-line summary.
 
-use lighthouse_model::{Position, Safety, utf16_position};
+use lighthouse_model::{Preview, Safety};
 use serde_json::{Value, json};
-use similar::{ChangeTag, TextDiff};
 
 /// Longest diff an agent finding carries inline, in lines; a longer fix is
 /// summarized.
 const DIFF_LINES: usize = 12;
-/// Lines of unchanged text around a change in the diff.
-const CONTEXT: usize = 1;
-
-/// The fix proposed for a finding, computed without writing anything.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProposedFix {
-    pub safety: Safety,
-    pub description: String,
-    /// The files it changes, sorted by path.
-    pub files: Vec<FixFile>,
-}
-
-/// One file a fix changes. The texts are not kept: the unified hunks and the
-/// replacements are computed once, when the preview is made.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FixFile {
-    pub path: String,
-    /// The unified diff hunks (`@@ -l,n +l,n @@`, one line of context), no
-    /// file headers.
-    hunks: String,
-    /// Lines the hunks add or remove.
-    changed: usize,
-    /// The replacements, as spans of the original text in UTF-16 columns.
-    pub edits: Vec<FixEdit>,
-}
-
-/// Replaces the text between `start` and `end` (an insertion when equal);
-/// columns count UTF-16 code units, as SARIF regions do.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FixEdit {
-    pub start: Position,
-    pub end: Position,
-    pub text: String,
-}
-
-impl FixFile {
-    /// The change of one file from `before` to `after`, with `edits` as
-    /// (start, end, text) in byte columns of `before`.
-    pub fn new(
-        path: String,
-        before: &str,
-        after: &str,
-        edits: impl IntoIterator<Item = (Position, Position, String)>,
-    ) -> Self {
-        let diff = TextDiff::from_lines(before, after);
-        let hunks = diff
-            .unified_diff()
-            .context_radius(CONTEXT)
-            .to_string()
-            .trim_end_matches('\n')
-            .to_owned();
-        let changed = diff
-            .iter_all_changes()
-            .filter(|c| c.tag() != ChangeTag::Equal)
-            .count();
-        let edits = edits
-            .into_iter()
-            .map(|(start, end, text)| FixEdit {
-                start: utf16_position(before, start),
-                end: utf16_position(before, end),
-                text,
-            })
-            .collect();
-        Self {
-            path,
-            hunks,
-            changed,
-            edits,
-        }
-    }
-}
 
 /// How an agent finding shows its fix: the diff, or a summary when the diff
 /// is long.
@@ -97,7 +25,7 @@ enum Body {
 impl Shown {
     /// How `fix`, proposed for a finding in `finding_file`, is shown. A file
     /// other than the finding's gets `---`/`+++` headers.
-    pub(crate) fn of(fix: &ProposedFix, finding_file: &str) -> Self {
+    pub(crate) fn of(fix: &Preview, finding_file: &str) -> Self {
         let diff = diff(fix, finding_file);
         let body = if diff.lines().count() <= DIFF_LINES {
             Body::Diff(diff)
@@ -132,7 +60,7 @@ impl Shown {
 
 /// The unified diff of a fix: hunks, with `---` and `+++` headers for every file
 /// when the fix touches a file other than `finding_file`. Trailing newlines are trimmed.
-pub(crate) fn diff(fix: &ProposedFix, finding_file: &str) -> String {
+pub(crate) fn diff(fix: &Preview, finding_file: &str) -> String {
     let headers = fix.files.iter().any(|f| f.path != finding_file);
     let mut out = String::new();
     for file in &fix.files {

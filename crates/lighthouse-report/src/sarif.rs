@@ -4,11 +4,10 @@ use std::{
 };
 
 use lighthouse_model::{
-    Diagnostic, Incomplete, Position, Severity, Suppressed, Suppression, utf16_position,
+    Diagnostic, Incomplete, Position, Preview, PreviewEdit, Severity, Suppressed, Suppression,
+    utf16_position,
 };
 use lighthouse_spec::{Catalog, Decision, help_path};
-
-use crate::fix::{FixEdit, ProposedFix};
 use serde::Serialize;
 
 const SCHEMA: &str = "https://json.schemastore.org/sarif-2.1.0.json";
@@ -213,7 +212,7 @@ pub fn render(
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
     catalog: Option<&Catalog>,
-    fixes: Option<&BTreeMap<String, ProposedFix>>,
+    fixes: Option<&BTreeMap<String, Preview>>,
     suppressed: &[Suppressed],
     sources: Option<&BTreeMap<String, String>>,
 ) -> String {
@@ -318,7 +317,7 @@ fn rule_ref<'a>(id: &'a str, decision: Option<&'a Decision>) -> RuleRef<'a> {
 fn result<'a>(
     d: &'a Diagnostic,
     rules: &[&str],
-    fix: Option<&'a ProposedFix>,
+    fix: Option<&'a Preview>,
     suppression: Option<&'a Suppression>,
     sources: Option<&BTreeMap<String, String>>,
 ) -> SarifResult<'a> {
@@ -370,7 +369,7 @@ fn region(d: &Diagnostic, sources: Option<&BTreeMap<String, String>>) -> Region 
     }
 }
 
-fn sarif_fix(fix: &ProposedFix) -> SarifFix<'_> {
+fn sarif_fix(fix: &Preview) -> SarifFix<'_> {
     SarifFix {
         description: Message {
             text: &fix.description,
@@ -386,7 +385,7 @@ fn sarif_fix(fix: &ProposedFix) -> SarifFix<'_> {
     }
 }
 
-fn replacement(edit: &FixEdit) -> Replacement {
+fn replacement(edit: &PreviewEdit) -> Replacement {
     Replacement {
         deleted_region: Region {
             start_line: edit.start.line,

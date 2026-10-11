@@ -10,7 +10,7 @@ use lighthouse_model::{Edge, Node, Project, Symbol, SymbolId, Target, hash::Hash
 use rayon::prelude::*;
 use serde::Serialize;
 
-use crate::{
+use super::{
     Error,
     digest::{Digest, FileDigest, digest_of, feed},
 };

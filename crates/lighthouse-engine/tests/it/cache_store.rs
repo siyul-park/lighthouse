@@ -1,6 +1,6 @@
 use std::fs;
 
-use lighthouse_cache::{Cache, Key, KeyBuilder};
+use lighthouse_engine::cache::{Cache, Key, KeyBuilder};
 
 fn key(name: &str) -> Key {
     let mut key = KeyBuilder::new();
@@ -113,9 +113,9 @@ fn cleaning_deletes_the_directory_and_what_a_plugin_kept_in_it() {
     Cache::open(&cache, u64::MAX).unwrap();
     fs::create_dir_all(cache.join("lang-go")).unwrap();
     fs::write(cache.join("lang-go/units.json"), "{}").unwrap();
-    assert!(lighthouse_cache::clean(&cache).unwrap());
+    assert!(lighthouse_engine::cache::clean(&cache).unwrap());
     assert!(!cache.exists());
-    assert!(!lighthouse_cache::clean(&cache).unwrap());
+    assert!(!lighthouse_engine::cache::clean(&cache).unwrap());
 }
 
 #[test]
@@ -136,10 +136,10 @@ fn cache_put_bytes_stores_what_get_reads() {
 
 #[test]
 fn build_identity_names_the_version_and_the_program() {
-    let identity = lighthouse_cache::build_identity();
+    let identity = lighthouse_engine::cache::build_identity();
     assert!(
         identity.starts_with(env!("CARGO_PKG_VERSION")),
         "{identity}"
     );
-    assert_eq!(identity, lighthouse_cache::build_identity());
+    assert_eq!(identity, lighthouse_engine::cache::build_identity());
 }

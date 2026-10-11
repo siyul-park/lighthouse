@@ -3,10 +3,8 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_model::{Diagnostic, Fingerprint, Position, Severity, Span};
-use lighthouse_report::{
-    Briefing, Entry, FixFile, Format, GroupOptions, Grouped, ProposedFix, render_with,
-};
+use lighthouse_model::{Diagnostic, Fingerprint, Position, Preview, PreviewFile, Severity, Span};
+use lighthouse_report::{Briefing, Entry, Format, GroupOptions, Grouped, render_with};
 use serde_json::{Value, json};
 
 fn span(line: u32) -> Span {
@@ -214,10 +212,11 @@ fn sarif_columns_count_utf16_code_units_and_not_bytes() {
         start: at(1, 7),
         end: at(1, 8),
     };
-    let fix = ProposedFix {
+    let fix = Preview {
+        fingerprint: d.fingerprint.clone(),
         safety: lighthouse_model::Safety::Safe,
         description: "rename".to_owned(),
-        files: vec![FixFile::new(
+        files: vec![PreviewFile::new(
             "a.go".to_owned(),
             &before,
             "é😀y := 1\n",
@@ -252,20 +251,21 @@ fn sarif_columns_count_utf16_code_units_and_not_bytes() {
 #[test]
 fn a_fix_diff_names_the_files_when_it_edits_one_besides_the_findings() {
     let file = |path: &str| {
-        FixFile::new(
+        PreviewFile::new(
             path.to_owned(),
             "a\nb\n",
             "a\nc\n",
             [(at(2, 1), at(2, 2), "c".to_owned())],
         )
     };
-    let fix = |files| ProposedFix {
+    let fix = |files| Preview {
+        fingerprint: unknown_rule().fingerprint,
         safety: lighthouse_model::Safety::Safe,
         description: "edit".to_owned(),
         files,
     };
     let findings = [unknown_rule()];
-    let render_fix = |fix: ProposedFix| {
+    let render_fix = |fix: Preview| {
         let fixes = BTreeMap::from([(findings[0].fingerprint.as_str().to_owned(), fix)]);
         let briefing = Briefing {
             fixes: Some(&fixes),

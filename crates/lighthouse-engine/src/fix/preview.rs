@@ -5,39 +5,15 @@
 
 use std::path::PathBuf;
 
-use lighthouse_model::{Capability, Diagnostic, Fingerprint, LineIndex, Position, Safety};
+use lighthouse_model::{Capability, Diagnostic, LineIndex, Preview, PreviewFile, Safety};
 
 use super::{
-    FileChange, FixPlan, FixRun,
+    FixPlan, FixRun,
     edits::apply,
     lower::{Lowerer, Sources},
     run::{Orchestrator, provides},
 };
 use crate::{Engine, Outcome, Overlays};
-
-/// One replacement of a preview: the span it deletes (empty for an insertion)
-/// in the original text, and what takes its place.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PreviewEdit {
-    pub file: PathBuf,
-    pub start: Position,
-    pub end: Position,
-    pub text: String,
-}
-
-/// The fix proposed for one finding, as it would change the files.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FixPreview {
-    pub fingerprint: Fingerprint,
-    pub description: String,
-    /// `Suggested` when applying the fix needs unsafe fixes, whatever the
-    /// fixer claims: a suggested proposal, a suggested cap or a rule that is
-    /// not mechanical.
-    pub safety: Safety,
-    pub edits: Vec<PreviewEdit>,
-    /// The files as they would be, sorted by path.
-    pub changes: Vec<FileChange>,
-}
 
 impl Engine {
     /// The previews of the fixes of `findings`, those that propose a fix that
@@ -49,7 +25,7 @@ impl Engine {
         plan: &FixPlan,
         outcome: &Outcome,
         findings: &[&Diagnostic],
-    ) -> Vec<FixPreview> {
+    ) -> Vec<Preview> {
         let run = FixRun::default();
         let orchestrator = Orchestrator::for_preview(self, plan, &run);
         let overlays = Overlays::new();
@@ -70,8 +46,7 @@ impl Engine {
                     proposal.edits.iter().map(|e| e.file.clone()).collect();
                 files.sort();
                 files.dedup();
-                let mut changes = Vec::new();
-                let mut edits = Vec::new();
+                let mut changed = Vec::new();
                 for file in files {
                     let base = sources.text(&file).ok()?;
                     let mine: Vec<_> = proposal.edits.iter().filter(|e| e.file == file).collect();
@@ -80,24 +55,26 @@ impl Engine {
                         continue;
                     }
                     let index = LineIndex::new(&base);
-                    edits.extend(mine.iter().map(|e| PreviewEdit {
-                        file: file.clone(),
-                        start: index.position(e.range.start),
-                        end: index.position(e.range.end),
-                        text: e.text.clone(),
-                    }));
-                    changes.push(FileChange {
-                        path: file,
-                        before: (*base).clone(),
-                        after,
+                    let edits = mine.iter().map(|e| {
+                        (
+                            index.position(e.range.start),
+                            index.position(e.range.end),
+                            e.text.clone(),
+                        )
                     });
+                    changed.push(PreviewFile::new(
+                        file.to_string_lossy().replace('\\', "/"),
+                        &base,
+                        &after,
+                        edits,
+                    ));
                 }
-                if changes.is_empty() {
+                if changed.is_empty() {
                     return None;
                 }
                 let needs_unsafe = proposal.safety == Safety::Suggested
                     || orchestrator.ineligible(binding).is_some();
-                Some(FixPreview {
+                Some(Preview {
                     fingerprint: finding.fingerprint.clone(),
                     description: proposal.description,
                     safety: if needs_unsafe {
@@ -105,8 +82,7 @@ impl Engine {
                     } else {
                         Safety::Safe
                     },
-                    edits,
-                    changes,
+                    files: changed,
                 })
             })
             .collect()

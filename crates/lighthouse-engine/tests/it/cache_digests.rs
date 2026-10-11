@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use lighthouse_cache::{Digests, FileDigest};
+use lighthouse_engine::cache::{Digests, FileDigest};
 use lighthouse_model::{
     Edge, EdgeKind, File, Fragment, FunctionSummary, Node, Position, Project, Resolution, Span,
     Symbol, SymbolId, SymbolKind, SymbolRole, Target, Visibility,
@@ -227,7 +227,13 @@ fn documents_digest_follows_their_content() {
         uid: None,
         labels: Default::default(),
     };
-    let one = lighthouse_cache::documents(&[document("a")]).unwrap();
-    assert_eq!(one, lighthouse_cache::documents(&[document("a")]).unwrap());
-    assert_ne!(one, lighthouse_cache::documents(&[document("b")]).unwrap());
+    let one = lighthouse_engine::cache::documents(&[document("a")]).unwrap();
+    assert_eq!(
+        one,
+        lighthouse_engine::cache::documents(&[document("a")]).unwrap()
+    );
+    assert_ne!(
+        one,
+        lighthouse_engine::cache::documents(&[document("b")]).unwrap()
+    );
 }

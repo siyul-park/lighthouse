@@ -22,7 +22,6 @@ use lighthouse_plugin::FixDecision;
 use lighthouse_spec::{Catalog, FixKind};
 
 pub use diff::unified_diff;
-pub use preview::{FixPreview, PreviewEdit};
 
 use crate::Outcome;
 

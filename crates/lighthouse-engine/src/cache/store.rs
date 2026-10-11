@@ -17,7 +17,7 @@ use lighthouse_model::Diagnostic;
 use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension, params};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
-use crate::{Error, Key};
+use super::{Error, Key};
 
 /// The file the results live in, under the cache directory.
 const DB: &str = "results.db";
