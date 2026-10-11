@@ -22,12 +22,12 @@ pub use fix::{
     FixDecision, FixRequest, Fixer, FixerManifest, KeyCtx, NoKeys, OrderKey, OrderKeyManifest,
     OrderKeys,
 };
-pub use lighthouse_protocol::training_file;
 pub use memo::Memo;
 pub use models::{
-    Ask, Classifier, ClassifyParams, ClassifyResult, Decided, DecisionRef, Judged, LabelSource,
-    ModelManifest, Models, Neighbor, NoModels, Open, Question, QuestionAnswer, ResultKind, Shot,
-    State, Subject, SubjectContext, TrainParams, TrainResponse, TrainSubject, UPPER, decide,
+    Answer, Ask, Classifier, ClassifyParams, Decided, DecisionRef, FineTuningJob,
+    FineTuningJobRequest, Judged, LineKeys, Method, ModelManifest, Models, Neighbor, NoModels,
+    Open, Question, ResultKind, Settle, Shot, State, Subject, SubjectContext, Supervised,
+    SystemOneRequest, SystemOneResponse, TrainingLine, UPPER, decide,
 };
 pub use notices::Notices;
 pub use registry::{Registry, plugin_of};

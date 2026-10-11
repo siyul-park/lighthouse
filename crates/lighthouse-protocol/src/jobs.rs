@@ -7,28 +7,77 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{DecisionRef, LabelSource, ModelManifest, Question, ResultKind, State, TrainSubject};
+use crate::{ModelManifest, Question, ResultKind, State};
 
-/// What a finished training gives the host: the artifact, content-addressed
-/// (`sha256:<hex>`), and the numbers the trainer measured, such as
-/// out-of-fold precision and recall.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct TrainResponse {
-    pub artifact: String,
-    #[serde(default)]
-    pub metrics: BTreeMap<String, Value>,
+/// One message of a supervised fine-tuning line, in OpenAI's chat format.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ChatMessage {
+    /// `system`, `user` or `assistant`.
+    pub role: String,
+    pub content: String,
 }
 
-/// One line of a training file: what a model is asked, and the answer the
-/// labels give.
+/// One line of a training file, in OpenAI's supervised fine-tuning format with
+/// the keys Lighthouse adds (mlops §2b). The `system` message is the
+/// TypeSafe question as a JSON string, the `user` message the `state`, and
+/// the `assistant` message the label as a TypeSafe answer, `{"type":"noul",
+/// "noul":1}` for a fail and `0` for a pass.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct TrainLine {
-    pub state: State,
-    pub questions: BTreeMap<String, Question>,
-    /// `fail` or `pass`.
-    pub label: ResultKind,
+pub struct TrainingLine {
+    pub messages: Vec<ChatMessage>,
+    /// How much the label is trusted, 0 to 1.
     pub weight: f64,
-    pub source: LabelSource,
+    /// The cross-validation group: subjects of one group are never split
+    /// between a training and a validation fold.
+    pub group: String,
+    pub decision: String,
+    /// The subject's key.
+    pub key: String,
+    /// Who gave the label, as a PROV `wasAttributedTo` object.
+    pub attribution: Value,
+}
+
+impl TrainingLine {
+    /// The line for a subject asked `question` and labelled `label` (`Review`
+    /// is no label and is read as a pass).
+    pub fn new(question: &Question, state: &State, label: ResultKind, keys: LineKeys<'_>) -> Self {
+        let json = |value: Value| value.to_string();
+        let noul = i32::from(label == ResultKind::Fail);
+        let message = |role: &str, content: String| ChatMessage {
+            role: role.to_owned(),
+            content,
+        };
+        Self {
+            messages: vec![
+                message(
+                    "system",
+                    json(serde_json::to_value(question).unwrap_or_default()),
+                ),
+                message(
+                    "user",
+                    json(serde_json::to_value(state).unwrap_or_default()),
+                ),
+                message(
+                    "assistant",
+                    json(serde_json::json!({"type": "noul", "noul": noul})),
+                ),
+            ],
+            weight: keys.weight,
+            group: keys.group.to_owned(),
+            decision: keys.decision.to_owned(),
+            key: keys.key.to_owned(),
+            attribution: keys.attribution,
+        }
+    }
+}
+
+/// What Lighthouse adds to a training line besides the chat messages.
+pub struct LineKeys<'a> {
+    pub weight: f64,
+    pub group: &'a str,
+    pub decision: &'a str,
+    pub key: &'a str,
+    pub attribution: Value,
 }
 
 /// The supervised method of a fine-tuning job.
@@ -48,9 +97,11 @@ pub struct Method {
 }
 
 /// The body of OpenAI's fine-tuning job creation (`POST /v1/fine_tuning/jobs`),
-/// which `lighthouse/train` takes verbatim. `training_file` is the path of a
-/// JSON Lines file of [`TrainLine`]s; `metadata` names the `decision` and the
-/// `dir` the artifact goes to.
+/// which `lighthouse/train` takes verbatim. `training_file` is the digest
+/// (`sha256:<hex>`) of a JSON Lines file of [`TrainingLine`]s in the host's
+/// dataset store; `metadata` names the `decision`, the `datasets` directory
+/// the file is in (`<hex>.jsonl` under `sha256/`) and the `dir` the artifact
+/// goes to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct FineTuningJobRequest {
     pub model: String,
@@ -211,22 +262,4 @@ impl ModelList {
             })
             .collect()
     }
-}
-
-/// The training file: one [`TrainLine`] per labelled subject, as JSON Lines.
-pub fn training_file(decision: &DecisionRef, subjects: &[TrainSubject]) -> String {
-    let question = BTreeMap::from([(decision.id.clone(), Question::of(decision))]);
-    let mut text = String::new();
-    for subject in subjects {
-        let line = TrainLine {
-            state: subject.subject.state(),
-            questions: question.clone(),
-            label: subject.label,
-            weight: subject.weight,
-            source: subject.source,
-        };
-        text.push_str(&serde_json::to_string(&line).unwrap_or_default());
-        text.push('\n');
-    }
-    text
 }

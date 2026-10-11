@@ -383,14 +383,11 @@ impl Run<'_> {
             frame.set_cel(name, bound);
         }
         let found = frame.truth(&rule.condition)?;
-        let kind = match (&rule.review, found) {
-            (_, true) => None,
+        match (&rule.review, found) {
             (None, false) => return Ok(None),
-            (Some(review), false) => match review.asks(&frame)? {
-                Some(kind) => kind,
-                None => return Ok(None),
-            },
-        };
+            (Some(review), false) if !review.asks(&frame)? => return Ok(None),
+            _ => {}
+        }
         // The message and evidence of a subject only suspected may read what
         // the subject does not have: they are then left empty.
         let message = frame.text(&rule.message);
@@ -426,7 +423,6 @@ impl Run<'_> {
             let fact = review.fact_of(&frame)?;
             self.candidates.borrow_mut().push(Candidate {
                 diagnostic: diagnostic.clone(),
-                kind,
                 fact,
                 decided: found,
             });

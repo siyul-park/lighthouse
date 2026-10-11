@@ -1,8 +1,12 @@
 use std::fs;
 
+use lighthouse_engine::ModelOptions;
 use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};
-use lighthouse_plugin::{LabelSource, ResultKind};
-use lighthouse_session::labels::{Baseline, collect};
+use lighthouse_session::{
+    Session,
+    labels::{Baseline, Collect, Label, Source},
+    metrics::Truth,
+};
 use lighthouse_spec::Catalog;
 use lighthouse_store::{NewJudgment, Observed, Run, Stamp, Store, Unchecked};
 use serde_json::json;
@@ -56,10 +60,33 @@ fn judge(
 }
 
 fn who(kind: AgentKind, id: &str) -> Attribution {
-    Attribution {
-        kind,
-        id: Some(id.to_owned()),
+    Attribution::new(kind, Some(id.to_owned()))
+}
+
+fn model(id: &str) -> Attribution {
+    Attribution::model(id)
+}
+
+fn collect(
+    root: &std::path::Path,
+    baseline: Option<&Baseline>,
+    exclude: Option<&str>,
+) -> Vec<Label> {
+    let catalog = Catalog::bundled().clone();
+    let decision = catalog.decision(RULE).unwrap().clone();
+    let session = Session::bare(root.to_path_buf()).unwrap();
+    Collect {
+        session: &session,
+        catalog: &catalog,
+        decision: &decision,
+        rule: RULE,
+        baseline,
+        exclude_model: exclude,
+        models: ModelOptions::default(),
+        examples: false,
     }
+    .labels()
+    .unwrap()
 }
 
 #[test]
@@ -68,7 +95,7 @@ fn labels_weigh_by_who_gave_them_and_skip_other_meanings_and_the_model_itself() 
     let decision = Catalog::bundled().decision(RULE).unwrap().clone();
     let meaning = decision.meaning_version();
     let mut store = Store::open(dir.path()).unwrap();
-    let names = ["p", "a", "m", "self", "old", "na"];
+    let names = ["p", "a", "m", "self", "old", "na", "zz", "b1"];
     store
         .record(&Run {
             observed: names.iter().map(|n| observed(n)).collect(),
@@ -100,14 +127,14 @@ fn labels_weigh_by_who_gave_them_and_skip_other_meanings_and_the_model_itself() 
         &mut store,
         "m",
         Judgment::Fail,
-        who(AgentKind::SoftwareAgent, "openai/gpt@v1"),
+        model("openai/gpt@v1"),
         &meaning,
     );
     judge(
         &mut store,
         "self",
         Judgment::Fail,
-        who(AgentKind::SoftwareAgent, "local/x@v2"),
+        model("local/x@v2"),
         &meaning,
     );
     judge(
@@ -124,6 +151,37 @@ fn labels_weigh_by_who_gave_them_and_skip_other_meanings_and_the_model_itself() 
         who(AgentKind::Person, "kim"),
         &meaning,
     );
+    // One subject judged by a person, then a coding agent, then a model: the
+    // person's label stands, whoever spoke last.
+    judge(
+        &mut store,
+        "zz",
+        Judgment::Fail,
+        who(AgentKind::Person, "kim"),
+        &meaning,
+    );
+    judge(
+        &mut store,
+        "zz",
+        Judgment::Pass,
+        who(AgentKind::SoftwareAgent, "claude"),
+        &meaning,
+    );
+    judge(
+        &mut store,
+        "zz",
+        Judgment::Pass,
+        model("openai/gpt@v1"),
+        &meaning,
+    );
+    // A reviewed table outranks a coding agent.
+    judge(
+        &mut store,
+        "b1",
+        Judgment::Pass,
+        who(AgentKind::SoftwareAgent, "claude"),
+        &meaning,
+    );
     drop(store);
 
     let table = dir.path().join("t.tsv");
@@ -136,25 +194,38 @@ fn labels_weigh_by_who_gave_them_and_skip_other_meanings_and_the_model_itself() 
         file: &table,
         repo: Some("cel"),
     };
-    let labels = collect(dir.path(), &decision, Some(&baseline), Some("local/x")).unwrap();
-    let by = |fp: &str| labels.iter().find(|l| l.fingerprint == fp);
+    let labels = collect(dir.path(), Some(&baseline), Some("local/x"));
+    let by = |key: &str| labels.iter().find(|l| l.key == key);
 
     let p = by("p").unwrap();
     assert_eq!(
-        (p.kind, p.weight, p.source),
-        (ResultKind::Fail, 1.0, LabelSource::Person)
+        (p.truth, p.weight, p.source),
+        (Truth::Fail, 1.0, Source::Person)
     );
-    assert_eq!(by("a").unwrap().weight, 0.7);
+    let a = by("a").unwrap();
+    assert_eq!(
+        (a.truth, a.weight, a.source),
+        (Truth::Pass, 0.7, Source::Agent)
+    );
     let m = by("m").unwrap();
-    assert_eq!((m.weight, m.source), (0.5, LabelSource::Model));
+    assert_eq!((m.weight, m.source), (0.5, Source::Model));
+    assert_eq!(m.attribution["hadRole"], "model");
     assert!(
         by("self").is_none(),
         "a model never trains on its own labels"
     );
     assert!(by("old").is_none(), "another meaning version is no label");
-    assert!(by("na").is_none());
-    assert_eq!(by("b1").unwrap().source, LabelSource::Baseline);
-    assert_eq!(by("b2").unwrap().kind, ResultKind::Pass);
+    let na = by("na").unwrap();
+    assert_eq!(
+        na.truth,
+        Truth::NotApplicable,
+        "the selector is graded by it"
+    );
+    let all = by("zz").unwrap();
+    assert_eq!((all.truth, all.source), (Truth::Fail, Source::Person));
+    let b1 = by("b1").unwrap();
+    assert_eq!((b1.truth, b1.source), (Truth::Fail, Source::Tsv));
+    assert_eq!(by("b2").unwrap().truth, Truth::Pass);
     assert!(by("b3").is_none() && by("b4").is_none());
-    assert_eq!(labels.len(), 5);
+    assert_eq!(labels.len(), 7);
 }

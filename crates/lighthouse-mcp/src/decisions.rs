@@ -38,8 +38,6 @@ pub struct EvalArgs {
     baseline: Option<std::path::PathBuf>,
     #[serde(default)]
     audit: Option<usize>,
-    #[serde(default)]
-    no_models: bool,
 }
 
 pub fn eval(args: EvalArgs) -> Outcome {
@@ -52,7 +50,6 @@ pub fn eval(args: EvalArgs) -> Outcome {
         repos: Vec::new(),
         candidate: args.check,
         config: None,
-        no_models: args.no_models,
         audit: args.audit,
     })
     .map_err(fail)?;

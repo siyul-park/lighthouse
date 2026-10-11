@@ -36,21 +36,26 @@ spec:
       files: [{ path: src/lib.rs, body: "pub fn fine() {}\n" }]
 "#;
 
-/// Answers System One questions by the source of the subject: `maybe_bad`
-/// is surely a violation, `maybe_good` surely not, anything else unsure. It
-/// counts its runs in `calls`.
-const SCRIPT: &str = r#"import json, sys
-request = json.load(sys.stdin)
-open("calls", "a").write("x")
-text = request["state"]["text"]
-p = 0.95 if "maybe_bad" in text else 0.05 if "maybe_good" in text else 0.5
-answers = {id: {"type": "noul", "noul": p} for id in request["questions"]}
-print(json.dumps({"model": request["model"], "answers": answers}))
-"#;
-
 const LIB: &str = "pub fn bad_one() {}\npub fn maybe_bad() {}\npub fn maybe_good() {}\npub fn maybe_unsure() {}\npub fn fine() {}\n";
 
-const BOUND: &str = "[models]\nclassification = \"fake/any\"\n[models.providers.fake]\ntype = \"command\"\nargv = [\"python3\", \"model.py\"]\n";
+/// The `fake-model` binary, which is also a `command` provider.
+fn fake_model() -> String {
+    let dir = lighthouse_test_support::fake_model();
+    dir.join("fake-model").to_str().unwrap().to_owned()
+}
+
+/// A project binding `fake/any` to the command provider in `mode`.
+fn provider(mode: &str) -> String {
+    format!(
+        "[models]\nclassification = \"fake/any\"\n[models.providers.fake]\ntype = \"command\"\nargv = [{:?}, {mode:?}]\n",
+        fake_model()
+    )
+}
+
+/// The bound model: answers by the source of the subject.
+fn bound() -> String {
+    provider("command")
+}
 
 pub(crate) fn project(models: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
@@ -69,7 +74,6 @@ pub(crate) fn project(models: &str) -> tempfile::TempDir {
         "[package]\nname = \"demo\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
     );
     write(dir.path(), "src/lib.rs", LIB);
-    write(dir.path(), "model.py", SCRIPT);
     write(dir.path(), ".lighthouse/decisions/ban.yaml", DECISION);
     dir
 }
@@ -116,7 +120,7 @@ fn calls(dir: &Path) -> usize {
 
 #[test]
 fn a_bound_model_fails_what_it_is_sure_of_and_the_rest_is_left_to_review() {
-    let dir = project(BOUND);
+    let dir = project(&bound());
     let (code, log) = check(dir.path(), &["--no-cache"]);
     let found = results(&log);
     assert_eq!(count(&found, "fail"), 2, "{found:?}");
@@ -134,8 +138,8 @@ fn a_bound_model_fails_what_it_is_sure_of_and_the_rest_is_left_to_review() {
 
 #[test]
 fn without_a_binding_or_with_models_off_every_abstention_is_a_review() {
-    for (models, args) in [("", &[][..]), (BOUND, &["--no-models"][..])] {
-        let dir = project(models);
+    for (models, args) in [(String::new(), &[][..]), (bound(), &["--no-models"][..])] {
+        let dir = project(&models);
         let mut all = vec!["--no-cache"];
         all.extend(args);
         let (_, log) = check(dir.path(), &all);
@@ -148,7 +152,7 @@ fn without_a_binding_or_with_models_off_every_abstention_is_a_review() {
 
 #[test]
 fn the_budget_caps_what_a_model_that_costs_is_asked() {
-    let dir = project(BOUND);
+    let dir = project(&bound());
     let text = fs::read_to_string(dir.path().join("lighthouse.toml")).unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
@@ -160,13 +164,17 @@ fn the_budget_caps_what_a_model_that_costs_is_asked() {
     .unwrap();
     let (_, log) = check(dir.path(), &["--no-cache"]);
     let found = results(&log);
-    // One of the three candidates was asked; the others stay for review.
-    assert_eq!(count(&found, "review"), 2, "{found:?}");
+    // One request was sent, for one of the three candidates (which one
+    // depends on how the files are scheduled); the others stay for review,
+    // and so does the one asked unless the model failed it.
+    assert_eq!(calls(dir.path()), 1);
+    assert!(count(&found, "review") >= 2, "{found:?}");
+    assert_eq!(found.len(), 4, "{found:?}");
 }
 
 #[test]
 fn answers_are_cached_and_a_warm_run_prints_what_a_cold_run_prints() {
-    let dir = project(BOUND);
+    let dir = project(&bound());
     let (_, cold) = check(dir.path(), &["--no-cache"]);
     assert_eq!(calls(dir.path()), 3);
     let (_, first) = check(dir.path(), &[]);
@@ -179,8 +187,7 @@ fn answers_are_cached_and_a_warm_run_prints_what_a_cold_run_prints() {
 
 #[test]
 fn a_model_that_fails_leaves_its_subjects_to_review_and_the_run_complete() {
-    let dir = project(BOUND);
-    write(dir.path(), "model.py", "import sys\nsys.exit(3)\n");
+    let dir = project(&provider("fail"));
     let (code, log) = check(dir.path(), &["--no-cache"]);
     assert_eq!(code, 0);
     assert_eq!(count(&results(&log), "review"), 3);
@@ -192,7 +199,7 @@ fn a_model_that_fails_leaves_its_subjects_to_review_and_the_run_complete() {
 
 #[test]
 fn a_command_model_is_not_run_until_the_project_is_trusted() {
-    let dir = project(BOUND);
+    let dir = project(&bound());
     let out = Command::cargo_bin("lighthouse")
         .unwrap()
         .current_dir(dir.path())
@@ -208,7 +215,7 @@ fn a_command_model_is_not_run_until_the_project_is_trusted() {
 
 #[test]
 fn recorded_model_labels_are_judgments_attributed_to_the_model() {
-    let dir = project(BOUND);
+    let dir = project(&bound());
     Command::cargo_bin("lighthouse")
         .unwrap()
         .current_dir(dir.path())
@@ -230,18 +237,19 @@ fn recorded_model_labels_are_judgments_attributed_to_the_model() {
     assert!(id.starts_with("fake/any@"), "{id}");
 }
 
-/// Answers 0.5 to everything, in an envelope, as text holding fenced JSON.
-const WEAK: &str = r#"import sys
-sys.stdin.read()
-print('{"result": "```json\\n{\\"noul\\": 0.5}\\n```"}')
-"#;
-
-const LAYERED: &str = "[models]\nclassification = \"fake/any\"\n[models.providers.fake]\ntype = \"command\"\nargv = [\"python3\", \"model.py\"]\n[models.providers.weak]\ntype = \"command\"\nargv = [\"python3\", \"weak.py\"]\nstdin = \"prompt\"\npointer = \"/result\"\n";
+/// The bound model plus a weaker one that takes a prompt and answers through
+/// a pointer.
+fn layered() -> String {
+    format!(
+        "{}[models.providers.weak]\ntype = \"command\"\nargv = [{:?}, \"weak\"]\nstdin = \"prompt\"\npointer = \"/result\"\n",
+        bound(),
+        fake_model()
+    )
+}
 
 #[test]
 fn an_abstention_falls_through_the_layers_and_a_prompt_command_answers_through_a_pointer() {
-    let dir = project(LAYERED);
-    write(dir.path(), "weak.py", WEAK);
+    let dir = project(&layered());
     let text = fs::read_to_string(dir.path().join("lighthouse.toml")).unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),

@@ -4,7 +4,7 @@
 
 use serde_json::{Value, json};
 
-use crate::{ClassifyParams, Question, State};
+use crate::{Question, State, SystemOneRequest};
 
 /// What the model is told about its job.
 const INSTRUCTIONS: &str = "You judge one design decision about source code. \
@@ -15,13 +15,18 @@ Reply with JSON only, no other text: {\"noul\": p}, where p is the probability, 
 from 0 to 1, that the subject violates the requirement. Use 0.5 when the code shown is \
 not enough to tell.";
 
-/// The system part for one question: the instructions, the requirement and
-/// the examples of both criteria.
+/// The system part for one question: the instructions, the requirement, the
+/// check's prompt when it differs from the requirement, and the examples of
+/// both criteria.
 pub fn system(id: &str, question: &Question) -> String {
+    let instructions = &question.instructions;
     let mut out = format!(
         "{INSTRUCTIONS}\n\nDecision: {id}\nRequirement: {}\n",
-        question.instructions.prompt
+        instructions.requirement
     );
+    if instructions.prompt != instructions.requirement {
+        out.push_str(&format!("Prompt: {}\n", instructions.prompt));
+    }
     for (criterion, side) in [
         ("true", &question.criteria.fail),
         ("false", &question.criteria.pass),
@@ -59,7 +64,7 @@ pub fn subject(state: &State) -> String {
 }
 
 /// One text with everything, for a program that reads a prompt on stdin.
-pub fn prompt(params: &ClassifyParams) -> String {
+pub fn prompt(params: &SystemOneRequest) -> String {
     let mut out = String::new();
     for (id, question) in &params.questions {
         out.push_str(&system(id, question));

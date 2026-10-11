@@ -89,12 +89,23 @@ impl Message {
 
     /// An error response; `id` is `None` when the request could not be read.
     pub fn failure(id: Option<Id>, code: i64, message: impl Into<String>) -> Self {
+        Self::failure_with(id, code, message, None)
+    }
+
+    /// An error response whose `data` carries the body of the error behind it,
+    /// such as the one an API answered with.
+    pub fn failure_with(
+        id: Option<Id>,
+        code: i64,
+        message: impl Into<String>,
+        data: Option<Value>,
+    ) -> Self {
         Self {
             id,
             error: Some(ErrorObject {
                 code,
                 message: message.into(),
-                data: None,
+                data,
             }),
             ..Self::empty()
         }

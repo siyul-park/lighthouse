@@ -3,8 +3,8 @@
 
 use lighthouse_engine::{Engine, ModelOptions};
 use lighthouse_plugin::{
-    Classifier, ClassifyParams, ClassifyResult, DecisionRef, Error, ModelManifest, Open, Plugin,
-    PluginManifest, QuestionAnswer, Registry, State, TrainParams, TrainResponse,
+    Answer, Classifier, ClassifyParams, DecisionRef, Error, FineTuningJob, FineTuningJobRequest,
+    ModelManifest, Open, Plugin, PluginManifest, Registry, State, SystemOneResponse,
 };
 use lighthouse_spec::{Catalog, Config};
 
@@ -16,14 +16,15 @@ impl Classifier for Echo {
         &self.0
     }
 
-    fn classify(&self, params: &ClassifyParams) -> Result<ClassifyResult, Error> {
-        Ok(ClassifyResult {
-            model: params.model.clone(),
+    fn classify(&self, params: &ClassifyParams) -> Result<SystemOneResponse, Error> {
+        Ok(SystemOneResponse {
+            model: params.request.model.clone(),
             answers: params
+                .request
                 .questions
                 .keys()
                 .map(|id| {
-                    let answer = QuestionAnswer {
+                    let answer = Answer {
                         kind: "noul".to_owned(),
                         noul: 0.25,
                     };
@@ -34,7 +35,7 @@ impl Classifier for Echo {
         })
     }
 
-    fn train(&self, _: &TrainParams) -> Result<TrainResponse, Error> {
+    fn train(&self, _: &FineTuningJobRequest) -> Result<FineTuningJob, Error> {
         Err(Error::Failed("no".to_owned()))
     }
 }
@@ -100,18 +101,20 @@ fn a_reference_names_a_provider_and_the_model_it_is_asked_for() {
     let model = engine.model("work/some/model:free").unwrap();
     let answer = model
         .classify(&ClassifyParams {
-            state: State {
-                language: "go".to_owned(),
-                file: "a.go".to_owned(),
-                text: String::new(),
-                facts: serde_json::Value::Null,
-                neighbors: Vec::new(),
+            request: lighthouse_plugin::SystemOneRequest {
+                state: State {
+                    language: "go".to_owned(),
+                    file: "a.go".to_owned(),
+                    text: String::new(),
+                    facts: serde_json::Value::Null,
+                    neighbors: Vec::new(),
+                },
+                model: String::new(),
+                questions: std::collections::BTreeMap::from([(
+                    "d/x".to_owned(),
+                    lighthouse_plugin::Question::of(&decision()),
+                )]),
             },
-            model: String::new(),
-            questions: std::collections::BTreeMap::from([(
-                "d/x".to_owned(),
-                lighthouse_plugin::Question::of(&decision()),
-            )]),
             options: serde_json::Map::new(),
         })
         .unwrap();
@@ -131,13 +134,13 @@ fn a_subject_nothing_decided_says_why() {
 }
 
 #[test]
-fn a_probability_decides_by_the_band_and_never_clears_a_subject() {
-    use lighthouse_plugin::{ResultKind, UPPER, decide};
+fn a_probability_fails_a_subject_only_at_or_above_the_upper_bound() {
+    use lighthouse_plugin::{UPPER, decide};
 
-    assert_eq!(decide(0.95, UPPER), (ResultKind::Fail, 0.95));
-    assert_eq!(decide(0.5, UPPER).0, ResultKind::Review);
-    // Even a model that is sure the subject is fine leaves it for review.
-    let (kind, confidence) = decide(0.02, UPPER);
-    assert_eq!(kind, ResultKind::Review);
-    assert!(confidence > 0.97);
+    assert_eq!(decide(0.95, UPPER), Some(0.95));
+    assert_eq!(decide(UPPER, UPPER), Some(UPPER));
+    assert_eq!(decide(0.5, UPPER), None);
+    // Even a model that is sure the subject is fine leaves it for review: the
+    // band has no lower bound in M1.
+    assert_eq!(decide(0.02, UPPER), None);
 }

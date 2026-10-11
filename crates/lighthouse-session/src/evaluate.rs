@@ -13,8 +13,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lighthouse_engine::ModelOptions;
 use lighthouse_model::Severity;
-use lighthouse_plugin::ResultKind;
 use lighthouse_spec::{Catalog, Evaluation, local_files};
 use serde::Serialize;
 
@@ -22,8 +22,9 @@ use crate::{
     CheckRequest, ModelFlags, Result, Session,
     assemble::{Gathered, Part, Usage},
     check,
-    labels::{Baseline, Label, collect},
-    metrics::{Metrics, Outcome, Rate, Truth},
+    labels::{Baseline, Collect, Label, Source},
+    metrics::{Metrics, Outcome, Rate},
+    samples,
 };
 
 pub(crate) const CAVEAT: &str = "labelled positives come mostly from flagged findings, so recall is an upper bound; sample unflagged subjects for a person to label";
@@ -45,8 +46,6 @@ pub struct EvalRequest {
     /// A decision file whose check is evaluated beside the current one.
     pub candidate: Option<PathBuf>,
     pub config: Option<PathBuf>,
-    /// Leave models out of both checks.
-    pub no_models: bool,
     /// Write this many selected subjects the check did not flag to a table
     /// a person labels, to measure recall.
     pub audit: Option<usize>,
@@ -77,9 +76,8 @@ pub struct EvalReport {
     /// How often the candidate answers as the current check does.
     pub agreement: Option<Rate>,
     /// Whether the check (the candidate, when there is one) meets the
-    /// evaluation policy by the lower bound of its interval: the precision
-    /// target when misses are tolerated, the recall target when false alarms
-    /// are.
+    /// evaluation policy by the point estimates of its precision and, when the
+    /// policy sets a target, of its recall; the intervals are shown beside.
     pub meets_policy: Option<bool>,
     pub caveat: &'static str,
     /// The table of unflagged subjects written for a person to label.
@@ -129,6 +127,15 @@ impl Setup {
     }
 }
 
+/// What one repository is evaluated with.
+struct Inputs<'a> {
+    config: Option<&'a Path>,
+    baseline: Option<&'a Path>,
+    candidate: Option<&'a Path>,
+    /// Whether the examples of the decision are subjects here (once per run).
+    examples: bool,
+}
+
 /// Runs the evaluation.
 pub fn eval(request: &EvalRequest) -> Result<EvalReport> {
     let start = env::current_dir()?;
@@ -152,14 +159,18 @@ pub fn eval(request: &EvalRequest) -> Result<EvalReport> {
     let candidate = request.candidate.as_ref().map(|c| start.join(c));
     let mut gathered = Gathered::default();
     let outcome = (|| -> Result<_> {
-        for repo in &repos {
+        for (at, repo) in repos.iter().enumerate() {
             env::set_current_dir(&repo.dir)?;
             gathered.add(one(
                 request,
                 repo,
-                config.as_deref(),
-                baseline.as_deref(),
-                candidate.as_deref(),
+                &Inputs {
+                    config: config.as_deref(),
+                    baseline: baseline.as_deref(),
+                    candidate: candidate.as_deref(),
+                    // The examples are the decision's, not the repository's.
+                    examples: at == 0,
+                },
             )?);
         }
         Ok(())
@@ -185,44 +196,53 @@ pub(crate) fn write_audit(request: &EvalRequest, rows: Vec<String>) -> Result<Op
     Ok(Some(path))
 }
 
-fn one(
-    request: &EvalRequest,
-    repo: &Repo,
-    config: Option<&Path>,
-    baseline: Option<&Path>,
-    candidate: Option<&Path>,
-) -> Result<Part> {
-    let session = Session::load(config)?;
-    let root = session.root.clone();
+fn one(request: &EvalRequest, repo: &Repo, inputs: &Inputs) -> Result<Part> {
+    let session = Session::load(inputs.config)?;
     let catalog = session.catalog()?;
     let decision = catalog
         .decision(&request.decision)
         .ok_or_else(|| format!("unknown decision `{}`", request.decision))?
         .clone();
     let policy = session.config.models().policy(&request.decision);
-    let table = baseline.map(|file| Baseline {
+    let table = inputs.baseline.map(|file| Baseline {
         file,
         repo: repo.name.as_deref(),
     });
-    // Only labels a person gave or an example shows grade a check; weak labels
-    // (an agent's, a model's) never do.
-    let labels: Vec<Label> = collect(&root, &decision, table.as_ref(), None)?
-        .into_iter()
-        .filter(|l| l.weight >= crate::labels::WEIGHT_PERSON)
-        .collect();
-    let current = run(request, config, &request.decision, None)?;
-    let truth = |l: &Label| match l.kind {
-        ResultKind::Fail => Truth::Fail,
-        _ => Truth::Pass,
+    let models = ModelOptions {
+        all: true,
+        ..ModelOptions::default()
+    };
+    // Only labels a person gave, a reviewed table holds or an example shows
+    // grade a check; weak labels (an agent's, a model's) never do.
+    let labels: Vec<Label> = Collect {
+        session: &session,
+        catalog: &catalog,
+        decision: &decision,
+        rule: &request.decision,
+        baseline: table.as_ref(),
+        exclude_model: None,
+        models: models.clone(),
+        examples: inputs.examples,
+    }
+    .labels()?
+    .into_iter()
+    .filter(|l| l.weight >= Source::Person.weight())
+    .collect();
+    let current = run(request, inputs.config, &request.decision, None)?;
+    let outcome_of = |found: &Found, l: &Label| {
+        l.observed.unwrap_or_else(|| {
+            found
+                .by_fingerprint
+                .get(&l.key)
+                .copied()
+                .unwrap_or(Outcome::Unselected)
+        })
     };
     let mut part = Part {
         policy,
         current: labels
             .iter()
-            .map(|l| {
-                let outcome = current.by_fingerprint.get(&l.fingerprint);
-                (truth(l), outcome.copied().unwrap_or(Outcome::Unselected))
-            })
+            .map(|l| (l.truth, outcome_of(&current, l)))
             .collect(),
         candidate: Vec::new(),
         pairs: Vec::new(),
@@ -232,32 +252,53 @@ fn one(
         check: request.decision.clone(),
         candidate_check: None,
     };
-    if let Some(file) = candidate {
-        let (id, setup) = Setup::read(&root, file)?;
-        let found = run(request, config, &id, Some(&setup))?;
+    if let Some(file) = inputs.candidate {
+        let (id, setup) = Setup::read(&session.root, file)?;
+        let found = run(request, inputs.config, &id, Some(&setup))?;
+        let beside = candidate_session(inputs.config, &setup, &id)?;
+        let shown: BTreeMap<String, Outcome> = if inputs.examples {
+            samples::shown(&beside, &beside.catalog()?, &decision, &id, &models)?
+                .into_iter()
+                .map(|s| (s.key, s.outcome))
+                .collect()
+        } else {
+            BTreeMap::new()
+        };
         for label in &labels {
-            let was = current
-                .by_fingerprint
-                .get(&label.fingerprint)
-                .copied()
-                .unwrap_or(Outcome::Unselected);
-            let now = current
-                .place
-                .get(&label.fingerprint)
-                .and_then(|place| found.by_place.get(place))
-                .copied()
-                .unwrap_or(Outcome::Unselected);
-            part.candidate.push((truth(label), now));
+            let was = outcome_of(&current, label);
+            let now = if label.observed.is_some() {
+                shown
+                    .get(&label.key)
+                    .copied()
+                    .unwrap_or(Outcome::Unselected)
+            } else {
+                current
+                    .place
+                    .get(&label.key)
+                    .and_then(|place| found.by_place.get(place))
+                    .copied()
+                    .unwrap_or(Outcome::Unselected)
+            };
+            part.candidate.push((label.truth, now));
             part.pairs.push((was, now));
         }
         part.candidate_decided = Usage::of(&found);
         part.audit = audit_rows(request, repo, &found);
         part.candidate_check = Some(id);
     }
-    if candidate.is_none() {
+    if inputs.candidate.is_none() {
         part.audit = audit_rows(request, repo, &current);
     }
     Ok(part)
+}
+
+/// The project with the candidate's decisions on top and its rule enabled.
+fn candidate_session(config: Option<&Path>, setup: &Setup, rule: &str) -> Result<Session> {
+    let mut session = Session::load(config)?;
+    let local = Catalog::from_local(setup.files.clone())?;
+    session = session.with_local(Some(local));
+    session.config = session.config.with_rule(rule, Severity::Warn);
+    Ok(session)
 }
 
 /// The rows of an audit table for a repository: unflagged selected subjects,
@@ -285,12 +326,10 @@ fn run(
     rule: &str,
     setup: Option<&Setup>,
 ) -> Result<Found> {
-    let mut session = Session::load(config)?;
-    if let Some(setup) = setup {
-        let local = Catalog::from_local(setup.files.clone())?;
-        session = session.with_local(Some(local));
-        session.config = session.config.with_rule(rule, Severity::Warn);
-    }
+    let session = match setup {
+        Some(setup) => candidate_session(config, setup, rule)?,
+        None => Session::load(config)?,
+    };
     let checked = check(
         session,
         &CheckRequest {
@@ -298,7 +337,6 @@ fn run(
             store: false,
             cache: false,
             models: ModelFlags {
-                off: request.no_models,
                 all: true,
                 collect: request.audit.is_some(),
                 ..ModelFlags::default()
@@ -322,7 +360,7 @@ fn run(
         let fp = d.fingerprint.as_str().to_owned();
         if result == Outcome::Review {
             found.reviews += 1;
-        } else if d.evidence.get("source").and_then(|v| v.as_str()) == Some("model") {
+        } else if d.evidence.get("model").is_some() {
             found.model_decided += 1;
         }
         found.by_fingerprint.insert(fp.clone(), result);

@@ -1,5 +1,24 @@
 {
   "$defs": {
+    "Answer": {
+      "description": "The answer to a question: P(fail).",
+      "properties": {
+        "noul": {
+          "description": "The probability that the subject fails the decision, from 0 to 1.",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "default": "noul",
+          "description": "`noul`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "noul"
+      ],
+      "type": "object"
+    },
     "CacheRef": {
       "description": "The directory a provider may keep derived results in between runs.",
       "properties": {
@@ -82,7 +101,7 @@
       "type": "object"
     },
     "ClassifyParams": {
-      "description": "Params of `lighthouse/classify`: the body of TypeSafe's System One API\n(`POST /v1/systemone`), for one subject and the decisions judged on it,\nkeyed by decision id.",
+      "description": "Params of `lighthouse/classify`: System One's body, and beside it the\n`options` of the project's provider, for a plugin that needs them\n(`spec`, `baseUrl`, `keyEnv`). The options are never part of the body.",
       "properties": {
         "model": {
           "description": "The model asked: the part of the reference after the provider.",
@@ -90,7 +109,6 @@
         },
         "options": {
           "additionalProperties": true,
-          "description": "The `options` of the project's provider, for a plugin that needs them\n(`spec`, `baseUrl`, `keyEnv`). Not part of System One's body.",
           "type": "object"
         },
         "questions": {
@@ -107,29 +125,6 @@
         "state",
         "model",
         "questions"
-      ],
-      "type": "object"
-    },
-    "ClassifyResult": {
-      "description": "Result of `lighthouse/classify`: System One's response. Every question\nasked is answered; a missing answer is an abstention.",
-      "properties": {
-        "answers": {
-          "additionalProperties": {
-            "$ref": "#/$defs/QuestionAnswer"
-          },
-          "type": "object"
-        },
-        "model": {
-          "description": "The model that answered, with its version when it has one.",
-          "type": "string"
-        },
-        "usage": {
-          "default": null
-        }
-      },
-      "required": [
-        "model",
-        "answers"
       ],
       "type": "object"
     },
@@ -467,7 +462,7 @@
       "type": "object"
     },
     "FineTuningJobRequest": {
-      "description": "The body of OpenAI's fine-tuning job creation (`POST /v1/fine_tuning/jobs`),\nwhich `lighthouse/train` takes verbatim. `training_file` is the path of a\nJSON Lines file of [`TrainLine`]s; `metadata` names the `decision` and the\n`dir` the artifact goes to.",
+      "description": "The body of OpenAI's fine-tuning job creation (`POST /v1/fine_tuning/jobs`),\nwhich `lighthouse/train` takes verbatim. `training_file` is the digest\n(`sha256:<hex>`) of a JSON Lines file of [`TrainingLine`]s in the host's\ndataset store; `metadata` names the `decision`, the `datasets` directory\nthe file is in (`<hex>.jsonl` under `sha256/`) and the `dir` the artifact\ngoes to.",
       "properties": {
         "metadata": {
           "additionalProperties": {
@@ -1185,25 +1180,6 @@
       ],
       "type": "object"
     },
-    "QuestionAnswer": {
-      "description": "The answer to a question: P(fail).",
-      "properties": {
-        "noul": {
-          "description": "The probability that the subject fails the decision, from 0 to 1.",
-          "format": "double",
-          "type": "number"
-        },
-        "type": {
-          "description": "`noul`.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "type",
-        "noul"
-      ],
-      "type": "object"
-    },
     "Resolution": {
       "description": "How reliable an edge's target is.",
       "oneOf": [
@@ -1427,6 +1403,29 @@
           "type": "string"
         }
       ]
+    },
+    "SystemOneResponse": {
+      "description": "Result of `lighthouse/classify`: System One's response. Every question\nasked is answered; a missing answer is an abstention.",
+      "properties": {
+        "answers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Answer"
+          },
+          "type": "object"
+        },
+        "model": {
+          "default": "",
+          "description": "The model that answered, with its version when it has one.",
+          "type": "string"
+        },
+        "usage": {
+          "default": null
+        }
+      },
+      "required": [
+        "answers"
+      ],
+      "type": "object"
     },
     "TestCase": {
       "description": "A test symbol and the symbols it exercises.",

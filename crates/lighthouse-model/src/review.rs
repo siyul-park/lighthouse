@@ -186,15 +186,6 @@ pub enum AgentKind {
 }
 
 impl AgentKind {
-    /// How much a judgment by this kind of agent weighs against another's on the
-    /// same subject: a person over an agent (a model would rank below it).
-    pub fn strength(self) -> u8 {
-        match self {
-            Self::Person => 2,
-            Self::SoftwareAgent => 1,
-        }
-    }
-
     /// The PROV class: `Person` or `SoftwareAgent`.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -228,13 +219,65 @@ impl FromStr for AgentKind {
     }
 }
 
-/// `prov:wasAttributedTo`: who a record is attributed to.
+/// The role a software agent had in a record, PROV's `hadRole`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum Role {
+    /// A coding agent that reviewed the finding.
+    #[serde(rename = "agent")]
+    Agent,
+    /// A model that classified the subject.
+    #[serde(rename = "model")]
+    Model,
+}
+
+vocabulary!(Role, "role" {
+    Agent => "agent",
+    Model => "model",
+});
+
+/// `prov:wasAttributedTo`: who a record is attributed to, with the role the
+/// agent had (`prov:hadRole`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Attribution {
     #[serde(rename = "type")]
     pub kind: AgentKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    #[serde(rename = "hadRole", default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<Role>,
+}
+
+impl Attribution {
+    /// A person, or a coding agent: a software agent is one unless it says
+    /// otherwise.
+    pub fn new(kind: AgentKind, id: Option<String>) -> Self {
+        let role = (kind == AgentKind::SoftwareAgent).then_some(Role::Agent);
+        Self { kind, id, role }
+    }
+
+    /// A model, as `<provider>/<model>@<version>`.
+    pub fn model(id: impl Into<String>) -> Self {
+        Self {
+            kind: AgentKind::SoftwareAgent,
+            id: Some(id.into()),
+            role: Some(Role::Model),
+        }
+    }
+
+    /// Whether a model is the one who judged.
+    pub fn is_model(&self) -> bool {
+        self.kind == AgentKind::SoftwareAgent && self.role == Some(Role::Model)
+    }
+
+    /// How much a judgment by this agent weighs against another's on the same
+    /// subject: a person over a coding agent over a model.
+    pub fn strength(&self) -> u8 {
+        match (self.kind, self.role) {
+            (AgentKind::Person, _) => 3,
+            (AgentKind::SoftwareAgent, Some(Role::Model)) => 1,
+            (AgentKind::SoftwareAgent, _) => 2,
+        }
+    }
 }
 
 /// What a judgment teaches a model about the decision that raised the

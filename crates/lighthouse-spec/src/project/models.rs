@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{RuleSetting, spec::ProjectSpec};
 
-/// Calls a run may spend on models unless the project says.
+/// Requests a run may send to models that cost, unless the project says.
 pub const DEFAULT_BUDGET: usize = 200;
 /// The precision a check must reach unless the project says.
 pub const DEFAULT_PRECISION: f64 = 0.9;
@@ -54,7 +54,7 @@ pub enum ModelOutput {
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum ModelProvider {
     /// A plugin process that offers models. The `options` say how to reach
-    /// them (`format`, `baseUrl`, `keyEnv` for `model-http`); the model part of
+    /// them (`spec`, `baseUrl`, `keyEnv` for `model-http`); the model part of
     /// the reference goes with every request.
     Rpc {
         /// A listed plugin that offers models.
@@ -67,8 +67,9 @@ pub enum ModelProvider {
     },
     /// Any program that reads a request and prints an answer, under the
     /// process contract: no shell, its own process group, a time limit, a cap
-    /// on output, and the project's trust. An answer that does not fit the
-    /// task's shape is an abstention.
+    /// on output, an environment cleared to `PATH`, `HOME`, `LANG`, `TMPDIR`,
+    /// the declared `env` and the variable `keyEnv` names, and the project's
+    /// trust. An answer that does not fit the task's shape is an abstention.
     Command {
         /// The program and its arguments; `{model}` stands for the model part
         /// of the reference.
@@ -90,6 +91,13 @@ pub enum ModelProvider {
         /// How long one run may take, such as `90s`. Default: 120s.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         timeout: Option<String>,
+        /// Variables the program is given besides the allowlist.
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        env: BTreeMap<String, String>,
+        /// The variable of the user's environment that holds the program's
+        /// key; it is passed through, and no other secret is.
+        #[serde(default, rename = "keyEnv", skip_serializing_if = "Option::is_none")]
+        key_env: Option<String>,
     },
 }
 
@@ -99,7 +107,7 @@ pub enum ModelProvider {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ApiProvider {
     /// The API: `openai` (Chat Completions, which OpenRouter, Ollama, vLLM
-    /// and LM Studio also speak). Others will join.
+    /// and LM Studio also speak) or `typesafe` (System One). Others will join.
     pub spec: Specs,
     /// Where requests go. Default: the spec's own service.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -186,8 +194,8 @@ pub struct ModelsSpec {
     /// left to agent review.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<String>,
-    /// Subjects a run may put to models that cost something; the rest are
-    /// left to review. Default: 200.
+    /// Requests a run may send to models that cost something; the subjects
+    /// of the rest are left to review. Default: 200.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub budget: Option<usize>,
     /// The providers the project defines, by name; a name that is built in
@@ -203,17 +211,6 @@ impl ModelsSpec {
     }
 }
 
-/// Which error an evaluation tolerates when it cannot have both.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Tolerate {
-    /// Missed violations: precision is what counts.
-    #[default]
-    Fn,
-    /// False alarms: recall is what counts.
-    Fp,
-}
-
 /// How a rule's check is judged by `lighthouse eval`. A policy, not a
 /// meaning: changing it moves no meaning version.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -222,16 +219,16 @@ pub struct Evaluation {
     /// The precision a check must reach, from 0 to 1. Default: 0.9.
     #[serde(default = "default_precision")]
     pub precision: f64,
-    /// Default: `fn`.
-    #[serde(default)]
-    pub tolerate: Tolerate,
+    /// The recall a check must reach, from 0 to 1; no target when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recall: Option<f64>,
 }
 
 impl Default for Evaluation {
     fn default() -> Self {
         Self {
             precision: DEFAULT_PRECISION,
-            tolerate: Tolerate::default(),
+            recall: None,
         }
     }
 }

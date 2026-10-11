@@ -96,3 +96,14 @@ fn message_into_params_reads_absent_params_as_null() {
     assert_eq!(absent, None);
     assert!(Message::notification("exit").into_params::<u8>().is_err());
 }
+
+#[test]
+fn failure_with_carries_the_error_body_as_data() {
+    let body = json!({ "error": { "type": "rate_limit" } });
+    let failure = Message::failure_with(Some(Id::Number(2)), -32603, "busy", Some(body.clone()));
+    let error = roundtrip(&failure)
+        .into_result::<serde_json::Value>()
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(error.data, Some(body));
+}

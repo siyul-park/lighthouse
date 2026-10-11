@@ -170,8 +170,9 @@ https://docs.typesafe.ai/api, for one subject: `{state, model, questions}`.
   fails the decision, and its examples are the decision's invalid examples; `false` means it
   passes, with the valid ones.
 - `model` is the part of the reference after the provider (`openrouter/qwen/qwen3-coder:free`
-  sends `qwen/qwen3-coder:free`). Lighthouse adds `options`, the provider's `options`, for a
-  plugin that needs them (`spec`, `baseUrl`, `keyEnv`); a remote server ignores it.
+  sends `qwen/qwen3-coder:free`). Beside System One's body (`SystemOneRequest`) Lighthouse sends
+  `options`, the provider's `options`, for a plugin that needs them (`spec`, `baseUrl`, `keyEnv`);
+  they are never part of the body a remote server gets.
 
 It answers `{model, answers: {<decision id>: {type: "noul", noul}}, usage}`: `noul` is the
 probability that the subject fails. There is no reason. The host maps it, the same for every
@@ -182,9 +183,11 @@ max(p, 1 - p).
 `lighthouse/train` takes OpenAI's fine-tuning job body (`POST /v1/fine_tuning/jobs`):
 `{model, training_file, validation_file?, method: {type: "supervised", supervised:
 {hyperparameters}}, seed, suffix?, metadata}`, and answers the final `FineTuningJob`. Here
-`training_file` is the path of a JSON Lines file, one `{state, questions, label, weight, source}`
-per line (`label` is `pass` or `fail`, `source` is `example`, `baseline`, `person` or `model`);
-`metadata` carries the `decision` and the `dir` the host owns for the artifact. A successful job
+`training_file` is the digest `sha256:<hex>` of a JSON Lines file in the host's dataset store,
+`<datasets>/sha256/<hex>.jsonl`: one OpenAI chat fine-tuning line per subject (`messages`: the
+system and user prompts and the assistant's `{type, noul}`), in canonical JSON, with `weight`,
+`group`, `decision`, `key` and `attribution` beside them. `metadata` carries the `decision`, the
+`datasets` directory and the `dir` the host owns for the artifact. A successful job
 has `status: "succeeded"`, `fine_tuned_model: "sha256:<hex>"` (the artifact) and, as its first
 `result_files` entry, a JSON file of the metrics. The same `seed` is the same request.
 

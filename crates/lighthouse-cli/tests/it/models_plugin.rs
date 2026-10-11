@@ -6,83 +6,26 @@ use std::{collections::BTreeMap, fs, path::Path};
 
 use assert_cmd::Command;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 use crate::{
     cache_fixtures::write,
     models::{count, project, results},
 };
 
-/// A model plugin that speaks the protocol: it answers `classify` by the id of
-/// each subject and keeps what `train` was given in the directory it is told.
-const PLUGIN: &str = r#"#!/usr/bin/env python3
-import json, sys
-
-def read():
-    length = None
-    while True:
-        line = sys.stdin.buffer.readline()
-        if not line:
-            return None
-        if line in (b"\r\n", b"\n"):
-            break
-        if line.lower().startswith(b"content-length:"):
-            length = int(line.split(b":")[1])
-    return json.loads(sys.stdin.buffer.read(length))
-
-def send(id, result):
-    body = json.dumps({"jsonrpc": "2.0", "id": id, "result": result}).encode()
-    sys.stdout.buffer.write(b"Content-Length: %d\r\n\r\n" % len(body) + body)
-    sys.stdout.buffer.flush()
-
-while True:
-    message = read()
-    if message is None or message.get("method") == "exit":
-        break
-    method, params, id = message.get("method"), message.get("params", {}), message.get("id")
-    if method == "initialize":
-        send(id, {"id": "fake-model", "version": "1", "protocolVersion": "0.1", "languages": [],
-                  "models": {"object": "list", "data": [{
-                      "id": "fake-model", "object": "model", "created": 0, "owned_by": "fake",
-                      "capabilities": {"classification": {"supported": True},
-                                       "fine_tuning": {"supported": True}},
-                      "version": "1", "cost": 0, "deterministic": True, "abstains": True}]}})
-    elif method == "lighthouse/classify":
-        text = params["state"]["text"]
-        p = 0.95 if "maybe_bad" in text else 0.05 if "maybe_good" in text else 0.5
-        send(id, {"model": params["model"],
-                  "answers": {q: {"type": "noul", "noul": p} for q in params["questions"]}})
-    elif method == "lighthouse/train":
-        with open(params["training_file"]) as f:
-            lines = [json.loads(l) for l in f]
-        with open(params["metadata"]["dir"] + "/subjects.json", "w") as f:
-            json.dump(lines, f)
-        with open(params["metadata"]["dir"] + "/metrics.json", "w") as f:
-            json.dump({"n": len(lines)}, f)
-        send(id, {"id": "ftjob-1", "object": "fine_tuning.job", "model": params["model"],
-                  "status": "succeeded", "fine_tuned_model": "sha256:abc",
-                  "result_files": [params["metadata"]["dir"] + "/metrics.json"]})
-    elif method == "shutdown":
-        send(id, None)
-"#;
-
 const RPC: &str = "[models]\nclassification = \"fake/m1\"\n[models.providers.fake]\ntype = \"rpc\"\nplugin = \"fake-model\"\noptions = { tag = 1 }\n";
 
+/// Binds the `fake-model` plugin, which speaks `lighthouse/classify` and
+/// `lighthouse/train`.
 fn with_plugin(dir: &Path) {
-    write(dir, "fakeplugin/plugin.py", PLUGIN);
-    std::process::Command::new("chmod")
-        .arg("+x")
-        .arg(dir.join("fakeplugin/plugin.py"))
-        .status()
-        .unwrap();
-    write(
-        dir,
-        "fakeplugin/lighthouse-plugin.toml",
-        "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Plugin\"\n\n[metadata]\nname = \"fake-model\"\n\n[spec]\nversion = \"0.1.0\"\n\n[spec.runtime]\ncommand = \"./plugin.py\"\n\n[spec.provides]\nmodels = [\"fake-model\"]\n",
-    );
+    let plugin = lighthouse_test_support::fake_model();
     let text = fs::read_to_string(dir.join("lighthouse.toml")).unwrap();
     let text = text.replace(
         "\"core\", \"local\"",
-        "\"core\", \"local\", { id = \"fake-model\", path = \"fakeplugin\" }",
+        &format!(
+            "\"core\", \"local\", {{ id = \"fake-model\", path = {:?} }}",
+            plugin.to_str().unwrap()
+        ),
     );
     fs::write(dir.join("lighthouse.toml"), text).unwrap();
 }
@@ -176,13 +119,15 @@ fn eval_measures_the_check_with_a_model_plugin_bound() {
     );
     let report = json(&out);
     let m = &report["current"]["metrics"];
-    assert_eq!(m["labelled"], 3);
-    assert_eq!(m["precision"]["hits"], 2);
-    assert_eq!(m["precision"]["of"], 2);
-    assert_eq!(m["recall"]["of"], 2);
+    // Three reviewed rows and the one subject the invalid example shows.
+    assert_eq!(m["labelled"], 4);
+    assert_eq!(m["precision"]["hits"], 3);
+    assert_eq!(m["precision"]["of"], 3);
+    assert_eq!(m["recall"]["of"], 3);
     assert_eq!(m["abstention"]["hits"], 1);
     assert_eq!(report["current"]["model_decided"], 1);
     assert_eq!(report["policy"]["precision"], 0.9);
+    assert_eq!(report["meets_policy"], true);
 }
 
 #[test]
@@ -204,23 +149,39 @@ fn learn_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
     );
     let trained = json(&out);
     assert_eq!(trained["model"], "fake/m1");
-    assert_eq!(trained["result"]["artifact"], "sha256:abc");
-    assert_eq!(trained["result"]["metrics"]["n"], 5);
+    let digest = trained["training_file"].as_str().unwrap();
+    assert!(digest.starts_with("sha256:"), "{digest}");
+    assert_eq!(trained["result"]["status"], "succeeded");
+    assert_eq!(trained["result"]["fine_tuned_model"], "sha256:abc");
     assert_eq!(trained["unresolved"], 0);
-    // Three baseline rows and two examples.
-    assert_eq!(trained["subjects"], 5);
-    assert_eq!(trained["by_source"]["baseline"], 3);
-    assert_eq!(trained["by_source"]["example"], 2);
+    // Three reviewed rows and one example.
+    assert_eq!(trained["subjects"], 4);
+    assert_eq!(trained["by_source"]["tsv"], 3);
+    assert_eq!(trained["by_source"]["example"], 1);
+
+    // The dataset is a file of the host's store named by its digest, in
+    // canonical JSON, one training line per subject.
+    let hex = digest.strip_prefix("sha256:").unwrap();
+    let path = dir
+        .path()
+        .join(format!(".lighthouse/datasets/sha256/{hex}.jsonl"));
+    let text = fs::read_to_string(&path).unwrap();
+    assert_eq!(format!("{:x}", Sha256::digest(text.as_bytes())), hex);
+    assert_eq!(text.lines().count(), 4);
+    for line in text.lines() {
+        let parsed: Value = serde_json::from_str(line).unwrap();
+        assert_eq!(parsed["messages"].as_array().unwrap().len(), 3);
+        assert!(parsed["weight"].is_number());
+        assert_eq!(line, lighthouse_model::canonical(&parsed));
+    }
+
+    // The model was handed the same lines.
     let kept = fs::read_to_string(
         dir.path()
             .join(".lighthouse/models/fake/local-naming-ban/subjects.json"),
     )
     .unwrap();
     let subjects: Vec<Value> = serde_json::from_str(&kept).unwrap();
-    assert!(subjects.iter().all(|s| s["weight"] == 1.0));
-    assert!(
-        subjects
-            .iter()
-            .any(|s| s["label"] == "pass" && s["source"] == "baseline")
-    );
+    assert_eq!(subjects.len(), 4);
+    assert!(subjects.iter().any(|s| s["weight"] == 1.0));
 }

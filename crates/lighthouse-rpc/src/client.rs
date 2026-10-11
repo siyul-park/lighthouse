@@ -153,9 +153,14 @@ impl Client {
                 Ok(Event::Response(message)) if message.id == Some(Id::Number(id)) => {
                     return match message.into_result::<R>() {
                         Ok(Ok(result)) => Ok(result),
-                        Ok(Err(e)) => Err(Failure::Rejected(
-                            self.say(&format!("rejected `{method}` ({}): {}", e.code, e.message)),
-                        )),
+                        Ok(Err(e)) => {
+                            // The error body of the API behind the plugin, if it sent one.
+                            let body = e.data.map_or_else(String::new, |data| format!(": {data}"));
+                            Err(Failure::Rejected(self.say(&format!(
+                                "rejected `{method}` ({}): {}{body}",
+                                e.code, e.message
+                            ))))
+                        }
                         Err(e) => {
                             Err(self.broken(&format!("sent a malformed `{method}` result: {e}")))
                         }

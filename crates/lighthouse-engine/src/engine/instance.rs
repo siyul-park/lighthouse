@@ -2,12 +2,12 @@
 //! process with the options that pick it, or any program that reads a request
 //! and prints an answer. Both are a [`Classifier`] named by the instance.
 
-use std::{path::PathBuf, time::Duration};
+use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
 use lighthouse_model::hash;
 use lighthouse_plugin::{
-    Classifier, ClassifyParams, ClassifyResult, Error, ModelManifest, QuestionAnswer, Registry,
-    TrainParams, TrainResponse,
+    Answer, Classifier, ClassifyParams, Error, FineTuningJob, FineTuningJobRequest, ModelManifest,
+    Registry, SystemOneResponse,
 };
 use lighthouse_process::{MAX_OUTPUT, Spec};
 use lighthouse_protocol::{json_in, noul_of};
@@ -66,13 +66,21 @@ impl<'a> Host<'a> {
                 tasks,
                 cost,
                 timeout,
+                env,
+                key_env,
                 ..
             } => Box::new(Command {
                 model: model.to_owned(),
                 manifest: ModelManifest {
                     id: name.to_owned(),
                     tasks: tasks.clone(),
-                    version: hash::short(&format!("{argv:?}{model}{stdin:?}{pointer:?}"), 6),
+                    version: hash::short(
+                        &format!(
+                            "{argv:?}{model}{stdin:?}{pointer:?}{env:?}{key_env:?}{}",
+                            self.program_hash(argv)
+                        ),
+                        6,
+                    ),
                     trains: false,
                     deterministic: false,
                     abstains: true,
@@ -82,6 +90,7 @@ impl<'a> Host<'a> {
                 stdin: *stdin,
                 pointer: pointer.clone(),
                 dir: self.root.clone(),
+                env: command_env(env, key_env.as_deref()),
                 timeout: timeout
                     .as_deref()
                     .and_then(parse_duration)
@@ -91,30 +100,28 @@ impl<'a> Host<'a> {
     }
 }
 
+impl Host<'_> {
+    /// The content hash of the program a command runs, so that a changed
+    /// program is a changed model; empty when it cannot be read (a program
+    /// found on the `PATH`).
+    fn program_hash(&self, argv: &[String]) -> String {
+        let Some(program) = argv.first() else {
+            return String::new();
+        };
+        let path = self.root.join(program);
+        let found = if path.is_file() {
+            path
+        } else {
+            std::path::PathBuf::from(program)
+        };
+        std::fs::read(found).map(hash::sha256).unwrap_or_default()
+    }
+}
+
 /// An instance that cannot run, kept so that its failure is reported.
 struct Refused {
     manifest: ModelManifest,
     reason: String,
-}
-
-impl Classifier for Refused {
-    fn manifest(&self) -> &ModelManifest {
-        &self.manifest
-    }
-
-    fn classify(&self, _: &ClassifyParams) -> Result<ClassifyResult, Error> {
-        Err(Error::Failed(format!(
-            "model `{}`: {}",
-            self.manifest.id, self.reason
-        )))
-    }
-
-    fn train(&self, _: &TrainParams) -> Result<TrainResponse, Error> {
-        Err(Error::Failed(format!(
-            "model `{}`: {}",
-            self.manifest.id, self.reason
-        )))
-    }
 }
 
 /// A model of a plugin process, named and configured by the instance.
@@ -126,22 +133,23 @@ struct Rpc<'a> {
     options: Map<String, Value>,
 }
 
-impl Classifier for Rpc<'_> {
+impl Classifier for Refused {
     fn manifest(&self) -> &ModelManifest {
         &self.manifest
     }
 
-    fn classify(&self, params: &ClassifyParams) -> Result<ClassifyResult, Error> {
-        let mut asked = params.clone();
-        asked.model.clone_from(&self.name);
-        asked.options.clone_from(&self.options);
-        self.model.classify(&asked)
+    fn classify(&self, _: &ClassifyParams) -> Result<SystemOneResponse, Error> {
+        Err(Error::Failed(format!(
+            "model `{}`: {}",
+            self.manifest.id, self.reason
+        )))
     }
 
-    fn train(&self, params: &TrainParams) -> Result<TrainResponse, Error> {
-        let mut asked = params.clone();
-        asked.options.clone_from(&self.options);
-        self.model.train(&asked)
+    fn train(&self, _: &FineTuningJobRequest) -> Result<FineTuningJob, Error> {
+        Err(Error::Failed(format!(
+            "model `{}`: {}",
+            self.manifest.id, self.reason
+        )))
     }
 }
 
@@ -153,7 +161,28 @@ struct Command {
     stdin: ModelInput,
     pointer: Option<String>,
     dir: PathBuf,
+    env: Vec<(String, String)>,
     timeout: Duration,
+}
+
+impl Classifier for Rpc<'_> {
+    fn manifest(&self) -> &ModelManifest {
+        &self.manifest
+    }
+
+    fn classify(&self, params: &ClassifyParams) -> Result<SystemOneResponse, Error> {
+        let mut asked = params.clone();
+        asked.request.model.clone_from(&self.name);
+        asked.options.clone_from(&self.options);
+        self.model.classify(&asked)
+    }
+
+    fn train(&self, request: &FineTuningJobRequest) -> Result<FineTuningJob, Error> {
+        let mut asked = request.clone();
+        asked.model.clone_from(&self.name);
+        asked.options.clone_from(&self.options);
+        self.model.train(&asked)
+    }
 }
 
 impl Classifier for Command {
@@ -162,20 +191,22 @@ impl Classifier for Command {
     }
 
     /// Output that does not fit the shape of an answer is a provider error.
-    fn classify(&self, params: &ClassifyParams) -> Result<ClassifyResult, Error> {
+    fn classify(&self, params: &ClassifyParams) -> Result<SystemOneResponse, Error> {
         let failed =
             |reason: String| Error::Failed(format!("model `{}`: {reason}", self.manifest.id));
         let mut asked = params.clone();
-        asked.model.clone_from(&self.model);
+        asked.request.model.clone_from(&self.model);
         let input = match self.stdin {
-            ModelInput::Request => serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?,
-            ModelInput::Prompt => lighthouse_protocol::prompt(&asked).into_bytes(),
+            ModelInput::Request => {
+                serde_json::to_vec(&asked.request).map_err(|e| failed(e.to_string()))?
+            }
+            ModelInput::Prompt => lighthouse_protocol::prompt(&asked.request).into_bytes(),
         };
         let output = lighthouse_process::run(&Spec {
             argv: &self.argv,
             dir: &self.dir,
             stdin: &input,
-            env: None,
+            env: Some(&self.env),
             limit: self.timeout,
             grace: GRACE,
             max_output: MAX_OUTPUT,
@@ -188,6 +219,7 @@ impl Classifier for Command {
         }
         let printed = printed_answer(&output.stdout, self.pointer.as_deref());
         let answers = params
+            .request
             .questions
             .keys()
             .map(|id| {
@@ -195,26 +227,41 @@ impl Classifier for Command {
                     .as_ref()
                     .and_then(|printed| noul_of(printed, id))
                     .ok_or_else(|| failed(format!("its output has no `noul` for `{id}`")))?;
-                let answer = QuestionAnswer {
+                let answer = Answer {
                     kind: "noul".to_owned(),
                     noul,
                 };
                 Ok((id.clone(), answer))
             })
             .collect::<Result<_, Error>>()?;
-        Ok(ClassifyResult {
+        Ok(SystemOneResponse {
             model: self.manifest.id.clone(),
             answers,
             usage: Value::Null,
         })
     }
 
-    fn train(&self, _: &TrainParams) -> Result<TrainResponse, Error> {
+    fn train(&self, _: &FineTuningJobRequest) -> Result<FineTuningJob, Error> {
         Err(Error::Failed(format!(
             "model `{}`: a command model does not train",
             self.manifest.id
         )))
     }
+}
+
+/// The variables a command is given: the allowlist of the command contract,
+/// the declared `env` and the key variable.
+fn command_env(
+    declared: &BTreeMap<String, String>,
+    key_env: Option<&str>,
+) -> Vec<(String, String)> {
+    let mut env: Vec<(String, String)> = ["PATH", "HOME", "LANG", "TMPDIR"]
+        .into_iter()
+        .chain(key_env)
+        .filter_map(|k| std::env::var(k).ok().map(|v| (k.to_owned(), v)))
+        .collect();
+    env.extend(declared.iter().map(|(k, v)| (k.clone(), v.clone())));
+    env
 }
 
 fn rpc_manifest(

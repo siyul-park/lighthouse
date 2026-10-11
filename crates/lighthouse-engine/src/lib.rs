@@ -16,5 +16,5 @@ pub use fix::{
     AppliedFix, DeclinedFix, FileChange, FixBinding, FixPlan, FixPreview, FixReport, FixRun,
     MAX_ROUNDS, PreviewEdit, unified_diff,
 };
-pub use tester::RuleTester;
+pub use tester::{ExampleRun, RuleTester};
 pub use timings::Timings;

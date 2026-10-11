@@ -1,9 +1,10 @@
 //! A model offered by a plugin process.
 
-use std::{collections::BTreeMap, fs, path::Path, sync::Arc};
+use std::sync::Arc;
 
 use lighthouse_plugin::{
-    Classifier, ClassifyParams, ClassifyResult, Error, ModelManifest, TrainParams, TrainResponse,
+    Classifier, ClassifyParams, Error, FineTuningJob, FineTuningJobRequest, ModelManifest,
+    SystemOneResponse,
 };
 use lighthouse_protocol::{self as wire, JobStatus};
 
@@ -27,68 +28,35 @@ impl Classifier for Model {
     }
 
     /// The answer may only name questions that were asked.
-    fn classify(&self, params: &ClassifyParams) -> Result<ClassifyResult, Error> {
-        let result: ClassifyResult = self
+    fn classify(&self, params: &ClassifyParams) -> Result<SystemOneResponse, Error> {
+        let result: SystemOneResponse = self
             .client
             .call(wire::CLASSIFY, params)
             .map_err(|reason| self.failed(reason))?;
         if let Some(stray) = result
             .answers
             .keys()
-            .find(|id| !params.questions.contains_key(*id))
+            .find(|id| !params.request.questions.contains_key(*id))
         {
             return Err(self.failed(format!("it answers `{stray}`, which was not asked")));
         }
         Ok(result)
     }
 
-    /// Writes the training file, asks for a fine-tuning job and reads the
-    /// metrics from its first result file.
-    fn train(&self, params: &TrainParams) -> Result<TrainResponse, Error> {
+    /// Asks for the fine-tuning job; the answer is final, `succeeded` or
+    /// `failed`, and a failed job is an error here.
+    fn train(&self, request: &FineTuningJobRequest) -> Result<FineTuningJob, Error> {
         if !self.manifest.trains {
             return Err(self.failed("it does not train"));
         }
-        let dir = Path::new(&params.dir);
-        let file = dir.join("training.jsonl");
-        let lines = wire::training_file(&params.decision, &params.subjects);
-        fs::write(&file, lines).map_err(|e| self.failed(format!("{}: {e}", file.display())))?;
-        let seed = params
-            .request_id
-            .as_deref()
-            .and_then(|id| u64::from_str_radix(&id[..id.len().min(15)], 16).ok())
-            .unwrap_or_default();
-        let request = wire::FineTuningJobRequest {
-            model: self.manifest.id.clone(),
-            training_file: file.to_string_lossy().into_owned(),
-            validation_file: None,
-            method: wire::Method {
-                kind: "supervised".to_owned(),
-                supervised: wire::Supervised::default(),
-            },
-            seed,
-            suffix: None,
-            metadata: BTreeMap::from([
-                ("decision".to_owned(), params.decision.id.clone()),
-                ("dir".to_owned(), params.dir.clone()),
-            ]),
-            options: params.options.clone(),
-        };
-        let job: wire::FineTuningJob = self
+        let job: FineTuningJob = self
             .client
             .call(wire::TRAIN, request)
             .map_err(|reason| self.failed(reason))?;
-        if let Some(error) = job.error {
-            return Err(self.failed(format!("{}: {}", error.code, error.message)));
+        match (&job.error, job.status) {
+            (Some(error), _) => Err(self.failed(format!("{}: {}", error.code, error.message))),
+            (None, JobStatus::Succeeded) if job.fine_tuned_model.is_some() => Ok(job),
+            _ => Err(self.failed("the training did not succeed")),
         }
-        let (JobStatus::Succeeded, Some(artifact)) = (job.status, job.fine_tuned_model) else {
-            return Err(self.failed("the training did not succeed"));
-        };
-        let metrics = job
-            .result_files
-            .first()
-            .and_then(|file| fs::read_to_string(file).ok())
-            .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or_default();
-        Ok(TrainResponse { artifact, metrics })
     }
 }

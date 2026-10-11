@@ -10,10 +10,7 @@ fn revision(decision: &str, model: Option<&str>) -> RevisionSpec {
         check_revision: Some("c1".to_owned()),
         change: Change::Minor,
         evaluation: json!({ "precision": 0.95, "n": 40 }),
-        approval: Attribution {
-            kind: AgentKind::Person,
-            id: Some("kim".to_owned()),
-        },
+        approval: Attribution::new(AgentKind::Person, Some("kim".to_owned())),
         model: model.map(str::to_owned),
         generated_at_time: "2026-10-11T00:00:00Z".to_owned(),
     }

@@ -17,8 +17,9 @@ use crate::Result;
 pub enum LearnCommand {
     /// Fit a model on the labels of a decision: its examples, the baseline
     /// rows, the judgments recorded under its current meaning version, and
-    /// optionally the answers of another model. Writes the artifact under
-    /// `.lighthouse/models/`; it binds nothing.
+    /// optionally the answers of another model. Writes the dataset under
+    /// `.lighthouse/datasets/` and the artifact under `.lighthouse/models/`;
+    /// it binds nothing.
     Train {
         /// The decision, such as design/feature-envy.
         decision: String,
@@ -27,15 +28,17 @@ pub enum LearnCommand {
         #[arg(long)]
         model: Option<String>,
         /// Also label the subjects nobody labelled with this model's answers
-        /// (weight 0.5), `<provider>/<model>`.
+        /// (weight 0.5): a fail where it is sure of one, a pass where it is
+        /// sure of the other. `<provider>/<model>`.
         #[arg(long)]
         from_model: Option<String>,
         /// A table of reviewed findings (`fingerprint repo location verdict`).
         #[arg(long)]
         baseline: Option<PathBuf>,
-        /// Use only the baseline rows of this repository.
-        #[arg(long)]
-        repo: Option<String>,
+        /// A repository the labels are about, `name=dir`, where `name` is the
+        /// baseline's `repo` column. Repeatable; default: this project.
+        #[arg(long = "repo", value_name = "NAME=DIR")]
+        repos: Vec<String>,
         /// text or json.
         #[arg(long, default_value = "text")]
         format: Output,
@@ -77,26 +80,13 @@ pub enum Output {
 
 /// Evaluates the check of a decision and prints the numbers.
 pub fn evaluate(args: EvalArgs, format: Output) -> Result<u8> {
-    let repos = args
-        .repos
-        .iter()
-        .map(|spec| {
-            let (name, dir) = spec
-                .split_once('=')
-                .ok_or_else(|| format!("--repo `{spec}` is not name=dir"))?;
-            Ok(Repo {
-                name: Some(name.to_owned()),
-                dir: PathBuf::from(dir),
-            })
-        })
-        .collect::<Result<Vec<_>>>()?;
+    let repos = repos_of(&args.repos)?;
     let report = eval(&EvalRequest {
         decision: args.decision.clone(),
         repos,
         baseline: args.baseline.or_else(|| default_baseline(&args.decision)),
         candidate: args.candidate,
         config: args.config,
-        no_models: false,
         audit: args.audit,
     })?;
     if matches!(format, Output::Json) {
@@ -107,6 +97,22 @@ pub fn evaluate(args: EvalArgs, format: Output) -> Result<u8> {
     Ok(0)
 }
 
+/// The repositories `--repo name=dir` names.
+fn repos_of(specs: &[String]) -> Result<Vec<Repo>> {
+    specs
+        .iter()
+        .map(|spec| {
+            let (name, dir) = spec
+                .split_once('=')
+                .ok_or_else(|| format!("--repo `{spec}` is not name=dir"))?;
+            Ok(Repo {
+                name: Some(name.to_owned()),
+                dir: PathBuf::from(dir),
+            })
+        })
+        .collect()
+}
+
 /// Trains and prints the metrics the trainer measured.
 pub fn learn(command: LearnCommand) -> Result<u8> {
     let LearnCommand::Train {
@@ -114,7 +120,7 @@ pub fn learn(command: LearnCommand) -> Result<u8> {
         model,
         from_model,
         baseline,
-        repo,
+        repos,
         format,
         config,
     } = command;
@@ -123,7 +129,7 @@ pub fn learn(command: LearnCommand) -> Result<u8> {
         model,
         from_model,
         baseline,
-        repo,
+        repos: repos_of(&repos)?,
         config,
     })?;
     if matches!(format, Output::Json) {
@@ -137,14 +143,19 @@ pub fn learn(command: LearnCommand) -> Result<u8> {
     for (source, n) in &trained.by_source {
         println!("  {source}: {n}");
     }
-    println!("dataset: {}", trained.dataset.display());
+    println!(
+        "dataset: {} ({})",
+        trained.dataset.display(),
+        trained.training_file
+    );
     match &trained.result {
-        Some(result) => {
-            println!("trained {}", trained.model);
-            for (name, value) in &result.metrics {
-                println!("  {name}: {value}");
-            }
-            println!("artifact: {}", result.artifact);
+        Some(job) => {
+            println!(
+                "trained {}: {} ({:?})",
+                trained.model,
+                job.fine_tuned_model.as_deref().unwrap_or("-"),
+                job.status
+            );
         }
         None => println!("no model that learns is bound: nothing was trained"),
     }
@@ -153,8 +164,14 @@ pub fn learn(command: LearnCommand) -> Result<u8> {
 
 fn print_report(report: &EvalReport) {
     println!(
-        "{}: {} labelled subject(s); target precision {} (tolerates {:?})",
-        report.decision, report.labelled, report.policy.precision, report.policy.tolerate
+        "{}: {} labelled subject(s); target precision {}{}",
+        report.decision,
+        report.labelled,
+        report.policy.precision,
+        report
+            .policy
+            .recall
+            .map_or_else(String::new, |r| format!(", recall {r}"))
     );
     print_side("current", &report.current);
     if let Some(candidate) = &report.candidate {
@@ -168,10 +185,9 @@ fn print_report(report: &EvalReport) {
     }
     if let Some(meets) = report.meets_policy {
         println!(
-            "verdict: {} the policy (precision {}, tolerating {:?}) by the lower bound",
+            "verdict: {} the policy (precision {}) by the point estimate",
             if meets { "meets" } else { "does not meet" },
-            report.policy.precision,
-            report.policy.tolerate
+            report.policy.precision
         );
     }
     if let Some(path) = &report.audit {

@@ -1,12 +1,12 @@
 //! The model half of a `cel` check: the subjects `review` suspects, put to the
 //! models the decision is bound to. A `fail` is reported with the check's own
-//! message, evidence and identity; a `pass` is clean; anything else is left
-//! to agent review.
+//! message and identity and the model's evidence; a subject no model failed is
+//! left to agent review.
 
 use cel::Program;
 use lighthouse_model::{Diagnostic, Position, Span, SymbolId, hash};
 use lighthouse_plugin::{
-    Ask, Ctx, DecisionRef, Judged, Neighbor, Open, ResultKind, RuleManifest, Shot, Subject,
+    Ask, Ctx, DecisionRef, Judged, Neighbor, ResultKind, RuleManifest, Shot, Subject,
     SubjectContext,
 };
 use lighthouse_spec::{CelCheck, Decision, ExampleKind, Select};
@@ -38,8 +38,6 @@ pub(crate) struct Review {
 /// `fail`.
 pub(crate) struct Candidate {
     pub(crate) diagnostic: Diagnostic,
-    /// What `review` gave besides `true`.
-    pub(crate) kind: Option<String>,
     /// The facts of the subject, as the builder made them.
     pub(crate) fact: Value,
     /// `where` already made it a finding: the models are not asked, but a run
@@ -72,20 +70,12 @@ impl Review {
         }))
     }
 
-    /// Whether the subject in `frame` is to be asked about, and the kind
-    /// `review` gave it, if any.
-    pub(crate) fn asks(
-        &self,
-        frame: &Frame,
-    ) -> Result<Option<Option<String>>, lighthouse_plugin::Error> {
+    /// Whether the subject in `frame` is to be asked about.
+    pub(crate) fn asks(&self, frame: &Frame) -> Result<bool, lighthouse_plugin::Error> {
         match frame.run(&self.program)? {
-            cel::Value::Bool(true) => Ok(Some(None)),
-            cel::Value::Bool(false) | cel::Value::Null => Ok(None),
-            cel::Value::String(kind) => Ok(Some(Some(kind.to_string()))),
-            other => Err(frame.fail(format!(
-                "`review` is {}, not a bool or a kind",
-                render(&other)
-            ))),
+            cel::Value::Bool(asks) => Ok(asks),
+            cel::Value::Null => Ok(false),
+            other => Err(frame.fail(format!("`review` is {}, not a bool", render(&other)))),
         }
     }
 
@@ -94,17 +84,20 @@ impl Review {
         Ok(to_json(&frame.run(&self.fact)?))
     }
 
-    /// Puts the candidates of the focused file to the models. A subject a
-    /// model fails is a finding; one a model passes is clean; one nothing
-    /// decided (undecided, unbound, over budget, a model's error) is a
-    /// diagnostic marked `review`, which the engine reports apart.
+    /// Queues the candidates of the focused file for the models, which are
+    /// asked when the file's rules are done, so that the decisions on one
+    /// subject share a request. A subject a model fails is a finding; one
+    /// nothing decided (undecided, unbound, over budget, a model's error) is a
+    /// diagnostic marked `review`, which the engine reports apart. The
+    /// findings come back from the engine's flush, not from here, unless no
+    /// model could be asked.
     pub(crate) fn settle(
         &self,
         ctx: &Ctx,
         rule: &RuleManifest,
         candidates: Vec<Candidate>,
     ) -> Vec<Diagnostic> {
-        let Some((_, text)) = ctx.file else {
+        let Some((file, text)) = ctx.file else {
             return Vec::new();
         };
         if candidates.is_empty() {
@@ -118,29 +111,27 @@ impl Review {
         if candidates.is_empty() {
             return Vec::new();
         }
-        let judged: Vec<Judged> = if ctx.models.bound(&rule.id) {
-            let subjects = candidates
-                .iter()
-                .map(|c| self.subject(ctx, text, c))
-                .collect();
-            ctx.models.classify(&Ask {
-                rule: rule.id.clone(),
-                revision: self.revision.clone(),
-                upper: self.upper,
-                decision: self.decision.clone(),
-                subjects,
-            })
-        } else {
-            candidates
-                .iter()
-                .map(|_| Judged::Open(Open::Unbound))
-                .collect()
+        let subjects = candidates
+            .iter()
+            .map(|c| self.subject(ctx, text, c))
+            .collect();
+        let ask = Ask {
+            rule: rule.id.clone(),
+            revision: self.revision.clone(),
+            upper: self.upper,
+            decision: self.decision.clone(),
+            subjects,
         };
-        judged
-            .into_iter()
-            .zip(candidates)
-            .filter_map(|(judged, candidate)| outcome(judged, candidate, &self.decision))
-            .collect()
+        let decision = self.decision.clone();
+        let settle = Box::new(move |judged: Vec<Judged>| {
+            judged
+                .into_iter()
+                .zip(candidates)
+                .map(|(judged, candidate)| outcome(judged, candidate, &decision))
+                .collect()
+        });
+        let group = file.path.to_string_lossy();
+        ctx.models.queue(&group, ask, settle).unwrap_or_default()
     }
 
     fn subject(&self, ctx: &Ctx, source: &str, candidate: &Candidate) -> Subject {
@@ -219,37 +210,23 @@ pub fn decision_ref(decision: &Decision) -> DecisionRef {
 }
 
 /// What a model's judgment makes of a candidate: the finding it confirms,
-/// with the model and its confidence in the evidence; a review task for a subject
-/// left open; nothing for a `pass`.
-fn outcome(judged: Judged, candidate: Candidate, decision: &DecisionRef) -> Option<Diagnostic> {
+/// with the model and its confidence as the evidence; a review task for a
+/// subject left open.
+fn outcome(judged: Judged, candidate: Candidate, decision: &DecisionRef) -> Diagnostic {
     let mut diagnostic = candidate.diagnostic;
-    let mut evidence = match std::mem::take(&mut diagnostic.evidence) {
-        Value::Object(map) => map,
-        _ => serde_json::Map::new(),
-    };
-    match judged {
-        Judged::Decided(decided) if decided.kind == ResultKind::Pass => return None,
-        Judged::Decided(decided) => {
-            if diagnostic.message.is_empty() {
-                diagnostic.message.clone_from(&decision.requirement);
-            }
-            evidence.insert("source".to_owned(), json!("model"));
-            if let Some(kind) = candidate.kind {
-                evidence.insert("kind".to_owned(), json!(kind));
-            }
-            evidence.insert("model".to_owned(), json!(decided.model));
-            evidence.insert("version".to_owned(), json!(decided.version));
-            evidence.insert("confidence".to_owned(), json!(decided.confidence));
-        }
-        Judged::Open(open) => {
-            if diagnostic.message.is_empty() {
-                diagnostic.message.clone_from(&decision.requirement);
-            }
-            diagnostic.review = Some(open.to_string());
-        }
+    if diagnostic.message.is_empty() {
+        diagnostic.message.clone_from(&decision.requirement);
     }
-    diagnostic.evidence = Value::Object(evidence);
-    Some(diagnostic)
+    match judged {
+        Judged::Decided(decided) => {
+            diagnostic.evidence = json!({
+                "model": decided.model,
+                "confidence": decided.confidence,
+            });
+        }
+        Judged::Open(open) => diagnostic.review = Some(open.to_string()),
+    }
+    diagnostic
 }
 
 /// The callers and callees of a symbol, with the source of those in the same

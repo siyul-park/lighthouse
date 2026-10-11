@@ -101,7 +101,7 @@ check:
   message: "{{ func.name }} depends on {{ func.envy.target_name }}'s members only"
 ```
 
-`where` true is a `fail`; `where` false and `review` true (or a kind string) is an **abstention**; anything else is a `pass`. Abstained subjects fall through the bindings below like a model's own abstention. A `fail` from a model is a finding with the check's own message, evidence, identity and fix, plus `evidence.source: model`, the model, its version and its confidence. Its level is at most `warn`.
+`where` true is a `fail`; `where` false and `review` true is an **abstention**; anything else is a `pass`. Abstained subjects fall through the bindings below like a model's own abstention. A `fail` from a model is a finding with the check's own message, evidence, identity and fix, plus `evidence.model` (`<provider>/<model>@<version>`) and `evidence.confidence`. Its level is at most `warn`.
 
 Models are one plugin kind, `Model`, with tasks (`tasks` in the manifest),
 because each task has its own call shape:
@@ -109,7 +109,7 @@ because each task has its own call shape:
 | Task | Call |
 | --- | --- |
 | `classification` | subject + decision (requirement or prompt, examples) → `pass`/`fail` with a confidence, or abstain |
-| `embedding` | texts → vectors |
+| `embedding` | texts → vectors (later; not built) |
 
 How a model answers is its own business. An LLM, a jev-class System 1 model, or a gradient-
 boosted classifier trained on the decision's judgments all serve `classification` the same
@@ -153,16 +153,16 @@ pointer = "/result"               # RFC 6901 pointer to the answer inside an env
 [rules."design/naming-result"]
 level = "info"
 model = "ollama/qwen3-coder:30b"  # a cheaper model for this decision only
-evaluation = { precision = 0.9, tolerate = "fn" }
+evaluation = { precision = 0.9 }          # recall = 0.8 optional
 ```
 
 - The `spec` providers are served by the `model-http` plugin, which must be listed in `plugins`. A `command` provider reuses the command contract (no shell, its own process group, a time limit, a cap on output, project trust) and its program is part of what trust covers. An answer that does not fit the shape is no answer, and the subject stays for review.
 - The engine keys off the capabilities a model declares, never its name: `deterministic`, `abstains` and `cost`. The budget and the report scope (changed files, or everything with `--all-models`) limit only the models with a `cost` above 0; an answer is cached under the model, its version, the check's revision and the subject. A model that fails never makes a run incomplete (exit 3): its subjects stay for review.
 - Subjects nothing decided (an abstention, an unsure answer, no bound model, the budget spent, a failed model, `--no-models`) are reported as SARIF results of kind `review`, in the report scope only, and as review tasks in the agent output, grouped. They never change the exit code.
 - `--record-model-labels` records what models fail as `Judgment`s attributed to the model (`<provider>/<model>@<version>`), so that training can reproduce them from `decisions.jsonl`. A person's judgment still wins.
-- The layer-1 reader is in: a `Revision` record (`{decision, parent, meaningVersion, checkRevision, change, evaluation, approval, model}`, `approval` being PROV `wasAttributedTo`) binds its `model` to the decision before every other layer; one without a `model` unbinds it. Nothing writes it yet.
-- `lighthouse eval <decision>` measures the check against the labels a person gave or an example shows (weight 1.0; an agent's or a model's label never grades): precision and FPR over conformance judgments, recall and FNR, the selector precision (the share of selected subjects not judged `notApplicable`, kept apart), coverage and abstention, and with `--check <file>` the agreement of a candidate check with the current one; every rate with a Wilson 95% interval. `--audit N` writes unflagged selected subjects to a table for a person to label, to measure recall. It counts the model calls and their cost, and gives a verdict against the policy. The policy it is judged by (`evaluation`: a precision target, default 0.9, and the error tolerated, default `fn`) is project configuration, not a decision option, because options are meaning and a policy change must not move the meaning version.
-- `lighthouse learn train <decision>` collects the same labels (only judgments under the current meaning version, weighted person 1.0, example 1.0, agent 0.7, model 0.5, mining 0.3, never the labels of the model being trained), builds the subjects exactly as `classify` does, and calls `lighthouse/train` on a model that learns. It writes nothing to `decisions.jsonl`.
+- The layer-1 reader is in: a `Revision` record (`{decision, parent, meaningVersion, checkRevision, change, evaluation, approval, model}`, `approval` being PROV `wasAttributedTo`) binds its `model` to the decision before every other layer; one without a `model` unbinds it (a revision is a full snapshot, so a writer copies its parent's model). Nothing writes it yet.
+- `lighthouse eval <decision>` measures the check against the labels a person gave or an example shows (weight 1.0; an agent's or a model's label never grades): precision and FPR over conformance judgments, recall and FNR, the selector precision (the share of selected subjects not judged `notApplicable`, kept apart), coverage and abstention, and with `--check <file>` the agreement of a candidate check with the current one; every rate with a Wilson 95% interval. `--audit N` writes unflagged selected subjects to a table for a person to label, to measure recall. It counts the model calls and their cost, and gives a verdict against the policy by the point estimates, the intervals shown beside. The policy it is judged by (`evaluation`: a precision target, default 0.9, and an optional recall target) is project configuration, not a decision option, because options are meaning and a policy change must not move the meaning version.
+- `lighthouse learn train <decision>` collects the same labels (only judgments under the current meaning version, one label per subject, the strongest source winning: person, reviewed table and example 1.0, agent 0.7, model 0.5; never the labels of the model being trained), builds the subjects exactly as `classify` does, and calls `lighthouse/train` on a model that learns. It writes the dataset to `.lighthouse/datasets/sha256/<hex>.jsonl` (see [models.md](models.md)) and nothing to `decisions.jsonl`.
 
 - A cheap model that abstains in front of an expensive one is just layer 1 or 2 over layer 3. It is not a separate mechanism.
 - If a layer-1 artifact is missing on a machine (a fresh clone, say), it is rebuilt from `decisions.jsonl`, or skipped with a notice and the case falls through.
@@ -281,7 +281,7 @@ Versioning but is not SemVer: it says which version of the decision moved.
 | Coverage, abstention rate | models that abstain |
 | Agreement | the current revision, on the same subjects |
 
-Each decision has an evaluation policy: its precision target and which error it tolerates.
+Each decision has an evaluation policy: its precision target and, optionally, a recall target.
 
 Beyond change classes:
 - **Status** follows the ADR lifecycle: `proposed → accepted | rejected`, `accepted → deprecated | superseded`. Split and merge are supersession, and the old judgments are reused only as evidence.

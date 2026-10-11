@@ -9,6 +9,7 @@ name = "model-http"
 path = "src/main.rs"
 
 [dependencies]
+async-openai.workspace = true
 lighthouse-protocol.workspace = true
 serde.workspace = true
 serde_json.workspace = true

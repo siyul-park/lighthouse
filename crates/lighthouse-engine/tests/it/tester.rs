@@ -1,4 +1,4 @@
-use lighthouse_engine::RuleTester;
+use lighthouse_engine::{ExampleRun, ModelOptions, RuleTester};
 use lighthouse_model::{Applicability, RunScope};
 use lighthouse_model::{
     Capability, Diagnostic, EditOp, Fingerprint, FixOutcome, Fragment, Options, Position, Safety,
@@ -407,4 +407,26 @@ fn a_fix_example_fails_when_the_fixer_applies_nothing() {
             .any(|f| f.contains("fix applied nothing") || f.contains("unknown rule")),
         "{failures:?}"
     );
+}
+
+#[test]
+fn example_run_checks_an_example_with_the_given_configuration() {
+    let catalog = catalog(HOLDING);
+    let decision = catalog.decisions().next().unwrap();
+    let config = lighthouse_spec::Config::parse_inline(
+        "plugins = [\"fake\"]\n[rules.\"fake/marker\"]\nlevel = \"warn\"\n",
+    )
+    .unwrap();
+    let run = ExampleRun {
+        registry: registry(),
+        config,
+        catalog: &catalog,
+        trusted: false,
+        models: ModelOptions::default(),
+    };
+
+    let outcome = run.outcome("fake/marker", &decision.examples[0]).unwrap();
+
+    assert_eq!(outcome.diagnostics.len(), 1);
+    assert_eq!(outcome.diagnostics[0].span.start.line, 2);
 }

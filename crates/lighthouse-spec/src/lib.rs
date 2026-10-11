@@ -53,7 +53,7 @@ pub use project::{
     GlobSet, Layer, Level, ModelBinding, ModelInput, ModelOutput, ModelProvider, ModelsSpec,
     OverrideSpec, PluginEntry, PluginRef, PluginRefSpec, ProjectError, ProjectLanguage,
     ProjectSpec, Projects, ProviderSpec, RESERVED as RESERVED_PROVIDERS, RuleConfig, RuleDetail,
-    RuleSetting, Rules, Specs, Tolerate, glob_set,
+    RuleSetting, Rules, Specs, glob_set,
 };
 pub use render::{DOCS_DIR, decision_markdown, docs, help_path};
 pub use sources::{SourceLine, SourceMapSpec};

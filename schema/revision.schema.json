@@ -16,8 +16,18 @@
       ]
     },
     "Attribution": {
-      "description": "`prov:wasAttributedTo`: who a record is attributed to.",
+      "description": "`prov:wasAttributedTo`: who a record is attributed to, with the role the\nagent had (`prov:hadRole`).",
       "properties": {
+        "hadRole": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Role"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "id": {
           "type": [
             "string",
@@ -112,7 +122,7 @@
           ]
         },
         "model": {
-          "description": "The model it binds, `<provider>/<model>` (a learned one is\n`local/learned@<artifact hash>`).",
+          "description": "The model it binds, `<provider>/<model>` (a learned one is\n`local/learned@<artifact hash>`). A revision is a full snapshot: absent\nmeans unbound, so a writer that does not change the model copies its\nparent's.",
           "type": [
             "string",
             "null"
@@ -133,6 +143,21 @@
         "generatedAtTime"
       ],
       "type": "object"
+    },
+    "Role": {
+      "description": "The role a software agent had in a record, PROV's `hadRole`.",
+      "oneOf": [
+        {
+          "const": "agent",
+          "description": "A coding agent that reviewed the finding.",
+          "type": "string"
+        },
+        {
+          "const": "model",
+          "description": "A model that classified the subject.",
+          "type": "string"
+        }
+      ]
     }
   },
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/revision.schema.json",

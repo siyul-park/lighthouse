@@ -1,0 +1,40 @@
+//! A client for tests: records what it is asked and answers with the next reply.
+
+use lighthouse_protocol::HandlerError;
+use serde_json::Value;
+
+use crate::http::Client;
+
+/// Records what it is asked and answers with the next reply.
+pub struct Recording {
+    replies: std::sync::Mutex<Vec<Value>>,
+    asked: std::sync::Mutex<Vec<(String, Value)>>,
+}
+
+impl Recording {
+    pub fn replying(replies: Vec<Value>) -> Self {
+        Self {
+            replies: std::sync::Mutex::new(replies.into_iter().rev().collect()),
+            asked: std::sync::Mutex::default(),
+        }
+    }
+
+    /// The urls and bodies posted so far.
+    pub fn asked(&self) -> Vec<(String, Value)> {
+        self.asked.lock().unwrap().clone()
+    }
+}
+
+impl Client for Recording {
+    fn post(&self, url: &str, _: Option<&str>, body: &Value) -> Result<Value, HandlerError> {
+        self.asked
+            .lock()
+            .unwrap()
+            .push((url.to_owned(), body.clone()));
+        self.replies
+            .lock()
+            .unwrap()
+            .pop()
+            .ok_or_else(|| "no reply".into())
+    }
+}

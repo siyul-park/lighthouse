@@ -28,7 +28,7 @@
         },
         "spec": {
           "$ref": "#/$defs/Specs",
-          "description": "The API: `openai` (Chat Completions, which OpenRouter, Ollama, vLLM\nand LM Studio also speak). Others will join."
+          "description": "The API: `openai` (Chat Completions, which OpenRouter, Ollama, vLLM\nand LM Studio also speak) or `typesafe` (System One). Others will join."
         }
       },
       "required": [
@@ -46,10 +46,13 @@
           "format": "double",
           "type": "number"
         },
-        "tolerate": {
-          "$ref": "#/$defs/Tolerate",
-          "default": "fn",
-          "description": "Default: `fn`."
+        "recall": {
+          "description": "The recall a check must reach, from 0 to 1; no target when absent.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "type": "object"
@@ -237,7 +240,7 @@
       "description": "A provider of models, named under `[models.providers.<name>]`: a provider,\nas a check or a fix is. A model is named `<provider>/<model>`.",
       "oneOf": [
         {
-          "description": "A plugin process that offers models. The `options` say how to reach\nthem (`format`, `baseUrl`, `keyEnv` for `model-http`); the model part of\nthe reference goes with every request.",
+          "description": "A plugin process that offers models. The `options` say how to reach\nthem (`spec`, `baseUrl`, `keyEnv` for `model-http`); the model part of\nthe reference goes with every request.",
           "properties": {
             "cost": {
               "description": "What one answer costs, when the plugin's own figure is not right.",
@@ -267,7 +270,7 @@
           "type": "object"
         },
         {
-          "description": "Any program that reads a request and prints an answer, under the\nprocess contract: no shell, its own process group, a time limit, a cap\non output, and the project's trust. An answer that does not fit the\ntask's shape is an abstention.",
+          "description": "Any program that reads a request and prints an answer, under the\nprocess contract: no shell, its own process group, a time limit, a cap\non output, an environment cleared to `PATH`, `HOME`, `LANG`, `TMPDIR`,\nthe declared `env` and the variable `keyEnv` names, and the project's\ntrust. An answer that does not fit the task's shape is an abstention.",
           "properties": {
             "argv": {
               "description": "The program and its arguments; `{model}` stands for the model part\nof the reference.",
@@ -281,6 +284,20 @@
               "description": "What one answer costs. Default: 1.",
               "format": "double",
               "type": "number"
+            },
+            "env": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Variables the program is given besides the allowlist.",
+              "type": "object"
+            },
+            "keyEnv": {
+              "description": "The variable of the user's environment that holds the program's\nkey; it is passed through, and no other secret is.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "output": {
               "$ref": "#/$defs/ModelOutput",
@@ -332,7 +349,7 @@
       "description": "The `models` table of a project: its bindings and limits, and its own\nproviders.",
       "properties": {
         "budget": {
-          "description": "Subjects a run may put to models that cost something; the rest are\nleft to review. Default: 200.",
+          "description": "Requests a run may send to models that cost something; the subjects\nof the rest are left to review. Default: 200.",
           "format": "uint",
           "minimum": 0,
           "type": [
@@ -576,21 +593,6 @@
         }
       ],
       "description": "One standard API, or several a provider speaks: each operation uses the\none that covers it (classification: `typesafe`, else `openai`)."
-    },
-    "Tolerate": {
-      "description": "Which error an evaluation tolerates when it cannot have both.",
-      "oneOf": [
-        {
-          "const": "fn",
-          "description": "Missed violations: precision is what counts.",
-          "type": "string"
-        },
-        {
-          "const": "fp",
-          "description": "False alarms: recall is what counts.",
-          "type": "string"
-        }
-      ]
     }
   },
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/project.schema.json",

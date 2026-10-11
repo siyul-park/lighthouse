@@ -24,7 +24,7 @@ pub use lighthouse_resource::{Format, Metadata, Resource};
 use lighthouse_resource::{documents, parse_duration, resource};
 pub use models::{
     ApiProvider, DEFAULT_BUDGET, DEFAULT_PRECISION, Evaluation, ModelBinding, ModelInput,
-    ModelOutput, ModelProvider, ModelsSpec, ProviderSpec, RESERVED, Specs, Tolerate,
+    ModelOutput, ModelProvider, ModelsSpec, ProviderSpec, RESERVED, Specs,
 };
 pub use rules::{Level, RuleConfig, RuleDetail, RuleSetting, Rules};
 pub use spec::{

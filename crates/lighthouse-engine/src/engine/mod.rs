@@ -30,6 +30,7 @@ use crate::{
     timings::{Timings, in_pool},
 };
 
+mod batch;
 mod cached;
 mod config;
 mod instance;
@@ -116,7 +117,7 @@ pub struct Outcome {
     /// With [`ModelOptions::collect`], the subjects rules put to models, by
     /// fingerprint: the same payload a model is asked about or trained on.
     pub subjects: BTreeMap<String, lighthouse_plugin::Subject>,
-    /// Questions put to models this run (answers from the cache are not
+    /// Requests put to models this run (answers from the cache are not
     /// counted), and what they cost.
     pub model_calls: usize,
     pub model_cost: f64,

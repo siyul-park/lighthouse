@@ -3,7 +3,7 @@
 
 use lighthouse_model::Severity;
 use lighthouse_spec::{
-    Config, Evaluation, ModelBinding, ModelCheck, ModelProvider, Select, Subject, Tolerate,
+    Config, Evaluation, ModelBinding, ModelCheck, ModelProvider, Select, Subject,
 };
 
 const PROJECT: &str = r#"
@@ -27,7 +27,7 @@ pointer = "/result"
 [rules."design/feature-envy"]
 level = "warn"
 model = "claude/sonnet"
-evaluation = { precision = 0.95, tolerate = "fp" }
+evaluation = { precision = 0.95, recall = 0.8 }
 "#;
 
 fn binding() -> ModelBinding {
@@ -89,7 +89,7 @@ fn a_provider_naming_an_unknown_spec_is_invalid() {
 fn the_evaluation_policy_of_a_rule_defaults_to_nine_tenths_and_tolerating_misses() {
     let binding = binding();
     let policy = binding.policy("design/feature-envy");
-    assert_eq!((policy.precision, policy.tolerate), (0.95, Tolerate::Fp));
+    assert_eq!((policy.precision, policy.recall), (0.95, Some(0.8)));
     assert_eq!(binding.policy("other/rule"), Evaluation::default());
     assert_eq!(Evaluation::default().precision, 0.9);
 }

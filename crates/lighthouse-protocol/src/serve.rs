@@ -7,15 +7,49 @@ use serde::Serialize;
 use thiserror::Error;
 
 use crate::{
-    CLASSIFY, ClassifyParams, ClassifyResult, EXIT, FineTuningJob, FineTuningJobRequest,
-    FrameError, INDEX, INITIALIZE, IndexParams, IndexResult, InitializeParams, InitializeResult,
-    Message, SHUTDOWN, TRAIN, read_message, write_message,
+    CLASSIFY, ClassifyParams, EXIT, FineTuningJob, FineTuningJobRequest, FrameError, INDEX,
+    INITIALIZE, IndexParams, IndexResult, InitializeParams, InitializeResult, Message, SHUTDOWN,
+    SystemOneResponse, TRAIN, read_message, write_message,
 };
 
 const PARSE_ERROR: i64 = -32700;
 const METHOD_NOT_FOUND: i64 = -32601;
 const INVALID_PARAMS: i64 = -32602;
 const INTERNAL_ERROR: i64 = -32603;
+
+/// Why a handler failed: what to tell, and the body of the error behind it
+/// when there is one (an API's own error object), which the JSON-RPC error
+/// carries as its `data`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HandlerError {
+    pub message: String,
+    pub data: Option<serde_json::Value>,
+}
+
+impl HandlerError {
+    /// A failure with the error body of the API that caused it.
+    pub fn with_data(message: impl Into<String>, data: serde_json::Value) -> Self {
+        Self {
+            message: message.into(),
+            data: Some(data),
+        }
+    }
+}
+
+impl From<String> for HandlerError {
+    fn from(message: String) -> Self {
+        Self {
+            message,
+            data: None,
+        }
+    }
+}
+
+impl From<&str> for HandlerError {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
+}
 
 /// The methods of a language provider. An `Err` becomes an internal error
 /// response; the provider stays usable.
@@ -25,15 +59,15 @@ const INTERNAL_ERROR: i64 = -32603;
 /// leave a half-updated cache or index). A host should treat the batch as
 /// incomplete and may restart the plugin rather than trust later answers.
 pub trait Handler {
-    fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, String>;
-    fn index(&mut self, params: IndexParams) -> Result<IndexResult, String>;
+    fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, HandlerError>;
+    fn index(&mut self, params: IndexParams) -> Result<IndexResult, HandlerError>;
     /// Puts subjects to a model; a language plugin offers no model.
-    fn classify(&mut self, _params: ClassifyParams) -> Result<ClassifyResult, String> {
-        Err("this plugin offers no model".to_owned())
+    fn classify(&mut self, _params: ClassifyParams) -> Result<SystemOneResponse, HandlerError> {
+        Err("this plugin offers no model".into())
     }
     /// Fits a model; only a model that learns from labels offers it.
-    fn train(&mut self, _params: FineTuningJobRequest) -> Result<FineTuningJob, String> {
-        Err("this plugin does not train".to_owned())
+    fn train(&mut self, _params: FineTuningJobRequest) -> Result<FineTuningJob, HandlerError> {
+        Err("this plugin does not train".into())
     }
 }
 
@@ -50,7 +84,7 @@ pub enum ServeError {
 
 type Reply = Box<dyn FnOnce(crate::Id) -> Message>;
 
-type Outcome = Result<Result<serde_json::Value, String>, (i64, String)>;
+type Outcome = Result<Result<serde_json::Value, HandlerError>, (i64, String)>;
 
 /// Answers requests from `reader` on `writer` until the host sends `exit`.
 /// Returns `Ok` after a `shutdown` followed by `exit`, or by the input closing
@@ -120,17 +154,20 @@ fn dispatch(
     });
     Box::new(move |id| match outcome {
         Ok(Ok(value)) => Message::response(id, value).expect("a value serializes"),
-        Ok(Err(text)) => Message::failure(Some(id), INTERNAL_ERROR, text),
+        Ok(Err(e)) => Message::failure_with(Some(id), INTERNAL_ERROR, e.message, e.data),
         Err((code, text)) => Message::failure(Some(id), code, text),
     })
 }
 
-fn call<P, R: Serialize>(message: Message, run: impl FnOnce(P) -> Result<R, String>) -> Outcome
+fn call<P, R: Serialize>(
+    message: Message,
+    run: impl FnOnce(P) -> Result<R, HandlerError>,
+) -> Outcome
 where
     P: serde::de::DeserializeOwned,
 {
     let params = message
         .into_params::<P>()
         .map_err(|e| (INVALID_PARAMS, e.to_string()))?;
-    Ok(run(params).and_then(|r| serde_json::to_value(r).map_err(|e| e.to_string())))
+    Ok(run(params).and_then(|r| serde_json::to_value(r).map_err(|e| e.to_string().into())))
 }

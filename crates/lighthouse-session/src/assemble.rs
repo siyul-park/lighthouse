@@ -1,6 +1,6 @@
 //! Putting what each repository gave into one report.
 
-use lighthouse_spec::{Evaluation, Tolerate};
+use lighthouse_spec::Evaluation;
 
 use crate::{
     Result,
@@ -90,11 +90,15 @@ impl Gathered {
             )
         });
         let judged = candidate_side.as_ref().unwrap_or(&current_side);
-        let meets_policy = match policy.tolerate {
-            Tolerate::Fn => judged.metrics.precision,
-            Tolerate::Fp => judged.metrics.recall,
-        }
-        .map(|rate| rate.low >= policy.precision);
+        let meets_policy = judged.metrics.precision.map(|precision| {
+            precision.value >= policy.precision
+                && policy.recall.is_none_or(|target| {
+                    judged
+                        .metrics
+                        .recall
+                        .is_some_and(|recall| recall.value >= target)
+                })
+        });
         let audit = write_audit(
             request,
             self.parts.iter().flat_map(|p| p.audit.clone()).collect(),

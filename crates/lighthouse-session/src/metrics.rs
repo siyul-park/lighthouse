@@ -76,16 +76,19 @@ pub struct Metrics {
 }
 
 /// Evaluates `pairs` of (truth, outcome). An unselected `fail` is a missed
-/// violation; an unselected `pass` is a correct silence. A subject left to
-/// review is not decided, so it is in neither precision nor recall, only in
-/// coverage.
+/// violation; an unselected `pass` is a correct silence. A subject labelled
+/// `fail` that was left to review was not found, so it is a miss (recall
+/// counts it); a subject left to review is in no precision, and in coverage
+/// only.
 pub fn evaluate(pairs: &[(Truth, Outcome)]) -> Metrics {
     let count = |want: &dyn Fn(&(Truth, Outcome)) -> bool| pairs.iter().filter(|p| want(p)).count();
     let selected = |p: &(Truth, Outcome)| p.1 != Outcome::Unselected;
     let tp = count(&|p| *p == (Truth::Fail, Outcome::Fail));
     let fp = count(&|p| *p == (Truth::Pass, Outcome::Fail));
     let tn = count(&|p| p.0 == Truth::Pass && matches!(p.1, Outcome::Pass | Outcome::Unselected));
-    let fn_ = count(&|p| p.0 == Truth::Fail && matches!(p.1, Outcome::Pass | Outcome::Unselected));
+    let fn_ = count(&|p| {
+        p.0 == Truth::Fail && matches!(p.1, Outcome::Pass | Outcome::Review | Outcome::Unselected)
+    });
     let chosen = count(&|p| selected(p));
     let not_applicable = count(&|p| selected(p) && p.0 == Truth::NotApplicable);
     let reviewed = count(&|p| p.1 == Outcome::Review);

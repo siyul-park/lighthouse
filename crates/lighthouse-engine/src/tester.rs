@@ -4,7 +4,7 @@ use lighthouse_plugin::Registry;
 use lighthouse_spec::{Catalog, Config, Decision, Example, ExampleKind};
 use serde_json::Value;
 
-use crate::{Engine, FixPlan, FixRun, unified_diff};
+use crate::{Engine, FixPlan, FixRun, ModelOptions, Outcome, unified_diff};
 
 /// Language of examples that need no language provider.
 const NEUTRAL: &str = "text";
@@ -181,6 +181,38 @@ impl<'a> RuleTester<'a> {
             );
         }
         Ok(())
+    }
+}
+
+/// What an example is run with: the project's own configuration and plugins,
+/// so that a rule bound to a model asks it.
+pub struct ExampleRun<'a> {
+    pub registry: Registry,
+    pub config: Config,
+    pub catalog: &'a Catalog,
+    pub trusted: bool,
+    pub models: ModelOptions,
+}
+
+impl ExampleRun<'_> {
+    /// Checks the files of `example` in a directory of their own, with the
+    /// rule `rule` only, and gives the outcome.
+    pub fn outcome(self, rule: &str, example: &Example) -> Result<Outcome, String> {
+        let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
+        for file in &example.files {
+            let path = dir.path().join(&file.path);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            fs::write(&path, file.text()).map_err(|e| e.to_string())?;
+        }
+        let engine = Engine::new(self.registry, self.config, self.catalog, dir.path())
+            .map_err(|e| e.to_string())?
+            .with_trust(self.trusted)
+            .with_models(self.models);
+        engine
+            .check(&[], &[rule.to_owned()])
+            .map_err(|e| e.to_string())
     }
 }
 

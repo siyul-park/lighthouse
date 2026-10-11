@@ -15,7 +15,7 @@ use crate::{Call, FineTuningJob, FineTuningJobRequest};
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ModelMethods {
     #[serde(rename = "lighthouse/classify")]
-    pub classify: Call<ClassifyParams, ClassifyResult>,
+    pub classify: Call<ClassifyParams, SystemOneResponse>,
     #[serde(rename = "lighthouse/train")]
     pub train: Call<FineTuningJobRequest, FineTuningJob>,
 }
@@ -176,25 +176,31 @@ pub struct Question {
 
 /// The answer to a question: P(fail).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct QuestionAnswer {
+pub struct Answer {
     /// `noul`.
-    #[serde(rename = "type")]
+    #[serde(rename = "type", default = "noul")]
     pub kind: String,
     /// The probability that the subject fails the decision, from 0 to 1.
     pub noul: f64,
 }
 
-/// Params of `lighthouse/classify`: the body of TypeSafe's System One API
-/// (`POST /v1/systemone`), for one subject and the decisions judged on it,
-/// keyed by decision id.
+/// The body of TypeSafe's System One API (`POST /v1/systemone`), for one
+/// subject and the decisions judged on it, keyed by decision id.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct ClassifyParams {
+pub struct SystemOneRequest {
     pub state: State,
     /// The model asked: the part of the reference after the provider.
     pub model: String,
     pub questions: BTreeMap<String, Question>,
-    /// The `options` of the project's provider, for a plugin that needs them
-    /// (`spec`, `baseUrl`, `keyEnv`). Not part of System One's body.
+}
+
+/// Params of `lighthouse/classify`: System One's body, and beside it the
+/// `options` of the project's provider, for a plugin that needs them
+/// (`spec`, `baseUrl`, `keyEnv`). The options are never part of the body.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ClassifyParams {
+    #[serde(flatten)]
+    pub request: SystemOneRequest,
     #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
     pub options: serde_json::Map<String, Value>,
 }
@@ -202,10 +208,11 @@ pub struct ClassifyParams {
 /// Result of `lighthouse/classify`: System One's response. Every question
 /// asked is answered; a missing answer is an abstention.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct ClassifyResult {
+pub struct SystemOneResponse {
     /// The model that answered, with its version when it has one.
+    #[serde(default)]
     pub model: String,
-    pub answers: BTreeMap<String, QuestionAnswer>,
+    pub answers: BTreeMap<String, Answer>,
     #[serde(default)]
     pub usage: Value,
 }
@@ -266,41 +273,6 @@ impl Subject {
     }
 }
 
-/// Where a training label came from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum LabelSource {
-    Example,
-    Baseline,
-    Person,
-    Model,
-}
-
-/// A labelled subject.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct TrainSubject {
-    #[serde(flatten)]
-    pub subject: Subject,
-    /// `fail` or `pass`.
-    pub label: ResultKind,
-    /// 0 to 1: how much the label is trusted.
-    pub weight: f64,
-    pub source: LabelSource,
-}
-
-/// Params of `lighthouse/train`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct TrainParams {
-    /// Names the request, so that a retry starts no second job.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub request_id: Option<String>,
-    pub decision: DecisionRef,
-    pub subjects: Vec<TrainSubject>,
-    /// The `options` of the project's model instance.
-    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
-    pub options: serde_json::Map<String, Value>,
-    /// A directory the host owns for this model and decision
-    /// (`.lighthouse/models/<plugin>/<decision>/`); the artifact goes there.
-    pub dir: String,
+fn noul() -> String {
+    "noul".to_owned()
 }

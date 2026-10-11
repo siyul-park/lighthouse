@@ -294,7 +294,7 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
 }
 
 /// The model each rule is bound to by an approved revision, by rule id.
-fn attached_models(root: &Path, catalog: &Catalog) -> BTreeMap<String, String> {
+pub(crate) fn attached_models(root: &Path, catalog: &Catalog) -> BTreeMap<String, String> {
     let Ok(records) = lighthouse_store::Records::read(root) else {
         return BTreeMap::new();
     };
@@ -311,30 +311,26 @@ fn attached_models(root: &Path, catalog: &Catalog) -> BTreeMap<String, String> {
         .collect()
 }
 
-/// Records what models failed as judgments attributed to them.
+/// Records what models failed as judgments attributed to them, in the role of
+/// a model: the reason names the model and its probability.
 fn record_model_labels(root: &Path, outcome: &Outcome) -> Vec<String> {
     let mut done = 0;
     let mut notes = Vec::new();
     for d in &outcome.diagnostics {
-        let evidence = &d.evidence;
-        if evidence.get("source").and_then(|v| v.as_str()) != Some("model") {
+        let Some(model) = d.evidence.get("model").and_then(|v| v.as_str()) else {
             continue;
-        }
-        let text = |key: &str| {
-            evidence
-                .get(key)
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
         };
+        let confidence = d
+            .evidence
+            .get("confidence")
+            .and_then(|v| v.as_f64())
+            .unwrap_or_default();
         let review = lighthouse_store::NewJudgment {
             fingerprint: d.fingerprint.as_str().to_owned(),
             judgment: lighthouse_model::Judgment::Fail,
-            reason: Some(text("reason").to_owned()),
+            reason: Some(format!("model {model} P(fail)={confidence:.2}")),
             suppress: None,
-            attribution: lighthouse_model::Attribution {
-                kind: lighthouse_model::AgentKind::SoftwareAgent,
-                id: Some(format!("{}@{}", text("model"), text("version"))),
-            },
+            attribution: lighthouse_model::Attribution::model(model),
             commit: None,
             expect_seen: None,
             lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),

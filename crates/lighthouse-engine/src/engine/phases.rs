@@ -305,6 +305,15 @@ impl Engine {
                 .found
                 .extend(found.into_iter().map(|d| leveled(d, level)));
         }
+        // The models answer what the file's rules queued, all at once.
+        for (rule, found) in scene.models.flush(&input.file.path.to_string_lossy()) {
+            let Some(level) = resolved.get(&rule).and_then(|config| config.level) else {
+                continue;
+            };
+            gathered
+                .found
+                .extend(found.into_iter().map(|d| answered(d, level)));
+        }
         Ok(gathered)
     }
 
@@ -395,16 +404,24 @@ impl Engine {
     }
 }
 
-/// A finding at the level the configuration gives its rule. A model's answer
-/// is not worth an `error`, and a subject nothing decided is only `info`.
+/// A finding at the level the configuration gives its rule; a subject nothing
+/// decided is only `info`.
 fn leveled(mut d: Diagnostic, level: Severity) -> Diagnostic {
-    let by_model = d.evidence.get("source").and_then(Value::as_str) == Some("model");
-    d.severity = match (level, d.review.is_some(), by_model) {
-        (_, true, _) => Severity::Info,
-        (Severity::Error, _, true) => Severity::Warn,
-        (level, _, _) => level,
+    d.severity = if d.review.is_some() {
+        Severity::Info
+    } else {
+        level
     };
     d
+}
+
+/// A finding that came from a model's answer: it is not worth an `error`.
+fn answered(d: Diagnostic, level: Severity) -> Diagnostic {
+    let level = match level {
+        Severity::Error => Severity::Warn,
+        other => other,
+    };
+    leveled(d, level)
 }
 
 /// What a rule found, or nothing and a gap when it could not finish: the gap

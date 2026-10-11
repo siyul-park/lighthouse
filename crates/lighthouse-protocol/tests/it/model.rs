@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
 use lighthouse_protocol::{
-    ClassifyParams, DecisionRef, ModelList, ModelManifest, Question, ResultKind, Shot, State,
-    Subject, SubjectContext, json_in, noul_of, prompt, response_schema, subject_text, system_text,
+    DecisionRef, ModelList, ModelManifest, Question, ResultKind, Shot, State, Subject,
+    SubjectContext, SystemOneRequest, json_in, noul_of, prompt, response_schema, subject_text,
+    system_text,
 };
 use serde_json::json;
 
@@ -71,13 +72,12 @@ fn the_subject_text_shows_the_file_and_the_source() {
 
 #[test]
 fn a_prompt_holds_both_and_the_schema_asks_for_a_probability() {
-    let params = ClassifyParams {
+    let request = SystemOneRequest {
         state: state(),
         model: "m".to_owned(),
         questions: BTreeMap::from([("design/x".to_owned(), Question::of(&decision()))]),
-        options: serde_json::Map::new(),
     };
-    let text = prompt(&params);
+    let text = prompt(&request);
     assert!(text.contains("Is it small?") && text.contains("func f() {}"));
     assert_eq!(response_schema()["properties"]["noul"]["type"], "number");
 }
@@ -137,38 +137,50 @@ fn a_subject_shows_a_model_its_state_and_json_may_come_fenced() {
 }
 
 #[test]
-fn a_training_file_has_one_line_per_labelled_subject() {
-    use lighthouse_protocol::{LabelSource, Subject, SubjectContext, TrainSubject, training_file};
+fn a_training_line_is_openais_supervised_format_with_lighthouses_keys() {
+    use lighthouse_protocol::{LineKeys, TrainingLine};
 
-    let subject = |key: &str, label| TrainSubject {
-        subject: Subject {
-            key: key.to_owned(),
-            kind: "function".to_owned(),
-            id: key.to_owned(),
-            language: "go".to_owned(),
-            file: "a.go".to_owned(),
-            text: "func f() {}".to_owned(),
-            context: SubjectContext::default(),
-        },
-        label,
-        weight: 0.5,
-        source: LabelSource::Model,
+    let state = State {
+        language: "go".to_owned(),
+        file: "a.go".to_owned(),
+        text: "func f() {}".to_owned(),
+        facts: json!({}),
+        neighbors: Vec::new(),
     };
-    let text = training_file(
-        &decision(),
-        &[
-            subject("a", ResultKind::Fail),
-            subject("b", ResultKind::Pass),
-        ],
-    );
-    let lines: Vec<serde_json::Value> = text
-        .lines()
-        .map(|l| serde_json::from_str(l).unwrap())
+    let question = Question::of(&decision());
+    let line = |label| {
+        let keys = LineKeys {
+            weight: 0.5,
+            group: "a.go",
+            decision: "design/x",
+            key: "k",
+            attribution: json!({"type": "Person"}),
+        };
+        let line = TrainingLine::new(&question, &state, label, keys);
+        serde_json::to_value(line).unwrap()
+    };
+    let fail = line(ResultKind::Fail);
+    let roles: Vec<&str> = fail["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["role"].as_str().unwrap())
         .collect();
 
-    assert_eq!(lines.len(), 2);
-    assert_eq!(lines[0]["label"], "fail");
-    assert_eq!(lines[1]["weight"], 0.5);
-    assert_eq!(lines[1]["source"], "model");
-    assert_eq!(lines[0]["questions"]["design/x"]["type"], "noul");
+    assert_eq!(roles, ["system", "user", "assistant"]);
+    let content = |line: &serde_json::Value, at: usize| -> serde_json::Value {
+        serde_json::from_str(line["messages"][at]["content"].as_str().unwrap()).unwrap()
+    };
+    assert_eq!(content(&fail, 0)["type"], "noul");
+    assert_eq!(content(&fail, 1)["text"], "func f() {}");
+    assert_eq!(content(&fail, 2), json!({"type": "noul", "noul": 1}));
+    assert_eq!(
+        content(&line(ResultKind::Pass), 2),
+        json!({"type": "noul", "noul": 0})
+    );
+    assert_eq!(fail["weight"], 0.5);
+    assert_eq!(fail["group"], "a.go");
+    assert_eq!(fail["decision"], "design/x");
+    assert_eq!(fail["key"], "k");
+    assert_eq!(fail["attribution"]["type"], "Person");
 }

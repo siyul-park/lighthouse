@@ -373,7 +373,7 @@ fn kind_problem(decision: &Decision, kind: &CheckKind) -> Option<String> {
                         select.name()
                     )
                 })
-                .or_else(|| review_problem(decision, cel.review.is_some(), select)),
+                .or_else(|| review_problem(cel.review.is_some(), select)),
         }),
         CheckKind::Command(command) => command.problem().or_else(|| {
             let per_file = subject.run_scope() == RunScope::File;
@@ -382,16 +382,13 @@ fn kind_problem(decision: &Decision, kind: &CheckKind) -> Option<String> {
                     .to_owned()
             })
         }),
-        CheckKind::Model(model) => model
-            .problem(subject)
-            .or_else(|| capped(decision)),
+        CheckKind::Model(model) => model.problem(subject),
         CheckKind::Rpc(_) => Some("an `rpc` check is not supported until plugin protocol 0.2".to_owned()),
     }
 }
 
-/// What a model cannot be asked: a subject outside a file, and a level above
-/// its answers' worth.
-fn review_problem(decision: &Decision, reviewed: bool, select: crate::Select) -> Option<String> {
+/// What a model cannot be asked: a subject outside a file.
+fn review_problem(reviewed: bool, select: crate::Select) -> Option<String> {
     if !reviewed {
         return None;
     }
@@ -401,15 +398,7 @@ fn review_problem(decision: &Decision, reviewed: bool, select: crate::Select) ->
             select.name()
         ));
     }
-    capped(decision)
-}
-
-/// A model's answer is not worth an `error`.
-fn capped(decision: &Decision) -> Option<String> {
-    (decision.severity == Some(Severity::Error)).then(|| {
-        "a check with `review` or of type `model` is capped at `warn`: only a deterministic check can be an `error`"
-            .to_owned()
-    })
+    None
 }
 
 /// A standard operation judges the shape of one file or of the whole project.

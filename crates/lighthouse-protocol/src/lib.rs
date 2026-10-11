@@ -7,18 +7,18 @@ mod wire;
 
 pub use frame::{ErrorObject, FrameError, Id, Message, read_message, write_message};
 pub use jobs::{
-    Capabilities, FineTuningJob, FineTuningJobRequest, JobError, JobStatus, Method, ModelEntry,
-    ModelList, Supervised, Supports, TrainLine, TrainResponse, training_file,
+    Capabilities, ChatMessage, FineTuningJob, FineTuningJobRequest, JobError, JobStatus, LineKeys,
+    Method, ModelEntry, ModelList, Supervised, Supports, TrainingLine,
 };
 pub use model::{
-    ClassifyParams, ClassifyResult, Criteria, Criterion, DecisionRef, Example, Instructions,
-    LabelSource, ModelManifest, ModelMethods, Neighbor, Question, QuestionAnswer, ResultKind, Shot,
-    State, Subject, SubjectContext, TrainParams, TrainSubject,
+    Answer, ClassifyParams, Criteria, Criterion, DecisionRef, Example, Instructions, ModelManifest,
+    ModelMethods, Neighbor, Question, ResultKind, Shot, State, Subject, SubjectContext,
+    SystemOneRequest, SystemOneResponse,
 };
 pub use prompt::{
     json_in, noul_of, prompt, response_schema, subject as subject_text, system as system_text,
 };
-pub use serve::{Handler, ServeError, serve};
+pub use serve::{Handler, HandlerError, ServeError, serve};
 pub use wire::{
     CacheRef, Call, ClientInfo, Comment, Context, Conventions, Edge, EdgeKind, Event, EventKind,
     FileInfo, FileRef, Flow, FlowKind, Fragment, FunctionSummary, Incomplete, IndexParams,

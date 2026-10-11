@@ -78,13 +78,14 @@ fn agent_kind_reads_the_prov_classes_and_the_old_words() {
         assert_eq!(text.parse::<AgentKind>().unwrap(), kind, "{text}");
     }
     assert!("robot".parse::<AgentKind>().is_err());
-    let attribution = Attribution {
-        kind: AgentKind::SoftwareAgent,
-        id: Some("claude".to_owned()),
-    };
+    let attribution = Attribution::new(AgentKind::SoftwareAgent, Some("claude".to_owned()));
     assert_eq!(
         serde_json::to_value(&attribution).unwrap(),
-        serde_json::json!({ "type": "SoftwareAgent", "id": "claude" })
+        serde_json::json!({ "type": "SoftwareAgent", "id": "claude", "hadRole": "agent" })
+    );
+    assert_eq!(
+        serde_json::to_value(Attribution::model("local/x@1")).unwrap(),
+        serde_json::json!({ "type": "SoftwareAgent", "id": "local/x@1", "hadRole": "model" })
     );
 }
 
@@ -115,6 +116,11 @@ fn an_unknown_term_names_the_text_and_what_was_expected() {
 }
 
 #[test]
-fn a_person_weighs_more_than_an_agent() {
-    assert!(AgentKind::Person.strength() > AgentKind::SoftwareAgent.strength());
+fn a_person_outweighs_a_coding_agent_and_that_outweighs_a_model() {
+    let person = Attribution::new(AgentKind::Person, Some("kim".to_owned()));
+    let agent = Attribution::new(AgentKind::SoftwareAgent, Some("claude".to_owned()));
+    let model = Attribution::model("openai/gpt@1");
+    assert!(person.strength() > agent.strength());
+    assert!(agent.strength() > model.strength());
+    assert!(model.is_model() && !agent.is_model() && !person.is_model());
 }

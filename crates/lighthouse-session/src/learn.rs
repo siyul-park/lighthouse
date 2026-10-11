@@ -1,22 +1,28 @@
 //! `lighthouse learn train`: collects the labelled subjects of a decision the
-//! way evaluation does, builds them exactly as a model is asked about them,
-//! and hands them to a model that learns from labels.
+//! way evaluation does, writes them as a dataset (the one writer of training
+//! files), and asks a model that learns from labels for a fine-tuning job on
+//! it.
 
 use std::{
-    collections::BTreeSet,
-    fs,
+    collections::{BTreeMap, BTreeSet},
+    env,
     path::{Path, PathBuf},
 };
 
+use lighthouse_engine::ModelOptions;
 use lighthouse_plugin::{
-    Classifier, ClassifyParams, LabelSource, Question, ResultKind, Subject, TrainParams,
-    TrainResponse, TrainSubject, UPPER, decide,
+    Classifier, ClassifyParams, FineTuningJob, FineTuningJobRequest, Method, Question, ResultKind,
+    Subject, Supervised, SystemOneRequest, UPPER, decide,
 };
 use serde::Serialize;
+use serde_json::json;
 
 use crate::{
     CheckRequest, ModelFlags, Result, Session, check,
-    labels::{Baseline, Label, WEIGHT_EXAMPLE, WEIGHT_MODEL, collect},
+    dataset::{self, DIR, Row},
+    evaluate::Repo,
+    labels::{Baseline, Collect, Label, Source},
+    metrics::Truth,
 };
 
 /// What to train.
@@ -26,11 +32,13 @@ pub struct TrainRequest {
     /// model.
     pub model: Option<String>,
     /// A model whose answers on unlabelled subjects are labels too, at the
-    /// weight of a model.
+    /// weight of a model: a `fail` where it is sure of one, a `pass` where it
+    /// is sure of the other.
     pub from_model: Option<String>,
     pub baseline: Option<PathBuf>,
-    /// The `repo` of the baseline rows to use.
-    pub repo: Option<String>,
+    /// The repositories the labels are about, as in `eval`; this project when
+    /// empty.
+    pub repos: Vec<Repo>,
     pub config: Option<PathBuf>,
 }
 
@@ -41,18 +49,124 @@ pub struct Trained {
     pub model: String,
     /// Labelled subjects handed over, by source.
     pub subjects: usize,
-    pub by_source: std::collections::BTreeMap<String, usize>,
+    pub by_source: BTreeMap<String, usize>,
     /// Labels whose subject no longer exists or is not selected.
     pub unresolved: usize,
-    /// The training file written for the learner.
+    /// The training file, by content.
     pub dataset: PathBuf,
-    /// What the learner gave; `None` when no model that learns is bound.
-    pub result: Option<TrainResponse>,
+    /// Its digest, `sha256:<hex>`.
+    pub training_file: String,
+    /// The job the learner gave; `None` when no model that learns is bound.
+    pub result: Option<FineTuningJob>,
+}
+
+/// What one repository gave to a training run.
+struct Gathered {
+    rows: Vec<Sourced>,
+    unresolved: usize,
+    root: PathBuf,
+    reference: Option<String>,
+    decision_ref: lighthouse_plugin::DecisionRef,
+    /// The run, which holds the models.
+    checked: crate::Checked,
+}
+
+/// A row with where it came from.
+struct Sourced {
+    row: Row,
+    source: Source,
 }
 
 /// Trains the model on the labels of the decision.
 pub fn train(request: &TrainRequest) -> Result<Trained> {
-    let session = Session::load(request.config.as_deref())?;
+    let start = env::current_dir()?;
+    let config = request.config.as_ref().map(|c| start.join(c));
+    let baseline = request.baseline.as_ref().map(|b| start.join(b));
+    let repos: Vec<Repo> = if request.repos.is_empty() {
+        vec![Repo {
+            name: None,
+            dir: start.clone(),
+        }]
+    } else {
+        request
+            .repos
+            .iter()
+            .map(|r| Repo {
+                name: r.name.clone(),
+                dir: start.join(&r.dir),
+            })
+            .collect()
+    };
+    let mut gathered: Vec<Gathered> = Vec::new();
+    let outcome = (|| -> Result<()> {
+        for (at, repo) in repos.iter().enumerate() {
+            env::set_current_dir(&repo.dir)?;
+            let one = gather(
+                request,
+                repo,
+                config.as_deref(),
+                baseline.as_deref(),
+                at == 0,
+            )?;
+            gathered.push(one);
+        }
+        Ok(())
+    })();
+    env::set_current_dir(&start)?;
+    outcome?;
+    let unresolved = gathered.iter().map(|g| g.unresolved).sum();
+    let rows: Vec<Sourced> = gathered.iter_mut().flat_map(|g| g.rows.drain(..)).collect();
+    let first = gathered.first().ok_or("nothing to train on")?;
+    let (root, reference, decision_ref) = (
+        first.root.clone(),
+        first.reference.clone(),
+        first.decision_ref.clone(),
+    );
+    let mut by_source = BTreeMap::new();
+    for row in &rows {
+        *by_source.entry(row.source.name().to_owned()).or_insert(0) += 1;
+    }
+    let count = rows.len();
+    let written = dataset::write(
+        &root,
+        &decision_ref,
+        rows.into_iter().map(|r| r.row).collect(),
+    )?;
+    let learner = reference
+        .as_deref()
+        .map(|r| first.checked.model(r))
+        .transpose()?;
+    let result = match learner.filter(|model| model.manifest().trains) {
+        Some(model) => Some(model.train(&job(
+            reference.as_deref().unwrap_or_default(),
+            &written.digest,
+            &root,
+            &request.decision,
+        ))?),
+        None => None,
+    };
+    Ok(Trained {
+        decision: request.decision.clone(),
+        model: reference.unwrap_or_default(),
+        subjects: count,
+        by_source,
+        unresolved,
+        dataset: written.path,
+        training_file: written.digest,
+        result,
+    })
+}
+
+/// The labelled subjects of the repository the process is in.
+fn gather(
+    request: &TrainRequest,
+    repo: &Repo,
+    config: Option<&Path>,
+    baseline: Option<&Path>,
+    examples: bool,
+) -> Result<Gathered> {
+    let labelling = Session::load(config)?;
+    let session = Session::load(config)?;
     let root = session.root.clone();
     let binding = session.config.models().clone();
     let checked = check(
@@ -79,141 +193,157 @@ pub fn train(request: &TrainRequest) -> Result<Trained> {
         .clone()
         .or_else(|| binding.rules.get(&request.decision).cloned())
         .or_else(|| binding.classification.clone());
-    let exclude = reference.as_deref();
-    let table = request.baseline.as_deref().map(|file| Baseline {
+    let table = baseline.map(|file| Baseline {
         file,
-        repo: request.repo.as_deref(),
+        repo: repo.name.as_deref(),
     });
-    let labels = collect(&root, &decision, table.as_ref(), exclude)?;
+    let labels = Collect {
+        session: &labelling,
+        catalog: &checked.catalog,
+        decision: &decision,
+        rule: &request.decision,
+        baseline: table.as_ref(),
+        exclude_model: reference.as_deref(),
+        models: ModelOptions {
+            off: true,
+            ..ModelOptions::default()
+        },
+        examples,
+    }
+    .labels()?;
     let observed = &checked.outcome.subjects;
     let decision_ref = lighthouse_checks::decision_ref(&decision);
-    let (mut subjects, seen) = labelled(&labels, observed);
-    let unresolved = labels.len() - subjects.len();
-    subjects.extend(examples(&decision_ref));
+    let (mut rows, seen) = rows_of(&labels, observed);
+    let unresolved = labels
+        .iter()
+        .filter(|l| l.truth != Truth::NotApplicable)
+        .count()
+        - rows.len();
     if let Some(teacher) = &request.from_model {
         let unlabelled = observed
             .iter()
             .filter(|(fingerprint, _)| !seen.contains(*fingerprint))
-            .map(|(_, subject)| subject.clone())
+            .map(|(fingerprint, subject)| (fingerprint.clone(), subject.clone()))
             .collect();
         let teacher = checked.model(teacher)?;
-        subjects.extend(taught(teacher.as_ref(), &decision_ref, unlabelled)?);
+        rows.extend(taught(teacher.as_ref(), &decision_ref, unlabelled)?);
     }
-    let mut by_source = std::collections::BTreeMap::new();
-    for s in &subjects {
-        *by_source
-            .entry(format!("{:?}", s.source).to_lowercase())
-            .or_insert(0) += 1;
-    }
-    let dir = artifact_dir(
-        &root,
-        reference.as_deref().unwrap_or("none"),
-        &request.decision,
-    );
-    fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let dataset = dir.join("training.jsonl");
-    fs::write(
-        &dataset,
-        lighthouse_plugin::training_file(&decision_ref, &subjects),
-    )
-    .map_err(|e| format!("{}: {e}", dataset.display()))?;
-    // The same labelled set for the same decision is the same request.
-    let request_id =
-        lighthouse_model::hash::short(&serde_json::to_string(&(&decision_ref.id, &subjects))?, 8);
-    let count = subjects.len();
-    let learner = reference.as_deref().map(|r| checked.model(r)).transpose()?;
-    let result = match learner.filter(|model| model.manifest().trains) {
-        Some(model) => Some(model.train(&TrainParams {
-            request_id: Some(request_id),
-            decision: decision_ref,
-            subjects,
-            options: serde_json::Map::new(),
-            dir: dir.to_string_lossy().into_owned(),
-        })?),
-        None => None,
-    };
-    Ok(Trained {
-        decision: request.decision.clone(),
-        model: reference.unwrap_or_default(),
-        subjects: count,
-        by_source,
+    Ok(Gathered {
+        rows,
         unresolved,
-        dataset,
-        result,
+        root,
+        reference,
+        decision_ref,
+        checked,
     })
 }
 
-/// The labels whose subject the run saw, as training subjects, and the
-/// fingerprints they cover.
-fn labelled(
+/// The labels with a subject to learn from, as rows, and the keys they cover.
+/// A `notApplicable` label teaches nothing to a classifier.
+fn rows_of(
     labels: &[Label],
-    observed: &std::collections::BTreeMap<String, Subject>,
-) -> (Vec<TrainSubject>, BTreeSet<String>) {
-    let mut subjects = Vec::new();
+    observed: &BTreeMap<String, Subject>,
+) -> (Vec<Sourced>, BTreeSet<String>) {
+    let mut rows = Vec::new();
     let mut seen = BTreeSet::new();
     for label in labels {
-        if let Some(subject) = observed.get(&label.fingerprint) {
-            seen.insert(label.fingerprint.clone());
-            subjects.push(TrainSubject {
+        let kind = match label.truth {
+            Truth::Fail => ResultKind::Fail,
+            Truth::Pass => ResultKind::Pass,
+            Truth::NotApplicable => continue,
+        };
+        let Some(subject) = label.subject.as_ref().or_else(|| observed.get(&label.key)) else {
+            continue;
+        };
+        seen.insert(label.key.clone());
+        rows.push(Sourced {
+            row: Row {
                 subject: subject.clone(),
-                label: label.kind,
+                label: kind,
                 weight: label.weight,
-                source: label.source,
-            });
-        }
-    }
-    (subjects, seen)
-}
-
-/// The decision's examples as training subjects.
-fn examples(decision: &lighthouse_plugin::DecisionRef) -> Vec<TrainSubject> {
-    decision
-        .examples
-        .iter()
-        .map(|shot| TrainSubject {
-            subject: Subject {
-                key: format!("example:{}", shot.note),
-                kind: "example".to_owned(),
-                id: shot.note.clone(),
-                language: shot.language.clone(),
-                file: String::new(),
-                text: shot.code.clone(),
-                context: lighthouse_plugin::SubjectContext::default(),
+                key: label.key.clone(),
+                attribution: label.attribution.clone(),
             },
-            label: shot.kind,
-            weight: WEIGHT_EXAMPLE,
-            source: LabelSource::Example,
-        })
-        .collect()
+            source: label.source,
+        });
+    }
+    (rows, seen)
 }
 
-/// What a teacher model decides about subjects nobody labelled: a `fail` at
-/// the uncalibrated band; what it is unsure of teaches nothing.
+/// What a teacher model decides about subjects nobody labelled: a `fail` where
+/// it is at least as sure as the band's upper bound, a `pass` where it is as
+/// sure the other way; what it is unsure of teaches nothing.
 fn taught(
     teacher: &dyn Classifier,
     decision: &lighthouse_plugin::DecisionRef,
-    unlabelled: Vec<Subject>,
-) -> Result<Vec<TrainSubject>> {
+    unlabelled: Vec<(String, Subject)>,
+) -> Result<Vec<Sourced>> {
     let question = Question::of(decision);
+    let attribution = json!({"type": "SoftwareAgent", "hadRole": "model"});
     let mut labelled = Vec::new();
-    for subject in unlabelled {
+    for (key, subject) in unlabelled {
         let answered = teacher.classify(&ClassifyParams {
-            state: subject.state(),
-            model: String::new(),
-            questions: std::collections::BTreeMap::from([(decision.id.clone(), question.clone())]),
+            request: SystemOneRequest {
+                state: subject.state(),
+                model: String::new(),
+                questions: BTreeMap::from([(decision.id.clone(), question.clone())]),
+            },
             options: serde_json::Map::new(),
         })?;
-        let noul = answered.answers.get(&decision.id).map(|a| a.noul);
-        if let Some((ResultKind::Fail, _)) = noul.map(|p| decide(p, UPPER)) {
-            labelled.push(TrainSubject {
+        let Some(noul) = answered.answers.get(&decision.id).map(|a| a.noul) else {
+            continue;
+        };
+        let kind = if decide(noul, UPPER).is_some() {
+            ResultKind::Fail
+        } else if decide(1.0 - noul, UPPER).is_some() {
+            ResultKind::Pass
+        } else {
+            continue;
+        };
+        labelled.push(Sourced {
+            row: Row {
                 subject,
-                label: ResultKind::Fail,
-                weight: WEIGHT_MODEL,
-                source: LabelSource::Model,
-            });
-        }
+                label: kind,
+                weight: Source::Model.weight(),
+                key,
+                attribution: attribution.clone(),
+            },
+            source: Source::Model,
+        });
     }
     Ok(labelled)
+}
+
+/// OpenAI's fine-tuning job creation for the dataset: the same dataset for the
+/// same base model is the same job (its seed comes from the digest).
+fn job(reference: &str, training_file: &str, root: &Path, decision: &str) -> FineTuningJobRequest {
+    let model = reference.split_once('/').map_or(reference, |(_, m)| m);
+    let seed = u64::from_str_radix(&training_file["sha256:".len()..][..15], 16).unwrap_or(0);
+    FineTuningJobRequest {
+        model: model.to_owned(),
+        training_file: training_file.to_owned(),
+        validation_file: None,
+        method: Method {
+            kind: "supervised".to_owned(),
+            supervised: Supervised::default(),
+        },
+        seed,
+        suffix: None,
+        metadata: BTreeMap::from([
+            ("decision".to_owned(), decision.to_owned()),
+            (
+                "datasets".to_owned(),
+                root.join(DIR).to_string_lossy().into_owned(),
+            ),
+            (
+                "dir".to_owned(),
+                artifact_dir(root, reference, decision)
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
+        ]),
+        options: serde_json::Map::new(),
+    }
 }
 
 /// Where a model keeps what it learned for a decision:

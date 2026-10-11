@@ -120,7 +120,9 @@ pub struct RevisionSpec {
     /// `prov:wasAttributedTo`: who approved it.
     pub approval: Attribution,
     /// The model it binds, `<provider>/<model>` (a learned one is
-    /// `local/learned@<artifact hash>`).
+    /// `local/learned@<artifact hash>`). A revision is a full snapshot: absent
+    /// means unbound, so a writer that does not change the model copies its
+    /// parent's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     /// `prov:generatedAtTime`.
