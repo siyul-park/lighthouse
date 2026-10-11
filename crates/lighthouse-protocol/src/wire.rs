@@ -47,6 +47,9 @@ pub struct InitializeResult {
     /// Must equal the host's protocol version.
     pub protocol_version: String,
     pub languages: Vec<ProviderManifest>,
+    /// The models the plugin offers; empty for a language plugin.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<crate::ModelManifest>,
 }
 
 /// What a language provider declares: the language it indexes, how the host

@@ -7,8 +7,9 @@ use serde::Serialize;
 use thiserror::Error;
 
 use crate::{
-    EXIT, FrameError, INDEX, INITIALIZE, IndexParams, IndexResult, InitializeParams,
-    InitializeResult, Message, SHUTDOWN, read_message, write_message,
+    CLASSIFY, ClassifyParams, ClassifyResult, EXIT, FrameError, INDEX, INITIALIZE, IndexParams,
+    IndexResult, InitializeParams, InitializeResult, Message, SHUTDOWN, TRAIN, TrainParams,
+    TrainResult, read_message, write_message,
 };
 
 const PARSE_ERROR: i64 = -32700;
@@ -26,6 +27,14 @@ const INTERNAL_ERROR: i64 = -32603;
 pub trait Handler {
     fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, String>;
     fn index(&mut self, params: IndexParams) -> Result<IndexResult, String>;
+    /// Puts subjects to a model; a language plugin offers no model.
+    fn classify(&mut self, _params: ClassifyParams) -> Result<ClassifyResult, String> {
+        Err("this plugin offers no model".to_owned())
+    }
+    /// Fits a model; only a model that learns from labels offers it.
+    fn train(&mut self, _params: TrainParams) -> Result<TrainResult, String> {
+        Err("this plugin does not train".to_owned())
+    }
 }
 
 /// Why [`serve`] ended without a clean `shutdown` and `exit`.
@@ -93,6 +102,8 @@ fn dispatch(
     let outcome = catch_unwind(AssertUnwindSafe(|| match method {
         INITIALIZE => call(message, |p| handler.initialize(p)),
         INDEX => call(message, |p| handler.index(p)),
+        CLASSIFY => call(message, |p| handler.classify(p)),
+        TRAIN => call(message, |p| handler.train(p)),
         SHUTDOWN => {
             *shutdown = true;
             Ok(Ok(serde_json::Value::Null))

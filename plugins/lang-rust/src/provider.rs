@@ -60,6 +60,7 @@ impl Handler for Provider {
                     lighthouse_protocol::OVERLAYS.to_owned(),
                 ],
             }],
+            models: Vec::new(),
         })
     }
 

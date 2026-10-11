@@ -1,5 +1,42 @@
 {
   "$defs": {
+    "Answer": {
+      "description": "The answer for one subject.",
+      "properties": {
+        "confidence": {
+          "description": "0 to 1.",
+          "format": "double",
+          "type": "number"
+        },
+        "key": {
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "description": "One sentence.",
+          "type": "string"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Span"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict"
+        }
+      },
+      "required": [
+        "key",
+        "verdict",
+        "confidence"
+      ],
+      "type": "object"
+    },
     "CacheRef": {
       "description": "The directory a provider may keep derived results in between runs.",
       "properties": {
@@ -42,6 +79,44 @@
       "required": [
         "params",
         "result"
+      ],
+      "type": "object"
+    },
+    "ClassifyParams": {
+      "description": "Params of `lighthouse/classify`.",
+      "properties": {
+        "decision": {
+          "$ref": "#/$defs/DecisionRef"
+        },
+        "subjects": {
+          "items": {
+            "$ref": "#/$defs/Subject"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "decision",
+        "subjects"
+      ],
+      "type": "object"
+    },
+    "ClassifyResult": {
+      "description": "Result of `lighthouse/classify`: every requested key is answered once; an\nunknown or missing key makes the batch an error.",
+      "properties": {
+        "model": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "results": {
+          "items": {
+            "$ref": "#/$defs/Answer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "results",
+        "model"
       ],
       "type": "object"
     },
@@ -138,6 +213,34 @@
           "type": "array"
         }
       },
+      "type": "object"
+    },
+    "DecisionRef": {
+      "description": "The decision the subjects are judged against.",
+      "properties": {
+        "examples": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Shot"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "prompt": {
+          "description": "What the model is told; the requirement unless the check says more.",
+          "type": "string"
+        },
+        "requirement": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "requirement",
+        "prompt"
+      ],
       "type": "object"
     },
     "Edge": {
@@ -591,6 +694,13 @@
           },
           "type": "array"
         },
+        "models": {
+          "description": "The models the plugin offers; empty for a language plugin.",
+          "items": {
+            "$ref": "#/$defs/ModelManifest"
+          },
+          "type": "array"
+        },
         "protocolVersion": {
           "description": "Must equal the host's protocol version.",
           "type": "string"
@@ -604,6 +714,63 @@
         "version",
         "protocolVersion",
         "languages"
+      ],
+      "type": "object"
+    },
+    "LabelSource": {
+      "description": "Where a training label came from.",
+      "enum": [
+        "example",
+        "baseline",
+        "person",
+        "model"
+      ],
+      "type": "string"
+    },
+    "ModelManifest": {
+      "description": "What a model plugin offers: one entry of `models` in its `initialize` result.",
+      "properties": {
+        "id": {
+          "description": "The model id the project binds in `[models]`; equals the plugin id.",
+          "type": "string"
+        },
+        "methods": {
+          "default": [],
+          "description": "`classify`, and `train` when the model learns from labels.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "task": {
+          "description": "`classification`: a subject of a decision is a violation or not.",
+          "type": "string"
+        },
+        "version": {
+          "description": "Changes whenever the answers for the same input may change (the model\nname, the prompt template, the trained artifact).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "task",
+        "version"
+      ],
+      "type": "object"
+    },
+    "ModelRef": {
+      "description": "Which model answered, and which version of it.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version"
       ],
       "type": "object"
     },
@@ -630,6 +797,31 @@
       },
       "required": [
         "path"
+      ],
+      "type": "object"
+    },
+    "Neighbor": {
+      "description": "A symbol near the subject: a caller or callee.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "relation": {
+          "description": "`caller` or `callee`.",
+          "type": "string"
+        },
+        "text": {
+          "description": "The neighbor's source when it is in the subject's file, truncated.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "relation"
       ],
       "type": "object"
     },
@@ -776,6 +968,30 @@
         }
       ]
     },
+    "Shot": {
+      "description": "An example of a decision, shown to the model as a few shots.",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict",
+          "description": "`fail` for an invalid example, `pass` for a valid one."
+        }
+      },
+      "required": [
+        "verdict",
+        "language",
+        "code"
+      ],
+      "type": "object"
+    },
     "Signature": {
       "description": "The parameter and result types of a function, receiver excluded. A Rust\ntuple result is one `results` entry.",
       "properties": {
@@ -810,6 +1026,66 @@
         "start",
         "end"
       ],
+      "type": "object"
+    },
+    "Subject": {
+      "description": "One thing to judge.",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/SubjectContext",
+          "default": {
+            "facts": null,
+            "neighbors": []
+          }
+        },
+        "file": {
+          "description": "Project-relative, `/`-separated.",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "key": {
+          "description": "Identifies the subject within the request; answers repeat it.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "`symbol`, `function`, `file`, `test`, `comment` or `event`.",
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "text": {
+          "description": "The subject's source by extent.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "kind",
+        "id",
+        "language",
+        "file",
+        "text"
+      ],
+      "type": "object"
+    },
+    "SubjectContext": {
+      "description": "What the host knows about a subject besides its text.",
+      "properties": {
+        "facts": {
+          "default": null,
+          "description": "The select's facts for the subject, as the builder made them."
+        },
+        "neighbors": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Neighbor"
+          },
+          "type": "array"
+        }
+      },
       "type": "object"
     },
     "Symbol": {
@@ -965,6 +1241,107 @@
       ],
       "type": "string"
     },
+    "TrainParams": {
+      "description": "Params of `lighthouse/train`.",
+      "properties": {
+        "decision": {
+          "$ref": "#/$defs/DecisionRef"
+        },
+        "dir": {
+          "description": "A directory the host owns for this model and decision\n(`.lighthouse/models/<plugin>/<decision>/`); the artifact goes there.",
+          "type": "string"
+        },
+        "subjects": {
+          "items": {
+            "$ref": "#/$defs/TrainSubject"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "decision",
+        "subjects",
+        "dir"
+      ],
+      "type": "object"
+    },
+    "TrainResult": {
+      "description": "Result of `lighthouse/train`.",
+      "properties": {
+        "metrics": {
+          "additionalProperties": true,
+          "default": {},
+          "description": "Numbers the trainer measured, such as out-of-fold precision and recall.",
+          "type": "object"
+        },
+        "version": {
+          "description": "The artifact's hash; it becomes the model's version.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "type": "object"
+    },
+    "TrainSubject": {
+      "description": "A labelled subject.",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/SubjectContext",
+          "default": {
+            "facts": null,
+            "neighbors": []
+          }
+        },
+        "file": {
+          "description": "Project-relative, `/`-separated.",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "key": {
+          "description": "Identifies the subject within the request; answers repeat it.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "`symbol`, `function`, `file`, `test`, `comment` or `event`.",
+          "type": "string"
+        },
+        "label": {
+          "$ref": "#/$defs/Verdict",
+          "description": "`fail` or `pass`."
+        },
+        "language": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/LabelSource"
+        },
+        "text": {
+          "description": "The subject's source by extent.",
+          "type": "string"
+        },
+        "weight": {
+          "description": "0 to 1: how much the label is trusted.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "key",
+        "kind",
+        "id",
+        "language",
+        "file",
+        "text",
+        "label",
+        "weight",
+        "source"
+      ],
+      "type": "object"
+    },
     "TypeRef": {
       "description": "A type as a signature or a field writes it.",
       "properties": {
@@ -992,6 +1369,23 @@
       ],
       "type": "object"
     },
+    "Verdict": {
+      "description": "The verdict on a subject.",
+      "oneOf": [
+        {
+          "enum": [
+            "fail",
+            "pass"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "abstain",
+          "description": "The code shown is not enough to tell.",
+          "type": "string"
+        }
+      ]
+    },
     "Visibility": {
       "description": "Who may use a symbol, as its language defines it; `internal` means visible\nwithin a bounded unit such as a crate, not outside it.",
       "enum": [
@@ -1010,6 +1404,12 @@
     },
     "initialize": {
       "$ref": "#/$defs/Call"
+    },
+    "lighthouse/classify": {
+      "$ref": "#/$defs/Call"
+    },
+    "lighthouse/train": {
+      "$ref": "#/$defs/Call2"
     }
   },
   "required": [

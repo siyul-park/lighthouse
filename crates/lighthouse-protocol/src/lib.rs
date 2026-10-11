@@ -1,8 +1,14 @@
 mod frame;
+mod model;
 mod serve;
 mod wire;
 
 pub use frame::{ErrorObject, FrameError, Id, Message, read_message, write_message};
+pub use model::{
+    Answer, ClassifyParams, ClassifyResult, DecisionRef, LabelSource, ModelManifest, ModelMethods,
+    ModelRef, Neighbor, Shot, Subject, SubjectContext, TrainParams, TrainResult, TrainSubject,
+    Verdict,
+};
 pub use serve::{Handler, ServeError, serve};
 pub use wire::{
     CacheRef, Call, ClientInfo, Comment, Context, Conventions, Edge, EdgeKind, Event, EventKind,
@@ -19,6 +25,10 @@ pub const VERSION: &str = "0.1";
 pub const INITIALIZE: &str = "initialize";
 /// Request: index the files of one language.
 pub const INDEX: &str = "index";
+/// Request: put the subjects of a decision to a model.
+pub const CLASSIFY: &str = "lighthouse/classify";
+/// Request: fit a model on labelled subjects.
+pub const TRAIN: &str = "lighthouse/train";
 /// Request: stop accepting work; answered, then followed by [`EXIT`].
 pub const SHUTDOWN: &str = "shutdown";
 /// Notification: end the process; valid only after [`SHUTDOWN`] was answered.
@@ -42,5 +52,26 @@ pub const REFERENCE_SITES: &str = "reference-sites";
 /// JSON Schema of every method's params and result, with the wire types under
 /// `$defs`.
 pub fn schema() -> serde_json::Value {
-    serde_json::to_value(schemars::schema_for!(Methods)).expect("schema serializes")
+    let mut schema =
+        serde_json::to_value(schemars::schema_for!(Methods)).expect("schema serializes");
+    let models =
+        serde_json::to_value(schemars::schema_for!(ModelMethods)).expect("schema serializes");
+    merge_models(&mut schema, &models);
+    schema
+}
+
+/// Adds the model methods to the schema of the language methods: their
+/// properties, and the types they define.
+fn merge_models(schema: &mut serde_json::Value, models: &serde_json::Value) {
+    for key in ["properties", "$defs"] {
+        let (Some(into), Some(from)) = (
+            schema.get_mut(key).and_then(|v| v.as_object_mut()),
+            models.get(key).and_then(|v| v.as_object()),
+        ) else {
+            continue;
+        };
+        for (name, value) in from {
+            into.entry(name.clone()).or_insert_with(|| value.clone());
+        }
+    }
 }
