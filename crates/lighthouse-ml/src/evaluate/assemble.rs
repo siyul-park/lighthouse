@@ -9,29 +9,29 @@ use crate::{
 };
 
 /// What one repository gave.
-pub(crate) struct Part {
-    pub(crate) policy: Evaluation,
-    pub(crate) current: Vec<(Truth, Outcome)>,
-    pub(crate) candidate: Vec<(Truth, Outcome)>,
-    pub(crate) pairs: Vec<(Outcome, Outcome)>,
-    pub(crate) decided: Usage,
-    pub(crate) candidate_decided: Usage,
-    pub(crate) audit: Vec<String>,
-    pub(crate) check: String,
-    pub(crate) candidate_check: Option<String>,
+pub struct Part {
+    pub(super) policy: Evaluation,
+    pub(super) current: Vec<(Truth, Outcome)>,
+    pub(super) candidate: Vec<(Truth, Outcome)>,
+    pub(super) pairs: Vec<(Outcome, Outcome)>,
+    pub(super) decided: Usage,
+    pub(super) candidate_decided: Usage,
+    pub(super) audit: Vec<String>,
+    pub(super) check: String,
+    pub(super) candidate_check: Option<String>,
 }
 
 /// What a check asked of models.
 #[derive(Clone, Copy, Default)]
-pub(crate) struct Usage {
-    pub(crate) decided: usize,
-    pub(crate) reviews: usize,
-    pub(crate) calls: usize,
-    pub(crate) cost: f64,
+pub(super) struct Usage {
+    pub(super) decided: usize,
+    pub(super) reviews: usize,
+    pub(super) calls: usize,
+    pub(super) cost: f64,
 }
 
 impl Usage {
-    pub(crate) fn of(found: &Found) -> Self {
+    pub(super) fn of(found: &Found) -> Self {
         Self {
             decided: found.model_decided,
             reviews: found.reviews,
@@ -40,7 +40,7 @@ impl Usage {
         }
     }
 
-    pub(crate) fn plus(self, other: Self) -> Self {
+    pub(super) fn plus(self, other: Self) -> Self {
         Self {
             decided: self.decided + other.decided,
             reviews: self.reviews + other.reviews,
@@ -50,17 +50,21 @@ impl Usage {
     }
 }
 
+/// What every repository gave so far.
 #[derive(Default)]
-pub(crate) struct Gathered {
-    pub(crate) parts: Vec<Part>,
+pub struct Gathered {
+    parts: Vec<Part>,
 }
 
 impl Gathered {
-    pub(crate) fn add(&mut self, part: Part) {
+    /// Takes what one more repository gave.
+    pub fn add(&mut self, part: Part) {
         self.parts.push(part);
     }
 
-    pub(crate) fn finish(self, request: &EvalRequest, with_candidate: bool) -> Result<EvalReport> {
+    /// The report over every repository; `with_candidate` says a candidate
+    /// ran beside the current check.
+    pub fn finish(self, request: &EvalRequest, with_candidate: bool) -> Result<EvalReport> {
         let first = self.parts.first().ok_or("nothing to evaluate")?;
         let policy = first.policy;
         let pool = |pick: fn(&Part) -> &Vec<(Truth, Outcome)>| -> Vec<(Truth, Outcome)> {

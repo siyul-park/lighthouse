@@ -1520,6 +1520,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "lighthouse-ml"
+version = "0.1.0"
+dependencies = [
+ "lighthouse-engine",
+ "lighthouse-model",
+ "lighthouse-plugin",
+ "lighthouse-spec",
+ "lighthouse-store",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "lighthouse-model"
 version = "0.1.0"
 dependencies = [
@@ -1613,6 +1627,7 @@ dependencies = [
  "globset",
  "lighthouse-checks",
  "lighthouse-engine",
+ "lighthouse-ml",
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-report",
@@ -1668,6 +1683,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "jsonschema",
+ "lighthouse-ml",
  "lighthouse-model",
  "lighthouse-report",
  "lighthouse-resource",

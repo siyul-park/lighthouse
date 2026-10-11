@@ -1,4 +1,4 @@
-use lighthouse_session::metrics::{Outcome, Rate, Truth, agreement, evaluate};
+use lighthouse_ml::metrics::{Outcome, Rate, Truth, agreement, evaluate};
 
 #[test]
 fn wilson_matches_the_published_example() {

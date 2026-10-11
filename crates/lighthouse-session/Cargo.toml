@@ -12,6 +12,7 @@ doctest = false
 globset.workspace = true
 lighthouse-checks.workspace = true
 lighthouse-engine.workspace = true
+lighthouse-ml.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-report.workspace = true

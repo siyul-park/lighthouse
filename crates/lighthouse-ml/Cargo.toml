@@ -1,0 +1,21 @@
+[package]
+name = "lighthouse-ml"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+lighthouse-engine.workspace = true
+lighthouse-model.workspace = true
+lighthouse-plugin.workspace = true
+lighthouse-spec.workspace = true
+lighthouse-store.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

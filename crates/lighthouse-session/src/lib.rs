@@ -4,19 +4,15 @@
 //! the agent skill. The CLI, the MCP server and
 //! the agent hooks only parse their own input and print the results of these.
 
-mod assemble;
 mod authoring;
 mod cache;
 mod check;
-mod dataset;
 mod decisions;
 mod docs;
-pub mod evaluate;
+mod evaluate;
 mod findings;
 mod fix;
 mod git;
-pub mod labels;
-pub mod metrics;
 mod models;
 mod project;
 mod reviewing;
@@ -25,7 +21,7 @@ mod schema;
 mod scope;
 mod select;
 mod skill;
-pub mod train;
+mod train;
 mod trust;
 mod validate;
 
@@ -39,6 +35,7 @@ pub use decisions::{
     decision_rows, decision_text, explain, explain_bundled, test_decisions,
 };
 pub use docs::bundled_docs;
+pub use evaluate::eval;
 pub use findings::Remembered;
 pub use fix::{AppliedRow, DeclinedRow, FixSelection, FixTargets, Fixed, fix, fix_plan};
 pub use git::head;
@@ -60,6 +57,7 @@ pub use schema::{schema_of, schemas};
 pub use scope::{changed, since};
 pub use select::{Selector, long_enough};
 pub use skill::{SKILL_MARKER, skill, skill_for};
+pub use train::train;
 pub use trust::{Basis, TRUST_VAR, revoke, trust};
 pub use validate::{Problem, Validated, validate_paths};
 

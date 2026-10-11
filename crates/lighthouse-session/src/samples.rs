@@ -5,27 +5,14 @@
 //! one is `pass` wherever the check looked.
 
 use lighthouse_engine::{ExampleRun, ModelOptions, Outcome as Run};
-use lighthouse_model::Diagnostic;
-use lighthouse_plugin::Subject;
-use lighthouse_spec::{Catalog, Decision, Example, ExampleKind};
-
-use crate::{
-    Result, Session,
-    check::attached_models,
+use lighthouse_ml::{
+    labels::Shown,
     metrics::{Outcome, Truth},
 };
+use lighthouse_model::Diagnostic;
+use lighthouse_spec::{Catalog, Decision, Example, ExampleKind};
 
-/// One subject an example shows.
-pub(crate) struct Shown {
-    /// `example:<decision>:<example>:<line>` for a `fail`, and
-    /// `example:<decision>:<example>:<fingerprint>` for a `pass`.
-    pub(crate) key: String,
-    pub(crate) truth: Truth,
-    /// How the check came out on it.
-    pub(crate) outcome: Outcome,
-    /// What a model is asked about it, when a rule put it to one.
-    pub(crate) subject: Option<Subject>,
-}
+use crate::{Result, Session, check::attached_models};
 
 /// What the examples of a decision show, checked by `rule` (the decision's own
 /// rule, or a candidate's) under `models`.

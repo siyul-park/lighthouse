@@ -1,12 +1,10 @@
 use std::fs;
 
-use lighthouse_engine::ModelOptions;
-use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};
-use lighthouse_session::{
-    Session,
+use lighthouse_ml::{
     labels::{Baseline, Collect, Label, Source},
     metrics::Truth,
 };
+use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};
 use lighthouse_spec::Catalog;
 use lighthouse_store::{NewJudgment, Observed, Run, Stamp, Store, Unchecked};
 use serde_json::json;
@@ -74,16 +72,12 @@ fn collect(
 ) -> Vec<Label> {
     let catalog = Catalog::bundled().clone();
     let decision = catalog.decision(RULE).unwrap().clone();
-    let session = Session::bare(root.to_path_buf()).unwrap();
     Collect {
-        session: &session,
-        catalog: &catalog,
+        root,
         decision: &decision,
-        rule: RULE,
         baseline,
         exclude_model: exclude,
-        models: ModelOptions::default(),
-        examples: false,
+        examples: Vec::new(),
     }
     .labels()
     .unwrap()
@@ -228,4 +222,25 @@ fn labels_weigh_by_who_gave_them_and_skip_other_meanings_and_the_model_itself() 
     assert_eq!(by("b2").unwrap().truth, Truth::Pass);
     assert!(by("b3").is_none() && by("b4").is_none());
     assert_eq!(labels.len(), 7);
+}
+
+#[test]
+fn weight_trusts_people_and_tables_over_agents_and_models() {
+    assert_eq!(Source::Person.weight(), 1.0);
+    assert_eq!(Source::Tsv.weight(), 1.0);
+    assert!(Source::Agent.weight() > Source::Model.weight());
+}
+
+#[test]
+fn name_is_what_a_dataset_line_calls_the_source() {
+    let names: Vec<_> = [
+        Source::Person,
+        Source::Tsv,
+        Source::Agent,
+        Source::Model,
+        Source::Example,
+    ]
+    .map(Source::name)
+    .into();
+    assert_eq!(names, ["person", "tsv", "agent", "model", "example"]);
 }

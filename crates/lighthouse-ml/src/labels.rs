@@ -9,17 +9,15 @@
 
 use std::{collections::BTreeMap, fs, path::Path};
 
-use lighthouse_engine::ModelOptions;
 use lighthouse_model::{AgentKind, Attribution, Judgment, Role};
 use lighthouse_plugin::Subject;
-use lighthouse_spec::{Catalog, Decision};
+use lighthouse_spec::Decision;
 use lighthouse_store::Records;
 use serde_json::{Value, json};
 
 use crate::{
-    Result, Session,
+    Result,
     metrics::{Outcome, Truth},
-    samples,
 };
 
 /// Who gave a label, strongest first.
@@ -105,26 +103,35 @@ pub struct Baseline<'a> {
     pub repo: Option<&'a str>,
 }
 
+/// One subject an example shows.
+pub struct Shown {
+    /// `example:<decision>:<example>:<line>` for a `fail`, and
+    /// `example:<decision>:<example>:<fingerprint>` for a `pass`.
+    pub key: String,
+    pub truth: Truth,
+    /// How the check came out on it.
+    pub outcome: Outcome,
+    /// What a model is asked about it, when a rule put it to one.
+    pub subject: Option<Subject>,
+}
+
 /// What to collect the labels of.
 pub struct Collect<'a> {
-    pub session: &'a Session,
-    pub catalog: &'a Catalog,
+    /// The project root, whose store holds the judgments.
+    pub root: &'a Path,
     pub decision: &'a Decision,
-    /// The rule that checks the examples: the decision's, or a candidate's.
-    pub rule: &'a str,
     pub baseline: Option<&'a Baseline<'a>>,
     /// `<provider>/<model>`, any version: its own labels are left out.
     pub exclude_model: Option<&'a str>,
-    /// How the examples are checked.
-    pub models: ModelOptions,
-    /// Whether the examples are subjects.
-    pub examples: bool,
+    /// The subjects the examples show, checked by the caller; none when the
+    /// examples are not subjects.
+    pub examples: Vec<Shown>,
 }
 
 impl Collect<'_> {
     /// The labels of the decision: its judgments under the current meaning
     /// version, the rows of the baseline table, and its examples.
-    pub fn labels(&self) -> Result<Vec<Label>> {
+    pub fn labels(mut self) -> Result<Vec<Label>> {
         let mut best: BTreeMap<String, Label> = BTreeMap::new();
         for label in self.judged()?.into_iter().chain(self.tabled()?) {
             let stronger = best
@@ -135,14 +142,12 @@ impl Collect<'_> {
             }
         }
         let mut labels: Vec<Label> = best.into_values().collect();
-        if self.examples {
-            labels.extend(self.examples()?);
-        }
+        labels.extend(self.examples());
         Ok(labels)
     }
 
     fn judged(&self) -> Result<Vec<Label>> {
-        let records = Records::read(&self.session.root)?;
+        let records = Records::read(self.root)?;
         let decision = self.decision;
         let meaning = decision.meaning_version();
         let mut labels = Vec::new();
@@ -183,17 +188,10 @@ impl Collect<'_> {
         self.baseline.map_or_else(|| Ok(Vec::new()), baseline_rows)
     }
 
-    fn examples(&self) -> Result<Vec<Label>> {
-        let shown = samples::shown(
-            self.session,
-            self.catalog,
-            self.decision,
-            self.rule,
-            &self.models,
-        )?;
+    fn examples(&mut self) -> Vec<Label> {
         let attribution =
             json!({"type": "Person", "id": format!("example:{}", self.decision.id())});
-        Ok(shown
+        std::mem::take(&mut self.examples)
             .into_iter()
             .map(|s| Label {
                 key: s.key,
@@ -204,7 +202,7 @@ impl Collect<'_> {
                 observed: Some(s.outcome),
                 subject: s.subject,
             })
-            .collect())
+            .collect()
     }
 }
 
