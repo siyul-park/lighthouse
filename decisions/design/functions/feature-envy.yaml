@@ -24,6 +24,9 @@ spec:
     the variants of an enum are not members) and no member of any other type,
     and nothing uses it as a value. Passing a value of the type on is not
     envy: parameters are not counted, only the members the body reaches. A
+    constructor is not judged, and neither is a function that names the type
+    itself in its body (a literal, `var x T`): it builds or holds an instance
+    and works on its members as any user of the type does. A
     function of fewer than `minStatements` statements is too little to judge,
     and so are the functions that start or wire up the program: those of a Go
     `main` package or the root of a Rust binary, and those an `init` function
@@ -32,6 +35,7 @@ spec:
     Go: A package function and the methods and fields of a type of its package.
 
     Rust: A free function and the methods and fields of a type of its module.
+    A free function that returns a type of its module is a constructor.
     Members the provider resolves only by name are not counted.
   scope:
     domain: code
@@ -67,7 +71,7 @@ spec:
     where: >-
       func.kind == 'function' && func.name != 'main' && func.name != 'init'
       && (func.visibility == 'private' || options.includeExported)
-      && !func.constructor_named && func.references == 0
+      && func.role != 'constructor' && func.references == 0
       && func.statements >= options.minStatements
       && size(envy) > 0 && !envy.entry && envy.count >= options.minMembers
       && size(envy.others) == 0 && envy.same_module
@@ -206,4 +210,51 @@ spec:
                     "warn" => Some(Level::Warn),
                     _ => Some(Level::Info),
                 }
+            }
+    - name: go-names-the-type-itself
+      language: go
+      kind: valid
+      files:
+        - path: example.go
+          body: |-
+            package sample
+
+            type Store struct {
+            	items []int
+            	total int
+            	extra int
+            }
+
+            func (s *Store) Reset() { s.items = nil }
+
+            func snapshot(items []int) int {
+            	s := Store{items: items}
+            	n := len(s.items)
+            	n += s.total
+            	n += s.extra
+            	return n
+            }
+    - name: rust-free-function-builds-the-type
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store {
+                items: Vec<i32>,
+                total: i32,
+                extra: i32,
+            }
+
+            impl Store {
+                pub fn reset(&mut self) {
+                    self.items.clear();
+                }
+            }
+
+            fn open(items: Vec<i32>) -> Store {
+                let mut store = Store { items, total: 0, extra: 0 };
+                store.total = store.items.len() as i32;
+                store.extra = store.total;
+                store
             }

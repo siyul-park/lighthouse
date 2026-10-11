@@ -74,8 +74,19 @@ impl Builder<'_> {
         let mut members: BTreeMap<&SymbolId, BTreeSet<&str>> = BTreeMap::new();
         let mut modules: BTreeMap<&str, BTreeSet<&SymbolId>> = BTreeMap::new();
         let mut own = 0;
+        // A function that names a type itself (a literal, `var x T`) builds
+        // or holds an instance of it: its members are the function's own.
+        let named: BTreeSet<&SymbolId> = used
+            .iter()
+            .filter(|id| {
+                project
+                    .symbol(id)
+                    .is_some_and(|s| s.kind == SymbolKind::Type)
+            })
+            .collect();
         for id in used {
             if let Some(owner) = owner_type(project, id)
+                && !named.contains(&owner.id)
                 && let Some(member) = project.symbol(id)
                 && matches!(member.kind, SymbolKind::Field | SymbolKind::Method)
             {
