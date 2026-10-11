@@ -7,7 +7,7 @@ use lighthouse_plugin::Registry;
 use lighthouse_spec::{Catalog, Decision, authored_severity};
 use serde::Serialize;
 
-use crate::{Result, Session};
+use crate::{Result, Selector, Session};
 
 /// The language examples without a provider run in.
 const NEUTRAL: &str = "text";
@@ -242,6 +242,7 @@ fn selected<'c>(catalog: &'c Catalog, ids: &[String]) -> Result<Vec<&'c Decision
     if ids.is_empty() {
         return Ok(catalog.decisions().filter(|d| d.automated()).collect());
     }
+    let ids = Selector::new(ids)?.expand(catalog.decisions().map(Decision::id))?;
     ids.iter()
         .map(|id| {
             let decision = catalog

@@ -10,7 +10,7 @@ use rusqlite::{
 use serde_json::{Value, json};
 
 use crate::{
-    Error, FindingRecord, JudgmentEvent, NewJudgment, Stamp, Standing, StatusFilter, Subject,
+    Error, MIN_PREFIX, FindingRecord, JudgmentEvent, NewJudgment, Stamp, Standing, StatusFilter, Subject,
     SuppressionEvent, digest, judged::Judged, log, log::LoggedSuppression,
 };
 use lighthouse_model::{SuppressionKind, SuppressionStatus};
@@ -19,6 +19,9 @@ use super::{JUDGMENT_COLUMNS, MAX_CANDIDATES, SNAPSHOT_VERSION};
 
 /// The full fingerprint that `prefix` names, among findings and judgments.
 pub(super) fn expand(conn: &Connection, prefix: &str) -> Result<String, Error> {
+    if prefix.len() < MIN_PREFIX {
+        return Err(Error::ShortFingerprint(prefix.to_owned()));
+    }
     let mut stmt = conn.prepare(
         "SELECT fingerprint FROM findings WHERE substr(fingerprint, 1, length(?1)) = ?1 \
          UNION SELECT fingerprint FROM judgments WHERE substr(fingerprint, 1, length(?1)) = ?1 \

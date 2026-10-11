@@ -1,14 +1,12 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Write,
-    str::FromStr,
 };
 
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Severity, Suppressed};
 use lighthouse_spec::{Catalog, authored_severity};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
-use thiserror::Error;
 
 use crate::{
     evidence::{evidence, evidence_line},
@@ -57,8 +55,9 @@ pub struct Briefing<'a> {
     /// The text of the files of findings, by project-relative path, for
     /// formats whose columns count characters and not bytes (SARIF).
     pub sources: Option<&'a BTreeMap<String, String>>,
-    /// The report is read through MCP, so fixing is the `fix` tool.
-    pub mcp: bool,
+    /// The report is data for a program: hints name tool calls
+    /// (`fix {...}`), not command lines.
+    pub tool_form: bool,
 }
 
 /// How much each finding carries.
@@ -73,30 +72,13 @@ pub enum Detail {
     Full,
 }
 
-/// The text given to [`Detail::from_str`] names no level of detail.
-#[derive(Debug, Error)]
-#[error("unknown detail `{0}` (expected compact or full)")]
-pub struct UnknownDetail(String);
-
-impl FromStr for Detail {
-    type Err = UnknownDetail;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "compact" => Ok(Self::Compact),
-            "full" => Ok(Self::Full),
-            _ => Err(UnknownDetail(s.to_owned())),
-        }
-    }
-}
-
 impl Briefing<'_> {
     /// How the compact shape is cut.
     pub fn group_options(&self) -> GroupOptions<'_> {
         GroupOptions {
             catalog: self.catalog,
             limit: self.limit,
-            mcp: self.mcp,
+            tool_form: self.tool_form,
         }
     }
 
@@ -203,7 +185,7 @@ pub fn shown<'d>(diagnostics: &'d [Diagnostic], briefing: &Briefing) -> Vec<&'d 
         .collect()
 }
 
-/// Builds the [`AgentReport`] that [`json_lines`] prints.
+/// Builds the [`AgentReport`]: the JSON report of a check.
 pub fn agent_report(
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
@@ -226,22 +208,6 @@ pub fn agent_report(
     AgentReport { fields }
 }
 
-/// The agent JSON: one object on one line in the compact shape; with full
-/// detail one object per line, see [`full_json_lines`].
-pub(crate) fn json_lines(
-    diagnostics: &[Diagnostic],
-    incomplete: &[Incomplete],
-    briefing: &Briefing,
-) -> String {
-    match briefing.detail {
-        Detail::Compact => {
-            let fields = compact_fields(diagnostics, incomplete, briefing);
-            format!("{}\n", Value::Object(fields))
-        }
-        Detail::Full => full_json_lines(diagnostics, incomplete, briefing),
-    }
-}
-
 /// One header per decision with its requirement and expected structure, one
 /// line per finding under it, then the gaps, how to record a judgment and the
 /// judgments it accepts when a shown finding asks for review, and the summary.
@@ -258,7 +224,7 @@ fn compact_text(
     if grouped.asks_review() {
         let _ = writeln!(
             out,
-            "resolve: lighthouse review resolve <fingerprint> --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent"
+            "resolve: lighthouse review resolve <fingerprint> --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>"
         );
         let _ = writeln!(out, "judgments: {}", judgments_line());
     }
@@ -402,46 +368,9 @@ fn full_report(
     }
 }
 
-/// One JSON object per line: findings, incomplete entries, a `truncated`
-/// record when `limit` left findings out, then the summary, each tagged with
-/// `type`. The summary carries the judgments table once, when a shown finding
-/// asks for review.
-fn full_json_lines(
-    diagnostics: &[Diagnostic],
-    incomplete: &[Incomplete],
-    briefing: &Briefing,
-) -> String {
-    let report = full_report(diagnostics, incomplete, briefing);
-    let mut lines: Vec<String> = report
-        .findings
-        .iter()
-        .chain(&report.incomplete)
-        .map(Value::to_string)
-        .collect();
-    if report.omitted > 0 {
-        lines.push(json!({ "type": "truncated", "omitted": report.omitted }).to_string());
-    }
-    let count = |s: Severity| severity_count(diagnostics, s);
-    let mut summary = json!({
-        "type": "summary",
-        "errors": count(Severity::Error),
-        "warnings": count(Severity::Warn),
-        "infos": count(Severity::Info),
-        "reviews": diagnostics.iter().filter(|d| briefing.needs_review(d)).count(),
-        "incomplete": incomplete.len(),
-        "suppressed": briefing.suppressed,
-        "allowed": briefing.allowed,
-    });
-    if let Some(judgments) = report.judgments {
-        summary["judgments"] = judgments;
-    }
-    lines.push(summary.to_string());
-    lines.iter().map(|line| format!("{line}\n")).collect()
-}
-
 /// The findings to print: all of them, or the first `limit` by severity
 /// (errors first) in their original order, and how many were left out.
-fn select(diagnostics: &[Diagnostic], limit: Option<usize>) -> (Vec<&Diagnostic>, usize) {
+pub(crate) fn select(diagnostics: &[Diagnostic], limit: Option<usize>) -> (Vec<&Diagnostic>, usize) {
     let Some(limit) = limit.filter(|&l| l < diagnostics.len()) else {
         return (diagnostics.iter().collect(), 0);
     };
@@ -517,7 +446,7 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
 fn resolve(diagnostic: &Diagnostic, width: usize) -> Value {
     json!({
         "command": format!(
-            "lighthouse review resolve {} --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent",
+            "lighthouse review resolve {} --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>",
             prefix(diagnostic.fingerprint.as_str(), width)
         ),
     })

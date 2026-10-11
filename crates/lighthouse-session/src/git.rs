@@ -12,6 +12,14 @@ pub fn head(root: &Path) -> Option<String> {
         .map(|out| out.trim().to_owned())
 }
 
+/// The `user.name` configured for the repository, when set.
+pub fn user_name(root: &Path) -> Option<String> {
+    git(root, &["config", "user.name"])
+        .ok()
+        .map(|out| out.trim().to_owned())
+        .filter(|name| !name.is_empty())
+}
+
 /// Whether tracked files differ from the commit the working tree is at.
 /// Untracked files do not count; `false` when there is no repository.
 pub fn dirty(root: &Path) -> bool {

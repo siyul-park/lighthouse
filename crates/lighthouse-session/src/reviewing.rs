@@ -10,39 +10,46 @@ use lighthouse_store::{
 };
 use serde_json::Value;
 
-use crate::{Result, project::catalog_at};
+use crate::{Result, Selector, git::user_name, project::catalog_at};
 
-/// Environment variables that say who is reviewing when nothing else does.
-/// Tools that run reviews for an agent (hooks, the MCP server) set both.
-const KIND_VAR: &str = "LIGHTHOUSE_REVIEWER_KIND";
-const ID_VAR: &str = "LIGHTHOUSE_REVIEWER";
+/// Says who is attributed with what is recorded when no flag does.
+const ATTRIBUTED_VAR: &str = "LIGHTHOUSE_ATTRIBUTED_TO";
 
-/// Who is judging.
-pub struct Reviewer {
-    pub kind: AgentKind,
-    pub id: Option<String>,
+/// Who a record is attributed to (PROV `wasAttributedTo`): `spec` is
+/// `person`, `person:<id>`, `agent` or `agent:<id>`; without it
+/// `$LIGHTHOUSE_ATTRIBUTED_TO` says; without that `default` does. A missing id
+/// is the default's when it is of the same kind.
+pub fn attribute_to(spec: Option<&str>, default: &Attribution) -> Result<Attribution> {
+    let from_env = env::var(ATTRIBUTED_VAR).ok().filter(|text| !text.is_empty());
+    let Some(text) = spec.map(str::to_owned).or(from_env) else {
+        return Ok(default.clone());
+    };
+    let (kind, id) = match text.split_once(':') {
+        Some((kind, id)) => (kind, Some(id)),
+        None => (text.as_str(), None),
+    };
+    let kind = match kind {
+        "person" => AgentKind::Person,
+        "agent" => AgentKind::SoftwareAgent,
+        other => {
+            return Err(
+                format!("`{other}` is not person or agent (expected person|agent[:<id>])").into(),
+            );
+        }
+    };
+    let id = match id.filter(|id| !id.is_empty()) {
+        Some(id) => Some(id.to_owned()),
+        None if default.kind == kind => default.id.clone(),
+        None => None,
+    };
+    Ok(Attribution::new(kind, id))
 }
 
-impl Reviewer {
-    /// The given kind and id, else `$LIGHTHOUSE_REVIEWER_KIND` (default human)
-    /// and `$LIGHTHOUSE_REVIEWER`, else `$USER`.
-    pub fn from_env(kind: Option<AgentKind>, id: Option<String>) -> Result<Self> {
-        let kind = match (kind, env::var(KIND_VAR)) {
-            (Some(kind), _) => kind,
-            (None, Ok(text)) => text.parse().map_err(|e| format!("{KIND_VAR}: {e}"))?,
-            (None, Err(_)) => AgentKind::Person,
-        };
-        let id = id
-            .or_else(|| env::var(ID_VAR).ok())
-            .or_else(|| env::var("USER").ok())
-            .filter(|id| !id.is_empty());
-        Ok(Self { kind, id })
-    }
-
-    /// The reviewer as a record attributes a judgment.
-    pub fn attribution(&self) -> Attribution {
-        Attribution::new(self.kind, self.id.clone())
-    }
+/// The person at the keyboard: the name configured for the repository, else
+/// `$USER`.
+pub fn person(root: &Path) -> Attribution {
+    let id = user_name(root).or_else(|| env::var("USER").ok());
+    Attribution::new(AgentKind::Person, id.filter(|id| !id.is_empty()))
 }
 
 /// A judgment that was recorded, with what the reviewer should know about it.
@@ -58,8 +65,8 @@ pub struct Recorded {
 
 /// Which remembered findings [`review_tasks`] lists.
 pub struct TaskQuery {
-    /// Only this fully qualified rule id.
-    pub rule: Option<String>,
+    /// Only these decisions: ids or globs over them; empty for all.
+    pub rules: Vec<String>,
     pub status: StatusFilter,
     /// Also the findings that are no task: errors, and open ones a judgment
     /// stands for.
@@ -80,13 +87,15 @@ pub fn review_tasks(root: &Path, query: &TaskQuery) -> Result<Option<Tasks>> {
     let Some(store) = Store::open_existing(root)? else {
         return Ok(None);
     };
+    let selector = Selector::new(&query.rules)?;
     let found = store.list(&Filter {
-        rule: query.rule.clone(),
+        rule: None,
         status: query.status,
     })?;
     Ok(Some(Tasks {
         findings: found
             .into_iter()
+            .filter(|f| selector.matches(&f.rule_id))
             .filter(|f| query.all_tiers || waits(f, query.status))
             .collect(),
         notices: store.notices().to_vec(),

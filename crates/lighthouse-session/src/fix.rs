@@ -9,11 +9,11 @@ use lighthouse_engine::{
     AppliedFix, DeclinedFix, Engine, FixPlan, FixReport, FixRun, unified_diff,
 };
 use lighthouse_model::Fingerprint;
-use lighthouse_spec::Catalog;
+use lighthouse_spec::{Catalog, Decision};
 use lighthouse_store::{NewFix, Store};
 use serde::Serialize;
 
-use crate::{Result, Session, findings, git};
+use crate::{Result, Selector, Session, findings, git, long_enough};
 
 /// Which findings to fix. At least one of `paths`, `fingerprints` and `rules`
 /// narrows a run from the whole project.
@@ -92,6 +92,9 @@ pub fn fix_plan(catalog: &Catalog) -> FixPlan {
 /// nothing is recorded; otherwise every applied fix is recorded and the
 /// findings it removed are resolved in the store.
 pub fn fix(session: Session, request: &FixSelection) -> Result<Fixed> {
+    for prefix in &request.targets.fingerprints {
+        long_enough(prefix)?;
+    }
     let (registry, plugins) = session.registry()?;
     let trusted = session.trusted();
     let root = session.root.clone();
@@ -104,7 +107,8 @@ pub fn fix(session: Session, request: &FixSelection) -> Result<Fixed> {
     let skip = suppressed(&engine, &root, &catalog, request.store)?;
     let run = FixRun {
         paths: request.targets.paths.clone(),
-        rules: request.targets.rules.clone(),
+        rules: Selector::new(&request.targets.rules)?
+            .expand(catalog.decisions().map(Decision::id))?,
         fingerprints: request.targets.fingerprints.clone(),
         skip,
         dry_run: request.dry_run,

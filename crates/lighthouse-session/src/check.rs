@@ -9,11 +9,11 @@ use std::{
 use lighthouse_engine::{Engine, FixPlan, ModelOptions, Outcome};
 use lighthouse_model::{Diagnostic, Severity, Suppressed};
 use lighthouse_report::{Briefing, Detail, FixFile, ProposedFix};
-use lighthouse_spec::Catalog;
+use lighthouse_spec::{Catalog, Decision};
 use serde::Serialize;
 
 use crate::{
-    Remembered, Result, Session,
+    Remembered, Result, Selector, Session,
     cache::{cache_dir, cache_limit},
     findings, scope,
 };
@@ -27,7 +27,8 @@ pub struct CheckRequest {
     pub changed: bool,
     /// Report only files changed since the merge base with this ref.
     pub diff: Option<String>,
-    /// Run only these fully qualified rule ids.
+    /// Run only these decisions: fully qualified ids, or globs over them
+    /// such as `design/*`.
     pub rules: Vec<String>,
     /// Record the run and apply judgments.
     pub store: bool,
@@ -226,7 +227,7 @@ impl Checked {
             detail: Detail::default(),
             fixes: None,
             sources: None,
-            mcp: false,
+            tool_form: false,
         }
     }
 }
@@ -256,7 +257,8 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     };
     let setup = started.elapsed();
     let mut messages = Vec::new();
-    let mut outcome = analyze(&engine, &root, request, &mut messages)?;
+    let rules = Selector::new(&request.rules)?.expand(catalog.decisions().map(Decision::id))?;
+    let mut outcome = analyze(&engine, &root, request, &rules, &mut messages)?;
     outcome.timings.setup = setup;
     messages.extend(plugins.notices.iter().chain(&outcome.notices).cloned());
     let started = Instant::now();
@@ -294,7 +296,7 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
 }
 
 /// The model each rule is bound to by an approved revision, by rule id.
-pub(crate) fn attached_models(root: &Path, catalog: &Catalog) -> BTreeMap<String, String> {
+pub fn attached_models(root: &Path, catalog: &Catalog) -> BTreeMap<String, String> {
     let Ok(records) = lighthouse_store::Records::read(root) else {
         return BTreeMap::new();
     };
@@ -350,6 +352,7 @@ fn analyze(
     engine: &Engine,
     root: &Path,
     request: &CheckRequest,
+    rules: &[String],
     messages: &mut Vec<String>,
 ) -> Result<Outcome> {
     let files = match (request.changed, request.diff.as_deref()) {
@@ -363,7 +366,7 @@ fn analyze(
             "reporting {} changed file(s); the whole project is analyzed",
             files.len()
         ));
-        return Ok(engine.check_files(&files, &request.rules)?);
+        return Ok(engine.check_files(&files, rules)?);
     }
     let default = [PathBuf::from(".")];
     let paths = if request.paths.is_empty() {
@@ -371,7 +374,7 @@ fn analyze(
     } else {
         &request.paths
     };
-    Ok(engine.check(paths, &request.rules)?)
+    Ok(engine.check(paths, rules)?)
 }
 
 /// The changed files that also lie under the given paths, when there are any.

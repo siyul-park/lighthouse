@@ -101,6 +101,17 @@ pub enum ModelProvider {
     },
 }
 
+impl ModelProvider {
+    /// Whether asking this provider reaches a service outside the machine: a
+    /// standard API, or a program that is given an API key.
+    pub fn remote(&self) -> bool {
+        match self {
+            Self::Rpc { plugin, .. } => plugin == API_PLUGIN,
+            Self::Command { key_env, .. } => key_env.is_some(),
+        }
+    }
+}
+
 /// A provider that speaks a standard API: Lighthouse knows the format of the
 /// requests, and the project says where to send them.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]

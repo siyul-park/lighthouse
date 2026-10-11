@@ -20,7 +20,7 @@ mod store;
 
 use lighthouse_resource::Descriptor;
 
-pub use error::Error;
+pub use error::{Error, MIN_PREFIX};
 pub use log::{Change, JudgmentSpec, RevisionEvent, RevisionSpec, SuppressionSpec};
 pub use record::{
     Filter, FindingRecord, FixEvent, JudgmentEvent, NewFix, NewJudgment, Observed, Resolved,

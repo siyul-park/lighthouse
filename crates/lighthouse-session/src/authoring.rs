@@ -12,7 +12,7 @@ use std::{
 
 use lighthouse_resource::{API_VERSION, new_uid};
 use lighthouse_spec::{Catalog, local_dir, local_files};
-use serde_json::{Map, Value, json};
+use serde_json::Value;
 
 use crate::{DecisionTest, Result, Session, test_decisions};
 
@@ -32,61 +32,33 @@ pub struct Authored {
     pub plugin_listed: bool,
 }
 
-/// Adds the local decision `id` (`local/<name>`) with `spec`, the spec of a
-/// `Decision` (its check is `type: cel` or absent), and `examples`, appended
-/// to the spec's own.
-pub fn create_decision(
-    session: Session,
-    id: &str,
-    mut spec: Value,
-    examples: Vec<Value>,
-) -> Result<Authored> {
-    let map = spec
-        .as_object_mut()
-        .ok_or("`spec` must be an object with the fields of a Decision spec")?;
-    if !examples.is_empty() {
-        let mut all = match map.remove("examples") {
-            Some(Value::Array(own)) => own,
-            Some(_) => return Err("`examples` must be a list".into()),
-            None => Vec::new(),
-        };
-        all.extend(examples);
-        map.insert("examples".to_owned(), Value::Array(all));
-    }
-    let name = id
-        .strip_prefix("local/")
-        .ok_or_else(|| format!("id is `{id}`, a local decision is `local/<name>`"))?
-        .to_owned();
-    checked_name(&name)?;
+/// Adds the local decision the `Decision` document describes. The document is
+/// complete: `metadata.name` is its id (`local/<name>`), `spec` carries the
+/// examples. A missing `apiVersion` or `metadata.uid` is filled in.
+pub fn create_decision(session: Session, mut document: Value) -> Result<Authored> {
+    let (id, name) = local_name(&document)?;
     let _lock = lock(&session.root)?;
     if local_files(&session.root)?.is_some_and(|f| f.contains_key(&file_name(&name))) {
-        return Err(format!("`{id}` already exists; change it with decision_update").into());
+        return Err(format!("`{id}` already exists; change it with `decision update`").into());
     }
-    let doc = json!({
-        "apiVersion": API_VERSION,
-        "kind": "Decision",
-        "metadata": { "name": id, "uid": new_uid() },
-        "spec": spec,
-    });
-    commit(session, id, &name, doc, true)
+    complete(&mut document);
+    commit(session, &id, &name, document, true)
 }
 
-/// Applies `patch`, a JSON merge patch (null removes a key), to the spec of
-/// the local decision `id`. A bundled decision is not changed in place: its
+/// Replaces the local decision the `Decision` document names with it, keeping
+/// the uid the decision has. A bundled decision is not changed in place: its
 /// level and options are the project's `rules`, and different wording or
 /// examples are a local decision.
-pub fn update_decision(session: Session, id: &str, patch: &Value) -> Result<Authored> {
-    if !patch.is_object() {
-        return Err("`patch` must be an object".into());
-    }
+pub fn replace_decision(session: Session, mut document: Value) -> Result<Authored> {
+    let id = document_id(&document)?;
     let _lock = lock(&session.root)?;
     let files = local_files(&session.root)?.unwrap_or_default();
     let Some(name) = id.strip_prefix("local/") else {
-        if session.catalog()?.decision(id).is_none() {
+        if session.catalog()?.decision(&id).is_none() {
             return Err(format!("unknown decision `{id}`").into());
         }
         return Err(format!(
-            "`{id}` is not a local decision of this project: set its level and options in `rules` of lighthouse.toml, or write a local decision with `decision_create`"
+            "`{id}` is not a local decision of this project: set its level and options in `rules` of lighthouse.toml, or write a local decision with `decision create`"
         )
         .into());
     };
@@ -94,12 +66,48 @@ pub fn update_decision(session: Session, id: &str, patch: &Value) -> Result<Auth
     let text = files
         .get(&file_name(name))
         .ok_or_else(|| format!("`{id}` is not a local decision of this project"))?;
-    let mut doc = parse(text)?;
-    let spec = doc
-        .get_mut("spec")
-        .ok_or_else(|| format!("the file of `{id}` has no `spec`"))?;
-    merge(spec, patch);
-    commit(session, id, name, doc, false)
+    let uid = parse(text)?
+        .pointer("/metadata/uid")
+        .cloned()
+        .filter(Value::is_string);
+    complete(&mut document);
+    if let (Some(uid), Some(metadata)) = (uid, document.get_mut("metadata")) {
+        metadata["uid"] = uid;
+    }
+    let name = name.to_owned();
+    commit(session, &id, &name, document, false)
+}
+
+/// The id of a document and the name of the file it is kept in.
+fn local_name(document: &Value) -> Result<(String, String)> {
+    let id = document_id(document)?;
+    let name = id
+        .strip_prefix("local/")
+        .ok_or_else(|| format!("id is `{id}`, a local decision is `local/<name>`"))?
+        .to_owned();
+    checked_name(&name)?;
+    Ok((id, name))
+}
+
+/// `metadata.name` of a `Decision` document.
+fn document_id(document: &Value) -> Result<String> {
+    if document.get("kind").and_then(Value::as_str) != Some("Decision") {
+        return Err("the document must be a `Decision` (`kind: Decision`)".into());
+    }
+    document
+        .pointer("/metadata/name")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .ok_or_else(|| "the document needs `metadata.name`, the decision id".into())
+}
+
+/// Fills in what a document may leave out: the API version and a uid.
+fn complete(document: &mut Value) {
+    if let Some(map) = document.as_object_mut() {
+        map.entry("apiVersion")
+            .or_insert_with(|| Value::String(API_VERSION.to_owned()));
+    }
+    ensure_uid(document);
 }
 
 /// Refuses a decision name that could name a file outside `.lighthouse/decisions`.
@@ -197,24 +205,4 @@ fn file_name(name: &str) -> String {
 
 fn parse(text: &str) -> Result<Value> {
     Ok(serde_norway::from_str(text)?)
-}
-
-fn merge(target: &mut Value, patch: &Value) {
-    let Value::Object(patch) = patch else {
-        *target = patch.clone();
-        return;
-    };
-    if !target.is_object() {
-        *target = Value::Object(Map::new());
-    }
-    let Value::Object(map) = target else {
-        return;
-    };
-    for (key, value) in patch {
-        if value.is_null() {
-            map.remove(key);
-        } else {
-            merge(map.entry(key.clone()).or_insert(Value::Null), value);
-        }
-    }
 }

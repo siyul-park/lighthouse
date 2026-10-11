@@ -71,9 +71,9 @@ pub struct GroupOptions<'a> {
     pub catalog: Option<&'a Catalog>,
     /// Keep at most this many findings.
     pub limit: Option<usize>,
-    /// The groups are read through MCP, so fixing is the `fix` tool and not
-    /// the command line.
-    pub mcp: bool,
+    /// The groups are data for a program: hints name tool calls, not
+    /// command lines.
+    pub tool_form: bool,
 }
 
 /// Findings grouped by decision, then by file, as many as fit a limit.
@@ -260,7 +260,7 @@ impl Group {
             review,
             requirement: decision.map(|d| one_line(&d.requirement)),
             expected: expecteds,
-            apply: decision.and_then(|d| apply_line(d, options.mcp)),
+            apply: decision.and_then(|d| apply_line(d, options.tool_form)),
             evidence: shared,
             files,
         }
@@ -417,10 +417,10 @@ pub(crate) fn judgments_line() -> String {
 }
 
 /// How the fix of a decision is applied for all its findings: `check --fix`
-/// on the command line, the `fix` tool through MCP, with unsafe fixes when the
+/// on the command line, the `fix` tool, with unsafe fixes when the
 /// decision's fix is only suggested or its rule is not mechanical. None for a
 /// decision without a fix that can run.
-fn apply_line(decision: &Decision, mcp: bool) -> Option<String> {
+fn apply_line(decision: &Decision, tool_form: bool) -> Option<String> {
     let fix = decision.fix.as_ref()?;
     if matches!(fix.kind, FixKind::Rpc { .. }) {
         return None;
@@ -428,11 +428,11 @@ fn apply_line(decision: &Decision, mcp: bool) -> Option<String> {
     let unsafe_fixes =
         fix.safety == Safety::Suggested || decision.severity() != Some(Severity::Error);
     let rule = decision.id();
-    Some(match (mcp, unsafe_fixes) {
-        (false, false) => format!("lighthouse check --fix --rules {rule}"),
-        (false, true) => format!("lighthouse check --fix --unsafe-fixes --rules {rule}"),
-        (true, false) => format!("fix {{\"rules\":[\"{rule}\"]}}"),
-        (true, true) => format!("fix {{\"rules\":[\"{rule}\"],\"unsafeFixes\":true}}"),
+    Some(match (tool_form, unsafe_fixes) {
+        (false, false) => format!("lighthouse check --fix --decision {rule}"),
+        (false, true) => format!("lighthouse check --fix --unsafe-fixes --decision {rule}"),
+        (true, false) => format!("fix {{\"decision\":[\"{rule}\"]}}"),
+        (true, true) => format!("fix {{\"decision\":[\"{rule}\"],\"unsafeFixes\":true}}"),
     })
 }
 

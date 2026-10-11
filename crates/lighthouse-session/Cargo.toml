@@ -9,6 +9,7 @@ test = false
 doctest = false
 
 [dependencies]
+globset.workspace = true
 lighthouse-cache.workspace = true
 lighthouse-checks.workspace = true
 lighthouse-engine.workspace = true
