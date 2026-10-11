@@ -1,3 +1,27 @@
-# retained: no
-# R3b review: 20 of 104 Go findings and 21 of 41 Rust findings were read and every one was a real panic site; about 1 in 20 Go sites was worth changing and none of the Rust ones. Only the summary survives
+# retained: yes
+# R4: 24 of the 107 findings the R3b sample did not cover (seed 11, six per repository). TP = a real panic site in production code
 fingerprint	repo	location	verdict	reason
+4e682a3ed8daf74b4d85e4f84aa337fc388181bf23db08ed0a6095f9bf8f6b05	cel	parser/parser.go:224	TP	a real panic site in production code (the R3b meaning)
+8f5bfb74665c4e32dca6e669b183fe41fa5b408e212a3f54ac582d871f445232	cel	interpreter/runtimecost.go:173	TP	a real panic site in production code (the R3b meaning)
+ea4abfe97c0c9f1b57eb76a183428c373fc0312bcc89bbe5ea14eaf352b7720a	cel	checker/decls/decls.go:251	TP	a real panic site in production code (the R3b meaning)
+db444b21d7b25c6a1fe2cc1a3fadf4684945207be7449027ac203d50c0ecff84	cel	common/debug/debug.go:308	TP	a real panic site in production code (the R3b meaning)
+85f9bb8049559da68efa071e6ad1ddd37cca5cc5bd62487b92145ae6d3fbde0a	cel	parser/input.go:32	TP	a real panic site in production code (the R3b meaning)
+ec9d25d6f1a72c482cb1921b2006c97ab9fde53389d3769ef58f21ae2217330a	cel	common/stdlib/standard.go:929	TP	a real panic site in production code (the R3b meaning)
+8f8ce7812a01e579eb87cfd9d9647815d38af7681e119ee90e53ee7fc07e7801	qlbridge	datasource/mockcsvtestdata/testdata.go:53	FP	test-data package (mockcsvtestdata), not production
+a45354f62b076ff7125a690feb9a5aae3b5d3abbf4a97c17d7efb8b2b8594244	qlbridge	exec/executor.go:306	TP	a real panic site in production code (the R3b meaning)
+9f365a3e80a8a2cc3010a6468f606ae68849d71093a312d886a13e8fb27cfc21	qlbridge	expr/parse.go:257	TP	a real panic site in production code (the R3b meaning)
+4bd35ac4a8d1fd9f9977b97ab1b97e42648628b1c77e06dcb03ecf031c0dde8e	qlbridge	vm/vm.go:1032	TP	a real panic site in production code (the R3b meaning)
+fd5652cf90b7a360da70d7b0b2b1361c791dcc94b13657bb0100b3e4d94e39cd	qlbridge	expr/parse.go:560	TP	a real panic site in production code (the R3b meaning)
+c93f8c5822188c5926294faf0a93b1ead6808fc6729450eb47a47f8b8071c92d	qlbridge	expr/parse.go:580	TP	a real panic site in production code (the R3b meaning)
+bd5156b93beacbe4f74cfe682fcd539a888b9ba604908b3c747cb9d2ac390ccb	minivm	internal/codegen/array.go:484	TP	a real panic site in production code (the R3b meaning)
+d17b914574d5f9d2bbc2f4f713dcfe1f3ae1ee4445dd1c2d2d08bb1151cee3ed	minivm	internal/codegen/lower.go:283	TP	a real panic site in production code (the R3b meaning)
+2328ec40b5ceda9a9c226ba612c87cb7e9e105b96758e45e81f805967d1b6ac6	minivm	interp/interp.go:985	TP	a real panic site in production code (the R3b meaning)
+af68c1fdc8eeb324e3d1927e73d6c989a2c8eb01db3d3c6366b8bc19b3fa97b9	minivm	internal/codegen/array.go:464	TP	a real panic site in production code (the R3b meaning)
+5ce9f7d9f9fb44d9fa89bf67966cc75021d8ff0d2cfcccef5c96919f4c55f255	minivm	internal/codegen/slot.go:587	TP	a real panic site in production code (the R3b meaning)
+c716725af858fcdd24f9b30ac4555cbf4533d4052c03cd2f3bc53916b86d1520	minivm	interp/decode.go:180	TP	a real panic site in production code (the R3b meaning)
+97116cd1e3c077109a59e3e15172c14844e194330475310e251dfb13b7bd097b	self	crates/lighthouse-spec/src/decision.rs:178	TP	a real panic site in production code (the R3b meaning)
+0aa1ec12167aacfab81781e5500b702335c1476371d3333298c8b05d1636ed78	self	crates/lighthouse-report/src/lib.rs:129	TP	a real panic site in production code (the R3b meaning)
+d6906c72344580bcb9eaa7ebb52546b18f55367e2e83eef4c90cd08ceadfae03	self	crates/lighthouse-protocol/src/serve.rs:111	TP	a real panic site in production code (the R3b meaning)
+df7469a8328ffbf9514e1e0e1ed50ecb82900cf95ef7f2db779a3dabadae94e4	self	crates/lighthouse-protocol/src/lib.rs:45	TP	a real panic site in production code (the R3b meaning)
+8780ea5b581e8a88490faa50fd70e4ea6303527f9c30162aa56851fb50ad34ff	self	crates/lighthouse-spec/src/catalog.rs:59	TP	a real panic site in production code (the R3b meaning)
+f4c6d0b7a1f21dfe56bfa3baee29ceb0aee3026698be2963fb66c92e187076c6	self	crates/lighthouse-store/src/log.rs:165	TP	a real panic site in production code (the R3b meaning)

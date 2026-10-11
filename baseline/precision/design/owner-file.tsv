@@ -1,7 +1,25 @@
-# retained: partial
-# R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -; 15 of 15 reviewed, only the named ones are listed
+# retained: yes
+# R4 review of the retired deterministic check; unclear counts as not TP
 fingerprint	repo	location	verdict	reason
--	cel	QualifierValueEquals	TP	method kept away from its type file (five samples)
--	qlbridge	planner_*	TP	Planner Walk* methods in planner_*.go and projection.go (samples)
--	minivm	Registry.unmarshalFunc	TP	
--	minivm	Module.analyze	TP	
+5fa84f5b3d88dd031a9d3c614e1e28f39bca4632bb8290b544dbf3c9845e331b	cel	minivm/internal/cmd/geninterp/validate.go:24	FP	literal; validate.go is the validation concern of pattern
+ca22fa3add189f8c83b920d809bd8a57b8c2ad1fa123a7872c75d6d0ade66e21	cel	minivm/prof/jit_metrics.go:236	FP	literal; metrics-label file
+3839117b789e0ba57b2debabac75a5ee09e3a8bd7bc56485c4c8bf718b5ba524	cel	minivm/internal/cmd/geninterp/validate.go:36	FP	literal; validation concern
+e446b477260d82f6c331fcc8deeb353b5c74e401721c5314d0aae1e7b0541366	cel	common/env/io.go:66	FP	literal; MarshalYAML in the io file
+cbfcbd5ca94ae7cb6dde5c9cc5003d4e16c902d9ab43a60665af42180cb454c3	cel	minivm/prof/jit.go:170	FP	literal; jit-collector methods in jit.go
+a0f727482585ce03e6c30cb974582d3a4a5726afc837fb4e2ba897249aad5970	cel	minivm/prof/jit_metrics.go:212	FP	literal; metrics-label file
+b134449b523b6fe257d82c4a6332346ac8dbb6d1c3bcbfb1fde76c8ef9cd8ade	qlbridge	plan/planner_select.go:267	FP	literal; planner_select.go holds Select walking
+9bd6740f56b6f8594e8644cfd34b85301a6f782946173673fe61cb0d00f9ca71	qlbridge	plan/projection.go:50	FP	literal; projection.go holds projection loading; plan.go holds all node types
+f48ba577fac3de3875c75b64fcbaab19f9fc8be6e676155ef7670a5c99372ea0	qlbridge	plan/projection.go:90	FP	literal; same
+010d2621d82171707af9bdcdd6fee1c76f92341687b42ed2a9484b7c102cd439	qlbridge	plan/projection.go:148	FP	literal; same
+786a0cac57d8547c7fc8b53f7bc0bffe58a8a56a1aa72b844b3d8d2db33e5ec6	minivm	instr/type.go:322	FP	literal; type.go is the opcode metadata file
+0267b29023728a31b09eae2419c98a6978c5a499350de961dd11b63fc3d9688c	minivm	instr/type.go:319	FP	literal; same
+2ba405ca0df13abaf106e1e7de99b28221084844a20da8d6c1145268cc865b4b	minivm	instr/type.go:328	FP	literal; same
+dbb65c59a443d48dc59d3c23a2c981a3f379c145e67de188612573dcb1afdacf	minivm	transform/fact.go:61	FP	literal; fact analysis of Module in fact.go
+8e1004073dccf492a94feb75a31f3f928c8a14b7c1624a7281cacbd05ff289d2	minivm	interp/decode.go:164	FP	literal; decode.go holds decoding of Registry entries
+d36722b3f7e42b86cf3325d7e739cbfb80dfaea9f68e7732dda376eeeab3239d	minivm	interp/encode.go:294	FP	literal; encode.go holds encoding
+c3862c937d30d7a0f54e80605fe85f31fa70d33216b7a47894005c28768dc764	self	plugins/lang-go/provider/implementation.go:100	FP	literal; resolver interface lookup lives with implementation.go
+6c15eba0e6aaad286edb165dbf7cf5fd892a048b70f2bd600e7297268c8dfbf2	self	plugins/lang-go/provider/events.go:43	FP	literal; events.go is the event concern of unit
+b51cc4871cea6cd8d0db3556bd74ef46469ee73064cc07268ed734b338b8fedd	self	crates/lighthouse-engine/src/fix/preview.rs:47	FP	literal; fix/ is a sibling module holding Engine's fix concern
+32963e2900db94a96a8d580a588554b3596551c8fbd79a5a5206ecf925523786	self	crates/lighthouse-engine/src/fix/run.rs:100	FP	literal; same
+57a0f00965a71ae114738f30e9fce37ebeedc24745b4b50c069196005a45395f	self	plugins/lang-go/provider/implementation.go:62	FP	literal; implementation.go concern
+a78d075ebefdb01c57e96dfa2b249c17d18a997c40d45df3d83bd5fa9097dbf6	self	plugins/lang-go/provider/comments.go:12	FP	literal; comments.go concern
