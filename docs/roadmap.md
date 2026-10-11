@@ -49,91 +49,103 @@ languages and editors are added.
 
 ## Next
 
-Rule accuracy and checking cost are proven; the [baseline](baseline.md) is what search and
-learned checks are later judged against. Checking cost comes first.
-
-### Fast on large repositories
-- **Caches:** content-addressed caches with early cutoff, the approach of Go build action
-  IDs, Salsa and ESLint `--cache`:
-  - per-unit index (with plugin protocol 0.2);
-  - per-file results.
-- **Protocol 0.2:** LSP lifecycle, text sync, UTF-8 positions, and `lighthouse/check`
-  for `rpc` checks.
-- **Gate:** a warm run equals a cold run byte for byte, and a one-file edit re-checks only
-  what depends on it.
+Rule accuracy and checking cost are measured; the [baseline](baseline.md) is the yardstick.
+Rules first, then models where rules fall short, then reach.
 
 ### Signals that earn their place
-- **Measured info signals:** a deterministic check below 20% precision after cheap
-  fixes merges into the decision that already states its requirement, or becomes a
-  `model` check. The rest are refined at their measured false-positive causes.
+- **Measured info signals:** a deterministic check below 20% precision after cheap fixes
+  stops deciding. Its heuristic becomes the recall-oriented candidate selector of a model
+  check, merged into the decision that already states the requirement. The rest are
+  refined at their measured false-positive causes.
+- **One cohesive catalog:** similar decisions merge. Variants become options or kinds,
+  every finding carries its kind so precision stays measurable, and other linters'
+  granularity is consulted. 117 decisions become 29.
 - **Clean Code, fully covered:** every item of Martin's *Smells and Heuristics* and every
-  chapter rule has one home: an existing decision, a new decision, or a recorded
-  "not applicable". A coverage test enforces it.
-  - A new deterministic check ships only if its sampled precision passes. Otherwise it
-    ships as a `model` check.
+  chapter rule is covered by a decision, recorded as not applicable, or pending a named
+  fact. A coverage test enforces it.
+  - A new deterministic kind ships only if its sampled precision passes; otherwise it is
+    judged.
   - A project can replace a bundled decision's check (`rules."<id>".check`) to wrap a
     linter it already runs.
-  - New facts are general shapes (flow attributes, event kinds, external calls,
-    parameter attributes, type origin). Effects, locals and clone fingerprints follow.
+  - New facts are general shapes: flow attributes, event kinds, external calls, parameter
+    attributes, type origin. Effects, locals and clone fingerprints follow.
+
+### Models where rules fall short
+A decision says what to ask; the project binds who answers. Bindings resolve in layers,
+and an abstention falls through: a classifier trained for this decision, then a model
+bound per decision, then the project's model, then the agent.
+- **Runtime:**
+  - a check is decided by its rule, which abstains where it is unsure;
+  - candidates go through the layers;
+  - undecided cases are reported as `review`;
+  - answers are cached, `cost > 0` calls are budgeted and limited to the report scope,
+    and remote use is opt-in.
+- **Local first, at no cost:** an embedding model run in process (EmbeddingGemma) and a
+  per-decision classifier (LightGBM against kNN and logistic-regression baselines,
+  calibrated, abstaining). It is trained on strength-weighted judgments and never on its
+  own outputs.
+- **Remote decision models:** System One models through OpenRouter's Decisions API
+  answer with a probability. `:free` chat models label candidates on request, and the
+  local classifier distils those labels.
+- **Evaluation is the promotion gate (CLI and MCP):** precision, false-positive rate,
+  recall, false-negative rate, selector precision, coverage and agreement, with
+  intervals, over examples, hand-reviewed samples and judgments. A trained model is
+  attached to a decision only by an approved revision that beats the current check.
+  Sampled re-judging gives recall and drift.
+- **Generative fixes:** a fix may be synthesised by the bound generation model (an API
+  model, or any CLI as a `command` model). It is always verified (apply, format, re-check, roll back) and
+  always `suggested`. Unbound, the agent gets a fix task.
+
+### Fast on large repositories
+- **Done:** per-unit provider caches with early cutoff and a host result cache keyed by
+  each rule's declared reach. Warm runs are byte-identical to cold runs
+  (`scripts/fastgate.sh`).
+- **Next:**
+  - type-check edited packages from source over dependency export data;
+  - cache failed units;
+  - let the host keep fragments, so providers answer "unchanged" (the index half of
+    protocol 0.2).
+- **Target:** a one-file edit costs under 40% of a cold run, reported per repository.
+- **Protocol 0.2, the rest:** LSP lifecycle, text sync, UTF-8 positions, and
+  `lighthouse/check` for `rpc` checks.
 
 ### Packaging
-- Prebuilt binaries that bundle the Go and Rust providers, and a one-command install,
-  verified on clean machines early, so real-environment problems surface before the
-  loop work.
+- Prebuilt binaries that bundle the Go and Rust providers and the local model plugin
+  (model weights download on first use), plus a one-command install. Verified on clean
+  machines.
 - Not yet a public release.
 
-### The decision loop
-This is the core value: a decision starts as text, is enforced at once by agent review,
-and earns a deterministic check through measured evidence.
+### The decision loop, completed
 - **Graph queries:** decision, finding, judgment (reason, actor), evidence and revision.
-- **Labels for recall:** judgments on candidate subjects of `model` checks, plus sampled
-  re-judging of decided subjects.
-- **Evaluation harness (the promotion gate, via CLI and MCP):**
-  - replays a candidate check against recorded judgments and every example;
-  - measures precision, estimated recall and agreement with the previous check.
-- **Proposals:** narrow, widen, demote or promote a decision, with generated examples.
-  Nothing is enabled automatically.
+- **Proposals:** narrow, widen, demote or promote a decision, with generated examples
+  and drafted wording. Nothing is enabled automatically.
 - `lighthouse log compact`.
 
 ### Decision search
-- One hybrid `search` tool over decisions, judgments, findings, examples, symbols and
+- One `search` tool over decisions, judgments, findings, examples, symbols and
   revisions, for decisions that rules cannot capture precisely.
-- **Ranking:** a structured filter first, then BM25 (FTS5), a local embedding model and
+- **Ranking:** a structured filter, then BM25 (FTS5), the project's embedding model and
   structural signals, fused with Reciprocal Rank Fusion.
-- **Hooks:** they search decisions when a task starts and before a file's first edit,
-  first in shadow mode.
-- **Feedback:** agents' answers (applied, not applicable, knowingly not followed) become
-  judgments and refinement proposals.
-- **Evaluation:** labels come from history. Recall@k, nDCG@10 and MRR are measured
-  against the R3 baseline.
-- **Evaluation labels.**
-  - **History labels are weak.** A finding or judgment marks a decision as relevant to
-    a file. A missing record is unlabelled, never "irrelevant": history keeps only the
-    cases someone judged.
-  - **A verified subset is the final measure.** It uses TREC-style pooling: the top
-    results of every ranker are pooled and the pool is judged by hand.
-  - **Splits:** by repository and by commit time. Data used to tune the rankers (fusion
-    constant, boosts, k) is never used for the final evaluation.
-  - **Strata:** results are reported per check type, decision and language, because
-    history over-represents decisions with deterministic checks and files that already
-    have findings. Judgments of `model` decisions and recorded `notApplicable` answers are
-    included.
-  - **Baseline:** FTS5 BM25 alone is measured first. The embedding model is adopted only
-    if it improves the verified-subset metrics.
+- **Hooks** search when a task starts and before a file's first edit, first in shadow
+  mode. Agents' answers become judgments.
+- **Evaluation:**
+  - History labels are weak: a missing record is unlabelled, never irrelevant.
+  - The final measure is a TREC-pooled, hand-verified subset.
+  - Splits are by repository and commit time; tuning data is kept apart.
+  - Results are reported per check type, decision and language.
+  - FTS5 BM25 alone is the baseline; embeddings are adopted only if they improve it.
 
 ### Adoption
-Public adoption waits until the decision loop has been shown working.
+Public adoption waits until the loop has been shown working.
 - Public release.
-- `lighthouse init` detects languages and proposes a starter set of decisions, including
-  decisions mined from the repository's history.
+- `lighthouse init` detects languages and proposes a starter set, including mined
+  decisions.
 - A docs pass: each document holds only what its reader needs.
 
 ### Learning from history
 - **Repository mining:** refactor-like commits and dominant conventions become weak
-  evidence and `proposed` decisions. Changes are grouped by structural change first, then
-  by embeddings.
-- **Learned routing per decision:** a calibrated classifier decides only when confident,
-  and must beat a statistical baseline and kNN.
+  labels and `proposed` decisions. Changes are grouped by structural change first, then
+  by embeddings; generation drafts the wording.
 
 ### Later
 | Step | Scope |
@@ -142,6 +154,7 @@ Public adoption waits until the decision loop has been shown working.
 | Breadth | `lsp-bridge` (any off-the-shelf language server, at lower capability), then native TypeScript and Python providers |
 | Ecosystem | `lighthouse lsp` for editors (diagnostics, fixes, judgments); external rule plugins over RPC that ship their decision specs; `plugin add` with a lockfile |
 | Session domain | decisions about agent actions; a PreToolUse gate that allows, asks or denies |
+| More model transports | Anthropic Messages API; session-domain models |
 
 ## Known gaps
 - A per-language check, `spec.languages.<id>.check`, does not exist. A decision whose
