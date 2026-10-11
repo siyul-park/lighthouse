@@ -94,7 +94,7 @@ impl Builder<'_> {
             }
             if id.module() == symbol.id.module() {
                 own += 1;
-            } else if !inside(symbol.id.module(), id.module()) {
+            } else if !inside(symbol.id.module(), id.module()) && !generated(project, id) {
                 modules.entry(id.module()).or_default().insert(id);
             }
         }
@@ -208,6 +208,15 @@ fn sole_owner(callers: &[&Symbol]) -> Option<String> {
     owners
         .all(|o| o.as_deref() == Some(first.as_str()))
         .then_some(first)
+}
+
+/// Whether `id` is declared in a generated file: a function cannot be moved
+/// next to code that is rewritten by a tool.
+fn generated(project: &Project, id: &SymbolId) -> bool {
+    project
+        .symbol(id)
+        .and_then(|s| project.file(&s.file))
+        .is_some_and(|f| f.generated)
 }
 
 /// Whether `inner` lies inside `outer`: a submodule uses its parent's types
