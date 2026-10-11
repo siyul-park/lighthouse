@@ -19,7 +19,6 @@ mod layout;
 mod model_selects;
 mod neighbors;
 mod reach;
-mod review;
 mod rules;
 mod rust;
 mod support;

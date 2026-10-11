@@ -218,7 +218,7 @@ fn gather(
     }
     .labels()?;
     let observed = &checked.outcome.subjects;
-    let decision_ref = lighthouse_checks::decision_ref(&decision);
+    let decision_ref = decision.reference();
     let (mut rows, seen) = rows_of(&labels, observed);
     let unresolved = labels
         .iter()

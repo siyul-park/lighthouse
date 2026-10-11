@@ -6,9 +6,9 @@
 use cel::Program;
 use lighthouse_model::{Diagnostic, Position, Span, SymbolId, hash};
 use lighthouse_plugin::{
-    Ask, Ctx, DecisionRef, Example, Judged, Neighbor, RuleManifest, Subject, SubjectContext,
+    Ask, Ctx, DecisionRef, Judged, Neighbor, RuleManifest, Subject, SubjectContext,
 };
-use lighthouse_spec::{CelCheck, Decision, ExampleKind, Select};
+use lighthouse_spec::{CelCheck, Decision, Select};
 use serde_json::{Value, json};
 
 use crate::{
@@ -55,7 +55,7 @@ impl Review {
             return Ok(None);
         };
         let id = decision.id();
-        let decision_ref = decision_ref(decision);
+        let decision_ref = decision.reference();
         let revision = serde_json::to_vec(&(decision.uid(), check, &decision_ref))
             .map(hash::sha256)
             .map_err(|e| Error::invalid(id, format!("the review cannot be hashed: {e}")))?;
@@ -172,51 +172,6 @@ impl Review {
                 neighbors: symbol.map_or_else(Vec::new, |s| neighbors(ctx, source, s)),
             },
         }
-    }
-}
-
-/// The decision as a model is told about it: its requirement, what the check
-/// asks (the `prompt`, else the requirement) and its examples as shots.
-pub fn decision_ref(decision: &Decision) -> DecisionRef {
-    let prompt = decision.check.as_ref().and_then(|check| match &check.kind {
-        lighthouse_spec::CheckKind::Cel(cel) => cel.prompt.clone(),
-        lighthouse_spec::CheckKind::Model(model) => model.prompt.clone(),
-        _ => None,
-    });
-    DecisionRef {
-        id: decision.id().to_owned(),
-        requirement: decision.requirement.clone(),
-        prompt: prompt.unwrap_or_else(|| decision.requirement.clone()),
-        valid: decision
-            .examples
-            .iter()
-            .filter(|example| example.kind == ExampleKind::Valid)
-            .map(|example| Example {
-                language: example.language.clone(),
-                code: example
-                    .files
-                    .iter()
-                    .map(|f| format!("// {}\n{}", f.path, f.text()))
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-                note: example.name.clone(),
-            })
-            .collect(),
-        invalid: decision
-            .examples
-            .iter()
-            .filter(|example| example.kind == ExampleKind::Invalid)
-            .map(|example| Example {
-                language: example.language.clone(),
-                code: example
-                    .files
-                    .iter()
-                    .map(|f| format!("// {}\n{}", f.path, f.text()))
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-                note: example.name.clone(),
-            })
-            .collect(),
     }
 }
 

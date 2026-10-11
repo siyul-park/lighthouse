@@ -1650,6 +1650,7 @@ dependencies = [
  "include_dir",
  "insta",
  "lighthouse-model",
+ "lighthouse-protocol",
  "lighthouse-resource",
  "lighthouse-test-support",
  "schemars",

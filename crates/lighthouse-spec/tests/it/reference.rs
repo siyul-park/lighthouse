@@ -1,10 +1,9 @@
-use lighthouse_checks::decision_ref;
 use lighthouse_spec::Catalog;
 
 #[test]
-fn a_decision_is_told_to_a_model_by_its_requirement_and_examples() {
+fn a_decision_reference_carries_its_requirement_and_examples() {
     let decision = Catalog::bundled().decision("design/feature-envy").unwrap();
-    let told = decision_ref(decision);
+    let told = decision.reference();
 
     assert_eq!(told.id, "design/feature-envy");
     assert_eq!(told.prompt, decision.requirement);

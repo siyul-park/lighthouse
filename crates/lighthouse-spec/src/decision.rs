@@ -6,8 +6,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-use crate::{Check, DecisionStatus, Error, Example, Fix, OptionsSchema, Scope};
+use crate::{
+    Check, CheckKind, DecisionStatus, Error, Example, ExampleKind, Fix, OptionsSchema, Scope,
+};
 use lighthouse_model::hash;
+use lighthouse_protocol::DecisionRef;
 
 /// Label that says which pack a decision belongs to.
 pub const PACK_LABEL: &str = "lighthouse/pack";
@@ -109,6 +112,39 @@ impl Decision {
     /// A decision with this identity and content.
     pub fn new(metadata: Metadata, spec: DecisionSpec) -> Self {
         Self(Resource::new(metadata, spec))
+    }
+
+    /// The decision as a model is told about it: its requirement, what the check
+    /// asks (the `prompt`, else the requirement) and its examples as shots.
+    pub fn reference(&self) -> DecisionRef {
+        let prompt = self.check.as_ref().and_then(|check| match &check.kind {
+            CheckKind::Cel(cel) => cel.prompt.clone(),
+            CheckKind::Model(model) => model.prompt.clone(),
+            _ => None,
+        });
+        let shots = |kind: ExampleKind| -> Vec<lighthouse_protocol::Example> {
+            self.examples
+                .iter()
+                .filter(|example| example.kind == kind)
+                .map(|example| lighthouse_protocol::Example {
+                    language: example.language.clone(),
+                    code: example
+                        .files
+                        .iter()
+                        .map(|f| format!("// {}\n{}", f.path, f.text()))
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                    note: example.name.clone(),
+                })
+                .collect()
+        };
+        DecisionRef {
+            id: self.id().to_owned(),
+            requirement: self.requirement.clone(),
+            prompt: prompt.unwrap_or_else(|| self.requirement.clone()),
+            valid: shots(ExampleKind::Valid),
+            invalid: shots(ExampleKind::Invalid),
+        }
     }
 
     /// Whether only the `strict` preset enables the decision: review-level

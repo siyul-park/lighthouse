@@ -8,6 +8,7 @@ mod kinds;
 mod local;
 mod models;
 mod project;
+mod reference;
 mod sources;
 mod validation;
 mod versions;
