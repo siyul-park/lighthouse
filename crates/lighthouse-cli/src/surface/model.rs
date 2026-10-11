@@ -2,8 +2,7 @@
 
 use std::fmt::Write;
 
-use lighthouse_ml::train::{TrainRequest, Trained};
-use lighthouse_session::{Session, bound_models, train};
+use lighthouse_session::{Session, TrainRequest, Trained, bound_models, train};
 use serde::Serialize;
 
 use crate::surface::{

@@ -1468,7 +1468,6 @@ dependencies = [
  "insta",
  "jsonschema",
  "lighthouse-engine",
- "lighthouse-ml",
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-report",

@@ -2,11 +2,7 @@
 
 use std::{fmt::Write, path::PathBuf};
 
-use lighthouse_ml::{
-    evaluate::{EvalReport, EvalRequest, Repo, Side},
-    metrics::Rate,
-};
-use lighthouse_session::{Session, eval};
+use lighthouse_session::{EvalReport, EvalRequest, Rate, Repo, Session, Side, eval};
 
 use crate::surface::{
     Result,

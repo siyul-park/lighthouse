@@ -42,6 +42,11 @@ pub use findings::Remembered;
 pub use fix::{AppliedRow, DeclinedRow, FixSelection, FixTargets, Fixed, fix};
 pub use git::head;
 pub use lighthouse_engine::{FailOn, Timings};
+pub use lighthouse_ml::{
+    evaluate::{EvalReport, EvalRequest, Repo, Side},
+    metrics::Rate,
+    train::{TrainRequest, Trained},
+};
 pub use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};
 pub use lighthouse_report::docs::DOCS_DIR;
 pub use lighthouse_resource::schema_file;

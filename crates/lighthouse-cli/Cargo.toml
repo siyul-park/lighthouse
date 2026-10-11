@@ -11,7 +11,6 @@ doctest = false
 [dependencies]
 clap.workspace = true
 clap_complete.workspace = true
-lighthouse-ml.workspace = true
 lighthouse-model.workspace = true
 lighthouse-report.workspace = true
 lighthouse-resource.workspace = true
