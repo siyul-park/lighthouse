@@ -84,8 +84,9 @@ bound per decision, then the project's model, then the agent.
   per-decision classifier (LightGBM against kNN and logistic-regression baselines,
   calibrated, abstaining). It is trained on strength-weighted judgments and never on its
   own outputs.
-- **Remote decision models:** System One models through OpenRouter's Decisions API
-  answer with a probability. `:free` chat models label candidates on request, and the
+- **Remote decision models:** System One models answer yes/no questions with a probability.
+  They are reached through the SystemOne API format (TypeSafe jev, or any provider that
+  speaks it). `:free` chat models label candidates on request, and the
   local classifier distils those labels.
 - **Evaluation is the promotion gate (CLI and MCP):** precision, false-positive rate,
   recall, false-negative rate, selector precision, coverage and agreement, with
