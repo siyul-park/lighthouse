@@ -237,7 +237,7 @@
       "description": "A provider of models, named under `[models.providers.<name>]`: a provider,\nas a check or a fix is. A model is named `<provider>/<model>`.",
       "oneOf": [
         {
-          "description": "A plugin process that offers models. The `options` say how to reach\nthem (`format`, `baseUrl`, `keyEnv` for `model-llm`); the model part of\nthe reference goes with every request.",
+          "description": "A plugin process that offers models. The `options` say how to reach\nthem (`format`, `baseUrl`, `keyEnv` for `model-http`); the model part of\nthe reference goes with every request.",
           "properties": {
             "cost": {
               "description": "What one answer costs, when the plugin's own figure is not right.",

@@ -5,7 +5,7 @@
 
 pub use lighthouse_protocol::{
     Answer, ClassifyParams, ClassifyResult, DecisionRef, LabelSource, ModelManifest, ModelRef,
-    Neighbor, ResultKind, Shot, Subject, SubjectContext, TrainParams, TrainResult, TrainSubject,
+    Neighbor, ResultKind, Shot, Subject, SubjectContext, TrainParams, TrainResponse, TrainSubject,
 };
 
 use crate::Error;
@@ -17,7 +17,7 @@ pub trait Classifier: Send + Sync {
     fn classify(&self, params: &ClassifyParams) -> Result<ClassifyResult, Error>;
     /// Fits the model on labelled subjects; only a model whose manifest lists
     /// the `train` method does.
-    fn train(&self, params: &TrainParams) -> Result<TrainResult, Error>;
+    fn train(&self, params: &TrainParams) -> Result<TrainResponse, Error>;
 }
 
 /// Subjects of one decision to be judged.

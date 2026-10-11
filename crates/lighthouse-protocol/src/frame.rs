@@ -100,6 +100,15 @@ impl Message {
         }
     }
 
+    /// The error with its canonical status (AIP-193) in `data.status`.
+    #[must_use]
+    pub fn with_status(mut self, status: &str) -> Self {
+        if let Some(error) = &mut self.error {
+            error.data = Some(serde_json::json!({ "status": status }));
+        }
+        self
+    }
+
     /// Deserializes `result` of a response; an `error` response is returned
     /// as the `Err` side.
     pub fn into_result<T: DeserializeOwned>(

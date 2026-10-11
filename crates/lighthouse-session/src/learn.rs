@@ -9,7 +9,7 @@ use std::{
 };
 
 use lighthouse_plugin::{
-    ClassifyParams, LabelSource, ResultKind, Subject, TrainParams, TrainResult, TrainSubject,
+    ClassifyParams, LabelSource, ResultKind, Subject, TrainParams, TrainResponse, TrainSubject,
 };
 use serde::Serialize;
 
@@ -43,7 +43,7 @@ pub struct Trained {
     pub by_source: std::collections::BTreeMap<String, usize>,
     /// Labels whose subject no longer exists or is not selected.
     pub unresolved: usize,
-    pub result: TrainResult,
+    pub result: TrainResponse,
 }
 
 /// Trains the model on the labels of the decision.
@@ -149,7 +149,11 @@ pub fn train(request: &TrainRequest) -> Result<Trained> {
     let dir = artifact_dir(&root, &reference, &request.decision);
     fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let model = checked.model(&reference)?;
+    // The same labelled set for the same decision is the same request.
+    let request_id =
+        lighthouse_model::hash::short(&serde_json::to_string(&(&decision_ref.id, &subjects))?, 8);
     let result = model.train(&TrainParams {
+        request_id: Some(request_id),
         decision: decision_ref,
         subjects: subjects.clone(),
         options: serde_json::Map::new(),

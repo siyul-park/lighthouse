@@ -7,7 +7,7 @@ use std::{path::PathBuf, time::Duration};
 use lighthouse_model::hash;
 use lighthouse_plugin::{
     Answer, Classifier, ClassifyParams, ClassifyResult, Error, ModelManifest, ModelRef, Registry,
-    ResultKind, TrainParams, TrainResult,
+    ResultKind, TrainParams, TrainResponse,
 };
 use lighthouse_process::{MAX_OUTPUT, Spec};
 use lighthouse_resource::parse_duration;
@@ -71,7 +71,7 @@ impl<'a> Host<'a> {
                     id: name.to_owned(),
                     tasks: tasks.clone(),
                     version: hash::short(&format!("{argv:?}{model}{stdin:?}{pointer:?}"), 6),
-                    methods: vec!["classify".to_owned()],
+                    trains: false,
                     deterministic: false,
                     abstains: true,
                     cost: *cost,
@@ -120,7 +120,7 @@ fn refused<'a>(name: &str, reason: String) -> Box<dyn Classifier + 'a> {
             id: name.to_owned(),
             tasks: vec!["classification".to_owned()],
             version: String::new(),
-            methods: Vec::new(),
+            trains: false,
             deterministic: false,
             abstains: true,
             cost: 0.0,
@@ -141,7 +141,7 @@ impl Classifier for Refused {
         )))
     }
 
-    fn train(&self, _: &TrainParams) -> Result<TrainResult, Error> {
+    fn train(&self, _: &TrainParams) -> Result<TrainResponse, Error> {
         Err(Error::Failed(format!(
             "model `{}`: {}",
             self.manifest.id, self.reason
@@ -169,7 +169,7 @@ impl Classifier for Rpc<'_> {
         Ok(result)
     }
 
-    fn train(&self, params: &TrainParams) -> Result<TrainResult, Error> {
+    fn train(&self, params: &TrainParams) -> Result<TrainResponse, Error> {
         let mut asked = params.clone();
         asked.options.clone_from(&self.options);
         self.model.train(&asked)
@@ -236,7 +236,7 @@ impl Classifier for Command {
         })
     }
 
-    fn train(&self, _: &TrainParams) -> Result<TrainResult, Error> {
+    fn train(&self, _: &TrainParams) -> Result<TrainResponse, Error> {
         Err(Error::Failed(format!(
             "model `{}`: a command model does not train",
             self.manifest.id

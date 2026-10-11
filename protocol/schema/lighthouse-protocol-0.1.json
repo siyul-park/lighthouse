@@ -748,17 +748,9 @@
           "description": "The same input always gets the same answer.",
           "type": "boolean"
         },
-        "id": {
-          "description": "The model id the project binds in `[models]`; equals the plugin id.",
+        "name": {
+          "description": "The `Model` resource's name; for a plugin's model, the plugin's id.",
           "type": "string"
-        },
-        "methods": {
-          "default": [],
-          "description": "`classify`, and `train` when the model learns from labels.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
         },
         "tasks": {
           "description": "The tasks it can do: `classification` (a subject of a decision is a\nviolation or not); later ones may join.",
@@ -767,13 +759,18 @@
           },
           "type": "array"
         },
+        "trains": {
+          "default": false,
+          "description": "The model learns from labels: it answers `lighthouse/train`.",
+          "type": "boolean"
+        },
         "version": {
           "description": "Changes whenever the answers for the same input may change (the model\nname, the prompt template, the trained artifact).",
           "type": "string"
         }
       },
       "required": [
-        "id",
+        "name",
         "tasks",
         "version",
         "deterministic",
@@ -877,6 +874,46 @@
           "type": "object"
         }
       ]
+    },
+    "Operation": {
+      "description": "A long-running operation (AIP-151). Over stdio `lighthouse/train` answers\nwith one that is `done`.",
+      "properties": {
+        "done": {
+          "type": "boolean"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Status"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set when the operation failed."
+        },
+        "metadata": true,
+        "name": {
+          "description": "`operations/{id}`.",
+          "type": "string"
+        },
+        "response": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrainResponse"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set when it succeeded."
+        }
+      },
+      "required": [
+        "name",
+        "done"
+      ],
+      "type": "object"
     },
     "Overlay": {
       "description": "The text that stands in for a file: a provider reads it instead of the\nfile on disk, and must not read the disk for that path. Hosts send overlays\nfor requested files only, as a fix run verifies edits before writing them.",
@@ -1066,6 +1103,23 @@
       "required": [
         "start",
         "end"
+      ],
+      "type": "object"
+    },
+    "Status": {
+      "description": "An error in the words of AIP-193: a canonical status and a message.",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "status": {
+          "description": "`INVALID_ARGUMENT`, `UNAVAILABLE`, `RESOURCE_EXHAUSTED`, ...",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "message"
       ],
       "type": "object"
     },
@@ -1297,6 +1351,13 @@
           "description": "The `options` of the project's model instance.",
           "type": "object"
         },
+        "requestId": {
+          "description": "Names the request, so that a retry starts no second job.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "subjects": {
           "items": {
             "$ref": "#/$defs/TrainSubject"
@@ -1311,22 +1372,20 @@
       ],
       "type": "object"
     },
-    "TrainResult": {
-      "description": "Result of `lighthouse/train`.",
+    "TrainResponse": {
+      "description": "What a finished training gives: the artifact, content-addressed\n(`sha256:<hex>`), and the numbers the trainer measured, such as\nout-of-fold precision and recall.",
       "properties": {
+        "artifact": {
+          "type": "string"
+        },
         "metrics": {
           "additionalProperties": true,
           "default": {},
-          "description": "Numbers the trainer measured, such as out-of-fold precision and recall.",
           "type": "object"
-        },
-        "version": {
-          "description": "The artifact's hash; it becomes the model's version.",
-          "type": "string"
         }
       },
       "required": [
-        "version"
+        "artifact"
       ],
       "type": "object"
     },

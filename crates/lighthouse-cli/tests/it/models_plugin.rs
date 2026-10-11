@@ -41,8 +41,8 @@ while True:
     method, params, id = message.get("method"), message.get("params", {}), message.get("id")
     if method == "initialize":
         send(id, {"id": "fake-model", "version": "1", "protocolVersion": "0.1", "languages": [],
-                  "models": [{"id": "fake-model", "tasks": ["classification"], "version": "1",
-                              "methods": ["classify", "train"], "deterministic": True,
+                  "models": [{"name": "fake-model", "tasks": ["classification"], "version": "1",
+                              "trains": True, "deterministic": True,
                               "abstains": True, "cost": 0}]})
     elif method == "lighthouse/classify":
         out = []
@@ -53,7 +53,7 @@ while True:
     elif method == "lighthouse/train":
         with open(params["dir"] + "/subjects.json", "w") as f:
             json.dump(params["subjects"], f)
-        send(id, {"metrics": {"n": len(params["subjects"])}, "version": "artifact-1"})
+        send(id, {"name": "operations/1", "done": True, "response": {"artifact": "sha256:abc", "metrics": {"n": len(params["subjects"])}}})
     elif method == "shutdown":
         send(id, None)
 "#;
@@ -195,7 +195,7 @@ fn learn_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
     );
     let trained = json(&out);
     assert_eq!(trained["model"], "fake/m1");
-    assert_eq!(trained["result"]["version"], "artifact-1");
+    assert_eq!(trained["result"]["artifact"], "sha256:abc");
     assert_eq!(trained["unresolved"], 0);
     // Three baseline rows and two examples.
     assert_eq!(trained["subjects"], 5);

@@ -8,8 +8,8 @@ use thiserror::Error;
 
 use crate::{
     CLASSIFY, ClassifyParams, ClassifyResult, EXIT, FrameError, INDEX, INITIALIZE, IndexParams,
-    IndexResult, InitializeParams, InitializeResult, Message, SHUTDOWN, TRAIN, TrainParams,
-    TrainResult, read_message, write_message,
+    IndexResult, InitializeParams, InitializeResult, Message, Operation, SHUTDOWN, TRAIN,
+    TrainParams, read_message, write_message,
 };
 
 const PARSE_ERROR: i64 = -32700;
@@ -32,7 +32,7 @@ pub trait Handler {
         Err("this plugin offers no model".to_owned())
     }
     /// Fits a model; only a model that learns from labels offers it.
-    fn train(&mut self, _params: TrainParams) -> Result<TrainResult, String> {
+    fn train(&mut self, _params: TrainParams) -> Result<Operation, String> {
         Err("this plugin does not train".to_owned())
     }
 }
@@ -120,9 +120,18 @@ fn dispatch(
     });
     Box::new(move |id| match outcome {
         Ok(Ok(value)) => Message::response(id, value).expect("a value serializes"),
-        Ok(Err(text)) => Message::failure(Some(id), INTERNAL_ERROR, text),
-        Err((code, text)) => Message::failure(Some(id), code, text),
+        Ok(Err(text)) => Message::failure(Some(id), INTERNAL_ERROR, text).with_status("INTERNAL"),
+        Err((code, text)) => Message::failure(Some(id), code, text).with_status(status_of(code)),
     })
+}
+
+/// The canonical status (AIP-193) of a JSON-RPC error code.
+fn status_of(code: i64) -> &'static str {
+    match code {
+        METHOD_NOT_FOUND => "UNIMPLEMENTED",
+        INVALID_PARAMS | PARSE_ERROR => "INVALID_ARGUMENT",
+        _ => "INTERNAL",
+    }
 }
 
 fn call<P, R: Serialize>(message: Message, run: impl FnOnce(P) -> Result<R, String>) -> Outcome

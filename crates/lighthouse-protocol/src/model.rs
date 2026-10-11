@@ -17,13 +17,15 @@ pub struct ModelMethods {
     #[serde(rename = "lighthouse/classify")]
     pub classify: Call<ClassifyParams, ClassifyResult>,
     #[serde(rename = "lighthouse/train")]
-    pub train: Call<TrainParams, TrainResult>,
+    pub train: Call<TrainParams, Operation>,
 }
 
 /// What a model plugin offers: one entry of `models` in its `initialize` result.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ModelManifest {
-    /// The model id the project binds in `[models]`; equals the plugin id.
+    /// The `Model` resource's name; for a plugin's model, the plugin's id.
+    #[serde(rename = "name")]
     pub id: String,
     /// The tasks it can do: `classification` (a subject of a decision is a
     /// violation or not); later ones may join.
@@ -31,9 +33,9 @@ pub struct ModelManifest {
     /// Changes whenever the answers for the same input may change (the model
     /// name, the prompt template, the trained artifact).
     pub version: String,
-    /// `classify`, and `train` when the model learns from labels.
+    /// The model learns from labels: it answers `lighthouse/train`.
     #[serde(default)]
-    pub methods: Vec<String>,
+    pub trains: bool,
     /// The same input always gets the same answer.
     pub deterministic: bool,
     /// The model may answer `abstain`, and the subject then goes on to the
@@ -180,7 +182,11 @@ pub struct TrainSubject {
 
 /// Params of `lighthouse/train`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct TrainParams {
+    /// Names the request, so that a retry starts no second job.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_id: Option<String>,
     pub decision: DecisionRef,
     pub subjects: Vec<TrainSubject>,
     /// The `options` of the project's model instance.
@@ -191,12 +197,37 @@ pub struct TrainParams {
     pub dir: String,
 }
 
-/// Result of `lighthouse/train`.
+/// What a finished training gives: the artifact, content-addressed
+/// (`sha256:<hex>`), and the numbers the trainer measured, such as
+/// out-of-fold precision and recall.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct TrainResult {
-    /// Numbers the trainer measured, such as out-of-fold precision and recall.
+pub struct TrainResponse {
+    pub artifact: String,
     #[serde(default)]
     pub metrics: BTreeMap<String, Value>,
-    /// The artifact's hash; it becomes the model's version.
-    pub version: String,
+}
+
+/// A long-running operation (AIP-151). Over stdio `lighthouse/train` answers
+/// with one that is `done`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Operation {
+    /// `operations/{id}`.
+    pub name: String,
+    pub done: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Value>,
+    /// Set when the operation failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<Status>,
+    /// Set when it succeeded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub response: Option<TrainResponse>,
+}
+
+/// An error in the words of AIP-193: a canonical status and a message.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Status {
+    /// `INVALID_ARGUMENT`, `UNAVAILABLE`, `RESOURCE_EXHAUSTED`, ...
+    pub status: String,
+    pub message: String,
 }

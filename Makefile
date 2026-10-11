@@ -16,6 +16,11 @@ plugins:
 	cp target/release/lang-rust $(PLUGINS)/lang-rust/lang-rust.new
 	mv -f $(PLUGINS)/lang-rust/lang-rust.new $(PLUGINS)/lang-rust/lang-rust
 	cp plugins/lang-rust/lighthouse-plugin.toml $(PLUGINS)/lang-rust/
+	mkdir -p $(PLUGINS)/model-http
+	cargo build --release -p model-http
+	cp target/release/model-http $(PLUGINS)/model-http/model-http.new
+	mv -f $(PLUGINS)/model-http/model-http.new $(PLUGINS)/model-http/model-http
+	cp plugins/model-http/lighthouse-plugin.toml $(PLUGINS)/model-http/
 
 test: plugins
 	cargo test --workspace

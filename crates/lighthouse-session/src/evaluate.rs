@@ -88,11 +88,7 @@ struct Found {
 /// Runs the evaluation.
 pub fn eval(request: &EvalRequest) -> Result<EvalReport> {
     let start = env::current_dir()?;
-    let config = request
-        .config
-        .as_ref()
-        .map(|c| start.join(c))
-        .or_else(|| None);
+    let config = request.config.as_ref().map(|c| start.join(c));
     let repos: Vec<Repo> = if request.repos.is_empty() {
         vec![Repo {
             name: None,

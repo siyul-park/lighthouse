@@ -73,12 +73,9 @@ impl super::Engine {
                 trusted: self.trusted,
             },
             binding,
-            &self.models.attached,
+            &self.models,
             scopes,
-            self.models.all,
             self.cache.as_ref().map(|c| c.dir.as_path()),
-            self.models.off,
-            self.models.collect,
         )
     }
 }
@@ -87,22 +84,19 @@ impl<'a> RunModels<'a> {
     pub(super) fn new(
         host: Host<'a>,
         binding: &'a ModelBinding,
-        attached: &'a BTreeMap<String, String>,
+        options: &'a super::ModelOptions,
         scopes: &'a [PathBuf],
-        all: bool,
         cache_dir: Option<&std::path::Path>,
-        off: bool,
-        collect: bool,
     ) -> Self {
         Self {
             host,
             binding,
-            attached,
-            scopes: (!all).then_some(scopes),
+            attached: &options.attached,
+            scopes: (!options.all).then_some(scopes),
             budget: AtomicUsize::new(binding.budget),
             answers: cache_dir.and_then(|dir| Cache::open(dir, DEFAULT_LIMIT).ok()),
-            off,
-            collect,
+            off: options.off,
+            collect: options.collect,
             seen: std::sync::Mutex::default(),
         }
     }

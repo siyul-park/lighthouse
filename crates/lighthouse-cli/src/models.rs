@@ -119,7 +119,7 @@ pub fn learn(command: LearnCommand) -> Result<u8> {
     for (name, value) in &trained.result.metrics {
         println!("  {name}: {value}");
     }
-    println!("version: {}", trained.result.version);
+    println!("artifact: {}", trained.result.artifact);
     Ok(0)
 }
 

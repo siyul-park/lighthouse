@@ -7,8 +7,8 @@ mod wire;
 pub use frame::{ErrorObject, FrameError, Id, Message, read_message, write_message};
 pub use model::{
     Answer, ClassifyParams, ClassifyResult, DecisionRef, LabelSource, ModelManifest, ModelMethods,
-    ModelRef, Neighbor, ResultKind, Shot, Subject, SubjectContext, TrainParams, TrainResult,
-    TrainSubject,
+    ModelRef, Neighbor, Operation, ResultKind, Shot, Status, Subject, SubjectContext, TrainParams,
+    TrainResponse, TrainSubject,
 };
 pub use prompt::{prompt, response_schema, subjects as subjects_text, system as system_text};
 pub use serve::{Handler, ServeError, serve};

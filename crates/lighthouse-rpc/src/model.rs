@@ -3,7 +3,7 @@
 use std::{collections::BTreeSet, sync::Arc};
 
 use lighthouse_plugin::{
-    Classifier, ClassifyParams, ClassifyResult, Error, ModelManifest, TrainParams, TrainResult,
+    Classifier, ClassifyParams, ClassifyResult, Error, ModelManifest, TrainParams, TrainResponse,
 };
 use lighthouse_protocol as wire;
 
@@ -16,10 +16,6 @@ pub(crate) struct Model {
 }
 
 impl Model {
-    fn offers(&self, method: &str) -> bool {
-        self.manifest.methods.iter().any(|m| m == method)
-    }
-
     fn failed(&self, reason: impl std::fmt::Display) -> Error {
         Error::Failed(format!("model `{}`: {reason}", self.manifest.id))
     }
@@ -44,12 +40,18 @@ impl Classifier for Model {
         Ok(result)
     }
 
-    fn train(&self, params: &TrainParams) -> Result<TrainResult, Error> {
-        if !self.offers("train") {
+    fn train(&self, params: &TrainParams) -> Result<TrainResponse, Error> {
+        if !self.manifest.trains {
             return Err(self.failed("it does not train"));
         }
-        self.client
+        let operation: wire::Operation = self
+            .client
             .call(wire::TRAIN, params)
-            .map_err(|reason| self.failed(reason))
+            .map_err(|reason| self.failed(reason))?;
+        match (operation.done, operation.error, operation.response) {
+            (_, Some(error), _) => Err(self.failed(format!("{}: {}", error.status, error.message))),
+            (true, None, Some(response)) => Ok(response),
+            _ => Err(self.failed("the training did not finish")),
+        }
     }
 }
