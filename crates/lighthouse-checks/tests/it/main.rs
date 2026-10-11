@@ -18,6 +18,7 @@ mod go;
 mod layout;
 mod neighbors;
 mod reach;
+mod review;
 mod rules;
 mod rust;
 mod support;

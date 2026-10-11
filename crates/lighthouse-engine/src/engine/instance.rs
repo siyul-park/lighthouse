@@ -89,44 +89,10 @@ impl<'a> Host<'a> {
     }
 }
 
-fn rpc_manifest(
-    name: &str,
-    inner: &ModelManifest,
-    options: &Map<String, Value>,
-    cost: Option<f64>,
-) -> ModelManifest {
-    let version = format!(
-        "{}+{}",
-        inner.version,
-        hash::short(&Value::Object(options.clone()).to_string(), 4)
-    );
-    ModelManifest {
-        id: name.to_owned(),
-        version,
-        cost: cost.unwrap_or(inner.cost),
-        ..inner.clone()
-    }
-}
-
 /// An instance that cannot run, kept so that its failure is reported.
 struct Refused {
     manifest: ModelManifest,
     reason: String,
-}
-
-fn refused<'a>(name: &str, reason: String) -> Box<dyn Classifier + 'a> {
-    Box::new(Refused {
-        manifest: ModelManifest {
-            id: name.to_owned(),
-            tasks: vec!["classification".to_owned()],
-            version: String::new(),
-            trains: false,
-            deterministic: false,
-            abstains: true,
-            cost: 0.0,
-        },
-        reason,
-    })
 }
 
 impl Classifier for Refused {
@@ -242,6 +208,40 @@ impl Classifier for Command {
             self.manifest.id
         )))
     }
+}
+
+fn rpc_manifest(
+    name: &str,
+    inner: &ModelManifest,
+    options: &Map<String, Value>,
+    cost: Option<f64>,
+) -> ModelManifest {
+    let version = format!(
+        "{}+{}",
+        inner.version,
+        hash::short(&Value::Object(options.clone()).to_string(), 4)
+    );
+    ModelManifest {
+        id: name.to_owned(),
+        version,
+        cost: cost.unwrap_or(inner.cost),
+        ..inner.clone()
+    }
+}
+
+fn refused<'a>(name: &str, reason: String) -> Box<dyn Classifier + 'a> {
+    Box::new(Refused {
+        manifest: ModelManifest {
+            id: name.to_owned(),
+            tasks: vec!["classification".to_owned()],
+            version: String::new(),
+            trains: false,
+            deterministic: false,
+            abstains: true,
+            cost: 0.0,
+        },
+        reason,
+    })
 }
 
 fn abstain(key: &str) -> Answer {

@@ -53,6 +53,51 @@ pub(super) fn validate_config(
     Ok(())
 }
 
+/// The constructor prefixes of each language: the project's, else the ones its
+/// provider declares.
+pub(super) fn constructors(registry: &Registry, config: &Config) -> BTreeMap<String, Vec<String>> {
+    let mut found: BTreeMap<String, Vec<String>> = registry
+        .languages()
+        .map(|(_, provider)| {
+            let manifest = provider.manifest();
+            (
+                manifest.id.clone(),
+                manifest.conventions.constructor_prefixes.clone(),
+            )
+        })
+        .collect();
+    for (id, prefixes) in config.constructor_prefixes() {
+        found.insert(id.clone(), prefixes.clone());
+    }
+    found
+}
+
+/// The language providers of the registry, and which of them listed plugins enable.
+pub(super) fn load_languages(
+    registry: &Registry,
+    config: &Config,
+) -> Result<(Vec<usize>, Vec<Language>), Error> {
+    let mut providers = Vec::new();
+    let mut languages = Vec::new();
+    for (plugin, provider) in registry.languages() {
+        if config.lists(plugin) {
+            providers.push(languages.len());
+        }
+        languages.push(Language {
+            files: glob_set(&provider.manifest().globs)?,
+            tests: glob_set(&provider.manifest().conventions.test_globs)?,
+        });
+    }
+    Ok((providers, languages))
+}
+
+pub(super) fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error {
+    |source| Error::Io {
+        path: path.to_owned(),
+        source,
+    }
+}
+
 /// Rejects a binding to a model whose provider is unknown, and a provider that
 /// cannot work.
 fn validate_models(registry: &Registry, config: &Config) -> Result<(), Error> {
@@ -109,49 +154,4 @@ fn validate_models(registry: &Registry, config: &Config) -> Result<(), Error> {
         }
     }
     Ok(())
-}
-
-/// The constructor prefixes of each language: the project's, else the ones its
-/// provider declares.
-pub(super) fn constructors(registry: &Registry, config: &Config) -> BTreeMap<String, Vec<String>> {
-    let mut found: BTreeMap<String, Vec<String>> = registry
-        .languages()
-        .map(|(_, provider)| {
-            let manifest = provider.manifest();
-            (
-                manifest.id.clone(),
-                manifest.conventions.constructor_prefixes.clone(),
-            )
-        })
-        .collect();
-    for (id, prefixes) in config.constructor_prefixes() {
-        found.insert(id.clone(), prefixes.clone());
-    }
-    found
-}
-
-/// The language providers of the registry, and which of them listed plugins enable.
-pub(super) fn load_languages(
-    registry: &Registry,
-    config: &Config,
-) -> Result<(Vec<usize>, Vec<Language>), Error> {
-    let mut providers = Vec::new();
-    let mut languages = Vec::new();
-    for (plugin, provider) in registry.languages() {
-        if config.lists(plugin) {
-            providers.push(languages.len());
-        }
-        languages.push(Language {
-            files: glob_set(&provider.manifest().globs)?,
-            tests: glob_set(&provider.manifest().conventions.test_globs)?,
-        });
-    }
-    Ok((providers, languages))
-}
-
-pub(super) fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error {
-    |source| Error::Io {
-        path: path.to_owned(),
-        source,
-    }
 }

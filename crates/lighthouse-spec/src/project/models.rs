@@ -17,6 +17,16 @@ pub const DEFAULT_BATCH: usize = 20;
 /// The precision a check must reach unless the project says.
 pub const DEFAULT_PRECISION: f64 = 0.9;
 
+/// The specs a provider may name, and what each needs by default.
+const SPECS: [(&str, &str, &str); 1] = [("openai", "https://api.openai.com/v1", "OPENAI_API_KEY")];
+
+/// The plugin that speaks the standard APIs.
+pub const API_PLUGIN: &str = "model-http";
+
+/// Names a project may not give a provider: they belong to the providers
+/// Lighthouse will predefine.
+pub const RESERVED: [&str; 3] = ["local", "typesafe", "anthropic"];
+
 /// What a `command` model is given on stdin.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -82,14 +92,6 @@ pub enum ModelProvider {
     },
 }
 
-fn default_tasks() -> Vec<String> {
-    vec!["classification".to_owned()]
-}
-
-fn default_cost() -> f64 {
-    1.0
-}
-
 /// A provider that speaks a standard API: Lighthouse knows the format of the
 /// requests, and the project says where to send them.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -118,16 +120,6 @@ pub enum ProviderSpec {
     Provider(ModelProvider),
 }
 
-/// The specs a provider may name, and what each needs by default.
-const SPECS: [(&str, &str, &str); 1] = [("openai", "https://api.openai.com/v1", "OPENAI_API_KEY")];
-
-/// The plugin that speaks the standard APIs.
-pub const API_PLUGIN: &str = "model-http";
-
-/// Names a project may not give a provider: they belong to the providers
-/// Lighthouse will predefine.
-pub const RESERVED: [&str; 3] = ["local", "typesafe", "anthropic"];
-
 impl ProviderSpec {
     /// The provider this is, or why it cannot be.
     pub fn resolve(&self) -> Result<ModelProvider, String> {
@@ -154,20 +146,6 @@ impl ProviderSpec {
             }
         }
     }
-}
-
-/// The providers Lighthouse predefines: the standard APIs, at their own
-/// service. Declare a provider of the same name to override one.
-pub fn builtin(name: &str) -> Option<ModelProvider> {
-    SPECS.iter().find(|(spec, ..)| *spec == name)?;
-    ProviderSpec::Api(ApiProvider {
-        spec: name.to_owned(),
-        base_url: None,
-        key_env: None,
-        cost: None,
-    })
-    .resolve()
-    .ok()
 }
 
 /// The `models` table of a project: its bindings and limits, and its own
@@ -222,10 +200,6 @@ pub struct Evaluation {
     /// Default: `fn`.
     #[serde(default)]
     pub tolerate: Tolerate,
-}
-
-fn default_precision() -> f64 {
-    DEFAULT_PRECISION
 }
 
 impl Default for Evaluation {
@@ -316,4 +290,30 @@ impl ModelBinding {
     pub fn policy(&self, rule: &str) -> Evaluation {
         self.evaluation.get(rule).copied().unwrap_or_default()
     }
+}
+
+/// The providers Lighthouse predefines: the standard APIs, at their own
+/// service. Declare a provider of the same name to override one.
+pub fn builtin(name: &str) -> Option<ModelProvider> {
+    SPECS.iter().find(|(spec, ..)| *spec == name)?;
+    ProviderSpec::Api(ApiProvider {
+        spec: name.to_owned(),
+        base_url: None,
+        key_env: None,
+        cost: None,
+    })
+    .resolve()
+    .ok()
+}
+
+fn default_tasks() -> Vec<String> {
+    vec!["classification".to_owned()]
+}
+
+fn default_cost() -> f64 {
+    1.0
+}
+
+fn default_precision() -> f64 {
+    DEFAULT_PRECISION
 }

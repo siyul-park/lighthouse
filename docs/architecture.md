@@ -739,11 +739,11 @@ L5  cli, mcp                  -> session, report            (nothing else: no st
 L4  session                   -> every layer below          (composition root)
     report                    -> model, spec
 L3  store                     -> model, resource            (findings, judgments, the decision log)
-L2  engine                    -> plugin, spec, model, process   (analysis, fix orchestration, rule tester)
+L2  engine                    -> plugin, spec, model, process, protocol, cache   (analysis, fix orchestration, rule tester, models)
     checks                    -> plugin, spec, model, process, resource (declarative checks, metrics, order keys,
                                                                        the bundled registry derived from the catalog's packs)
     rpc                       -> plugin, spec, protocol, process, model, resource  (language plugins as processes)
-L1  plugin                    -> model                      (SPI and Registry)
+L1  plugin                    -> model, protocol            (SPI and Registry)
     spec                      -> model, resource            (decision kinds, Catalog, local layer, `spec::project`)
 L0  model, resource, protocol, process   (no workspace dependencies)
     cache                     -> model                      (the host result cache; rusqlite)
@@ -758,6 +758,27 @@ bundled catalog and adds those; plugin ids and rule ids are the packs' own.
 builds, project documents, catalog files). Each crate has one integration-test
 binary, `tests/it/main.rs` with a module per area, and no lib test binary unless
 it has unit tests.
+
+## Models
+
+A model is a plugin kind beside language providers: a process (`rpc`) that answers
+`lighthouse/classify` (and `lighthouse/train` when it learns), or any program (`command`).
+The wire types are one serde module of `lighthouse-protocol` with a JSON Schema
+(`protocol/schema/lighthouse-protocol-0.1.json`): `Model` (`name`, `tasks`, `cost`,
+`deterministic`, `abstains`, `trains`), `Subject`, `Answer {key, kind, confidence, reason}`,
+and, for training, an AIP-151 `Operation` whose `response` is `{artifact: "sha256:…", metrics}`.
+Errors are JSON-RPC errors with an AIP-193 status in `data.status`. No HTTP server is
+built: the same types could be served by one later.
+
+At run time a rule hands the subjects it suspects (`review`) to `Ctx::models`. The engine
+resolves the decision's bindings (Revision, rule, project default), asks each model in turn for
+the subjects the previous one left open, applies the budget and the report scope to models
+that cost, keeps every answer in the result cache under the model's reference and version,
+and returns for each subject a decision or the reason it stays open. Open subjects come back
+as diagnostics marked `review`; the engine reports them apart from findings
+(`Outcome::reviews`), and they never change the exit code. `Outcome::subjects` keeps what was put to the models when
+a command (`eval`, `learn train`) asks for it. Session owns the labels (`labels`), the metrics
+(`metrics`), `eval` and `learn`; the CLI only parses and prints.
 
 ## Frontends
 

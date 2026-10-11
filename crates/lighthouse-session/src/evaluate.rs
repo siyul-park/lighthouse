@@ -24,6 +24,8 @@ use crate::{
     metrics::{Metrics, Outcome, Rate, Truth, agreement, evaluate},
 };
 
+const CAVEAT: &str = "labelled positives come mostly from flagged findings, so recall is an upper bound; sample unflagged subjects for a person to label";
+
 /// A repository whose findings the labels are about.
 pub struct Repo {
     /// The name its baseline rows use (the `repo` column).
@@ -72,8 +74,6 @@ pub struct EvalReport {
     pub caveat: &'static str,
 }
 
-const CAVEAT: &str = "labelled positives come mostly from flagged findings, so recall is an upper bound; sample unflagged subjects for a person to label";
-
 /// What one run of a check found, by subject.
 #[derive(Default)]
 struct Found {
@@ -83,46 +83,6 @@ struct Found {
     by_place: BTreeMap<String, Outcome>,
     model_decided: usize,
     reviews: usize,
-}
-
-/// Runs the evaluation.
-pub fn eval(request: &EvalRequest) -> Result<EvalReport> {
-    let start = env::current_dir()?;
-    let config = request.config.as_ref().map(|c| start.join(c));
-    let repos: Vec<Repo> = if request.repos.is_empty() {
-        vec![Repo {
-            name: None,
-            dir: start.clone(),
-        }]
-    } else {
-        request
-            .repos
-            .iter()
-            .map(|r| Repo {
-                name: r.name.clone(),
-                dir: start.join(&r.dir),
-            })
-            .collect()
-    };
-    let baseline = request.baseline.as_ref().map(|b| start.join(b));
-    let candidate = request.candidate.as_ref().map(|c| start.join(c));
-    let mut gathered = Gathered::default();
-    let outcome = (|| -> Result<_> {
-        for repo in &repos {
-            env::set_current_dir(&repo.dir)?;
-            gathered.add(one(
-                request,
-                repo,
-                config.as_deref(),
-                baseline.as_deref(),
-                candidate.as_deref(),
-            )?);
-        }
-        Ok(())
-    })();
-    env::set_current_dir(&start)?;
-    outcome?;
-    gathered.finish(request, candidate.is_some())
 }
 
 /// What one repository gave.
@@ -194,6 +154,73 @@ impl Gathered {
     }
 }
 
+/// A candidate decision to run beside the project's.
+struct Setup {
+    files: BTreeMap<String, String>,
+}
+
+impl Setup {
+    /// The project's own decisions with the candidate file added; the id of
+    /// the candidate decision.
+    fn read(root: &Path, file: &Path) -> Result<(String, Self)> {
+        let text = std::fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
+        let name = file.file_name().map_or_else(
+            || "candidate.yaml".to_owned(),
+            |n| n.to_string_lossy().into_owned(),
+        );
+        let mut files = local_files(root)?.unwrap_or_default();
+        files.insert(name.clone(), text.clone());
+        let alone = BTreeMap::from([(name, text)]);
+        let catalog = Catalog::from_local(alone)?;
+        let id = catalog
+            .decisions()
+            .next()
+            .map(|d| d.id().to_owned())
+            .ok_or("the candidate file holds no decision")?;
+        Ok((id, Self { files }))
+    }
+}
+
+/// Runs the evaluation.
+pub fn eval(request: &EvalRequest) -> Result<EvalReport> {
+    let start = env::current_dir()?;
+    let config = request.config.as_ref().map(|c| start.join(c));
+    let repos: Vec<Repo> = if request.repos.is_empty() {
+        vec![Repo {
+            name: None,
+            dir: start.clone(),
+        }]
+    } else {
+        request
+            .repos
+            .iter()
+            .map(|r| Repo {
+                name: r.name.clone(),
+                dir: start.join(&r.dir),
+            })
+            .collect()
+    };
+    let baseline = request.baseline.as_ref().map(|b| start.join(b));
+    let candidate = request.candidate.as_ref().map(|c| start.join(c));
+    let mut gathered = Gathered::default();
+    let outcome = (|| -> Result<_> {
+        for repo in &repos {
+            env::set_current_dir(&repo.dir)?;
+            gathered.add(one(
+                request,
+                repo,
+                config.as_deref(),
+                baseline.as_deref(),
+                candidate.as_deref(),
+            )?);
+        }
+        Ok(())
+    })();
+    env::set_current_dir(&start)?;
+    outcome?;
+    gathered.finish(request, candidate.is_some())
+}
+
 fn one(
     request: &EvalRequest,
     repo: &Repo,
@@ -257,33 +284,6 @@ fn one(
         part.candidate_check = Some(id);
     }
     Ok(part)
-}
-
-/// A candidate decision to run beside the project's.
-struct Setup {
-    files: BTreeMap<String, String>,
-}
-
-impl Setup {
-    /// The project's own decisions with the candidate file added; the id of
-    /// the candidate decision.
-    fn read(root: &Path, file: &Path) -> Result<(String, Self)> {
-        let text = std::fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
-        let name = file.file_name().map_or_else(
-            || "candidate.yaml".to_owned(),
-            |n| n.to_string_lossy().into_owned(),
-        );
-        let mut files = local_files(root)?.unwrap_or_default();
-        files.insert(name.clone(), text.clone());
-        let alone = BTreeMap::from([(name, text)]);
-        let catalog = Catalog::from_local(alone)?;
-        let id = catalog
-            .decisions()
-            .next()
-            .map(|d| d.id().to_owned())
-            .ok_or("the candidate file holds no decision")?;
-        Ok((id, Self { files }))
-    }
 }
 
 fn run(

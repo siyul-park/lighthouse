@@ -6,6 +6,7 @@ mod docs;
 mod fixes;
 mod kinds;
 mod local;
+mod models;
 mod project;
 mod sources;
 mod validation;

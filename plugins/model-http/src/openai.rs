@@ -10,38 +10,42 @@ use serde_json::{Value, json};
 
 use crate::serve::{Endpoint, Prompt, Transport};
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn prompt() -> Prompt {
+        Prompt {
+            system: "s".to_owned(),
+            user: "u".to_owned(),
+            schema: json!({"type": "object"}),
+        }
+    }
+
+    #[test]
+    fn the_request_asks_for_the_schema_only_when_it_is_structured() {
+        let with = request("m", &prompt(), true);
+        assert_eq!(with["response_format"]["type"], "json_schema");
+        assert_eq!(with["response_format"]["json_schema"]["strict"], true);
+        assert_eq!(with["messages"][0]["role"], "system");
+        assert!(
+            request("m", &prompt(), false)
+                .get("response_format")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn the_text_is_the_first_choice_and_an_error_body_is_reported() {
+        let ok = json!({"choices": [{"message": {"content": "hi"}}]});
+        assert_eq!(text_of(&ok).unwrap(), "hi");
+        let err = json!({"error": {"message": "rate limited"}});
+        assert!(text_of(&err).unwrap_err().contains("rate limited"));
+    }
+}
+
 /// How long a request may take.
 const TIMEOUT: Duration = Duration::from_secs(120);
-
-/// The body of a Chat Completions request.
-pub fn request(model: &str, prompt: &Prompt, structured: bool) -> Value {
-    let mut body = json!({
-        "model": model,
-        "temperature": 0,
-        "messages": [
-            {"role": "system", "content": prompt.system},
-            {"role": "user", "content": prompt.user},
-        ],
-    });
-    if structured {
-        body["response_format"] = json!({
-            "type": "json_schema",
-            "json_schema": {"name": "classification", "strict": true, "schema": prompt.schema},
-        });
-    }
-    body
-}
-
-/// The text of the first choice of a response.
-pub fn text_of(response: &Value) -> Result<String, String> {
-    response["choices"][0]["message"]["content"]
-        .as_str()
-        .map(str::to_owned)
-        .ok_or_else(|| match response["error"]["message"].as_str() {
-            Some(message) => format!("the provider answered with an error: {message}"),
-            None => "the provider's response has no message".to_owned(),
-        })
-}
 
 /// Chat Completions over HTTP.
 pub struct Http;
@@ -88,36 +92,32 @@ impl Transport for Http {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn prompt() -> Prompt {
-        Prompt {
-            system: "s".to_owned(),
-            user: "u".to_owned(),
-            schema: json!({"type": "object"}),
-        }
+/// The body of a Chat Completions request.
+pub fn request(model: &str, prompt: &Prompt, structured: bool) -> Value {
+    let mut body = json!({
+        "model": model,
+        "temperature": 0,
+        "messages": [
+            {"role": "system", "content": prompt.system},
+            {"role": "user", "content": prompt.user},
+        ],
+    });
+    if structured {
+        body["response_format"] = json!({
+            "type": "json_schema",
+            "json_schema": {"name": "classification", "strict": true, "schema": prompt.schema},
+        });
     }
+    body
+}
 
-    #[test]
-    fn the_request_asks_for_the_schema_only_when_it_is_structured() {
-        let with = request("m", &prompt(), true);
-        assert_eq!(with["response_format"]["type"], "json_schema");
-        assert_eq!(with["response_format"]["json_schema"]["strict"], true);
-        assert_eq!(with["messages"][0]["role"], "system");
-        assert!(
-            request("m", &prompt(), false)
-                .get("response_format")
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn the_text_is_the_first_choice_and_an_error_body_is_reported() {
-        let ok = json!({"choices": [{"message": {"content": "hi"}}]});
-        assert_eq!(text_of(&ok).unwrap(), "hi");
-        let err = json!({"error": {"message": "rate limited"}});
-        assert!(text_of(&err).unwrap_err().contains("rate limited"));
-    }
+/// The text of the first choice of a response.
+pub fn text_of(response: &Value) -> Result<String, String> {
+    response["choices"][0]["message"]["content"]
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| match response["error"]["message"].as_str() {
+            Some(message) => format!("the provider answered with an error: {message}"),
+            None => "the provider's response has no message".to_owned(),
+        })
 }

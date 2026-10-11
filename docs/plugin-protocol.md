@@ -149,6 +149,38 @@ answered terminates with a non-zero code; input that closes after `shutdown` (a
 host that went away) is a clean stop for providers built on the Rust server loop,
 and tolerated by hosts.
 
+### Model methods
+
+A plugin may offer models instead of, or besides, languages. `initialize` then lists them in
+`models`, each a `Model` resource: `name` (the plugin's id), `tasks` (`classification`),
+`version` (changes whenever the answers for the same input may), `cost` (0 for a model that
+runs locally for free), `deterministic`, `abstains` and `trains`. The manifest lists the same
+ids in `provides.models`. The host keys behaviour off these capabilities, never off names.
+
+`lighthouse/classify` takes `{decision, subjects, options}` and answers
+`{results: [{key, kind, confidence, reason}], model: {id, version}}`.
+- `decision` is `{id, requirement, prompt, examples: [{kind: pass|fail, language, code, note}]}`;
+  the examples are the shots.
+- A subject is `{key, kind, id, language, file, text, context: {facts, neighbors}}`: its source by
+  extent, the facts the check computed, and a few callers and callees.
+- `options` are the `options` of the project's provider, with `model` set to the part of the
+  reference after the provider (`openrouter/qwen/qwen3-coder:free` sends `qwen/qwen3-coder:free`).
+- `kind` is `pass`, `fail` or `review` (the SARIF result kinds; `review` is an abstention).
+  `confidence` is from 0 to 1.
+- Every `key` asked MUST be answered exactly once. Any other answer is an error for the batch;
+  the subjects stay for review.
+
+`lighthouse/train` takes `{requestId?, decision, subjects, options, dir}`, where each subject is a
+classify subject with `label` (`pass` or `fail`), `weight` (0 to 1) and `source` (`example`,
+`baseline`, `person` or `model`), and `dir` is a directory the host owns for the artifact. It
+answers an AIP-151 `Operation {name, done, metadata?, error?, response?}`; over stdio it is
+`done`, and `response` is `{artifact: "sha256:<hex>", metrics}`. A retry with the same
+`requestId` MUST NOT start a second job.
+
+Errors are JSON-RPC errors with a canonical AIP-193 status in `data.status`
+(`INVALID_ARGUMENT`, `UNIMPLEMENTED`, `UNAVAILABLE`, `RESOURCE_EXHAUSTED`, ...). All of these
+types are in `lighthouse-protocol` and in the checked-in JSON Schema.
+
 ## Errors and failure handling
 
 A response MAY carry a JSON-RPC `error`: `-32700` malformed input (the plugin
@@ -544,3 +576,15 @@ Rust with a notice.
   expressions) with an example; `include!` has a notice of its own. Attribute macros and derives leave the item as
   written. A file whose header comment says `@generated` or `DO NOT EDIT` has
   `generated` set.
+
+## `model-http`
+
+Models behind the standard HTTP APIs, as a provider in `lighthouse.toml`
+(`spec = "openai"`, `baseUrl`, `keyEnv`; see [rule-pipeline.md](rule-pipeline.md#models)).
+The `openai` spec posts to `{baseUrl}/chat/completions` with `Authorization: Bearer <key>`,
+`temperature` 0, and `response_format` of type `json_schema` (strict) so that the answer has the
+shape of `lighthouse/classify`; a service that refuses `response_format` (HTTP 400, 404 or 422) is
+asked again without it and its text is parsed as strict JSON, in a fenced block too. Text that
+does not fit leaves the subject to review. The version of an answer is `<model>@<prompt version>`.
+The API shapes are those of OpenAI's Chat Completions as documented by OpenRouter
+(https://openrouter.ai/docs/quickstart, https://openrouter.ai/docs/features/structured-outputs).

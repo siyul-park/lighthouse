@@ -9,13 +9,14 @@ use std::{
 };
 
 use lighthouse_plugin::{
-    ClassifyParams, LabelSource, ResultKind, Subject, TrainParams, TrainResponse, TrainSubject,
+    Classifier, ClassifyParams, LabelSource, ResultKind, Subject, TrainParams, TrainResponse,
+    TrainSubject,
 };
 use serde::Serialize;
 
 use crate::{
     CheckRequest, ModelFlags, Result, Session, check,
-    labels::{Baseline, WEIGHT_EXAMPLE, WEIGHT_MODEL, collect},
+    labels::{Baseline, Label, WEIGHT_EXAMPLE, WEIGHT_MODEL, collect},
 };
 
 /// What to train.
@@ -82,26 +83,76 @@ pub fn train(request: &TrainRequest) -> Result<Trained> {
     });
     let labels = collect(&root, &decision, table.as_ref(), Some(&reference))?;
     let observed = &checked.outcome.subjects;
-    let mut subjects: Vec<TrainSubject> = Vec::new();
+    let decision_ref = lighthouse_checks::decision_ref(&decision);
+    let (mut subjects, seen) = labelled(&labels, observed);
+    let unresolved = labels.len() - subjects.len();
+    subjects.extend(examples(&decision_ref));
+    if let Some(teacher) = &request.from_model {
+        let unlabelled = observed
+            .iter()
+            .filter(|(fingerprint, _)| !seen.contains(*fingerprint))
+            .map(|(_, subject)| subject.clone())
+            .collect();
+        let teacher = checked.model(teacher)?;
+        subjects.extend(taught(teacher.as_ref(), &decision_ref, unlabelled)?);
+    }
+    let mut by_source = std::collections::BTreeMap::new();
+    for s in &subjects {
+        *by_source
+            .entry(format!("{:?}", s.source).to_lowercase())
+            .or_insert(0) += 1;
+    }
+    let dir = artifact_dir(&root, &reference, &request.decision);
+    fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    // The same labelled set for the same decision is the same request.
+    let request_id =
+        lighthouse_model::hash::short(&serde_json::to_string(&(&decision_ref.id, &subjects))?, 8);
+    let count = subjects.len();
+    let result = checked.model(&reference)?.train(&TrainParams {
+        request_id: Some(request_id),
+        decision: decision_ref,
+        subjects,
+        options: serde_json::Map::new(),
+        dir: dir.to_string_lossy().into_owned(),
+    })?;
+    Ok(Trained {
+        decision: request.decision.clone(),
+        model: reference,
+        subjects: count,
+        by_source,
+        unresolved,
+        result,
+    })
+}
+
+/// The labels whose subject the run saw, as training subjects, and the
+/// fingerprints they cover.
+fn labelled(
+    labels: &[Label],
+    observed: &std::collections::BTreeMap<String, Subject>,
+) -> (Vec<TrainSubject>, BTreeSet<String>) {
+    let mut subjects = Vec::new();
     let mut seen = BTreeSet::new();
-    let mut unresolved = 0;
-    for label in &labels {
-        match observed.get(&label.fingerprint) {
-            Some(subject) => {
-                seen.insert(label.fingerprint.clone());
-                subjects.push(TrainSubject {
-                    subject: subject.clone(),
-                    label: label.kind,
-                    weight: label.weight,
-                    source: label.source,
-                });
-            }
-            None => unresolved += 1,
+    for label in labels {
+        if let Some(subject) = observed.get(&label.fingerprint) {
+            seen.insert(label.fingerprint.clone());
+            subjects.push(TrainSubject {
+                subject: subject.clone(),
+                label: label.kind,
+                weight: label.weight,
+                source: label.source,
+            });
         }
     }
-    let decision_ref = lighthouse_checks::decision_ref(&decision);
-    for shot in &decision_ref.examples {
-        subjects.push(TrainSubject {
+    (subjects, seen)
+}
+
+/// The decision's examples as training subjects.
+fn examples(decision: &lighthouse_plugin::DecisionRef) -> Vec<TrainSubject> {
+    decision
+        .examples
+        .iter()
+        .map(|shot| TrainSubject {
             subject: Subject {
                 key: format!("example:{}", shot.note),
                 kind: "example".to_owned(),
@@ -114,59 +165,35 @@ pub fn train(request: &TrainRequest) -> Result<Trained> {
             label: shot.kind,
             weight: WEIGHT_EXAMPLE,
             source: LabelSource::Example,
-        });
-    }
-    if let Some(teacher) = &request.from_model {
-        let unlabelled: Vec<Subject> = observed
-            .iter()
-            .filter(|(fp, _)| !seen.contains(*fp))
-            .map(|(_, s)| s.clone())
-            .collect();
-        let teacher = checked.model(teacher)?;
-        let answers = teacher.classify(&ClassifyParams {
-            decision: decision_ref.clone(),
-            subjects: unlabelled.clone(),
-            options: serde_json::Map::new(),
-        })?;
-        for answer in answers.results {
-            let subject = unlabelled.iter().find(|s| s.key == answer.key);
-            if let (Some(subject), true) = (subject, answer.kind != ResultKind::Review) {
-                subjects.push(TrainSubject {
-                    subject: subject.clone(),
-                    label: answer.kind,
-                    weight: WEIGHT_MODEL,
-                    source: LabelSource::Model,
-                });
-            }
-        }
-    }
-    let mut by_source = std::collections::BTreeMap::new();
-    for s in &subjects {
-        *by_source
-            .entry(format!("{:?}", s.source).to_lowercase())
-            .or_insert(0) += 1;
-    }
-    let dir = artifact_dir(&root, &reference, &request.decision);
-    fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let model = checked.model(&reference)?;
-    // The same labelled set for the same decision is the same request.
-    let request_id =
-        lighthouse_model::hash::short(&serde_json::to_string(&(&decision_ref.id, &subjects))?, 8);
-    let result = model.train(&TrainParams {
-        request_id: Some(request_id),
-        decision: decision_ref,
-        subjects: subjects.clone(),
+        })
+        .collect()
+}
+
+/// What a teacher model decides about subjects nobody labelled.
+fn taught(
+    teacher: &dyn Classifier,
+    decision: &lighthouse_plugin::DecisionRef,
+    unlabelled: Vec<Subject>,
+) -> Result<Vec<TrainSubject>> {
+    let answers = teacher.classify(&ClassifyParams {
+        decision: decision.clone(),
+        subjects: unlabelled.clone(),
         options: serde_json::Map::new(),
-        dir: dir.to_string_lossy().into_owned(),
     })?;
-    Ok(Trained {
-        decision: request.decision.clone(),
-        model: reference,
-        subjects: subjects.len(),
-        by_source,
-        unresolved,
-        result,
-    })
+    Ok(answers
+        .results
+        .into_iter()
+        .filter(|answer| answer.kind != ResultKind::Review)
+        .filter_map(|answer| {
+            let subject = unlabelled.iter().find(|s| s.key == answer.key)?;
+            Some(TrainSubject {
+                subject: subject.clone(),
+                label: answer.kind,
+                weight: WEIGHT_MODEL,
+                source: LabelSource::Model,
+            })
+        })
+        .collect())
 }
 
 /// Where a model keeps what it learned for a decision:

@@ -13,10 +13,15 @@ use lighthouse_store::Records;
 use crate::Result;
 
 /// How much a label of each source is trusted.
+/// A person, a hand-reviewed baseline.
 pub const WEIGHT_PERSON: f64 = 1.0;
+/// An example the decision carries.
 pub const WEIGHT_EXAMPLE: f64 = 1.0;
+/// A coding agent.
 pub const WEIGHT_AGENT: f64 = 0.7;
+/// A model.
 pub const WEIGHT_MODEL: f64 = 0.5;
+/// A mining rule.
 pub const WEIGHT_MINING: f64 = 0.3;
 
 /// What is known about one subject.

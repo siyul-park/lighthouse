@@ -88,10 +88,23 @@ check:
 That is the whole check for a decision the model should evaluate:
 - **Question:** the decision's `requirement`. An optional `prompt` replaces it when the requirement reads badly as a question.
 - **Shots:** the decision's examples.
-- **Candidates:** the subjects in the decision's `scope`. An optional `select` (CEL) narrows them.
-- **Output:** fixed by the task, so there is nothing to configure.
+- **Candidates:** the subjects in the decision's `scope`. An optional `select` (CEL) narrows them. Only subjects of a file (a symbol, function, file, test, comment or event) can be judged: a model needs their source.
+- **Output:** fixed by the task, so there is nothing to configure: `kind` (`pass`, `fail` or `review`, the SARIF result kinds), a `confidence` and a one-sentence `reason`.
+- **`threshold`** (default 0.7): the least confidence at which an answer decides; below it the answer is an abstention.
 
-Models are one plugin kind, `Model`, with one of two tasks,
+`type: model` is the same runtime as a `cel` check whose `where` is `false` and whose `review` is the `select`. A `cel` check that can prove part of a decision says so in the same place:
+
+```yaml
+check:
+  type: cel
+  where: func.envy.count >= 3 && size(func.envy.others) == 0   # proven: a finding
+  review: func.envy.count >= 2                                  # suspected: ask the bound model
+  message: "{{ func.name }} depends on {{ func.envy.target_name }}'s members only"
+```
+
+`where` true is a `fail`; `where` false and `review` true (or a kind string) is an **abstention**; anything else is a `pass`. Abstained subjects fall through the bindings below like a model's own abstention. A `fail` from a model is a finding with the check's own message, evidence, identity and fix, plus `evidence.source: model`, the model, its version, its confidence and its reason. Its level is at most `warn`.
+
+Models are one plugin kind, `Model`, with tasks (`tasks` in the manifest),
 because each task has its own call shape:
 
 | Task | Call |
@@ -113,22 +126,50 @@ most specific layer to the least, and an **abstention falls through** to the nex
 | 1. Trained for this decision | a `Revision` record in `decisions.jsonl` naming the model id and version; the artifact is local and rebuildable | Lighthouse trains on request (`lighthouse learn train <decision>`); a person or agent approves the revision |
 | 2. Project, per decision | `[rules."<id>"] model = "…"` | the project |
 | 3. Project default | `[models] classification = "…"`, `embedding = "…"` | the project |
-| 4. Agent | a review task | always available; how `type: model` is served today |
+| 4. Agent | a review task | always available |
+
+A model is named `<provider>/<model>`, split at the first `/`. The standard API specs are built in (`openai`: OpenAI's API at api.openai.com/v1, key in `OPENAI_API_KEY`); any other service is a provider the project declares, with the same `rpc` or `command` union as checks and fixes. OpenRouter, Ollama, vLLM and LM Studio speak the `openai` spec:
 
 ```toml
 [models]
-classification = "my-llm"
-embedding = "embeddinggemma"
+classification = "openrouter/qwen/qwen3-coder:free"
+budget = 200                      # calls per run to models that cost; the rest stay `review`
+
+[models.providers.openrouter]     # a recipe: any OpenAI-compatible service
+spec = "openai"
+baseUrl = "https://openrouter.ai/api/v1"
+keyEnv = "OPENROUTER_API_KEY"
+
+[models.providers.ollama]         # a local one needs no key
+spec = "openai"
+baseUrl = "http://localhost:11434/v1"
+cost = 0
+
+[models.providers.claude]         # any program that reads a request and prints JSON
+type = "command"
+argv = ["claude", "-p", "--model", "{model}", "--output-format", "json"]
+stdin = "prompt"                  # `prompt` (text with the answer's shape) or `request` (JSON)
+pointer = "/result"               # RFC 6901 pointer to the answer inside an envelope
 
 [rules."design/naming-result"]
-model = "local-small"            # cheaper model for this decision only
+level = "info"
+model = "ollama/qwen3-coder:30b"  # a cheaper model for this decision only
+evaluation = { precision = 0.9, tolerate = "fn" }
 ```
+
+- The `spec` providers are served by the `model-http` plugin, which must be listed in `plugins`. A `command` provider reuses the command contract (no shell, its own process group, a time limit, a cap on output, project trust) and its program is part of what trust covers. An answer that does not fit the shape is an abstention.
+- The engine keys off the capabilities a model declares, never its name: `deterministic`, `abstains` and `cost`. The budget and the report scope (changed files, or everything with `--all-models`) limit only the models with a `cost` above 0; an answer is cached under the model, its version, the check's revision and the subject. A model that fails never makes a run incomplete (exit 3): its subjects stay for review.
+- Subjects nothing decided (an abstention, an unsure answer, no bound model, the budget spent, a failed model, `--no-models`) are reported as SARIF results of kind `review`, in the report scope only, and as review tasks in the agent output, grouped. They never change the exit code.
+- `--record-model-labels` records what models fail as `Judgment`s attributed to the model (`<provider>/<model>@<version>`), so that training can reproduce them from `decisions.jsonl`. A person's judgment still wins.
+- The layer-1 reader is in: a `Revision` record (`{decision, parent, meaningVersion, checkRevision, change, evaluation, approval, model}`, `approval` being PROV `wasAttributedTo`) binds its `model` to the decision before every other layer; one without a `model` unbinds it. Nothing writes it yet.
+- `lighthouse eval <decision>` measures the check against the labels: precision and FPR over conformance judgments, recall and FNR, the selector precision (the share of selected subjects not judged `notApplicable`, kept apart), coverage and abstention, and with `--check <file>` the agreement of a candidate check with the current one; every rate with a Wilson 95% interval. The policy it is judged by (`evaluation`: a precision target, default 0.9, and the error tolerated, default `fn`) is project configuration, not a decision option, because options are meaning and a policy change must not move the meaning version.
+- `lighthouse learn train <decision>` collects the same labels (only judgments under the current meaning version, weighted person 1.0, example 1.0, agent 0.7, model 0.5, mining 0.3, never the labels of the model being trained), builds the subjects exactly as `classify` does, and calls `lighthouse/train` on a model that learns. It writes nothing to `decisions.jsonl`.
 
 - A cheap model that abstains in front of an expensive one is just layer 1 or 2 over layer 3. It is not a separate mechanism.
 - If a layer-1 artifact is missing on a machine (a fresh clone, say), it is rebuilt from `decisions.jsonl`, or skipped with a notice and the case falls through.
 - `embedding` is bound only per project. Classifiers trained on embeddings record the embedding model in their version tuple, and changing the embedding model invalidates them.
 - The order is about **cost and confidence**, not quality. A trained classifier approximates a boundary that has no faithful predicate; it is not a weaker deterministic rule.
-- A deterministic check decides every subject it selects. Partial deterministic coverage of a model-evaluated decision is expressed by narrowing its `select`, not by stacking providers.
+- A deterministic check decides every subject it selects unless it abstains (`review`); abstained subjects fall through to the model bindings, like a model's abstention. Providers are never stacked.
 - Deterministic evaluation is the **preferred** endpoint when the boundary can be expressed faithfully. It is not a required one: some decisions stay model-evaluated for good.
 
 ## Evidence
@@ -286,8 +327,9 @@ judgment, meaning version and check revision.
 | Part | State |
 | --- | --- |
 | Decisions, packs, judgments, suppressions (reviewer-declared and in the code), `decisions.jsonl`, SQLite memory | done |
-| `check` providers (`builtin`, `cel`, `command`, `model` served by agent review tasks; `rpc` reserved), meaning version and check revision | done |
+| `check` providers (`builtin`, `cel` with `review`, `command`, `model`; `rpc` reserved), meaning version and check revision | done |
+| `classification` with layered bindings (Revision, rule, project, agent), `provider/model` references, `model-http` (`openai` spec) and `command` providers, answer cache, budget, SARIF `review` results, `eval`, the label collector, `learn train` plumbing | done |
 | Judgments and suppressions replace verdicts; naming alignment (`intent` → `context`, provenance fields) | done |
 | Judgments on subjects, sampling, evaluation, `Revision` records, log compaction, snapshot budgets | Phase 3 |
 | Evidence sources (grouping, mining) and revision proposals | Phase 4 (mining at `init` in Phase 5) |
-| `Model` kind: `embedding` (Phase 3), `classification` with layered bindings (Phase 7) | Phase 3, 7 |
+| `Model` kind: `embedding`, trained layer-1 models, `learn attach` | Phase 3, 7 |

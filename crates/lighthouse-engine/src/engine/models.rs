@@ -147,25 +147,6 @@ impl<'a> RunModels<'a> {
         found
     }
 
-    /// Whether a subject is asked of a model that costs: it lies in the files
-    /// the run reports, and the budget has some left.
-    fn spend(&self, subject: &Subject) -> Result<(), Open> {
-        let reported = self.scopes.is_none_or(|scopes| {
-            scopes
-                .iter()
-                .any(|scope| std::path::Path::new(&subject.file).starts_with(scope))
-        });
-        if !reported {
-            return Err(Open::Undecided);
-        }
-        self.budget
-            .try_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
-                left.checked_sub(1)
-            })
-            .map(drop)
-            .map_err(|_| Open::OverBudget)
-    }
-
     /// The answers of one model to the subjects at `at`, kept ones first.
     fn ask(
         &self,
@@ -234,6 +215,25 @@ impl<'a> RunModels<'a> {
                 .map(|&i| (i, Err(Open::Failed(e.to_string())), String::new()))
                 .collect(),
         }
+    }
+
+    /// Whether a subject is asked of a model that costs: it lies in the files
+    /// the run reports, and the budget has some left.
+    fn spend(&self, subject: &Subject) -> Result<(), Open> {
+        let reported = self.scopes.is_none_or(|scopes| {
+            scopes
+                .iter()
+                .any(|scope| std::path::Path::new(&subject.file).starts_with(scope))
+        });
+        if !reported {
+            return Err(Open::Undecided);
+        }
+        self.budget
+            .try_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
+                left.checked_sub(1)
+            })
+            .map(drop)
+            .map_err(|_| Open::OverBudget)
     }
 
     fn key(

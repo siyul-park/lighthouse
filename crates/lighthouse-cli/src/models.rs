@@ -45,14 +45,29 @@ pub enum LearnCommand {
 }
 
 /// The arguments of `eval`.
+#[derive(clap::Args)]
 pub struct Eval {
-    pub decision: String,
-    pub repos: Vec<String>,
-    pub baseline: Option<PathBuf>,
-    pub candidate: Option<PathBuf>,
-    pub no_models: bool,
-    pub json: bool,
-    pub config: Option<PathBuf>,
+    /// The decision, such as design/feature-envy.
+    decision: String,
+    /// A repository the labels are about, `name=dir`, where `name` is the
+    /// baseline's `repo` column. Repeatable; default: this project.
+    #[arg(long = "repo", value_name = "NAME=DIR")]
+    repos: Vec<String>,
+    /// A table of reviewed findings. Default:
+    /// baseline/precision/<decision>.tsv when it exists.
+    #[arg(long)]
+    baseline: Option<PathBuf>,
+    /// A decision file whose check is evaluated beside the current one.
+    #[arg(long = "check", value_name = "FILE")]
+    candidate: Option<PathBuf>,
+    /// Ask no model.
+    #[arg(long)]
+    no_models: bool,
+    /// Print the report as JSON.
+    #[arg(long)]
+    json: bool,
+    #[arg(long)]
+    config: Option<PathBuf>,
 }
 
 /// Evaluates the check of a decision and prints the numbers.
@@ -71,9 +86,9 @@ pub fn evaluate(args: Eval) -> Result<u8> {
         })
         .collect::<Result<Vec<_>>>()?;
     let report = eval(&EvalRequest {
-        decision: args.decision,
+        decision: args.decision.clone(),
         repos,
-        baseline: args.baseline,
+        baseline: args.baseline.or_else(|| default_baseline(&args.decision)),
         candidate: args.candidate,
         config: args.config,
         no_models: args.no_models,
@@ -177,4 +192,10 @@ fn show(rate: Option<Rate>) -> String {
             )
         },
     )
+}
+
+/// `baseline/precision/<pack>/<decision>.tsv` when it exists.
+fn default_baseline(decision: &str) -> Option<PathBuf> {
+    let path = PathBuf::from(format!("baseline/precision/{decision}.tsv"));
+    path.is_file().then_some(path)
 }

@@ -188,6 +188,39 @@ impl Review {
     }
 }
 
+/// The decision as a model is told about it: its requirement, what the check
+/// asks (the `prompt`, else the requirement) and its examples as shots.
+pub fn decision_ref(decision: &Decision) -> DecisionRef {
+    let prompt = decision.check.as_ref().and_then(|check| match &check.kind {
+        lighthouse_spec::CheckKind::Cel(cel) => cel.prompt.clone(),
+        lighthouse_spec::CheckKind::Model(model) => model.prompt.clone(),
+        _ => None,
+    });
+    DecisionRef {
+        id: decision.id().to_owned(),
+        requirement: decision.requirement.clone(),
+        prompt: prompt.unwrap_or_else(|| decision.requirement.clone()),
+        examples: decision
+            .examples
+            .iter()
+            .map(|example| Shot {
+                kind: match example.kind {
+                    ExampleKind::Invalid => ResultKind::Fail,
+                    ExampleKind::Valid => ResultKind::Pass,
+                },
+                language: example.language.clone(),
+                code: example
+                    .files
+                    .iter()
+                    .map(|f| format!("// {}\n{}", f.path, f.text()))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                note: example.name.clone(),
+            })
+            .collect(),
+    }
+}
+
 /// What a model's judgment makes of a candidate: the finding it confirms,
 /// with the model and its reason in the evidence; a review task for a subject
 /// left open; nothing for a `pass`.
@@ -268,37 +301,4 @@ fn lines(source: &str, span: Span) -> String {
 /// At most `max` characters of `text`.
 fn cut(text: &str, max: usize) -> String {
     text.chars().take(max).collect()
-}
-
-/// The decision as a model is told about it: its requirement, what the check
-/// asks (the `prompt`, else the requirement) and its examples as shots.
-pub fn decision_ref(decision: &Decision) -> DecisionRef {
-    let prompt = decision.check.as_ref().and_then(|check| match &check.kind {
-        lighthouse_spec::CheckKind::Cel(cel) => cel.prompt.clone(),
-        lighthouse_spec::CheckKind::Model(model) => model.prompt.clone(),
-        _ => None,
-    });
-    DecisionRef {
-        id: decision.id().to_owned(),
-        requirement: decision.requirement.clone(),
-        prompt: prompt.unwrap_or_else(|| decision.requirement.clone()),
-        examples: decision
-            .examples
-            .iter()
-            .map(|example| Shot {
-                kind: match example.kind {
-                    ExampleKind::Invalid => ResultKind::Fail,
-                    ExampleKind::Valid => ResultKind::Pass,
-                },
-                language: example.language.clone(),
-                code: example
-                    .files
-                    .iter()
-                    .map(|f| format!("// {}\n{}", f.path, f.text()))
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-                note: example.name.clone(),
-            })
-            .collect(),
-    }
 }
