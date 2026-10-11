@@ -34,8 +34,7 @@ formatter = { argv = ["rustfmt", "--edition", "2024", "--emit", "stdout"], stdin
 [spec.rules."design/layers"]
 level = "warn"
 options.layers = [
-  ["lighthouse_cli*/**", "lighthouse_mcp/**", "lang_rust*/**"],
-  ["lighthouse_surface/**"],
+  ["lighthouse_cli*/**", "lang_rust*/**"],
   ["lighthouse_session/**"],
   ["lighthouse_report/**", "lighthouse_store/**"],
   ["lighthouse_engine/**", "lighthouse_checks/**", "lighthouse_rpc/**"],

@@ -13,7 +13,7 @@ use lighthouse_session::{
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{
+use crate::surface::{
     Result,
     args::{DecisionListArgs, DecisionShowArgs, DecisionTestArgs},
     list::{Page, omitted_line, page},

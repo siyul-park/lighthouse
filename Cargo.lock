@@ -1468,7 +1468,7 @@ dependencies = [
  "insta",
  "jsonschema",
  "lighthouse-engine",
- "lighthouse-mcp",
+ "lighthouse-ml",
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-report",
@@ -1477,13 +1477,16 @@ dependencies = [
  "lighthouse-session",
  "lighthouse-spec",
  "lighthouse-store",
- "lighthouse-surface",
  "lighthouse-test-support",
  "predicates",
+ "rmcp",
+ "schemars",
+ "serde",
  "serde_json",
  "serde_norway",
  "sha2",
  "tempfile",
+ "tokio",
  "toml",
 ]
 
@@ -1506,17 +1509,6 @@ dependencies = [
  "tempfile",
  "thiserror",
  "toml",
-]
-
-[[package]]
-name = "lighthouse-mcp"
-version = "0.1.0"
-dependencies = [
- "lighthouse-session",
- "lighthouse-surface",
- "rmcp",
- "serde_json",
- "tokio",
 ]
 
 [[package]]
@@ -1675,25 +1667,6 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror",
-]
-
-[[package]]
-name = "lighthouse-surface"
-version = "0.1.0"
-dependencies = [
- "clap",
- "jsonschema",
- "lighthouse-ml",
- "lighthouse-model",
- "lighthouse-report",
- "lighthouse-resource",
- "lighthouse-session",
- "lighthouse-test-support",
- "schemars",
- "serde",
- "serde_json",
- "serde_norway",
- "tempfile",
 ]
 
 [[package]]

@@ -248,8 +248,8 @@ files they ran on), identity, store, report and the total.
 The model is that of Go's build cache, rustc's incremental compilation (Salsa's
 early cutoff), ESLint `--cache` and Bazel's action cache: a result is kept under
 a key of everything it was computed from, and any doubt is a miss. The cache is
-`.lighthouse/cache/` (derived, never committed); `lighthouse-cache` (L0: rusqlite
-and model) owns `results.db`, a WAL SQLite table of findings and notices by key,
+`.lighthouse/cache/` (derived, never committed); `lighthouse-engine` (its `cache`
+module, over rusqlite) owns `results.db`, a WAL SQLite table of findings and notices by key,
 capped at 256 MB (`LIGHTHOUSE_CACHE_LIMIT_MB`), least recently used pruned at the
 end of a run. `check --no-cache` (MCP `noCache`) bypasses it; `lighthouse cache
 clean` deletes the whole directory, providers' subdirectories included.
@@ -699,8 +699,9 @@ hook is the same record in the same log. Fixing is the same: `check --fix [--dry
 Hooks never fix.
 
 ```
- lighthouse-cli ── check [--fix], review, decision, spec, schema, docs, init --agent, hook claude-code
- lighthouse-mcp ── `lighthouse mcp`: tools and resources over stdio (rmcp)
+ lighthouse-cli ── surface: the operations both frontends share (check [--fix], review, decision, ...)
+                ├ cli: the terminal (docs, init --agent, hook claude-code, ...)
+                └ mcp: `lighthouse mcp`, tools and resources over stdio (rmcp)
         └── lighthouse-session ── engine, store, spec, checks, rpc, report
 ```
 

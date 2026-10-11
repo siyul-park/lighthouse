@@ -3,7 +3,7 @@
 use lighthouse_session::{AppliedRow, DeclinedRow, FixSelection, FixTargets, Fixed, Session};
 use serde::Serialize;
 
-use crate::{
+use crate::surface::{
     Result,
     args::FixArgs,
     reply::{Context, Output, Reply},

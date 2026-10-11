@@ -2,8 +2,8 @@
 
 use std::path::PathBuf;
 
+use lighthouse_cli::surface::{Caller, Context, Reply, reply::Output};
 use lighthouse_model::AgentKind;
-use lighthouse_surface::{Caller, Context, Reply, reply::Output};
 use serde_json::json;
 
 #[test]

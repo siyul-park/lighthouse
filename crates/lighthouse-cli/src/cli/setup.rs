@@ -8,7 +8,7 @@ use lighthouse_resource::write_atomic;
 use lighthouse_session::{SKILL_MARKER, Session, skill_for};
 use serde_json::{Value, json};
 
-use crate::Result;
+use crate::cli::Result;
 
 const MCP_FILE: &str = ".mcp.json";
 const SETTINGS_FILE: &str = ".claude/settings.json";

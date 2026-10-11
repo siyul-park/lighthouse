@@ -7,11 +7,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lighthouse_cli::surface::kinds;
 use lighthouse_session::{Session, config_file, schema_file, schemas, validate_paths};
-use lighthouse_surface::kinds;
 use serde_json::Value;
 
-use crate::Result;
+use crate::cli::Result;
 
 /// Where a project keeps its own decisions, for the default of validation.
 const LOCAL_DECISIONS: &str = ".lighthouse/decisions";

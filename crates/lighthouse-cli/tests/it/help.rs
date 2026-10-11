@@ -1,7 +1,7 @@
 //! The help of the loop commands: short summaries, and examples where the
 //! design asks for them.
 
-use lighthouse_surface::cli::{command, command_at, help};
+use lighthouse_cli::surface::cli::{command, command_at, help};
 
 /// The longest summary `--help` lists next to a command.
 const SHORT_HELP_LIMIT: usize = 80;

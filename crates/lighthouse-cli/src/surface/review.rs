@@ -10,7 +10,7 @@ use lighthouse_session::{
 };
 use serde_json::{Map, Value, json};
 
-use crate::{
+use crate::surface::{
     Result,
     args::{Detail, FingerprintArgs, ReviewListArgs, ReviewResolveArgs},
     list::{omitted_line, page},

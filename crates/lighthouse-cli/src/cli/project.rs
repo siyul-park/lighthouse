@@ -8,7 +8,7 @@ use std::{
 
 use lighthouse_session::{DEFAULT_CONFIG, FILE_NAME, Session};
 
-use crate::{Result, cli::Agent, setup};
+use crate::cli::{Result, command::Agent, setup};
 
 /// What `init` keeps out of version control: the store is a local cache of
 /// one machine's checks and reviews.

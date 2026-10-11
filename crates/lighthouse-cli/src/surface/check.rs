@@ -6,7 +6,7 @@ use lighthouse_report::{Briefing, Format, agent_report, render_with};
 use lighthouse_session::{CheckRequest, Checked, FailOn, ModelFlags, Session};
 use serde_json::{Value, json};
 
-use crate::{
+use crate::surface::{
     Result,
     args::{CheckArgs, Detail, FixArgs, FixOptions},
     fix,

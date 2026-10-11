@@ -4,15 +4,24 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
+[lib]
+test = false
+doctest = false
+
 [dependencies]
 clap.workspace = true
 clap_complete.workspace = true
-lighthouse-mcp.workspace = true
+lighthouse-ml.workspace = true
+lighthouse-model.workspace = true
 lighthouse-report.workspace = true
 lighthouse-resource.workspace = true
 lighthouse-session.workspace = true
-lighthouse-surface.workspace = true
+rmcp.workspace = true
+schemars.workspace = true
+serde.workspace = true
 serde_json.workspace = true
+serde_norway.workspace = true
+tokio.workspace = true
 
 [[bin]]
 name = "lighthouse"
@@ -21,7 +30,6 @@ test = false
 
 [dev-dependencies]
 lighthouse-engine.workspace = true
-lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-rpc.workspace = true
 lighthouse-spec.workspace = true

@@ -7,7 +7,7 @@ use lighthouse_session::{AgentKind, Attribution, attribute_to, person};
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::Result;
+use crate::surface::Result;
 
 /// The exit code of a run that found nothing wrong.
 pub const OK: u8 = 0;

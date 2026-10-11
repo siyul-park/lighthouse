@@ -1,14 +1,14 @@
 //! The command line: global flags, the agent-loop commands of
-//! `lighthouse-surface`, and the commands only a terminal needs (setup,
+//! `lighthouse_cli::surface`, and the commands only a terminal needs (setup,
 //! housekeeping, build).
 
 use std::path::PathBuf;
 
+use lighthouse_cli::surface::Action;
+
+use crate::cli::hook;
 use clap::{ColorChoice, Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
-use lighthouse_surface::Action;
-
-use crate::hook;
 
 /// Where `docs generate` writes the agent skill.
 pub const SKILL_PATH: &str = "skills/lighthouse/SKILL.md";

@@ -5,8 +5,8 @@
 use std::path::PathBuf;
 
 use clap::FromArgMatches;
+use lighthouse_cli::surface::{Action, Context, args::CheckArgs, cli::command, tools::tools};
 use lighthouse_session::Session;
-use lighthouse_surface::{Action, Context, args::CheckArgs, cli::command, tools::tools};
 use serde_json::{Value, json};
 
 /// A context over a project that enables the `core` pack, and its directory.
@@ -28,7 +28,7 @@ fn run() {
         .try_get_matches_from(["decision", "list", "--format", "json"])
         .unwrap();
     let action = Action::from_arg_matches(&matches).unwrap();
-    let reply = lighthouse_surface::run(&ctx, &action).unwrap();
+    let reply = lighthouse_cli::surface::run(&ctx, &action).unwrap();
     assert_eq!(reply.code, 0);
     assert!(reply.stdout.starts_with('{') && reply.stdout.ends_with("}\n"));
     assert_eq!(
@@ -41,14 +41,14 @@ fn run() {
 fn call() {
     let (_dir, ctx) = core_project();
     assert!(
-        lighthouse_surface::tools::call(&ctx, "nope", json!({})).is_none(),
+        lighthouse_cli::surface::tools::call(&ctx, "nope", json!({})).is_none(),
         "no such tool"
     );
-    let reply = lighthouse_surface::tools::call(&ctx, "decision_list", Value::Null)
+    let reply = lighthouse_cli::surface::tools::call(&ctx, "decision_list", Value::Null)
         .unwrap()
         .unwrap();
     assert!(reply.value.is_object(), "{reply:?}");
-    let error = lighthouse_surface::tools::call(&ctx, "decision_list", json!({"nope": 1}))
+    let error = lighthouse_cli::surface::tools::call(&ctx, "decision_list", json!({"nope": 1}))
         .unwrap()
         .unwrap_err();
     assert!(
@@ -59,7 +59,7 @@ fn call() {
 
 #[test]
 fn schema() {
-    let schema = lighthouse_surface::tools::schema::<CheckArgs>();
+    let schema = lighthouse_cli::surface::tools::schema::<CheckArgs>();
     assert_eq!(schema["type"], "object");
     assert_eq!(schema["additionalProperties"], false);
     assert!(schema.get("$schema").is_none() && schema.get("title").is_none());

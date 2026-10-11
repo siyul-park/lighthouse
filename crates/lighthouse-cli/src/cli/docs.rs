@@ -6,7 +6,7 @@ use std::{
 
 use lighthouse_session::{DOCS_DIR, Session, bundled_docs, skill_for};
 
-use crate::{Result, reference};
+use crate::cli::{Result, reference};
 
 pub fn generate(config: Option<&Path>, out: &Path, skill: &Path) -> Result<u8> {
     let docs = generated();

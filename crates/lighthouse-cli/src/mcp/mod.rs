@@ -1,5 +1,5 @@
 //! The MCP frontend: `lighthouse mcp` serves the commands of
-//! `lighthouse-surface` to a coding agent over stdio, as tools with JSON
+//! `crate::surface` to a coding agent over stdio, as tools with JSON
 //! schemas, and the catalog as resources. Every judgment recorded here is
 //! attributed to a `SoftwareAgent`.
 

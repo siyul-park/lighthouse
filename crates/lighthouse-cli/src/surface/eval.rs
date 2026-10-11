@@ -8,7 +8,7 @@ use lighthouse_ml::{
 };
 use lighthouse_session::{Session, eval};
 
-use crate::{
+use crate::surface::{
     Result,
     args::DecisionEvalArgs,
     reply::{Context, Output, Reply},

@@ -6,7 +6,7 @@ use lighthouse_ml::train::{TrainRequest, Trained};
 use lighthouse_session::{Session, bound_models, train};
 use serde::Serialize;
 
-use crate::{
+use crate::surface::{
     Result,
     args::{ModelListArgs, ModelTrainArgs},
     eval::repos_of,

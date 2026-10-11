@@ -6,11 +6,11 @@ use std::{fmt::Write, io};
 
 use clap::{Command, CommandFactory};
 use clap_complete::Shell;
+use lighthouse_cli::surface::tools::{self, Tool};
 use lighthouse_resource::schema_file;
-use lighthouse_surface::tools::{self, Tool};
 use serde_json::Value;
 
-use crate::cli::Cli;
+use crate::cli::command::Cli;
 
 /// The command reference, under the docs directory.
 pub const CLI_DOC: &str = "cli.md";

@@ -1,12 +1,12 @@
-//! The tool list: each tool of `lighthouse-surface` as the MCP describes it,
+//! The tool list: each tool of `crate::surface` as the MCP describes it,
 //! with its title and description from the command's help, its input schema
 //! from the command's arguments, its output schema from the kind it returns
 //! and its annotations from the table of tools.
 
 use std::sync::Arc;
 
+use crate::surface::{kinds, tools};
 use lighthouse_session::Session;
-use lighthouse_surface::{kinds, tools};
 use rmcp::model::{JsonObject, Tool, ToolAnnotations};
 use serde_json::Value;
 

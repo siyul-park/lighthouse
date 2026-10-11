@@ -28,7 +28,7 @@ use lighthouse_report::{Briefing, Detail, Format, render_with};
 use lighthouse_session::{CheckRequest, Checked, RunStatus, SKIPPED_DIRS, Session};
 use serde_json::{Value, json};
 
-use crate::Result;
+use crate::cli::Result;
 
 /// Findings printed back to the agent by an edit and by the end of a turn.
 const EDIT_LIMIT: usize = 5;

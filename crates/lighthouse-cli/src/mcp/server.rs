@@ -2,7 +2,7 @@
 //! operations. Each call runs on the blocking pool because checks start
 //! processes and open SQLite.
 
-use lighthouse_surface::{Context, tools};
+use crate::surface::{Context, tools};
 use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler,
     model::{
@@ -15,7 +15,7 @@ use rmcp::{
 };
 use serde_json::Value;
 
-use crate::{definitions, resources};
+use crate::mcp::{definitions, resources};
 
 /// The agent id when the client names itself by `clientInfo` and
 /// `LIGHTHOUSE_ATTRIBUTED_TO` says nothing.

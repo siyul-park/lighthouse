@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 
 use clap::Command;
-use lighthouse_surface::{
+use lighthouse_cli::surface::{
     cli::{command, command_at},
     kinds::kinds,
     tools::{camel_case, tools},

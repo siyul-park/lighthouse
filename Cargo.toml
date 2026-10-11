@@ -39,7 +39,6 @@ uuid = { version = "1", features = ["v4"] }
 
 lighthouse-checks = { path = "crates/lighthouse-checks" }
 lighthouse-engine = { path = "crates/lighthouse-engine" }
-lighthouse-mcp = { path = "crates/lighthouse-mcp" }
 lighthouse-ml = { path = "crates/lighthouse-ml" }
 lighthouse-model = { path = "crates/lighthouse-model" }
 lighthouse-plugin = { path = "crates/lighthouse-plugin" }
@@ -50,5 +49,4 @@ lighthouse-resource = { path = "crates/lighthouse-resource" }
 lighthouse-rpc = { path = "crates/lighthouse-rpc" }
 lighthouse-session = { path = "crates/lighthouse-session" }
 lighthouse-spec = { path = "crates/lighthouse-spec" }
-lighthouse-surface = { path = "crates/lighthouse-surface" }
 lighthouse-store = { path = "crates/lighthouse-store" }
