@@ -21,6 +21,10 @@ type resolver struct {
 	local *goModule
 	// interfaces caches, per package, the interfaces its code names.
 	interfaces sync.Map
+	// declared are the packages inside the project.
+	declared []*packages.Package
+	// wider are the interfaces a package satisfies without naming them.
+	wider wider
 }
 
 // goModule is the module of a go.mod: its import path and its directory
@@ -43,6 +47,9 @@ func newResolver(root string, roots []*packages.Package, local *goModule) *resol
 		if module, inside := moduleOf(root, p); module != "" && r.modules[p.PkgPath] == "" {
 			r.modules[p.PkgPath] = module
 			r.project[p.PkgPath] = inside
+			if inside {
+				r.declared = append(r.declared, p)
+			}
 		}
 	})
 	return r

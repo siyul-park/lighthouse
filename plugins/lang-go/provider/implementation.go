@@ -3,15 +3,18 @@ package provider
 import (
 	"go/ast"
 	"go/types"
+	"slices"
 	"sync"
 
 	"golang.org/x/tools/go/packages"
 )
 
-// interfaceSet is the interfaces the code of a package names, by method name.
+// interfaceSet is the interfaces the code of a package names, by method name,
+// and those it satisfies without naming them (see wider).
 type interfaceSet struct {
 	once     sync.Once
 	byMethod map[string][]*types.Interface
+	wider    map[string][]*types.Interface
 	// embedders are the types of the package that embed a type, by the
 	// embedded type: its methods are promoted into them.
 	embedders map[*types.TypeName][]*types.Named
@@ -21,9 +24,10 @@ type interfaceSet struct {
 // signature an interface dictates is an implementation; a function without a
 // receiver that returns a type of its package builds it.
 
-// implementation reports whether the method satisfies an interface its
-// package names: some candidate interface has a method of the same name and
-// the receiver type (or a pointer to it) implements the interface.
+// implementation reports whether the method satisfies an interface of the
+// project or of a package the code can import, named by the package or not:
+// some candidate interface has a method of the same name and the receiver
+// type (or a pointer to it) implements the interface.
 func (u *unit) implementation(d *ast.FuncDecl) bool {
 	if d.Recv == nil {
 		return false
@@ -44,7 +48,7 @@ func (u *unit) implementation(d *ast.FuncDecl) bool {
 		return true
 	}
 	set := u.res.interfacesOf(u.pkg)
-	for _, iface := range set.byMethod[d.Name.Name] {
+	for _, iface := range slices.Concat(set.byMethod[d.Name.Name], set.wider[d.Name.Name]) {
 		if satisfies(named, iface) {
 			return true
 		}
@@ -102,6 +106,7 @@ func (r *resolver) interfacesOf(pkg *packages.Package) *interfaceSet {
 	set := cached.(*interfaceSet)
 	set.once.Do(func() {
 		set.byMethod = collectInterfaces(pkg)
+		set.wider = r.widerInterfaces(pkg)
 		set.embedders = collectEmbedders(pkg)
 	})
 	return set
