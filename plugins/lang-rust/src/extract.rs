@@ -17,9 +17,10 @@ use crate::{
         Generics, Index, ModId, Ns, Res, Sym, TyCx, ViaTrait, generics_of, is_test_fn, symbol_id,
     },
     signature::signature_of,
+    spans::{extent_of, span_of},
+    syntax::{built_type, constructs, count_tokens, doc_of, signature_counts},
     testcase,
     tree::{SourceFile, Vis, vis},
-    util::{built_type, constructs, count_tokens, doc_of, extent_of, signature_counts, span_of},
 };
 
 /// What macros kept from the analysis in one file.

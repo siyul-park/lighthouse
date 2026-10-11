@@ -12,9 +12,10 @@ mod macros;
 mod names;
 mod provider;
 mod signature;
+mod spans;
+mod syntax;
 mod testcase;
 mod tree;
-mod util;
 
 use std::{
     io::{self, BufReader},

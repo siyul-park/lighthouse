@@ -9,8 +9,9 @@ use super::{Extractor, Owner, Shape, cap, declared};
 use crate::{
     names::{ModId, symbol_id},
     signature::{field_type, optional_field, serde_default},
+    spans::{extent_of, span_of},
+    syntax::doc_of,
     tree::vis,
-    util::{doc_of, extent_of, span_of},
 };
 
 impl Extractor<'_> {

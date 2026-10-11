@@ -54,7 +54,7 @@ pub fn style(attrs: &[Attribute], body: &Block) -> TestStyle {
 }
 
 fn declared_cases(attrs: &[Attribute]) -> usize {
-    let paths: Vec<String> = attrs.iter().map(crate::util::attr_path).collect();
+    let paths: Vec<String> = attrs.iter().map(crate::syntax::attr_path).collect();
     let count = |names: &[&str]| paths.iter().filter(|p| names.contains(&p.as_str())).count();
     let rstest = count(&["rstest", "rstest::rstest"]) > 0;
     let rstest_cases = if rstest {
