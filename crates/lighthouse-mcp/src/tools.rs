@@ -126,6 +126,7 @@ fn check(args: CheckArgs) -> Outcome {
         rules: args.rules,
         store: true,
         cache: !args.no_cache,
+        models: lighthouse_session::ModelFlags::default(),
     };
     let checked = lighthouse_session::check(session, &request).map_err(fail)?;
     let outcome = &checked.outcome;

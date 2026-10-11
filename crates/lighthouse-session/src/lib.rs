@@ -24,7 +24,7 @@ use std::error::Error;
 
 pub use authoring::{Authored, create_decision, update_decision};
 pub use cache::{LIMIT_VAR, cache_dir, clean_cache};
-pub use check::{CheckRequest, Checked, RunStatus, Summary, check};
+pub use check::{CheckRequest, Checked, ModelFlags, RunStatus, Summary, check};
 pub use decisions::{
     DecisionRow, DecisionTest, active_decisions, bundled_decision_rows, catalog_index,
     decision_rows, decision_text, explain, explain_bundled, test_decisions,

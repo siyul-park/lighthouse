@@ -10,6 +10,7 @@ mod fix;
 mod internal;
 mod judgments;
 mod mcp;
+mod models;
 mod preview;
 mod review;
 mod sarif_places;
