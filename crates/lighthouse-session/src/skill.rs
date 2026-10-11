@@ -25,7 +25,7 @@ pub fn skill_for(session: &Session) -> Result<String> {
 /// The text of `skills/lighthouse/SKILL.md`: what Lighthouse is for, the loop
 /// an agent follows, how to look decisions up, and a digest (id, title, authored severity)
 /// of the decisions `active` names. The decision text itself is never copied:
-/// the agent reads it from the MCP resources or `lighthouse explain`.
+/// the agent reads it from the MCP resources or `lighthouse decision show`.
 pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
     let mut out = String::from(HEAD);
     let mut by_pack: Vec<(&str, Vec<String>)> = Vec::new();

@@ -62,7 +62,7 @@ spec:
 
 
 def run(path, cfg, cache):
-    args = [binary, "check", ".", "--format", "json", "--timings", "--no-store", "--config", cfg]
+    args = [binary, "check", ".", "--format", "json", "--timings", "--no-store", "--limit", "1000000", "--config", cfg]
     if not cache:
         args.append("--no-cache")
     done = subprocess.run(args, cwd=path, capture_output=True)

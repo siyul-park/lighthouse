@@ -58,10 +58,10 @@ fix:
   adds `Bash(lighthouse trust:*)` to the agent's permission deny list); it records the
   canonical root with a digest of `lighthouse.toml`, the rule files and the content of any
   command program that lies inside the project (a program named by a relative path is the
-  project's own, run from the project root) in `~/.lighthouse/trust.toml`. Programs outside
+  project's own, run from the project root) in `$XDG_CONFIG_HOME/lighthouse/trust.toml` (default `~/.config/lighthouse/trust.toml`). Programs outside
   the project (`gofmt`, `rustfmt`) are trusted by command line only. Every field of the digest
   is tagged and length-prefixed, and it is computed from the very bytes the configuration
-  and rules were loaded from. Authoring candidates (`decision_create`) are never trusted (`$LIGHTHOUSE_HOME` replaces `~/.lighthouse`); any change to
+  and rules were loaded from. Authoring candidates (`decision_create`) are never trusted; any change to
   either withdraws it, and `lighthouse trust --revoke` removes it. `LIGHTHOUSE_TRUST=1`
   trusts every project, for CI. The repository cannot grant trust itself: a `[fix]` table
   in `lighthouse.toml` is not accepted. Without trust a command fix is declined with a

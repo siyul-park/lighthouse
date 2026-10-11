@@ -8,7 +8,7 @@ without changing the decision model.
 ## Contract
 
 A learned part must:
-- be trained only from recorded evidence of its decision, by an explicit `lighthouse learn train <decision>`;
+- be trained only from recorded evidence of its decision, by an explicit `lighthouse model train <decision>`;
 - beat the baselines on held-out data;
 - output calibrated probabilities and abstain between two thresholds; an abstained case falls through to the next binding (the project model, then an agent), and is reported as SARIF `review` until one answers;
 - be reproducible from a recorded tuple:

@@ -408,7 +408,8 @@ starting it; only `languages` is checked today.
 
 Only plugins listed in `lighthouse.toml` are started. Manifests that do not parse are ignored (with a notice) unless the directory
 is named after a listed id. A bare id is looked up in
-`./.lighthouse/plugins/*/`, `~/.lighthouse/plugins/*/` and `<executable
+`./.lighthouse/plugins/*/`, `$XDG_DATA_HOME/lighthouse/plugins/*/` (default
+`~/.local/share/lighthouse/plugins/*/`) and `<executable
 dir>/plugins/*/`; an entry `{ id = "lang-go", path = "plugins/lang-go",
 timeout = "120s" }` names the directory itself (relative to the config) and is how
 a development checkout is used. The same id in more than one place, an in-process

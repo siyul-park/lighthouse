@@ -18,18 +18,19 @@ judged is remembered with its reason and is not raised again.
 ## The loop
 
 1. **Check** the files you changed: MCP tool `check` (with `changed: true`), or
-   `lighthouse check --changed --format agent`.
+   `lighthouse check --changed --format json`.
 2. **Understand** the findings: they come grouped by decision, then by file.
    A group says once what its decision requires and what the code should look
    like (`expected`), plus the evidence all its findings share; a finding is
    `[line:col, message, fingerprint prefix]` with the evidence that sets it
    apart as an optional fourth element. For more (the context, every example),
    read the decision: MCP resource `lighthouse://decisions/<id>`, tool
-   `explain`, or `lighthouse explain <id>`. `detail: "full"` (`--detail full`)
+   `decision_show`, or `lighthouse decision show <id>`. `detail: "full"` (`--detail full`)
    returns one self-contained record per finding instead.
 3. **Fix** the code, then **recheck**. Findings of a rule marked `fixable` in
-   the digest below can be fixed for you: MCP tool `fix` (by `fingerprints` or
-   `paths`, `dryRun` first to see the diff), or `lighthouse check --fix`.
+   the digest below can be fixed for you: MCP tool `fix` (by `fingerprints`,
+   `paths` or `decision`, `dryRun` first to see the diff), or
+   `lighthouse check --fix`.
    A fixable finding carries its fix as a unified diff (`fix`) and its group an
    `apply` command: prefer `check --fix` for safe fixes, and read the diff of a
    suggested one before applying it.
@@ -37,7 +38,7 @@ judged is remembered with its reason and is not raised again.
    applies suggested ones. Every fix is verified and rolled back if it makes
    the file worse. Review the diff like any other change. A run that reports `incomplete` did not
    check everything: it is not a pass.
-4. **Judge** the findings that ask for review (`review_tasks`: those of
+4. **Judge** the findings that ask for review (`review_list`: those of
    decisions that authored `warn` or `info`, whatever level the configuration
    reports them at): fix them, or record a judgment with `review_resolve`.
    `fail` means the finding is right; add `suppress: {justification}` to leave
@@ -46,7 +47,8 @@ judged is remembered with its reason and is not raised again.
    it. Give a `reason` that says why, written for the next reader. Pass `seen`
    (the `seen` evidence of a review task) so a judgment is refused if the
    finding changed under you. A fingerprint prefix as shown names the finding;
-   an ambiguous one is refused.
+   an ambiguous or shorter than 7 characters one is refused. `review_show`
+   reads one finding in full.
 
 ## Rules of conduct
 

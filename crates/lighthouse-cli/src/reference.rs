@@ -116,9 +116,14 @@ fn command_line(tool: &Tool) -> String {
 
 fn section(tool: &Tool, out: &mut String) {
     let (title, description) = tool.help();
+    let text = if description.starts_with(title.trim_end_matches('.')) {
+        description
+    } else {
+        format!("{title}\n\n{description}")
+    };
     let _ = write!(
         out,
-        "\n## {name}\n\n{title}\n\n{description}\n\nResult: [{kind}](../schema/{file}).\n",
+        "\n## {name}\n\n{text}\n\nResult: [{kind}](../schema/{file}).\n",
         name = tool.name,
         kind = tool.kind,
         file = schema_file(tool.kind),
@@ -159,6 +164,9 @@ fn kind_of(property: &Value) -> String {
             .filter_map(Value::as_str)
             .collect::<Vec<_>>()
             .join(" \\| ");
+    }
+    if let Some(value) = property["const"].as_str() {
+        return value.to_owned();
     }
     if let Some(variants) = property["anyOf"]
         .as_array()

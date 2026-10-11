@@ -37,7 +37,7 @@ languages and editors are added.
 | Analysis | metrics analyzers (complexity, nesting, coupling), first design rules |
 | Language providers | JSON-RPC protocol; Go provider in Go (`go/packages`, `go/types`); Rust provider; conformance suite |
 | Self-enforcement | layout, test and declarative (CEL) rules; Lighthouse lints itself in `make lint` |
-| Decision memory | SQLite history, committed `decisions.jsonl`, `lighthouse-disable-next-line` directives, expiring judgments, evidence snapshots, `--format agent` |
+| Decision memory | SQLite history, committed `decisions.jsonl`, `lighthouse-disable-next-line` directives, expiring judgments, evidence snapshots, `--format json` |
 | Agent loop | MCP server, Claude Code hooks, generated skill, `init --agent`; compact grouped agent output with fix previews |
 | Autofix | one canonical fix per decision (`ops`, `command`), in-memory verification, rollback, atomic writes, user-level trust |
 | Resource model | `apiVersion`/`kind`/`metadata`/`spec` for every spec, JSON Schema per kind, `spec validate`, SARIF, `pattern` renamed to `decision`, severity `error`/`warn`/`info` |

@@ -129,7 +129,7 @@ a warning fails only with `--strict` or past `--max-warnings N`; `info` never
 fails; an incomplete analysis is `3`.
 
 Needing review follows the *authored* severity: `error` is definitive (no review, only a directive in the code suppresses it, its fix may be `safe`); `warn` and `info` are review tasks whatever level the configuration reports them at, until a judgment stands for them (`needs_review`: a non-error authored severity and no judgment).
-`review list`, the MCP `review_tasks` tool, the agent format and the hooks select by
+`review list`, the MCP `review_list` tool, the JSON output and the hooks select by
 that property. A rule that has no decision is treated by its severity.
 
 Hiding follows the same property, not the severity: a judgment can hide a finding of a
@@ -315,7 +315,7 @@ A run updates `findings` like this:
   marked resolved. `--changed` and `--diff` include deleted files in the scope, so what a
   deleted file had is resolved;
 - nothing is resolved outside the report scope (`check src/a.rs`, `--changed`, `--diff`
-  narrow it), for rules that did not run (`--rules`), or under a directory that holds a
+  narrow it), for rules that did not run (`--decision`), or under a directory that holds a
   file the run could not analyze. A gap that cannot be placed (a language provider that
   failed) stops all resolving. "Not checked" never means "fixed";
 - an open finding of a rule the configuration no longer enables becomes `inactive`: it
@@ -378,11 +378,11 @@ judgment; a suppression goes with a `fail` only. A directive in the code is the
 | `pass` | | a false positive; hidden while valid |
 | `notApplicable` | | the decision does not apply; hidden while valid, flagged to narrow the decision |
 
-The reviewer is `--reviewer-kind` / `--reviewer-id`, else `LIGHTHOUSE_REVIEWER_KIND` /
-`LIGHTHOUSE_REVIEWER`, else a person and `$USER`. The kind is the PROV class (`Person` or
-`SoftwareAgent`; `human` and `agent` are read too). Tools that run reviews for an agent
-(hooks, an MCP server) set both variables, so `SoftwareAgent` is recorded without the
-agent having to remember it. `review resolve --seen <last seen>` refuses the judgment when
+The reviewer is `--attributed-to person|agent[:<id>]`, else `LIGHTHOUSE_ATTRIBUTED_TO`,
+else a person and the name configured for the repository or `$USER`. `person` and `agent`
+are the PROV classes `Person` and `SoftwareAgent`; another word is refused. Tools that
+run reviews for an agent (hooks, an MCP server) set the variable, so `SoftwareAgent` is
+recorded without the agent having to remember it. `review resolve --seen <last seen>` refuses the judgment when
 the finding has been seen again since the reviewer read it, and the finding is read in the
 same transaction that records the judgment. `review resolve` works without a readable
 catalog: it warns, and the versions are left out.
@@ -470,7 +470,7 @@ SARIF lists the suppressed finding with it. The reason is required on every form
 directive without one is ignored and reported by the error rule
 `core/allow-reason`. A directive or range whose rule no longer fires there, or is not
 enabled, an `lighthouse-enable` that closes nothing and a directive that names no id are
-reported by `core/no-unused-allow` so annotations do not rot (when `--rules` leaves the
+reported by `core/no-unused-allow` so annotations do not rot (when `--decision` leaves the
 annotated rule out of the run, nothing is said). A second `lighthouse-disable` of an id
 inside its open range is redundant and reported the same way. Both rules belong to
 the `core` pack, so `core/recommended` enables them; the engine evaluates them because
@@ -481,13 +481,13 @@ of several adjacent line comments may hold several directives, one per line.
 
 ### Agent output
 
-`check --format agent` groups findings by decision, then by file: a header with the
-requirement and the expected structure once, then one line per finding (location,
-message, fingerprint prefix of at least 7 characters); `--format agent-json` is the same
-groups as one JSON object. See "Compact output" in [agents.md](agents.md). `--detail full`
-restores the per-finding shape described below: one block per finding that an agent can
-act on without another lookup, as JSON lines (`finding`, `incomplete`, `truncated` and
-`summary` records tagged by `type`) for `agent-json`:
+`check --format json` groups findings by decision, then by file: a decision's
+requirement and the expected structure once, then one entry per finding (location,
+message, fingerprint prefix of at least 7 characters), as one JSON document that
+validates against the `CheckReport` schema. See "Compact output" in [agents.md](agents.md).
+`--detail full` gives one self-contained record per finding, which an agent can act on
+without another lookup. The hooks print the same findings as one text block per finding
+for the agent to read:
 
 ```text
 design/no-panic  info (heuristic)  src/lib.rs:2:7
@@ -499,7 +499,7 @@ design/no-panic  info (heuristic)  src/lib.rs:2:7
   expected:    valid rust example `rust-result` (src/lib.rs), canonical
                  pub fn parse(text: &str) -> Result<u32, std::num::ParseIntError> { ... }
   fingerprint: 395d1985afe8
-  resolve:     lighthouse review resolve 395d1985afe8 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent
+  resolve:     lighthouse review resolve 395d1985afe8 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>
 ```
 
 The requirement and context come from the catalog. The expected structure is a valid
@@ -530,7 +530,7 @@ resolution is deterministic, `finding.rule` to `decision.fix` to the fixer regis
 under the decision's id; there is no list of competing fixers and no fallback chain.
 `--fixer <id>` is an explicit override that must name a registered fixer; it replaces the
 decision's fixer for the selected findings, whose proposals count as `suggested`, and it
-is the way to use a fixer for a rule that has no `fix:`. Documentation, `explain` and the
+is the way to use a fixer for a rule that has no `fix:`. Documentation, `decision show` and the
 skill show `fixable: safe|suggested`.
 
 **Edit operations, not a round-trip IR.** Fixers do not rewrite source and there is no
@@ -583,8 +583,8 @@ By default only safe fixes of mechanical rules are applied; `--unsafe-fixes` (MC
 `unsafeFixes`) also applies suggested ones. Eligibility is decided from the decision before
 a fixer is asked, so a suggested fix, a command included, never even runs without
 `--unsafe-fixes`; the finding is reported as left alone, with the reason. `--fixer <id>`
-(CLI only, not offered by MCP) names a registered fixer for the selected findings and
-needs `--rules` or fingerprints.
+(the `fixer` argument of the `fix` tool) names a registered fixer for the selected findings and
+needs `--decision` or fingerprints.
 
 **The orchestrator** (`lighthouse-engine`, the only component that writes) runs rounds,
 at most five:
@@ -684,7 +684,7 @@ it has unit tests.
 ## Models
 
 A model is a plugin kind beside language providers, behind published API bodies and layered
-bindings. The runtime, the wire, `model-http`, labels, datasets, `eval` and `learn` are in
+bindings. The runtime, the wire, `model-http`, labels, datasets, `decision eval` and `model train` are in
 [models.md](models.md).
 
 ## Frontends

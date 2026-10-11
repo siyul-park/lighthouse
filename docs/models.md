@@ -24,7 +24,7 @@ stays open. The host owns the band: `noul` at or above `UPPER` (0.9) fails the s
 confidence `max(p, 1 - p)`; anything else is left to review. Open subjects come back as
 diagnostics marked `review`; the engine reports them apart from findings (`Outcome::reviews`), and
 they never change the exit code. `Outcome::subjects` keeps what was put to the models when a
-command (`eval`, `learn train`) asks for it.
+command (`decision eval`, `model train`) asks for it.
 
 ## `model-http`
 
@@ -74,16 +74,16 @@ print(json.dumps({"model": request["model"], "answers": answers}))
 Anthropic's and TypeSafe's Python SDKs fit the same way: read the body, call the SDK, print
 `{answers: {<decision id>: {noul}}}`.
 
-## Labels, datasets, `eval` and `learn`
+## Labels, datasets, `decision eval` and `model train`
 
-Session owns the labels (`labels`), the metrics (`metrics`), `eval` and `learn`; the CLI only
-parses and prints. Both `eval` and `learn train` collect labels the same way: a subject has one
+Session owns the labels (`labels`), the metrics (`metrics`), `decision eval` and `model train`; the CLI only
+parses and prints. Both `decision eval` and `model train` collect labels the same way: a subject has one
 label, the strongest source winning (person, a reviewed table, a coding agent, a model; the latest
 within one source). A judgment's source comes from its PROV attribution: a person, or a software
 agent by the role it had (`hadRole`, agent or model). The decision's examples are subjects too,
 run through the project's own configuration. `eval` grades only on weight 1.0 labels.
 
-`learn train` writes the training lines (OpenAI's chat fine-tuning format, canonical JSON per
+`model train` writes the training lines (OpenAI's chat fine-tuning format, canonical JSON per
 line, with `weight`, `key` and `attribution` beside the messages) to
 `.lighthouse/datasets/sha256/<hex>.jsonl`, named by the digest of the file, and hands the job
 request, with `training_file = "sha256:<hex>"` and the dataset directory in `metadata`, to the

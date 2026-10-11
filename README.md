@@ -134,8 +134,8 @@ make plugins                                  # language plugins into target/plu
 
 lighthouse init                               # writes lighthouse.toml
 lighthouse check                              # analyze the project
-lighthouse check --changed --format agent     # what the working tree changed, for an agent
-lighthouse explain design/no-single-use-wrapper  # context, requirement, examples
+lighthouse check --changed --format json      # what the working tree changed, for an agent
+lighthouse decision show design/no-single-use-wrapper  # context, requirement, examples
 lighthouse review list                        # findings Lighthouse remembers
 lighthouse decision test                      # run every decision's examples
 ```
