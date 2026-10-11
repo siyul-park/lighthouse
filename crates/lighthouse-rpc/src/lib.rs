@@ -82,13 +82,12 @@ pub fn descriptors() -> Vec<lighthouse_resource::Descriptor> {
 }
 
 /// Where plugin manifests are searched: `<root>/.lighthouse/plugins`,
-/// `~/.lighthouse/plugins` and `plugins` next to the executable. A
+/// `$XDG_DATA_HOME/lighthouse/plugins` (default `~/.local/share/lighthouse/plugins`)
+/// and `plugins` next to the executable. A
 /// development checkout is reached only through an explicit `path`.
 pub fn search_dirs(root: &Path) -> Vec<PathBuf> {
     let mut dirs = vec![root.join(".lighthouse/plugins")];
-    if let Some(home) = env::var_os("HOME") {
-        dirs.push(PathBuf::from(home).join(".lighthouse/plugins"));
-    }
+    dirs.extend(lighthouse_resource::xdg_plugins());
     if let Some(dir) = env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(|p| p.join("plugins")))

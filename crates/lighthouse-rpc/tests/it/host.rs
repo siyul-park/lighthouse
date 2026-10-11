@@ -718,12 +718,12 @@ fn only_listed_plugins_start_and_unknown_ids_are_left_to_the_engine() {
 }
 
 #[test]
-fn search_directories_cover_the_project_home_and_the_executable() {
+fn search_directories_cover_the_project_the_xdg_data_home_and_the_executable() {
     let dirs = search_dirs(Path::new("/work/project"));
     assert_eq!(dirs[0], Path::new("/work/project/.lighthouse/plugins"));
     assert!(
         dirs.iter()
-            .any(|d| d.ends_with(".lighthouse/plugins") && d != &dirs[0])
+            .any(|d| d.ends_with("lighthouse/plugins") && d != &dirs[0])
     );
     assert!(dirs.last().unwrap().ends_with("plugins"));
 }

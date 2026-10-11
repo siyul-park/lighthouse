@@ -21,8 +21,6 @@ use crate::Result;
 
 /// `1` in this variable trusts every project, for CI.
 pub const TRUST_VAR: &str = "LIGHTHOUSE_TRUST";
-/// Where user-level state lives, instead of `~/.lighthouse`.
-const HOME_VAR: &str = "LIGHTHOUSE_HOME";
 const FILE: &str = "trust.toml";
 
 #[derive(serde::Serialize, serde::Deserialize, Default)]
@@ -191,10 +189,7 @@ fn write(known: &BTreeMap<String, String>) -> Result<PathBuf> {
 }
 
 fn path() -> Result<PathBuf> {
-    let dir = match env::var_os(HOME_VAR) {
-        Some(dir) => PathBuf::from(dir),
-        None => PathBuf::from(env::var_os("HOME").ok_or("no home directory for the trust file")?)
-            .join(".lighthouse"),
-    };
+    let dir = lighthouse_resource::xdg_dir(lighthouse_resource::Base::Config)
+        .ok_or("no config directory for the trust file (set XDG_CONFIG_HOME or HOME)")?;
     Ok(dir.join(FILE))
 }

@@ -7,6 +7,7 @@ mod document;
 mod duration;
 mod error;
 mod schema;
+mod xdg;
 mod yaml;
 
 use std::{
@@ -22,6 +23,7 @@ pub use document::{Format, documents, kind_of, resource};
 pub use duration::parse_duration;
 pub use error::Error;
 pub use schema::{Descriptor, SCHEMA_URL_BASE, header, schema, schema_file};
+pub use xdg::{Base, dir as xdg_dir, dir_in as xdg_dir_in, plugins as xdg_plugins};
 pub use yaml::to_yaml;
 
 /// The version every document of this model declares.

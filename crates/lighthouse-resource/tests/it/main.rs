@@ -2,4 +2,5 @@
 
 mod envelope;
 mod files;
+mod xdg;
 mod yaml;
