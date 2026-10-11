@@ -92,9 +92,11 @@ bound per decision, then the project's model, then the agent.
   intervals, over examples, hand-reviewed samples and judgments. A trained model is
   attached to a decision only by an approved revision that beats the current check.
   Sampled re-judging gives recall and drift.
-- **Generative fixes:** a fix may be synthesised by the bound generation model (an API
-  model, or any CLI as a `command` model). It is always verified (apply, format, re-check, roll back) and
-  always `suggested`. Unbound, the agent gets a fix task.
+- **LLM fixers are ordinary fix providers** (`command` for any CLI, `rpc` for a plugin).
+  - Lighthouse ships a ready-made plugin with clients for standard APIs: OpenAI-compatible endpoints (OpenRouter, Ollama, vLLM, LM Studio) now, Anthropic later.
+  - CLIs get documented presets.
+  - A project attaches a fixer to a bundled decision with `rules."<id>".fix`.
+  - The fixer's output is always verified (apply, format, re-check, roll back) and is always `suggested`.
 
 ### Fast on large repositories
 - **Done:** per-unit provider caches with early cutoff and a host result cache keyed by
