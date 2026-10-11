@@ -52,6 +52,7 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("module_tested", Reach::Global),
     ("local_callers", Reach::Global),
     ("effective", Reach::Global),
+    ("module_imports", Reach::Global),
     ("homonyms", Reach::Global),
 ];
 

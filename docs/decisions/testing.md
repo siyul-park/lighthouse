@@ -126,9 +126,13 @@ A readable test is a small, direct specification whose behavior can be understoo
 
 `testing/standard-assertions` · test · warn · cel
 
-*A hand-written compare-and-fail repeats what the project's assertion library already states, with worse failure output. Go: The library is `github.com/stretchr/testify/require`. A function of a test file that has an `if` with no `else` whose condition compares or negates and whose only effect is `t.Fatal`, `t.Fatalf`, `t.Error`, `t.Errorf`, `t.Fail` or `t.FailNow` is reported with the number of such checks. A check that does more than fail, such as one that also returns, is not a plain assertion. Rust: Use `assert_eq!`, `assert_ne!` and `assert!` with a message instead of helpers that compare and `panic!`. Not enforced for Rust, whose provider does not count hand-written checks.*
+*A hand-written compare-and-fail repeats what the project's assertion library already states, with worse failure output. The decision applies to a module whose files import one of the `libraries` somewhere: where no assertion library is in use, a plain compare-and-fail is the standard form and there is nothing to prefer. A benchmark (`Benchmark*`) is not judged: its loop checks a result without an assertion library's overhead. Go: The library is `github.com/stretchr/testify/require`. A function of a test file that has an `if` with no `else` whose condition compares or negates and whose only effect is `t.Fatal`, `t.Fatalf`, `t.Error`, `t.Errorf`, `t.Fail` or `t.FailNow` is reported with the number of such checks. A check that does more than fail, such as one that also returns, is not a plain assertion. Rust: Use `assert_eq!`, `assert_ne!` and `assert!` with a message instead of helpers that compare and `panic!`. Not enforced for Rust, whose provider does not count hand-written checks.*
 
 Tests SHOULD assert through the project's standard assertion library, and a test helper SHOULD NOT reimplement a comparison and failure that the library already provides.
+
+| option | default | meaning |
+| --- | --- | --- |
+| `libraries` | `["github.com/stretchr/testify"]` | Import paths (or their prefixes) of the assertion libraries; a module that imports none of them is not judged. |
 
 ```go invalid store_test.go
 package store_test

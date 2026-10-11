@@ -119,7 +119,7 @@ const REACHES: &[(&str, Option<(Reach, bool)>)] = &[
     ("testing/file-layout", Some((Reach::Neighbors, true))),
     ("testing/no-hidden-target", Some((Reach::Global, false))),
     ("testing/owner", Some((Reach::Global, false))),
-    ("testing/standard-assertions", Some((Reach::Local, false))),
+    ("testing/standard-assertions", Some((Reach::Global, false))),
     ("testing/unique-owner", Some((Reach::Global, false))),
 ];
 

@@ -31,6 +31,7 @@ mod effective;
 mod forward;
 mod hidden;
 mod homonyms;
+mod imports;
 mod measures;
 mod ownership;
 mod role;
@@ -54,6 +55,7 @@ pub(crate) struct Builder<'a> {
     table: Arc<Table>,
     names: Arc<homonyms::Names>,
     single: Arc<effective::Single>,
+    imports: Arc<imports::Imports>,
     allow_suffixes: Vec<String>,
     first_test: OnceCell<Option<Value>>,
 }
@@ -90,6 +92,7 @@ impl<'a> Builder<'a> {
             table: ctx.memo.slot(),
             names: ctx.memo.slot(),
             single: ctx.memo.slot(),
+            imports: ctx.memo.slot(),
             allow_suffixes: strings(options.get("allowSuffixes")),
             first_test: OnceCell::new(),
         })
@@ -298,6 +301,9 @@ impl<'a> Builder<'a> {
         }
         if needs.fact("homonyms") {
             map.insert("homonyms".to_owned(), self.homonyms(symbol));
+        }
+        if needs.fact("module_imports") {
+            map.insert("module_imports".to_owned(), self.module_imports(symbol));
         }
         if needs.fact("hidden_target") {
             map.insert("hidden_target".to_owned(), self.hidden_target(symbol));
