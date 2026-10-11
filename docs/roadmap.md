@@ -85,7 +85,7 @@ bound per decision, then the project's model, then the agent.
   calibrated, abstaining). It is trained on strength-weighted judgments and never on its
   own outputs.
 - **Remote decision models:** System One models answer yes/no questions with a probability.
-  They are reached through TypeSafe's API format (TypeSafe jev, or any provider that
+  They are reached through TypeSafe's API spec (TypeSafe jev, or any provider that
   speaks it). `:free` chat models label candidates on request, and the
   local classifier distils those labels.
 - **Evaluation is the promotion gate (CLI and MCP):** precision, false-positive rate,
@@ -95,7 +95,7 @@ bound per decision, then the project's model, then the agent.
   Sampled re-judging gives recall and drift.
 - **LLM fixers are ordinary fix providers** (`command` for any CLI, `rpc` for a plugin).
   - Lighthouse ships a ready-made plugin with clients for standard APIs: OpenAI-compatible endpoints (OpenRouter, Ollama, vLLM, LM Studio) now, Anthropic later.
-  - CLIs get documented presets.
+  - CLIs are documented as recipes (command providers).
   - A project attaches a fixer to a bundled decision with `rules."<id>".fix`.
   - The fixer's output is always verified (apply, format, re-check, roll back) and is always `suggested`.
 
@@ -157,7 +157,7 @@ Public adoption waits until the loop has been shown working.
 | Breadth | `lsp-bridge` (any off-the-shelf language server, at lower capability), then native TypeScript and Python providers |
 | Ecosystem | `lighthouse lsp` for editors (diagnostics, fixes, judgments); external rule plugins over RPC that ship their decision specs; `plugin add` with a lockfile |
 | Session domain | decisions about agent actions; a PreToolUse gate that allows, asks or denies |
-| More model transports | Anthropic Messages API; session-domain models |
+| More API specs | Anthropic Messages API; session-domain models |
 
 ## Known gaps
 - A per-language check, `spec.languages.<id>.check`, does not exist. A decision whose
