@@ -173,7 +173,10 @@ fn full_agent_json_is_one_object_of_tagged_records() {
     assert_eq!(out.lines().count(), 1, "one object on one line");
     let report: Value = serde_json::from_str(&out).unwrap();
     let records = report["findings"].as_array().unwrap();
-    let kinds: Vec<_> = records.iter().map(|r| r["type"].as_str().unwrap()).collect();
+    let kinds: Vec<_> = records
+        .iter()
+        .map(|r| r["type"].as_str().unwrap())
+        .collect();
     assert_eq!(kinds, ["finding", "finding", "finding"]);
     assert_eq!(report["incomplete"].as_array().unwrap().len(), 1);
     assert_eq!(report["omitted"], 0);
@@ -221,7 +224,8 @@ fn agent_formats_state_a_clean_run() {
         text,
         "summary: 0 error, 0 warn, 0 info, 0 review, 0 incomplete, 0 suppressed, 0 allowed\n"
     );
-    let json: Value = serde_json::from_str(crate::agent_json(&[], &[], &Briefing::default()).trim()).unwrap();
+    let json: Value =
+        serde_json::from_str(crate::agent_json(&[], &[], &Briefing::default()).trim()).unwrap();
     assert_eq!(
         json,
         json!({ "status": "clean", "counts": { "error": 0, "warn": 0, "review": 0 }, "groups": [] })
@@ -230,9 +234,11 @@ fn agent_formats_state_a_clean_run() {
         detail: Detail::Full,
         ..Briefing::default()
     };
-    let json: Value =
-        serde_json::from_str(crate::agent_json(&[], &[], &full).trim()).unwrap();
-    assert_eq!(json, json!({ "findings": [], "incomplete": [], "omitted": 0 }));
+    let json: Value = serde_json::from_str(crate::agent_json(&[], &[], &full).trim()).unwrap();
+    assert_eq!(
+        json,
+        json!({ "findings": [], "incomplete": [], "omitted": 0 })
+    );
 }
 
 #[test]
@@ -415,10 +421,7 @@ fn evidence_leaves_out_the_owner_symbol_and_cuts_long_values() {
     let text = render_with(Format::Agent, &findings, &[], &briefing);
     assert!(!text.contains("symbol=jit"), "{text}");
 
-    let compact = records_of(&crate::agent_json(&findings,
-        &[],
-        &briefed(&facts, |b| b),
-    ));
+    let compact = records_of(&crate::agent_json(&findings, &[], &briefed(&facts, |b| b)));
     let shared = &compact[0]["groups"][0]["evidence"];
     assert_eq!(shared["fan_in"], 2);
     assert!(shared["callees"].as_str().unwrap().len() < 140);

@@ -50,16 +50,14 @@ fn fingerprints(dir: &Path) -> BTreeMap<String, String> {
             "--no-cache",
             "--no-models",
             "--format",
-            "agent-json",
+            "json",
             "--detail",
             "full",
         ],
     );
     let mut found = BTreeMap::new();
-    for line in String::from_utf8(out.stdout).unwrap().lines() {
-        let Ok(v) = serde_json::from_str::<Value>(line) else {
-            continue;
-        };
+    let report: Value = serde_json::from_slice(&out.stdout).unwrap();
+    for v in report["findings"].as_array().unwrap() {
         if v["rule"] == "local/naming-ban" {
             let message = v["message"].as_str().unwrap();
             let name = message.split(' ').next().unwrap().to_owned();
@@ -109,6 +107,7 @@ fn eval_measures_the_check_with_a_model_plugin_bound() {
     let out = lighthouse(
         dir.path(),
         &[
+            "decision",
             "eval",
             "local/naming-ban",
             "--baseline",
@@ -138,7 +137,7 @@ fn learn_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
     let out = lighthouse(
         dir.path(),
         &[
-            "learn",
+            "model",
             "train",
             "local/naming-ban",
             "--baseline",

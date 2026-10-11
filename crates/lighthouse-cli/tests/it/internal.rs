@@ -26,7 +26,7 @@ fn findings(dir: &Path) -> Vec<(String, String)> {
     let out = Command::cargo_bin("lighthouse")
         .unwrap()
         .current_dir(dir)
-        .args(["check", "--no-store", "--format", "agent-json"])
+        .args(["check", "--no-store", "--format", "json"])
         .output()
         .unwrap();
     let report: Value = serde_json::from_slice(&out.stdout).unwrap();

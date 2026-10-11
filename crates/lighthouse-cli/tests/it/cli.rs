@@ -123,8 +123,9 @@ fn json_and_sarif_formats() {
         .output()
         .unwrap();
     let line: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(line["ruleId"], "core/max-lines");
-    assert_eq!(line["evidence"]["lines"], 8);
+    assert_eq!(line["status"], "findings");
+    assert_eq!(line["groups"][0]["rule"], "core/max-lines");
+    assert_eq!(line["groups"][0]["evidence"]["lines"], 8);
 
     let out = lighthouse(dir.path())
         .args(["check", "--format", "sarif"])
@@ -147,7 +148,7 @@ fn gitignored_files_are_skipped_and_rules_filter_applies() {
 
     let dir = project(6);
     lighthouse(dir.path())
-        .args(["check", "--rules", "core/nope"])
+        .args(["check", "--decision", "core/nope"])
         .assert()
         .code(2)
         .stderr("lighthouse: unknown rule `core/nope`\n");
@@ -237,7 +238,7 @@ fn decision_list_and_explain() {
         );
     }
     let out = lighthouse(dir.path())
-        .args(["explain", "design/coupling"])
+        .args(["decision", "show", "design/coupling"])
         .output()
         .unwrap();
     assert!(
@@ -246,7 +247,7 @@ fn decision_list_and_explain() {
             .contains("Analyzers: metrics/size")
     );
     lighthouse(dir.path())
-        .args(["explain", "core/nope"])
+        .args(["decision", "show", "core/nope"])
         .assert()
         .code(2);
 }
@@ -272,7 +273,7 @@ fn decision_list_all_shows_status_of_every_decision() {
 fn explain_describes_judged_decisions() {
     let dir = tempfile::tempdir().unwrap();
     let out = lighthouse(dir.path())
-        .args(["explain", "design/plural-collections"])
+        .args(["decision", "show", "design/plural-collections"])
         .output()
         .unwrap();
     let text = String::from_utf8(out.stdout).unwrap();

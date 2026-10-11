@@ -13,7 +13,9 @@ use tempfile::TempDir;
 fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
     cmd.current_dir(dir)
-        .env("LIGHTHOUSE_HOME", dir.join(".home"))
+        .env("XDG_CONFIG_HOME", dir.join(".home"))
+        .env("XDG_DATA_HOME", dir.join(".home"))
+        .env("XDG_CACHE_HOME", dir.join(".home"))
         .env_remove("LIGHTHOUSE_TRUST");
     cmd
 }
@@ -178,7 +180,7 @@ fn paths_and_rules_select_what_is_fixed() {
             "check",
             "sub",
             "--fix",
-            "--rules",
+            "--decision",
             "design/declaration-groups",
         ])
         .assert()
@@ -248,7 +250,7 @@ fn a_rename_is_declined_because_no_provider_has_complete_references_yet() {
     };
 
     lighthouse(dir.path())
-        .args(["check", "--fix", "--rules", "local/old-suffix"])
+        .args(["check", "--fix", "--decision", "local/old-suffix"])
         .assert()
         .stderr(predicate::str::contains("complete-references"));
 
@@ -511,7 +513,7 @@ fn a_fixer_can_be_named_for_a_rule_that_has_none() {
         "--fix",
         "--fixer",
         "local/shout",
-        "--rules",
+        "--decision",
         "local/plain",
     ];
 
@@ -724,12 +726,19 @@ fn a_run_without_the_store_still_honors_the_committed_decisions() {
         return;
     };
     let found = lighthouse(dir.path())
-        .args(["check", "--format", "json", "--rules", "design/no-banners"])
+        .args([
+            "check",
+            "--format",
+            "json",
+            "--detail",
+            "full",
+            "--decision",
+            "design/no-banners",
+        ])
         .output()
         .unwrap();
-    let finding: serde_json::Value =
-        serde_json::from_slice(found.stdout.split(|&b| b == b'\n').next().unwrap()).unwrap();
-    let fingerprint = finding["fingerprint"].as_str().unwrap();
+    let report: serde_json::Value = serde_json::from_slice(&found.stdout).unwrap();
+    let fingerprint = report["findings"][0]["fingerprint"].as_str().unwrap();
     lighthouse(dir.path())
         .args([
             "review",
@@ -771,7 +780,7 @@ fn a_rust_file_that_declares_a_module_file_is_formatted_through_stdin() {
     trust(dir.path());
 
     lighthouse(dir.path())
-        .args(["check", "--fix", "--rules", "design/declaration-groups"])
+        .args(["check", "--fix", "--decision", "design/declaration-groups"])
         .assert()
         .success()
         .stderr(predicate::str::contains("rolled back").not())
@@ -794,7 +803,7 @@ fn a_formatter_that_cannot_use_stdin_still_works_on_a_scratch_copy() {
     trust(dir.path());
 
     lighthouse(dir.path())
-        .args(["check", "--fix", "--rules", "design/declaration-groups"])
+        .args(["check", "--fix", "--decision", "design/declaration-groups"])
         .assert()
         .success();
 

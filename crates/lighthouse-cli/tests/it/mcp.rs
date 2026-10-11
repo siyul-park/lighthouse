@@ -26,7 +26,7 @@ impl Client {
         let mut child = Command::new(env!("CARGO_BIN_EXE_lighthouse"))
             .arg("mcp")
             .current_dir(dir)
-            .env_remove("LIGHTHOUSE_REVIEWER")
+            .env_remove("LIGHTHOUSE_ATTRIBUTED_TO")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -84,6 +84,9 @@ impl Client {
             "tools/call",
             json!({ "name": name, "arguments": arguments }),
         );
+        if let Some(message) = reply["error"]["message"].as_str() {
+            return Err(message.to_owned());
+        }
         let result = &reply["result"];
         let text = result["content"][0]["text"].as_str().unwrap_or_default();
         if result["isError"] == json!(true) {
@@ -133,28 +136,42 @@ fn text_project() -> TempDir {
     dir
 }
 
-const LONG_FILE_SPEC: &str = r#"
-title: Notes stay short
-context: Notes are read in one glance.
-scope: { subject: file }
-requirement: A note file MUST NOT exceed three lines.
-severity: error
-check:
-  type: cel
-  select: file
-  where: 'file.lines > 3'
-  message: '{{ file.path }} is too long'
-  evidence:
-    path: file.path
-"#;
+/// A `Decision` document: files over three lines are an error, with the
+/// invalid example `invalid_body` and one valid example.
+fn long_file_document(id: &str, invalid_body: &str, condition: &str, context: &str) -> Value {
+    json!({
+        "kind": "Decision",
+        "metadata": { "name": id },
+        "spec": {
+            "title": "Notes stay short",
+            "context": context,
+            "scope": { "subject": "file" },
+            "requirement": "A note file MUST NOT exceed three lines.",
+            "severity": "error",
+            "check": {
+                "type": "cel",
+                "select": "file",
+                "where": condition,
+                "message": "{{ file.path }} is too long",
+                "evidence": { "path": "file.path" }
+            },
+            "examples": [
+                { "name": "long", "language": "text", "kind": "invalid",
+                  "files": [{ "path": "a.txt", "body": invalid_body }], "expect": [{ "line": 1 }] },
+                { "name": "short", "language": "text", "kind": "valid",
+                  "files": [{ "path": "a.txt", "body": "a\n" }] }
+            ]
+        }
+    })
+}
 
-fn examples(invalid_body: &str) -> Value {
-    json!([
-        { "name": "long", "language": "text", "kind": "invalid",
-          "files": [{ "path": "a.txt", "body": invalid_body }], "expect": [{ "line": 1 }] },
-        { "name": "short", "language": "text", "kind": "valid",
-          "files": [{ "path": "a.txt", "body": "a\n" }] }
-    ])
+fn notes(id: &str, invalid_body: &str) -> Value {
+    long_file_document(
+        id,
+        invalid_body,
+        "file.lines > 3",
+        "Notes are read in one glance.",
+    )
 }
 
 #[test]
@@ -179,17 +196,20 @@ fn the_server_lists_its_tools_and_resources() {
             "decision_create",
             "decision_eval",
             "decision_list",
+            "decision_show",
             "decision_test",
             "decision_update",
-            "explain",
             "fix",
+            "model_list",
+            "model_train",
             "review_history",
+            "review_list",
             "review_resolve",
-            "review_tasks"
+            "review_show"
         ]
     );
-    let reserved = client.tool("decision_similar", json!({}));
-    assert!(reserved.unwrap_err().contains("reserved"));
+    let unknown = client.tool("explain", json!({}));
+    assert!(unknown.unwrap_err().contains("unknown tool"));
 
     let resources = client.request("resources/list", json!({}));
     let uris: Vec<&str> = resources["result"]["resources"]
@@ -258,7 +278,6 @@ fn check_reports_findings_and_never_calls_an_incomplete_run_clean() {
     let records = full["findings"].as_array().unwrap();
     assert!(records.iter().any(|f| f["rule"] == "design/exported-doc"));
     assert!(records[0]["location"]["line"].is_u64(), "{full}");
-    assert!(full["summary"]["warnings"].as_u64().unwrap() >= 1);
     assert!(
         client
             .tool("check", json!({ "detail": "verbose" }))
@@ -269,7 +288,7 @@ fn check_reports_findings_and_never_calls_an_incomplete_run_clean() {
     let broken = client.tool("check", json!({})).unwrap();
     assert_eq!(broken["status"], "incomplete", "{broken}");
 
-    let bad = client.tool("check", json!({ "rules": ["nope/nope"] }));
+    let bad = client.tool("check", json!({ "decision": ["nope/nope"] }));
     assert!(bad.is_err());
 }
 
@@ -278,7 +297,7 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
     let dir = rust_project();
     let mut client = Client::start(dir.path());
     client.tool("check", json!({})).unwrap();
-    let tasks = client.tool("review_tasks", json!({})).unwrap();
+    let tasks = client.tool("review_list", json!({})).unwrap();
     let group = tasks["groups"]
         .as_array()
         .unwrap()
@@ -296,7 +315,7 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
     assert!(tasks["resolve"].is_string() && tasks["judgments"].is_object());
 
     let full = client
-        .tool("review_tasks", json!({ "detail": "full" }))
+        .tool("review_list", json!({ "detail": "full" }))
         .unwrap();
     let task = full["tasks"]
         .as_array()
@@ -311,27 +330,27 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
     let ambiguous = client
         .tool(
             "review_resolve",
-            json!({ "fingerprint": "", "judgment": "fail" }),
+            json!({ "fingerprint": "abc", "judgment": "fail" }),
         )
         .unwrap_err();
-    assert!(ambiguous.contains("matches several"), "{ambiguous}");
+    assert!(ambiguous.contains("at least 7 characters"), "{ambiguous}");
     let stale = client.tool(
         "review_resolve",
         json!({ "fingerprint": prefix, "judgment": "fail",
-                "suppress": { "justification": "intentional-exception" },
+                "suppress": "intentional-exception",
                 "seen": "1999-01-01T00:00:00Z" }),
     );
     assert!(stale.is_err());
     let blank = client.tool(
         "review_resolve",
         json!({ "fingerprint": prefix, "judgment": "fail",
-                "suppress": { "justification": " " } }),
+                "suppress": " " }),
     );
     assert!(blank.unwrap_err().contains("needs a justification"));
     let misplaced = client.tool(
         "review_resolve",
         json!({ "fingerprint": prefix, "judgment": "pass",
-                "suppress": { "justification": "why" } }),
+                "suppress": "why" }),
     );
     assert!(misplaced.unwrap_err().contains("goes with a `fail`"));
 
@@ -339,7 +358,7 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
         .tool(
             "review_resolve",
             json!({ "fingerprint": prefix, "judgment": "fail",
-                    "suppress": { "justification": "intentional-exception" },
+                    "suppress": "intentional-exception",
                     "reason": "named policy", "seen": seen }),
         )
         .unwrap();
@@ -375,8 +394,7 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
     let created = client
         .tool(
             "decision_create",
-            json!({ "id": "local/short-notes", "spec": LONG_FILE_SPEC,
-                    "examples": examples("a\nb\nc\nd\n") }),
+            json!({ "document": notes("local/short-notes", "a\nb\nc\nd\n") }),
         )
         .unwrap();
     assert_eq!(created["id"], "local/short-notes");
@@ -392,13 +410,16 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
     assert_eq!(created["localPluginListed"], false);
 
     let tested = client
-        .tool("decision_test", json!({ "ids": ["local/short-notes"] }))
+        .tool(
+            "decision_test",
+            json!({ "decision": ["local/short-notes"] }),
+        )
         .unwrap();
     assert_eq!(tested["ok"], true, "{tested}");
 
     let again = client.tool(
         "decision_create",
-        json!({ "id": "local/short-notes", "spec": LONG_FILE_SPEC, "examples": examples("a\nb\nc\nd\n") }),
+        json!({ "document": notes("local/short-notes", "a\nb\nc\nd\n") }),
     );
     assert!(again.unwrap_err().contains("already exists"));
 
@@ -406,7 +427,7 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
     // project keeps only the first rule.
     let rejected = client.tool(
         "decision_create",
-        json!({ "id": "local/tiny-notes", "spec": LONG_FILE_SPEC, "examples": examples("a\n") }),
+        json!({ "document": notes("local/tiny-notes", "a\n") }),
     );
     let message = rejected.unwrap_err();
     assert!(message.contains("not written"), "{message}");
@@ -414,9 +435,8 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
 
     let broken_rule = client.tool(
         "decision_create",
-        json!({ "id": "local/tiny-notes",
-                "spec": LONG_FILE_SPEC.replace("file.lines > 3", "file.nope >"),
-                "examples": examples("a\nb\nc\nd\n") }),
+        json!({ "document": long_file_document(
+            "local/tiny-notes", "a\nb\nc\nd\n", "file.nope >", "Notes are read in one glance.") }),
     );
     assert!(broken_rule.is_err());
     assert!(!rules_dir.join("tiny-notes.yaml").exists());
@@ -426,7 +446,8 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
     // An update goes through the same gate.
     let bad_update = client.tool(
         "decision_update",
-        json!({ "id": "local/short-notes", "patch": { "check": { "where": "file.lines > 100" } } }),
+        json!({ "document": long_file_document(
+            "local/short-notes", "a\nb\nc\nd\n", "file.lines > 100", "Notes are read in one glance.") }),
     );
     assert!(bad_update.is_err());
     let before = fs::read_to_string(rules_dir.join("short-notes.yaml")).unwrap();
@@ -434,7 +455,8 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
     let updated = client
         .tool(
             "decision_update",
-            json!({ "id": "local/short-notes", "patch": { "context": "Notes fit one screen." } }),
+            json!({ "document": long_file_document(
+                "local/short-notes", "a\nb\nc\nd\n", "file.lines > 3", "Notes fit one screen.") }),
         )
         .unwrap();
     assert_eq!(updated["created"], false);
@@ -448,14 +470,14 @@ fn decision_create_writes_a_tested_decision_and_rolls_back_a_bad_one() {
     // the project's `rules`.
     let bundled = client.tool(
         "decision_update",
-        json!({ "id": "core/max-lines", "patch": { "requirement": "A file MUST be short." } }),
+        json!({ "document": notes("core/max-lines", "a\nb\nc\nd\n") }),
     );
     assert!(bundled.unwrap_err().to_string().contains("rules"));
     assert!(!rules_dir.join("override-core-max-file-lines.yaml").exists());
 }
 
 #[test]
-fn decision_list_and_explain_describe_decisions() {
+fn decision_list_and_show_describe_decisions() {
     let dir = text_project();
     let mut client = Client::start(dir.path());
     let list = client.tool("decision_list", json!({})).unwrap();
@@ -467,12 +489,12 @@ fn decision_list_and_explain_describe_decisions() {
         .unwrap();
     assert_eq!(row["enabled"], true);
     let explained = client
-        .tool("explain", json!({ "id": "core/max-lines" }))
+        .tool("decision_show", json!({ "id": "core/max-lines" }))
         .unwrap();
     assert!(explained["markdown"].as_str().unwrap().contains("Status:"));
     assert!(
         client
-            .tool("explain", json!({ "id": "nope/nope" }))
+            .tool("decision_show", json!({ "id": "nope/nope" }))
             .is_err()
     );
 }
@@ -484,7 +506,7 @@ fn decision_names_cannot_leave_the_decisions_directory() {
     for id in ["local/../../../evil", "local/a/b"] {
         let rejected = client.tool(
             "decision_create",
-            json!({ "id": id, "spec": LONG_FILE_SPEC, "examples": examples("a\nb\nc\nd\n") }),
+            json!({ "document": notes(id, "a\nb\nc\nd\n") }),
         );
         assert!(rejected.unwrap_err().contains("not a valid decision name"));
     }
@@ -493,7 +515,7 @@ fn decision_names_cannot_leave_the_decisions_directory() {
     assert!(!dir.path().join(".lighthouse/decisions").exists());
     let update = client.tool(
         "decision_update",
-        json!({ "id": "local/../x", "patch": { "context": "x" } }),
+        json!({ "document": notes("local/../x", "a\nb\nc\nd\n") }),
     );
     assert!(update.is_err());
 }

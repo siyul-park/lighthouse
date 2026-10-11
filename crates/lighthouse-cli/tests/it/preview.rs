@@ -60,7 +60,7 @@ fn instance(group: &Value) -> Value {
 }
 
 fn report(dir: &TempDir, extra: &[&str]) -> Value {
-    let mut args = vec!["--format", "agent-json"];
+    let mut args = vec!["--format", "json"];
     args.extend(extra);
     serde_json::from_str(&check(dir, &args)).unwrap()
 }
@@ -78,21 +78,19 @@ fn a_declaration_move_shows_its_diff_and_how_to_apply_it() {
     assert!(diff.lines().count() <= 12, "{diff}");
     assert_eq!(
         group["apply"],
-        "lighthouse check --fix --rules design/declaration-groups"
+        "fix {\"decision\":[\"design/declaration-groups\"]}"
     );
     assert_eq!(
         fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),
         MISORDERED
     );
 
-    let text = check(&dir, &["--format", "agent"]);
-    assert!(text.contains("    fix [safe]\n      @@ -"), "{text}");
-    assert!(text.contains("      +pub struct Store;"), "{text}");
-
-    let full = check(&dir, &["--format", "agent-json", "--detail", "full"]);
-    let record = full
-        .lines()
-        .map(|l| serde_json::from_str::<Value>(l).unwrap())
+    let full = check(&dir, &["--format", "json", "--detail", "full"]);
+    let report: Value = serde_json::from_str(full.trim()).unwrap();
+    let record = report["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
         .find(|r| r["rule"] == "design/declaration-groups")
         .unwrap();
     assert!(record["fix"]["diff"].as_str().unwrap().starts_with("@@ -"));
@@ -169,7 +167,12 @@ fn a_delete_fix_replaces_a_region_with_nothing() {
     let compact = report(&dir, &[]);
     let group = group(&compact, "design/no-banners");
     assert_eq!(instance(&group)[3]["fix"]["safety"], "suggested", "{group}");
-    assert!(group["apply"].as_str().unwrap().contains("--unsafe-fixes"));
+    assert!(
+        group["apply"]
+            .as_str()
+            .unwrap()
+            .contains("\"unsafeFixes\":true")
+    );
     assert!(
         instance(&group)[3]["fix"]["diff"]
             .as_str()
@@ -199,13 +202,15 @@ fn a_command_fix_is_not_previewed_and_only_names_how_to_apply_it() {
     let out = Command::cargo_bin("lighthouse")
         .unwrap()
         .current_dir(dir.path())
-        .env("LIGHTHOUSE_HOME", dir.path().join(".home"))
-        .args(["check", "--no-store", "--format", "agent-json"])
+        .env("XDG_CONFIG_HOME", dir.path().join(".home"))
+        .env("XDG_DATA_HOME", dir.path().join(".home"))
+        .env("XDG_CACHE_HOME", dir.path().join(".home"))
+        .args(["check", "--no-store", "--format", "json"])
         .output()
         .unwrap();
     let report: Value = serde_json::from_slice(&out.stdout).unwrap();
     let shout = group(&report, "local/shout");
-    assert_eq!(shout["apply"], "lighthouse check --fix --rules local/shout");
+    assert_eq!(shout["apply"], "fix {\"decision\":[\"local/shout\"]}");
     assert_eq!(
         shout["files"]["a.txt"][0].as_array().unwrap().len(),
         3,

@@ -10,7 +10,9 @@ use tempfile::TempDir;
 pub(crate) fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
     cmd.current_dir(dir)
-        .env("LIGHTHOUSE_HOME", dir.join(".home"))
+        .env("XDG_CONFIG_HOME", dir.join(".home"))
+        .env("XDG_DATA_HOME", dir.join(".home"))
+        .env("XDG_CACHE_HOME", dir.join(".home"))
         .env_remove("LIGHTHOUSE_TRUST");
     cmd
 }

@@ -63,7 +63,7 @@ fn a_uri_lands_in_its_file_however_it_is_spelled() {
             .iter()
             .find(|(m, _)| m == name)
             .unwrap_or_else(|| panic!("{name}"));
-        assert_eq!(hit.1["file"], file, "{name}");
+        assert_eq!(hit.1["location"]["path"], file, "{name}");
     }
 }
 
@@ -117,17 +117,15 @@ fn a_file_the_reader_cannot_read_starts_its_columns_at_one_and_says_so() {
     );
     trust(dir.path());
     let out = lighthouse(dir.path())
-        .args(["check", "--format", "json"])
+        .args(["check", "--format", "json", "--detail", "full"])
         .output()
         .unwrap();
     let stdout = String::from_utf8_lossy(&out.stdout);
-    let found: Vec<Value> = stdout
-        .lines()
-        .filter_map(|l| serde_json::from_str(l).ok())
-        .collect();
+    let report: Value = serde_json::from_str(stdout.trim()).unwrap();
+    let found = report["findings"].as_array().unwrap();
     assert_eq!(found.len(), 1, "{stdout}");
-    assert_eq!(found[0]["span"]["start"]["col"], 1);
-    assert_eq!(found[0]["span"]["start"]["line"], 2);
+    assert_eq!(found[0]["location"]["column"], 1);
+    assert_eq!(found[0]["location"]["line"], 2);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
         stderr.contains("could not be read to convert columns"),
@@ -161,7 +159,7 @@ fn columns_count_in_the_unit_the_decision_the_log_or_the_default_names() {
         let dir = wrapped(extra, &log_of(vec![result("r", "error", name, at)], kind));
         let found = check(dir.path());
         assert_eq!(found.len(), 1, "{name}");
-        assert_eq!(found[0]["span"]["start"]["col"], 7, "{name}");
+        assert_eq!(found[0]["location"]["column"], 7, "{name}");
     }
 }
 

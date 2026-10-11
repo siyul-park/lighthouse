@@ -9,6 +9,14 @@ use tempfile::TempDir;
 
 use crate::review::{HELPER, fingerprint_of, lighthouse, listing, records, rust_project, stdout};
 
+/// The findings a full-detail JSON report carries.
+fn findings_of(out: &str) -> Vec<Value> {
+    records(out)[0]["findings"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+}
+
 const SEVERAL: &str = "pub fn a() {}\npub fn b() {}\npub fn c() {}\npub fn d() {}\n\n// lighthouse-disable-next-line design/exported-doc -- documented at its origin\npub fn e() {}\n";
 
 fn reported(dir: &TempDir, extra: &[&str]) -> Vec<String> {
@@ -18,12 +26,14 @@ fn reported(dir: &TempDir, extra: &[&str]) -> Vec<String> {
                 "check",
                 "--format",
                 "json",
-                "--rules",
+                "--detail",
+                "full",
+                "--decision",
                 "design/exported-doc",
             ])
             .args(extra),
     );
-    let mut names: Vec<String> = records(&out)
+    let mut names: Vec<String> = findings_of(&out)
         .iter()
         .filter_map(|f| f["message"].as_str())
         .map(str::to_owned)
@@ -37,11 +47,13 @@ fn finding_named(dir: &TempDir, name: &str) -> String {
         "check",
         "--format",
         "json",
-        "--rules",
+        "--detail",
+        "full",
+        "--decision",
         "design/exported-doc",
         "--no-store",
     ]));
-    records(&out)
+    findings_of(&out)
         .iter()
         .find(|f| {
             f["message"]
@@ -116,7 +128,7 @@ fn judgments_and_suppressions_hide_and_show_findings_the_same_in_every_run() {
         "check",
         "--format",
         "sarif",
-        "--rules",
+        "--decision",
         "design/exported-doc",
     ])))
     .unwrap();
@@ -179,19 +191,16 @@ fn a_suppression_without_a_justification_is_refused_and_records_nothing() {
 }
 
 #[test]
-fn an_ambiguous_fingerprint_prefix_is_refused_and_a_unique_one_is_enough() {
+fn a_short_fingerprint_prefix_is_refused_and_a_unique_one_is_enough() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
     let out = lighthouse(dir.path())
-        .args(["review", "resolve", "", "--judgment", "fail"])
+        .args(["review", "resolve", "abc", "--judgment", "fail"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
     let stderr = String::from_utf8(out.stderr).unwrap();
-    assert!(
-        stderr.contains("matches several recorded findings"),
-        "{stderr}"
-    );
+    assert!(stderr.contains("give at least 7 characters"), "{stderr}");
     let fingerprint = fingerprint_of(&dir, "design/exported-doc");
     lighthouse(dir.path())
         .args(["review", "resolve", &fingerprint[..7], "--judgment", "fail"])
@@ -205,7 +214,8 @@ fn review_show_and_text_listings_describe_a_finding() {
     assert_eq!(stdout(lighthouse(dir.path()).args(["review", "list"])), "");
     lighthouse(dir.path()).arg("check").assert().success();
     let fingerprint = fingerprint_of(&dir, "design/no-panic");
-    let list = stdout(lighthouse(dir.path()).args(["review", "list", "--rule", "design/no-panic"]));
+    let list =
+        stdout(lighthouse(dir.path()).args(["review", "list", "--decision", "design/no-panic"]));
     assert_eq!(list.lines().count(), 1);
     assert!(list.starts_with(&fingerprint[..12]), "{list}");
     assert!(list.contains("\topen\t-\t"), "{list}");

@@ -1,34 +1,26 @@
-//! The agent formats of `check` over remembered findings: the compact and the
-//! full shape, the resolve command each finding carries, and `--limit`.
+//! The JSON shapes of `check` over remembered findings: the compact and the
+//! full detail, the resolve command each finding carries, and `--limit`.
 
 use serde_json::Value;
 
 use crate::review::{HELPER, lighthouse, records, rust_project, stdout};
 
 #[test]
-fn agent_format_groups_findings_and_agent_json_carries_the_same_groups() {
+fn text_lists_one_line_per_finding_and_json_compact_groups_them() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
-    let text = stdout(lighthouse(dir.path()).args(["check", "--format", "agent"]));
-    for expected in [
-        "design/no-panic info [review] \u{2014} Panic MUST be limited to impossible programmer errors",
-        "  expected:\n    pub fn parse(text: &str) -> Result<u32, std::num::ParseIntError> {",
-        "  evidence: function=run kind=unwrap\n",
-        "  src/lib.rs:2:",
-        "resolve: lighthouse review resolve <fingerprint> ",
-        "summary: 0 error, 1 warn, 1 info, 2 review, 0 incomplete, 0 suppressed",
-    ] {
-        assert!(text.contains(expected), "{expected}\n{text}");
-    }
+    let text = stdout(lighthouse(dir.path()).args(["check", "--format", "text"]));
     assert!(
-        !text.contains("fingerprint:") && !text.contains("symbol="),
+        text.contains("src/lib.rs:2:7: info design/no-panic:"),
+        "{text}"
+    );
+    assert!(
+        text.contains("summary: 0 error, 1 warn, 1 info, 0 incomplete"),
         "{text}"
     );
 
-    let json = records(&stdout(lighthouse(dir.path()).args([
-        "check",
-        "--format",
-        "agent-json",
-    ])));
+    let json = records(&stdout(
+        lighthouse(dir.path()).args(["check", "--format", "json"]),
+    ));
     assert_eq!(json.len(), 1, "one object");
     let groups = json[0]["groups"].as_array().unwrap();
     assert_eq!(groups.len(), 2);
@@ -45,33 +37,22 @@ fn agent_format_groups_findings_and_agent_json_carries_the_same_groups() {
 #[test]
 fn full_detail_keeps_one_record_per_finding() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
-    let text =
-        stdout(lighthouse(dir.path()).args(["check", "--format", "agent", "--detail", "full"]));
-    for expected in [
-        "design/no-panic  info  src/lib.rs:2:7",
-        "  owner:       demo::run#function",
-        "  requirement: Panic MUST be limited to impossible programmer errors",
-        "  evidence:    function=run kind=unwrap",
-        "  expected:    valid rust example `rust-result` (src/lib.rs)",
-        "lighthouse review resolve ",
-    ] {
-        assert!(text.contains(expected), "{expected}\n{text}");
-    }
-    let json = records(&stdout(lighthouse(dir.path()).args([
-        "check",
-        "--format",
-        "agent-json",
-        "--detail",
-        "full",
-    ])));
-    let findings: Vec<_> = json.iter().filter(|r| r["type"] == "finding").collect();
+    let json = records(&stdout(
+        lighthouse(dir.path()).args(["check", "--format", "json", "--detail", "full"]),
+    ));
+    assert_eq!(json.len(), 1, "one object");
+    let findings = json[0]["findings"].as_array().unwrap();
     assert_eq!(findings.len(), 2);
-    assert_eq!(json.last().unwrap()["type"], "summary");
-    lighthouse(dir.path())
-        .args(["check", "--detail", "full"])
-        .assert()
-        .code(2)
-        .stderr("lighthouse: --detail applies to the agent formats only\n");
+    assert!(findings.iter().all(|f| f["type"] == "finding"));
+    let panic = findings
+        .iter()
+        .find(|f| f["rule"] == "design/no-panic")
+        .unwrap();
+    assert_eq!(panic["location"]["line"], 2);
+    assert_eq!(panic["symbol"], "demo::run#function");
+    assert_eq!(panic["evidence"]["kind"], "unwrap");
+    assert_eq!(panic["expected"]["name"], "rust-result");
+    assert!(panic["resolve"]["command"].is_string());
 }
 
 /// The group of `rule` in a compact report.
@@ -85,50 +66,53 @@ fn group<'a>(report: &'a Value, rule: &str) -> &'a Value {
 }
 
 #[test]
-fn the_resolve_command_of_an_agent_finding_runs_as_given() {
+fn the_resolve_command_of_a_full_finding_runs_as_given() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
-    let text = stdout(lighthouse(dir.path()).args(["check", "--format", "agent"]));
-    let template = text
-        .lines()
-        .find_map(|l| l.strip_prefix("resolve: "))
+    let json = records(&stdout(
+        lighthouse(dir.path()).args(["check", "--format", "json", "--detail", "full"]),
+    ));
+    let finding = json[0]["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["rule"] == "design/no-panic")
         .unwrap();
-    let json = records(&stdout(lighthouse(dir.path()).args([
-        "check",
-        "--format",
-        "agent-json",
-    ])));
-    let helper = group(&json[0], "design/no-panic");
-    let prefix = helper["files"]["src/lib.rs"][0][2].as_str().unwrap();
-    let args: Vec<&str> = template
+    let prefix = finding["fingerprint"].as_str().unwrap()[..7].to_owned();
+    let command = finding["resolve"]["command"].as_str().unwrap();
+    let args: Vec<&str> = command
         .split_whitespace()
         .skip(1)
         .map(|a| match a {
-            "<fingerprint>" => prefix,
             "<pass|fail|notApplicable>" => "fail",
+            "agent:<id>" => "agent:tester",
             other => other,
         })
         .filter(|a| !["[--suppress", "<justification>]", "[--reason", "<text>]"].contains(a))
         .collect();
     lighthouse(dir.path()).args(args).assert().success();
     let history = records(&stdout(
-        lighthouse(dir.path()).args(["review", "history", prefix, "--format", "json"]),
+        lighthouse(dir.path()).args(["review", "history", &prefix, "--format", "json"]),
     ));
-    assert_eq!(history[0]["wasAttributedTo"]["type"], "SoftwareAgent");
-    assert_eq!(history[0]["judgment"], "fail");
-    assert_eq!(history[0]["label"], "positive");
-    assert_eq!(history[0]["fingerprint"].as_str().unwrap().len(), 64);
+    let event = &history[0]["events"][0];
+    assert_eq!(event["wasAttributedTo"]["type"], "SoftwareAgent");
+    assert_eq!(event["wasAttributedTo"]["id"], "tester");
+    assert_eq!(event["judgment"], "fail");
+    assert_eq!(event["label"], "positive");
+    assert_eq!(event["fingerprint"].as_str().unwrap().len(), 64);
 }
 
 #[test]
-fn limit_trims_agent_output_and_is_refused_for_other_formats() {
+fn limit_trims_the_output_and_counts_what_it_left_out() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
-    let text = stdout(lighthouse(dir.path()).args(["check", "--format", "agent", "--limit", "1"]));
-    assert!(text.contains("design/exported-doc warn"), "{text}");
+    let json = records(&stdout(
+        lighthouse(dir.path()).args(["check", "--format", "json", "--limit", "1"]),
+    ));
+    assert_eq!(json[0]["groups"].as_array().unwrap().len(), 1);
+    assert_eq!(group(&json[0], "design/exported-doc")["severity"], "warn");
+    assert_eq!(json[0]["omitted"]["findings"], 1);
+
+    let text = stdout(lighthouse(dir.path()).args(["check", "--format", "text", "--limit", "1"]));
+    assert!(text.contains("design/exported-doc"), "{text}");
     assert!(!text.contains("no-panic"), "{text}");
-    assert!(text.contains("... 1 more finding(s) not shown"), "{text}");
-    lighthouse(dir.path())
-        .args(["check", "--limit", "1"])
-        .assert()
-        .code(2)
-        .stderr("lighthouse: --limit applies to the agent formats only\n");
+    assert!(text.contains("1 more"), "{text}");
 }

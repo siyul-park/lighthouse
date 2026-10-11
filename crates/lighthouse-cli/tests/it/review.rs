@@ -57,22 +57,30 @@ pub(crate) fn records(text: &str) -> Vec<Value> {
 }
 
 pub(crate) fn listing(dir: &TempDir, status: &str) -> Vec<Value> {
-    let out = stdout(
-        lighthouse(dir.path()).args(["review", "list", "--status", status, "--format", "json"]),
-    );
-    records(&out)
+    let out = stdout(lighthouse(dir.path()).args([
+        "review", "list", "--status", status, "--format", "json", "--detail", "full",
+    ]));
+    let list = records(&out);
+    list[0]["tasks"].as_array().cloned().unwrap_or_default()
+}
+
+/// The whole record `review show` prints for a finding.
+pub(crate) fn shown(dir: &TempDir, fingerprint: &str) -> Value {
+    let out =
+        stdout(lighthouse(dir.path()).args(["review", "show", fingerprint, "--format", "json"]));
+    records(&out).remove(0)
 }
 
 pub(crate) fn fingerprint_of(dir: &TempDir, rule: &str) -> String {
     let all = listing(dir, "all");
-    let found = all.iter().find(|f| f["ruleId"] == rule).unwrap();
+    let found = all.iter().find(|f| f["rule"] == rule).unwrap();
     found["fingerprint"].as_str().unwrap().to_owned()
 }
 
 fn rules(records: &[Value]) -> Vec<&str> {
     let mut rules: Vec<_> = records
         .iter()
-        .map(|f| f["ruleId"].as_str().unwrap())
+        .map(|f| f["rule"].as_str().unwrap())
         .collect();
     rules.sort_unstable();
     rules
@@ -86,11 +94,13 @@ fn check_remembers_findings_and_marks_fixed_ones_resolved() {
     assert_eq!(rules(&open), ["design/exported-doc", "design/no-panic"]);
     let helper = open
         .iter()
-        .find(|f| f["ruleId"] == "design/no-panic")
+        .find(|f| f["rule"] == "design/no-panic")
         .unwrap();
     assert_eq!(helper["symbol"], "demo::run#function");
-    assert_eq!(helper["facts"]["language"], "rust");
-    assert_eq!(helper["locator"]["span"]["start"]["line"], 2);
+    assert_eq!(helper["location"]["line"], 2);
+    let record = shown(&dir, helper["fingerprint"].as_str().unwrap());
+    assert_eq!(record["facts"]["language"], "rust");
+    assert_eq!(record["locator"]["span"]["start"]["line"], 2);
 
     write(&dir, "src/lib.rs", DOCUMENTED);
     lighthouse(dir.path())
@@ -101,13 +111,15 @@ fn check_remembers_findings_and_marks_fixed_ones_resolved() {
     assert!(listing(&dir, "open").is_empty());
     let all = listing(&dir, "all");
     assert_eq!(all.len(), 2);
-    assert!(all.iter().all(|f| f["resolvedAt"].is_string()));
+    assert!(all.iter().all(|f| f["state"] == "resolved"));
+    let fingerprint = all[0]["fingerprint"].as_str().unwrap();
+    assert!(shown(&dir, fingerprint)["resolvedAt"].is_string());
 
     write(&dir, "src/lib.rs", HELPER);
     lighthouse(dir.path()).arg("check").assert().success();
     let back = listing(&dir, "open");
     assert_eq!(back.len(), 2);
-    assert!(back.iter().all(|f| f["reopened"] == 1));
+    assert_eq!(shown(&dir, fingerprint)["reopened"], 1);
 }
 
 #[test]
@@ -122,10 +134,8 @@ fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
         .args([
             "--reason",
             "named policy",
-            "--reviewer-kind",
-            "agent",
-            "--reviewer-id",
-            "claude",
+            "--attributed-to",
+            "agent:claude",
         ])
         .assert()
         .success();
@@ -139,8 +149,10 @@ fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
         notice.contains("1 finding(s) kept out of the report by judgments"),
         "{notice}"
     );
-    let agent = stdout(lighthouse(dir.path()).args(["check", "--format", "agent"]));
-    assert!(agent.contains("0 incomplete, 1 suppressed"), "{agent}");
+    let report = &records(&stdout(
+        lighthouse(dir.path()).args(["check", "--format", "json"]),
+    ))[0];
+    assert_eq!(report["counts"]["suppressed"], 1, "{report}");
 
     assert_eq!(rules(&listing(&dir, "suppressed")), ["design/no-panic"]);
     assert_eq!(rules(&listing(&dir, "open")), ["design/exported-doc"]);
@@ -152,8 +164,8 @@ fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
         "--format",
         "json",
     ])));
-    assert_eq!(history.len(), 1);
-    let event = &history[0];
+    assert_eq!(history[0]["events"].as_array().unwrap().len(), 1);
+    let event = &history[0]["events"][0];
     assert_eq!(event["judgment"], "fail");
     assert_eq!(event["reason"], "named policy");
     assert_eq!(event["suppressions"][0]["kind"], "external");
@@ -204,6 +216,11 @@ fn resolve_rejects_inconsistent_judgments_and_unknown_findings() {
         .args(["review", "resolve", "abc", "--judgment", "fail"])
         .assert()
         .code(2)
+        .stderr("lighthouse: `abc` is too short for a fingerprint: give at least 7 characters\n");
+    lighthouse(dir.path())
+        .args(["review", "resolve", "abcdef0", "--judgment", "fail"])
+        .assert()
+        .code(2)
         .stderr("lighthouse: no findings recorded yet (run `lighthouse check`)\n");
     lighthouse(dir.path()).arg("check").assert().success();
     let fingerprint = fingerprint_of(&dir, "design/exported-doc");
@@ -222,25 +239,23 @@ fn resolve_rejects_inconsistent_judgments_and_unknown_findings() {
         &["--judgment", "pass", "--suppress", "why"],
         "a suppression goes with a `fail`, not with `pass`",
     );
-    fails(&["--judgment", "maybe"], "unknown judgment");
+    fails(&["--judgment", "maybe"], "invalid value 'maybe'");
     fails(
-        &["--judgment", "fail", "--reviewer-kind", "robot"],
-        "unknown reviewer kind",
+        &["--judgment", "fail", "--attributed-to", "robot:r2"],
+        "is not person or agent",
     );
     lighthouse(dir.path())
         .args(["review", "resolve", "ffffffff", "--judgment", "fail"])
         .assert()
         .code(2);
-    assert!(
-        records(&stdout(lighthouse(dir.path()).args([
-            "review",
-            "history",
-            &fingerprint,
-            "--format",
-            "json"
-        ])))
-        .is_empty()
-    );
+    let history = records(&stdout(lighthouse(dir.path()).args([
+        "review",
+        "history",
+        &fingerprint,
+        "--format",
+        "json",
+    ])));
+    assert!(history[0]["events"].as_array().unwrap().is_empty());
 }
 
 #[test]
@@ -280,10 +295,10 @@ fn a_run_resolves_only_findings_inside_its_report_scope() {
         .success();
     let open = listing(&dir, "open");
     assert_eq!(open.len(), 1);
-    assert_eq!(open[0]["path"], "src/b.rs");
+    assert_eq!(open[0]["location"]["path"], "src/b.rs");
 
     lighthouse(dir.path())
-        .args(["check", "--rules", "design/no-panic", "src/b.rs"])
+        .args(["check", "--decision", "design/no-panic", "src/b.rs"])
         .assert()
         .success();
     assert_eq!(listing(&dir, "open").len(), 1);
@@ -328,11 +343,10 @@ fn go_findings_are_remembered_and_resolved_like_any_other() {
     )
     .unwrap();
     lighthouse(dir.path()).arg("check").assert().success();
-    let open = records(&stdout(
-        lighthouse(dir.path()).args(["review", "list", "--format", "json"]),
-    ));
+    let open = listing(&dir, "open");
     assert_eq!(open.len(), 1);
-    assert_eq!(open[0]["facts"]["language"], "go");
+    let record = shown(&dir, open[0]["fingerprint"].as_str().unwrap());
+    assert_eq!(record["facts"]["language"], "go");
     assert_eq!(open[0]["symbol"], ".::Open#function");
 
     fs::write(
@@ -345,11 +359,8 @@ fn go_findings_are_remembered_and_resolved_like_any_other() {
         .assert()
         .success()
         .stdout("");
-    let all =
-        records(&stdout(lighthouse(dir.path()).args([
-            "review", "list", "--status", "all", "--format", "json",
-        ])));
-    assert!(all[0]["resolvedAt"].is_string());
+    let all = listing(&dir, "all");
+    assert_eq!(all[0]["state"], "resolved");
 }
 
 fn git_in(dir: &TempDir, args: &[&str]) {
@@ -383,9 +394,13 @@ fn error_level(dir: &TempDir) {
 
 /// The findings of any tier, mechanical included, in a status.
 fn every(dir: &TempDir, status: &str) -> Vec<Value> {
-    records(&stdout(lighthouse(dir.path()).args([
-        "review", "list", "--all", "--status", status, "--format", "json",
-    ])))
+    let out = stdout(lighthouse(dir.path()).args([
+        "review", "list", "--all", "--status", status, "--format", "json", "--detail", "full",
+    ]));
+    records(&out)[0]["tasks"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
 }
 
 #[test]
@@ -404,7 +419,7 @@ fn an_error_stays_reported_whatever_the_judgment() {
     lighthouse(dir.path()).arg("check").assert().code(1);
     let fingerprint = every(&dir, "all")
         .iter()
-        .find(|f| f["ruleId"] == "core/allow-reason")
+        .find(|f| f["rule"] == "core/allow-reason")
         .map(|f| f["fingerprint"].as_str().unwrap().to_owned())
         .unwrap();
     let out = lighthouse(dir.path())
@@ -426,13 +441,13 @@ fn an_error_stays_reported_whatever_the_judgment() {
             .contains("this is an error")
     );
     let check = lighthouse(dir.path())
-        .args(["check", "--format", "agent"])
+        .args(["check", "--format", "json", "--detail", "full"])
         .output()
         .unwrap();
     assert_eq!(check.status.code(), Some(1));
     let text = String::from_utf8(check.stdout).unwrap();
     assert!(
-        text.contains("(note: judged fail \u{2014} errors are definitive and no judgment hides them; fix the code or suppress it in the code)"),
+        text.contains("judged fail \u{2014} errors are definitive and no judgment hides them; fix the code or suppress it in the code"),
         "{text}"
     );
     let notice = String::from_utf8(check.stderr).unwrap();
@@ -486,13 +501,13 @@ fn a_judgment_expires_when_the_evidence_it_judged_changes() {
     )
     .unwrap();
     let out = lighthouse(dir.path())
-        .args(["check", "--format", "agent"])
+        .args(["check", "--format", "json", "--detail", "full"])
         .output()
         .unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(text.contains("max-name-words"), "{text}");
     assert!(
-        text.contains("(note: judgment expired: evidence changed)"),
+        text.contains("\"note\":\"judgment expired: evidence changed\""),
         "{text}"
     );
     let notice = String::from_utf8(out.stderr).unwrap();
@@ -509,8 +524,9 @@ fn the_reviewer_comes_from_flags_then_the_environment_then_a_human() {
     let fingerprint = fingerprint_of(&dir, "design/no-panic");
     let resolve = |envs: &[(&str, &str)], flags: &[&str]| {
         let mut cmd = lighthouse(dir.path());
-        cmd.env_remove("LIGHTHOUSE_REVIEWER_KIND")
-            .env_remove("LIGHTHOUSE_REVIEWER")
+        cmd.env_remove("LIGHTHOUSE_ATTRIBUTED_TO")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
             .env("USER", "dana");
         for (key, value) in envs {
             cmd.env(key, value);
@@ -521,19 +537,10 @@ fn the_reviewer_comes_from_flags_then_the_environment_then_a_human() {
             .success();
     };
     resolve(&[], &[]);
+    resolve(&[("LIGHTHOUSE_ATTRIBUTED_TO", "agent:hook")], &[]);
     resolve(
-        &[
-            ("LIGHTHOUSE_REVIEWER_KIND", "agent"),
-            ("LIGHTHOUSE_REVIEWER", "hook"),
-        ],
-        &[],
-    );
-    resolve(
-        &[
-            ("LIGHTHOUSE_REVIEWER_KIND", "agent"),
-            ("LIGHTHOUSE_REVIEWER", "hook"),
-        ],
-        &["--reviewer-kind", "human", "--reviewer-id", "ana"],
+        &[("LIGHTHOUSE_ATTRIBUTED_TO", "agent:hook")],
+        &["--attributed-to", "person:ana"],
     );
     let history = records(&stdout(lighthouse(dir.path()).args([
         "review",
@@ -542,7 +549,9 @@ fn the_reviewer_comes_from_flags_then_the_environment_then_a_human() {
         "--format",
         "json",
     ])));
-    let who: Vec<_> = history
+    let who: Vec<_> = history[0]["events"]
+        .as_array()
+        .unwrap()
         .iter()
         .map(|e| {
             (
@@ -557,7 +566,7 @@ fn the_reviewer_comes_from_flags_then_the_environment_then_a_human() {
     assert!(who.contains(&("Person", "ana")), "{who:?}");
 
     lighthouse(dir.path())
-        .env("LIGHTHOUSE_REVIEWER_KIND", "robot")
+        .env("LIGHTHOUSE_ATTRIBUTED_TO", "robot:r2")
         .args(["review", "resolve", &fingerprint, "--judgment", "fail"])
         .assert()
         .code(2);
@@ -602,7 +611,7 @@ fn the_decision_log_carries_a_judgment_to_a_clone_without_the_cache() {
         "json",
     ])));
     assert_eq!(
-        history[0]["suppressions"][0]["justification"],
+        history[0]["events"][0]["suppressions"][0]["justification"],
         "project-allowed"
     );
 }
@@ -750,8 +759,11 @@ fn source_annotations_allow_findings_and_are_counted() {
             .unwrap()
             .contains("1 finding(s) allowed by source annotations")
     );
-    let agent = stdout(lighthouse(dir.path()).args(["check", "--format", "agent"]));
-    assert!(agent.contains("0 suppressed, 1 allowed"), "{agent}");
+    let report = &records(&stdout(
+        lighthouse(dir.path()).args(["check", "--format", "json"]),
+    ))[0];
+    assert_eq!(report["counts"]["allowed"], 1, "{report}");
+    assert!(report["counts"].get("suppressed").is_none(), "{report}");
 
     let plugin = lighthouse_test_support::lang_rust();
     fs::write(

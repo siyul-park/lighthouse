@@ -90,16 +90,16 @@ pub(crate) fn wrapped(select: &str, log: &Value) -> TempDir {
     dir
 }
 
-/// The findings of `lighthouse check --format json`, one object per line.
+/// The findings of `lighthouse check --format json --detail full`.
 pub(crate) fn check(dir: &Path) -> Vec<Value> {
     let out = lighthouse(dir)
-        .args(["check", "--format", "json"])
+        .args(["check", "--format", "json", "--detail", "full"])
         .output()
         .unwrap();
-    String::from_utf8_lossy(&out.stdout)
-        .lines()
-        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
-        .collect()
+    serde_json::from_slice::<Value>(&out.stdout)
+        .ok()
+        .and_then(|report| report["findings"].as_array().cloned())
+        .unwrap_or_default()
 }
 
 #[test]
@@ -123,10 +123,13 @@ fn a_sarif_log_becomes_findings_with_the_decisions_severity_and_the_tools_eviden
         );
     }
 
-    let wide = all.iter().find(|d| d["file"] == "src/wide.txt").unwrap();
+    let wide = all
+        .iter()
+        .find(|d| d["location"]["path"] == "src/wide.txt")
+        .unwrap();
     assert_eq!(wide["severity"], "error");
     // `é` is 2 bytes, the emoji 4: the 4th UTF-16 unit is the 7th byte column.
-    assert_eq!(wide["span"]["start"]["col"], 7, "{wide}");
+    assert_eq!(wide["location"]["column"], 7, "{wide}");
     let renamed = all
         .iter()
         .find(|d| d["message"] == "Rename foo to bar")
@@ -167,8 +170,8 @@ fn a_finding_keeps_its_identity_when_its_line_and_the_numbers_in_its_message_mov
         let dir = wrapped(select, &log(line, count));
         let mut found: Vec<(String, Value)> = check(dir.path())
             .into_iter()
-            .filter(|d| d["file"] != ".")
-            .map(|d| (d["file"].to_string(), d["fingerprint"].clone()))
+            .filter(|d| d["location"]["path"] != ".")
+            .map(|d| (d["location"]["path"].to_string(), d["fingerprint"].clone()))
             .collect();
         found.sort_by_key(|(file, print)| (file.clone(), print.to_string()));
         found
