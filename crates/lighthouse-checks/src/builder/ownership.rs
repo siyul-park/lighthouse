@@ -56,10 +56,7 @@ impl Builder<'_> {
         };
         json!({
             "owner": owner.id.as_str(),
-            "owner_name": owner.name,
             "owner_file": owner.file.to_string_lossy(),
-            "owner_module": owner.id.module(),
-            "owner_tree": tree_of(&owner.file),
         })
     }
 
@@ -171,28 +168,6 @@ impl Builder<'_> {
             .filter(|id| !project.in_test(id))
             .filter_map(|id| project.symbol(id))
             .collect()
-    }
-}
-
-/// The files of the module tree of a file: the directory a Rust module `m.rs`
-/// keeps its child modules in (`m/`), or, for a crate root or a `mod.rs`, the
-/// directory the file is in. A method's id names the module of its type, not
-/// the module its `impl` is written in, so the place of the `impl` is its file.
-fn tree_of(file: &std::path::Path) -> String {
-    let dir = file.parent().map(|d| d.to_string_lossy().into_owned());
-    let dir = dir.filter(|d| !d.is_empty());
-    let stem = file.file_stem().map(|s| s.to_string_lossy().into_owned());
-    let root = matches!(stem.as_deref(), Some("lib" | "main" | "mod"));
-    let path = match (dir, stem) {
-        (Some(dir), _) if root || file.extension().is_none_or(|e| e != "rs") => dir,
-        (Some(dir), Some(stem)) => format!("{dir}/{stem}"),
-        (None, Some(stem)) if !root => stem,
-        _ => String::new(),
-    };
-    if path.is_empty() {
-        String::new()
-    } else {
-        format!("{path}/")
     }
 }
 

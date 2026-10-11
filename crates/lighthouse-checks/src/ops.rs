@@ -182,8 +182,12 @@ impl Clause {
                     .filter(|at| !kept[*at])
                     .map(|at| {
                         // The declaration to follow is one of an earlier group
-                        // that still lies below this one: the first such.
-                        let after = (at + 1..ranked.len()).find(|i| ranked[*i].1 < ranked[at].1);
+                        // that still lies below this one: the first such that
+                        // stays in place, else the first such.
+                        let earlier = |i: &usize| ranked[*i].1 < ranked[at].1;
+                        let after = (at + 1..ranked.len())
+                            .find(|i| kept[*i] && earlier(i))
+                            .or_else(|| (at + 1..ranked.len()).find(earlier));
                         (at, after)
                     })
                     .collect()

@@ -30,7 +30,8 @@ spec:
     A helper that returns a value other than an `error` or a `bool` builds a
     fixture (`env := testEnv(t)`) and is not followed. Helpers that return
     nothing, an `error` or a `bool` are assertion and wrapper shapes and are
-    judged.
+    judged. This covers Go's `error`/`bool` helpers; Rust assertion helpers
+    (which return `()` or panic) are not told apart from setup helpers yet.
 
     Go: The helper is a function that takes the test handle or a test fixture
     function.

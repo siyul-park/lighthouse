@@ -26,7 +26,10 @@ spec:
     # The old deterministic check of `design/tiny-modules` (0 of 20 sampled
     # findings were right) picks what the model is asked about. Widened for
     # recall: the size limit doubles from 300 to 600 lines and a module nobody
-    # imports is asked about too.
+    # imports is asked about too, unless it is an entry module (a Go `main`
+    # package or a Rust binary target), which nobody imports by design.
     select: >-
       module.lines < 600
-      && (size(module.dependents) <= 1 || module.declares == 0)
+      && (size(module.dependents) == 1 || module.declares == 0
+          || (size(module.dependents) == 0 && module.name != 'main'
+              && !module.path.contains('[bin:')))

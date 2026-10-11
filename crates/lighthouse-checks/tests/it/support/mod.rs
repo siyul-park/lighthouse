@@ -336,6 +336,17 @@ impl World {
         rule: &str,
         options: Value,
     ) -> Vec<lighthouse_model::Diagnostic> {
+        self.diagnose_with(Catalog::bundled(), subject, rule, options)
+    }
+
+    /// Runs `rule` of `subject`, described by `catalog`, over the world.
+    pub fn diagnose_with(
+        &self,
+        catalog: &Catalog,
+        subject: &Subject,
+        rule: &str,
+        options: Value,
+    ) -> Vec<lighthouse_model::Diagnostic> {
         let dir = tempfile::tempdir().unwrap();
         for (path, fragment) in self.fragments() {
             let target = dir.path().join(path);
@@ -364,7 +375,7 @@ impl World {
         registry.register(&Fixture::new()).unwrap();
         registry.register(&Metrics).unwrap();
         registry.register(subject.plugin).unwrap();
-        let outcome = Engine::new(registry, config, Catalog::bundled(), dir.path())
+        let outcome = Engine::new(registry, config, catalog, dir.path())
             .unwrap()
             .check(&[], &[rule.to_owned()])
             .unwrap();

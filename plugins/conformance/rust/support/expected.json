@@ -13,6 +13,24 @@
         },
         {
           "from": {
+            "symbol": "app::run#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 2
+            },
+            "start": {
+              "col": 17,
+              "line": 2
+            }
+          },
+          "to": "shared::shared#function"
+        },
+        {
+          "from": {
             "module": "app/tests"
           },
           "kind": "contains",
@@ -79,7 +97,7 @@
           },
           "statements": 1,
           "symbol": "app::run#function",
-          "tokens": 5,
+          "tokens": 9,
           "top_level": 1
         },
         {
@@ -246,6 +264,78 @@
           "id": "fixtures::sample#function",
           "kind": "function",
           "name": "sample",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "shared"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "shared::shared#function"
+        }
+      ],
+      "file": {
+        "path": "shared/src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "u8"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "shared::shared#function",
+          "tokens": 3,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "shared",
+          "path": "shared"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "shared/src/lib.rs",
+          "id": "shared::shared#function",
+          "kind": "function",
+          "name": "shared",
           "span": {
             "end": {
               "col": 2,

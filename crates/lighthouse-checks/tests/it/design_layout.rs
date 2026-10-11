@@ -46,6 +46,25 @@ fn groups_name_the_declaration_a_displaced_one_must_follow() {
 }
 
 #[test]
+fn groups_anchor_a_displaced_declaration_on_one_that_stays() {
+    // `helper` and `Run` both belong after the three types, which stay put;
+    // `Run` is itself displaced, so it is no anchor for `helper`.
+    let mut w = World::default();
+    let helper = w.func("m", "helper", "m/a.ucm");
+    w.private(&helper);
+    w.func("m", "Run", "m/a.ucm");
+    for name in ["First", "Second", "Third"] {
+        w.symbol("m", name, SymbolKind::Type, "m/a.ucm");
+    }
+    let groups = json!({ "groups": ["type", "public-function", "private-function"] });
+    let found = w.messages(GROUPS, groups);
+    assert_eq!(found.len(), 2, "{found:?}");
+    for message in &found {
+        assert!(message.contains("must follow First"), "{message}");
+    }
+}
+
+#[test]
 fn groups_accept_a_file_in_order_and_ignore_unlisted_groups() {
     let mut w = World::default();
     w.symbol("m", "A", SymbolKind::Type, "m/a.ucm");

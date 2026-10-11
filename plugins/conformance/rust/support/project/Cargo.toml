@@ -1,5 +1,5 @@
 [workspace]
-members = ["app", "fixtures"]
+members = ["app", "fixtures", "shared"]
 resolver = "3"
 
 [workspace.package]

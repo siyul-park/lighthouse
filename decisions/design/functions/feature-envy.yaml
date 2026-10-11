@@ -258,3 +258,28 @@ spec:
                 store.extra = store.total;
                 store
             }
+    - name: rust-names-the-type-but-returns-another-value
+      language: rust
+      kind: valid
+      files:
+        - path: src/lib.rs
+          body: |-
+            pub struct Store {
+                items: Vec<i32>,
+                total: i32,
+                extra: i32,
+            }
+
+            impl Store {
+                pub fn reset(&mut self) {
+                    self.items.clear();
+                }
+            }
+
+            fn measure(items: Vec<i32>) -> i32 {
+                let store = Store { items, total: 0, extra: 0 };
+                let mut n = store.items.len() as i32;
+                n += store.total;
+                n += store.extra;
+                n
+            }

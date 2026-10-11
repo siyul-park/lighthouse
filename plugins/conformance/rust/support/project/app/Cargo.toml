@@ -6,3 +6,6 @@ publish.workspace = true
 
 [dev-dependencies]
 fixtures = { path = "../fixtures" }
+
+[dependencies]
+shared = { path = "../shared" }

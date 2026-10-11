@@ -1,5 +1,5 @@
 pub fn run(x: u8) -> u8 {
-    x + 1
+    x + shared::shared()
 }
 
 #[cfg(test)]

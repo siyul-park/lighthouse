@@ -109,6 +109,21 @@ fn misplaced_symbol_reports_a_function_that_uses_one_other_module_only() {
 }
 
 #[test]
+fn misplaced_symbol_does_not_move_a_function_into_generated_code() {
+    let mut w = World::default();
+    let load = w.func("app", "load", "app/a.ucm");
+    w.summarize(&load, 4, &[]);
+    w.private(&load);
+    for name in ["read", "count", "scan"] {
+        let used = w.func("gen", name, "gen/a.ucm");
+        w.edge(EdgeKind::Calls, &load, &used);
+    }
+    assert_eq!(w.names(&w.check(MISPLACED, json!({}))), ["load"]);
+    w.files.insert("gen/a.ucm".to_owned(), true);
+    assert!(w.check(MISPLACED, json!({})).is_empty());
+}
+
+#[test]
 fn misplaced_symbol_leaves_a_function_that_uses_two_other_modules_alone() {
     let mut w = World::default();
     let load = w.func("app", "load", "app/a.ucm");
