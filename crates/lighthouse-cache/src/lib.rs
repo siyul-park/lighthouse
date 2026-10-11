@@ -13,6 +13,7 @@ use thiserror::Error;
 
 mod digest;
 mod key;
+mod neighbors;
 mod store;
 
 pub use digest::{Digest, Digests, FileDigest, documents};
