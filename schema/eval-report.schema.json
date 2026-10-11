@@ -1,0 +1,677 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/eval-report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "agreement": {
+      "anyOf": [
+        {
+          "properties": {
+            "high": {
+              "type": "number"
+            },
+            "hits": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "low": {
+              "type": "number"
+            },
+            "of": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "hits",
+            "of",
+            "value",
+            "low",
+            "high"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "audit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "candidate": {
+      "anyOf": [
+        {
+          "properties": {
+            "calls": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "check": {
+              "type": "string"
+            },
+            "cost": {
+              "type": "number"
+            },
+            "metrics": {
+              "properties": {
+                "abstention": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "high": {
+                          "type": "number"
+                        },
+                        "hits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "low": {
+                          "type": "number"
+                        },
+                        "of": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "value": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "hits",
+                        "of",
+                        "value",
+                        "low",
+                        "high"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "coverage": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "high": {
+                          "type": "number"
+                        },
+                        "hits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "low": {
+                          "type": "number"
+                        },
+                        "of": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "value": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "hits",
+                        "of",
+                        "value",
+                        "low",
+                        "high"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "fnr": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "high": {
+                          "type": "number"
+                        },
+                        "hits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "low": {
+                          "type": "number"
+                        },
+                        "of": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "value": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "hits",
+                        "of",
+                        "value",
+                        "low",
+                        "high"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "fpr": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "high": {
+                          "type": "number"
+                        },
+                        "hits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "low": {
+                          "type": "number"
+                        },
+                        "of": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "value": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "hits",
+                        "of",
+                        "value",
+                        "low",
+                        "high"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "precision": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "high": {
+                          "type": "number"
+                        },
+                        "hits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "low": {
+                          "type": "number"
+                        },
+                        "of": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "value": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "hits",
+                        "of",
+                        "value",
+                        "low",
+                        "high"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "recall": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "high": {
+                          "type": "number"
+                        },
+                        "hits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "low": {
+                          "type": "number"
+                        },
+                        "of": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "value": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "hits",
+                        "of",
+                        "value",
+                        "low",
+                        "high"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "selector_precision": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "high": {
+                          "type": "number"
+                        },
+                        "hits": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "low": {
+                          "type": "number"
+                        },
+                        "of": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "value": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "hits",
+                        "of",
+                        "value",
+                        "low",
+                        "high"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [],
+              "type": "object"
+            },
+            "model_decided": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reviews": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "check",
+            "metrics",
+            "model_decided",
+            "reviews",
+            "calls",
+            "cost"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "caveat": {
+      "type": "string"
+    },
+    "current": {
+      "properties": {
+        "calls": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "check": {
+          "type": "string"
+        },
+        "cost": {
+          "type": "number"
+        },
+        "metrics": {
+          "properties": {
+            "abstention": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "high": {
+                      "type": "number"
+                    },
+                    "hits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "low": {
+                      "type": "number"
+                    },
+                    "of": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "hits",
+                    "of",
+                    "value",
+                    "low",
+                    "high"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "coverage": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "high": {
+                      "type": "number"
+                    },
+                    "hits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "low": {
+                      "type": "number"
+                    },
+                    "of": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "hits",
+                    "of",
+                    "value",
+                    "low",
+                    "high"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "fnr": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "high": {
+                      "type": "number"
+                    },
+                    "hits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "low": {
+                      "type": "number"
+                    },
+                    "of": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "hits",
+                    "of",
+                    "value",
+                    "low",
+                    "high"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "fpr": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "high": {
+                      "type": "number"
+                    },
+                    "hits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "low": {
+                      "type": "number"
+                    },
+                    "of": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "hits",
+                    "of",
+                    "value",
+                    "low",
+                    "high"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "precision": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "high": {
+                      "type": "number"
+                    },
+                    "hits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "low": {
+                      "type": "number"
+                    },
+                    "of": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "hits",
+                    "of",
+                    "value",
+                    "low",
+                    "high"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "recall": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "high": {
+                      "type": "number"
+                    },
+                    "hits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "low": {
+                      "type": "number"
+                    },
+                    "of": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "hits",
+                    "of",
+                    "value",
+                    "low",
+                    "high"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "selector_precision": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "high": {
+                      "type": "number"
+                    },
+                    "hits": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "low": {
+                      "type": "number"
+                    },
+                    "of": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "hits",
+                    "of",
+                    "value",
+                    "low",
+                    "high"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [],
+          "type": "object"
+        },
+        "model_decided": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reviews": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "check",
+        "metrics",
+        "model_decided",
+        "reviews",
+        "calls",
+        "cost"
+      ],
+      "type": "object"
+    },
+    "decision": {
+      "type": "string"
+    },
+    "labelled": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "meets_policy": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "policy": {
+      "properties": {
+        "precision": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "precision"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "decision",
+    "labelled",
+    "policy",
+    "current",
+    "caveat"
+  ],
+  "title": "EvalReport",
+  "type": "object"
+}

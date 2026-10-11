@@ -33,3 +33,5 @@ assert_cmd.workspace = true
 predicates = "3"
 tempfile.workspace = true
 lighthouse-test-support = { path = "../lighthouse-test-support" }
+insta.workspace = true
+jsonschema.workspace = true

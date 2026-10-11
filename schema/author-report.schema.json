@@ -1,0 +1,48 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/author-report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "created": {
+      "type": "boolean"
+    },
+    "id": {
+      "type": "string"
+    },
+    "localPluginListed": {
+      "type": "boolean"
+    },
+    "note": {
+      "type": "string"
+    },
+    "path": {
+      "type": "string"
+    },
+    "tested": {
+      "properties": {
+        "languages": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "runs": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "runs",
+        "languages"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "id",
+    "path",
+    "created",
+    "tested",
+    "localPluginListed",
+    "note"
+  ],
+  "title": "AuthorReport",
+  "type": "object"
+}

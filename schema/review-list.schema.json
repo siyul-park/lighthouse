@@ -1,0 +1,59 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/review-list.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "groups": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "judgments": {},
+    "note": {
+      "type": "string"
+    },
+    "notices": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "omitted": {
+      "oneOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "properties": {
+            "findings": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "groups": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "groups",
+            "findings"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "resolve": {
+      "type": "string"
+    },
+    "tasks": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [],
+  "title": "ReviewList",
+  "type": "object"
+}

@@ -1,0 +1,96 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/fix-report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "applied": {
+      "items": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "fixer": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
+          },
+          "safety": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fingerprint",
+          "rule",
+          "fixer",
+          "safety"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "declined": {
+      "items": {
+        "properties": {
+          "fingerprint": {
+            "type": "string"
+          },
+          "line": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fingerprint",
+          "rule",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "diff": {
+      "type": "string"
+    },
+    "dryRun": {
+      "type": "boolean"
+    },
+    "messages": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "rounds": {
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "dryRun",
+    "diff",
+    "applied",
+    "declined",
+    "rounds",
+    "messages"
+  ],
+  "title": "FixReport",
+  "type": "object"
+}

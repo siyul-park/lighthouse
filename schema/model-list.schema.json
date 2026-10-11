@@ -1,0 +1,53 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/model-list.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "models": {
+      "items": {
+        "properties": {
+          "binding": {
+            "enum": [
+              "classification",
+              "rule",
+              "attached"
+            ]
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "remote": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "model",
+          "decision",
+          "binding",
+          "remote"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "omitted": {
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "models",
+    "omitted"
+  ],
+  "title": "ModelList",
+  "type": "object"
+}

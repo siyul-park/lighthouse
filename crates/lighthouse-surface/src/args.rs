@@ -8,11 +8,13 @@ use std::path::PathBuf;
 use clap::{Args, ValueEnum};
 use lighthouse_session::{Judgment, StatusFilter};
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 /// How much each item of a report carries.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, ValueEnum, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Detail {
     /// Grouped by decision, a decision's text said once.
@@ -32,7 +34,7 @@ impl From<Detail> for lighthouse_report::Detail {
 }
 
 /// A judgment, spelled as SARIF and the rule pipeline spell it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, JsonSchema)]
 pub enum JudgmentArg {
     /// The code conforms: the finding is a false positive.
     #[serde(rename = "pass")]
@@ -59,7 +61,9 @@ impl From<JudgmentArg> for Judgment {
 }
 
 /// Which remembered findings a listing includes.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, ValueEnum, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Status {
     /// Still reported and not suppressed.

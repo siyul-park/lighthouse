@@ -1479,6 +1479,8 @@ dependencies = [
  "assert_cmd",
  "clap",
  "clap_complete",
+ "insta",
+ "jsonschema",
  "lighthouse-engine",
  "lighthouse-mcp",
  "lighthouse-model",

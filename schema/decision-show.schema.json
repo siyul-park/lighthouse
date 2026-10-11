@@ -1,0 +1,18 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/decision-show.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "markdown": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "markdown"
+  ],
+  "title": "DecisionShow",
+  "type": "object"
+}

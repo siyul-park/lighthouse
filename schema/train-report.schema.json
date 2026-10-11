@@ -1,0 +1,53 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/train-report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "by_source": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "type": "object"
+    },
+    "dataset": {
+      "type": "string"
+    },
+    "decision": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "result": {
+      "anyOf": [
+        {
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "subjects": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "training_file": {
+      "type": "string"
+    },
+    "unresolved": {
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "decision",
+    "model",
+    "subjects",
+    "unresolved",
+    "dataset",
+    "training_file"
+  ],
+  "title": "TrainReport",
+  "type": "object"
+}

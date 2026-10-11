@@ -1,0 +1,148 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/check-report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "counts": {
+      "properties": {
+        "allowed": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "error": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "info": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "review": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "suppressed": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "warn": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "error",
+        "warn",
+        "review"
+      ],
+      "type": "object"
+    },
+    "findings": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "groups": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "incomplete": {
+      "items": {},
+      "type": "array"
+    },
+    "judgments": {},
+    "messages": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "omitted": {
+      "oneOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "properties": {
+            "findings": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "groups": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "groups",
+            "findings"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "reasons": {},
+    "resolve": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "clean",
+        "findings",
+        "incomplete",
+        "review"
+      ]
+    },
+    "summary": {
+      "properties": {
+        "allowed": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "errors": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "incomplete": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "infos": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reviews": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "clean",
+            "findings",
+            "incomplete"
+          ]
+        },
+        "suppressed": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "warnings": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "CheckReport",
+  "type": "object"
+}

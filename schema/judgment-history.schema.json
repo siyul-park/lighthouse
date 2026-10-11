@@ -1,0 +1,21 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/judgment-history.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "events": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "fingerprint": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "fingerprint",
+    "events"
+  ],
+  "title": "JudgmentHistory",
+  "type": "object"
+}
