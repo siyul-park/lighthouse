@@ -161,8 +161,7 @@ impl Classifier for Command {
         &self.manifest
     }
 
-    /// Whatever the program prints that does not fit the shape of an answer is
-    /// no answer for the question it concerns.
+    /// Output that does not fit the shape of an answer is a provider error.
     fn classify(&self, params: &ClassifyParams) -> Result<ClassifyResult, Error> {
         let failed =
             |reason: String| Error::Failed(format!("model `{}`: {reason}", self.manifest.id));
@@ -191,17 +190,18 @@ impl Classifier for Command {
         let answers = params
             .questions
             .keys()
-            .filter_map(|id| {
-                let noul = noul_of(printed.as_ref()?, id)?;
-                Some((
-                    id.clone(),
-                    QuestionAnswer {
-                        kind: "noul".to_owned(),
-                        noul,
-                    },
-                ))
+            .map(|id| {
+                let noul = printed
+                    .as_ref()
+                    .and_then(|printed| noul_of(printed, id))
+                    .ok_or_else(|| failed(format!("its output has no `noul` for `{id}`")))?;
+                let answer = QuestionAnswer {
+                    kind: "noul".to_owned(),
+                    noul,
+                };
+                Ok((id.clone(), answer))
             })
-            .collect();
+            .collect::<Result<_, Error>>()?;
         Ok(ClassifyResult {
             model: self.manifest.id.clone(),
             answers,

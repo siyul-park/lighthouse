@@ -90,7 +90,7 @@ pub fn all() -> Vec<Tool> {
 }
 
 /// The tools that author and test decisions.
-fn decision_tools() -> [Tool; 3] {
+fn decision_tools() -> [Tool; 4] {
     [
         tool(
             "decision_create",
@@ -116,6 +116,18 @@ fn decision_tools() -> [Tool; 3] {
             "Run the examples of checked decisions through the whole engine, in each language the project's plugins provide. `ok` is false when any example fails.",
             json!({ "ids": { "type": "array", "items": { "type": "string" }, "description": "Decision ids; default every checked decision." } }),
             &[],
+        ),
+        tool(
+            "decision_eval",
+            "Measure a decision's check against its labels (person judgments under the current meaning version, hand-reviewed baseline rows): precision, FPR, recall, FNR, selector precision, coverage and abstention, each with a Wilson 95% interval, the model calls and their cost, and a verdict against the decision's evaluation policy (`rules.\"<id>\".evaluation`). With `check`, a candidate decision file is measured beside it and their agreement is reported. Labelled positives come mostly from flagged findings, so recall is an upper bound; `audit` writes unflagged selected subjects for a person to label.",
+            json!({
+                "decision": { "type": "string", "description": "The decision id." },
+                "check": { "type": "string", "description": "Path of a decision file whose check is the candidate." },
+                "baseline": { "type": "string", "description": "A table of reviewed findings (default baseline/precision/<decision>.tsv)." },
+                "audit": { "type": "integer", "description": "Write this many unflagged selected subjects to a table for a person to label." },
+                "noModels": { "type": "boolean", "description": "Ask no model." }
+            }),
+            &["decision"],
         ),
     ]
 }

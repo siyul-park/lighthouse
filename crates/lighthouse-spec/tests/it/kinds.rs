@@ -117,7 +117,6 @@ fn cel_check_selects() {
         identity: None,
         review: None,
         prompt: None,
-        threshold: None,
     };
 
     assert_eq!(check(None).selects(Subject::File), Some(Select::File));

@@ -229,3 +229,31 @@ fn recorded_model_labels_are_judgments_attributed_to_the_model() {
     let id = judgment["spec"]["wasAttributedTo"]["id"].as_str().unwrap();
     assert!(id.starts_with("fake/any@"), "{id}");
 }
+
+/// Answers 0.5 to everything, in an envelope, as text holding fenced JSON.
+const WEAK: &str = r#"import sys
+sys.stdin.read()
+print('{"result": "```json\\n{\\"noul\\": 0.5}\\n```"}')
+"#;
+
+const LAYERED: &str = "[models]\nclassification = \"fake/any\"\n[models.providers.fake]\ntype = \"command\"\nargv = [\"python3\", \"model.py\"]\n[models.providers.weak]\ntype = \"command\"\nargv = [\"python3\", \"weak.py\"]\nstdin = \"prompt\"\npointer = \"/result\"\n";
+
+#[test]
+fn an_abstention_falls_through_the_layers_and_a_prompt_command_answers_through_a_pointer() {
+    let dir = project(LAYERED);
+    write(dir.path(), "weak.py", WEAK);
+    let text = fs::read_to_string(dir.path().join("lighthouse.toml")).unwrap();
+    fs::write(
+        dir.path().join("lighthouse.toml"),
+        text.replace(
+            "\"local/naming-ban\" = \"warn\"",
+            "\"local/naming-ban\" = { level = \"warn\", model = \"weak/m\" }",
+        ),
+    )
+    .unwrap();
+    let (_, log) = check(dir.path(), &["--no-cache"]);
+    let found = results(&log);
+    // The rule's own model is unsure of everything, so the project's decides.
+    assert_eq!(count(&found, "fail"), 2, "{found:?}");
+    assert_eq!(count(&found, "review"), 2, "{found:?}");
+}

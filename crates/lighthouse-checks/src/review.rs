@@ -67,7 +67,7 @@ impl Review {
             fact: compile(id, "review", select.variable())?,
             select,
             decision: decision_ref,
-            upper: check.confidence(),
+            upper: lighthouse_plugin::UPPER,
             revision,
         }))
     }

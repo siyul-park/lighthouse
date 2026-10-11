@@ -3,8 +3,7 @@
 
 use lighthouse_model::Severity;
 use lighthouse_spec::{
-    Config, DEFAULT_THRESHOLD, Evaluation, ModelBinding, ModelCheck, ModelProvider, Select,
-    Subject, Tolerate,
+    Config, Evaluation, ModelBinding, ModelCheck, ModelProvider, Select, Subject, Tolerate,
 };
 
 const PROJECT: &str = r#"
@@ -116,6 +115,5 @@ fn a_model_check_is_a_cel_check_that_never_fails_and_reviews_what_it_selects() {
     assert_eq!(cel.condition, "false");
     assert_eq!(cel.review.as_deref(), Some("symbol.name.startsWith(\"x\")"));
     assert_eq!(cel.select, Some(Select::Symbol));
-    assert_eq!(cel.confidence(), DEFAULT_THRESHOLD);
     assert!(ModelCheck::default().as_cel(Subject::Project).is_none());
 }

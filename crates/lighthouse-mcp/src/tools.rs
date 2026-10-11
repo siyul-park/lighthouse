@@ -62,6 +62,7 @@ pub fn call(name: &str, args: Value, caller: &Caller) -> Outcome {
         "decision_create" => decisions::create(parse(args)?),
         "decision_update" => decisions::update(parse(args)?),
         "decision_test" => decisions::test(parse(args)?),
+        "decision_eval" => decisions::eval(parse(args)?),
         "fix" => fix::fix(parse(args)?),
         "decision_similar" | "decision_proposals" => Err(format!(
             "`{name}` is reserved for a later version and not available yet"

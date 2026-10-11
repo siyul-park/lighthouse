@@ -37,6 +37,10 @@ pub(super) struct RunModels<'a> {
     off: bool,
     collect: bool,
     seen: std::sync::Mutex<BTreeMap<String, Subject>>,
+    notes: std::sync::Mutex<std::collections::BTreeSet<String>>,
+    over_budget: AtomicUsize,
+    calls: AtomicUsize,
+    cost: std::sync::Mutex<f64>,
 }
 
 /// What is kept of an answer: the probability of failing. The model that gave
@@ -97,6 +101,10 @@ impl<'a> RunModels<'a> {
             off: options.off,
             collect: options.collect,
             seen: std::sync::Mutex::default(),
+            notes: std::sync::Mutex::default(),
+            over_budget: AtomicUsize::new(0),
+            calls: AtomicUsize::new(0),
+            cost: std::sync::Mutex::default(),
         }
     }
 
@@ -108,12 +116,47 @@ impl<'a> RunModels<'a> {
             .clone()
     }
 
-    /// Writes the answers kept this run.
-    pub(super) fn finish(&self) -> Option<String> {
-        let kept = self.answers.as_ref()?;
-        kept.finish()
-            .err()
-            .map(|e| format!("the model answers were not saved: {e}"))
+    /// How many questions were put to models this run, and what they cost.
+    pub(super) fn usage(&self) -> (usize, f64) {
+        let cost = *self
+            .cost
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        (self.calls.load(Ordering::SeqCst), cost)
+    }
+
+    /// Writes the answers kept this run, and says what went wrong with the
+    /// models: a failure never makes the run incomplete, but it is not silent.
+    pub(super) fn finish(&self) -> Vec<String> {
+        let mut notes: Vec<String> = std::mem::take(
+            &mut *self
+                .notes
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        )
+        .into_iter()
+        .map(|note| format!("model failed, its subjects are left to review: {note}"))
+        .collect();
+        let spent = self.over_budget.load(Ordering::SeqCst);
+        if spent > 0 {
+            notes.push(format!(
+                "the model budget ({}) was spent: {spent} subject(s) are left to review",
+                self.binding.budget
+            ));
+        }
+        if let Some(kept) = &self.answers
+            && let Err(e) = kept.finish()
+        {
+            notes.push(format!("the model answers were not saved: {e}"));
+        }
+        notes
+    }
+
+    fn note(&self, note: String) {
+        self.notes
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(note);
     }
 
     /// The models that judge the rule's decision, most specific binding first:
@@ -191,14 +234,20 @@ impl<'a> RunModels<'a> {
             questions: BTreeMap::from([(ask.decision.id.clone(), Question::of(&ask.decision))]),
             options: serde_json::Map::new(),
         };
-        let result = model
-            .classify(&params)
-            .map_err(|e| Open::Failed(e.to_string()))?;
-        let noul = result
-            .answers
-            .get(&ask.decision.id)
-            .map(|a| a.noul)
-            .ok_or(Open::Undecided)?;
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        *self
+            .cost
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += model.manifest().cost;
+        let failed = |reason: String| {
+            self.note(format!("{}: {reason}", model.manifest().id));
+            Open::Failed(reason)
+        };
+        let result = model.classify(&params).map_err(|e| failed(e.to_string()))?;
+        let noul = match result.answers.get(&ask.decision.id) {
+            Some(answer) if answer.kind == "noul" => answer.noul,
+            _ => return Err(failed("it gave no `noul` answer".to_owned())),
+        };
         self.keep(model.manifest(), ask, subject, noul);
         Ok(noul)
     }
@@ -219,7 +268,10 @@ impl<'a> RunModels<'a> {
                 left.checked_sub(1)
             })
             .map(drop)
-            .map_err(|_| Open::OverBudget)
+            .map_err(|_| {
+                self.over_budget.fetch_add(1, Ordering::SeqCst);
+                Open::OverBudget
+            })
     }
 
     fn key(
@@ -229,14 +281,15 @@ impl<'a> RunModels<'a> {
         ask: &Ask,
         subject: &Subject,
     ) -> lighthouse_cache::Key {
+        // The check's revision, the model at its version, what the model reads
+        // of the subject and what it is asked. The band is not part of it: the
+        // cache holds the raw probability.
         let mut key = KeyBuilder::new();
         key.part("model-answer")
-            .part(model)
-            .part(version)
             .part(&ask.revision)
-            .part(&ask.decision.id)
-            .part(hash::sha256(&subject.text))
-            .part(hash::sha256(subject.context.facts.to_string()));
+            .part(format!("{model}@{version}"))
+            .part(digest_of(&subject.state()))
+            .part(digest_of(&Question::of(&ask.decision)));
         key.finish()
     }
 
@@ -310,4 +363,9 @@ impl Models for RunModels<'_> {
         }
         judged
     }
+}
+
+/// The digest of a value as JSON, with sorted keys.
+fn digest_of<T: Serialize>(value: &T) -> String {
+    hash::sha256(serde_json::to_string(value).unwrap_or_default())
 }

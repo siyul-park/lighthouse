@@ -28,6 +28,37 @@ pub struct TestArgs {
     ids: Vec<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct EvalArgs {
+    decision: String,
+    #[serde(default)]
+    check: Option<std::path::PathBuf>,
+    #[serde(default)]
+    baseline: Option<std::path::PathBuf>,
+    #[serde(default)]
+    audit: Option<usize>,
+    #[serde(default)]
+    no_models: bool,
+}
+
+pub fn eval(args: EvalArgs) -> Outcome {
+    let default = std::path::PathBuf::from(format!("baseline/precision/{}.tsv", args.decision));
+    let report = lighthouse_session::evaluate::eval(&lighthouse_session::evaluate::EvalRequest {
+        baseline: args
+            .baseline
+            .or_else(|| default.is_file().then_some(default)),
+        decision: args.decision,
+        repos: Vec::new(),
+        candidate: args.check,
+        config: None,
+        no_models: args.no_models,
+        audit: args.audit,
+    })
+    .map_err(fail)?;
+    serde_json::to_value(report).map_err(fail)
+}
+
 pub fn create(args: CreateArgs) -> Outcome {
     let spec = document(args.spec, "spec")?;
     let examples = match document(args.examples, "examples")? {

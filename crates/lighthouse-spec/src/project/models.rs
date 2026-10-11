@@ -16,14 +16,17 @@ pub const DEFAULT_BUDGET: usize = 200;
 pub const DEFAULT_PRECISION: f64 = 0.9;
 
 /// The specs a provider may name, and what each needs by default.
-const SPECS: [(&str, &str, &str); 1] = [("openai", "https://api.openai.com/v1", "OPENAI_API_KEY")];
+const SPECS: [(&str, &str, &str); 2] = [
+    ("openai", "https://api.openai.com/v1", "OPENAI_API_KEY"),
+    ("typesafe", "https://api.typesafe.ai", "TYPESAFE_API_KEY"),
+];
 
 /// The plugin that speaks the standard APIs.
 pub const API_PLUGIN: &str = "model-http";
 
 /// Names a project may not give a provider: they belong to the providers
 /// Lighthouse will predefine.
-pub const RESERVED: [&str; 3] = ["local", "typesafe", "anthropic"];
+pub const RESERVED: [&str; 2] = ["local", "anthropic"];
 
 /// What a `command` model is given on stdin.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -148,7 +151,9 @@ impl ProviderSpec {
                     .iter()
                     .find(|(spec, ..)| names.contains(spec))
                     .ok_or_else(|| {
-                        format!("none of the specs {names:?} is supported (openai is)")
+                        format!(
+                            "none of the specs {names:?} is supported (openai and typesafe are)"
+                        )
                     })?;
                 let mut options = Map::new();
                 options.insert(

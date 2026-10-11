@@ -78,16 +78,8 @@ impl<'de> Deserialize<'de> for Check {
                 }
             },
             Some("cel") => &[
-                "select",
-                "with",
-                "where",
-                "message",
-                "evidence",
-                "at",
-                "identity",
-                "review",
+                "select", "with", "where", "message", "evidence", "at", "identity", "review",
                 "prompt",
-                "threshold",
             ],
             Some("command") => &[
                 "argv",
@@ -100,7 +92,7 @@ impl<'de> Deserialize<'de> for Check {
                 "select",
             ],
             Some("rpc") => &["params"],
-            Some("model") => &["over", "with", "select", "prompt", "threshold", "identity"],
+            Some("model") => &["over", "with", "select", "prompt", "identity"],
             other => {
                 return Err(D::Error::custom(match other {
                     None => {
@@ -457,11 +449,6 @@ pub struct CelCheck {
     /// decision's requirement.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
-    /// P(fail), from 0 to 1, at or above which a model's answer is a `fail`;
-    /// below it the subject is left to review. Default: 0.9 (an uncalibrated
-    /// model never clears a subject).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub threshold: Option<f64>,
 }
 
 /// A named CEL value.
@@ -570,23 +557,15 @@ impl CelCheck {
         template_problem(&self.message).map(|p| format!("check message: {p}"))
     }
 
-    /// What is wrong with `review`, `prompt` or `threshold`.
+    /// What is wrong with `review` or `prompt`.
     fn review_problem(&self, compile: &dyn Fn(&str, &str) -> Option<String>) -> Option<String> {
-        if self.review.is_none() && (self.prompt.is_some() || self.threshold.is_some()) {
-            return Some("check: `prompt` and `threshold` need a `review`".to_owned());
+        if self.review.is_none() && self.prompt.is_some() {
+            return Some("check: `prompt` needs a `review`".to_owned());
         }
         if self.prompt.as_deref().is_some_and(|p| p.trim().is_empty()) {
             return Some("check: `prompt` is empty".to_owned());
         }
-        if self.threshold.is_some_and(|t| !(0.0..=1.0).contains(&t)) {
-            return Some("check: `threshold` is between 0 and 1".to_owned());
-        }
         compile("review", self.review.as_deref()?)
-    }
-
-    /// P(fail) at which a model's answer is a `fail`.
-    pub fn confidence(&self) -> f64 {
-        self.threshold.unwrap_or(crate::DEFAULT_THRESHOLD)
     }
 }
 

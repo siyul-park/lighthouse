@@ -175,8 +175,8 @@ https://docs.typesafe.ai/api, for one subject: `{state, model, questions}`.
 
 It answers `{model, answers: {<decision id>: {type: "noul", noul}}, usage}`: `noul` is the
 probability that the subject fails. There is no reason. The host maps it, the same for every
-model: at or above the band (`threshold`, default 0.9) the subject fails; otherwise it is left to
-review. A model that has not been calibrated never clears a subject. The confidence is
+model: at or above the band's `upper` the subject fails (0.9 until `eval` calibrates one);
+otherwise it is left to review. A model that has not been calibrated never clears a subject. The confidence is
 max(p, 1 - p).
 
 `lighthouse/train` takes OpenAI's fine-tuning job body (`POST /v1/fine_tuning/jobs`):
@@ -593,7 +593,9 @@ Rust with a notice.
 Models behind the standard HTTP APIs, as a provider in `lighthouse.toml`
 (`spec = "openai"` or a list such as `["openai", "typesafe"]`, `baseUrl`, `keyEnv`; see
 [rule-pipeline.md](rule-pipeline.md#models)). Each operation uses the spec that covers it:
-classification uses `typesafe` when listed, else `openai`. Only `openai` is served so far.
+classification uses `typesafe` when listed, else `openai`.
+
+For `typesafe`, the System One body is forwarded as it is to `POST {baseUrl}/v1/systemone` with `Authorization: Bearer <key>` (https://docs.typesafe.ai/api), and its answer is read as it comes.
 
 For `openai`, each question is rendered as a prompt that asks for the probability of yes, and
 sent to `{baseUrl}/chat/completions` with `Authorization: Bearer <key>`, `temperature` 0 and

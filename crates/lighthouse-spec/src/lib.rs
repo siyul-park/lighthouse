@@ -42,7 +42,7 @@ pub use model::{
     Content, DecisionStatus, Domain, Example, ExampleFile, ExampleKind, Expect, Scope, Subject,
     authored_severity,
 };
-pub use model_check::{DEFAULT_THRESHOLD, ModelCheck};
+pub use model_check::ModelCheck;
 pub use options::{
     LIMIT_ROLES, NO_LIMIT, ObjectType, OptionSchema, OptionType, OptionsSchema, Shape, definitions,
 };

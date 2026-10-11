@@ -22,6 +22,7 @@ pub use fix::{
     FixDecision, FixRequest, Fixer, FixerManifest, KeyCtx, NoKeys, OrderKey, OrderKeyManifest,
     OrderKeys,
 };
+pub use lighthouse_protocol::training_file;
 pub use memo::Memo;
 pub use models::{
     Ask, Classifier, ClassifyParams, ClassifyResult, Decided, DecisionRef, Judged, LabelSource,

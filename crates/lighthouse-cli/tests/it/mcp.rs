@@ -177,6 +177,7 @@ fn the_server_lists_its_tools_and_resources() {
         [
             "check",
             "decision_create",
+            "decision_eval",
             "decision_list",
             "decision_test",
             "decision_update",

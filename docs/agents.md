@@ -53,6 +53,7 @@ value starting with `-` is refused).
 | `decision_create` | `id` (`local/<name>`), `spec` (object or YAML/JSON text), `examples` | `id`, written `path`, test runs, whether the `local` plugin is listed |
 | `decision_update` | `id`, `patch` (JSON merge patch over the spec) | like `decision_create` |
 | `decision_test` | `ids?` | `ok`, counts, `failures` |
+| `decision_eval` | `decision`, `check?`, `baseline?`, `audit?`, `noModels?` | the metrics with Wilson intervals, model calls and cost, the verdict against the evaluation policy |
 | `fix` | `fingerprints?`, `paths?`, `rules?` (at least one), `dryRun?`, `unsafeFixes?` | `dryRun`, `diff` (unified, every changed file), `applied` (`fingerprint`, `rule`, `fixer`, `safety`, `description`, `files`), `declined` (`fingerprint`, `rule`, `path`, `line`, `reason`), `rounds`, `messages` |
 
 `decision_similar` and `decision_proposals` are reserved for later phases and are

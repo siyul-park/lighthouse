@@ -15,7 +15,7 @@ use std::{
 
 use lighthouse_model::Severity;
 use lighthouse_plugin::ResultKind;
-use lighthouse_spec::{Catalog, Evaluation, local_files};
+use lighthouse_spec::{Catalog, Evaluation, Tolerate, local_files};
 use serde::Serialize;
 
 use crate::{
@@ -45,6 +45,9 @@ pub struct EvalRequest {
     pub config: Option<PathBuf>,
     /// Leave models out of both checks.
     pub no_models: bool,
+    /// Write this many selected subjects the check did not flag to a table
+    /// a person labels, to measure recall.
+    pub audit: Option<usize>,
 }
 
 /// One check's numbers.
@@ -56,6 +59,9 @@ pub struct Side {
     pub model_decided: usize,
     /// Subjects left to review.
     pub reviews: usize,
+    /// Questions put to models, and what they cost.
+    pub calls: usize,
+    pub cost: f64,
 }
 
 /// The result of an evaluation.
@@ -68,10 +74,14 @@ pub struct EvalReport {
     pub candidate: Option<Side>,
     /// How often the candidate answers as the current check does.
     pub agreement: Option<Rate>,
-    /// Whether the check (the candidate, when there is one) reaches the
-    /// precision target by the lower bound of its interval.
-    pub meets_precision: Option<bool>,
+    /// Whether the check (the candidate, when there is one) meets the
+    /// evaluation policy by the lower bound of its interval: the precision
+    /// target when misses are tolerated, the recall target when false alarms
+    /// are.
+    pub meets_policy: Option<bool>,
     pub caveat: &'static str,
+    /// The table of unflagged subjects written for a person to label.
+    pub audit: Option<PathBuf>,
 }
 
 /// What one run of a check found, by subject.
@@ -83,6 +93,11 @@ struct Found {
     by_place: BTreeMap<String, Outcome>,
     model_decided: usize,
     reviews: usize,
+    calls: usize,
+    cost: f64,
+    /// Selected subjects the check did not flag, for an audit, with the
+    /// place each is at.
+    unflagged: Vec<(String, String)>,
 }
 
 /// What one repository gave.
@@ -91,10 +106,40 @@ struct Part {
     current: Vec<(Truth, Outcome)>,
     candidate: Vec<(Truth, Outcome)>,
     pairs: Vec<(Outcome, Outcome)>,
-    decided: (usize, usize),
-    candidate_decided: (usize, usize),
+    decided: Usage,
+    candidate_decided: Usage,
+    audit: Vec<String>,
     check: String,
     candidate_check: Option<String>,
+}
+
+/// What a check asked of models.
+#[derive(Clone, Copy, Default)]
+struct Usage {
+    decided: usize,
+    reviews: usize,
+    calls: usize,
+    cost: f64,
+}
+
+impl Usage {
+    fn of(found: &Found) -> Self {
+        Self {
+            decided: found.model_decided,
+            reviews: found.reviews,
+            calls: found.calls,
+            cost: found.cost,
+        }
+    }
+
+    fn plus(self, other: Self) -> Self {
+        Self {
+            decided: self.decided + other.decided,
+            reviews: self.reviews + other.reviews,
+            calls: self.calls + other.calls,
+            cost: self.cost + other.cost,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -114,16 +159,18 @@ impl Gathered {
             self.parts.iter().flat_map(|p| pick(p).clone()).collect()
         };
         let current = pool(|p| &p.current);
-        let side = |check: String, pairs: &[(Truth, Outcome)], decided: (usize, usize)| Side {
+        let side = |check: String, pairs: &[(Truth, Outcome)], used: Usage| Side {
             check,
             metrics: evaluate(pairs),
-            model_decided: decided.0,
-            reviews: decided.1,
+            model_decided: used.decided,
+            reviews: used.reviews,
+            calls: used.calls,
+            cost: used.cost,
         };
-        let sum = |pick: fn(&Part) -> (usize, usize)| {
+        let sum = |pick: fn(&Part) -> Usage| {
             self.parts
                 .iter()
-                .fold((0, 0), |a, p| (a.0 + pick(p).0, a.1 + pick(p).1))
+                .fold(Usage::default(), |a, p| a.plus(pick(p)))
         };
         let current_side = side(first.check.clone(), &current, sum(|p| p.decided));
         let candidate_side = with_candidate.then(|| {
@@ -135,10 +182,15 @@ impl Gathered {
             )
         });
         let judged = candidate_side.as_ref().unwrap_or(&current_side);
-        let meets_precision = judged
-            .metrics
-            .precision
-            .map(|rate| rate.low >= policy.precision);
+        let meets_policy = match policy.tolerate {
+            Tolerate::Fn => judged.metrics.precision,
+            Tolerate::Fp => judged.metrics.recall,
+        }
+        .map(|rate| rate.low >= policy.precision);
+        let audit = write_audit(
+            request,
+            self.parts.iter().flat_map(|p| p.audit.clone()).collect(),
+        )?;
         let pairs: Vec<(Outcome, Outcome)> =
             self.parts.iter().flat_map(|p| p.pairs.clone()).collect();
         Ok(EvalReport {
@@ -148,8 +200,9 @@ impl Gathered {
             agreement: with_candidate.then(|| agreement(&pairs)).flatten(),
             current: current_side,
             candidate: candidate_side,
-            meets_precision,
+            meets_policy,
             caveat: CAVEAT,
+            audit,
         })
     }
 }
@@ -240,7 +293,12 @@ fn one(
         file,
         repo: repo.name.as_deref(),
     });
-    let labels = collect(&root, &decision, table.as_ref(), None)?;
+    // Only labels a person gave or an example shows grade a check; weak labels
+    // (an agent's, a model's) never do.
+    let labels: Vec<Label> = collect(&root, &decision, table.as_ref(), None)?
+        .into_iter()
+        .filter(|l| l.weight >= crate::labels::WEIGHT_PERSON)
+        .collect();
     let current = run(request, config, &request.decision, None)?;
     let truth = |l: &Label| match l.kind {
         ResultKind::Fail => Truth::Fail,
@@ -257,8 +315,9 @@ fn one(
             .collect(),
         candidate: Vec::new(),
         pairs: Vec::new(),
-        decided: (current.model_decided, current.reviews),
-        candidate_decided: (0, 0),
+        decided: Usage::of(&current),
+        candidate_decided: Usage::default(),
+        audit: Vec::new(),
         check: request.decision.clone(),
         candidate_check: None,
     };
@@ -280,10 +339,49 @@ fn one(
             part.candidate.push((truth(label), now));
             part.pairs.push((was, now));
         }
-        part.candidate_decided = (found.model_decided, found.reviews);
+        part.candidate_decided = Usage::of(&found);
+        part.audit = audit_rows(request, repo, &found);
         part.candidate_check = Some(id);
     }
+    if candidate.is_none() {
+        part.audit = audit_rows(request, repo, &current);
+    }
     Ok(part)
+}
+
+/// The rows of an audit table for a repository: unflagged selected subjects,
+/// a deterministic sample.
+fn audit_rows(request: &EvalRequest, repo: &Repo, found: &Found) -> Vec<String> {
+    let Some(n) = request.audit else {
+        return Vec::new();
+    };
+    let mut rows: Vec<&(String, String)> = found.unflagged.iter().collect();
+    rows.sort_by_key(|(fingerprint, _)| lighthouse_model::hash::short(fingerprint, 8));
+    rows.into_iter()
+        .take(n)
+        .map(|(fingerprint, place)| {
+            format!(
+                "{fingerprint}\t{}\t{place}\t\t",
+                repo.name.as_deref().unwrap_or("-")
+            )
+        })
+        .collect()
+}
+
+/// Writes the audit table, when one was asked for and there is something to
+/// label: a person fills in the `verdict` column (`TP` or `FP`).
+fn write_audit(request: &EvalRequest, rows: Vec<String>) -> Result<Option<PathBuf>> {
+    if request.audit.is_none() || rows.is_empty() {
+        return Ok(None);
+    }
+    let path = PathBuf::from(format!("{}.audit.tsv", request.decision.replace('/', "-")));
+    let mut text = String::from("fingerprint\trepo\tlocation\tverdict\treason\n");
+    for row in rows {
+        text.push_str(&row);
+        text.push('\n');
+    }
+    std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok(Some(path))
 }
 
 fn run(
@@ -307,6 +405,7 @@ fn run(
             models: ModelFlags {
                 off: request.no_models,
                 all: true,
+                collect: request.audit.is_some(),
                 ..ModelFlags::default()
             },
             ..CheckRequest::default()
@@ -335,5 +434,19 @@ fn run(
         found.by_place.insert(place.clone(), result);
         found.place.insert(fp, place);
     }
+    found.calls = outcome.model_calls;
+    found.cost = outcome.model_cost;
+    let flagged: std::collections::BTreeSet<&String> = found.by_fingerprint.keys().collect();
+    found.unflagged = outcome
+        .subjects
+        .iter()
+        .filter(|(fingerprint, _)| !flagged.contains(fingerprint))
+        .map(|(fingerprint, subject)| {
+            (
+                fingerprint.clone(),
+                format!("{} {}", subject.file, subject.id),
+            )
+        })
+        .collect();
     Ok(found)
 }

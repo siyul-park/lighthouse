@@ -170,7 +170,8 @@ fn eval_measures_the_check_with_a_model_plugin_bound() {
             "local/naming-ban",
             "--baseline",
             "labels.tsv",
-            "--json",
+            "--format",
+            "json",
         ],
     );
     let report = json(&out);
@@ -197,7 +198,8 @@ fn learn_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
             "local/naming-ban",
             "--baseline",
             "labels.tsv",
-            "--json",
+            "--format",
+            "json",
         ],
     );
     let trained = json(&out);

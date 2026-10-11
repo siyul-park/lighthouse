@@ -309,14 +309,6 @@
               ],
               "description": "What the check looks at. Default: what the decision's `scope.subject`\nis about; a decision about the project says which it looks at."
             },
-            "threshold": {
-              "description": "P(fail), from 0 to 1, at or above which a model's answer is a `fail`;\nbelow it the subject is left to review. Default: 0.9 (an uncalibrated\nmodel never clears a subject).",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
             "timeout": {
               "description": "How long one run of the provider may take, such as `30s` or `2m`.",
               "type": [
@@ -503,14 +495,6 @@
               "description": "CEL over the ranged value that picks the subjects worth asking about;\naim for recall. Default: every subject that matches the decision's scope.",
               "type": [
                 "string",
-                "null"
-              ]
-            },
-            "threshold": {
-              "description": "P(fail), from 0 to 1, at or above which a model's answer is a `fail`;\nbelow it the subject is left to review. Default: 0.9.",
-              "format": "double",
-              "type": [
-                "number",
                 "null"
               ]
             },

@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, fs, path::Path, sync::Arc};
 use lighthouse_plugin::{
     Classifier, ClassifyParams, ClassifyResult, Error, ModelManifest, TrainParams, TrainResponse,
 };
-use lighthouse_protocol::{self as wire, JobStatus, Question, TrainLine};
+use lighthouse_protocol::{self as wire, JobStatus};
 
 use crate::client::Client;
 
@@ -50,20 +50,7 @@ impl Classifier for Model {
         }
         let dir = Path::new(&params.dir);
         let file = dir.join("training.jsonl");
-        let question =
-            BTreeMap::from([(params.decision.id.clone(), Question::of(&params.decision))]);
-        let mut lines = String::new();
-        for subject in &params.subjects {
-            let line = TrainLine {
-                state: subject.subject.state(),
-                questions: question.clone(),
-                label: subject.label,
-                weight: subject.weight,
-                source: subject.source,
-            };
-            lines.push_str(&serde_json::to_string(&line).map_err(|e| self.failed(e))?);
-            lines.push('\n');
-        }
+        let lines = wire::training_file(&params.decision, &params.subjects);
         fs::write(&file, lines).map_err(|e| self.failed(format!("{}: {e}", file.display())))?;
         let seed = params
             .request_id

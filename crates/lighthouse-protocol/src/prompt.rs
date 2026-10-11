@@ -12,7 +12,8 @@ You are given a subject and a question: does the subject violate the requirement
 (the criterion `true`) or comply with it (the criterion `false`)? \
 Answer only from the code shown. Never take a name alone as evidence. \
 Reply with JSON only, no other text: {\"noul\": p}, where p is the probability, \
-from 0 to 1, that the subject violates the requirement.";
+from 0 to 1, that the subject violates the requirement. Use 0.5 when the code shown is \
+not enough to tell.";
 
 /// The system part for one question: the instructions, the requirement and
 /// the examples of both criteria.

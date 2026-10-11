@@ -56,6 +56,31 @@ pub struct Prompt {
 /// Something that turns a prompt into the model's text.
 pub trait Transport {
     fn complete(&self, endpoint: &Endpoint, prompt: &Prompt) -> Result<String, String>;
+
+    /// Forwards the System One body as it is.
+    fn systemone(
+        &self,
+        endpoint: &Endpoint,
+        params: &ClassifyParams,
+    ) -> Result<ClassifyResult, String>;
+}
+
+/// The transports of the specs served: each operation goes to the spec that
+/// covers it.
+pub struct Specs;
+
+impl Transport for Specs {
+    fn complete(&self, endpoint: &Endpoint, prompt: &Prompt) -> Result<String, String> {
+        crate::openai::Http.complete(endpoint, prompt)
+    }
+
+    fn systemone(
+        &self,
+        endpoint: &Endpoint,
+        params: &ClassifyParams,
+    ) -> Result<ClassifyResult, String> {
+        crate::typesafe::classify(endpoint, params)
+    }
 }
 
 pub struct Plugin {
@@ -96,6 +121,9 @@ impl Handler for Plugin {
 
     fn classify(&mut self, params: ClassifyParams) -> Result<ClassifyResult, String> {
         let endpoint = Endpoint::of(&params.options, &params.model)?;
+        if endpoint.spec == "typesafe" {
+            return self.transport.systemone(&endpoint, &params);
+        }
         let mut answers = BTreeMap::new();
         for (id, question) in &params.questions {
             let prompt = Prompt {
@@ -123,18 +151,18 @@ impl Handler for Plugin {
 }
 
 /// The spec that covers classification: `typesafe` when the provider speaks
-/// it, else `openai`. Only `openai` is served so far.
+/// it, else `openai`.
 fn spec_for_classification(declared: Option<&Value>) -> Result<String, String> {
     let names: Vec<&str> = match declared {
         Some(Value::String(name)) => vec![name.as_str()],
         Some(Value::Array(list)) => list.iter().filter_map(Value::as_str).collect(),
         _ => return Err("the provider declares no `spec`".to_owned()),
     };
-    if names.contains(&"openai") {
-        Ok("openai".to_owned())
-    } else {
-        Err(format!("no served spec among {names:?} (openai is)"))
-    }
+    ["typesafe", "openai"]
+        .into_iter()
+        .find(|spec| names.contains(spec))
+        .map(str::to_owned)
+        .ok_or_else(|| format!("no served spec among {names:?} (openai and typesafe are)"))
 }
 
 #[cfg(test)]
@@ -151,6 +179,10 @@ mod tests {
         fn complete(&self, endpoint: &Endpoint, _: &Prompt) -> Result<String, String> {
             assert_eq!(endpoint.model, "qwen/qwen3-coder:free");
             Ok(self.0.to_owned())
+        }
+
+        fn systemone(&self, _: &Endpoint, _: &ClassifyParams) -> Result<ClassifyResult, String> {
+            Err("not asked".to_owned())
         }
     }
 
@@ -216,5 +248,92 @@ mod tests {
         assert!(Endpoint::of(&params().options, "").is_err());
         let endpoint = Endpoint::of(&params().options, "m").unwrap();
         assert_eq!(endpoint.key_env.as_deref(), Some("OPENROUTER_API_KEY"));
+    }
+
+    /// Serves one canned JSON response on a local port and returns the base
+    /// URL and what the request was.
+    fn serve_once(body: &'static str) -> (String, std::thread::JoinHandle<String>) {
+        use std::io::{Read, Write};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = Vec::new();
+            let mut chunk = [0u8; 4096];
+            loop {
+                let n = stream.read(&mut chunk).unwrap();
+                request.extend_from_slice(&chunk[..n]);
+                let text = String::from_utf8_lossy(&request).into_owned();
+                let Some((head, rest)) = text.split_once("\r\n\r\n") else {
+                    continue;
+                };
+                let length = head
+                    .lines()
+                    .filter_map(|l| {
+                        l.to_lowercase()
+                            .strip_prefix("content-length:")
+                            .map(str::to_owned)
+                    })
+                    .find_map(|v| v.trim().parse::<usize>().ok())
+                    .unwrap_or(0);
+                if rest.len() >= length {
+                    break;
+                }
+            }
+            let reply = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(reply.as_bytes()).unwrap();
+            String::from_utf8_lossy(&request).into_owned()
+        });
+        (url, handle)
+    }
+
+    fn over_http(spec: Value, url: &str) -> ClassifyResult {
+        let mut params = params();
+        params.options = json!({ "spec": spec, "baseUrl": url })
+            .as_object()
+            .unwrap()
+            .clone();
+        Plugin::new(Box::new(Specs)).classify(params).unwrap()
+    }
+
+    #[test]
+    fn the_openai_spec_posts_chat_completions_with_the_schema_and_reads_the_probability() {
+        let (url, request) = serve_once(
+            r#"{"choices":[{"message":{"role":"assistant","content":"{\"noul\": 0.97}"}}]}"#,
+        );
+        let result = over_http(json!("openai"), &url);
+        let request = request.join().unwrap();
+
+        assert!(
+            request.starts_with("POST /chat/completions HTTP/1.1"),
+            "{request}"
+        );
+        assert!(request.contains("json_schema") && request.contains("noul"));
+        assert!(request.contains("qwen/qwen3-coder:free"));
+        assert_eq!(result.answers["d/x"].noul, 0.97);
+    }
+
+    #[test]
+    fn the_typesafe_spec_forwards_system_ones_body_to_its_endpoint() {
+        let (url, request) = serve_once(
+            r#"{"model":"jev-latest","answers":{"d/x":{"type":"noul","noul":0.81}},"usage":{"tokens":3}}"#,
+        );
+        let result = over_http(json!(["openai", "typesafe"]), &url);
+        let request = request.join().unwrap();
+
+        assert!(
+            request.starts_with("POST /v1/systemone HTTP/1.1"),
+            "{request}"
+        );
+        let body: Value = serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+        assert_eq!(body["model"], "qwen/qwen3-coder:free");
+        assert_eq!(body["state"]["text"], "func f() {}");
+        assert_eq!(body["questions"]["d/x"]["type"], "noul");
+        assert_eq!(result.answers["d/x"].noul, 0.81);
+        assert_eq!(result.model, "jev-latest");
     }
 }

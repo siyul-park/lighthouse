@@ -51,9 +51,8 @@ impl Engine {
         };
         let found = self.collect(&scene, &mut progress)?;
         progress.outcome.subjects = models.subjects();
-        if let Some(notice) = models.finish() {
-            progress.outcome.notices.insert(notice);
-        }
+        (progress.outcome.model_calls, progress.outcome.model_cost) = models.usage();
+        progress.outcome.notices.extend(models.finish());
         if let Some(cache) = scene.cache {
             self.close_cache(cache, &mut progress.timings, &mut progress.outcome.notices);
         }

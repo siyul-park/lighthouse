@@ -44,7 +44,10 @@ pub struct Trained {
     pub by_source: std::collections::BTreeMap<String, usize>,
     /// Labels whose subject no longer exists or is not selected.
     pub unresolved: usize,
-    pub result: TrainResponse,
+    /// The training file written for the learner.
+    pub dataset: PathBuf,
+    /// What the learner gave; `None` when no model that learns is bound.
+    pub result: Option<TrainResponse>,
 }
 
 /// Trains the model on the labels of the decision.
@@ -75,13 +78,13 @@ pub fn train(request: &TrainRequest) -> Result<Trained> {
         .model
         .clone()
         .or_else(|| binding.rules.get(&request.decision).cloned())
-        .or_else(|| binding.classification.clone())
-        .ok_or("no model to train: pass --model or bind one")?;
+        .or_else(|| binding.classification.clone());
+    let exclude = reference.as_deref();
     let table = request.baseline.as_deref().map(|file| Baseline {
         file,
         repo: request.repo.as_deref(),
     });
-    let labels = collect(&root, &decision, table.as_ref(), Some(&reference))?;
+    let labels = collect(&root, &decision, table.as_ref(), exclude)?;
     let observed = &checked.outcome.subjects;
     let decision_ref = lighthouse_checks::decision_ref(&decision);
     let (mut subjects, seen) = labelled(&labels, observed);
@@ -102,25 +105,40 @@ pub fn train(request: &TrainRequest) -> Result<Trained> {
             .entry(format!("{:?}", s.source).to_lowercase())
             .or_insert(0) += 1;
     }
-    let dir = artifact_dir(&root, &reference, &request.decision);
+    let dir = artifact_dir(
+        &root,
+        reference.as_deref().unwrap_or("none"),
+        &request.decision,
+    );
     fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let dataset = dir.join("training.jsonl");
+    fs::write(
+        &dataset,
+        lighthouse_plugin::training_file(&decision_ref, &subjects),
+    )
+    .map_err(|e| format!("{}: {e}", dataset.display()))?;
     // The same labelled set for the same decision is the same request.
     let request_id =
         lighthouse_model::hash::short(&serde_json::to_string(&(&decision_ref.id, &subjects))?, 8);
     let count = subjects.len();
-    let result = checked.model(&reference)?.train(&TrainParams {
-        request_id: Some(request_id),
-        decision: decision_ref,
-        subjects,
-        options: serde_json::Map::new(),
-        dir: dir.to_string_lossy().into_owned(),
-    })?;
+    let learner = reference.as_deref().map(|r| checked.model(r)).transpose()?;
+    let result = match learner.filter(|model| model.manifest().trains) {
+        Some(model) => Some(model.train(&TrainParams {
+            request_id: Some(request_id),
+            decision: decision_ref,
+            subjects,
+            options: serde_json::Map::new(),
+            dir: dir.to_string_lossy().into_owned(),
+        })?),
+        None => None,
+    };
     Ok(Trained {
         decision: request.decision.clone(),
-        model: reference,
+        model: reference.unwrap_or_default(),
         subjects: count,
         by_source,
         unresolved,
+        dataset,
         result,
     })
 }

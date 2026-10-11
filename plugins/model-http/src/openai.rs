@@ -4,75 +4,45 @@
 //! does not support it refuses the request; the request is then sent again
 //! without it, and the text is parsed as strict JSON.
 
-use std::{env, time::Duration};
-
+use lighthouse_protocol::{ClassifyParams, ClassifyResult};
 use serde_json::{Value, json};
 
-use crate::serve::{Endpoint, Prompt, Transport};
-
-/// How long a request may take.
-const TIMEOUT: Duration = Duration::from_secs(120);
-/// How many times a busy service is asked again.
-const RETRIES: usize = 3;
+use crate::{
+    http,
+    serve::{Endpoint, Prompt, Transport},
+};
 
 /// Chat Completions over HTTP.
 pub struct Http;
 
-impl Http {
-    /// Posts, and tries again after a pause when the service is busy (429,
-    /// 503) or overloaded (529).
-    fn retrying(&self, endpoint: &Endpoint, body: &Value) -> Result<Value, ureq::Error> {
-        let mut pause = Duration::from_secs(1);
-        for _ in 0..RETRIES {
-            match self.post(endpoint, body) {
-                Err(ureq::Error::StatusCode(429 | 503 | 529)) => {
-                    std::thread::sleep(pause);
-                    pause *= 2;
-                }
-                other => return other,
-            }
-        }
-        self.post(endpoint, body)
-    }
-
-    fn post(&self, endpoint: &Endpoint, body: &Value) -> Result<Value, ureq::Error> {
+impl Transport for Http {
+    fn complete(&self, endpoint: &Endpoint, prompt: &Prompt) -> Result<String, String> {
+        let key = http::key(endpoint.key_env.as_deref())?;
         let url = format!(
             "{}/chat/completions",
             endpoint.base_url.trim_end_matches('/')
         );
-        let agent: ureq::Agent = ureq::Agent::config_builder()
-            .timeout_global(Some(TIMEOUT))
-            .http_status_as_error(true)
-            .build()
-            .into();
-        let mut call = agent.post(&url);
-        if let Some(key) = endpoint
-            .key_env
-            .as_deref()
-            .and_then(|name| env::var(name).ok())
-        {
-            call = call.header("Authorization", &format!("Bearer {key}"));
-        }
-        call.send_json(body)?.body_mut().read_json()
-    }
-}
-
-impl Transport for Http {
-    fn complete(&self, endpoint: &Endpoint, prompt: &Prompt) -> Result<String, String> {
-        if let Some(name) = &endpoint.key_env
-            && env::var(name).is_err()
-        {
-            return Err(format!("${name} is not set"));
-        }
-        let structured = request(&endpoint.model, prompt, true);
-        let response = match self.retrying(endpoint, &structured) {
+        let post = |structured: bool| {
+            http::post(
+                &url,
+                key.as_deref(),
+                &request(&endpoint.model, prompt, structured),
+            )
+        };
+        let response = match post(true) {
             Ok(response) => response,
-            Err(ureq::Error::StatusCode(400 | 404 | 422)) => self
-                .retrying(endpoint, &request(&endpoint.model, prompt, false))
-                .map_err(|e| e.to_string())?,
+            // A service that does not take `response_format` is asked again
+            // without it.
+            Err(ureq::Error::StatusCode(400 | 404 | 422)) => {
+                post(false).map_err(|e| e.to_string())?
+            }
             Err(e) => return Err(e.to_string()),
         };
         text_of(&response)
+    }
+
+    fn systemone(&self, _: &Endpoint, _: &ClassifyParams) -> Result<ClassifyResult, String> {
+        Err("this spec does not speak System One".to_owned())
     }
 }
 

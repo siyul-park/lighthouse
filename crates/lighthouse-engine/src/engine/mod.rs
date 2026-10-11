@@ -116,6 +116,10 @@ pub struct Outcome {
     /// With [`ModelOptions::collect`], the subjects rules put to models, by
     /// fingerprint: the same payload a model is asked about or trained on.
     pub subjects: BTreeMap<String, lighthouse_plugin::Subject>,
+    /// Questions put to models this run (answers from the cache are not
+    /// counted), and what they cost.
+    pub model_calls: usize,
+    pub model_cost: f64,
     /// Findings that source directives suppress, within the report scope.
     /// They are not in `diagnostics` and never fail the run.
     pub suppressed: Vec<Suppressed>,

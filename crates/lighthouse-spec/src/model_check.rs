@@ -10,9 +10,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Binding, CelCheck, Identity, Select, Subject};
 
-/// P(fail) at which an answer is a `fail` when the check names none.
-pub const DEFAULT_THRESHOLD: f64 = 0.9;
-
 /// A check a model answers. The subjects `select` picks are put to the models
 /// the decision is bound to, with the decision's examples as their few shots.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -32,10 +29,6 @@ pub struct ModelCheck {
     /// What the model is told. Default: the decision's requirement.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
-    /// P(fail), from 0 to 1, at or above which a model's answer is a `fail`;
-    /// below it the subject is left to review. Default: 0.9.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub threshold: Option<f64>,
     /// What makes a finding the same one from run to run, as for a `cel` check.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub identity: Option<Identity>,
@@ -57,7 +50,6 @@ impl ModelCheck {
             identity: self.identity.clone(),
             review: Some(self.select.clone().unwrap_or_else(|| "true".to_owned())),
             prompt: self.prompt.clone(),
-            threshold: self.threshold,
         })
     }
 

@@ -36,9 +36,9 @@ pub enum LearnCommand {
         /// Use only the baseline rows of this repository.
         #[arg(long)]
         repo: Option<String>,
-        /// Print the result as JSON.
-        #[arg(long)]
-        json: bool,
+        /// text or json.
+        #[arg(long, default_value = "text")]
+        format: Output,
         #[arg(long)]
         config: Option<PathBuf>,
     },
@@ -63,11 +63,22 @@ pub struct Eval {
     /// Ask no model.
     #[arg(long)]
     no_models: bool,
-    /// Print the report as JSON.
-    #[arg(long)]
-    json: bool,
+    /// Write this many selected subjects the check did not flag to a table
+    /// for a person to label (`TP` or `FP`), to measure recall.
+    #[arg(long, value_name = "N")]
+    audit: Option<usize>,
+    /// text or json.
+    #[arg(long, default_value = "text")]
+    format: Output,
     #[arg(long)]
     config: Option<PathBuf>,
+}
+
+/// How a report is printed.
+#[derive(Clone, Copy, clap::ValueEnum)]
+pub enum Output {
+    Text,
+    Json,
 }
 
 /// Evaluates the check of a decision and prints the numbers.
@@ -92,8 +103,9 @@ pub fn evaluate(args: Eval) -> Result<u8> {
         candidate: args.candidate,
         config: args.config,
         no_models: args.no_models,
+        audit: args.audit,
     })?;
-    if args.json {
+    if matches!(args.format, Output::Json) {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         print_report(&report);
@@ -109,7 +121,7 @@ pub fn learn(command: LearnCommand) -> Result<u8> {
         from_model,
         baseline,
         repo,
-        json,
+        format,
         config,
     } = command;
     let trained = train(&TrainRequest {
@@ -120,21 +132,28 @@ pub fn learn(command: LearnCommand) -> Result<u8> {
         repo,
         config,
     })?;
-    if json {
+    if matches!(format, Output::Json) {
         println!("{}", serde_json::to_string_pretty(&trained)?);
         return Ok(0);
     }
     println!(
-        "trained {} on {} subject(s) ({} label(s) found no subject)",
-        trained.model, trained.subjects, trained.unresolved
+        "{} subject(s) for {} ({} label(s) found no subject)",
+        trained.subjects, trained.decision, trained.unresolved
     );
     for (source, n) in &trained.by_source {
         println!("  {source}: {n}");
     }
-    for (name, value) in &trained.result.metrics {
-        println!("  {name}: {value}");
+    println!("dataset: {}", trained.dataset.display());
+    match &trained.result {
+        Some(result) => {
+            println!("trained {}", trained.model);
+            for (name, value) in &result.metrics {
+                println!("  {name}: {value}");
+            }
+            println!("artifact: {}", result.artifact);
+        }
+        None => println!("no model that learns is bound: nothing was trained"),
     }
-    println!("artifact: {}", trained.result.artifact);
     Ok(0)
 }
 
@@ -153,10 +172,18 @@ fn print_report(report: &EvalReport) {
             show(Some(*rate))
         );
     }
-    if let Some(meets) = report.meets_precision {
+    if let Some(meets) = report.meets_policy {
         println!(
-            "precision {} the target by the lower bound",
-            if meets { "reaches" } else { "does not reach" }
+            "verdict: {} the policy (precision {}, tolerating {:?}) by the lower bound",
+            if meets { "meets" } else { "does not meet" },
+            report.policy.precision,
+            report.policy.tolerate
+        );
+    }
+    if let Some(path) = &report.audit {
+        println!(
+            "audit: label the rows of {} (verdict TP or FP)",
+            path.display()
         );
     }
     println!("note: {}", report.caveat);
@@ -177,8 +204,8 @@ fn print_side(label: &str, side: &Side) {
         println!("  {name}: {}", show(rate));
     }
     println!(
-        "  decided by a model: {}, left to review: {}",
-        side.model_decided, side.reviews
+        "  decided by a model: {}, left to review: {}, questions asked: {} (cost {})",
+        side.model_decided, side.reviews, side.calls, side.cost
     );
 }
 
