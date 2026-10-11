@@ -184,7 +184,7 @@ fn write(known: &BTreeMap<String, String>) -> Result<PathBuf> {
     let text = toml::to_string(&Table {
         trusted: known.clone(),
     })?;
-    lighthouse_spec::write_atomic(&path, &text)?;
+    lighthouse_resource::write_atomic(&path, &text)?;
     Ok(path)
 }
 

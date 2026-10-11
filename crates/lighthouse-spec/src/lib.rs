@@ -19,7 +19,7 @@ mod validate;
 
 use lighthouse_resource::Descriptor;
 
-pub use catalog::{Catalog, write_atomic, write_atomic_guarded};
+pub use catalog::Catalog;
 pub use check::{
     At, Binding, BuiltinCheck, BuiltinOp, CelCheck, Check, CheckKind, CycleLevel, DEFAULT_TIMEOUT,
     Identity, NamedRule, OrderClause, OrderReport, OrderScope, RpcCheck, Select, TemplatePart,

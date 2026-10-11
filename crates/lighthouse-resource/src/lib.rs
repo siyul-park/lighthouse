@@ -6,6 +6,7 @@
 mod document;
 mod duration;
 mod error;
+mod fs;
 mod schema;
 mod xdg;
 mod yaml;
@@ -22,6 +23,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 pub use document::{Format, documents, kind_of, resource};
 pub use duration::parse_duration;
 pub use error::Error;
+pub use fs::{write_atomic, write_atomic_guarded};
 pub use schema::{Descriptor, SCHEMA_URL_BASE, header, schema, schema_file};
 pub use xdg::{Base, dir as xdg_dir, dir_in as xdg_dir_in, plugins as xdg_plugins};
 pub use yaml::to_yaml;

@@ -4,7 +4,8 @@
 
 use std::{fs, io, path::Path};
 
-use lighthouse_session::{SKILL_MARKER, Session, skill_for, write_atomic};
+use lighthouse_resource::write_atomic;
+use lighthouse_session::{SKILL_MARKER, Session, skill_for};
 use serde_json::{Value, json};
 
 use crate::Result;

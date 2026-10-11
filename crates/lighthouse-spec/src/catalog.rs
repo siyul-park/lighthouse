@@ -1,17 +1,14 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
-    io::Write,
     path::{Path, PathBuf},
-    sync::{
-        OnceLock,
-        atomic::{AtomicU64, Ordering},
-    },
+    sync::OnceLock,
 };
 
 use lighthouse_model::hash;
 use lighthouse_resource::{
     Format, Resource, SCHEMA_URL_BASE, Spec, documents, kind_of, resource, to_document,
+    write_atomic,
 };
 use serde::Serialize;
 
@@ -271,7 +268,7 @@ impl Catalog {
                 "resolves outside the decisions directory",
             ));
         }
-        write_atomic(&path, text)
+        Ok(write_atomic(&path, text)?)
     }
 
     /// Fails unless `sources.yaml` lists exactly the normative lines of the
@@ -334,60 +331,6 @@ impl Catalog {
             .collect();
         hash::short(&listing, 8)
     }
-}
-
-/// Writes `text` to `path` through a uniquely named temporary file in the same
-/// directory, flushed to disk before it is renamed over `path`, so a reader
-/// sees the old file or the new one and a failure leaves no partial file. A
-/// `path` that is a symlink is refused rather than followed or replaced.
-pub fn write_atomic(path: &Path, text: &str) -> Result<(), Error> {
-    write_atomic_guarded(path, text, &|| Ok(()))
-}
-
-/// Like [`write_atomic`], but `guard` is asked once the temporary file is
-/// complete, right before it is renamed over `path`; an `Err` abandons the
-/// write and leaves `path` as it was.
-pub fn write_atomic_guarded(
-    path: &Path,
-    text: &str,
-    guard: &dyn Fn() -> Result<(), String>,
-) -> Result<(), Error> {
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-    let io = |source| Error::Io {
-        path: path.display().to_string(),
-        source,
-    };
-    if fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
-        return Err(Error::invalid(
-            &path.display().to_string(),
-            "is a symlink; edit its target by hand",
-        ));
-    }
-    let name = path.file_name().unwrap_or_default().to_string_lossy();
-    let tmp = path.with_file_name(format!(
-        ".{name}.{}.{}.tmp",
-        std::process::id(),
-        COUNTER.fetch_add(1, Ordering::Relaxed)
-    ));
-    let written = (|| {
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&tmp)?;
-        file.write_all(text.as_bytes())?;
-        file.sync_all()?;
-        // The replacement keeps the mode of the file it replaces.
-        if let Ok(meta) = fs::metadata(path) {
-            fs::set_permissions(&tmp, meta.permissions())?;
-        }
-        guard().map_err(std::io::Error::other)?;
-        fs::rename(&tmp, path)
-    })();
-    if let Err(e) = written {
-        let _ = fs::remove_file(&tmp);
-        return Err(io(e));
-    }
-    Ok(())
 }
 
 /// The documents of one catalog file; files that are not documents (example

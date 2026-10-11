@@ -8,7 +8,8 @@ use std::{
 use lighthouse_model::hash::{self, Hasher};
 use lighthouse_model::{Capability, Diagnostic, EditOp, Fingerprint, FixOutcome, Safety, Severity};
 use lighthouse_plugin::{FixDecision, FixRequest};
-use lighthouse_spec::{Formatter, FormatterOutput, FormatterStdin, write_atomic};
+use lighthouse_resource::{write_atomic, write_atomic_guarded};
+use lighthouse_spec::{Formatter, FormatterOutput, FormatterStdin};
 use serde_json::Value;
 
 use super::{
@@ -356,9 +357,7 @@ impl Orchestrator<'_> {
                     _ => Err("changed concurrently".to_owned()),
                 }
             };
-            if let Err(e) =
-                lighthouse_spec::write_atomic_guarded(&target, &self.texts[path], &guard)
-            {
+            if let Err(e) = write_atomic_guarded(&target, &self.texts[path], &guard) {
                 for written in done {
                     let _ = write_atomic(&root.join(written), &self.original[written].0);
                 }

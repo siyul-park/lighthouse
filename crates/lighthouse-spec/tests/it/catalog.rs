@@ -414,34 +414,6 @@ fn write_local_refuses_names_and_targets_that_leave_the_directory() {
 }
 
 #[test]
-fn write_atomic_replaces_a_file_and_leaves_no_temporary() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("a.json");
-    lighthouse_spec::write_atomic(&path, "one").unwrap();
-    lighthouse_spec::write_atomic(&path, "two").unwrap();
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "two");
-    let names: Vec<_> = std::fs::read_dir(dir.path()).unwrap().collect();
-    assert_eq!(names.len(), 1);
-}
-
-#[test]
-fn write_atomic_guarded() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("a.txt");
-    std::fs::write(&path, "old").unwrap();
-
-    let refused =
-        lighthouse_spec::write_atomic_guarded(&path, "new", &|| Err("changed".to_owned()));
-    let allowed = lighthouse_spec::write_atomic_guarded(&path, "new", &|| Ok(()));
-
-    assert!(refused.unwrap_err().to_string().contains("changed"));
-    allowed.unwrap();
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
-    let leftovers = std::fs::read_dir(dir.path()).unwrap().count();
-    assert_eq!(leftovers, 1, "a refused write leaves no temporary file");
-}
-
-#[test]
 fn decision_strict() {
     assert!(bundled("design/no-panic").strict());
     assert!(!bundled("design/exported-doc").strict());

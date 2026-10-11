@@ -1,8 +1,11 @@
 use thiserror::Error;
 
-/// Why a document could not be read as a resource.
+/// Why a resource could not be read or written.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum Error {
+    /// A file could not be safely written.
+    #[error("cannot write {path}: {message}")]
+    Io { path: String, message: String },
     /// The text is not valid YAML, TOML or JSON.
     #[error("{path}: {message}")]
     Parse { path: String, message: String },

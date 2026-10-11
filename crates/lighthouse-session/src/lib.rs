@@ -45,7 +45,7 @@ pub use git::head;
 pub use lighthouse_engine::{FailOn, Timings};
 pub use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};
 pub use lighthouse_resource::schema_file;
-pub use lighthouse_spec::{DOCS_DIR, FILE_NAME, write_atomic};
+pub use lighthouse_spec::{DOCS_DIR, FILE_NAME};
 pub use lighthouse_store::{
     FindingRecord, JudgmentEvent, NewJudgment, Standing, StatusFilter, SuppressionEvent,
 };
