@@ -12,7 +12,7 @@
 use std::{
     collections::BTreeMap,
     fs,
-    io::{Read, stdin, stdout},
+    io::{Read, Write, stdin, stdout},
     process::ExitCode,
 };
 
@@ -118,8 +118,14 @@ fn command() -> ExitCode {
     let Ok(request) = serde_json::from_str::<Value>(&input) else {
         return ExitCode::FAILURE;
     };
-    let mark = fs::read_to_string("calls").unwrap_or_default() + "x";
-    if fs::write("calls", mark).is_err() {
+    // Runs are concurrent: an append of one byte is atomic, a read and
+    // rewrite is not.
+    let marked = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("calls")
+        .and_then(|mut file| file.write_all(b"x"));
+    if marked.is_err() {
         return ExitCode::FAILURE;
     }
     let noul = noul_of(request["state"]["text"].as_str().unwrap_or_default());
