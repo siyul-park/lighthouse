@@ -27,7 +27,7 @@ impl Tally {
     /// The text of a project file, read once; `None` when it cannot be read.
     pub(super) fn text(&mut self, ctx: &Ctx, path: &Path) -> Option<&str> {
         if !self.texts.contains_key(path) {
-            let text = super::super::read(ctx, path).ok();
+            let text = ctx.ws.read(path).ok();
             if text.is_none() {
                 self.unreadable.push(path.to_owned());
             }

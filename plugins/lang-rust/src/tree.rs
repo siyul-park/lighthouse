@@ -113,6 +113,31 @@ pub struct Tree {
 }
 
 impl Tree {
+    /// `include!` pastes a file the analysis does not read; say so once.
+    pub fn included(&self, requested: &[String]) -> Option<String> {
+        let mut count = 0;
+        let mut example = None;
+        for m in 0..self.mods.len() {
+            let file = &self.files[self.mods[m].file].rel;
+            if !requested.contains(file) {
+                continue;
+            }
+            for item in self.items(m) {
+                if let syn::Item::Macro(mac) = item
+                    && mac.mac.path.is_ident("include")
+                {
+                    count += 1;
+                    example.get_or_insert_with(|| file.clone());
+                }
+            }
+        }
+        example.map(|file| {
+            format!(
+                "{count} `include!` invocation(s) paste code that is not analyzed, e.g. in {file}"
+            )
+        })
+    }
+
     pub fn new(root: &Path) -> Self {
         Self {
             root: root.to_owned(),

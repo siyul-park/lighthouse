@@ -205,7 +205,7 @@ fn index_files(params: &IndexParams, options: &Options, provider: &str) -> Index
         incomplete.insert((Some(rel.clone()), reason.clone()));
     }
     unreached(&orphans, &tree, &mut incomplete, &mut notices);
-    notices.extend(included(&tree, &files));
+    notices.extend(tree.included(&files));
     notices.extend(macros.notice());
     notices.extend(shared(&tree));
     notices.extend(cache.and_then(Cache::save));
@@ -438,29 +438,6 @@ fn unreached(
             "not reached from any crate target; a file of the project could not be read or parsed, so the module tree may be incomplete".to_owned(),
         ));
     }
-}
-
-/// `include!` pastes a file the analysis does not read; say so once.
-fn included(tree: &Tree, requested: &[String]) -> Option<String> {
-    let mut count = 0;
-    let mut example = None;
-    for m in 0..tree.mods.len() {
-        let file = &tree.files[tree.mods[m].file].rel;
-        if !requested.contains(file) {
-            continue;
-        }
-        for item in tree.items(m) {
-            if let syn::Item::Macro(mac) = item
-                && mac.mac.path.is_ident("include")
-            {
-                count += 1;
-                example.get_or_insert_with(|| file.clone());
-            }
-        }
-    }
-    example.map(|file| {
-        format!("{count} `include!` invocation(s) paste code that is not analyzed, e.g. in {file}")
-    })
 }
 
 /// Files that several crate targets reach are analyzed once; say so.
