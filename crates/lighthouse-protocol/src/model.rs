@@ -49,7 +49,7 @@ pub struct ModelManifest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Shot {
     /// `fail` for an invalid example, `pass` for a valid one.
-    pub verdict: Verdict,
+    pub kind: ResultKind,
     pub language: String,
     pub code: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -106,14 +106,14 @@ pub struct Subject {
     pub context: SubjectContext,
 }
 
-/// The verdict on a subject.
+/// How a subject came out, in the words of SARIF result kinds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
-pub enum Verdict {
+pub enum ResultKind {
     Fail,
     Pass,
-    /// The code shown is not enough to tell.
-    Abstain,
+    /// The code shown is not enough to tell: someone else must look.
+    Review,
 }
 
 /// Params of `lighthouse/classify`.
@@ -131,7 +131,7 @@ pub struct ClassifyParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Answer {
     pub key: String,
-    pub verdict: Verdict,
+    pub kind: ResultKind,
     /// 0 to 1.
     pub confidence: f64,
     /// One sentence.
@@ -172,7 +172,7 @@ pub struct TrainSubject {
     #[serde(flatten)]
     pub subject: Subject,
     /// `fail` or `pass`.
-    pub label: Verdict,
+    pub label: ResultKind,
     /// 0 to 1: how much the label is trusted.
     pub weight: f64,
     pub source: LabelSource,

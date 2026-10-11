@@ -267,9 +267,9 @@ pub struct ModelOptions {
     /// Models are asked at all. Off, the subjects they would judge are
     /// reported for review.
     pub off: bool,
-    /// Ask about the whole project, or only the files the run reports; the
-    /// project's `models.scope` when unset.
-    pub scope: Option<lighthouse_spec::ModelScope>,
+    /// Ask models that cost about the whole project, not only the files the
+    /// run reports.
+    pub all: bool,
     /// The model a revision attached to a decision, by decision id.
     pub attached: BTreeMap<String, String>,
 }

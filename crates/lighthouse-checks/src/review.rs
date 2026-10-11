@@ -6,8 +6,8 @@
 use cel::Program;
 use lighthouse_model::{Diagnostic, Position, Span, SymbolId, hash};
 use lighthouse_plugin::{
-    Ask, ClassifyParams, Ctx, DecisionRef, Judged, Neighbor, Open, RuleManifest, Shot, Subject,
-    SubjectContext, Verdict,
+    Ask, ClassifyParams, Ctx, DecisionRef, Judged, Neighbor, Open, ResultKind, RuleManifest, Shot,
+    Subject, SubjectContext,
 };
 use lighthouse_spec::{CelCheck, Decision, ExampleKind, Select};
 use serde_json::{Value, json};
@@ -59,9 +59,9 @@ impl Review {
             .examples
             .iter()
             .map(|example| Shot {
-                verdict: match example.kind {
-                    ExampleKind::Invalid => Verdict::Fail,
-                    ExampleKind::Valid => Verdict::Pass,
+                kind: match example.kind {
+                    ExampleKind::Invalid => ResultKind::Fail,
+                    ExampleKind::Valid => ResultKind::Pass,
                 },
                 language: example.language.clone(),
                 code: example
@@ -213,7 +213,7 @@ fn outcome(judged: Judged, candidate: Candidate, decision: &DecisionRef) -> Opti
         _ => serde_json::Map::new(),
     };
     match judged {
-        Judged::Decided(decided) if decided.verdict == Verdict::Pass => return None,
+        Judged::Decided(decided) if decided.kind == ResultKind::Pass => return None,
         Judged::Decided(decided) => {
             if diagnostic.message.is_empty() {
                 diagnostic.message.clone_from(&decided.reason);

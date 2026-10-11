@@ -327,21 +327,6 @@
         }
       ]
     },
-    "ModelScope": {
-      "description": "Which subjects a run asks models that cost something about.",
-      "oneOf": [
-        {
-          "const": "changed",
-          "description": "The subjects in the files the run reports (changed files, or the paths\ngiven).",
-          "type": "string"
-        },
-        {
-          "const": "all",
-          "description": "Every subject of the project.",
-          "type": "string"
-        }
-      ]
-    },
     "ModelsSpec": {
       "additionalProperties": false,
       "description": "The `models` table of a project: its bindings and limits, and its own\nproviders.",
@@ -377,17 +362,6 @@
           },
           "description": "The providers the project defines, by name; a name that is built in\noverrides it.",
           "type": "object"
-        },
-        "scope": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ModelScope"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Default: `changed`."
         }
       },
       "type": "object"

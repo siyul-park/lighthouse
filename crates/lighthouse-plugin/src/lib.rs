@@ -21,8 +21,8 @@ pub use fix::{
 pub use memo::Memo;
 pub use models::{
     Answer, Ask, Classifier, ClassifyParams, ClassifyResult, Decided, DecisionRef, Judged,
-    LabelSource, ModelManifest, ModelRef, Models, Neighbor, NoModels, Open, Shot, Subject,
-    SubjectContext, TrainParams, TrainResult, TrainSubject, Verdict,
+    LabelSource, ModelManifest, ModelRef, Models, Neighbor, NoModels, Open, ResultKind, Shot,
+    Subject, SubjectContext, TrainParams, TrainResult, TrainSubject,
 };
 pub use notices::Notices;
 pub use registry::{Registry, plugin_of};

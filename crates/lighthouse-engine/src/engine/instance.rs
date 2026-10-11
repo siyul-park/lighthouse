@@ -7,7 +7,7 @@ use std::{path::PathBuf, time::Duration};
 use lighthouse_model::hash;
 use lighthouse_plugin::{
     Answer, Classifier, ClassifyParams, ClassifyResult, Error, ModelManifest, ModelRef, Registry,
-    TrainParams, TrainResult, Verdict,
+    ResultKind, TrainParams, TrainResult,
 };
 use lighthouse_process::{MAX_OUTPUT, Spec};
 use lighthouse_resource::parse_duration;
@@ -247,7 +247,7 @@ impl Classifier for Command {
 fn abstain(key: &str) -> Answer {
     Answer {
         key: key.to_owned(),
-        verdict: Verdict::Abstain,
+        kind: ResultKind::Review,
         confidence: 0.0,
         reason: "the model's answer did not fit the expected shape".to_owned(),
         span: None,

@@ -276,12 +276,12 @@ fn to_json_shows_a_judgment_in_camel_case_with_its_id_label_and_suppressions() {
 }
 
 #[test]
-fn the_judgment_and_suppression_records_have_schemas() {
+fn the_records_of_the_log_have_schemas() {
     let kinds: Vec<_> = lighthouse_store::descriptors()
         .iter()
         .map(|d| d.kind)
         .collect();
-    assert_eq!(kinds, ["Judgment", "Suppression"]);
+    assert_eq!(kinds, ["Judgment", "Suppression", "Revision"]);
 }
 
 #[test]

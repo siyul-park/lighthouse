@@ -5,16 +5,16 @@
 
 use serde_json::{Value, json};
 
-use crate::{ClassifyParams, DecisionRef, Shot, Subject, Verdict};
+use crate::{ClassifyParams, DecisionRef, ResultKind, Shot, Subject};
 
 /// What the model is told about its job, before the decision.
 const INSTRUCTIONS: &str = "You judge one design decision about source code. \
 For each subject decide whether it violates the requirement (fail), complies with it (pass), \
-or whether the code shown is not enough to tell (abstain). \
+or whether the code shown is not enough to tell (review). \
 Answer only from the code shown. Never take a name alone as evidence. \
-Give a confidence from 0 to 1 that your verdict is right, and one sentence of reason. \
+Give a confidence from 0 to 1 that your answer is right, and one sentence of reason. \
 Reply with JSON only, no other text: \
-{\"results\":[{\"key\":\"<the subject's key>\",\"verdict\":\"fail|pass|abstain\",\"confidence\":0.0,\"reason\":\"...\"}]} \
+{\"results\":[{\"key\":\"<the subject's key>\",\"kind\":\"fail|pass|review\",\"confidence\":0.0,\"reason\":\"...\"}]} \
 with exactly one result for each subject.";
 
 /// The system part: the instructions, the requirement and the shots.
@@ -24,13 +24,13 @@ pub fn system(decision: &DecisionRef, shots: &[Shot]) -> String {
         decision.id, decision.prompt
     );
     for shot in shots {
-        let verdict = if shot.verdict == Verdict::Fail {
+        let kind = if shot.kind == ResultKind::Fail {
             "fail"
         } else {
             "pass"
         };
         out.push_str(&format!(
-            "\nExample ({verdict}{}):\n```{}\n{}\n```\n",
+            "\nExample ({kind}{}):\n```{}\n{}\n```\n",
             if shot.note.is_empty() {
                 String::new()
             } else {
@@ -83,11 +83,11 @@ pub fn response_schema() -> Value {
                     "type": "object",
                     "properties": {
                         "key": {"type": "string"},
-                        "verdict": {"type": "string", "enum": ["fail", "pass", "abstain"]},
+                        "kind": {"type": "string", "enum": ["fail", "pass", "review"]},
                         "confidence": {"type": "number"},
                         "reason": {"type": "string"}
                     },
-                    "required": ["key", "verdict", "confidence", "reason"],
+                    "required": ["key", "kind", "confidence", "reason"],
                     "additionalProperties": false
                 }
             }

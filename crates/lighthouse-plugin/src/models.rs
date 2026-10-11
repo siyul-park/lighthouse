@@ -5,7 +5,7 @@
 
 pub use lighthouse_protocol::{
     Answer, ClassifyParams, ClassifyResult, DecisionRef, LabelSource, ModelManifest, ModelRef,
-    Neighbor, Shot, Subject, SubjectContext, TrainParams, TrainResult, TrainSubject, Verdict,
+    Neighbor, ResultKind, Shot, Subject, SubjectContext, TrainParams, TrainResult, TrainSubject,
 };
 
 use crate::Error;
@@ -37,8 +37,8 @@ pub struct Ask {
 /// A subject a model decided.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Decided {
-    /// `Fail` or `Pass`, never `Abstain`.
-    pub verdict: Verdict,
+    /// `Fail` or `Pass`, never `Review`.
+    pub kind: ResultKind,
     pub confidence: f64,
     pub reason: String,
     /// The model that decided.

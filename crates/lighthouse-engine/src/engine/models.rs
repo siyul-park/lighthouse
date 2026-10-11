@@ -13,9 +13,9 @@ use lighthouse_cache::{Cache, DEFAULT_LIMIT, KeyBuilder};
 use lighthouse_model::hash;
 use lighthouse_plugin::{
     Answer, Ask, Classifier, ClassifyParams, Decided, Judged, ModelManifest, ModelRef, Models,
-    Open, Subject, Verdict,
+    Open, ResultKind, Subject,
 };
-use lighthouse_spec::{ModelBinding, ModelScope};
+use lighthouse_spec::ModelBinding;
 use serde::{Deserialize, Serialize};
 
 use super::instance::Host;
@@ -39,7 +39,7 @@ pub(super) struct RunModels<'a> {
 /// What is kept of an answer: the model that gave it is in the key.
 #[derive(Serialize, Deserialize)]
 struct Kept {
-    verdict: Verdict,
+    kind: ResultKind,
     confidence: f64,
     reason: String,
     version: String,
@@ -58,7 +58,7 @@ impl super::Engine {
             binding,
             &self.models.attached,
             scopes,
-            self.models.scope.unwrap_or(binding.scope),
+            self.models.all,
             self.cache.as_ref().map(|c| c.dir.as_path()),
             self.models.off,
         )
@@ -71,7 +71,7 @@ impl<'a> RunModels<'a> {
         binding: &'a ModelBinding,
         attached: &'a BTreeMap<String, String>,
         scopes: &'a [PathBuf],
-        scope: ModelScope,
+        all: bool,
         cache_dir: Option<&std::path::Path>,
         off: bool,
     ) -> Self {
@@ -79,7 +79,7 @@ impl<'a> RunModels<'a> {
             host,
             binding,
             attached,
-            scopes: (scope == ModelScope::Changed).then_some(scopes),
+            scopes: (!all).then_some(scopes),
             budget: AtomicUsize::new(binding.budget),
             answers: cache_dir.and_then(|dir| Cache::open(dir, DEFAULT_LIMIT).ok()),
             off,
@@ -242,7 +242,7 @@ impl<'a> RunModels<'a> {
                 .get(&self.key(&manifest.id, &manifest.version, ask, subject))?;
         let answer = Answer {
             key: subject.key.clone(),
-            verdict: kept.verdict,
+            kind: kept.kind,
             confidence: kept.confidence,
             reason: kept.reason,
             span: None,
@@ -261,7 +261,7 @@ impl<'a> RunModels<'a> {
         answers.put(
             key,
             &Kept {
-                verdict: answer.verdict,
+                kind: answer.kind,
                 confidence: answer.confidence,
                 reason: answer.reason.clone(),
                 version: version.to_owned(),
@@ -289,9 +289,9 @@ impl Models for RunModels<'_> {
             let mut still = Vec::new();
             for (i, answer, version) in self.ask(model, ask, &open) {
                 match answer {
-                    Ok(a) if a.verdict != Verdict::Abstain && a.confidence >= ask.threshold => {
+                    Ok(a) if a.kind != ResultKind::Review && a.confidence >= ask.threshold => {
                         judged[i] = Judged::Decided(Decided {
-                            verdict: a.verdict,
+                            kind: a.kind,
                             confidence: a.confidence,
                             reason: a.reason,
                             model: ModelRef {

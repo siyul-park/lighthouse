@@ -11,6 +11,9 @@
         "key": {
           "type": "string"
         },
+        "kind": {
+          "$ref": "#/$defs/ResultKind"
+        },
         "reason": {
           "default": "",
           "description": "One sentence.",
@@ -25,14 +28,11 @@
               "type": "null"
             }
           ]
-        },
-        "verdict": {
-          "$ref": "#/$defs/Verdict"
         }
       },
       "required": [
         "key",
-        "verdict",
+        "kind",
         "confidence"
       ],
       "type": "object"
@@ -992,25 +992,42 @@
         }
       ]
     },
+    "ResultKind": {
+      "description": "How a subject came out, in the words of SARIF result kinds.",
+      "oneOf": [
+        {
+          "enum": [
+            "fail",
+            "pass"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "review",
+          "description": "The code shown is not enough to tell: someone else must look.",
+          "type": "string"
+        }
+      ]
+    },
     "Shot": {
       "description": "An example of a decision, shown to the model as a few shots.",
       "properties": {
         "code": {
           "type": "string"
         },
+        "kind": {
+          "$ref": "#/$defs/ResultKind",
+          "description": "`fail` for an invalid example, `pass` for a valid one."
+        },
         "language": {
           "type": "string"
         },
         "note": {
           "type": "string"
-        },
-        "verdict": {
-          "$ref": "#/$defs/Verdict",
-          "description": "`fail` for an invalid example, `pass` for a valid one."
         }
       },
       "required": [
-        "verdict",
+        "kind",
         "language",
         "code"
       ],
@@ -1339,7 +1356,7 @@
           "type": "string"
         },
         "label": {
-          "$ref": "#/$defs/Verdict",
+          "$ref": "#/$defs/ResultKind",
           "description": "`fail` or `pass`."
         },
         "language": {
@@ -1397,23 +1414,6 @@
         "text"
       ],
       "type": "object"
-    },
-    "Verdict": {
-      "description": "The verdict on a subject.",
-      "oneOf": [
-        {
-          "enum": [
-            "fail",
-            "pass"
-          ],
-          "type": "string"
-        },
-        {
-          "const": "abstain",
-          "description": "The code shown is not enough to tell.",
-          "type": "string"
-        }
-      ]
     },
     "Visibility": {
       "description": "Who may use a symbol, as its language defines it; `internal` means visible\nwithin a bounded unit such as a crate, not outside it.",

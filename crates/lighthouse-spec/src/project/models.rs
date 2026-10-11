@@ -17,18 +17,6 @@ pub const DEFAULT_BATCH: usize = 20;
 /// The precision a check must reach unless the project says.
 pub const DEFAULT_PRECISION: f64 = 0.9;
 
-/// Which subjects a run asks models that cost something about.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum ModelScope {
-    /// The subjects in the files the run reports (changed files, or the paths
-    /// given).
-    #[default]
-    Changed,
-    /// Every subject of the project.
-    All,
-}
-
 /// What a `command` model is given on stdin.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -196,9 +184,6 @@ pub struct ModelsSpec {
     /// left to review. Default: 200.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub budget: Option<usize>,
-    /// Default: `changed`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub scope: Option<ModelScope>,
     /// Subjects in one request to a model. Default: 20.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub batch: Option<usize>,
@@ -267,7 +252,6 @@ pub struct ModelBinding {
     /// The evaluation policy a rule sets, by decision id.
     pub evaluation: BTreeMap<String, Evaluation>,
     pub budget: usize,
-    pub scope: ModelScope,
     pub batch: usize,
 }
 
@@ -303,7 +287,6 @@ impl ModelBinding {
             invalid,
             evaluation,
             budget: models.budget.unwrap_or(DEFAULT_BUDGET),
-            scope: models.scope.unwrap_or_default(),
             batch: models.batch.unwrap_or(DEFAULT_BATCH).max(1),
         }
     }
