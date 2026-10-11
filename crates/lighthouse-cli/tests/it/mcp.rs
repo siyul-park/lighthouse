@@ -361,10 +361,7 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
 
     let after = client.tool("check", json!({})).unwrap();
     let still = rules_of(&after);
-    assert!(
-        !still.contains(&"design/no-panic"),
-        "{still:?}"
-    );
+    assert!(!still.contains(&"design/no-panic"), "{still:?}");
     assert_eq!(after["counts"]["suppressed"], 1);
 }
 

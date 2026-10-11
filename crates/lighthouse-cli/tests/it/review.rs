@@ -142,10 +142,7 @@ fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
     let agent = stdout(lighthouse(dir.path()).args(["check", "--format", "agent"]));
     assert!(agent.contains("0 incomplete, 1 suppressed"), "{agent}");
 
-    assert_eq!(
-        rules(&listing(&dir, "suppressed")),
-        ["design/no-panic"]
-    );
+    assert_eq!(rules(&listing(&dir, "suppressed")), ["design/no-panic"]);
     assert_eq!(rules(&listing(&dir, "open")), ["design/exported-doc"]);
 
     let history = records(&stdout(lighthouse(dir.path()).args([
@@ -286,12 +283,7 @@ fn a_run_resolves_only_findings_inside_its_report_scope() {
     assert_eq!(open[0]["path"], "src/b.rs");
 
     lighthouse(dir.path())
-        .args([
-            "check",
-            "--rules",
-            "design/no-panic",
-            "src/b.rs",
-        ])
+        .args(["check", "--rules", "design/no-panic", "src/b.rs"])
         .assert()
         .success();
     assert_eq!(listing(&dir, "open").len(), 1);
@@ -460,12 +452,7 @@ fn review_show_and_text_listings_describe_a_finding() {
     assert_eq!(stdout(lighthouse(dir.path()).args(["review", "list"])), "");
     lighthouse(dir.path()).arg("check").assert().success();
     let fingerprint = fingerprint_of(&dir, "design/no-panic");
-    let list = stdout(lighthouse(dir.path()).args([
-        "review",
-        "list",
-        "--rule",
-        "design/no-panic",
-    ]));
+    let list = stdout(lighthouse(dir.path()).args(["review", "list", "--rule", "design/no-panic"]));
     assert_eq!(list.lines().count(), 1);
     assert!(list.starts_with(&fingerprint[..12]), "{list}");
     assert!(list.contains("\topen\t-\t"), "{list}");
