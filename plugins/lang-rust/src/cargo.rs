@@ -3,7 +3,7 @@
 //! or lock file, and runs no build script.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
 };
@@ -11,6 +11,8 @@ use std::{
 use toml::{Table, Value};
 
 const DEP_SECTIONS: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
+/// The sections whose crates are linked into what the package ships.
+const RUNTIME_SECTIONS: [&str; 2] = ["dependencies", "build-dependencies"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TargetKind {
@@ -52,6 +54,9 @@ pub struct Package {
     pub targets: Vec<Target>,
     /// Extern crate name (as written in code) to the package that provides it.
     pub deps: BTreeMap<String, String>,
+    /// The packages that `[dependencies]` and `[build-dependencies]` name, as
+    /// opposed to `[dev-dependencies]`.
+    pub runtime: BTreeSet<String>,
 }
 
 /// Reads the package of the manifest in `dir`; `None` for a virtual workspace
@@ -80,7 +85,10 @@ pub fn load(dir: &Path) -> Result<Option<Package>, String> {
     Ok(Some(Package {
         publishable: publishable(dir, package),
         targets: targets(dir, &name, package, &manifest),
-        deps: dependencies(&manifest),
+        deps: dependencies(&manifest, &DEP_SECTIONS),
+        runtime: dependencies(&manifest, &RUNTIME_SECTIONS)
+            .into_values()
+            .collect(),
         name,
         lib_name,
     }))
@@ -96,6 +104,7 @@ pub fn synthetic(dir: &Path) -> Package {
         publishable: true,
         targets: targets(dir, "workspace", &empty, &empty),
         deps: BTreeMap::new(),
+        runtime: BTreeSet::new(),
     }
 }
 
@@ -133,12 +142,12 @@ fn publish_flag(value: &Value) -> bool {
     }
 }
 
-fn dependencies(manifest: &Table) -> BTreeMap<String, String> {
+fn dependencies(manifest: &Table, sections: &[&str]) -> BTreeMap<String, String> {
     let mut tables: Vec<&Table> = Vec::new();
-    collect_dependency_tables(manifest, &mut tables);
+    collect_dependency_tables(manifest, sections, &mut tables);
     if let Some(platforms) = manifest.get("target").and_then(Value::as_table) {
         for platform in platforms.values().filter_map(Value::as_table) {
-            collect_dependency_tables(platform, &mut tables);
+            collect_dependency_tables(platform, sections, &mut tables);
         }
     }
     let mut found = BTreeMap::new();
@@ -152,9 +161,9 @@ fn dependencies(manifest: &Table) -> BTreeMap<String, String> {
     found
 }
 
-fn collect_dependency_tables<'a>(from: &'a Table, into: &mut Vec<&'a Table>) {
-    for section in DEP_SECTIONS {
-        into.extend(from.get(section).and_then(Value::as_table));
+fn collect_dependency_tables<'a>(from: &'a Table, sections: &[&str], into: &mut Vec<&'a Table>) {
+    for section in sections {
+        into.extend(from.get(*section).and_then(Value::as_table));
     }
 }
 

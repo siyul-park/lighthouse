@@ -206,7 +206,7 @@ fn index_files(params: &IndexParams, options: &Options, provider: &str) -> Index
         incomplete.insert((Some(rel.clone()), reason.clone()));
     }
     unreached(&orphans, &tree, &mut incomplete, &mut notices);
-    notices.extend(included(&tree, &files));
+    notices.extend(tree.included(&files));
     notices.extend(macros.notice());
     notices.extend(shared(&tree));
     notices.extend(cache.and_then(Cache::save));
@@ -357,12 +357,18 @@ fn module_tree(
 
 fn roots(packages: &[Package], mode: Unpublished) -> Vec<Root> {
     let used = depended_on(packages);
+    let shipped = shipped(packages);
     let mut roots = Vec::new();
     for (at, package) in packages.iter().enumerate() {
         let mut targets: Vec<&Target> = package.targets.iter().collect();
         targets.sort_by(|a, b| (a.kind, &a.name).cmp(&(b.kind, &b.name)));
         let has_lib = targets.iter().any(|t| t.kind == TargetKind::Lib);
         let base = cargo::crate_name(&package.name);
+        // A library only tests link in, and that ships nowhere, is test code.
+        let support = !package.publishable
+            && used.contains(package.name.as_str())
+            && !shipped.contains(package.name.as_str())
+            && !targets.iter().any(|t| t.kind == TargetKind::Bin);
         let exported = package.publishable
             || match mode {
                 Unpublished::Public => true,
@@ -375,7 +381,9 @@ fn roots(packages: &[Package], mode: Unpublished) -> Vec<Root> {
                 kind => format!("{base}[{}:{}]", kind.label(), target.name),
             };
             roots.push(Root {
-                test_of: (target.kind == TargetKind::Test && has_lib).then(|| base.clone()),
+                test_of: ((target.kind == TargetKind::Test && has_lib)
+                    || (target.kind == TargetKind::Lib && support))
+                    .then(|| base.clone()),
                 label,
                 package: at,
                 kind: target.kind,
@@ -385,6 +393,15 @@ fn roots(packages: &[Package], mode: Unpublished) -> Vec<Root> {
         }
     }
     roots
+}
+
+/// Packages another package of the project links into what it ships.
+fn shipped(packages: &[Package]) -> BTreeSet<&str> {
+    packages
+        .iter()
+        .flat_map(|p| p.runtime.iter())
+        .map(String::as_str)
+        .collect()
 }
 
 /// Packages another package of the project depends on.
@@ -422,29 +439,6 @@ fn unreached(
             "not reached from any crate target; a file of the project could not be read or parsed, so the module tree may be incomplete".to_owned(),
         ));
     }
-}
-
-/// `include!` pastes a file the analysis does not read; say so once.
-fn included(tree: &Tree, requested: &[String]) -> Option<String> {
-    let mut count = 0;
-    let mut example = None;
-    for m in 0..tree.mods.len() {
-        let file = &tree.files[tree.mods[m].file].rel;
-        if !requested.contains(file) {
-            continue;
-        }
-        for item in tree.items(m) {
-            if let syn::Item::Macro(mac) = item
-                && mac.mac.path.is_ident("include")
-            {
-                count += 1;
-                example.get_or_insert_with(|| file.clone());
-            }
-        }
-    }
-    example.map(|file| {
-        format!("{count} `include!` invocation(s) paste code that is not analyzed, e.g. in {file}")
-    })
 }
 
 /// Files that several crate targets reach are analyzed once; say so.

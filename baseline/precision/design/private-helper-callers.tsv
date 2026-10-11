@@ -1,0 +1,27 @@
+# retained: yes
+# R4 review of the retired deterministic check; unclear counts as not TP
+fingerprint	repo	location	verdict	reason
+c4407d4e68f190ef26319459ddac7880d3c3343bd51c7a7ffec6ee296c87d266	cel	ext/lists.go:739	FP	recursive (calls itself at 752), cannot be inlined
+830cebc578eb989cafe393b9c30f1d20c3011d06584e13606418433faba8a653	cel	checker/checker.go:630	unclear	one-statement predicate that names a condition
+f517171cd10c27d5c487466f3e736740cbea2623e705b8db3056ff0091f12db0	cel	parser/helper.go:72	FP	member of the newLiteral{Int,Uint,Double,...} family
+4f2a9307a2217173007a2a50adaa16ea27cadecac71cc2c4e563012226b3bbbc	cel	ext/lists.go:925	FP	member of the estimateList*Legacy family, builds a closure
+ad625fcf8f8ef66a736b7229ea129fe78953dc73bed42c92e5c023f14af8b980	cel	minivm/internal/cmd/geninterp/lower.go:493	unclear	9 statements, names the standalone lowering step
+edac9bdb60a5dec1f96311270a4077f83ad89a34db13659e790237eb749de8ec	cel	minivm/internal/cmd/geninterp/lower.go:638	unclear	9 statements, generator step
+e3e1023f04ecdb1ff4091033b46e08b2416eef125067b83dc442cfd4cbd1fd06	qlbridge	lex/lexer.go:541	FP	Lexer primitive (match/tryMatch family)
+5ed571364ba2b5935d2e11ad9b5262e2e80c1689167da0329513ccb81ddef173	qlbridge	rel/parse_sql.go:2019	FP	clause parser of the parseLimit/parseWhere family
+3cefe26cc02e3752431ff5e4769b7b87f3914ad416e659ace540e8b2b0123223	qlbridge	lex/lexer.go:737	unclear	5-statement lexer state helper
+48b9ce628d4427071e21c87e0efdd728660b5fe9dc8aa4bbab69a4052af9e24a	qlbridge	vm/vm.go:299	FP	348 statements: the evaluator body, not a detail of walkBinary
+7d25bb45a362030a62b1ffe3a5cbc2b413ce505fa4cf7ab95769f991a2facb87	qlbridge	datasource/files/filehandler.go:80	FP	registry accessor paired with Register
+1b3e37927a01cdf0b930cbe7dda461dd641265846c40fd4b77b685d65d282c0c	qlbridge	datasource/files/storesource.go:43	FP	constructor
+94e00842d63b499b078aaa0fba6e2f500b4d49026268919eee81096c3c512dfa	minivm	instr/parse.go:374	FP	18 statements, error-description policy
+9bfd68534b49c87a6d846098a05822cb7230037afcd68502cb1b45f96aca793c	minivm	transform/bound.go:109	FP	documented predicate of the loop analysis
+8584d5f889939d7990500b64d00ea52a4a2c3f8d706d55b15055b58d5c88a46a	minivm	internal/vigil/declarations.go:429	FP	11-statement format-verb scan
+1889b3c6230034944ac964c610cdb05e35b66567de96a1c32871e3fea674f97e	minivm	internal/vigil/declarations.go:592	unclear	4-statement visitor helper
+f99e08070e687f59972cebb0cbcd7e70492439171403ba0d53b0773301a6b6ef	minivm	internal/asm/assembler.go:192	FP	13 statements, documented step of encode
+9fd5a8d30852c4d308c7b168da600603ac5ffd27a678b8c15988cbd3ce46b6c1	minivm	internal/asm/arm64/encoder.go:1395	FP	29-statement algorithm, documented
+f2ca89ec1624c3f25fa88b3f9154fddefa52ced5e2197407bca95ab4f583302d	self	plugins/lang-go/provider/testcase.go:34	FP	12 statements, documented
+db4386e468b30ea0407db988038cf7ba9073b1d15941042d53349134324cba66	self	crates/lighthouse-spec/src/render.rs:98	FP	renders one section of the decision page
+0d7553e9e814d2526fdcd545c0cd1b1e724975491414041969c394eb708bf5e1	self	crates/lighthouse-checks/src/builder/mod.rs:519	unclear	4 statements, names the rank-augmented node
+25fa13f865aae5dd88eea0b04095172801686a476bab07a4253234981e07bb2b	self	crates/lighthouse-checks/src/ops.rs:400	FP	10-statement graph build, documented
+a983a8b4e093382537b007f06cd2f89fa64f3fb85b25522e13cbafcace1a45af	self	plugins/lang-rust/src/extract.rs:604	FP	one arm of the item dispatch (item_fn, item_struct, ...)
+24f620f4f5fab9f5e8c944a2a079fbb7a84574f0ab900688bcff7895c57623a0	self	crates/lighthouse-cli/src/review.rs:220	TP	two statements, prints and returns Ok(0); inline into run

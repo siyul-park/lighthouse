@@ -16,6 +16,7 @@ mod directives;
 mod fixes;
 mod go;
 mod layout;
+mod model_selects;
 mod neighbors;
 mod reach;
 mod review;

@@ -56,10 +56,7 @@ impl Builder<'_> {
         };
         json!({
             "owner": owner.id.as_str(),
-            "owner_name": owner.name,
             "owner_file": owner.file.to_string_lossy(),
-            "owner_module": owner.id.module(),
-            "owner_tree": tree_of(&owner.file),
         })
     }
 
@@ -74,8 +71,19 @@ impl Builder<'_> {
         let mut members: BTreeMap<&SymbolId, BTreeSet<&str>> = BTreeMap::new();
         let mut modules: BTreeMap<&str, BTreeSet<&SymbolId>> = BTreeMap::new();
         let mut own = 0;
+        // A function that names a type itself (a literal, `var x T`) builds
+        // or holds an instance of it: its members are the function's own.
+        let named: BTreeSet<&SymbolId> = used
+            .iter()
+            .filter(|id| {
+                project
+                    .symbol(id)
+                    .is_some_and(|s| s.kind == SymbolKind::Type)
+            })
+            .collect();
         for id in used {
             if let Some(owner) = owner_type(project, id)
+                && !named.contains(&owner.id)
                 && let Some(member) = project.symbol(id)
                 && matches!(member.kind, SymbolKind::Field | SymbolKind::Method)
             {
@@ -83,7 +91,7 @@ impl Builder<'_> {
             }
             if id.module() == symbol.id.module() {
                 own += 1;
-            } else if !inside(symbol.id.module(), id.module()) {
+            } else if !inside(symbol.id.module(), id.module()) && !generated(project, id) {
                 modules.entry(id.module()).or_default().insert(id);
             }
         }
@@ -163,28 +171,6 @@ impl Builder<'_> {
     }
 }
 
-/// The files of the module tree of a file: the directory a Rust module `m.rs`
-/// keeps its child modules in (`m/`), or, for a crate root or a `mod.rs`, the
-/// directory the file is in. A method's id names the module of its type, not
-/// the module its `impl` is written in, so the place of the `impl` is its file.
-fn tree_of(file: &std::path::Path) -> String {
-    let dir = file.parent().map(|d| d.to_string_lossy().into_owned());
-    let dir = dir.filter(|d| !d.is_empty());
-    let stem = file.file_stem().map(|s| s.to_string_lossy().into_owned());
-    let root = matches!(stem.as_deref(), Some("lib" | "main" | "mod"));
-    let path = match (dir, stem) {
-        (Some(dir), _) if root || file.extension().is_none_or(|e| e != "rs") => dir,
-        (Some(dir), Some(stem)) => format!("{dir}/{stem}"),
-        (None, Some(stem)) if !root => stem,
-        _ => String::new(),
-    };
-    if path.is_empty() {
-        String::new()
-    } else {
-        format!("{path}/")
-    }
-}
-
 /// The owner every caller is a method of, when there is at least one caller
 /// and they all are methods of the same owner.
 fn sole_owner(callers: &[&Symbol]) -> Option<String> {
@@ -197,6 +183,15 @@ fn sole_owner(callers: &[&Symbol]) -> Option<String> {
     owners
         .all(|o| o.as_deref() == Some(first.as_str()))
         .then_some(first)
+}
+
+/// Whether `id` is declared in a generated file: a function cannot be moved
+/// next to code that is rewritten by a tool.
+fn generated(project: &Project, id: &SymbolId) -> bool {
+    project
+        .symbol(id)
+        .and_then(|s| project.file(&s.file))
+        .is_some_and(|f| f.generated)
 }
 
 /// Whether `inner` lies inside `outer`: a submodule uses its parent's types

@@ -31,12 +31,12 @@ fn coupling() -> Diagnostic {
 
 fn helper() -> Diagnostic {
     let mut d = Diagnostic::new(
-        "design/private-helper-callers",
+        "design/no-panic",
         Severity::Info,
         "private helper has one caller",
         "src/lib.rs",
         span(7),
-        Fingerprint::of("design/private-helper-callers", "m::helper#function", ""),
+        Fingerprint::of("design/no-panic", "m::helper#function", ""),
     );
     d.symbol = Some("m::helper#function".to_owned());
     d
@@ -95,12 +95,12 @@ fn mixed(count: usize) -> Vec<Diagnostic> {
             3 => {
                 let symbol = format!("store::helper{i}#function");
                 let mut d = Diagnostic::new(
-                    "design/private-helper-callers",
+                    "design/no-panic",
                     Severity::Info,
                     "private helper has one caller",
                     format!("internal/store/file{}.go", i % 7),
                     span(i as u32 * 5 + 2),
-                    Fingerprint::of("design/private-helper-callers", &symbol, ""),
+                    Fingerprint::of("design/no-panic", &symbol, ""),
                 );
                 d.evidence =
                     json!({ "caller": "store::run#function", "callers": 1, "statements": 3 });
@@ -299,7 +299,7 @@ fn full_limit_keeps_the_most_severe_findings_and_counts_the_rest() {
     let text = render_with(Format::Agent, &findings, &[], &briefing);
     assert!(text.contains("acme/custom  error"), "{text}");
     assert!(text.contains("design/coupling  warn"), "{text}");
-    assert!(!text.contains("private-helper-callers  info"), "{text}");
+    assert!(!text.contains("no-panic  info"), "{text}");
     assert!(
         text.contains("... 1 more finding(s) not shown (raise --limit)"),
         "{text}"
@@ -332,7 +332,7 @@ fn limit_counts_findings_and_keeps_errors_then_the_larger_groups() {
     let text = render_with(Format::Agent, &findings, &[], &briefing);
     assert!(text.starts_with("acme/custom error\n"), "{text}");
     assert!(text.contains("design/coupling warn [review]"), "{text}");
-    assert!(!text.contains("private-helper-callers"), "{text}");
+    assert!(!text.contains("no-panic"), "{text}");
     assert!(
         text.contains("... 1 more finding(s) not shown (raise --limit)"),
         "{text}"

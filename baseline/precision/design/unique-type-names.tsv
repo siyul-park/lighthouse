@@ -1,8 +1,30 @@
-# retained: partial
-# R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -
+# retained: yes
+# R4 review of the retired deterministic check; unclear counts as not TP
 fingerprint	repo	location	verdict	reason
-3f71a323d1300f743b54f175f73b8406ed4289c4b36a88033231d38b0dad839c	cel	checker/options.go:25 Option	TP	two different option types in checker and parser
-4de741ee38a19c1270808f44dd623a4b5f6ab1a29b0183bcf5c78b9d2ee0b6c1	cel	common/types/provider.go:75 FieldType	TP	near-duplicate structs in common/types and common/types/ref
-70111dcf3b04e0385f52db4f8e46d07b6eb0a066e8163212a59f097ca51c2ad5	qlbridge	generators/elasticsearch/es2gen/estypes.go:22 BoolOccurrence	TP	duplicated struct in es2gen and esgen
-c0317e50b9d0919072895fe876ac3b608d4e68dde88e332e3df95a2dcc1a3f3e	minivm	instr/builder.go:14 Builder	TP	two builders in instr and program
-40bd5691be3792cc499913aa329d0b17379eb0a24b7dd631c603a5641401d8a1	minivm	instr/builder.go:24 Label	TP	two concepts under one name in prof and instr
+fcd12c03faf6906fccf4d0ebf10784064aa6dc4c02c0201e6cb55e89d8acc47c	cel	common/decls/decls.go:200	FP	cel/decls.go:208 is `type OverloadSelector = decls.OverloadSelector`, a re-export, not a second concept
+d276cf0f6f0cfe06f4d97529f00070086c24d0968f65cdbc92a9d2463b75a5a6	cel	common/functions/functions.go:60	FP	interpreter/functions/functions.go:32 `type UnaryOp = fn.UnaryOp` is an alias
+3f71a323d1300f743b54f175f73b8406ed4289c4b36a88033231d38b0dad839c	cel	checker/options.go:25	FP	functional-options `Option` per package (also minivm/cli, parser)
+0b2c1ee1d76c10f00a2fa70d223749ce512165d9e1a3142d65ba6425f192819a	cel	minivm/instr/kind.go:7	FP	cel.Kind and minivm types.Kind are aliases; common/types.Kind is another subproject's concept (cel carries a minivm tree)
+edbd084ea7bbd42afeeafea5c5990167d53f335afec2efae2f1541e44eee103f	cel	interpreter/functions/functions.go:32	FP	the alias itself
+6bcb0611eed61d010488dfcb48355f5d15894905154589fa9a1223fe553c9030	cel	common/types/types.go:221	FP	cel.Type is an alias; minivm/instr Type is a different concept from another subproject
+468c6eae0074138fa6b7b1f2b9189aae8e7a099a5528ada6bf0571b1d1fd0105	qlbridge	exec/ddl.go:33	unclear	exec task Alter and plan node Alter: related, layered mirror
+27ed53697bc54dbbe2a83d9955c1332ba7d93d8b83105cda00b66f4183745aff	qlbridge	generators/elasticsearch/esgen/estypes.go:152	unclear	same shape declared for another ES major version (es2gen); deliberate parallel packages
+08fa9cef0cd2cff3da810e25bb09e2373dda452e6ed4c1f240e5101892a16167	qlbridge	exec/join.go:30	unclear	exec JoinKey and plan JoinKey: layered mirror
+b7ac0d220f121a9f9945670e167aff31cb9267c8f92b8a23109333319cb852ec	qlbridge	schema/schema.go:102	FP	mockcsv.Table is a test datasource's own type, different concept
+6cd12210cf16e635ad88c2bc1a4131779755759c3feb89060c27145aefd27d25	qlbridge	value/value.go:195	unclear	TimeValue in value and datasource; not checked for equality
+ba07804e587986bf3e7a6fab3e47e9d37c489a5d365fdb3591cceaa2a41070be	qlbridge	generators/elasticsearch/esgen/estypes.go:19	unclear	as RangeFilter, parallel ES version packages
+66ac3597602c2bbc19df068b676289914888c1f10acdfc4f18c562a8997c5a8e	minivm	program/builder.go:15	FP	one Builder per package is idiomatic; program.Builder and instr.Builder build different things
+b8e4b468c6bd5140f9f4dbe66029179f9bee89df1c7da2877ed1711685ff01e0	minivm	instr/kind.go:7	FP	types.Kind is `type Kind = instr.Kind` (kind.go comment says so)
+c0317e50b9d0919072895fe876ac3b608d4e68dde88e332e3df95a2dcc1a3f3e	minivm	instr/builder.go:14	FP	same idiom as program.Builder
+0802f1471a26338dc4b90ddf62e98b87ef6688f99f2c11aa6e0b3c59a0a57658	minivm	cli/cli.go:15	FP	functional-options `Option`
+b5b79321703529efd111e477dc1347fa4947879dccf277b8c8df5e389bb605d6	minivm	types/value.go:38	FP	the alias itself
+40bd5691be3792cc499913aa329d0b17379eb0a24b7dd631c603a5641401d8a1	minivm	instr/builder.go:24	FP	jump label vs profiler label: different concepts, qualified by package
+271b1b280f3784372e49e9673d580bbbd376c9eeb67eef1f4d863419b0a93cf2	self	crates/lighthouse-protocol/src/wire.rs:329	FP	wire model mirrors the core model on purpose (docs/architecture.md:43)
+2a08c3c73c599392b60e5522291a87986e7541fbf59f662d1d185adf63751452	self	crates/lighthouse-protocol/src/wire.rs:491	FP	same
+4cbe085139be94b4b58df9e9aaae2e7d0bd8a71765e8cb682320b32a374b0dcd	self	crates/lighthouse-protocol/src/wire.rs:377	FP	same
+39b402c92bcb480c320fb5303ca3ca8dacbb4ed383e7336e9c214586e5fd1d2b	self	crates/lighthouse-protocol/src/wire.rs:248	FP	same
+32850c30b52318aeebbce9abea8b76c4b110c1cf0e844600fb4dd3ab02422966	self	crates/lighthouse-protocol/src/wire.rs:455	FP	same
+13571c79f397f79cbad0540026faf3ea02ecd88b709f45ae3120449b2f816a36	self	crates/lighthouse-protocol/src/wire.rs:444	FP	same
+9e727bee5da97fa1a13159d8cf54f8b7902d7729b09bc434ad83e98825859efb	self	crates/lighthouse-report/src/lib.rs:20	TP	report output Format vs resource document Format: two concepts, one name
+ea8edf2e0e8de1abe58afd7b4feaa733ed31ed99438d013bfd8e938360de8277	self	crates/lighthouse-spec/src/model.rs:23	unclear	Subject enum (decision subject) vs Subject struct (judgment subject): different, qualified by crate
+0f147694469ebd877e9d16a8d2c5840b5a3ccf0897eac82211ff472e30295ed0	self	crates/lighthouse-checks/src/bundled/mod.rs:18	unclear	Pack embedded in the binary vs spec Pack: related

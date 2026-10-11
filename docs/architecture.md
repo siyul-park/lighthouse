@@ -490,14 +490,14 @@ act on without another lookup, as JSON lines (`finding`, `incomplete`, `truncate
 `summary` records tagged by `type`) for `agent-json`:
 
 ```text
-design/private-helper-callers  info (heuristic)  src/lib.rs:5:1
-  owner:       demo::clamp#function
-  message:     private function clamp has one caller (run); review whether ...
-  requirement: A private helper SHOULD have at least two callers.
-  context:     A private helper with one caller is usually part of that caller.
-  evidence:    caller=demo::run#function callers=1 statements=3
-  expected:    valid rust example `rust-valid` (src/lib.rs), canonical
-                 pub fn run(x: u8) -> u8 { ... }
+design/no-panic  info (heuristic)  src/lib.rs:2:7
+  owner:       demo::run#function
+  message:     .unwrap() can panic in run: return an error instead
+  requirement: Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
+  context:     Panics bypass the caller's control flow.
+  evidence:    function=run kind=unwrap
+  expected:    valid rust example `rust-result` (src/lib.rs), canonical
+                 pub fn parse(text: &str) -> Result<u32, std::num::ParseIntError> { ... }
   fingerprint: 395d1985afe8
   resolve:     lighthouse review resolve 395d1985afe8 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent
 ```
@@ -811,7 +811,7 @@ See [agents.md](agents.md).
 ## Dogfooding
 
 Lighthouse checks its own sources. The repository's `lighthouse.toml` enables the
-bundled `core`, `design` and `testing` plugins with their recommended projects (`<plugin>/strict` adds the advice that is too noisy to recommend, such as `design/private-helper-callers`) and
+bundled `core`, `design` and `testing` plugins with their recommended projects (`<plugin>/strict` adds the advice that is too noisy to recommend, such as `design/no-panic`) and
 the Go and Rust plugins built by `make plugins`, and `make lint` (part of `make ci`)
 ends with `lighthouse check .`, which must exit 0: a finding is either fixed in the code, or it exposes a rule or
 provider that is imprecise, and that is fixed instead of silenced. The only

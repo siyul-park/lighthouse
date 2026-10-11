@@ -27,20 +27,12 @@ design/coupling warn [review] — Coupling SHOULD be judged from direct intra-pa
     func b() { hub() }
   evidence: callees=["a","b c"] fan_in=2 fan_out=14 symbol=jit::compile#function
   internal/jit/compile.go:350:1 function coordinates 14 collaborators in its package 5da1c26
-design/private-helper-callers info [review] — A private helper SHOULD have at least two callers.
+design/no-panic info [review] — Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
   expected:
-    pub fn run(x: u8) -> u8 {
-        clamp(x) + 1
+    pub fn parse(text: &str) -> Result<u32, std::num::ParseIntError> {
+        text.parse()
     }
-
-    pub fn other(x: u8) -> u8 {
-        clamp(x) + 2
-    }
-
-    fn clamp(x: u8) -> u8 {
-        if x > 10 { 10 } else { x }
-    }
-  src/lib.rs:7:1 private helper has one caller d3d6fba
+  src/lib.rs:7:1 private helper has one caller f999fb1
 broken.go: incomplete: type error
 resolve: lighthouse review resolve <fingerprint> --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent
 judgments: fail=the finding is right; add `suppress` with a justification to leave it in place; pass=false positive: the code conforms; notApplicable=the decision does not apply here; a hint to narrow it

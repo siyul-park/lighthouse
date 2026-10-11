@@ -1,18 +1,30 @@
-# retained: partial
-# R2 review: the samples the report names; fingerprints are those of the R3 final run where the finding still exists, else -
+# retained: yes
+# R4 review after the refinements, all findings; unclear counts as not TP
 fingerprint	repo	location	verdict	reason
-3f3599a1d1e9a41358a4061e38d1d61df281fdac23d1ccf7865c93379e45b700	cel	interpreter/decorators.go:198 maybeBuildMapLiteral	TP	
-103d159867f9deaee8b8123865db0e4e87454ffa8ff8570d61798ba3a8ac0f93	cel	interpreter/vm_ir.go:379 evalVMComparison	TP	
-1a1aa8e45a1face4fd9a17fb2b4b4dd86cb4ac98e4621090f4a31bc7d64a6023	cel	interpreter/vm_ir.go:418 evalVMEquality	TP	
-0989c8e46086fa4a77b8c28a1b30cb59e869cedc6099e9f4f579a4170437e967	cel	interpreter/vm_program.go:232 emitVMConstant	TP	
-855fb7f1e1a69eb28bff6e899ce292636ebfd591916f8ef2edb2913aa1a52d82	cel	interpreter/vm_program.go:676 vmRefFromScalar	TP	
-57fe280a90869203d44a39eee81f853848e6e2399197b541d21b2d6d25dc563b	qlbridge	lex/lexer.go:1275 lexExpressionIdentifier	FP	lexer state function
-54710e5c720d7fe7cf38998a0abc440afa7852d40403ff99949059e494118bf0	qlbridge	lex/lexer.go:1408 lexIdentifierOfTypeNoWs	FP	lexer state function
-46962ca51efcc83312f9b3d84903440eb8b2a9492e5d2028ac72d9e34c8c7b48	qlbridge	lex/lexer.go:3138 scanNumericOrDuration	FP	lexer state function
-6cdeb549a15c01e9af5b6ba5bbe26c6e692eee8a292e3d02aa381251bcd11942	qlbridge	rel/parse_sql.go:32 parseSqlResolver	TP	
-48707490247cf2fc7f225ee4b7855d2a131d74286826b4c1228e77f1e394af37	qlbridge	schema/registry.go:296 discoverSchemaFromSource	TP	
-1fc30a6d19dae0f2d937deea779b4ced6887d5287d56e25c9152b3f87a1fea1a	minivm	internal/codegen/slot.go:435 materialize	TP	
-9dbb45977e124a684e6ed1c3aef1843cc5405287be5523a9b6bc29ccdcf9236c	minivm	internal/vigil/analyzer.go:40 collectGraph	TP	
-cb4b2833310e6db220fd46c82e7ea814b2eb22aaf8599e0fd2cc83ff5650e9c9	minivm	internal/vigil/clones.go:60 candidates	TP	
-7fba9ac37c31fc52d5166de07850538c5a1615bfa7bbc83832a738c4563d7f77	minivm	program/parse.go:103 parseSection	TP	
-db44308babadf32857d3a3e74dd67f114310a4814cf3830309d050feb36a2205	minivm	transform/fact.go:238 holds	TP	
+6bf2ab6c79ddd8b323064d2f08726ac1584446282e63c3db0dadfe3c8df4c3a1	cel	interpreter/vm_program.go:84	TP	recursive over node.children/op/constant
+58029a1b7c5b9b0f7a027f392b48b42d7830f61d140656d7e10cd831b035e29c	cel	interpreter/vm_program.go:289	TP	opcode of a node: switch over node.op
+46962ca51efcc83312f9b3d84903440eb8b2a9492e5d2028ac72d9e34c8c7b48	qlbridge	lex/lexer.go:3138	TP	scanner over l; text/template has scanNumber as a Lexer method
+48707490247cf2fc7f225ee4b7855d2a131d74286826b4c1228e77f1e394af37	qlbridge	schema/registry.go:296	TP	all work on Schema fields; a Schema method with an Applyer arg
+8cf4ad044bc864a0e14f9b563d8d8f5dfd032a47ef22462ee63322305b1aede4	minivm	internal/codegen/call.go:178	unclear	6 params; callee target is one input of a code generator
+3cb4c2a311248e7ed70f4e3fdd91eed04e60826ad9195d7f461a119f9185ef44	minivm	internal/codegen/numeric.go:129	FP	slice param: members of inputs[i]
+1fc30a6d19dae0f2d937deea779b4ced6887d5287d56e25c9152b3f87a1fea1a	minivm	internal/codegen/slot.go:435	TP	reads input.room/check/body/boxed only
+2bcfb0b884ed6d5a85e4a9888122145d0a79c540c79d2196d8217c55d33633b3	self	crates/lighthouse-report/src/agent.rs:349	unclear	Briefing is one of two inputs; counts diagnostics
+7ccee4643d22b539b27afee37c772cfee739beeb83b5789a257d1e0fdbd36b71	self	crates/lighthouse-report/src/agent.rs:595	unclear	Briefing is one of three inputs; summary line over diagnostics
+9a1c5f4338e9654223d4db4a0519e6daba4d8d4708d71f7df6d13704dda22c5e	cel	cel/folding.go:319	unclear	factory-like: builds with the optimizer factory, ctx is the real input
+bf7d6879f56206c2a8151bec3eff61ba87b7c270330085604824c86594db6a7a	cel	cel/folding.go:400	unclear	same
+ecc843117b5683c3fcbe45d3883ab4bd5f67c21073b5cff4fc79731a064dc972	cel	common/decls/decls.go:1102	unclear	conversion to a protobuf declaration; a method would couple the type to exprpb
+1ef1a8311ba42e475068664109f4ef2dffeed7dc262f3e29ace268c308d57d76	cel	common/decls/decls.go:1200	TP	formats an overload
+4693f879c418b23c2c28ca00ef6db437a339caa8f746a1a268beeaa270814f33	cel	common/env/env.go:852	TP	recursive over TypeDesc
+261cc14490df09c7aa9561286a7128228137c30f0213f84a58f3be8c8f16b7c6	cel	interpreter/vm_program.go:179	TP	recursive over vmIRNode
+0e3c0d53857040f93ec24aa80c97dcc0c611bf5eca50df8a34674ecfc525eb79	cel	interpreter/vm_program.go:194	unclear	emitter: the builder is the main input
+0989c8e46086fa4a77b8c28a1b30cb59e869cedc6099e9f4f579a4170437e967	cel	interpreter/vm_program.go:232	unclear	emitter: the builder is the main input
+855fb7f1e1a69eb28bff6e899ce292636ebfd591916f8ef2edb2913aa1a52d82	cel	interpreter/vm_program.go:676	TP	converts a vmScalarValue
+016da7b43bf164920f0cae5ecd7cecb1d23b4d3b36f0fbc6eafcc5fb5169ff5a	qlbridge	rel/sql_rewrite.go:107	FP	slice of Columns, a collection loop
+dd5330c3e0924c555f134e2c122b10dd8fb87db97e7af713c8d62940b41891c4	minivm	analysis/blocks.go:138	FP	graph builder over a slice of blocks
+d16d2a7e0e90792dcbf2665306bd9113c41dd8bbe99b0ebb62fc67717e503846	minivm	internal/codegen/call.go:243	unclear	code generator, callee is data
+6a8d7dc5a5178e51761063d48eeb36236f831befe5d4a2c6440d32ac7e00a9be	minivm	internal/ssa/format.go:108	TP	String-like rendering of a Slot
+7fba9ac37c31fc52d5166de07850538c5a1615bfa7bbc83832a738c4563d7f77	minivm	program/parse.go:103	FP	parser fills a Program
+30891fee25f6b72addc3b8bef7ab6e991cb2cfd84dc6c40ac61c033699a6070a	self	crates/lighthouse-report/src/agent.rs:267	unclear	briefing is context, diagnostics are the input
+9e792df44eb9ee1563e5fb32545f04393d18afef82faf752cafa3e35ad6d18a7	self	crates/lighthouse-report/src/agent.rs:401	FP	builds a report output
+738cd190976355470494d1c4767847acbaf336120783b4d36ffb1bc43395b99e	self	crates/lighthouse-report/src/agent.rs:536	unclear	renderer in another layer
+60aa770203a7246bef142730fb5c6c318d91bcd684a6745db49b001b819494f7	self	crates/lighthouse-report/src/group.rs:442	TP	derived only from an Entry

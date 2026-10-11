@@ -70,7 +70,9 @@ impl Builder<'_> {
             .unwrap_or(0)
     }
 
-    /// Whether `id` is a function of test code that is not a test case itself.
+    /// Whether `id` is a function of test code that is not a test case itself
+    /// and builds nothing: a helper that returns a value other than an
+    /// `error` or a `bool` creates a fixture, it does not hide a call.
     fn is_helper(&self, id: &SymbolId) -> bool {
         let project = self.project;
         project.in_test(id)
@@ -78,5 +80,11 @@ impl Builder<'_> {
             && project
                 .symbol(id)
                 .is_some_and(|s| s.kind == SymbolKind::Function)
+            && project.function(id).is_none_or(|f| {
+                f.signature
+                    .results
+                    .iter()
+                    .all(|r| matches!(r.text.as_str(), "error" | "bool"))
+            })
     }
 }

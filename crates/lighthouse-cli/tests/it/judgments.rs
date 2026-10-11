@@ -7,7 +7,7 @@ use std::fs;
 use serde_json::Value;
 use tempfile::TempDir;
 
-use crate::review::{lighthouse, listing, records, rust_project, stdout};
+use crate::review::{HELPER, fingerprint_of, lighthouse, listing, records, rust_project, stdout};
 
 const SEVERAL: &str = "pub fn a() {}\npub fn b() {}\npub fn c() {}\npub fn d() {}\n\n// lighthouse-disable-next-line design/exported-doc -- documented at its origin\npub fn e() {}\n";
 
@@ -176,4 +176,51 @@ fn a_suppression_without_a_justification_is_refused_and_records_nothing() {
     }
 
     assert!(!dir.path().join(".lighthouse/decisions.jsonl").exists());
+}
+
+#[test]
+fn an_ambiguous_fingerprint_prefix_is_refused_and_a_unique_one_is_enough() {
+    let dir = rust_project(&[("src/lib.rs", HELPER)]);
+    lighthouse(dir.path()).arg("check").assert().success();
+    let out = lighthouse(dir.path())
+        .args(["review", "resolve", "", "--judgment", "fail"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        stderr.contains("matches several recorded findings"),
+        "{stderr}"
+    );
+    let fingerprint = fingerprint_of(&dir, "design/exported-doc");
+    lighthouse(dir.path())
+        .args(["review", "resolve", &fingerprint[..7], "--judgment", "fail"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn review_show_and_text_listings_describe_a_finding() {
+    let dir = rust_project(&[("src/lib.rs", HELPER)]);
+    assert_eq!(stdout(lighthouse(dir.path()).args(["review", "list"])), "");
+    lighthouse(dir.path()).arg("check").assert().success();
+    let fingerprint = fingerprint_of(&dir, "design/no-panic");
+    let list = stdout(lighthouse(dir.path()).args(["review", "list", "--rule", "design/no-panic"]));
+    assert_eq!(list.lines().count(), 1);
+    assert!(list.starts_with(&fingerprint[..12]), "{list}");
+    assert!(list.contains("\topen\t-\t"), "{list}");
+
+    let show = stdout(lighthouse(dir.path()).args(["review", "show", &fingerprint[..10]]));
+    for expected in [
+        "owner:       demo::run#function",
+        "state:       open",
+        "location:    src/lib.rs:2",
+        "kind=\"unwrap\"",
+    ] {
+        assert!(show.contains(expected), "{expected}\n{show}");
+    }
+    lighthouse(dir.path())
+        .args(["review", "show", "nonesuch"])
+        .assert()
+        .code(2);
 }

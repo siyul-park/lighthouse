@@ -227,7 +227,7 @@ fn decision_list_and_explain() {
         "design/complexity\twarn\tCyclomatic complexity is a review signal",
         "design/declaration-groups\terror\t",
         "design/no-mutable-globals\twarn\t",
-        "design/private-helper-callers\tinfo\t",
+        "design/no-panic\tinfo\t",
         "testing/owner\twarn\t",
         "testing/unique-owner\terror\t",
     ] {

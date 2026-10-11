@@ -87,7 +87,7 @@ is at 83–95%. Where the time goes in the edit run (phases, ms; cold `--no-cach
 
 A reviewer read each sampled finding against the decision's requirement and called it true (TP) or false (FP).
 The interval is Wilson 95%. Rows that are not warn or error rules, or that sample little, are indications only.
-Sample files are `baseline/precision/<decision>.tsv` (fingerprint, repo, location, verdict, reason).
+Sample files are `baseline/precision/<pack>/<decision>.tsv` (fingerprint, repo, location, verdict, reason).
 
 | decision | review | TP / sample | precision | Wilson 95% | samples |
 | --- | --- | ---: | ---: | --- | --- |
@@ -103,20 +103,37 @@ Sample files are `baseline/precision/<decision>.tsv` (fingerprint, repo, locatio
 | design/no-stored-context | R3b | 1 / 2 | 50% | 9.5-90.5 | retained (one debatable) |
 | design/no-panic (Go) | R3b | 20 / 20 | 100% | 83.9-100 (not comparable) | not retained; 20 of 104 |
 | design/no-panic (Rust) | R3b | 21 / 21 | 100% | 84.5-100 (not comparable) | not retained; 21 of 41 |
-| design/feature-envy | R2 | 12 / 15 | 80% | 54.8-93.0 | retained by name |
-| design/misplaced-symbol | R2 | 13 / 15 | 87% | 62.1-96.3 | retained by name |
-| design/owner-file | R2 | 15 / 15 | 100% | 79.6-100 (not comparable) | 4 of 15 named |
-| design/unique-type-names | R2 | 5 / 5 | 100% | 56.6-100 | retained by name |
-| design/tiny-modules | R2 | 5 / 5 | 100% | 56.6-100 | retained by name |
-| testing/no-hidden-target | R2 | 0 / 5 | 0% | 0-43.4 | retained by name |
+| design/feature-envy | R4 | 11 / 27 | 41% | 25-59 | all findings, after the refinements |
+| design/misplaced-symbol | R4 | 9 / 36 | 25% | 14-41 | all findings, after the refinements |
+| design/no-panic | R4 | 23 / 24 | 96% | 80-99 | 24 of the 107 the R3b sample missed (seed 11) |
+| testing/standard-assertions | R4 | 13 / 13 | 100% | 77-100 | all findings, after the refinements |
+| testing/owner | R4 | 17 / 22 | 77% | 57-90 | 22 of 651 (seed 5); the other 5 are unclear |
+
+Retired in R4 (a deterministic check below 20% is not a signal; the wording lives on in a model decision,
+whose `select` is the old condition, widened for recall; the TSVs keep the evidence):
+
+| retired | became | TP / sample | Wilson 95% |
+| --- | --- | ---: | --- |
+| design/private-helper-callers | `select` of design/justified-helpers | 1 / 24 | 1-20 |
+| design/unique-type-names | `select` of design/terminology | 1 / 27 | 1-18 |
+| design/tiny-modules | `select` of design/meaningful-separation | 0 / 20 | 0-16 |
+| design/owner-file | model check, `select` of its own | 0 / 22 | 0-15 |
+| testing/no-hidden-target (before the fix) | kept; creation helpers no longer followed | 0 / 7 | 0-35 |
 
 - "Not comparable" marks an interval whose samples are not retained: a later review cannot be set against it
   sample by sample, and it counts "real panic site" or "violation of the definition" as the reviewer then meant it.
-  Each TSV starts with `# retained: yes|partial|no`; `no-panic.tsv` holds only its summary.
+  Each TSV starts with `# retained: yes|partial|no`; `no-panic.tsv` holds the R4 sample only.
 - `no-panic` is info: the review checked that each finding is a real panic site (all were), and that about one in
   twenty of the Go sites is worth changing; the rest are invariants and recovered hot paths. Rust: none of the 21.
-- `no-hidden-target` is wrong on a pattern: a helper builds an environment with the target passed as an argument,
-  which the code model cannot tell from a helper that asserts. It finds 7 in cel and nothing elsewhere.
+- `no-hidden-target` was wrong on one pattern, a helper that builds an environment the target is passed to; it
+  no longer follows helpers that return a value other than an error or a bool, and finds nothing on the four
+  repositories.
+- R4 refinements and what they did to the counts (strict, cel / qlbridge / minivm / this repository): feature-envy
+  17 / 5 / 21 / 15 to 11 / 3 / 7 / 6; misplaced-symbol 15 / 5 / 8 / 12 to 14 / 5 / 8 / 9; no-panic 39 to 20 here
+  (the dev-only support crate is test code); standard-assertions 995 / 17 / 3 to 0 / 13 / 0 (cel imports no
+  assertion library); exported-doc 971 to 415 in qlbridge and 206 to 154 in minivm (interface implementations
+  are exempt); testing/owner 537 to 516 in qlbridge and 139 to 134 in cel (the implementation flag knows every
+  interface of the project and of the import closure).
 - `design/max-statements` and `design/max-params` count one false positive each: a benchmark fixture that emits a
   byte program, and a method that implements an interface outside the project.
 - R2 samples were five per decision and kept by name; where a finding still exists in the R3b run the TSV carries

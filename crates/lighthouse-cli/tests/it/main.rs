@@ -16,6 +16,7 @@ mod models;
 mod models_plugin;
 mod preview;
 mod review;
+mod review_agent;
 mod sarif_places;
 mod skill;
 mod spec;

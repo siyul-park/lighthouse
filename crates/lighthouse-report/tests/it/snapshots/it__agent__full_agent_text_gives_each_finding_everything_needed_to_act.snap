@@ -24,25 +24,17 @@ design/coupling  warn  internal/jit/compile.go:350:1
   fingerprint: 5da1c26cc609
   resolve:     lighthouse review resolve 5da1c26cc609 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent
 
-design/private-helper-callers  info  src/lib.rs:7:1
+design/no-panic  info  src/lib.rs:7:1
   owner:       m::helper#function
   message:     private helper has one caller
-  requirement: A private helper SHOULD have at least two callers.
-  context:     A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count, and neither does a package variable that calls the helper in its initializer: it is a table of handlers, not a caller to compare the helper with. Forwarding wrappers are reported by `design/no-single-use-wrapper`, and a function used as a value is not judged. A method that implements an interface method is not judged either: its callers reach it through the interface. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.
-  expected:    valid rust example `rust-valid` (src/lib.rs), canonical
-                 pub fn run(x: u8) -> u8 {
-                     clamp(x) + 1
+  requirement: Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
+  context:     Panics bypass the caller's control flow. Every place production code can panic is reported, one finding each (forbidigo `^panic$`; clippy's restriction lints `panic`, `unwrap_used`, `expect_used`, `todo`, `unimplemented`, `unreachable`): Go reports a call of `panic`; Rust reports the `panic!`, `unreachable!`, `todo!` and `unimplemented!` macros and any `.unwrap()` or `.expect(..)` call (syntactically, on any receiver, as clippy does). The findings are candidates, not violations: impossible programmer errors, `Must*`-style APIs and documented hot-path invariants are allowed by the requirement and stay with review. Test code, entrypoints (`main`, `init`) and functions whose name starts with one of `allowPrefixes` are not reported. In Rust, a library that is not published and that only tests link in (no other package lists it in `[dependencies]`, and it has no binary) is test code. The decision is in the `strict` preset only, as clippy's restriction lints and forbidigo are opt-in for the same reason.
+  expected:    valid rust example `rust-result` (src/lib.rs), canonical
+                 pub fn parse(text: &str) -> Result<u32, std::num::ParseIntError> {
+                     text.parse()
                  }
-
-                 pub fn other(x: u8) -> u8 {
-                     clamp(x) + 2
-                 }
-
-                 fn clamp(x: u8) -> u8 {
-                     if x > 10 { 10 } else { x }
-                 }
-  fingerprint: d3d6fba8ce7c
-  resolve:     lighthouse review resolve d3d6fba8ce7c --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent
+  fingerprint: f999fb1d4030
+  resolve:     lighthouse review resolve f999fb1d4030 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --reviewer-kind agent
 
 acme/custom  error  a.txt:1:1
   message:     custom finding

@@ -13,6 +13,12 @@ spec:
     A hand-written compare-and-fail repeats what the project's assertion
     library already states, with worse failure output.
 
+    The decision applies to a module whose files import one of the
+    `libraries` somewhere: where no assertion library is in use, a plain
+    compare-and-fail is the standard form and there is nothing to prefer. A
+    benchmark (`Benchmark*`) is not judged: its loop checks a result without
+    an assertion library's overhead.
+
     Go: The library is `github.com/stretchr/testify/require`. A function
     of a test file that has an `if` with no `else` whose condition
     compares or negates and whose only effect is `t.Fatal`, `t.Fatalf`,
@@ -32,11 +38,24 @@ spec:
     test helper SHOULD NOT reimplement a comparison and failure that the library
     already provides.
   severity: warn
+  options:
+    type: object
+    properties:
+      libraries:
+        type: array
+        items:
+          type: string
+        default: ["github.com/stretchr/testify"]
+        description: >-
+          Import paths (or their prefixes) of the assertion libraries; a module
+          that imports none of them is not judged.
+    additionalProperties: false
   check:
     type: cel
     select: function
     where: >-
-      func.manual_assertions > 0
+      func.manual_assertions > 0 && !func.name.startsWith('Benchmark')
+      && func.module_imports.exists(i, options.libraries.exists(l, i == l || i.startsWith(l + '/')))
     message: >-
       {{ func.kind == 'test' ? 'test' : func.test_role == 'test-helper' ? 'test helper' : 'function' }}
       {{ func.name }} compares and fails by hand {{ func.manual_assertions }} time(s);
@@ -50,6 +69,8 @@ spec:
     - name: hand-written-comparison
       language: go
       kind: invalid
+      options:
+        libraries: [testing]
       files:
         - path: go.mod
           body: |-
@@ -65,6 +86,40 @@ spec:
           body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc TestGet(t *testing.T) {\n\tif got := store.Get(); got != 1 {\n\t\tt.Fatalf(\"got %d\", got)\n\t}\n}"
       expect:
         - line: 9
+    - name: no-assertion-library-in-use
+      language: go
+      kind: valid
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/store
+
+            go 1.26
+        - path: store.go
+          body: |-
+            package store
+
+            func Get() int { return 1 }
+        - path: store_test.go
+          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc TestGet(t *testing.T) {\n\tif got := store.Get(); got != 1 {\n\t\tt.Fatalf(\"got %d\", got)\n\t}\n}"
+    - name: benchmark-loop
+      language: go
+      kind: valid
+      options:
+        libraries: [testing]
+      files:
+        - path: go.mod
+          body: |-
+            module example.com/store
+
+            go 1.26
+        - path: store.go
+          body: |-
+            package store
+
+            func Get() int { return 1 }
+        - path: store_test.go
+          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc BenchmarkGet(b *testing.B) {\n\tfor range b.N {\n\t\tif got := store.Get(); got != 1 {\n\t\t\tb.Fatalf(\"got %d\", got)\n\t\t}\n\t}\n}"
     - name: check-that-does-more
       language: go
       kind: valid

@@ -9,7 +9,7 @@
 pub mod sarif;
 
 use std::{
-    env, fs,
+    env,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -78,7 +78,7 @@ impl CommandRule {
                 let mut found = Vec::new();
                 for file in &ctx.project.files {
                     let text = self.spec.stdin == CheckStdin::File;
-                    let content = text.then(|| read(ctx, &file.path)).transpose()?;
+                    let content = text.then(|| ctx.ws.read(&file.path)).transpose()?;
                     found.extend(run.one(&file.path, content.as_deref())?);
                 }
                 Ok(found)
@@ -344,15 +344,6 @@ fn known(project: &Project, path: &Path) -> bool {
 
 fn slashed(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
-}
-
-/// The text of a file as the run sees it: the overlay, else the disk.
-fn read(ctx: &Ctx, path: &Path) -> Result<String, PluginError> {
-    if let Some(text) = ctx.ws.overlays.get(path) {
-        return Ok(text.clone());
-    }
-    fs::read_to_string(ctx.ws.root.join(path))
-        .map_err(|e| PluginError::Incomplete(format!("{}: {e}", path.display())))
 }
 
 /// Splits `files` into runs whose arguments fit the budget.

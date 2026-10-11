@@ -9,7 +9,6 @@ use serde_json::json;
 const GROUPS: &str = "design/declaration-groups";
 const CLOSE: &str = "design/contiguity";
 const CALLERS: &str = "design/callers-before-callees";
-const HELPERS: &str = "design/private-helper-callers";
 const BANNERS: &str = "design/no-banners";
 const QUALIFIERS: &str = "design/no-redundant-qualifiers";
 
@@ -27,6 +26,42 @@ fn groups_flag_the_fewest_declarations_that_break_the_order() {
         ["helper"],
         "one misplaced helper, not three"
     );
+}
+
+#[test]
+fn groups_name_the_declaration_a_displaced_one_must_follow() {
+    // A public function between the types it belongs after: it already
+    // follows `Public`, and must follow the private types below it.
+    let mut w = World::default();
+    w.symbol("m", "Public", SymbolKind::Type, "m/a.ucm");
+    w.func("m", "Run", "m/a.ucm");
+    for name in ["hidden", "other"] {
+        let ty = w.symbol("m", name, SymbolKind::Type, "m/a.ucm");
+        w.private(&ty);
+    }
+    let found = w.messages(GROUPS, json!({}));
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].contains("function Run"), "{found:?}");
+    assert!(found[0].contains("must follow hidden"), "{found:?}");
+}
+
+#[test]
+fn groups_anchor_a_displaced_declaration_on_one_that_stays() {
+    // `helper` and `Run` both belong after the three types, which stay put;
+    // `Run` is itself displaced, so it is no anchor for `helper`.
+    let mut w = World::default();
+    let helper = w.func("m", "helper", "m/a.ucm");
+    w.private(&helper);
+    w.func("m", "Run", "m/a.ucm");
+    for name in ["First", "Second", "Third"] {
+        w.symbol("m", name, SymbolKind::Type, "m/a.ucm");
+    }
+    let groups = json!({ "groups": ["type", "public-function", "private-function"] });
+    let found = w.messages(GROUPS, groups);
+    assert_eq!(found.len(), 2, "{found:?}");
+    for message in &found {
+        assert!(message.contains("must follow First"), "{message}");
+    }
 }
 
 #[test]
@@ -207,48 +242,6 @@ fn callers_ignore_test_callers_and_can_ask_for_the_last_caller() {
     assert!(w.check(CALLERS, json!({})).is_empty());
     let strict = w.check(CALLERS, json!({ "sharedAfterLastCaller": true }));
     assert_eq!(w.names(&strict), ["leaf"]);
-}
-
-#[test]
-fn helpers_with_one_production_caller_are_reported() {
-    let (w, ..) = call_pair(false);
-    assert_eq!(w.names(&w.check(HELPERS, json!({}))), ["helper"]);
-}
-
-#[test]
-fn helpers_with_two_callers_or_a_test_caller_pass() {
-    let (mut w, _, helper) = call_pair(false);
-    let other = w.func("m", "Other", "m/a.ucm");
-    w.edge(EdgeKind::Calls, &other, &helper);
-    assert!(w.check(HELPERS, json!({})).is_empty(), "two callers");
-
-    let (mut w, _, helper) = call_pair(false);
-    let test = w.func("m", "TestHelper", "m/a_test.ucm");
-    w.edge(EdgeKind::Calls, &test, &helper);
-    assert_eq!(
-        w.names(&w.check(HELPERS, json!({}))),
-        ["helper"],
-        "tests do not count"
-    );
-}
-
-#[test]
-fn helpers_leave_wrappers_to_their_own_rule_and_skip_values_and_recursion() {
-    let (mut w, _, helper) = call_pair(false);
-    let target = w.func("m", "target", "m/a.ucm");
-    w.private(&target);
-    w.edge(EdgeKind::Calls, &helper, &target);
-    w.forward(&helper, &target);
-    let found = w.check(HELPERS, json!({}));
-    assert_eq!(
-        w.names(&found),
-        ["target"],
-        "the wrapper is not reported twice"
-    );
-
-    let (mut w, run, helper) = call_pair(false);
-    w.edge(EdgeKind::References, &run, &helper);
-    assert!(w.check(HELPERS, json!({})).is_empty());
 }
 
 #[test]

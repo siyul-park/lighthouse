@@ -1,0 +1,16 @@
+# retained: yes
+# R4: all 13 findings after the refinements
+fingerprint	repo	location	verdict	reason
+ecb264ba7003cffc2e813976932f9c2da2ce1854b1d0bd497c217f61c33bcaed	qlbridge	datasource/files/filesource_test.go:99	TP	a hand-written compare-and-fail in a module that uses the assertion library
+d84f581e305d00ff2a4410351d2d8a0008bc3f3e1848da6dba2304643521e9d4	qlbridge	datasource/files/json_test.go:87	TP	mixed with assert
+b9e96008deb891de4f4a8a25080be52b6136d5059aeca1b8d6549bb6f6f75a18	qlbridge	exec/sqldriver_test.go:32	TP	mixed with assert
+0f4e71d8287f486251b398f641d1560946fa1f45e91bb57397690aacb7ea6f18	qlbridge	exec/sqldriver_test.go:75	TP	a hand-written compare-and-fail in a module that uses the assertion library
+3daac61bf919c6767415bf851bc66ab284f0e52b67e05caf47e09c218ff6dae5	qlbridge	exec/sqldriver_test.go:119	TP	mixed with assert
+e2b68ca91fae64170786ab0173c7855c46a19cc8c5ec2e81d23401998754b665	qlbridge	exec/sqldriver_test.go:164	TP	a hand-written compare-and-fail in a module that uses the assertion library
+6ce9e709f02d5a16c5a48b8fcd8303c40859c2b03d6e4a2c9d096b01a978b1e7	qlbridge	exec/sqldriver_test.go:210	TP	a hand-written compare-and-fail in a module that uses the assertion library
+715a222db5772919a3f3b95d46be050ac4aa315c25c2849ac583a2693c406550	qlbridge	exec/sqldriver_test.go:290	TP	a hand-written compare-and-fail in a module that uses the assertion library
+44383b5fb93591a4a45d7b926d63663a156ecc30b0933fedd992af9e3ea81541	qlbridge	expr/parse_test.go:67	TP	a hand-written compare-and-fail in a module that uses the assertion library
+431fd69c6a6151c4234a735be8ea83cb89c06d4e8536d20207a4083739e62b57	qlbridge	lex/lexer_test.go:164	TP	a hand-written compare-and-fail in a module that uses the assertion library
+415d968e1d19893e91e618491a92407af230d2a5012cccf0b3e40a488146fc61	qlbridge	lex/lexer_test.go:239	TP	a hand-written compare-and-fail in a module that uses the assertion library
+dc269f450492c0331223bba698fb1882ebeb0c23bff5b4c0c9817760cb9d56ed	qlbridge	rel/parse_filterql_test.go:228	TP	qlbridge uses testify assert in the same function
+6a55a550963065c5345811327cc728dcf9cb6050939b89990380557c154c50a5	qlbridge	schema/registry_test.go:21	TP	a hand-written compare-and-fail in a module that uses the assertion library

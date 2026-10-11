@@ -7,7 +7,8 @@ use assert_cmd::Command;
 use serde_json::Value;
 use tempfile::TempDir;
 
-const HELPER: &str = "pub fn run(x: u8) -> u8 {\n    clamp(x) + 1\n}\n\nfn clamp(x: u8) -> u8 {\n    if x > 10 { 10 } else { x }\n}\n";
+pub(crate) const HELPER: &str = "pub fn run(x: Option<u8>) -> u8 {\n    x.unwrap()\n}\n";
+const LONG_NAME: &str = "/// Runs.\npub fn run_the_whole_thing_now() {}\n";
 const DOCUMENTED: &str = "/// Runs.\npub fn run(x: u8) -> u8 {\n    x + 1\n}\n";
 
 pub(crate) fn lighthouse(dir: &Path) -> Command {
@@ -62,7 +63,7 @@ pub(crate) fn listing(dir: &TempDir, status: &str) -> Vec<Value> {
     records(&out)
 }
 
-fn fingerprint_of(dir: &TempDir, rule: &str) -> String {
+pub(crate) fn fingerprint_of(dir: &TempDir, rule: &str) -> String {
     let all = listing(dir, "all");
     let found = all.iter().find(|f| f["ruleId"] == rule).unwrap();
     found["fingerprint"].as_str().unwrap().to_owned()
@@ -82,18 +83,14 @@ fn check_remembers_findings_and_marks_fixed_ones_resolved() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
     let open = listing(&dir, "open");
-    assert_eq!(
-        rules(&open),
-        ["design/exported-doc", "design/private-helper-callers"]
-    );
+    assert_eq!(rules(&open), ["design/exported-doc", "design/no-panic"]);
     let helper = open
         .iter()
-        .find(|f| f["ruleId"] == "design/private-helper-callers")
+        .find(|f| f["ruleId"] == "design/no-panic")
         .unwrap();
-    assert_eq!(helper["symbol"], "demo::clamp#function");
+    assert_eq!(helper["symbol"], "demo::run#function");
     assert_eq!(helper["facts"]["language"], "rust");
-    assert_eq!(helper["facts"]["callers"], 1);
-    assert_eq!(helper["locator"]["span"]["start"]["line"], 5);
+    assert_eq!(helper["locator"]["span"]["start"]["line"], 2);
 
     write(&dir, "src/lib.rs", DOCUMENTED);
     lighthouse(dir.path())
@@ -117,7 +114,7 @@ fn check_remembers_findings_and_marks_fixed_ones_resolved() {
 fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
+    let fingerprint = fingerprint_of(&dir, "design/no-panic");
 
     lighthouse(dir.path())
         .args(["review", "resolve", &fingerprint[..12]])
@@ -135,7 +132,7 @@ fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
 
     let out = lighthouse(dir.path()).arg("check").output().unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
-    assert!(!text.contains("private-helper-callers"), "{text}");
+    assert!(!text.contains("no-panic"), "{text}");
     assert!(text.contains("design/exported-doc"), "{text}");
     let notice = String::from_utf8(out.stderr).unwrap();
     assert!(
@@ -145,10 +142,7 @@ fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
     let agent = stdout(lighthouse(dir.path()).args(["check", "--format", "agent"]));
     assert!(agent.contains("0 incomplete, 1 suppressed"), "{agent}");
 
-    assert_eq!(
-        rules(&listing(&dir, "suppressed")),
-        ["design/private-helper-callers"]
-    );
+    assert_eq!(rules(&listing(&dir, "suppressed")), ["design/no-panic"]);
     assert_eq!(rules(&listing(&dir, "open")), ["design/exported-doc"]);
 
     let history = records(&stdout(lighthouse(dir.path()).args([
@@ -174,8 +168,7 @@ fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
     assert_eq!(event["language"], "rust");
     assert_eq!(event["scope"], "symbol");
     assert_eq!(event["label"], "separate");
-    assert_eq!(event["snapshot"]["facts"]["callers"], 1);
-    assert_eq!(event["snapshot"]["evidence"]["callers"], 1);
+    assert_eq!(event["snapshot"]["evidence"]["kind"], "unwrap");
     assert_eq!(event["snapshot"]["v"], 2);
     assert_eq!(event["snapshot"]["dirty"], false);
     assert_eq!(event["meaningVersion"].as_str().unwrap().len(), 16);
@@ -186,7 +179,7 @@ fn a_suppressed_judgment_keeps_the_finding_out_of_later_reports() {
         .assert()
         .success();
     let again = stdout(lighthouse(dir.path()).arg("check"));
-    assert!(again.contains("private-helper-callers"), "{again}");
+    assert!(again.contains("no-panic"), "{again}");
 }
 
 #[test]
@@ -290,12 +283,7 @@ fn a_run_resolves_only_findings_inside_its_report_scope() {
     assert_eq!(open[0]["path"], "src/b.rs");
 
     lighthouse(dir.path())
-        .args([
-            "check",
-            "--rules",
-            "design/private-helper-callers",
-            "src/b.rs",
-        ])
+        .args(["check", "--rules", "design/no-panic", "src/b.rs"])
         .assert()
         .success();
     assert_eq!(listing(&dir, "open").len(), 1);
@@ -314,179 +302,13 @@ fn no_store_neither_records_nor_applies_judgments() {
     assert!(!dir.path().join(".lighthouse").exists());
 
     lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
+    let fingerprint = fingerprint_of(&dir, "design/no-panic");
     lighthouse(dir.path())
         .args(["review", "resolve", &fingerprint, "--judgment", "pass"])
         .assert()
         .success();
     let out = stdout(lighthouse(dir.path()).args(["check", "--no-store"]));
-    assert!(out.contains("private-helper-callers"), "{out}");
-}
-
-#[test]
-fn agent_format_groups_findings_and_agent_json_carries_the_same_groups() {
-    let dir = rust_project(&[("src/lib.rs", HELPER)]);
-    let text = stdout(lighthouse(dir.path()).args(["check", "--format", "agent"]));
-    for expected in [
-        "design/private-helper-callers info [review] \u{2014} A private helper SHOULD have at least two callers.",
-        "  expected:\n    pub fn run(x: u8) -> u8 {",
-        "  evidence: caller=demo::run#function callers=1 statements=3\n",
-        "  src/lib.rs:5:1 private function clamp has one caller (run); review whether",
-        "resolve: lighthouse review resolve <fingerprint> ",
-        "summary: 0 error, 1 warn, 1 info, 2 review, 0 incomplete, 0 suppressed",
-    ] {
-        assert!(text.contains(expected), "{expected}\n{text}");
-    }
-    assert!(
-        !text.contains("fingerprint:") && !text.contains("symbol="),
-        "{text}"
-    );
-
-    let json = records(&stdout(lighthouse(dir.path()).args([
-        "check",
-        "--format",
-        "agent-json",
-    ])));
-    assert_eq!(json.len(), 1, "one object");
-    let groups = json[0]["groups"].as_array().unwrap();
-    assert_eq!(groups.len(), 2);
-    assert_eq!(json[0]["counts"]["review"], 2);
-    assert_eq!(json[0]["status"], "findings");
-    assert!(json[0]["resolve"].is_string());
-    let helper = group(&json[0], "design/private-helper-callers");
-    assert_eq!(helper["review"], true);
-    let instance = &helper["files"]["src/lib.rs"][0];
-    assert_eq!(instance[0], "5:1");
-    assert_eq!(instance[2].as_str().unwrap().len(), 7);
-}
-
-#[test]
-fn full_detail_keeps_one_record_per_finding() {
-    let dir = rust_project(&[("src/lib.rs", HELPER)]);
-    let text =
-        stdout(lighthouse(dir.path()).args(["check", "--format", "agent", "--detail", "full"]));
-    for expected in [
-        "design/private-helper-callers  info  src/lib.rs:5:1",
-        "  owner:       demo::clamp#function",
-        "  requirement: A private helper SHOULD have at least two callers.",
-        "  evidence:    caller=demo::run#function callers=1 statements=3",
-        "  expected:    valid rust example `rust-valid` (src/lib.rs)",
-        "lighthouse review resolve ",
-    ] {
-        assert!(text.contains(expected), "{expected}\n{text}");
-    }
-    let json = records(&stdout(lighthouse(dir.path()).args([
-        "check",
-        "--format",
-        "agent-json",
-        "--detail",
-        "full",
-    ])));
-    let findings: Vec<_> = json.iter().filter(|r| r["type"] == "finding").collect();
-    assert_eq!(findings.len(), 2);
-    assert_eq!(json.last().unwrap()["type"], "summary");
-    lighthouse(dir.path())
-        .args(["check", "--detail", "full"])
-        .assert()
-        .code(2)
-        .stderr("lighthouse: --detail applies to the agent formats only\n");
-}
-
-/// The group of `rule` in a compact report.
-fn group<'a>(report: &'a Value, rule: &str) -> &'a Value {
-    report["groups"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|g| g["rule"] == rule)
-        .unwrap_or_else(|| panic!("{rule} in {report}"))
-}
-
-#[test]
-fn the_resolve_command_of_an_agent_finding_runs_as_given() {
-    let dir = rust_project(&[("src/lib.rs", HELPER)]);
-    let text = stdout(lighthouse(dir.path()).args(["check", "--format", "agent"]));
-    let template = text
-        .lines()
-        .find_map(|l| l.strip_prefix("resolve: "))
-        .unwrap();
-    let json = records(&stdout(lighthouse(dir.path()).args([
-        "check",
-        "--format",
-        "agent-json",
-    ])));
-    let helper = group(&json[0], "design/private-helper-callers");
-    let prefix = helper["files"]["src/lib.rs"][0][2].as_str().unwrap();
-    let args: Vec<&str> = template
-        .split_whitespace()
-        .skip(1)
-        .map(|a| match a {
-            "<fingerprint>" => prefix,
-            "<pass|fail|notApplicable>" => "fail",
-            other => other,
-        })
-        .filter(|a| !["[--suppress", "<justification>]", "[--reason", "<text>]"].contains(a))
-        .collect();
-    lighthouse(dir.path()).args(args).assert().success();
-    let history = records(&stdout(
-        lighthouse(dir.path()).args(["review", "history", prefix, "--format", "json"]),
-    ));
-    assert_eq!(history[0]["wasAttributedTo"]["type"], "SoftwareAgent");
-    assert_eq!(history[0]["judgment"], "fail");
-    assert_eq!(history[0]["label"], "positive");
-    assert_eq!(history[0]["fingerprint"].as_str().unwrap().len(), 64);
-}
-
-#[test]
-fn an_ambiguous_fingerprint_prefix_is_refused_and_a_unique_one_is_enough() {
-    let dir = rust_project(&[("src/lib.rs", HELPER)]);
-    lighthouse(dir.path()).arg("check").assert().success();
-    let out = lighthouse(dir.path())
-        .args(["review", "resolve", "", "--judgment", "fail"])
-        .output()
-        .unwrap();
-    assert_eq!(out.status.code(), Some(2));
-    let stderr = String::from_utf8(out.stderr).unwrap();
-    assert!(
-        stderr.contains("matches several recorded findings"),
-        "{stderr}"
-    );
-    let fingerprint = fingerprint_of(&dir, "design/exported-doc");
-    lighthouse(dir.path())
-        .args(["review", "resolve", &fingerprint[..7], "--judgment", "fail"])
-        .assert()
-        .success();
-}
-
-#[test]
-fn review_show_and_text_listings_describe_a_finding() {
-    let dir = rust_project(&[("src/lib.rs", HELPER)]);
-    assert_eq!(stdout(lighthouse(dir.path()).args(["review", "list"])), "");
-    lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
-    let list = stdout(lighthouse(dir.path()).args([
-        "review",
-        "list",
-        "--rule",
-        "design/private-helper-callers",
-    ]));
-    assert_eq!(list.lines().count(), 1);
-    assert!(list.starts_with(&fingerprint[..12]), "{list}");
-    assert!(list.contains("\topen\t-\t"), "{list}");
-
-    let show = stdout(lighthouse(dir.path()).args(["review", "show", &fingerprint[..10]]));
-    for expected in [
-        "owner:       demo::clamp#function",
-        "state:       open",
-        "location:    src/lib.rs:5",
-        "callers=1",
-    ] {
-        assert!(show.contains(expected), "{expected}\n{show}");
-    }
-    lighthouse(dir.path())
-        .args(["review", "show", "nonesuch"])
-        .assert()
-        .code(2);
+    assert!(out.contains("no-panic"), "{out}");
 }
 
 #[test]
@@ -528,20 +350,6 @@ fn go_findings_are_remembered_and_resolved_like_any_other() {
             "review", "list", "--status", "all", "--format", "json",
         ])));
     assert!(all[0]["resolvedAt"].is_string());
-}
-
-#[test]
-fn limit_trims_agent_output_and_is_refused_for_other_formats() {
-    let dir = rust_project(&[("src/lib.rs", HELPER)]);
-    let text = stdout(lighthouse(dir.path()).args(["check", "--format", "agent", "--limit", "1"]));
-    assert!(text.contains("design/exported-doc warn"), "{text}");
-    assert!(!text.contains("private-helper-callers"), "{text}");
-    assert!(text.contains("... 1 more finding(s) not shown"), "{text}");
-    lighthouse(dir.path())
-        .args(["check", "--limit", "1"])
-        .assert()
-        .code(2)
-        .stderr("lighthouse: --limit applies to the agent formats only\n");
 }
 
 fn git_in(dir: &TempDir, args: &[&str]) {
@@ -657,27 +465,32 @@ fn a_warn_decision_configured_as_error_is_hidden_by_a_judgment() {
 
 #[test]
 fn a_judgment_expires_when_the_evidence_it_judged_changes() {
-    let dir = rust_project(&[("src/lib.rs", HELPER)]);
+    let dir = rust_project(&[("src/lib.rs", LONG_NAME)]);
     lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
+    let fingerprint = fingerprint_of(&dir, "design/max-name-words");
     lighthouse(dir.path())
         .args(["review", "resolve", &fingerprint, "--judgment", "pass"])
         .assert()
         .success();
     let quiet = stdout(lighthouse(dir.path()).arg("check"));
-    assert!(!quiet.contains("private-helper-callers"), "{quiet}");
+    assert!(!quiet.contains("max-name-words"), "{quiet}");
 
-    let grown = HELPER.replace(
-        "if x > 10 { 10 } else { x }",
-        "let y = x;\n    if y > 10 { 10 } else { y }",
-    );
-    write(&dir, "src/lib.rs", &grown);
+    // A looser limit changes the evidence of the same finding.
+    let plugin = lighthouse_test_support::lang_rust();
+    fs::write(
+        dir.path().join("lighthouse.toml"),
+        lighthouse_test_support::project(&format!(
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}, \"design\"]\nextends = [\"design/recommended\", \"design/strict\"]\n[rules]\n\"design/max-name-words\" = {{ level = \"warn\", options = {{ max = 4 }} }}\n",
+            plugin.to_str().unwrap()
+        )),
+    )
+    .unwrap();
     let out = lighthouse(dir.path())
         .args(["check", "--format", "agent"])
         .output()
         .unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
-    assert!(text.contains("private-helper-callers"), "{text}");
+    assert!(text.contains("max-name-words"), "{text}");
     assert!(
         text.contains("(note: judgment expired: evidence changed)"),
         "{text}"
@@ -693,7 +506,7 @@ fn a_judgment_expires_when_the_evidence_it_judged_changes() {
 fn the_reviewer_comes_from_flags_then_the_environment_then_a_human() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
+    let fingerprint = fingerprint_of(&dir, "design/no-panic");
     let resolve = |envs: &[(&str, &str)], flags: &[&str]| {
         let mut cmd = lighthouse(dir.path());
         cmd.env_remove("LIGHTHOUSE_REVIEWER_KIND")
@@ -754,7 +567,7 @@ fn the_reviewer_comes_from_flags_then_the_environment_then_a_human() {
 fn the_decision_log_carries_a_judgment_to_a_clone_without_the_cache() {
     let author = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(author.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&author, "design/private-helper-callers");
+    let fingerprint = fingerprint_of(&author, "design/no-panic");
     lighthouse(author.path())
         .args([
             "review",
@@ -775,7 +588,7 @@ fn the_decision_log_carries_a_judgment_to_a_clone_without_the_cache() {
     fs::write(clone.path().join(".lighthouse/decisions.jsonl"), &log).unwrap();
     let out = lighthouse(clone.path()).arg("check").output().unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
-    assert!(!text.contains("private-helper-callers"), "{text}");
+    assert!(!text.contains("no-panic"), "{text}");
     assert!(
         String::from_utf8(out.stderr)
             .unwrap()
@@ -798,7 +611,7 @@ fn the_decision_log_carries_a_judgment_to_a_clone_without_the_cache() {
 fn resolve_refuses_a_finding_that_was_seen_again_and_warns_about_a_resolved_one() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
+    let fingerprint = fingerprint_of(&dir, "design/no-panic");
     lighthouse(dir.path())
         .args([
             "review",
@@ -831,7 +644,7 @@ fn resolve_refuses_a_finding_that_was_seen_again_and_warns_about_a_resolved_one(
 fn history_says_when_nothing_was_reviewed_and_resolve_survives_a_broken_catalog() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/private-helper-callers");
+    let fingerprint = fingerprint_of(&dir, "design/no-panic");
     lighthouse(dir.path())
         .args(["review", "history", &fingerprint])
         .assert()
@@ -885,7 +698,7 @@ fn findings_of_a_rule_taken_out_of_the_config_are_inactive_and_can_be_pruned() {
     .unwrap();
     lighthouse(dir.path()).arg("check").assert().success();
     let inactive = listing(&dir, "inactive");
-    assert_eq!(rules(&inactive), ["design/private-helper-callers"]);
+    assert_eq!(rules(&inactive), ["design/no-panic"]);
     assert_eq!(rules(&listing(&dir, "open")), ["design/exported-doc"]);
     let out = stdout(lighthouse(dir.path()).args(["review", "list", "--status", "inactive"]));
     assert!(out.contains("\tinactive\t"), "{out}");

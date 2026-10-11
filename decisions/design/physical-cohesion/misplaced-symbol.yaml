@@ -24,6 +24,8 @@ spec:
     that fills a table of handlers lives where the table is). Symbols outside
     the project are not counted, and neither is a module that contains the
     function's module: a submodule uses its parent as a matter of course.
+    Generated code is not a place to move a function to, so it is not counted
+    either.
     Types are not judged: the code model states no uses of a type. A function
     of fewer than `minStatements` statements is too little to judge, and so
     are the functions that start or wire up the program: those of a Go `main`

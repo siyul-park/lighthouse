@@ -329,7 +329,6 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
             "design/plural-collections",
             "design/predicate-names",
             "design/prefer-method",
-            "design/private-helper-callers",
             "design/reserved-verbs",
             "design/resource-owner",
             "design/scoped-borrows",
@@ -338,9 +337,7 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
             "design/standard-abbreviations",
             "design/state-owner",
             "design/stateless-layout",
-            "design/tiny-modules",
             "design/top-down-order",
-            "design/unique-type-names",
             "design/validated-constructors",
         ]
     );
@@ -353,12 +350,9 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
         })
         .collect();
     let recommended = preset("design/recommended");
-    assert_eq!(recommended.len(), design.len() - 7);
+    assert_eq!(recommended.len(), design.len() - 4);
     for strict in [
-        "design/private-helper-callers",
         "design/max-name-words",
-        "design/unique-type-names",
-        "design/tiny-modules",
         "design/feature-envy",
         "design/misplaced-symbol",
         "design/no-panic",

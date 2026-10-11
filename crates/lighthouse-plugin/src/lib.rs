@@ -4,7 +4,11 @@ mod models;
 mod notices;
 mod registry;
 
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use lighthouse_model::{
     Applicability, Capability, Diagnostic, File, Fingerprint, Fragment, Incomplete, Options,
@@ -96,6 +100,15 @@ impl Workspace {
             overlays: BTreeMap::new(),
             cache_dir: None,
         }
+    }
+
+    /// The text of a file as the run sees it: the overlay, else the disk.
+    pub fn read(&self, path: &Path) -> Result<String, Error> {
+        if let Some(text) = self.overlays.get(path) {
+            return Ok(text.clone());
+        }
+        fs::read_to_string(self.root.join(path))
+            .map_err(|e| Error::Incomplete(format!("{}: {e}", path.display())))
     }
 
     /// The constructor prefixes of `language`; none for an unknown language.

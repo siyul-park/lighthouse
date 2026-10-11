@@ -1,0 +1,478 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": "api::Sink#interface",
+          "span": {
+            "end": {
+              "col": 37,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "text": "// Sink takes what is written to it."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "api"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "api::Sink#interface"
+        },
+        {
+          "from": {
+            "symbol": "api::Sink#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "api::Sink::Close#method"
+        },
+        {
+          "from": {
+            "symbol": "api::Sink#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "api::Sink::Flush#method"
+        }
+      ],
+      "file": {
+        "path": "api/api.go"
+      },
+      "functions": [],
+      "modules": [
+        {
+          "name": "api",
+          "path": "api"
+        }
+      ],
+      "symbols": [
+        {
+          "doc": "Sink takes what is written to it.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "api/api.go",
+          "id": "api::Sink#interface",
+          "kind": "interface",
+          "name": "Sink",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 7
+            },
+            "start": {
+              "col": 6,
+              "line": 4
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 15,
+              "line": 5
+            },
+            "start": {
+              "col": 2,
+              "line": 5
+            }
+          },
+          "file": "api/api.go",
+          "id": "api::Sink::Close#method",
+          "kind": "method",
+          "name": "Close",
+          "owner": "api::Sink#interface",
+          "span": {
+            "end": {
+              "col": 15,
+              "line": 5
+            },
+            "start": {
+              "col": 2,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 9,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
+            }
+          },
+          "file": "api/api.go",
+          "id": "api::Sink::Flush#method",
+          "kind": "method",
+          "name": "Flush",
+          "owner": "api::Sink#interface",
+          "span": {
+            "end": {
+              "col": 9,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    },
+    {
+      "comments": [
+        {
+          "attached_to": "impl::File::Close#method",
+          "span": {
+            "end": {
+              "col": 17,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "text": "// Close closes."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "impl"
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "to": "fmt"
+        },
+        {
+          "from": {
+            "module": "impl"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "impl::File#type"
+        },
+        {
+          "from": {
+            "symbol": "impl::File#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "impl::File::Close#method"
+        },
+        {
+          "from": {
+            "symbol": "impl::File#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "impl::File::Flush#method"
+        },
+        {
+          "from": {
+            "module": "impl"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "impl::source#type"
+        },
+        {
+          "from": {
+            "symbol": "impl::source#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "impl::source::Read#method"
+        },
+        {
+          "from": {
+            "symbol": "impl::source#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": "impl::source::Other#method"
+        },
+        {
+          "from": {
+            "symbol": "impl::File#type"
+          },
+          "kind": "implements",
+          "resolution": "semantic",
+          "to": "api::Sink"
+        }
+      ],
+      "file": {
+        "path": "impl/impl.go"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "impl::File::Close#method",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "impl::File::Flush#method",
+          "tokens": 2,
+          "top_level": 0
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 2,
+          "signature": {
+            "params": [
+              {
+                "text": "[]byte"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              },
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "impl::source::Read#method",
+          "tokens": 12,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 0,
+          "statements": 0,
+          "symbol": "impl::source::Other#method",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "impl",
+          "path": "impl"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 19,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 5
+            }
+          },
+          "file": "impl/impl.go",
+          "id": "impl::File#type",
+          "kind": "type",
+          "name": "File",
+          "span": {
+            "end": {
+              "col": 19,
+              "line": 5
+            },
+            "start": {
+              "col": 6,
+              "line": 5
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Close closes.",
+          "extent": {
+            "end": {
+              "col": 44,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "file": "impl/impl.go",
+          "id": "impl::File::Close#method",
+          "kind": "method",
+          "name": "Close",
+          "owner": "impl::File#type",
+          "span": {
+            "end": {
+              "col": 44,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "file": "impl/impl.go",
+          "id": "impl::File::Flush#method",
+          "kind": "method",
+          "name": "Flush",
+          "owner": "impl::File#type",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 10
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 21,
+              "line": 12
+            },
+            "start": {
+              "col": 1,
+              "line": 12
+            }
+          },
+          "file": "impl/impl.go",
+          "id": "impl::source#type",
+          "kind": "type",
+          "name": "source",
+          "span": {
+            "end": {
+              "col": 21,
+              "line": 12
+            },
+            "start": {
+              "col": 6,
+              "line": 12
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 73,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 14
+            }
+          },
+          "file": "impl/impl.go",
+          "id": "impl::source::Read#method",
+          "kind": "method",
+          "name": "Read",
+          "owner": "impl::source#type",
+          "span": {
+            "end": {
+              "col": 73,
+              "line": 14
+            },
+            "start": {
+              "col": 1,
+              "line": 14
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 25,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "file": "impl/impl.go",
+          "id": "impl::source::Other#method",
+          "kind": "method",
+          "name": "Other",
+          "owner": "impl::source#type",
+          "span": {
+            "end": {
+              "col": 25,
+              "line": 16
+            },
+            "start": {
+              "col": 1,
+              "line": 16
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

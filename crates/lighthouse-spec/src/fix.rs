@@ -236,6 +236,29 @@ pub struct CommandSpec {
 }
 
 impl CommandSpec {
+    /// Why the command cannot run as written.
+    fn valid(&self) -> Result<(), String> {
+        if let Some(arg) = self.argv.iter().find(|a| bad_placeholder(a)) {
+            return Err(format!(
+                "`{arg}` is not a placeholder of its own: `{{file}}`, `{{line}}`, `{{symbol}}` and `{{rule}}` fill a whole argument"
+            ));
+        }
+        if self
+            .argv
+            .first()
+            .is_none_or(|program| program.trim().is_empty())
+        {
+            return Err("`argv` needs a program".to_owned());
+        }
+        if self.timeout_duration().is_none_or(|t| t.is_zero()) {
+            return Err(format!(
+                "`timeout` is `{}`, expected a duration such as `30s` or `2m`",
+                self.timeout
+            ));
+        }
+        Ok(())
+    }
+
     /// How long the command may run; `None` for a text that is not a
     /// duration such as `30s`.
     pub fn timeout_duration(&self) -> Option<Duration> {
@@ -269,7 +292,7 @@ pub(crate) fn validate(id: &str, fix: &Fix, mechanical: bool, checked: bool) -> 
             }
             ops.iter().try_for_each(|op| op_valid(op).map_err(fail))
         }
-        FixKind::Command(command) => command_valid(command).map_err(fail),
+        FixKind::Command(command) => command.valid().map_err(fail),
         // Kept, and declined when a fix is asked for; see `FixPlan`.
         FixKind::Rpc { .. } => Ok(()),
     }
@@ -277,28 +300,6 @@ pub(crate) fn validate(id: &str, fix: &Fix, mechanical: bool, checked: bool) -> 
 
 fn default_timeout() -> String {
     "30s".to_owned()
-}
-
-fn command_valid(command: &CommandSpec) -> Result<(), String> {
-    if let Some(arg) = command.argv.iter().find(|a| bad_placeholder(a)) {
-        return Err(format!(
-            "`{arg}` is not a placeholder of its own: `{{file}}`, `{{line}}`, `{{symbol}}` and `{{rule}}` fill a whole argument"
-        ));
-    }
-    if command
-        .argv
-        .first()
-        .is_none_or(|program| program.trim().is_empty())
-    {
-        return Err("`argv` needs a program".to_owned());
-    }
-    if command.timeout_duration().is_none_or(|t| t.is_zero()) {
-        return Err(format!(
-            "`timeout` is `{}`, expected a duration such as `30s` or `2m`",
-            command.timeout
-        ));
-    }
-    Ok(())
 }
 
 /// An argument that uses a placeholder without being exactly that placeholder
