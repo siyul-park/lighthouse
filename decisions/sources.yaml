@@ -134,7 +134,7 @@ spec:
       decisions: [design/justified-helpers]
     - ref: "coding-patterns#functions-be8f45fd"
       text: A private helper SHOULD have at least two callers.
-      decisions: [design/private-helper-callers]
+      decisions: [design/justified-helpers]
     - ref: "coding-patterns#functions-3419f6c9"
       text: >-
         A simple single-use wrapper SHOULD be inlined unless its name expresses

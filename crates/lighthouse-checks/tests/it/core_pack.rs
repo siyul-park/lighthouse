@@ -290,20 +290,13 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
             "design/no-redundant-qualifiers",
             "design/no-single-use-wrapper",
             "design/no-stored-context",
-            "design/owner-file",
             "design/prefer-method",
-            "design/private-helper-callers",
-            "design/tiny-modules",
-            "design/unique-type-names"
         ]
     );
     let recommended = preset("design/recommended");
-    assert_eq!(recommended.len(), design.len() - 7);
+    assert_eq!(recommended.len(), design.len() - 4);
     for strict in [
-        "design/private-helper-callers",
         "design/max-name-words",
-        "design/unique-type-names",
-        "design/tiny-modules",
         "design/feature-envy",
         "design/misplaced-symbol",
         "design/no-panic",

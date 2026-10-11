@@ -33,6 +33,20 @@ pub struct Output {
     pub timings: bool,
 }
 
+impl Output {
+    /// Refuses the flags that only the agent formats honor.
+    fn validate(&self) -> Result<()> {
+        let agent = matches!(self.format, Format::Agent | Format::AgentJson);
+        if self.limit.is_some() && !agent {
+            return Err("--limit applies to the agent formats only".into());
+        }
+        if self.detail != Detail::default() && !agent {
+            return Err("--detail applies to the agent formats only".into());
+        }
+        Ok(())
+    }
+}
+
 /// What `check --fix` is asked to do.
 pub struct FixOptions {
     pub dry_run: bool,
@@ -50,7 +64,7 @@ pub struct Reported<'a> {
 /// whether the findings fail the run.
 pub fn run(scope: &Scope, output: &Output, fix: Option<FixOptions>) -> Result<u8> {
     let started = Instant::now();
-    validate(output)?;
+    output.validate()?;
     if let Some(fix) = fix {
         let dry_run = fix.dry_run;
         fixing(scope, fix)?;
@@ -60,18 +74,6 @@ pub fn run(scope: &Scope, output: &Output, fix: Option<FixOptions>) -> Result<u8
     }
     let checked = select(scope)?;
     report(&checked, output, started)
-}
-
-/// Refuses the flags that only the agent formats honor.
-fn validate(output: &Output) -> Result<()> {
-    let agent = matches!(output.format, Format::Agent | Format::AgentJson);
-    if output.limit.is_some() && !agent {
-        return Err("--limit applies to the agent formats only".into());
-    }
-    if output.detail != Detail::default() && !agent {
-        return Err("--detail applies to the agent formats only".into());
-    }
-    Ok(())
 }
 
 /// Analyzes the project and keeps what the scope reports.

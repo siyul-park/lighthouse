@@ -1,0 +1,25 @@
+# retained: yes
+# R4: 22 of 651 findings (seed 5, eleven each from cel and qlbridge). TP = no test named after the symbol exists
+fingerprint	repo	location	verdict	reason
+e6fff11c6cfd8b9a95e24289ebb0fb214b093c4c2aef7099c14fb97a570662e0	cel	common/operators/operators.go:116	TP	no test mentions it
+b2bcea9b44e7ec416e974495dfafa416cb2374390d2f925872eb98e9438d9bdb	cel	checker/decls/decls.go:239	TP	no test mentions it
+7dc26d80650db22f549f0d4c443b0fdc7726875f00ce8a940fd4e80c70d6894e	cel	common/decls/decls.go:719	unclear	a test named TestOverloadOperandTrait exists, not by the owner convention
+ec1455ffcb172279a438cf51d9799d595ab626fd9658172c908aab94cb47f469	cel	common/types/types.go:692	TP	no test mentions it
+eebdc73accc9e964f7ca845ce9cd49c5e3490a6d7778fc60452b968842dc928a	cel	common/source.go:96	TP	no test mentions it
+6042a8b56d0afeb07d5227a40aa079f5af95e052ccf97824e06bc189779eb5e2	cel	checker/cost.go:151	TP	no test mentions it
+5e116aa6e8363d6e4ccba30f58162ebe0a4bce167e838af72a1ea21c63aa49a1	cel	common/env/env.go:441	TP	no test mentions it
+16e12393372a040fb77cb6b35485dce44d869e0138f496a14572ba8e4b463abf	cel	interpreter/interpretable.go:171	TP	no test mentions it
+a04967d660e1d7e5027b5a92cef5d3bf18d312d289dc2ab8b87fa1d4b4cbb49d	cel	ext/strings.go:383	TP	no test mentions it
+587741c4abc7a5dc1a399f71c68c9f7aad98317d86b570349e3a20a984572e5e	cel	cel/decls.go:321	unclear	two test files use it, none is named after it
+3544c6f2de07a48cadb7c6b65c9b32369d9d3df22aac61e136bebd2d895cd01c	cel	checker/cost.go:174	TP	no test mentions it
+bc2bbbed18a0d230fc8329764206671fa6fea5883a2b793bb515dd1c524e3173	qlbridge	schema/apply_schema.go:29	TP	no test mentions it
+08fa1b042173242167b31deadd23a7bfa84f93cf233aa404af804171d2717430	qlbridge	datasource/schemadb.go:449	TP	no test mentions it
+4ccdb8a1beb1ceff78a24c4f5b0ae607043dc10cb709fc938f53036b689cb3cf	qlbridge	expr/builtins/url_email.go:286	TP	no test mentions it
+a1b99c55b740ecfd82dd6bf0de8e5dae49fcee322f4946104e76fc0def969495	qlbridge	value/value.go:502	unclear	not checked
+68ab6aee08b51d847a342999306f6a6f63d0f9142da2bc7649e5ba0b09ff3d9c	qlbridge	exec/results.go:134	unclear	a test file mentions Copy
+11e8c298f360471acd79df0e0e740ffa054d8434d3f21d5c1786070d15198f80	qlbridge	expr/builtins/string.go:177	TP	no test mentions it
+53a98ee81710099210442dd4d1def0115ee2862eb16a60faee1071eecf43939f	qlbridge	lex/lexer.go:834	TP	no test mentions it
+1dc631f2423406b56dd6a022e6c33b8367d70862726ef778bb86d57261a85899	qlbridge	rel/sql.go:1662	TP	no test mentions it
+5c562f9fdaf1cfb0b2a88a41f9a8cb1cc20589d71a0eecb7bc165dfb89e41942	qlbridge	datasource/key.go:38	TP	no test mentions it
+2ca3dd81eb5ea80bb876979476f1f4da41f366b823998c0334a3058c93db3fd3	qlbridge	rel/sql.go:1915	unclear	five test files mention SqlSelect, none is named after this method
+414d81de8e65b43099df5813a0c6b6b3ce5814c45975e0b3d28e706888781cca	qlbridge	expr/builtins/list_map.go:213	TP	no test mentions it

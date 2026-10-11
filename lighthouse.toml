@@ -25,8 +25,6 @@ formatter = { argv = ["rustfmt", "--edition", "2024", "--emit", "stdout"], stdin
 "core/max-lines" = { level = "warn", options = { max = 1000 } }
 # Four words: the visitor methods of syn and the field names of SARIF are not ours to rename.
 "design/max-name-words" = { level = "warn", options = { max = 4 } }
-"design/unique-type-names" = "info"
-"design/tiny-modules" = "info"
 "design/feature-envy" = "info"
 "design/misplaced-symbol" = "info"
 
@@ -51,7 +49,7 @@ options.layers = [
 # project's own design.
 [[spec.overrides]]
 files = ["plugins/conformance/**"]
-rules = { "core/max-lines" = "off", "design/complexity" = "off", "design/coupling" = "off", "design/exported-doc" = "off", "design/no-single-use-wrapper" = "off", "design/declaration-groups" = "off", "design/contiguity" = "off", "design/callers-before-callees" = "off", "design/private-helper-callers" = "off", "design/no-banners" = "off", "design/no-redundant-qualifiers" = "off", "design/no-mutable-globals" = "off", "testing/external-package" = "off", "testing/owner" = "off", "testing/unique-owner" = "off" }
+rules = { "core/max-lines" = "off", "design/complexity" = "off", "design/coupling" = "off", "design/exported-doc" = "off", "design/no-single-use-wrapper" = "off", "design/declaration-groups" = "off", "design/contiguity" = "off", "design/callers-before-callees" = "off", "design/no-banners" = "off", "design/no-redundant-qualifiers" = "off", "design/no-mutable-globals" = "off", "testing/external-package" = "off", "testing/owner" = "off", "testing/unique-owner" = "off" }
 
 [[spec.overrides]]
 files = ["docs/decisions/**", "schema/**", "protocol/schema/**"]

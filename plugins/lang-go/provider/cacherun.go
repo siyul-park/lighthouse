@@ -177,10 +177,9 @@ func analyzeMisses(r *run, params sdk.IndexParams, plan *cachePlan) (*run, bool)
 	if len(plan.misses) == 0 {
 		return nil, true
 	}
-	units := plan.misses
-	if len(plan.previous) < len(plan.misses) {
-		units = slices.Concat(plan.misses, plan.interfaces)
-	}
+	// The interface units are always analyzed along: a method is an
+	// implementation of any interface of the project, named or not.
+	units := slices.Concat(plan.misses, plan.interfaces)
 	wanted := map[string]bool{}
 	for _, u := range units {
 		for _, rel := range u.requested {

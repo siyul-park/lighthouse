@@ -11,13 +11,25 @@ spec:
   title: Separation marks a boundary
   context: >-
     A file or module split without a real boundary only adds navigation
-    cost.
+    cost, and a small module that a single other module uses is that user's
+    detail.
   scope:
     domain: code
     subject: module
   requirement: >-
     Physical separation MUST represent a real responsibility, ownership, or
-    abstraction boundary.
+    abstraction boundary: a module separated from its only user MUST be that
+    kind of boundary, or be merged into the user.
   severity: info
   check:
     type: model
+    # The old deterministic check of `design/tiny-modules` (0 of 20 sampled
+    # findings were right) picks what the model is asked about. Widened for
+    # recall: the size limit doubles from 300 to 600 lines and a module nobody
+    # imports is asked about too, unless it is an entry module (a Go `main`
+    # package or a Rust binary target), which nobody imports by design.
+    select: >-
+      module.lines < 600
+      && (size(module.dependents) == 1 || module.declares == 0
+          || (size(module.dependents) == 0 && module.name != 'main'
+              && !module.path.contains('[bin:')))

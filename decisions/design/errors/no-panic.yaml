@@ -22,7 +22,9 @@ spec:
     candidates, not violations: impossible programmer errors, `Must*`-style
     APIs and documented hot-path invariants are allowed by the requirement
     and stay with review. Test code, entrypoints (`main`, `init`) and
-    functions whose name starts with one of `allowPrefixes` are not reported.
+    functions whose name starts with one of `allowPrefixes` are not reported. In Rust, a
+    library that is not published and that only tests link in (no other
+    package lists it in `[dependencies]`, and it has no binary) is test code.
     The decision is in the `strict` preset only, as clippy's restriction lints
     and forbidigo are opt-in for the same reason.
   scope:

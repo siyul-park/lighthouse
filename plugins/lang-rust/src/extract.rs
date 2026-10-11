@@ -19,7 +19,7 @@ use crate::{
     signature::signature_of,
     testcase,
     tree::{SourceFile, Vis, vis},
-    util::{constructs, count_tokens, doc_of, extent_of, signature_counts, span_of},
+    util::{built_type, constructs, count_tokens, doc_of, extent_of, signature_counts, span_of},
 };
 
 /// What macros kept from the analysis in one file.
@@ -189,6 +189,13 @@ impl Extractor<'_> {
             self_ty: None,
             generics: generics_of(&f.sig.generics, None),
         };
+        // A free function that returns a type of its own module builds it.
+        let role = Role {
+            implementation: false,
+            constructs: built_type(&f.sig)
+                .and_then(|ty| self.idx.type_sym(ty, &cx))
+                .is_some_and(|sym| sym.id.rsplit_once("::").is_some_and(|(m, _)| m == module)),
+        };
         let home = Home {
             kind,
             module_path: module,
@@ -200,7 +207,7 @@ impl Extractor<'_> {
             &home,
             &f.sig,
             &f.block,
-            (test.then_some(f.attrs.as_slice()), Role::default()),
+            (test.then_some(f.attrs.as_slice()), role),
         );
     }
 

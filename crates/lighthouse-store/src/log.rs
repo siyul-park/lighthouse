@@ -233,6 +233,29 @@ pub(crate) struct Logged {
     pub notices: Vec<String>,
 }
 
+impl Logged {
+    /// Removes the suppressions that go with no judgment of their finding.
+    fn drop_orphans(&mut self, path: &Path) {
+        let judged: BTreeSet<(&str, &str)> = self
+            .judgments
+            .iter()
+            .map(|j| (j.id.as_str(), j.fingerprint.as_str()))
+            .collect();
+        let (kept, orphans): (Vec<_>, Vec<_>) = std::mem::take(&mut self.suppressions)
+            .into_iter()
+            .partition(|s| judged.contains(&(s.judgment.as_str(), s.fingerprint.as_str())));
+        for orphan in &orphans {
+            self.notices.push(format!(
+                "{}: the suppression {} goes with no judgment of {} and was ignored",
+                path.display(),
+                orphan.event.id,
+                orphan.fingerprint
+            ));
+        }
+        self.suppressions = kept;
+    }
+}
+
 /// What a log line holds.
 enum Record {
     Judgment(Box<JudgmentEvent>),
@@ -302,7 +325,7 @@ pub(crate) fn read(path: &Path) -> Result<Logged, Error> {
             Record::Suppression(suppression) => read.suppressions.push(*suppression),
         }
     }
-    drop_orphans(path, &mut read);
+    read.drop_orphans(path);
     Ok(read)
 }
 
@@ -333,27 +356,6 @@ pub(crate) fn append(path: &Path, lines: &[String]) -> Result<(), Error> {
     file.write_all(text.as_bytes())
         .and_then(|()| file.sync_all())
         .map_err(|source| io(path, source))
-}
-
-/// Removes the suppressions that go with no judgment of their finding.
-fn drop_orphans(path: &Path, read: &mut Logged) {
-    let judged: BTreeSet<(&str, &str)> = read
-        .judgments
-        .iter()
-        .map(|j| (j.id.as_str(), j.fingerprint.as_str()))
-        .collect();
-    let (kept, orphans): (Vec<_>, Vec<_>) = std::mem::take(&mut read.suppressions)
-        .into_iter()
-        .partition(|s| judged.contains(&(s.judgment.as_str(), s.fingerprint.as_str())));
-    for orphan in &orphans {
-        read.notices.push(format!(
-            "{}: the suppression {} goes with no judgment of {} and was ignored",
-            path.display(),
-            orphan.event.id,
-            orphan.fingerprint
-        ));
-    }
-    read.suppressions = kept;
 }
 
 /// The record a log line holds.

@@ -172,17 +172,23 @@ fn generic_of<'a>(ty: &'a syn::Type, name: &str) -> Option<&'a syn::Type> {
     })
 }
 
+/// The type a function without a receiver gives, inside a `Result` or an
+/// `Option`: what it builds when it is a constructor.
+pub fn built_type(sig: &syn::Signature) -> Option<&syn::Type> {
+    let syn::ReturnType::Type(_, ty) = &sig.output else {
+        return None;
+    };
+    sig.receiver()
+        .is_none()
+        .then(|| generic_of(ty, "Option").unwrap_or_else(|| unwrap_result(ty)))
+}
+
 /// Whether the function builds a value of `owner` without taking one: no
 /// receiver, and it returns `Self` or `owner`, bare or inside a `Result` or
 /// an `Option`.
 pub fn constructs(sig: &syn::Signature, owner: &str) -> bool {
-    let syn::ReturnType::Type(_, ty) = &sig.output else {
-        return false;
-    };
-    let ty = generic_of(ty, "Option").unwrap_or_else(|| unwrap_result(ty));
-    sig.receiver().is_none()
-        && matches!(ty, syn::Type::Path(p) if p.qself.is_none()
-            && p.path.segments.last().is_some_and(|s| s.ident == "Self" || s.ident == owner))
+    matches!(built_type(sig), Some(syn::Type::Path(p)) if p.qself.is_none()
+        && p.path.segments.last().is_some_and(|s| s.ident == "Self" || s.ident == owner))
 }
 
 /// An attribute's path as written, `tokio::test`.

@@ -31,6 +31,7 @@ mod effective;
 mod forward;
 mod hidden;
 mod homonyms;
+mod imports;
 mod measures;
 mod ownership;
 mod role;
@@ -54,6 +55,7 @@ pub(crate) struct Builder<'a> {
     table: Arc<Table>,
     names: Arc<homonyms::Names>,
     single: Arc<effective::Single>,
+    imports: Arc<imports::Imports>,
     allow_suffixes: Vec<String>,
     first_test: OnceCell<Option<Value>>,
 }
@@ -90,6 +92,7 @@ impl<'a> Builder<'a> {
             table: ctx.memo.slot(),
             names: ctx.memo.slot(),
             single: ctx.memo.slot(),
+            imports: ctx.memo.slot(),
             allow_suffixes: strings(options.get("allowSuffixes")),
             first_test: OnceCell::new(),
         })
@@ -248,12 +251,6 @@ impl<'a> Builder<'a> {
                 json!(target.map_or("", |t| t.as_str())),
             );
         }
-        if needs.fact("documented_by_interface") {
-            map.insert(
-                "documented_by_interface".to_owned(),
-                json!(documented_by_interface(project, symbol)),
-            );
-        }
         if needs.fact("receiver_affinity") {
             map.insert(
                 "receiver_affinity".to_owned(),
@@ -304,6 +301,9 @@ impl<'a> Builder<'a> {
         }
         if needs.fact("homonyms") {
             map.insert("homonyms".to_owned(), self.homonyms(symbol));
+        }
+        if needs.fact("module_imports") {
+            map.insert("module_imports".to_owned(), self.module_imports(symbol));
         }
         if needs.fact("hidden_target") {
             map.insert("hidden_target".to_owned(), self.hidden_target(symbol));
@@ -567,27 +567,6 @@ impl<'a> Builder<'a> {
             "first": at.map_or("", |s| s.id.as_str()),
         })
     }
-}
-
-/// Whether a method implements a documented method of an interface its type
-/// implements: it is documented where the interface declares it.
-fn documented_by_interface(project: &Project, method: &Symbol) -> bool {
-    let Some(owner) = method
-        .owner
-        .as_ref()
-        .filter(|_| method.kind == SymbolKind::Method)
-    else {
-        return false;
-    };
-    project.implements(owner).iter().any(|interface| {
-        project.members(interface).iter().any(|id| {
-            project.symbol(id).is_some_and(|declared| {
-                declared.kind == SymbolKind::Method
-                    && declared.name == method.name
-                    && declared.doc.is_some()
-            })
-        })
-    })
 }
 
 /// The strings of an option that is a list of them; empty when it is not.

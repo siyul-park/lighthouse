@@ -1,13 +1,10 @@
-//! The decisions about where modules and types sit: layers, type names and
-//! module size, over synthetic projects.
+//! The layers decision over synthetic projects.
 
 use crate::support::World;
 use lighthouse_model::SymbolKind;
 use serde_json::{Value, json};
 
 const LAYERS: &str = "design/layers";
-const TYPE_NAMES: &str = "design/unique-type-names";
-const TINY: &str = "design/tiny-modules";
 
 /// A project whose modules each declare one function, named like the last
 /// segment of the module path, and import each other as `imports` say.
@@ -119,92 +116,4 @@ fn layers_skip_an_import_an_ignore_entry_names() {
         importers(&["infra", "domain"], &[("domain", "infra")], other),
         ["domain".to_owned()]
     );
-}
-
-/// Two modules each declare a type called `name`, with these visibilities.
-fn homonyms(name: &str, second_file: &str, second_private: bool) -> (World, Vec<String>) {
-    let mut w = World::default();
-    w.symbol("a", name, SymbolKind::Type, "a/a.ucm");
-    let other = w.symbol("b", name, SymbolKind::Type, second_file);
-    if second_private {
-        w.private(&other);
-    }
-    let found = w.check(TYPE_NAMES, json!({}));
-    let names = w.names(&found);
-    (w, names)
-}
-
-#[test]
-fn type_names_report_each_public_type_another_module_also_declares() {
-    let (_, found) = homonyms("Account", "b/a.ucm", false);
-    assert_eq!(found, ["Account", "Account"]);
-}
-
-#[test]
-fn type_names_skip_idiomatic_names_private_types_and_code_that_is_not_production() {
-    for name in ["Error", "Result", "Options", "Config"] {
-        assert!(homonyms(name, "b/a.ucm", false).1.is_empty(), "{name}");
-    }
-    assert!(homonyms("Account", "b/a.ucm", true).1.is_empty(), "private");
-    assert!(
-        homonyms("Account", "b/a_test.ucm", false).1.is_empty(),
-        "test"
-    );
-}
-
-#[test]
-fn type_names_accept_the_names_the_options_allow() {
-    let mut w = World::default();
-    w.symbol("a", "Account", SymbolKind::Type, "a/a.ucm");
-    w.symbol("b", "Account", SymbolKind::Type, "b/a.ucm");
-    assert!(
-        w.check(TYPE_NAMES, json!({ "allow": ["Account"] }))
-            .is_empty()
-    );
-}
-
-/// Module `small` of `lines` declarations, imported by `users`.
-fn small(lines: usize, users: &[&str], declares: bool) -> World {
-    let mut w = World::default();
-    w.module("small", None, None);
-    for n in 0..lines {
-        let kind = if declares {
-            SymbolKind::Function
-        } else {
-            SymbolKind::Field
-        };
-        w.symbol("small", &format!("f{n}"), kind, "small/a.ucm");
-    }
-    for user in users {
-        w.module(user, None, None);
-        w.symbol(user, "run", SymbolKind::Function, &format!("{user}/a.ucm"));
-        w.import(user, "small");
-    }
-    w
-}
-
-#[test]
-fn tiny_modules_report_a_small_module_with_one_dependent_or_none_of_its_own() {
-    let one = small(2, &["user"], true);
-    assert_eq!(one.check(TINY, json!({ "minLines": 5 })).len(), 1);
-    let empty = small(2, &["first", "second"], false);
-    assert_eq!(empty.check(TINY, json!({ "minLines": 5 })).len(), 1);
-}
-
-#[test]
-fn tiny_modules_skip_shared_big_and_unused_modules() {
-    let shared = small(2, &["first", "second"], true);
-    assert!(shared.check(TINY, json!({ "minLines": 5 })).is_empty());
-    let big = small(6, &["user"], true);
-    assert!(big.check(TINY, json!({ "minLines": 5 })).is_empty());
-    let unused = small(2, &[], true);
-    assert!(unused.check(TINY, json!({ "minLines": 5 })).is_empty());
-}
-
-#[test]
-fn tiny_modules_do_not_count_a_module_that_tests_it_as_a_dependent() {
-    let mut w = small(2, &["user", "check"], true);
-    w.modules.retain(|m| m.path != "check");
-    w.module("check", None, Some("small"));
-    assert_eq!(w.check(TINY, json!({ "minLines": 5 })).len(), 1);
 }

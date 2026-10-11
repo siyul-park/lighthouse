@@ -12,17 +12,19 @@ spec:
   context: >-
     Public API changes need facts callers cannot read from the code.
 
-    Go: Normal Go doc comments beginning with the symbol name.
+    Go: Normal Go doc comments beginning with the symbol name. A method that
+    implements an interface of the project or of a package the code can
+    import is exempt (revive's `exported` rule, and golint before it, leave
+    the well-known interface methods undocumented too): the interface fixes
+    its name and contract.
 
     Rust: Doc comments (`///`, `#[doc]`) on items reachable from outside
     the library crate: `pub` items whose modules are all `pub` or that a
     `pub use` re-exports. Items in binary crates, in tests and in
     `pub(crate)` positions are not exported. A trait impl method without
     docs of its own shows the documentation of the trait's method, as
-    rustdoc does; a method that implements a method of a trait declared in
-    the project is documented where the trait declares it, and the methods
-    of the standard traits (`fmt`, `from`, `default`, `drop`, ...) need
-    none. The public items of a library that cannot be published (`publish
+    rustdoc does, and a method of any trait impl is exempt. The public items
+    of a library that cannot be published (`publish
     = false`) are importable only inside the project and count as
     internal, unless another package of the project depends on the
     library: then its public items are a contract between packages and
@@ -51,47 +53,17 @@ spec:
           as under an internal path.
       exemptInterfaceMethods:
         type: boolean
-        default: false
+        default: true
         description: >-
-          Do not require docs on a method that implements a documented method of
-          an interface (or trait) the project declares, since it is documented
-          where the interface declares it.
+          Do not require docs on a method that implements an interface (or
+          trait) method, since the interface fixes its name and contract.
       exemptMethods:
         type: array
         default: [String, Error, Unwrap]
         description: >-
           Method names that implement well-known interfaces and need no doc
-          comment of their own.
+          comment of their own, when the provider cannot tell they do.
     additionalProperties: false
-  languages:
-    rust:
-      options:
-        exemptInterfaceMethods: true
-        exemptMethods:
-          - fmt
-          - source
-          - from
-          - try_from
-          - from_str
-          - default
-          - drop
-          - clone
-          - eq
-          - ne
-          - partial_cmp
-          - cmp
-          - hash
-          - deref
-          - deref_mut
-          - as_ref
-          - as_mut
-          - borrow
-          - next
-          - into_iter
-          - index
-          - index_mut
-          - serialize
-          - deserialize
   check:
     type: cel
     with:
@@ -103,7 +75,7 @@ spec:
       && (owner.kind == '' || (exposed(owner, options.includeInternal) && owner.kind != 'interface'))
       && !(symbol.kind == 'method'
            && (options.exemptMethods.exists(m, m == symbol.name)
-               || (options.exemptInterfaceMethods && symbol.documented_by_interface)))
+               || (options.exemptInterfaceMethods && symbol.role == 'implementation')))
       && !symbol.documented
     message: "exported {{ symbol.kind }} {{ symbol.name }} must have a doc comment"
     evidence:
@@ -332,27 +304,6 @@ spec:
                     1
                 }
             }
-    - name: rust-impl-of-an-undocumented-trait-method
-      language: rust
-      kind: invalid
-      files:
-        - path: src/lib.rs
-          body: |-
-            /// Something that can be read.
-            pub trait Source {
-                fn read(&self) -> i32;
-            }
-
-            /// A constant source.
-            pub struct Fixed;
-
-            impl Source for Fixed {
-                fn read(&self) -> i32 {
-                    1
-                }
-            }
-      expect:
-        - line: 10
     - name: rust-inline-test-module
       language: rust
       kind: valid
@@ -385,3 +336,13 @@ spec:
             pub struct Internal;
 
             pub fn only_inside_the_project() {}
+    - name: go-implements-an-interface-it-never-names
+      language: go
+      kind: valid
+      files:
+        - path: go.mod
+          body: "module example.com/app\n\ngo 1.26\n"
+        - path: api/api.go
+          body: "package api\n\n// Sink takes what is written to it.\ntype Sink interface {\n\t// Flush writes what is buffered.\n\tFlush()\n}\n"
+        - path: impl/impl.go
+          body: "package impl\n\n// File is a file.\ntype File struct{}\n\nfunc (f *File) Flush() {}\n"

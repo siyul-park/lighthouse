@@ -39,7 +39,6 @@ spec:
       decisions:
         - owner-file
         - misplaced-symbol
-        - tiny-modules
         - contiguity
         - layout
         - meaningful-separation
@@ -75,7 +74,6 @@ spec:
         readable, not merely make functions smaller.
       decisions:
         - justified-helpers
-        - private-helper-callers
         - no-single-use-wrapper
         - prefer-method
         - feature-envy
@@ -88,7 +86,6 @@ spec:
         vocabulary that preserves the required distinction.
       decisions:
         - terminology
-        - unique-type-names
         - minimal-names
         - max-name-words
         - no-redundant-qualifiers

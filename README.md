@@ -102,14 +102,14 @@ A hook runs `lighthouse check` on what the agent just changed and returns feedba
 agent can act on:
 
 ```text
-design/private-helper-callers  info (heuristic)  src/lib.rs:5:1
-  owner:       demo::clamp#function
-  message:     private function clamp has one caller (run)
-  requirement: A private helper SHOULD have at least two callers.
-  context:     A private helper with one caller is usually part of that caller.
-  evidence:    caller=demo::run#function callers=1 statements=3
+design/no-panic  info (heuristic)  src/lib.rs:2:7
+  owner:       demo::run#function
+  message:     .unwrap() can panic in run: return an error instead
+  requirement: Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
+  context:     Panics bypass the caller's control flow.
+  evidence:    function=run kind=unwrap
   expected:    canonical rust example (src/lib.rs)
-                 pub fn run(x: u8) -> u8 { x.min(9) + 1 }
+                 pub fn parse(text: &str) -> Result<u32, std::num::ParseIntError> { text.parse() }
   fingerprint: 395d1985afe8
 ```
 

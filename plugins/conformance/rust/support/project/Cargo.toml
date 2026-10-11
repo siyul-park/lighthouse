@@ -1,0 +1,6 @@
+[workspace]
+members = ["app", "fixtures", "shared"]
+resolver = "3"
+
+[workspace.package]
+publish = false

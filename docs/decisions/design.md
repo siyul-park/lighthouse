@@ -102,54 +102,17 @@ Physical layout should make ownership and collaboration visible while preserving
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/owner-file`](#one-owner-one-file) | One owner, one file | info · cel |  |  |
+| `design/owner-file` | One owner, one file | info · model |  | Symbols with one owner and cohesive responsibility MUST share a file, unless the split follows a concern of the owner. |
 | [`design/misplaced-symbol`](#a-function-lives-with-what-it-uses) | A function lives with what it uses | info · cel |  |  |
-| [`design/tiny-modules`](#a-module-earns-its-boundary) | A module earns its boundary | info · cel |  |  |
 | [`design/contiguity`](#collaborators-stay-close) | Collaborators stay close | warn · proximity | suggested |  |
 | `design/layout` | Layout shows ownership | info · model |  | Files and declaration order MUST make ownership, responsibility, and relationships easy to read. |
-| `design/meaningful-separation` | Separation marks a boundary | info · model |  | Physical separation MUST represent a real responsibility, ownership, or abstraction boundary. |
-
-### One owner, one file
-
-`design/owner-file` · symbol · info · cel
-
-*A reader finds an owner and everything it owns in one place. This is a review signal: most findings are deliberate splits of an owner by concern, which the code model cannot tell from accidents, and no tool backs the Go convention of one file per receiver type. A method is reported when it is declared outside the unit of its type: its file, or its module and the modules below it (option `unit`). A private free function is reported the same way when every production caller of it is a method of one type that is declared outside the unit and the function calls or references that type or one of its members. A function named like a constructor is not reported. Go: All methods of a receiver type stay in the file of the type (`unit: file`). A method that implements an interface method is exempt, as a trait impl method is in Rust: the interface decides where it is written. Rust: The methods of an inherent `impl` stay in the module of the type or in a module below it (`unit: module-tree`): a type with a child module for its impls keeps them together. The code model names the module of a method after its type, not after the `impl`, so the module tree is read from files: `m.rs` holds `m/`, a crate root or `mod.rs` the directory it is in. An impl in a sibling or parent module is reported. A method of a trait impl is exempt, because the trait decides where it is written; the code model marks it by an id that carries the trait. A type that the project does not declare has no module to keep to.*
-
-Symbols with one owner and cohesive responsibility MUST share a file.
-
-| option | default | meaning |
-| --- | --- | --- |
-| `unit` | `"file"`; rust: `"module-tree"` | Where the members of a type must be: `file` (the file of the type) or `module-tree` (the module of the type or one below it). |
-
-```go invalid store.go
-package sample
-
-type Store struct{ items []int }
-```
-
-```go invalid total.go
-package sample
-
-func (s *Store) Total() int { return len(s.items) }
-```
-
-```go valid
-package sample
-
-type Store struct{ items []int }
-
-func (s *Store) Total() int { return count(s) }
-
-func count(s *Store) int { return len(s.items) }
-```
-
-Also: rust
+| `design/meaningful-separation` | Separation marks a boundary | info · model |  | Physical separation MUST represent a real responsibility, ownership, or abstraction boundary: a module separated from its only user MUST be that kind of boundary, or be merged into the user. |
 
 ### A function lives with what it uses
 
 `design/misplaced-symbol` · symbol · info · cel · strict
 
-*A function whose every use lies in one other module is that module's code, kept here by accident of history. This is Fowler's Move Function (Refactoring, 2nd ed.) with the foreign-data measure of Lanza and Marinescu (2006). No tool checks it: Sonar and PMD judge coupling of a class, not where a function belongs. A free function is reported when everything it calls or references in the project lies in one other module, at least `minUses` distinct functions, methods or fields of it (naming its constants and types ties nothing), and nothing in its own module, and nothing uses it as a value (a function that fills a table of handlers lives where the table is). Symbols outside the project are not counted, and neither is a module that contains the function's module: a submodule uses its parent as a matter of course. Types are not judged: the code model states no uses of a type. A function of fewer than `minStatements` statements is too little to judge, and so are the functions that start or wire up the program: those of a Go `main` package or the root of a Rust binary, and those an `init` function or a package variable's initializer uses. Go: A package function that uses only another package. Rust: A free function that uses only another module of the crate or another crate of the workspace.*
+*A function whose every use lies in one other module is that module's code, kept here by accident of history. This is Fowler's Move Function (Refactoring, 2nd ed.) with the foreign-data measure of Lanza and Marinescu (2006). No tool checks it: Sonar and PMD judge coupling of a class, not where a function belongs. A free function is reported when everything it calls or references in the project lies in one other module, at least `minUses` distinct functions, methods or fields of it (naming its constants and types ties nothing), and nothing in its own module, and nothing uses it as a value (a function that fills a table of handlers lives where the table is). Symbols outside the project are not counted, and neither is a module that contains the function's module: a submodule uses its parent as a matter of course. Generated code is not a place to move a function to, so it is not counted either. Types are not judged: the code model states no uses of a type. A function of fewer than `minStatements` statements is too little to judge, and so are the functions that start or wire up the program: those of a Go `main` package or the root of a Rust binary, and those an `init` function or a package variable's initializer uses. Go: A package function that uses only another package. Rust: A free function that uses only another module of the crate or another crate of the workspace.*
 
 A function SHOULD live in the module whose symbols it uses.
 
@@ -190,66 +153,6 @@ func load() int {
 }
 
 func local() int { return 0 }
-```
-
-Also: rust
-
-### A module earns its boundary
-
-`design/tiny-modules` · module · info · cel · strict
-
-*A small module with one user is that user's detail, and a module that only forwards others adds a hop without a concept. No tool checks this: Sonar and PMD bound the size of a file or class from above only. A module is reported when it has fewer than `minLines` lines and either exactly one production module imports it or it declares nothing of its own. Lines run from the first to the last declaration of each file of the module, because the code model does not carry the length of a file. Declarations are the types, interfaces, constants, variables and functions at module level, without `init`; a Rust re-export is not one. Tests and generated code are not judged, and a module that tests another is not a dependent. Go: A package is a module. Rust: A crate or a `mod` is a module; a crate root that only declares `mod` and `pub use` is reported when small, as the facade it is.*
-
-A module SHOULD hold enough to justify its boundary: a small module that one other module uses SHOULD be merged into its user, or its boundary justified.
-
-Derived from: Fowler, Refactoring 2nd ed., Inline Class
-
-| option | default | meaning |
-| --- | --- | --- |
-| `minLines` | `300` | Fewer lines than this make a module small. |
-
-```go invalid go.mod
-module example.com/app
-
-go 1.26
-```
-
-```go invalid app/app.go
-package app
-
-import "example.com/app/tiny"
-
-func Run() int { return tiny.One() }
-
-func Other() int { return 2 }
-
-func Third() int { return 3 }
-
-func Fourth() int { return 4 }
-
-func Fifth() int { return 5 }
-```
-
-```go invalid tiny/tiny.go
-package tiny
-
-func One() int { return 1 }
-```
-
-```go valid cli/cli.go
-package cli
-
-import "example.com/app/tiny"
-
-func Run() int { return tiny.One() }
-
-func Other() int { return 2 }
-
-func Third() int { return 3 }
-
-func Fourth() int { return 4 }
-
-func Fifth() int { return 5 }
 ```
 
 Also: rust
@@ -663,51 +566,12 @@ Function structure should make meaningful behavior reusable and readable, not me
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/justified-helpers` | Helpers are justified | info · model |  | A helper MUST be extracted only to remove semantic duplication, name reusable behavior or policy, isolate an abstraction level, or serve as a function value. |
-| [`design/private-helper-callers`](#private-helpers-have-two-callers) | Private helpers have two callers | info · cel |  |  |
+| `design/justified-helpers` | Helpers are justified | info · model |  | A helper MUST earn its extraction: it removes semantic duplication, names reusable behavior or a policy, isolates an abstraction level, serves as a function value, or is a seam for a test; otherwise it stays in its caller. |
 | [`design/no-single-use-wrapper`](#inline-single-use-wrappers) | Inline single-use wrappers | warn · cel |  |  |
 | [`design/prefer-method`](#behavior-lives-with-its-owner) | Behavior lives with its owner | warn · cel |  |  |
 | [`design/feature-envy`](#a-function-that-wants-another-types-members) | A function that wants another type's members | info · cel |  |  |
 | `design/single-abstraction-level` | One abstraction level per function | info · model |  | One function MUST stay at one abstraction level. |
 | [`design/callers-before-callees`](#callers-before-callees) | Callers before callees | warn · cel | suggested |  |
-
-### Private helpers have two callers
-
-`design/private-helper-callers` · symbol · info · cel · strict
-
-*A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count, and neither does a package variable that calls the helper in its initializer: it is a table of handlers, not a caller to compare the helper with. Forwarding wrappers are reported by `design/no-single-use-wrapper`, and a function used as a value is not judged. A method that implements an interface method is not judged either: its callers reach it through the interface. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.*
-
-A private helper SHOULD have at least two callers.
-
-```go invalid
-package sample
-
-func Run(x int) int { return clamp(x) + 1 }
-
-func clamp(x int) int {
-	if x > 10 {
-		return 10
-	}
-	return x
-}
-```
-
-```go valid
-package sample
-
-func Run(x int) int { return clamp(x) + 1 }
-
-func Other(x int) int { return clamp(x) + 2 }
-
-func clamp(x int) int {
-	if x > 10 {
-		return 10
-	}
-	return x
-}
-```
-
-Also: rust
 
 ### Inline single-use wrappers
 
@@ -789,7 +653,7 @@ Also: rust
 
 `design/feature-envy` · symbol · info · cel · strict
 
-*A function that spends its body on the members of one type is that type's behavior wearing another name. This is Fowler's Feature Envy (Refactoring, 2nd ed.) with the detection strategy of Lanza and Marinescu (2006): the function accesses more than a few foreign attributes (ATFD above FEW, which they put at 3) of a few classes only (FDP at most 2; here, one). Sonar has no rule for it, and PMD's design rules have a God Class (the same authors' strategy) but no feature-envy rule. A free function is reported when it uses at least `minMembers` distinct members of one type of its own module (fields, and methods that it calls; the variants of an enum are not members) and no member of any other type, and nothing uses it as a value. Passing a value of the type on is not envy: parameters are not counted, only the members the body reaches. A function of fewer than `minStatements` statements is too little to judge, and so are the functions that start or wire up the program: those of a Go `main` package or the root of a Rust binary, and those an `init` function or a package variable's initializer uses. Go: A package function and the methods and fields of a type of its package. Rust: A free function and the methods and fields of a type of its module. Members the provider resolves only by name are not counted.*
+*A function that spends its body on the members of one type is that type's behavior wearing another name. This is Fowler's Feature Envy (Refactoring, 2nd ed.) with the detection strategy of Lanza and Marinescu (2006): the function accesses more than a few foreign attributes (ATFD above FEW, which they put at 3) of a few classes only (FDP at most 2; here, one). Sonar has no rule for it, and PMD's design rules have a God Class (the same authors' strategy) but no feature-envy rule. A free function is reported when it uses at least `minMembers` distinct members of one type of its own module (fields, and methods that it calls; the variants of an enum are not members) and no member of any other type, and nothing uses it as a value. Passing a value of the type on is not envy: parameters are not counted, only the members the body reaches. A constructor is not judged, and neither is a function that names the type itself in its body (a literal, `var x T`): it builds or holds an instance and works on its members as any user of the type does. A function of fewer than `minStatements` statements is too little to judge, and so are the functions that start or wire up the program: those of a Go `main` package or the root of a Rust binary, and those an `init` function or a package variable's initializer uses. Go: A package function and the methods and fields of a type of its package. Rust: A free function and the methods and fields of a type of its module. A free function that returns a type of its module is a constructor. Members the provider resolves only by name are not counted.*
 
 A function that uses only the members of one type SHOULD be a method of that type.
 
@@ -874,8 +738,7 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/terminology` | One term, one concept | info · model |  | One term MUST represent one concept across packages. |
-| [`design/unique-type-names`](#one-type-name-one-concept) | One type name, one concept | info · cel |  |  |
+| `design/terminology` | One term, one concept | info · model |  | One term MUST represent one concept across packages, and one concept one term: modules MUST NOT export types of the same name unless they are the same concept. |
 | `design/minimal-names` | Minimal names | info · model |  | One word SHOULD be the default; a multi-word name MUST add only the minimum qualifier needed to express a distinction. |
 | [`design/max-name-words`](#names-have-at-most-a-few-words) | Names have at most a few words | warn · cel |  |  |
 | [`design/no-redundant-qualifiers`](#no-redundant-qualifiers) | No redundant qualifiers | warn · cel |  |  |
@@ -884,34 +747,6 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 | `design/predicate-names` | Predicate names state their form | warn · model |  | Predicates MUST name their form: `HasX` for containing or registering X, `IsX` for a state predicate, `MatchX` for comparison or validation against X, and a bare `X` for a direct boolean value. `At` MUST be used for position or time predicates. |
 | `design/reserved-verbs` | Action verbs are reserved | info · model |  | Configured action verbs, by default `Build`, `Compile`, `Publish`, `Capture`, and `Use`, MUST be reserved for actions or transitions. |
 | `design/plural-collections` | Singular capabilities, plural collections | info · model |  | Capability names MUST be singular; collections and stores MUST be plural. |
-
-### One type name, one concept
-
-`design/unique-type-names` · symbol · info · cel · strict
-
-*The deterministic companion of `design/terminology`: two public types of one name in different modules make a reader suspect they are the same concept, or hide that they are not. No tool checks this exactly; Sonar's S101 (type names follow a convention) is the nearest naming-consistency rule. A public type of production code is reported when another module of the project declares a public type of the same name, one finding for each declaration. The names in `allow` are idiomatic in every module and are not judged. Types of tests and of generated files are not compared, and only types of one language are: a type mirrored in another language is not a homonym. Go: `Error`, `Result`, `Options` and `Config` are the usual per-package names. Interfaces are not compared. Rust: `Error` and `Result` are idiomatic in every module.*
-
-A public type name SHOULD name one concept in the project; two modules SHOULD NOT export types of the same name.
-
-Derived from: Sonar, S101 naming conventions
-
-| option | default | meaning |
-| --- | --- | --- |
-| `allow` | `["Error","Result","Options","Config"]` | Type names that are idiomatic in every module. |
-
-```go invalid billing/billing.go
-package billing
-
-type Account struct{}
-```
-
-```go valid billing/billing.go
-package billing
-
-type Invoice struct{}
-```
-
-Also: rust
 
 ### Names have at most a few words
 
@@ -1177,7 +1012,7 @@ Also: rust
 
 `design/no-panic` · symbol · info · cel · strict
 
-*Panics bypass the caller's control flow. Every place production code can panic is reported, one finding each (forbidigo `^panic$`; clippy's restriction lints `panic`, `unwrap_used`, `expect_used`, `todo`, `unimplemented`, `unreachable`): Go reports a call of `panic`; Rust reports the `panic!`, `unreachable!`, `todo!` and `unimplemented!` macros and any `.unwrap()` or `.expect(..)` call (syntactically, on any receiver, as clippy does). The findings are candidates, not violations: impossible programmer errors, `Must*`-style APIs and documented hot-path invariants are allowed by the requirement and stay with review. Test code, entrypoints (`main`, `init`) and functions whose name starts with one of `allowPrefixes` are not reported. The decision is in the `strict` preset only, as clippy's restriction lints and forbidigo are opt-in for the same reason.*
+*Panics bypass the caller's control flow. Every place production code can panic is reported, one finding each (forbidigo `^panic$`; clippy's restriction lints `panic`, `unwrap_used`, `expect_used`, `todo`, `unimplemented`, `unreachable`): Go reports a call of `panic`; Rust reports the `panic!`, `unreachable!`, `todo!` and `unimplemented!` macros and any `.unwrap()` or `.expect(..)` call (syntactically, on any receiver, as clippy does). The findings are candidates, not violations: impossible programmer errors, `Must*`-style APIs and documented hot-path invariants are allowed by the requirement and stay with review. Test code, entrypoints (`main`, `init`) and functions whose name starts with one of `allowPrefixes` are not reported. In Rust, a library that is not published and that only tests link in (no other package lists it in `[dependencies]`, and it has no binary) is test code. The decision is in the `strict` preset only, as clippy's restriction lints and forbidigo are opt-in for the same reason.*
 
 Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
 
@@ -1315,14 +1150,14 @@ Also: rust
 
 `design/exported-doc` · symbol · warn · cel
 
-*Public API changes need facts callers cannot read from the code. Go: Normal Go doc comments beginning with the symbol name. Rust: Doc comments (`///`, `#[doc]`) on items reachable from outside the library crate: `pub` items whose modules are all `pub` or that a `pub use` re-exports. Items in binary crates, in tests and in `pub(crate)` positions are not exported. A trait impl method without docs of its own shows the documentation of the trait's method, as rustdoc does; a method that implements a method of a trait declared in the project is documented where the trait declares it, and the methods of the standard traits (`fmt`, `from`, `default`, `drop`, ...) need none. The public items of a library that cannot be published (`publish = false`) are importable only inside the project and count as internal, unless another package of the project depends on the library: then its public items are a contract between packages and stay public (`[languages.rust] unpublished = "auto" | "public" | "internal"`). Code in an inline `#[cfg(test)]` module is test code.*
+*Public API changes need facts callers cannot read from the code. Go: Normal Go doc comments beginning with the symbol name. A method that implements an interface of the project or of a package the code can import is exempt (revive's `exported` rule, and golint before it, leave the well-known interface methods undocumented too): the interface fixes its name and contract. Rust: Doc comments (`///`, `#[doc]`) on items reachable from outside the library crate: `pub` items whose modules are all `pub` or that a `pub use` re-exports. Items in binary crates, in tests and in `pub(crate)` positions are not exported. A trait impl method without docs of its own shows the documentation of the trait's method, as rustdoc does, and a method of any trait impl is exempt. The public items of a library that cannot be published (`publish = false`) are importable only inside the project and count as internal, unless another package of the project depends on the library: then its public items are a contract between packages and stay public (`[languages.rust] unpublished = "auto" | "public" | "internal"`). Code in an inline `#[cfg(test)]` module is test code.*
 
 Exported symbols SHOULD have doc comments in the language's standard form. Public API changes SHOULD document user-visible behavior, constraints, ownership, or other facts the code cannot express.
 
 | option | default | meaning |
 | --- | --- | --- |
-| `exemptInterfaceMethods` | `false`; rust: `true` | Do not require docs on a method that implements a documented method of an interface (or trait) the project declares, since it is documented where the interface declares it. |
-| `exemptMethods` | `["String","Error","Unwrap"]`; rust: `["fmt","source","from","try_from","from_str","default","drop","clone","eq","ne","partial_cmp","cmp","hash","deref","deref_mut","as_ref","as_mut","borrow","next","into_iter","index","index_mut","serialize","deserialize"]` | Method names that implement well-known interfaces and need no doc comment of their own. |
+| `exemptInterfaceMethods` | `true` | Do not require docs on a method that implements an interface (or trait) method, since the interface fixes its name and contract. |
+| `exemptMethods` | `["String","Error","Unwrap"]` | Method names that implement well-known interfaces and need no doc comment of their own, when the provider cannot tell they do. |
 | `includeInternal` | `false` | Also require docs for symbols exported only inside the project, such as under an internal path. |
 | `kinds` | `["function","method","type","interface","const","var"]` | Symbol kinds that must be documented when exported. |
 

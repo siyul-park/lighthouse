@@ -1,0 +1,11 @@
+[package]
+name = "app"
+version = "0.1.0"
+edition = "2024"
+publish.workspace = true
+
+[dev-dependencies]
+fixtures = { path = "../fixtures" }
+
+[dependencies]
+shared = { path = "../shared" }
