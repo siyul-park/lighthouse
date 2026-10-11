@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use lighthouse_protocol::{
     ClassifyParams, DecisionRef, ModelList, ModelManifest, Question, ResultKind, Shot, State,
-    noul_of, prompt, response_schema, subject_text, system_text,
+    Subject, SubjectContext, json_in, noul_of, prompt, response_schema, subject_text, system_text,
 };
 use serde_json::json;
 
@@ -114,4 +114,24 @@ fn a_model_list_is_openais_list_object_and_reads_back_to_the_same_models() {
     assert!(wire["data"][0]["capabilities"].get("embedding").is_none());
     assert_eq!(list.manifests(), [model]);
     assert!(ModelList::default().is_empty());
+}
+
+#[test]
+fn a_subject_shows_a_model_its_state_and_json_may_come_fenced() {
+    let subject = Subject {
+        key: "k".to_owned(),
+        kind: "function".to_owned(),
+        id: "m::f".to_owned(),
+        language: "go".to_owned(),
+        file: "a.go".to_owned(),
+        text: "func f() {}".to_owned(),
+        context: SubjectContext::default(),
+    };
+    assert_eq!(subject.state().text, "func f() {}");
+    assert_eq!(
+        json_in("```json\n{\"noul\": 0.5}\n```"),
+        Some(json!({"noul": 0.5}))
+    );
+    assert_eq!(json_in("{\"noul\": 0.5}"), Some(json!({"noul": 0.5})));
+    assert_eq!(json_in("no"), None);
 }

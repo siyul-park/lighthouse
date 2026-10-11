@@ -11,6 +11,10 @@ pub use lighthouse_protocol::{
 
 use crate::Error;
 
+/// The probability at which an uncalibrated model's answer is a `fail`; a
+/// model that has not been calibrated never clears a subject.
+pub const UPPER: f64 = 0.9;
+
 /// A model offered by a plugin.
 pub trait Classifier: Send + Sync {
     fn manifest(&self) -> &ModelManifest;
@@ -20,10 +24,6 @@ pub trait Classifier: Send + Sync {
     /// the `train` method does.
     fn train(&self, params: &TrainParams) -> Result<TrainResponse, Error>;
 }
-
-/// The probability at which an uncalibrated model's answer is a `fail`; a
-/// model that has not been calibrated never clears a subject.
-pub const UPPER: f64 = 0.9;
 
 /// Subjects of one decision to be judged.
 #[derive(Debug, Clone)]
@@ -50,17 +50,6 @@ pub struct Decided {
     /// The model that decided, `<provider>/<model>`, and its version.
     pub model: String,
     pub version: String,
-}
-
-/// What a probability of failing makes of a subject, and how confident that
-/// is: `fail` from `upper` up, otherwise left for review.
-pub fn decide(noul: f64, upper: f64) -> (ResultKind, f64) {
-    let kind = if noul >= upper {
-        ResultKind::Fail
-    } else {
-        ResultKind::Review
-    };
-    (kind, noul.max(1.0 - noul))
 }
 
 /// Why a subject was left undecided: it is a candidate for agent review.
@@ -122,4 +111,15 @@ impl Models for NoModels {
             .map(|_| Judged::Open(Open::Unbound))
             .collect()
     }
+}
+
+/// What a probability of failing makes of a subject, and how confident that
+/// is: `fail` from `upper` up, otherwise left for review.
+pub fn decide(noul: f64, upper: f64) -> (ResultKind, f64) {
+    let kind = if noul >= upper {
+        ResultKind::Fail
+    } else {
+        ResultKind::Review
+    };
+    (kind, noul.max(1.0 - noul))
 }

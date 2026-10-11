@@ -45,21 +45,6 @@ impl Endpoint {
     }
 }
 
-/// The spec that covers classification: `typesafe` when the provider speaks
-/// it, else `openai`. Only `openai` is served so far.
-fn spec_for_classification(declared: Option<&Value>) -> Result<String, String> {
-    let names: Vec<&str> = match declared {
-        Some(Value::String(name)) => vec![name.as_str()],
-        Some(Value::Array(list)) => list.iter().filter_map(Value::as_str).collect(),
-        _ => return Err("the provider declares no `spec`".to_owned()),
-    };
-    if names.contains(&"openai") {
-        Ok("openai".to_owned())
-    } else {
-        Err(format!("no served spec among {names:?} (openai is)"))
-    }
-}
-
 /// One request for text: the system and user parts, and the shape the answer
 /// must have.
 pub struct Prompt {
@@ -134,6 +119,21 @@ impl Handler for Plugin {
             answers,
             usage: Value::Null,
         })
+    }
+}
+
+/// The spec that covers classification: `typesafe` when the provider speaks
+/// it, else `openai`. Only `openai` is served so far.
+fn spec_for_classification(declared: Option<&Value>) -> Result<String, String> {
+    let names: Vec<&str> = match declared {
+        Some(Value::String(name)) => vec![name.as_str()],
+        Some(Value::Array(list)) => list.iter().filter_map(Value::as_str).collect(),
+        _ => return Err("the provider declares no `spec`".to_owned()),
+    };
+    if names.contains(&"openai") {
+        Ok("openai".to_owned())
+    } else {
+        Err(format!("no served spec among {names:?} (openai is)"))
     }
 }
 

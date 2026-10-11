@@ -129,3 +129,15 @@ fn a_subject_nothing_decided_says_why() {
     assert_eq!(Open::OverBudget.to_string(), "the model budget was spent");
     assert!(Open::Failed("x".to_owned()).to_string().contains('x'));
 }
+
+#[test]
+fn a_probability_decides_by_the_band_and_never_clears_a_subject() {
+    use lighthouse_plugin::{ResultKind, UPPER, decide};
+
+    assert_eq!(decide(0.95, UPPER), (ResultKind::Fail, 0.95));
+    assert_eq!(decide(0.5, UPPER).0, ResultKind::Review);
+    // Even a model that is sure the subject is fine leaves it for review.
+    let (kind, confidence) = decide(0.02, UPPER);
+    assert_eq!(kind, ResultKind::Review);
+    assert!(confidence > 0.97);
+}
