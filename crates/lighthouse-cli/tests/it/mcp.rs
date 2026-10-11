@@ -11,7 +11,7 @@ use std::{
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-const HELPER: &str = "pub fn run(x: u8) -> u8 {\n    clamp(x) + 1\n}\n\nfn clamp(x: u8) -> u8 {\n    if x > 10 { 10 } else { x }\n}\n";
+const HELPER: &str = "pub fn run(x: Option<u8>) -> u8 {\n    x.unwrap()\n}\n";
 
 /// A `lighthouse mcp` process spoken to in newline-delimited JSON-RPC.
 struct Client {
@@ -282,7 +282,7 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
         .as_array()
         .unwrap()
         .iter()
-        .find(|g| g["rule"] == "design/private-helper-callers")
+        .find(|g| g["rule"] == "design/no-panic")
         .unwrap_or_else(|| panic!("{tasks}"));
     let (path, rows) = group["files"].as_object().unwrap().iter().next().unwrap();
     let instance = &rows[0];
@@ -301,7 +301,7 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
         .as_array()
         .unwrap()
         .iter()
-        .find(|t| t["rule"] == "design/private-helper-callers")
+        .find(|t| t["rule"] == "design/no-panic")
         .unwrap();
     let fingerprint = task["fingerprint"].as_str().unwrap();
     assert!(fingerprint.starts_with(prefix));
@@ -362,7 +362,7 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
     let after = client.tool("check", json!({})).unwrap();
     let still = rules_of(&after);
     assert!(
-        !still.contains(&"design/private-helper-callers"),
+        !still.contains(&"design/no-panic"),
         "{still:?}"
     );
     assert_eq!(after["counts"]["suppressed"], 1);

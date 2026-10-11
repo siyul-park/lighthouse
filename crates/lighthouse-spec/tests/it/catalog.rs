@@ -25,7 +25,7 @@ fn a_finding_asks_for_review_unless_its_decision_authored_an_error_or_a_judgment
         assert_eq!(authored.needs_review(false), asks, "{authored}");
         assert!(!authored.needs_review(true), "{authored} judged");
     }
-    let warn = bundled("design/private-helper-callers");
+    let warn = bundled("design/no-panic");
     assert!(authored_severity(Severity::Error, Some(warn)).needs_review(false));
     let definitive = bundled("design/declaration-groups");
     assert!(!authored_severity(Severity::Warn, Some(definitive)).needs_review(false));
@@ -332,7 +332,7 @@ mod overlay {
 
 #[test]
 fn the_authored_severity_follows_the_decision_else_what_was_reported() {
-    let warn = bundled("design/private-helper-callers");
+    let warn = bundled("design/no-panic");
     assert_eq!(
         authored_severity(Severity::Error, Some(warn)),
         Severity::Info
@@ -443,7 +443,7 @@ fn write_atomic_guarded() {
 
 #[test]
 fn decision_strict() {
-    assert!(bundled("design/private-helper-callers").strict());
+    assert!(bundled("design/no-panic").strict());
     assert!(!bundled("design/exported-doc").strict());
 }
 

@@ -102,48 +102,11 @@ Physical layout should make ownership and collaboration visible while preserving
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/owner-file`](#one-owner-one-file) | One owner, one file | info · cel |  |  |
+| `design/owner-file` | One owner, one file | info · model |  | Symbols with one owner and cohesive responsibility MUST share a file, unless the split follows a concern of the owner. |
 | [`design/misplaced-symbol`](#a-function-lives-with-what-it-uses) | A function lives with what it uses | info · cel |  |  |
-| [`design/tiny-modules`](#a-module-earns-its-boundary) | A module earns its boundary | info · cel |  |  |
 | [`design/contiguity`](#collaborators-stay-close) | Collaborators stay close | warn · proximity | suggested |  |
 | `design/layout` | Layout shows ownership | info · model |  | Files and declaration order MUST make ownership, responsibility, and relationships easy to read. |
-| `design/meaningful-separation` | Separation marks a boundary | info · model |  | Physical separation MUST represent a real responsibility, ownership, or abstraction boundary. |
-
-### One owner, one file
-
-`design/owner-file` · symbol · info · cel
-
-*A reader finds an owner and everything it owns in one place. This is a review signal: most findings are deliberate splits of an owner by concern, which the code model cannot tell from accidents, and no tool backs the Go convention of one file per receiver type. A method is reported when it is declared outside the unit of its type: its file, or its module and the modules below it (option `unit`). A private free function is reported the same way when every production caller of it is a method of one type that is declared outside the unit and the function calls or references that type or one of its members. A function named like a constructor is not reported. Go: All methods of a receiver type stay in the file of the type (`unit: file`). A method that implements an interface method is exempt, as a trait impl method is in Rust: the interface decides where it is written. Rust: The methods of an inherent `impl` stay in the module of the type or in a module below it (`unit: module-tree`): a type with a child module for its impls keeps them together. The code model names the module of a method after its type, not after the `impl`, so the module tree is read from files: `m.rs` holds `m/`, a crate root or `mod.rs` the directory it is in. An impl in a sibling or parent module is reported. A method of a trait impl is exempt, because the trait decides where it is written; the code model marks it by an id that carries the trait. A type that the project does not declare has no module to keep to.*
-
-Symbols with one owner and cohesive responsibility MUST share a file.
-
-| option | default | meaning |
-| --- | --- | --- |
-| `unit` | `"file"`; rust: `"module-tree"` | Where the members of a type must be: `file` (the file of the type) or `module-tree` (the module of the type or one below it). |
-
-```go invalid store.go
-package sample
-
-type Store struct{ items []int }
-```
-
-```go invalid total.go
-package sample
-
-func (s *Store) Total() int { return len(s.items) }
-```
-
-```go valid
-package sample
-
-type Store struct{ items []int }
-
-func (s *Store) Total() int { return count(s) }
-
-func count(s *Store) int { return len(s.items) }
-```
-
-Also: rust
+| `design/meaningful-separation` | Separation marks a boundary | info · model |  | Physical separation MUST represent a real responsibility, ownership, or abstraction boundary: a module separated from its only user MUST be that kind of boundary, or be merged into the user. |
 
 ### A function lives with what it uses
 
@@ -190,66 +153,6 @@ func load() int {
 }
 
 func local() int { return 0 }
-```
-
-Also: rust
-
-### A module earns its boundary
-
-`design/tiny-modules` · module · info · cel · strict
-
-*A small module with one user is that user's detail, and a module that only forwards others adds a hop without a concept. No tool checks this: Sonar and PMD bound the size of a file or class from above only. A module is reported when it has fewer than `minLines` lines and either exactly one production module imports it or it declares nothing of its own. Lines run from the first to the last declaration of each file of the module, because the code model does not carry the length of a file. Declarations are the types, interfaces, constants, variables and functions at module level, without `init`; a Rust re-export is not one. Tests and generated code are not judged, and a module that tests another is not a dependent. Go: A package is a module. Rust: A crate or a `mod` is a module; a crate root that only declares `mod` and `pub use` is reported when small, as the facade it is.*
-
-A module SHOULD hold enough to justify its boundary: a small module that one other module uses SHOULD be merged into its user, or its boundary justified.
-
-Derived from: Fowler, Refactoring 2nd ed., Inline Class
-
-| option | default | meaning |
-| --- | --- | --- |
-| `minLines` | `300` | Fewer lines than this make a module small. |
-
-```go invalid go.mod
-module example.com/app
-
-go 1.26
-```
-
-```go invalid app/app.go
-package app
-
-import "example.com/app/tiny"
-
-func Run() int { return tiny.One() }
-
-func Other() int { return 2 }
-
-func Third() int { return 3 }
-
-func Fourth() int { return 4 }
-
-func Fifth() int { return 5 }
-```
-
-```go invalid tiny/tiny.go
-package tiny
-
-func One() int { return 1 }
-```
-
-```go valid cli/cli.go
-package cli
-
-import "example.com/app/tiny"
-
-func Run() int { return tiny.One() }
-
-func Other() int { return 2 }
-
-func Third() int { return 3 }
-
-func Fourth() int { return 4 }
-
-func Fifth() int { return 5 }
 ```
 
 Also: rust
@@ -663,51 +566,12 @@ Function structure should make meaningful behavior reusable and readable, not me
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/justified-helpers` | Helpers are justified | info · model |  | A helper MUST be extracted only to remove semantic duplication, name reusable behavior or policy, isolate an abstraction level, or serve as a function value. |
-| [`design/private-helper-callers`](#private-helpers-have-two-callers) | Private helpers have two callers | info · cel |  |  |
+| `design/justified-helpers` | Helpers are justified | info · model |  | A helper MUST earn its extraction: it removes semantic duplication, names reusable behavior or a policy, isolates an abstraction level, serves as a function value, or is a seam for a test; otherwise it stays in its caller. |
 | [`design/no-single-use-wrapper`](#inline-single-use-wrappers) | Inline single-use wrappers | warn · cel |  |  |
 | [`design/prefer-method`](#behavior-lives-with-its-owner) | Behavior lives with its owner | warn · cel |  |  |
 | [`design/feature-envy`](#a-function-that-wants-another-types-members) | A function that wants another type's members | info · cel |  |  |
 | `design/single-abstraction-level` | One abstraction level per function | info · model |  | One function MUST stay at one abstraction level. |
 | [`design/callers-before-callees`](#callers-before-callees) | Callers before callees | warn · cel | suggested |  |
-
-### Private helpers have two callers
-
-`design/private-helper-callers` · symbol · info · cel · strict
-
-*A private helper with one caller is usually part of that caller. Go: A review item, not an error: a helper with one caller may be justified by naming a policy or isolating an abstraction level. Test callers do not count, and neither does a package variable that calls the helper in its initializer: it is a table of handlers, not a caller to compare the helper with. Forwarding wrappers are reported by `design/no-single-use-wrapper`, and a function used as a value is not judged. A method that implements an interface method is not judged either: its callers reach it through the interface. Rust: Private free functions and methods that have exactly one caller outside test code and are never named as a value. A method that some call may reach through a receiver of unknown type is not judged.*
-
-A private helper SHOULD have at least two callers.
-
-```go invalid
-package sample
-
-func Run(x int) int { return clamp(x) + 1 }
-
-func clamp(x int) int {
-	if x > 10 {
-		return 10
-	}
-	return x
-}
-```
-
-```go valid
-package sample
-
-func Run(x int) int { return clamp(x) + 1 }
-
-func Other(x int) int { return clamp(x) + 2 }
-
-func clamp(x int) int {
-	if x > 10 {
-		return 10
-	}
-	return x
-}
-```
-
-Also: rust
 
 ### Inline single-use wrappers
 
@@ -874,8 +738,7 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| `design/terminology` | One term, one concept | info · model |  | One term MUST represent one concept across packages. |
-| [`design/unique-type-names`](#one-type-name-one-concept) | One type name, one concept | info · cel |  |  |
+| `design/terminology` | One term, one concept | info · model |  | One term MUST represent one concept across packages, and one concept one term: modules MUST NOT export types of the same name unless they are the same concept. |
 | `design/minimal-names` | Minimal names | info · model |  | One word SHOULD be the default; a multi-word name MUST add only the minimum qualifier needed to express a distinction. |
 | [`design/max-name-words`](#names-have-at-most-a-few-words) | Names have at most a few words | warn · cel |  |  |
 | [`design/no-redundant-qualifiers`](#no-redundant-qualifiers) | No redundant qualifiers | warn · cel |  |  |
@@ -884,34 +747,6 @@ Names should expose role, contract, or ownership with the smallest vocabulary th
 | `design/predicate-names` | Predicate names state their form | warn · model |  | Predicates MUST name their form: `HasX` for containing or registering X, `IsX` for a state predicate, `MatchX` for comparison or validation against X, and a bare `X` for a direct boolean value. `At` MUST be used for position or time predicates. |
 | `design/reserved-verbs` | Action verbs are reserved | info · model |  | Configured action verbs, by default `Build`, `Compile`, `Publish`, `Capture`, and `Use`, MUST be reserved for actions or transitions. |
 | `design/plural-collections` | Singular capabilities, plural collections | info · model |  | Capability names MUST be singular; collections and stores MUST be plural. |
-
-### One type name, one concept
-
-`design/unique-type-names` · symbol · info · cel · strict
-
-*The deterministic companion of `design/terminology`: two public types of one name in different modules make a reader suspect they are the same concept, or hide that they are not. No tool checks this exactly; Sonar's S101 (type names follow a convention) is the nearest naming-consistency rule. A public type of production code is reported when another module of the project declares a public type of the same name, one finding for each declaration. The names in `allow` are idiomatic in every module and are not judged. Types of tests and of generated files are not compared, and only types of one language are: a type mirrored in another language is not a homonym. Go: `Error`, `Result`, `Options` and `Config` are the usual per-package names. Interfaces are not compared. Rust: `Error` and `Result` are idiomatic in every module.*
-
-A public type name SHOULD name one concept in the project; two modules SHOULD NOT export types of the same name.
-
-Derived from: Sonar, S101 naming conventions
-
-| option | default | meaning |
-| --- | --- | --- |
-| `allow` | `["Error","Result","Options","Config"]` | Type names that are idiomatic in every module. |
-
-```go invalid billing/billing.go
-package billing
-
-type Account struct{}
-```
-
-```go valid billing/billing.go
-package billing
-
-type Invoice struct{}
-```
-
-Also: rust
 
 ### Names have at most a few words
 

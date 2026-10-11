@@ -1,5 +1,5 @@
 //! The decisions about where functions live: feature envy, misplaced
-//! symbols and the file of an owner, over synthetic projects.
+//! symbols over synthetic projects.
 
 use crate::support::World;
 use lighthouse_model::{EdgeKind, Symbol, SymbolKind, Visibility};
@@ -7,7 +7,6 @@ use serde_json::json;
 
 const ENVY: &str = "design/feature-envy";
 const MISPLACED: &str = "design/misplaced-symbol";
-const OWNER_FILE: &str = "design/owner-file";
 
 /// A type `Store` with fields `items`, `total` and `extra` in module `m`, and a
 /// private function `summary` of four statements that references the fields in
@@ -123,35 +122,6 @@ fn misplaced_symbol_leaves_a_function_that_uses_two_other_modules_alone() {
 }
 
 #[test]
-fn owner_file_reports_a_method_declared_away_from_its_type() {
-    let mut w = World::default();
-    let store = w.symbol("m", "Store", SymbolKind::Type, "m/store.ucm");
-    w.member(&store, "Near", SymbolKind::Method, "m/store.ucm");
-    w.member(&store, "Far", SymbolKind::Method, "m/total.ucm");
-    assert_eq!(w.names(&w.check(OWNER_FILE, json!({}))), ["Far"]);
-}
-
-#[test]
-fn owner_file_reports_a_helper_only_methods_of_one_type_call() {
-    let mut w = World::default();
-    let store = w.symbol("m", "Store", SymbolKind::Type, "m/store.ucm");
-    let total = w.member(&store, "Total", SymbolKind::Method, "m/store.ucm");
-    let count = w.func("m", "count", "m/count.ucm");
-    w.private(&count);
-    w.edge(EdgeKind::Calls, &total, &count);
-    assert!(
-        w.check(OWNER_FILE, json!({})).is_empty(),
-        "a helper that does not use the type"
-    );
-    w.edge(EdgeKind::References, &count, &store);
-    assert_eq!(w.names(&w.check(OWNER_FILE, json!({}))), ["count"]);
-
-    let other = w.func("m", "Other", "m/store.ucm");
-    w.edge(EdgeKind::Calls, &other, &count);
-    assert!(w.check(OWNER_FILE, json!({})).is_empty(), "another caller");
-}
-
-#[test]
 fn feature_envy_does_not_count_the_variants_of_an_enum() {
     let mut w = World::default();
     let level = w.symbol("m", "Level", SymbolKind::Type, "m/a.ucm");
@@ -202,15 +172,4 @@ fn feature_envy_and_misplaced_symbol_skip_entry_points_and_wiring() {
     let init = w.func("m", "init", "m/a.ucm");
     w.edge(EdgeKind::Calls, &init, &summary);
     assert!(w.check(ENVY, json!({})).is_empty(), "init");
-}
-
-#[test]
-fn owner_file_keeps_a_module_tree_together_only_when_the_unit_says_so() {
-    let mut w = World::default();
-    let store = w.symbol("m", "Store", SymbolKind::Type, "m/store.ucm");
-    w.member(&store, "Total", SymbolKind::Method, "m/total.ucm");
-    w.member(&store, "Far", SymbolKind::Method, "n/far.ucm");
-    assert_eq!(w.names(&w.check(OWNER_FILE, json!({}))), ["Total", "Far"]);
-    let tree = json!({ "unit": "module-tree" });
-    assert_eq!(w.names(&w.check(OWNER_FILE, tree)), ["Far"]);
 }
