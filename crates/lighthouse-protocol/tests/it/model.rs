@@ -135,3 +135,40 @@ fn a_subject_shows_a_model_its_state_and_json_may_come_fenced() {
     assert_eq!(json_in("{\"noul\": 0.5}"), Some(json!({"noul": 0.5})));
     assert_eq!(json_in("no"), None);
 }
+
+#[test]
+fn a_training_file_has_one_line_per_labelled_subject() {
+    use lighthouse_protocol::{LabelSource, Subject, SubjectContext, TrainSubject, training_file};
+
+    let subject = |key: &str, label| TrainSubject {
+        subject: Subject {
+            key: key.to_owned(),
+            kind: "function".to_owned(),
+            id: key.to_owned(),
+            language: "go".to_owned(),
+            file: "a.go".to_owned(),
+            text: "func f() {}".to_owned(),
+            context: SubjectContext::default(),
+        },
+        label,
+        weight: 0.5,
+        source: LabelSource::Model,
+    };
+    let text = training_file(
+        &decision(),
+        &[
+            subject("a", ResultKind::Fail),
+            subject("b", ResultKind::Pass),
+        ],
+    );
+    let lines: Vec<serde_json::Value> = text
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0]["label"], "fail");
+    assert_eq!(lines[1]["weight"], 0.5);
+    assert_eq!(lines[1]["source"], "model");
+    assert_eq!(lines[0]["questions"]["design/x"]["type"], "noul");
+}

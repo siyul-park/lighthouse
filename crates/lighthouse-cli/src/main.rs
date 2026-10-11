@@ -151,7 +151,13 @@ enum Command {
     /// Measure a decision's check against its labels: precision, FPR,
     /// recall, FNR, selector precision, coverage and abstention, with Wilson
     /// 95% intervals; and, with --check, a candidate check beside it.
-    Eval(models::Eval),
+    Eval {
+        #[command(flatten)]
+        args: models::EvalArgs,
+        /// text or json.
+        #[arg(long, default_value = "text")]
+        format: models::Output,
+    },
     /// Learn from labels.
     Learn {
         #[command(subcommand)]
@@ -393,7 +399,7 @@ fn run(cli: Cli) -> Result<u8> {
                 fixer,
             }),
         ),
-        Command::Eval(args) => models::evaluate(args),
+        Command::Eval { args, format } => models::evaluate(args, format),
         Command::Learn { command } => models::learn(command),
         Command::Cache {
             command: CacheCommand::Clean,

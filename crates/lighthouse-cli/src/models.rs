@@ -46,7 +46,7 @@ pub enum LearnCommand {
 
 /// The arguments of `eval`.
 #[derive(clap::Args)]
-pub struct Eval {
+pub struct EvalArgs {
     /// The decision, such as design/feature-envy.
     decision: String,
     /// A repository the labels are about, `name=dir`, where `name` is the
@@ -60,16 +60,10 @@ pub struct Eval {
     /// A decision file whose check is evaluated beside the current one.
     #[arg(long = "check", value_name = "FILE")]
     candidate: Option<PathBuf>,
-    /// Ask no model.
-    #[arg(long)]
-    no_models: bool,
     /// Write this many selected subjects the check did not flag to a table
     /// for a person to label (`TP` or `FP`), to measure recall.
     #[arg(long, value_name = "N")]
     audit: Option<usize>,
-    /// text or json.
-    #[arg(long, default_value = "text")]
-    format: Output,
     #[arg(long)]
     config: Option<PathBuf>,
 }
@@ -82,7 +76,7 @@ pub enum Output {
 }
 
 /// Evaluates the check of a decision and prints the numbers.
-pub fn evaluate(args: Eval) -> Result<u8> {
+pub fn evaluate(args: EvalArgs, format: Output) -> Result<u8> {
     let repos = args
         .repos
         .iter()
@@ -102,10 +96,10 @@ pub fn evaluate(args: Eval) -> Result<u8> {
         baseline: args.baseline.or_else(|| default_baseline(&args.decision)),
         candidate: args.candidate,
         config: args.config,
-        no_models: args.no_models,
+        no_models: false,
         audit: args.audit,
     })?;
-    if matches!(args.format, Output::Json) {
+    if matches!(format, Output::Json) {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         print_report(&report);

@@ -327,24 +327,6 @@ pub struct TrainLine {
     pub source: LabelSource,
 }
 
-/// The training file: one [`TrainLine`] per labelled subject, as JSON Lines.
-pub fn training_file(decision: &DecisionRef, subjects: &[TrainSubject]) -> String {
-    let question = BTreeMap::from([(decision.id.clone(), Question::of(decision))]);
-    let mut text = String::new();
-    for subject in subjects {
-        let line = TrainLine {
-            state: subject.subject.state(),
-            questions: question.clone(),
-            label: subject.label,
-            weight: subject.weight,
-            source: subject.source,
-        };
-        text.push_str(&serde_json::to_string(&line).unwrap_or_default());
-        text.push('\n');
-    }
-    text
-}
-
 /// The supervised method of a fine-tuning job.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Supervised {
@@ -525,4 +507,22 @@ impl ModelList {
             })
             .collect()
     }
+}
+
+/// The training file: one [`TrainLine`] per labelled subject, as JSON Lines.
+pub fn training_file(decision: &DecisionRef, subjects: &[TrainSubject]) -> String {
+    let question = BTreeMap::from([(decision.id.clone(), Question::of(decision))]);
+    let mut text = String::new();
+    for subject in subjects {
+        let line = TrainLine {
+            state: subject.subject.state(),
+            questions: question.clone(),
+            label: subject.label,
+            weight: subject.weight,
+            source: subject.source,
+        };
+        text.push_str(&serde_json::to_string(&line).unwrap_or_default());
+        text.push('\n');
+    }
+    text
 }

@@ -152,13 +152,6 @@ impl<'a> RunModels<'a> {
         notes
     }
 
-    fn note(&self, note: String) {
-        self.notes
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(note);
-    }
-
     /// The models that judge the rule's decision, most specific binding first:
     /// the model a revision attached, the model the rule names, the project's.
     fn cascade(&self, rule: &str) -> Vec<Box<dyn Classifier + 'a>> {
@@ -250,6 +243,13 @@ impl<'a> RunModels<'a> {
         };
         self.keep(model.manifest(), ask, subject, noul);
         Ok(noul)
+    }
+
+    fn note(&self, note: String) {
+        self.notes
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(note);
     }
 
     /// Whether a subject is asked of a model that costs: it lies in the files
