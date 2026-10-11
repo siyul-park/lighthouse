@@ -366,12 +366,14 @@ fn kind_problem(decision: &Decision, kind: &CheckKind) -> Option<String> {
         CheckKind::Builtin(BuiltinCheck::Op(op)) => op_problem(op).or_else(|| scope_problem(op, subject)),
         CheckKind::Cel(cel) => cel.problem().or_else(|| match cel.selects(subject) {
             None => Some(format!("a `{subject}` decision needs a `select`")),
-            Some(select) => (select.scope() != subject.run_scope()).then(|| {
-                format!(
-                    "selects `{}`, which a `{subject}` decision cannot run over",
-                    select.name()
-                )
-            }),
+            Some(select) => (select.scope() != subject.run_scope())
+                .then(|| {
+                    format!(
+                        "selects `{}`, which a `{subject}` decision cannot run over",
+                        select.name()
+                    )
+                })
+                .or_else(|| review_problem(cel.review.is_some(), select)),
         }),
         CheckKind::Command(command) => command.problem().or_else(|| {
             let per_file = subject.run_scope() == RunScope::File;
@@ -380,14 +382,23 @@ fn kind_problem(decision: &Decision, kind: &CheckKind) -> Option<String> {
                     .to_owned()
             })
         }),
-        CheckKind::Model(model) => model.problem().or_else(|| {
-            (decision.severity == Some(Severity::Error)).then(|| {
-                "a `model` check is capped at `warn`: only a deterministic check can be an `error`"
-                    .to_owned()
-            })
-        }),
+        CheckKind::Model(model) => model.problem(subject),
         CheckKind::Rpc(_) => Some("an `rpc` check is not supported until plugin protocol 0.2".to_owned()),
     }
+}
+
+/// What a model cannot be asked: a subject outside a file.
+fn review_problem(reviewed: bool, select: crate::Select) -> Option<String> {
+    if !reviewed {
+        return None;
+    }
+    if select.scope() != RunScope::File {
+        return Some(format!(
+            "a model cannot judge `{}`: it needs the source of a subject in a file",
+            select.name()
+        ));
+    }
+    None
 }
 
 /// A standard operation judges the shape of one file or of the whole project.

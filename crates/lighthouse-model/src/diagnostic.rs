@@ -129,6 +129,11 @@ pub struct Diagnostic {
     pub evidence: Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fix: Option<String>,
+    /// Why no check decided the subject: the diagnostic is a candidate for
+    /// review, not a finding, and the engine reports it apart. The exit code
+    /// does not count it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<String>,
     /// A suppression the tool that reported the finding already carries, such
     /// as its own `//nolint`: the engine reports the finding as suppressed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -155,6 +160,7 @@ impl Diagnostic {
             symbol: None,
             evidence: Value::Null,
             fix: None,
+            review: None,
             suppression: None,
         }
     }

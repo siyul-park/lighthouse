@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    Analyzer, Error, Fixer, LanguageProvider, OrderKey, OrderKeys, Plugin, PluginManifest, Rule,
+    Analyzer, Classifier, Error, Fixer, LanguageProvider, OrderKey, OrderKeys, Plugin,
+    PluginManifest, Rule,
 };
 
 /// The registered plugins and everything they contribute. `register` is atomic,
@@ -14,6 +15,7 @@ pub struct Registry {
     rules: BTreeMap<String, Box<dyn Rule>>,
     fixers: BTreeMap<String, Box<dyn Fixer>>,
     keys: BTreeMap<String, Box<dyn OrderKey>>,
+    models: BTreeMap<String, Box<dyn Classifier>>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -34,6 +36,8 @@ impl Registry {
         let rules = plugin.rules();
         let fixers = plugin.fixers();
         let keys = plugin.order_keys();
+        let models = plugin.models();
+        self.check_models(&manifest.id, &models)?;
         self.check_languages(&languages)?;
         check_prefixes(&manifest.id, &analyzers, &rules)?;
         self.check_unique(&analyzers, &rules)?;
@@ -51,6 +55,8 @@ impl Registry {
             .extend(fixers.into_iter().map(|f| (f.manifest().id.clone(), f)));
         self.keys
             .extend(keys.into_iter().map(|k| (k.manifest().id.clone(), k)));
+        self.models
+            .extend(models.into_iter().map(|m| (m.manifest().id.clone(), m)));
         Ok(())
     }
 
@@ -88,6 +94,29 @@ impl Registry {
             }
         }
         Ok(())
+    }
+
+    /// A model's id is the id of its plugin, and unique.
+    fn check_models(&self, plugin: &str, models: &[Box<dyn Classifier>]) -> Result<(), Error> {
+        let mut seen = BTreeSet::new();
+        for m in models {
+            let id = m.manifest().id.as_str();
+            if id != plugin {
+                return Err(Error::Prefix {
+                    plugin: plugin.to_owned(),
+                    id: id.to_owned(),
+                });
+            }
+            if self.models.contains_key(id) || !seen.insert(id) {
+                return Err(Error::Duplicate(id.to_owned()));
+            }
+        }
+        Ok(())
+    }
+
+    /// The model with this id.
+    pub fn model(&self, id: &str) -> Option<&dyn Classifier> {
+        self.models.get(id).map(Box::as_ref)
     }
 
     /// The fixer with this qualified id.

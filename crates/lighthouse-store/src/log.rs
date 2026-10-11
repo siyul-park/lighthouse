@@ -4,10 +4,11 @@
 //! twice is one record.
 //!
 //! A line is a resource: `apiVersion`, `kind` and `metadata.name` (the id of
-//! the record, the hash of its spec) around a `spec`. The log holds two
-//! kinds: `Judgment`, a label on a subject (see [`JudgmentSpec`]), and
+//! the record, the hash of its spec) around a `spec`. The log holds three
+//! kinds: `Judgment`, a label on a subject (see [`JudgmentSpec`]),
 //! `Suppression`, a finding that is right and is left in place on purpose (see
-//! [`SuppressionSpec`]). A line of any other kind, or whose id does not match
+//! [`SuppressionSpec`]), and `Revision`, a change to how a decision is judged
+//! that someone approved (see [`RevisionSpec`]). A line of any other kind, or whose id does not match
 //! its spec, is an error that names the file and the line: a decision that
 //! cannot be read must not be skipped. The one exception is a last line an
 //! interrupted write cut short.
@@ -84,6 +85,59 @@ pub struct JudgmentSpec {
 
 impl Spec for JudgmentSpec {
     const KIND: &'static str = "Judgment";
+}
+
+/// How far a revision moves a decision. Binding or retraining a model is
+/// `minor`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Change {
+    Major,
+    Minor,
+    Patch,
+}
+
+/// The spec of the `Revision` record: a change to how a decision is judged,
+/// approved by whoever it is attributed to. One that carries a `model` binds
+/// that model to the decision before every other binding; one that carries
+/// none unbinds it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RevisionSpec {
+    /// The uid of the decision, else its name.
+    pub decision: String,
+    /// The id of the revision this one follows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meaning_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_revision: Option<String>,
+    pub change: Change,
+    /// The evaluation that justified it: metrics, labelled-set size and hash.
+    #[serde(default)]
+    pub evaluation: Value,
+    /// `prov:wasAttributedTo`: who approved it.
+    pub approval: Attribution,
+    /// The model it binds, `<provider>/<model>` (a learned one is
+    /// `local/learned@<artifact hash>`). A revision is a full snapshot: absent
+    /// means unbound, so a writer that does not change the model copies its
+    /// parent's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// `prov:generatedAtTime`.
+    pub generated_at_time: String,
+}
+
+impl Spec for RevisionSpec {
+    const KIND: &'static str = "Revision";
+}
+
+/// A revision as the log holds it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RevisionEvent {
+    pub id: String,
+    pub spec: RevisionSpec,
 }
 
 /// The spec of the `Suppression` record: the `fail` judgment `judgment` is
@@ -228,6 +282,7 @@ impl LoggedSuppression {
 pub(crate) struct Logged {
     pub judgments: Vec<JudgmentEvent>,
     pub suppressions: Vec<LoggedSuppression>,
+    pub revisions: Vec<RevisionEvent>,
     /// What the reader skipped: a torn last line, a suppression that goes
     /// with no judgment of its finding.
     pub notices: Vec<String>,
@@ -260,6 +315,7 @@ impl Logged {
 enum Record {
     Judgment(Box<JudgmentEvent>),
     Suppression(Box<LoggedSuppression>),
+    Revision(Box<RevisionEvent>),
 }
 
 /// Gives the judgment the id its content determines.
@@ -323,6 +379,7 @@ pub(crate) fn read(path: &Path) -> Result<Logged, Error> {
         match decode(value).map_err(fail)? {
             Record::Judgment(event) => read.judgments.push(*event),
             Record::Suppression(suppression) => read.suppressions.push(*suppression),
+            Record::Revision(revision) => read.revisions.push(*revision),
         }
     }
     read.drop_orphans(path);
@@ -366,11 +423,15 @@ fn decode(value: Value) -> Result<Record, String> {
     if value.get("apiVersion").and_then(Value::as_str) != Some(API_VERSION) {
         return Err(format!("`apiVersion` is not `{API_VERSION}`"));
     }
-    if kind != JudgmentSpec::KIND && kind != SuppressionSpec::KIND {
+    let kinds = [
+        JudgmentSpec::KIND,
+        SuppressionSpec::KIND,
+        RevisionSpec::KIND,
+    ];
+    if !kinds.contains(&kind) {
         return Err(format!(
-            "`{kind}` is not a kind of the decision log (expected {} or {})",
-            JudgmentSpec::KIND,
-            SuppressionSpec::KIND
+            "`{kind}` is not a kind of the decision log (expected {})",
+            kinds.join(", ")
         ));
     }
     // The id covers the spec as written, fields this build does not know
@@ -394,6 +455,13 @@ fn decode(value: Value) -> Result<Record, String> {
             name,
             record.spec,
         ))))
+    } else if kind == RevisionSpec::KIND {
+        let record: Resource<RevisionSpec> =
+            serde_json::from_value(value).map_err(|e| e.to_string())?;
+        Ok(Record::Revision(Box::new(RevisionEvent {
+            id: name,
+            spec: record.spec,
+        })))
     } else {
         let record: Resource<SuppressionSpec> =
             serde_json::from_value(value).map_err(|e| e.to_string())?;

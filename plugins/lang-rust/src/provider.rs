@@ -8,8 +8,8 @@ use std::{
 };
 
 use lighthouse_protocol::{
-    self as wire, Conventions, FileInfo, Fragment, Handler, Incomplete, IndexParams, IndexResult,
-    InitializeParams, InitializeResult, ProviderManifest,
+    self as wire, Conventions, FileInfo, Fragment, Handler, HandlerError, Incomplete, IndexParams,
+    IndexResult, InitializeParams, InitializeResult, ProviderManifest,
 };
 use serde::Deserialize;
 
@@ -29,13 +29,14 @@ pub struct Provider {
 }
 
 impl Handler for Provider {
-    fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, String> {
+    fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, HandlerError> {
         if params.protocol_version != wire::VERSION {
             return Err(format!(
                 "host speaks protocol {}, this plugin speaks {}",
                 params.protocol_version,
                 wire::VERSION
-            ));
+            )
+            .into());
         }
         Ok(InitializeResult {
             id: self.id.clone(),
@@ -60,10 +61,11 @@ impl Handler for Provider {
                     lighthouse_protocol::OVERLAYS.to_owned(),
                 ],
             }],
+            models: wire::ModelList::default(),
         })
     }
 
-    fn index(&mut self, params: IndexParams) -> Result<IndexResult, String> {
+    fn index(&mut self, params: IndexParams) -> Result<IndexResult, HandlerError> {
         let options = match params.context.options.get(LANGUAGE) {
             Some(raw) => match Options::deserialize(raw) {
                 Ok(options) => options,

@@ -85,7 +85,7 @@ fn checked_in_schemas_match_the_types() {
             .success();
     }
     let schemas = lighthouse_session::schemas();
-    assert_eq!(schemas.len(), 7);
+    assert_eq!(schemas.len(), 8);
     let on_disk = fs::read_dir(&root)
         .unwrap()
         .filter(|e| {
@@ -93,7 +93,7 @@ fn checked_in_schemas_match_the_types() {
             name.to_string_lossy().ends_with(".schema.json")
         })
         .count();
-    assert_eq!(on_disk, 7, "a schema file nothing generates is stale");
+    assert_eq!(on_disk, 8, "a schema file nothing generates is stale");
     for descriptor in schemas.into_values() {
         let file = root.join(lighthouse_resource::schema_file(descriptor.kind));
         let mut want = serde_json::to_string_pretty(&descriptor.schema).unwrap();

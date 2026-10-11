@@ -50,6 +50,7 @@ fn ctx_run<R>(project: &Project, file: Option<&File>, run: impl FnOnce(&Ctx) -> 
         memo: &memo,
         notices: &notices,
         applies: Applicability::default(),
+        models: &lighthouse_plugin::NoModels,
     };
     run(&ctx)
 }

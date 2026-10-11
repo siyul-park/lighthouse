@@ -1,4 +1,5 @@
 pub mod annotation;
+mod canonical;
 mod diagnostic;
 mod document;
 mod fix;
@@ -10,11 +11,12 @@ mod scope;
 mod text;
 mod ucm;
 
+pub use canonical::canonical;
 pub use diagnostic::{Diagnostic, Fingerprint, Incomplete, Severity, UnknownSeverity};
 pub use document::Document;
 pub use fix::{Anchor, EditOp, FixOutcome, Owner, Safety, UnknownSafety};
 pub use review::{
-    AgentKind, Attribution, Judgment, Label, Suppressed, Suppression, SuppressionKind,
+    AgentKind, Attribution, Judgment, Label, Role, Suppressed, Suppression, SuppressionKind,
     SuppressionStatus, UnknownTerm,
 };
 pub use scope::{Applicability, Reach, RunScope, TestScope};

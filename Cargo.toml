@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "plugins/lang-rust"]
+members = ["crates/*", "plugins/fake-model", "plugins/lang-rust", "plugins/model-http"]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,6 +9,7 @@ publish = false
 
 [workspace.dependencies]
 assert_cmd = "2"
+async-openai = { version = "=0.42.0", default-features = false, features = ["chat-completion-types"] }
 cel = "0.14"
 clap = { version = "4", features = ["derive"] }
 globset = "0.4"

@@ -6,7 +6,7 @@ use std::{
     time::Instant,
 };
 
-use lighthouse_engine::{Engine, FixPlan, Outcome};
+use lighthouse_engine::{Engine, FixPlan, ModelOptions, Outcome};
 use lighthouse_model::{Diagnostic, Severity, Suppressed};
 use lighthouse_report::{Briefing, Detail, FixFile, ProposedFix};
 use lighthouse_spec::Catalog;
@@ -35,6 +35,21 @@ pub struct CheckRequest {
     /// `.lighthouse/cache` when the code they read has not changed, and keep
     /// new ones there. The findings are the same either way.
     pub cache: bool,
+    pub models: ModelFlags,
+}
+
+/// What a run may do with models.
+#[derive(Default, Clone, Copy)]
+pub struct ModelFlags {
+    /// Ask no model: what they would judge is left to review (`--no-models`).
+    pub off: bool,
+    /// Ask models that cost about the whole project (`--all-models`).
+    pub all: bool,
+    /// Record what models fail as judgments attributed to them
+    /// (`--record-model-labels`), so that training can reproduce them.
+    pub record: bool,
+    /// Keep the subjects models were put, for training and evaluation.
+    pub collect: bool,
 }
 
 /// How a run ended. `Incomplete` wins over everything: "not checked" is never
@@ -83,6 +98,11 @@ pub struct Checked {
 }
 
 impl Checked {
+    /// The model `reference` (`<provider>/<model>`), from the engine that ran.
+    pub fn model(&self, reference: &str) -> Result<Box<dyn lighthouse_plugin::Classifier + '_>> {
+        Ok(self.engine.model(reference)?)
+    }
+
     /// The status and counts of this run.
     pub fn summary(&self) -> Summary {
         let outcome = &self.outcome;
@@ -222,6 +242,13 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     let engine = Engine::new(registry, session.config, &catalog, &root)?
         .with_incomplete(plugins.incomplete)
         .with_trust(trusted);
+    let attached = attached_models(&root, &catalog);
+    let engine = engine.with_models(ModelOptions {
+        off: request.models.off,
+        all: request.models.all,
+        collect: request.models.collect,
+        attached,
+    });
     let engine = if request.cache {
         engine.with_cache(cache_dir(&root), cache_limit())
     } else {
@@ -238,6 +265,9 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     } else {
         Remembered::default()
     };
+    if request.store && request.models.record {
+        messages.extend(record_model_labels(&root, &outcome));
+    }
     outcome.timings.store = started.elapsed();
     messages.extend(remembered.messages.iter().cloned());
     if !outcome.suppressed.is_empty() {
@@ -261,6 +291,59 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
         engine,
         root,
     })
+}
+
+/// The model each rule is bound to by an approved revision, by rule id.
+pub(crate) fn attached_models(root: &Path, catalog: &Catalog) -> BTreeMap<String, String> {
+    let Ok(records) = lighthouse_store::Records::read(root) else {
+        return BTreeMap::new();
+    };
+    let named = |key: &str| {
+        catalog
+            .decisions()
+            .find(|d| d.uid() == Some(key) || d.id() == key)
+            .map(|d| d.id().to_owned())
+    };
+    records
+        .attached()
+        .into_iter()
+        .filter_map(|(decision, model)| Some((named(&decision)?, model)))
+        .collect()
+}
+
+/// Records what models failed as judgments attributed to them, in the role of
+/// a model: the reason names the model and its probability.
+fn record_model_labels(root: &Path, outcome: &Outcome) -> Vec<String> {
+    let mut done = 0;
+    let mut notes = Vec::new();
+    for d in &outcome.diagnostics {
+        let Some(model) = d.evidence.get("model").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let confidence = d
+            .evidence
+            .get("confidence")
+            .and_then(|v| v.as_f64())
+            .unwrap_or_default();
+        let review = lighthouse_store::NewJudgment {
+            fingerprint: d.fingerprint.as_str().to_owned(),
+            judgment: lighthouse_model::Judgment::Fail,
+            reason: Some(format!("model {model} P(fail)={confidence:.2}")),
+            suppress: None,
+            attribution: lighthouse_model::Attribution::model(model),
+            commit: None,
+            expect_seen: None,
+            lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
+        };
+        match crate::reviewing::record_judgment(root, &review) {
+            Ok(_) => done += 1,
+            Err(e) => notes.push(format!("a model label was not recorded: {e}")),
+        }
+    }
+    if done > 0 {
+        notes.push(format!("{done} model label(s) recorded"));
+    }
+    notes
 }
 
 fn analyze(

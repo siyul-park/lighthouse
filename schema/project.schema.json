@@ -1,5 +1,62 @@
 {
   "$defs": {
+    "ApiProvider": {
+      "additionalProperties": false,
+      "description": "A provider that speaks a standard API: Lighthouse knows the format of the\nrequests, and the project says where to send them.",
+      "properties": {
+        "baseUrl": {
+          "description": "Where requests go. Default: the spec's own service.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cost": {
+          "description": "What one answer costs. Default: 1.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "keyEnv": {
+          "description": "The environment variable that holds the API key; none for a service\nthat needs no key. Default: the spec's own.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "spec": {
+          "$ref": "#/$defs/Specs",
+          "description": "The API: `openai` (Chat Completions, which OpenRouter, Ollama, vLLM\nand LM Studio also speak) or `typesafe` (System One). Others will join."
+        }
+      },
+      "required": [
+        "spec"
+      ],
+      "type": "object"
+    },
+    "Evaluation": {
+      "additionalProperties": false,
+      "description": "How a rule's check is judged by `lighthouse eval`. A policy, not a\nmeaning: changing it moves no meaning version.",
+      "properties": {
+        "precision": {
+          "default": 0.9,
+          "description": "The precision a check must reach, from 0 to 1. Default: 0.9.",
+          "format": "double",
+          "type": "number"
+        },
+        "recall": {
+          "description": "The recall a check must reach, from 0 to 1; no target when absent.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "Formatter": {
       "additionalProperties": false,
       "description": "The command that formats a file of a language, by the command contract of\nfixes: exit `0` succeeds, stdout carries only the result, stderr is for\npeople.",
@@ -154,6 +211,169 @@
       ],
       "type": "object"
     },
+    "ModelInput": {
+      "description": "What a `command` model is given on stdin.",
+      "oneOf": [
+        {
+          "const": "request",
+          "description": "The request as JSON, as a model plugin gets it.",
+          "type": "string"
+        },
+        {
+          "const": "prompt",
+          "description": "The request as text for a language model, with the answer's shape.",
+          "type": "string"
+        }
+      ]
+    },
+    "ModelOutput": {
+      "description": "How a `command` model prints its answer.",
+      "oneOf": [
+        {
+          "const": "json",
+          "description": "stdout is one JSON value.",
+          "type": "string"
+        }
+      ]
+    },
+    "ModelProvider": {
+      "description": "A provider of models, named under `[models.providers.<name>]`: a provider,\nas a check or a fix is. A model is named `<provider>/<model>`.",
+      "oneOf": [
+        {
+          "description": "A plugin process that offers models. The `options` say how to reach\nthem (`spec`, `baseUrl`, `keyEnv` for `model-http`); the model part of\nthe reference goes with every request.",
+          "properties": {
+            "cost": {
+              "description": "What one answer costs, when the plugin's own figure is not right.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "options": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "plugin": {
+              "description": "A listed plugin that offers models.",
+              "type": "string"
+            },
+            "type": {
+              "const": "rpc",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "plugin"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Any program that reads a request and prints an answer, under the\nprocess contract: no shell, its own process group, a time limit, a cap\non output, an environment cleared to `PATH`, `HOME`, `LANG`, `TMPDIR`,\nthe declared `env` and the variable `keyEnv` names, and the project's\ntrust. An answer that does not fit the task's shape is an abstention.",
+          "properties": {
+            "argv": {
+              "description": "The program and its arguments; `{model}` stands for the model part\nof the reference.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "cost": {
+              "default": 1.0,
+              "description": "What one answer costs. Default: 1.",
+              "format": "double",
+              "type": "number"
+            },
+            "env": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Variables the program is given besides the allowlist.",
+              "type": "object"
+            },
+            "keyEnv": {
+              "description": "The variable of the user's environment that holds the program's\nkey; it is passed through, and no other secret is.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "output": {
+              "$ref": "#/$defs/ModelOutput",
+              "default": "json"
+            },
+            "pointer": {
+              "description": "RFC 6901 JSON Pointer to the answer inside the printed JSON, when\nthe program wraps it in an envelope.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "stdin": {
+              "$ref": "#/$defs/ModelInput",
+              "default": "request"
+            },
+            "tasks": {
+              "default": [
+                "classification"
+              ],
+              "description": "Default: `classification`.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "timeout": {
+              "description": "How long one run may take, such as `90s`. Default: 120s.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "command",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "argv"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ModelsSpec": {
+      "additionalProperties": false,
+      "description": "The `models` table of a project: its bindings and limits, and its own\nproviders.",
+      "properties": {
+        "budget": {
+          "description": "Requests a run may send to models that cost something; the subjects\nof the rest are left to review. Default: 200.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "classification": {
+          "description": "The model (`<provider>/<model>`) that judges a decision no rule binds\nand no trained model is attached to. When it abstains, the subject is\nleft to agent review.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "providers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ProviderSpec"
+          },
+          "description": "The providers the project defines, by name; a name that is built in\noverrides it.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "OverrideSpec": {
       "additionalProperties": false,
       "description": "Rules for the files and languages that match.",
@@ -267,6 +487,10 @@
           "description": "Options per language id; `formatter` is the host's, the rest goes to\nthe language's provider.",
           "type": "object"
         },
+        "models": {
+          "$ref": "#/$defs/ModelsSpec",
+          "description": "The models that judge the decisions rules cannot prove."
+        },
         "overrides": {
           "description": "Rules that apply to some files or languages only, after `rules`.",
           "items": {
@@ -291,10 +515,32 @@
       },
       "type": "object"
     },
+    "ProviderSpec": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ApiProvider"
+        },
+        {
+          "$ref": "#/$defs/ModelProvider"
+        }
+      ],
+      "description": "A provider as the project writes it."
+    },
     "RuleDetail": {
       "additionalProperties": false,
       "description": "A level with options.",
       "properties": {
+        "evaluation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Evaluation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How `lighthouse eval` judges this rule's check."
+        },
         "generated": {
           "description": "Check generated code with this rule (`true`) or not (`false`),\nwhatever the decision's scope and the project's `generated.check` say.",
           "type": [
@@ -304,6 +550,13 @@
         },
         "level": {
           "$ref": "#/$defs/Level"
+        },
+        "model": {
+          "description": "The model plugin that judges this decision, before the project's\n`models.classification`. When it abstains, the subject is left to\nagent review.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "options": {
           "additionalProperties": true,
@@ -326,6 +579,20 @@
         }
       ],
       "description": "How a rule is written in a spec: `warn`, `off`, or\n`{ level: warn, options: { max: 10 } }`."
+    },
+    "Specs": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ],
+      "description": "One standard API, or several a provider speaks: each operation uses the\none that covers it (classification: `typesafe`, else `openai`)."
     }
   },
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/project.schema.json",

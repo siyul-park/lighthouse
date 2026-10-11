@@ -46,10 +46,7 @@ pub fn review(fingerprint: &str, judgment: Judgment) -> NewJudgment {
         judgment,
         reason: None,
         suppress: None,
-        attribution: Attribution {
-            kind: AgentKind::SoftwareAgent,
-            id: Some("claude".to_owned()),
-        },
+        attribution: Attribution::new(AgentKind::SoftwareAgent, Some("claude".to_owned())),
         commit: Some("def456".to_owned()),
         expect_seen: None,
         lighthouse_version: "0.1.0".to_owned(),

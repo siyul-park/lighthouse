@@ -525,7 +525,7 @@ never apply, the orchestrator never judges. `check` stays pure: a fix is compute
 demand, when `check --fix` or the MCP `fix` tool asks.
 
 **One canonical fix per rule.** The catalog is the single source that says how a rule is
-fixed: the optional `fix:` block of its decision (see [Fixer spec](#fixer-spec)). The
+fixed: the optional `fix:` block of its decision (see [Fixer spec](fixer-spec.md)). The
 resolution is deterministic, `finding.rule` to `decision.fix` to the fixer registered
 under the decision's id; there is no list of competing fixers and no fallback chain.
 `--fixer <id>` is an explicit override that must name a registered fixer; it replaces the
@@ -648,87 +648,9 @@ reordering a Rust file cannot move one: such findings are declined and fixed by 
 
 ## Fixer spec
 
-The `fix:` block of a decision is declarative and selects one fixer *kind*; every kind
-compiles into a provider of the single `Fixer` interface, the way declarative rules
-compile into `Rule`, and bundled fixers are such specs registered by their plugin through
-`Plugin::fixers()` under the decision's id. Local rules in `.lighthouse/decisions/*.yaml` carry
-a `fix:` too.
-
-```yaml
-fix:
-  safety: safe            # safe | suggested: the cap on what the fixer may claim
-  requires: [extent]      # optional provider capabilities; absent means declined
-  # exactly one of:
-  ops:                    # CEL over the finding and the code model
-    - op: move
-      node: finding.evidence.callee
-      after: finding.evidence.caller
-  command:
-    argv: ["gofmt", "-s", "-w", "{file}"]   # no shell
-    output: inPlace       # inPlace | text (the new file text on stdout)
-    stdin: none           # none | file
-    env: {}               # extra variables; the rest is cleared
-    timeout: 30s
-    scope: file           # edits outside the finding's file are refused
-  rpc: {}                 # reserved: a language plugin's own fix method; not yet supported
-```
-
-- **`ops`** is a list of generic operations: `move`, `reorder`, `delete`, `rename`,
-  `replace`. Each takes typed parameters, validated by the catalog; expressions are CEL over
-  `finding` (`rule`, `message`, `file`, `span`, `symbol`, `evidence`, `fingerprint`,
-  `facts`), `symbol` (the finding's symbol, as in declarative rules) and `options`, and an
-  optional `when` skips an operation. `text` and `name` are templates with `{{ cel }}`
-  holes. The operations, their parameters and the registered order keys of `reorder` are
-  generated into [decisions/fix-operations.md](decisions/fix-operations.md). Semantics that
-  need Rust (`reorder` sorting by a key such as `design/group`, registered by a plugin
-  through `Plugin::order_keys()`) live in the operation, not in per-rule code.
-- **`command`** is the simple text contract; structured data goes through `rpc`. It runs a
-  program without a shell in a scratch directory that holds a copy of the finding's file.
-  *Exit codes:* `0` succeeds with the result per `output` (an empty result changes nothing),
-  `1` declines with the reason taken from stderr, `>= 2`, a signal or a timeout is an error:
-  nothing is applied and the capped stderr goes into the notice. *Output:* `inPlace` diffs
-  the scratch copy against the original into the smallest whole-line `Replace`; `text` takes
-  the new file text from stdout, which carries only the result (stderr is never parsed).
-  *stdin:* `none` (default) or `file`, the target file's content; no request JSON is sent.
-  *Argv:* `{file}`, `{line}`, `{symbol}` and `{rule}` fill a whole argument each (no
-  embedding, no `{root}`; a value starting with `-` is refused); the working directory is the
-  scratch directory, and a symlink in the output is refused. *Environment:* cleared to
-  `PATH`, `HOME`, `LANG`, `TMPDIR`, plus the declared `env`, plus `LIGHTHOUSE_DECISION` (the
-  finding as JSON), `LIGHTHOUSE_OPTIONS` (the rule's options as JSON) and
-  `LIGHTHOUSE_API_VERSION`. *Limits:* a timeout sends SIGTERM to the process group, then
-  SIGKILL after a grace period, through the runner shared with the plugin host
-  (`lighthouse-process`); stdout and stderr are capped. The result goes through the same
-  containment, verify and rollback as any other fix.
-  **Trust:** commands (command fixers and `[languages.<id>] formatter`) run only in a
-  project the *user* trusts, whoever wrote them. `lighthouse trust` lists the formatters and
-  fixer commands it would trust and asks for confirmation on the terminal (without a
-  terminal it refuses unless `--yes` says the list was read; `init --agent claude-code`
-  adds `Bash(lighthouse trust:*)` to the agent's permission deny list); it records the
-  canonical root with a digest of `lighthouse.toml`, the rule files and the content of any
-  command program that lies inside the project (a program named by a relative path is the
-  project's own, run from the project root) in `~/.lighthouse/trust.toml`. Programs outside
-  the project (`gofmt`, `rustfmt`) are trusted by command line only. Every field of the digest
-  is tagged and length-prefixed, and it is computed from the very bytes the configuration
-  and rules were loaded from. Authoring candidates (`decision_create`) are never trusted (`$LIGHTHOUSE_HOME` replaces `~/.lighthouse`); any change to
-  either withdraws it, and `lighthouse trust --revoke` removes it. `LIGHTHOUSE_TRUST=1`
-  trusts every project, for CI. The repository cannot grant trust itself: a `[fix]` table
-  in `lighthouse.toml` is not accepted. Without trust a command fix is declined with a
-  message naming the command, and formatting is skipped with a note.
-- **Validation** (every catalog load, local layers included): exactly one kind; a decision
-  with an implementation; `safe` only on mechanical decisions; every CEL expression and
-  template compiles; operation parameters are well-typed (one of `before`/`after`, `node`
-  or `file` and `span`, qualified order keys); a command has a program and a timeout;
-  `rename` lists `complete-references`; placeholders fill whole arguments; an `rpc` fix is
-  kept but only that rule's findings are declined as not yet supported (it does not fail
-  the pack); and the decision has an invalid example with
-  `fixed`. The workspace tests also check that every bundled `fix` has its rule and a
-  registered fixer, that every `reorder` key is registered and that the `requires` list
-  covers what the operations need.
-- **Testing:** an invalid example may carry `fixed:`, the new text of each file that
-  changes. `lighthouse rule test` applies the fix to the example (suggested ones too),
-  asserts the files equal `fixed` (a final newline aside), checks that the rule no longer
-  fires and that applying the fix again changes nothing. `decision_create` and `decision_update`
-  run the same examples in their gate.
+The `fix:` block of a decision selects one fixer kind that compiles into a provider of the
+single `Fixer` interface. The kinds, their operations and their testing are in
+[fixer-spec.md](fixer-spec.md).
 
 ## Crates
 
@@ -739,11 +661,11 @@ L5  cli, mcp                  -> session, report            (nothing else: no st
 L4  session                   -> every layer below          (composition root)
     report                    -> model, spec
 L3  store                     -> model, resource            (findings, judgments, the decision log)
-L2  engine                    -> plugin, spec, model, process   (analysis, fix orchestration, rule tester)
+L2  engine                    -> plugin, spec, model, process, protocol, cache   (analysis, fix orchestration, rule tester, models)
     checks                    -> plugin, spec, model, process, resource (declarative checks, metrics, order keys,
                                                                        the bundled registry derived from the catalog's packs)
     rpc                       -> plugin, spec, protocol, process, model, resource  (language plugins as processes)
-L1  plugin                    -> model                      (SPI and Registry)
+L1  plugin                    -> model, protocol            (SPI and Registry)
     spec                      -> model, resource            (decision kinds, Catalog, local layer, `spec::project`)
 L0  model, resource, protocol, process   (no workspace dependencies)
     cache                     -> model                      (the host result cache; rusqlite)
@@ -758,6 +680,12 @@ bundled catalog and adds those; plugin ids and rule ids are the packs' own.
 builds, project documents, catalog files). Each crate has one integration-test
 binary, `tests/it/main.rs` with a module per area, and no lib test binary unless
 it has unit tests.
+
+## Models
+
+A model is a plugin kind beside language providers, behind published API bodies and layered
+bindings. The runtime, the wire, `model-http`, labels, datasets, `eval` and `learn` are in
+[models.md](models.md).
 
 ## Frontends
 

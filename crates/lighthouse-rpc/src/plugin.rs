@@ -2,17 +2,19 @@ use std::{fs, path::Path, sync::Arc, time::Duration};
 
 use lighthouse_model::Incomplete;
 use lighthouse_plugin::{
-    Error, Indexed, LanguageProvider, Plugin, PluginManifest, ProviderManifest, Source, Workspace,
+    Classifier, Error, Indexed, LanguageProvider, Plugin, PluginManifest, ProviderManifest, Source,
+    Workspace,
 };
 use lighthouse_protocol as wire;
 use serde_json::Value;
 
-use crate::{client::Client, convert, manifest::Found};
+use crate::{client::Client, convert, manifest::Found, model::Model};
 
 /// A language plugin running as a separate process.
 pub struct RpcPlugin {
     manifest: PluginManifest,
     languages: Vec<wire::ProviderManifest>,
+    models: Vec<lighthouse_plugin::ModelManifest>,
     client: Arc<Client>,
 }
 
@@ -66,18 +68,50 @@ impl RpcPlugin {
                 reported.join(", ")
             )));
         }
+        let models = result.models.manifests();
+        let mut offered: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        offered.sort_unstable();
+        let mut named: Vec<&str> = found
+            .manifest
+            .provides
+            .models
+            .iter()
+            .map(String::as_str)
+            .collect();
+        named.sort_unstable();
+        if !named.is_empty() && named != offered {
+            return Err(failed(format!(
+                "its manifest provides models [{}], the process reports [{}]",
+                named.join(", "),
+                offered.join(", ")
+            )));
+        }
         Ok(Self {
             manifest: PluginManifest {
                 id: result.id,
                 version: result.version,
             },
             languages: result.languages,
+            models,
             client: Arc::new(client),
         })
     }
 }
 
 impl Plugin for RpcPlugin {
+    /// One model per entry the process declared, sharing its connection.
+    fn models(&self) -> Vec<Box<dyn Classifier>> {
+        self.models
+            .iter()
+            .map(|manifest| {
+                Box::new(Model {
+                    manifest: manifest.clone(),
+                    client: Arc::clone(&self.client),
+                }) as Box<dyn Classifier>
+            })
+            .collect()
+    }
+
     /// The identity the process reported during the handshake.
     fn manifest(&self) -> &PluginManifest {
         &self.manifest

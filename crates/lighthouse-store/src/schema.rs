@@ -6,7 +6,7 @@ use crate::Error;
 /// is a cache of the decision log and of what runs saw, so it has no migration
 /// chain: one with another version is dropped and built again, and the
 /// judgments come back from `decisions.jsonl`.
-pub(crate) const VERSION: i64 = 8;
+pub(crate) const VERSION: i64 = 9;
 
 /// Findings with the judgments and suppressions on them. Locators, evidence and
 /// facts are JSON text, so nothing here assumes the artifact is code.
@@ -61,6 +61,7 @@ CREATE TABLE judgments (
     reason             TEXT,
     agent_type         TEXT NOT NULL CHECK (agent_type IN ('Person', 'SoftwareAgent')),
     agent_id           TEXT,
+    agent_role         TEXT CHECK (agent_role IN ('agent', 'model')),
     language           TEXT,
     scope              TEXT,
     evidence_digest    TEXT,
@@ -80,6 +81,7 @@ CREATE TABLE suppressions (
     justification  TEXT NOT NULL,
     agent_type     TEXT NOT NULL CHECK (agent_type IN ('Person', 'SoftwareAgent')),
     agent_id       TEXT,
+    agent_role     TEXT CHECK (agent_role IN ('agent', 'model')),
     generated_at   TEXT NOT NULL
 );
 CREATE INDEX suppressions_judgment ON suppressions (judgment_id);

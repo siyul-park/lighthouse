@@ -141,6 +141,11 @@ fn request(paths: Vec<PathBuf>, changed: bool) -> CheckRequest {
         rules: Vec::new(),
         store: true,
         cache: true,
+        // An edit hook never spends on a model.
+        models: lighthouse_session::ModelFlags {
+            off: true,
+            ..Default::default()
+        },
     }
 }
 

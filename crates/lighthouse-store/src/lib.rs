@@ -14,18 +14,20 @@ mod error;
 mod judged;
 mod log;
 mod record;
+mod records;
 mod schema;
 mod store;
 
 use lighthouse_resource::Descriptor;
 
 pub use error::Error;
-pub use log::{JudgmentSpec, SuppressionSpec};
+pub use log::{Change, JudgmentSpec, RevisionEvent, RevisionSpec, SuppressionSpec};
 pub use record::{
     Filter, FindingRecord, FixEvent, JudgmentEvent, NewFix, NewJudgment, Observed, Resolved,
     Ruling, Run, RunSummary, Stamp, Standing, State, StatusFilter, Subject, SuppressionEvent,
     Unchecked,
 };
+pub use records::{Records, append_revision};
 pub use store::Store;
 
 /// The JSON Schema of every record kind the decision log holds.
@@ -33,5 +35,6 @@ pub fn descriptors() -> Vec<Descriptor> {
     vec![
         Descriptor::of::<JudgmentSpec>(),
         Descriptor::of::<SuppressionSpec>(),
+        Descriptor::of::<RevisionSpec>(),
     ]
 }

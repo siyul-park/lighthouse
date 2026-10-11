@@ -1,5 +1,6 @@
 mod fix;
 mod memo;
+mod models;
 mod notices;
 mod registry;
 
@@ -22,6 +23,12 @@ pub use fix::{
     OrderKeys,
 };
 pub use memo::Memo;
+pub use models::{
+    Answer, Ask, Classifier, ClassifyParams, Decided, DecisionRef, FineTuningJob,
+    FineTuningJobRequest, Judged, LineKeys, Method, ModelManifest, Models, Neighbor, NoModels,
+    Open, Question, ResultKind, Settle, Shot, State, Subject, SubjectContext, Supervised,
+    SystemOneRequest, SystemOneResponse, TrainingLine, UPPER, decide,
+};
 pub use notices::Notices;
 pub use registry::{Registry, plugin_of};
 
@@ -132,6 +139,8 @@ pub struct Ctx<'a> {
     /// the project's configuration left it. The engine drops the files that
     /// are out before the rule runs; a rule drops the symbols that are.
     pub applies: Applicability,
+    /// The models rules may put subjects to.
+    pub models: &'a dyn Models,
 }
 
 /// Layout conventions a language declares; the engine applies them to every file of that language.
@@ -315,6 +324,10 @@ pub trait Plugin {
     }
     /// Ways to order declarations that fix operations may name.
     fn order_keys(&self) -> Vec<Box<dyn OrderKey>> {
+        Vec::new()
+    }
+    /// The models of the plugin; each has the id of the plugin.
+    fn models(&self) -> Vec<Box<dyn Classifier>> {
         Vec::new()
     }
 }

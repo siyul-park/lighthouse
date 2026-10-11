@@ -1,6 +1,7 @@
 //! The `select` of a model check picks the subjects a model is asked about.
-//! There is no model runtime yet, so each select is run as the `where` of a
-//! cel check over a synthetic project: what it selects is what would be asked.
+//! Each select is run as the `where` of a cel check over a synthetic project:
+//! what it selects is what the model runtime would ask about. (The runtime
+//! itself is tested end to end in the CLI's `models` tests.)
 
 use std::collections::BTreeMap;
 

@@ -16,8 +16,18 @@
       ]
     },
     "Attribution": {
-      "description": "`prov:wasAttributedTo`: who a record is attributed to.",
+      "description": "`prov:wasAttributedTo`: who a record is attributed to, with the role the\nagent had (`prov:hadRole`).",
       "properties": {
+        "hadRole": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Role"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "id": {
           "type": [
             "string",
@@ -191,6 +201,21 @@
         "name"
       ],
       "type": "object"
+    },
+    "Role": {
+      "description": "The role a software agent had in a record, PROV's `hadRole`.",
+      "oneOf": [
+        {
+          "const": "agent",
+          "description": "A coding agent that reviewed the finding.",
+          "type": "string"
+        },
+        {
+          "const": "model",
+          "description": "A model that classified the subject.",
+          "type": "string"
+        }
+      ]
     }
   },
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/judgment.schema.json",

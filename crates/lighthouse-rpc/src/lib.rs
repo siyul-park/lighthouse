@@ -1,6 +1,7 @@
 mod client;
 mod convert;
 mod manifest;
+mod model;
 mod plugin;
 
 use std::{

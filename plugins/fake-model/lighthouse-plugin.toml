@@ -1,0 +1,14 @@
+apiVersion = "lighthouse/v1alpha1"
+kind = "Plugin"
+
+[metadata]
+name = "fake-model"
+
+[spec]
+version = "0.1.0"
+
+[spec.runtime]
+command = "./fake-model"
+
+[spec.provides]
+models = ["fake-model"]

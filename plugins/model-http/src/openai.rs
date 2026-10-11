@@ -1,0 +1,88 @@
+//! OpenAI's API (https://platform.openai.com/docs/api-reference). One
+//! function per operation used, named by its operationId in snake_case. The
+//! types are `async-openai`'s, generated from OpenAI's OpenAPI spec; only its
+//! type features are enabled, and the HTTP is this crate's [`Client`].
+
+use async_openai::types::chat::{CreateChatCompletionRequest, CreateChatCompletionResponse};
+use lighthouse_protocol::HandlerError;
+
+use crate::{endpoint::Endpoint, http::Client};
+
+/// `createChatCompletion`: `POST /chat/completions`. A refusal comes back
+/// as the error body the service answered; an error body in a 200 response
+/// is carried the same way.
+pub fn create_chat_completion(
+    client: &dyn Client,
+    endpoint: &Endpoint,
+    request: &CreateChatCompletionRequest,
+) -> Result<CreateChatCompletionResponse, HandlerError> {
+    let body = serde_json::to_value(request).map_err(|e| e.to_string())?;
+    let response = client.post(
+        &endpoint.url("chat/completions"),
+        endpoint.key()?.as_deref(),
+        &body,
+    )?;
+    if let Some(error) = response.get("error").filter(|e| !e.is_null()) {
+        return Err(HandlerError::with_data(
+            "the provider answered with an error",
+            error.clone(),
+        ));
+    }
+    serde_json::from_value(response)
+        .map_err(|e| format!("the response does not fit createChatCompletion's: {e}").into())
+}
+
+#[cfg(test)]
+mod tests {
+    use async_openai::types::chat::{
+        ChatCompletionRequestMessage, ChatCompletionRequestUserMessage,
+    };
+    use serde_json::{Value, json};
+
+    use super::*;
+    use crate::recording::Recording;
+
+    /// The response of the Chat Completions reference.
+    const COMPLETION: &str = r#"{"id":"chatcmpl-123","object":"chat.completion","created":1700000000,"model":"gpt-5.2","choices":[{"index":0,"message":{"role":"assistant","content":"Hello! How can I help you today?"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":12,"total_tokens":22},"service_tier":"auto","system_fingerprint":"fp_123","moderation":null}"#;
+
+    fn request() -> CreateChatCompletionRequest {
+        CreateChatCompletionRequest {
+            model: "gpt-5.2".to_owned(),
+            messages: vec![ChatCompletionRequestMessage::User(
+                ChatCompletionRequestUserMessage::from("Hello"),
+            )],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn it_posts_to_chat_completions_and_reads_the_documented_response() {
+        let client = Recording::replying(vec![serde_json::from_str(COMPLETION).unwrap()]);
+        let endpoint = Endpoint::at("openai", "https://api.openai.com/v1/");
+        let response = create_chat_completion(&client, &endpoint, &request()).unwrap();
+        assert_eq!(
+            response.choices[0].message.content.as_deref(),
+            Some("Hello! How can I help you today?")
+        );
+        let asked = client.asked();
+        assert_eq!(asked[0].0, "https://api.openai.com/v1/chat/completions");
+        assert_eq!(asked[0].1["model"], "gpt-5.2");
+        assert_eq!(asked[0].1["messages"][0]["role"], "user");
+    }
+
+    #[test]
+    fn an_error_body_is_carried_as_data() {
+        let error = json!({"message": "rate limited", "type": "requests"});
+        let client = Recording::replying(vec![json!({ "error": error })]);
+        let endpoint = Endpoint::at("openai", "https://x");
+        let failed = create_chat_completion(&client, &endpoint, &request()).unwrap_err();
+        assert_eq!(failed.data, Some(error));
+    }
+
+    #[test]
+    fn a_response_of_another_shape_fails() {
+        let client = Recording::replying(vec![Value::Null]);
+        let endpoint = Endpoint::at("openai", "https://x");
+        assert!(create_chat_completion(&client, &endpoint, &request()).is_err());
+    }
+}

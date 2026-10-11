@@ -21,6 +21,7 @@ pub struct Scope<'a> {
     pub config: Option<&'a Path>,
     pub store: bool,
     pub cache: bool,
+    pub models: lighthouse_session::ModelFlags,
 }
 
 /// How a check reports.
@@ -85,6 +86,7 @@ fn select(scope: &Scope) -> Result<Checked> {
         rules: scope.only.to_vec(),
         store: scope.store,
         cache: scope.cache,
+        models: scope.models,
     };
     let checked = lighthouse_session::check(Session::load(scope.config)?, &request)?;
     for message in &checked.messages {
@@ -110,11 +112,19 @@ fn report(checked: &Checked, output: &Output, started: Instant) -> Result<u8> {
     } else {
         BTreeMap::new()
     };
+    // Subjects nothing decided are reported beside the findings, as `review`
+    // results; they never change the exit code.
+    let shown: Vec<_> = outcome
+        .diagnostics
+        .iter()
+        .chain(&outcome.reviews)
+        .cloned()
+        .collect();
     print!(
         "{}",
         render_with(
             output.format,
-            &outcome.diagnostics,
+            &shown,
             &outcome.incomplete,
             &Briefing {
                 detail: output.detail,

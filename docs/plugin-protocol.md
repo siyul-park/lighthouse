@@ -149,6 +149,52 @@ answered terminates with a non-zero code; input that closes after `shutdown` (a
 host that went away) is a clean stop for providers built on the Rust server loop,
 and tolerated by hosts.
 
+### Model methods
+
+Lighthouse defines no model API of its own: each method takes the body of a published API,
+verbatim, with that API's own field names.
+
+A plugin may offer models instead of, or besides, languages. `initialize` lists them in
+`models`, OpenAI's list object `{object: "list", data: [{id, object: "model", created, owned_by,
+capabilities: {classification | embedding | fine_tuning: {supported}}}]}`, with what Lighthouse
+adds to each entry: `version` (changes whenever the answers for the same input may), `cost` (0
+for a model that runs locally for free), `deterministic` and `abstains`. The manifest lists the
+same ids in `provides.models`. The host keys behaviour off these capabilities, never off names.
+
+`lighthouse/classify` takes the body of TypeSafe's System One API (`POST /v1/systemone`),
+https://docs.typesafe.ai/api, for one subject: `{state, model, questions}`.
+- `state` is `{language, file, text, facts, neighbors}`: the subject's source by extent, the facts
+  the check computed, and a few callers and callees.
+- `questions` is keyed by decision id; each is `{type: "noul", instructions: {requirement, prompt},
+  criteria: {true: {meaning, examples}, false: {meaning, examples}}}`. `true` means the subject
+  fails the decision, and its examples are the decision's invalid examples; `false` means it
+  passes, with the valid ones.
+- `model` is the part of the reference after the provider (`openrouter/qwen/qwen3-coder:free`
+  sends `qwen/qwen3-coder:free`). Beside System One's body (`SystemOneRequest`) Lighthouse sends
+  `options`, the provider's `options`, for a plugin that needs them (`spec`, `baseUrl`, `keyEnv`);
+  they are never part of the body a remote server gets.
+
+It answers `{model, answers: {<decision id>: {type: "noul", noul}}, usage}`: `noul` is the
+probability that the subject fails. There is no reason. The host maps it, the same for every
+model: at or above the band's `upper` the subject fails (0.9 until `eval` calibrates one);
+otherwise it is left to review. A model that has not been calibrated never clears a subject. The confidence is
+max(p, 1 - p).
+
+`lighthouse/train` takes OpenAI's fine-tuning job body (`POST /v1/fine_tuning/jobs`):
+`{model, training_file, validation_file?, method: {type: "supervised", supervised:
+{hyperparameters}}, seed, suffix?, metadata}`, and answers the final `FineTuningJob`. Here
+`training_file` is the digest `sha256:<hex>` of a JSON Lines file in the host's dataset store,
+`<datasets>/sha256/<hex>.jsonl`: one OpenAI chat fine-tuning line per subject (`messages`: the
+system and user prompts and the assistant's `{type, noul}`), in canonical JSON, with `weight`,
+`group`, `decision`, `key` and `attribution` beside them. `metadata` carries the `decision`, the
+`datasets` directory and the `dir` the host owns for the artifact. A successful job
+has `status: "succeeded"`, `fine_tuned_model: "sha256:<hex>"` (the artifact) and, as its first
+`result_files` entry, a JSON file of the metrics. The same `seed` is the same request.
+
+Errors are JSON-RPC errors; `data` carries the error body of the API reused (OpenAI's
+`{error: {message, type, param, code}}`, or TypeSafe's status code). Calls are retried with
+backoff on 429, 503 and 529. A model that fails leaves its subjects to review.
+
 ## Errors and failure handling
 
 A response MAY carry a JSON-RPC `error`: `-32700` malformed input (the plugin
@@ -544,3 +590,20 @@ Rust with a notice.
   expressions) with an example; `include!` has a notice of its own. Attribute macros and derives leave the item as
   written. A file whose header comment says `@generated` or `DO NOT EDIT` has
   `generated` set.
+
+## `model-http`
+
+Models behind the standard HTTP APIs, as a provider in `lighthouse.toml`
+(`spec = "openai"` or a list such as `["openai", "typesafe"]`, `baseUrl`, `keyEnv`; see
+[rule-pipeline.md](rule-pipeline.md#models)). Each operation uses the spec that covers it:
+classification uses `typesafe` when listed, else `openai`.
+
+For `typesafe`, the System One body is forwarded as it is to `POST {baseUrl}/v1/systemone` with `Authorization: Bearer <key>` (https://docs.typesafe.ai/api), and its answer is read as it comes.
+
+For `openai`, each question is rendered as a prompt that asks for the probability of yes, and
+sent to `{baseUrl}/chat/completions` with `Authorization: Bearer <key>`, `temperature` 0 and
+`response_format` of type `json_schema` (strict, `{noul}`). A service that refuses
+`response_format` (HTTP 400, 404 or 422) is asked again without it and its text is parsed as
+strict JSON, in a fenced block too. Text that does not fit is no answer: the subject stays for
+review. The API shapes are those of OpenAI's Chat Completions as documented by OpenRouter
+(https://openrouter.ai/docs/quickstart, https://openrouter.ai/docs/features/structured-outputs).

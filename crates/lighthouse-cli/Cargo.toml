@@ -19,10 +19,13 @@ test = false
 [dev-dependencies]
 lighthouse-engine.workspace = true
 lighthouse-model.workspace = true
+lighthouse-plugin.workspace = true
 lighthouse-resource.workspace = true
 lighthouse-rpc.workspace = true
 lighthouse-spec.workspace = true
+lighthouse-store.workspace = true
 serde_norway.workspace = true
+sha2.workspace = true
 toml.workspace = true
 assert_cmd.workspace = true
 predicates = "3"

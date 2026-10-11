@@ -4,16 +4,23 @@
 //! the agent skill. The CLI, the MCP server and
 //! the agent hooks only parse their own input and print the results of these.
 
+mod assemble;
 mod authoring;
 mod cache;
 mod check;
+mod dataset;
 mod decisions;
 mod docs;
+pub mod evaluate;
 mod findings;
 mod fix;
 mod git;
+pub mod labels;
+pub mod learn;
+pub mod metrics;
 mod project;
 mod reviewing;
+mod samples;
 mod schema;
 mod scope;
 mod skill;
@@ -24,7 +31,7 @@ use std::error::Error;
 
 pub use authoring::{Authored, create_decision, update_decision};
 pub use cache::{LIMIT_VAR, cache_dir, clean_cache};
-pub use check::{CheckRequest, Checked, RunStatus, Summary, check};
+pub use check::{CheckRequest, Checked, ModelFlags, RunStatus, Summary, check};
 pub use decisions::{
     DecisionRow, DecisionTest, active_decisions, bundled_decision_rows, catalog_index,
     decision_rows, decision_text, explain, explain_bundled, test_decisions,

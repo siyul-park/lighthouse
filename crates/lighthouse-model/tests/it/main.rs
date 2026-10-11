@@ -1,6 +1,7 @@
 //! The code model and the finding identity, one binary.
 
 mod annotation;
+mod canonical;
 mod fingerprint;
 mod fix;
 mod hash;

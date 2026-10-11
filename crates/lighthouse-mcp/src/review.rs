@@ -108,10 +108,7 @@ pub fn resolve(args: ResolveArgs, reviewer: &str) -> Outcome {
         judgment,
         reason: args.reason,
         suppress: args.suppress.map(|s| s.justification),
-        attribution: Attribution {
-            kind: AgentKind::SoftwareAgent,
-            id: Some(reviewer.to_owned()),
-        },
+        attribution: Attribution::new(AgentKind::SoftwareAgent, Some(reviewer.to_owned())),
         commit: head(&root),
         expect_seen: args.seen,
         lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),

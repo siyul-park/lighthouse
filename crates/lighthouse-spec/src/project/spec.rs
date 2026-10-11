@@ -8,7 +8,7 @@ use lighthouse_resource::Spec;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{formatter::FormatterSpec, rules::RuleSetting};
+use super::{formatter::FormatterSpec, models::ModelsSpec, rules::RuleSetting};
 
 /// A project's configuration, and the shape of a shareable one: `extends`
 /// names any project, the way an ESLint config extends a shareable config.
@@ -36,6 +36,9 @@ pub struct ProjectSpec {
     /// Rules that apply to some files or languages only, after `rules`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub overrides: Vec<OverrideSpec>,
+    /// The models that judge the decisions rules cannot prove.
+    #[serde(default, skip_serializing_if = "ModelsSpec::is_empty")]
+    pub models: ModelsSpec,
     /// Which files are generated code, beyond what the providers and
     /// `.gitattributes` say, and whether it is checked.
     #[serde(default, skip_serializing_if = "GeneratedSpec::is_empty")]

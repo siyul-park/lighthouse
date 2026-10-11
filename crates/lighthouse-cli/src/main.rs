@@ -13,6 +13,7 @@ mod check;
 mod decisions;
 mod docs;
 mod hook;
+mod models;
 mod review;
 mod setup;
 mod spec;
@@ -131,9 +132,36 @@ enum Command {
         /// suggested.
         #[arg(long, requires = "fix", value_name = "ID")]
         fixer: Option<String>,
+        /// Ask no model: what they would judge is left to review. CI can
+        /// choose this.
+        #[arg(long)]
+        no_models: bool,
+        /// Ask models that cost about the whole project, not only the files
+        /// the run reports.
+        #[arg(long)]
+        all_models: bool,
+        /// Record what models fail as judgments attributed to them, so that
+        /// training can reproduce them from `decisions.jsonl`.
+        #[arg(long)]
+        record_model_labels: bool,
         /// Use this config file; the project root is then the current directory.
         #[arg(long)]
         config: Option<PathBuf>,
+    },
+    /// Measure a decision's check against its labels: precision, FPR,
+    /// recall, FNR, selector precision, coverage and abstention, with Wilson
+    /// 95% intervals; and, with --check, a candidate check beside it.
+    Eval {
+        #[command(flatten)]
+        args: models::EvalArgs,
+        /// text or json.
+        #[arg(long, default_value = "text")]
+        format: models::Output,
+    },
+    /// Learn from labels.
+    Learn {
+        #[command(subcommand)]
+        command: models::LearnCommand,
     },
     /// Manage the result cache in `.lighthouse/cache`.
     Cache {
@@ -332,6 +360,9 @@ fn run(cli: Cli) -> Result<u8> {
             dry_run,
             unsafe_fixes,
             fixer,
+            no_models,
+            all_models,
+            record_model_labels,
             config,
         } => check::run(
             &check::Scope {
@@ -344,6 +375,12 @@ fn run(cli: Cli) -> Result<u8> {
                 config: config.as_deref(),
                 store: !no_store,
                 cache: !no_cache,
+                models: lighthouse_session::ModelFlags {
+                    off: no_models,
+                    all: all_models,
+                    record: record_model_labels,
+                    collect: false,
+                },
             },
             &check::Output {
                 format,
@@ -362,6 +399,8 @@ fn run(cli: Cli) -> Result<u8> {
                 fixer,
             }),
         ),
+        Command::Eval { args, format } => models::evaluate(args, format),
+        Command::Learn { command } => models::learn(command),
         Command::Cache {
             command: CacheCommand::Clean,
         } => cache_clean(),

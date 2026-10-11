@@ -41,10 +41,7 @@ impl Reviewer {
 
     /// The reviewer as a record attributes a judgment.
     pub fn attribution(&self) -> Attribution {
-        Attribution {
-            kind: self.kind,
-            id: self.id.clone(),
-        }
+        Attribution::new(self.kind, self.id.clone())
     }
 }
 

@@ -204,6 +204,7 @@ impl Engine {
                     memo,
                     notices: &Notices::default(),
                     applies: Applicability::default(),
+                    models: &lighthouse_plugin::NoModels,
                 };
                 let fact = analyzer.run(&ctx)?;
                 facts.insert((analyzer.manifest().id.clone(), key), fact);
@@ -288,6 +289,7 @@ impl Engine {
                 memo: scene.memo,
                 notices: &notices,
                 applies,
+                models: scene.models,
             };
             let started = Instant::now();
             let checked = self.run_rule(scene, *rule, &ctx, &config.options);
@@ -299,10 +301,18 @@ impl Engine {
                 Some(&input.file.path),
                 &mut gathered.incomplete,
             )?;
-            gathered.found.extend(found.into_iter().map(|mut d| {
-                d.severity = level;
-                d
-            }));
+            gathered
+                .found
+                .extend(found.into_iter().map(|d| leveled(d, level)));
+        }
+        // The models answer what the file's rules queued, all at once.
+        for (rule, found) in scene.models.flush(&input.file.path.to_string_lossy()) {
+            let Some(level) = resolved.get(&rule).and_then(|config| config.level) else {
+                continue;
+            };
+            gathered
+                .found
+                .extend(found.into_iter().map(|d| answered(d, level)));
         }
         Ok(gathered)
     }
@@ -364,16 +374,16 @@ impl Engine {
             memo: scene.memo,
             notices: &notices,
             applies: self.applies(meta.applicability, config),
+            models: scene.models,
         };
         let started = Instant::now();
         let checked = self.run_rule(scene, rule, &ctx, &config.options);
         gathered.notices.extend(notices.take());
         *gathered.spent.entry(meta.id.clone()).or_default() += started.elapsed();
         let found = unfinished(checked, &meta.id, None, &mut gathered.incomplete)?;
-        gathered.found.extend(found.into_iter().map(|mut d| {
-            d.severity = level;
-            d
-        }));
+        gathered
+            .found
+            .extend(found.into_iter().map(|d| leveled(d, level)));
         Ok(gathered)
     }
 }
@@ -392,6 +402,26 @@ impl Engine {
             ..declared
         }
     }
+}
+
+/// A finding at the level the configuration gives its rule; a subject nothing
+/// decided is only `info`.
+fn leveled(mut d: Diagnostic, level: Severity) -> Diagnostic {
+    d.severity = if d.review.is_some() {
+        Severity::Info
+    } else {
+        level
+    };
+    d
+}
+
+/// A finding that came from a model's answer: it is not worth an `error`.
+fn answered(d: Diagnostic, level: Severity) -> Diagnostic {
+    let level = match level {
+        Severity::Error => Severity::Warn,
+        other => other,
+    };
+    leveled(d, level)
 }
 
 /// What a rule found, or nothing and a gap when it could not finish: the gap

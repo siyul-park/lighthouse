@@ -40,7 +40,7 @@ const SNAPSHOT_VERSION: u32 = 2;
 
 const JUDGMENT_COLUMNS: &str = "judgment_id, fingerprint, rule_id, decision_uid, meaning_version, \
      check_revision, decision_hash, catalog_version, lighthouse_version, judgment, reason, \
-     agent_type, agent_id, language, scope, evidence_digest, feature_snapshot, git_commit, \
+     agent_type, agent_id, agent_role, language, scope, evidence_digest, feature_snapshot, git_commit, \
      generated_at";
 
 /// Most fingerprints an ambiguous prefix error lists.

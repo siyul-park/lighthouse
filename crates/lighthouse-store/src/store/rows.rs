@@ -3,7 +3,7 @@
 
 use std::{collections::BTreeMap, path::Path};
 
-use lighthouse_model::{Attribution, Judgment, Severity};
+use lighthouse_model::{Attribution, Judgment, Role, Severity};
 use rusqlite::{
     Connection, OptionalExtension, Row, Transaction, named_params, params, types::Type,
 };
@@ -93,7 +93,7 @@ pub(super) fn judgments_of(
 pub(super) fn suppressions_of(conn: &Connection) -> Result<Vec<LoggedSuppression>, Error> {
     let mut stmt = conn.prepare(
         "SELECT suppression_id, judgment_id, fingerprint, kind, status, justification, \
-             agent_type, agent_id, generated_at FROM suppressions \
+             agent_type, agent_id, agent_role, generated_at FROM suppressions \
          ORDER BY generated_at, suppression_id",
     )?;
     let rows = stmt.query_map([], |row| {
@@ -108,8 +108,9 @@ pub(super) fn suppressions_of(conn: &Connection) -> Result<Vec<LoggedSuppression
                 was_attributed_to: Attribution {
                     kind: parse(&row.get::<_, String>(6)?)?,
                     id: row.get(7)?,
+                    role: role_of(row.get(8)?)?,
                 },
-                generated_at_time: row.get(8)?,
+                generated_at_time: row.get(9)?,
             },
         })
     })?;
@@ -195,10 +196,10 @@ pub(super) fn insert_judgment(tx: &Transaction, event: &JudgmentEvent) -> Result
     tx.execute(
         "INSERT OR IGNORE INTO judgments (judgment_id, fingerprint, rule_id, decision_uid, \
              meaning_version, check_revision, decision_hash, catalog_version, lighthouse_version, \
-             judgment, reason, agent_type, agent_id, language, scope, evidence_digest, \
+             judgment, reason, agent_type, agent_id, agent_role, language, scope, evidence_digest, \
              feature_snapshot, git_commit, generated_at) \
          VALUES (:id, :fingerprint, :rule_id, :decision_uid, :meaning_version, :check_revision, \
-             :decision_hash, :catalog, :version, :judgment, :reason, :agent_type, :agent_id, \
+             :decision_hash, :catalog, :version, :judgment, :reason, :agent_type, :agent_id, :agent_role, \
              :language, :scope, :digest, :snapshot, :commit, :generated_at)",
         named_params! {
             ":id": event.id,
@@ -214,6 +215,7 @@ pub(super) fn insert_judgment(tx: &Transaction, event: &JudgmentEvent) -> Result
             ":reason": event.reason,
             ":agent_type": event.was_attributed_to.kind.as_str(),
             ":agent_id": event.was_attributed_to.id,
+            ":agent_role": event.was_attributed_to.role.map(Role::as_str),
             ":language": event.language,
             ":scope": event.scope,
             ":digest": event.evidence_digest,
@@ -228,8 +230,8 @@ pub(super) fn insert_judgment(tx: &Transaction, event: &JudgmentEvent) -> Result
 pub(super) fn insert_suppression(tx: &Transaction, s: &LoggedSuppression) -> Result<(), Error> {
     tx.execute(
         "INSERT OR IGNORE INTO suppressions (suppression_id, judgment_id, fingerprint, kind, \
-             status, justification, agent_type, agent_id, generated_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+             status, justification, agent_type, agent_id, agent_role, generated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
             s.event.id,
             s.judgment,
@@ -239,6 +241,7 @@ pub(super) fn insert_suppression(tx: &Transaction, s: &LoggedSuppression) -> Res
             s.event.justification,
             s.event.was_attributed_to.kind.as_str(),
             s.event.was_attributed_to.id,
+            s.event.was_attributed_to.role.map(Role::as_str),
             s.event.generated_at_time,
         ],
     )?;
@@ -304,6 +307,7 @@ pub(super) fn judgment_event(row: &Row) -> rusqlite::Result<JudgmentEvent> {
         was_attributed_to: Attribution {
             kind: parse(&row.get::<_, String>("agent_type")?)?,
             id: row.get("agent_id")?,
+            role: role_of(row.get("agent_role")?)?,
         },
         generated_at_time: row.get("generated_at")?,
         language: row.get("language")?,
@@ -340,4 +344,8 @@ pub(super) fn io(path: &Path, source: std::io::Error) -> Error {
         path: path.display().to_string(),
         source,
     }
+}
+
+fn role_of(text: Option<String>) -> rusqlite::Result<Option<Role>> {
+    text.map(|text| parse(&text)).transpose()
 }

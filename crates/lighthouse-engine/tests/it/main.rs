@@ -5,6 +5,7 @@ mod engine;
 mod fix;
 mod fix_safety;
 mod fix_write;
+mod models;
 mod preview;
 mod scope;
 mod support;

@@ -1,8 +1,8 @@
 use std::io::Cursor;
 
 use lighthouse_protocol::{
-    EXIT, Handler, INDEX, INITIALIZE, IndexParams, IndexResult, InitializeParams, InitializeResult,
-    Message, SHUTDOWN, ServeError, read_message, serve, write_message,
+    EXIT, Handler, HandlerError, INDEX, INITIALIZE, IndexParams, IndexResult, InitializeParams,
+    InitializeResult, Message, SHUTDOWN, ServeError, read_message, serve, write_message,
 };
 use serde_json::{Value, json};
 
@@ -11,20 +11,21 @@ struct Stub {
 }
 
 impl Handler for Stub {
-    fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, String> {
+    fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, HandlerError> {
         Ok(InitializeResult {
             id: params.root,
             version: "1".to_owned(),
             protocol_version: params.protocol_version,
             languages: Vec::new(),
+            models: lighthouse_protocol::ModelList::default(),
         })
     }
 
-    fn index(&mut self, _: IndexParams) -> Result<IndexResult, String> {
+    fn index(&mut self, _: IndexParams) -> Result<IndexResult, HandlerError> {
         if self.panic {
             panic!("boom");
         }
-        Err("no index".to_owned())
+        Err("no index".into())
     }
 }
 
@@ -102,4 +103,20 @@ fn serve_survives_a_panicking_handler_and_reports_bad_input() {
     assert!(matches!(closed, Err(ServeError::Frame(_))));
     let closed = serve(input(&[]), Vec::new(), &mut Stub { panic: false });
     assert!(matches!(closed, Err(ServeError::Closed)));
+}
+
+#[test]
+fn handler_error_keeps_the_body_beside_the_message() {
+    let body = json!({ "error": { "message": "no" } });
+    let error = HandlerError::with_data("the service answered 400", body.clone());
+    assert_eq!(error.message, "the service answered 400");
+    assert_eq!(error.data, Some(body));
+    assert_eq!(HandlerError::from("plain".to_owned()).data, None);
+}
+
+#[test]
+fn with_data_is_what_a_handler_returns_for_an_api_error() {
+    let body = json!({ "error": { "message": "no" } });
+    let error = HandlerError::with_data("m", body.clone());
+    assert_eq!(error.data.as_ref(), Some(&body));
 }

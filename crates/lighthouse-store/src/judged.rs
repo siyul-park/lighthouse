@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_model::{AgentKind, Judgment, Severity};
+use lighthouse_model::{Attribution, Judgment, Severity};
 use rusqlite::Connection;
 
 use crate::{Error, Ruling, Standing, Subject};
@@ -42,7 +42,7 @@ impl Judged {
         let mut found: BTreeMap<String, Vec<Candidate>> = BTreeMap::new();
         let mut stmt = conn.prepare(
             "SELECT judgment_id, fingerprint, judgment, meaning_version, evidence_digest, \
-                 agent_type, generated_at FROM judgments",
+                 agent_type, agent_id, agent_role, generated_at FROM judgments",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok((
@@ -52,15 +52,23 @@ impl Judged {
                 row.get::<_, Option<String>>(3)?,
                 row.get::<_, Option<String>>(4)?,
                 row.get::<_, String>(5)?,
-                row.get::<_, String>(6)?,
+                row.get::<_, Option<String>>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, String>(8)?,
             ))
         })?;
         for row in rows {
-            let (id, fingerprint, judgment, meaning_version, evidence_digest, agent, at) = row?;
+            let (id, fingerprint, judgment, meaning_version, evidence_digest, kind, who, role, at) =
+                row?;
+            let attribution = Attribution {
+                kind: kind.parse().map_err(invalid)?,
+                id: who,
+                role: role.map(|role| role.parse()).transpose().map_err(invalid)?,
+            };
             let accepted = suppressions.get(&id);
             let candidate = Candidate {
                 judgment: judgment.parse().map_err(invalid)?,
-                strength: agent.parse::<AgentKind>().map_err(invalid)?.strength(),
+                strength: attribution.strength(),
                 suppressed: accepted.is_some(),
                 justification: accepted.cloned().flatten(),
                 id,

@@ -109,6 +109,9 @@ struct RuleProperties<'a> {
 struct SarifResult<'a> {
     rule_id: &'a str,
     rule_index: usize,
+    /// `review` for a subject nothing decided; absent for a finding (`fail`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<&'static str>,
     level: &'static str,
     message: Message<'a>,
     locations: [Location; 1],
@@ -325,7 +328,13 @@ fn result<'a>(
             .iter()
             .position(|r| *r == d.rule_id)
             .expect("every result's rule is in the driver's rules"),
-        level: level(d.severity),
+        kind: d.review.as_ref().map(|_| "review"),
+        // SARIF: a result of any kind but `fail` has level `none`.
+        level: if d.review.is_some() {
+            "none"
+        } else {
+            level(d.severity)
+        },
         message: Message { text: &d.message },
         locations: [Location {
             physical_location: Physical {

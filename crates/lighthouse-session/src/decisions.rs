@@ -224,7 +224,10 @@ fn status(decision: &Decision, registry: &Registry) -> &'static str {
     if decision.check.is_some() && !decision.status.enforced() {
         // Written down, tested, not enforced.
         "not-enforced"
-    } else if registry.rule(decision.id()).is_some() {
+    } else if registry.rule(decision.id()).is_some()
+        && decision.check.is_some() == decision.automated()
+    {
+        // A model check has a rule too, but a model judges it: it stays `judged`.
         "implemented"
     } else if decision.check.is_none() {
         "doc"

@@ -187,6 +187,14 @@ fn commands(config: &Config, catalog: &Catalog) -> Vec<Command> {
             argv: f.argv.clone(),
         })
         .collect();
+    for (name, provider) in &config.models().providers {
+        if let lighthouse_spec::ModelProvider::Command { argv, .. } = provider {
+            found.push(Command {
+                what: format!("model provider {name}: {}", argv.join(" ")),
+                argv: argv.clone(),
+            });
+        }
+    }
     for decision in catalog.decisions() {
         if let Some(check) = &decision.check
             && let CheckKind::Command(command) = &check.kind

@@ -2,5 +2,6 @@
 
 mod fixes;
 mod log;
+mod revisions;
 mod store;
 mod support;

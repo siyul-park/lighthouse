@@ -38,7 +38,7 @@ pub struct InitializeParams {
 
 /// A plugin's answer to `initialize`: who it is, which protocol it speaks, and
 /// the languages it indexes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InitializeResult {
     /// Plugin id; must equal the `id` of its `lighthouse-plugin.toml`.
@@ -47,6 +47,10 @@ pub struct InitializeResult {
     /// Must equal the host's protocol version.
     pub protocol_version: String,
     pub languages: Vec<ProviderManifest>,
+    /// The models the plugin offers, as OpenAI's list object; empty for a
+    /// language plugin.
+    #[serde(default, skip_serializing_if = "crate::ModelList::is_empty")]
+    pub models: crate::ModelList,
 }
 
 /// What a language provider declares: the language it indexes, how the host

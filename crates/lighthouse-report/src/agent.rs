@@ -108,6 +108,9 @@ impl Briefing<'_> {
         let decision = self
             .catalog
             .and_then(|catalog| catalog.decision(&diagnostic.rule_id));
+        if diagnostic.review.is_some() {
+            return true;
+        }
         let judged = self
             .judged
             .is_some_and(|judged| judged.contains(&diagnostic.fingerprint));
@@ -281,7 +284,10 @@ fn entries<'a>(diagnostics: &[Diagnostic], briefing: &Briefing<'a>) -> Vec<Entry
                 symbol: d.symbol.clone(),
                 evidence: d.evidence.clone(),
                 attributes: Map::new(),
-                note: briefing.notes.and_then(|n| n.get(&d.fingerprint)).cloned(),
+                note: d
+                    .review
+                    .clone()
+                    .or_else(|| briefing.notes.and_then(|n| n.get(&d.fingerprint)).cloned()),
                 fingerprint: d.fingerprint.as_str().to_owned(),
                 facts: briefing.facts.and_then(|f| f.get(&d.fingerprint)).cloned(),
                 fix: briefing.fixes.and_then(|f| f.get(d.fingerprint.as_str())),
@@ -329,6 +335,8 @@ fn compact_fields(
         "incomplete"
     } else if diagnostics.is_empty() {
         "clean"
+    } else if diagnostics.iter().all(|d| d.review.is_some()) {
+        "review"
     } else {
         "findings"
     };
@@ -347,7 +355,7 @@ fn compact_fields(
 /// Errors, warnings and findings asking for review always; the other
 /// counts when they are not zero.
 fn counts(diagnostics: &[Diagnostic], briefing: &Briefing) -> Value {
-    let count = |s: Severity| diagnostics.iter().filter(|d| d.severity == s).count();
+    let count = |s: Severity| severity_count(diagnostics, s);
     let reviews = diagnostics
         .iter()
         .filter(|d| briefing.needs_review(d))
@@ -413,7 +421,7 @@ fn full_json_lines(
     if report.omitted > 0 {
         lines.push(json!({ "type": "truncated", "omitted": report.omitted }).to_string());
     }
-    let count = |s: Severity| diagnostics.iter().filter(|d| d.severity == s).count();
+    let count = |s: Severity| severity_count(diagnostics, s);
     let mut summary = json!({
         "type": "summary",
         "errors": count(Severity::Error),
@@ -469,7 +477,11 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
         .and_then(|facts| facts.get(&diagnostic.fingerprint));
     let subject = Subject::of(facts);
     Finding {
-        kind: "finding",
+        kind: if diagnostic.review.is_some() {
+            "review"
+        } else {
+            "finding"
+        },
         rule: &diagnostic.rule_id,
         severity: diagnostic.severity,
         authored: authored_severity(diagnostic.severity, decision),
@@ -485,10 +497,12 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
         context: decision.map(|d| one_line(&d.context)),
         evidence: evidence(&diagnostic.evidence, diagnostic.symbol.as_deref()),
         expected: decision.and_then(|d| expected(d, &subject, &diagnostic.file)),
-        note: briefing
-            .notes
-            .and_then(|notes| notes.get(&diagnostic.fingerprint))
-            .cloned(),
+        note: diagnostic.review.clone().or_else(|| {
+            briefing
+                .notes
+                .and_then(|notes| notes.get(&diagnostic.fingerprint))
+                .cloned()
+        }),
         fingerprint: diagnostic.fingerprint.as_str(),
         fix: briefing
             .fixes
@@ -592,12 +606,21 @@ fn incomplete_line(item: &Incomplete) -> String {
     }
 }
 
+/// How many findings have this severity; a subject left to review is no
+/// finding.
+fn severity_count(diagnostics: &[Diagnostic], severity: Severity) -> usize {
+    diagnostics
+        .iter()
+        .filter(|d| d.review.is_none() && d.severity == severity)
+        .count()
+}
+
 fn summary_line(
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
     briefing: &Briefing,
 ) -> String {
-    let count = |s: Severity| diagnostics.iter().filter(|d| d.severity == s).count();
+    let count = |s: Severity| severity_count(diagnostics, s);
     let reviews = diagnostics
         .iter()
         .filter(|d| briefing.needs_review(d))
