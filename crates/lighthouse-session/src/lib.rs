@@ -52,8 +52,8 @@ pub use lighthouse_store::{
 pub use models::{Binding, BoundModel, bound_models, remote_bound};
 pub use project::{DEFAULT_CONFIG, Session, catalog_at, config_file, project_root};
 pub use reviewing::{
-    Recorded, TaskQuery, Tasks, attribute_to, person, record_judgment, review_finding, review_history,
-    review_prune, review_tasks,
+    Recorded, TaskQuery, Tasks, attribute_to, person, record_judgment, review_finding,
+    review_history, review_prune, review_tasks,
 };
 pub use schema::{schema_of, schemas};
 pub use scope::{changed, since};

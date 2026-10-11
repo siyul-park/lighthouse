@@ -9,13 +9,15 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::{
-    Result, check, cli, decision, eval, fix, model, review,
+    Result,
     args::{
         CheckArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs, DecisionTestArgs,
         DocumentArgs, FingerprintArgs, FixArgs, ModelListArgs, ModelTrainArgs, ReviewListArgs,
         ReviewResolveArgs,
     },
+    check, cli, decision, eval, fix, model,
     reply::{CheckFormat, Context, Output, Reply},
+    review,
 };
 
 /// What the tool `fix` is: the twin of `check --fix`, as its own tool because
@@ -95,8 +97,20 @@ pub const TOOLS: [Tool; 14] = [
         },
         schema::<FixArgs>,
     ),
-    tool("decision_list", &["decision", "list"], "DecisionList", READ, schema::<DecisionListArgs>),
-    tool("decision_show", &["decision", "show"], "DecisionShow", READ, schema::<DecisionShowArgs>),
+    tool(
+        "decision_list",
+        &["decision", "list"],
+        "DecisionList",
+        READ,
+        schema::<DecisionListArgs>,
+    ),
+    tool(
+        "decision_show",
+        &["decision", "show"],
+        "DecisionShow",
+        READ,
+        schema::<DecisionShowArgs>,
+    ),
     tool(
         "decision_create",
         &["decision", "create"],
@@ -121,7 +135,13 @@ pub const TOOLS: [Tool; 14] = [
         },
         schema::<DocumentArgs>,
     ),
-    tool("decision_test", &["decision", "test"], "TestReport", READ, schema::<DecisionTestArgs>),
+    tool(
+        "decision_test",
+        &["decision", "test"],
+        "TestReport",
+        READ,
+        schema::<DecisionTestArgs>,
+    ),
     tool(
         "decision_eval",
         &["decision", "eval"],
@@ -132,8 +152,20 @@ pub const TOOLS: [Tool; 14] = [
         },
         schema::<DecisionEvalArgs>,
     ),
-    tool("review_list", &["review", "list"], "ReviewList", READ, schema::<ReviewListArgs>),
-    tool("review_show", &["review", "show"], "Finding", READ, schema::<FingerprintArgs>),
+    tool(
+        "review_list",
+        &["review", "list"],
+        "ReviewList",
+        READ,
+        schema::<ReviewListArgs>,
+    ),
+    tool(
+        "review_show",
+        &["review", "show"],
+        "Finding",
+        READ,
+        schema::<FingerprintArgs>,
+    ),
     tool(
         "review_resolve",
         &["review", "resolve"],
@@ -146,8 +178,20 @@ pub const TOOLS: [Tool; 14] = [
         },
         schema::<ReviewResolveArgs>,
     ),
-    tool("review_history", &["review", "history"], "JudgmentHistory", READ, schema::<FingerprintArgs>),
-    tool("model_list", &["model", "list"], "ModelList", READ, schema::<ModelListArgs>),
+    tool(
+        "review_history",
+        &["review", "history"],
+        "JudgmentHistory",
+        READ,
+        schema::<FingerprintArgs>,
+    ),
+    tool(
+        "model_list",
+        &["model", "list"],
+        "ModelList",
+        READ,
+        schema::<ModelListArgs>,
+    ),
     tool(
         "model_train",
         &["model", "train"],
@@ -193,11 +237,12 @@ pub fn schema<T: JsonSchema>() -> Value {
     let generator = SchemaSettings::draft2020_12()
         .with(|settings| settings.inline_subschemas = true)
         .into_generator();
-    let mut schema = serde_json::to_value(generator.into_root_schema_for::<T>())
-        .expect("a schema serializes");
+    let mut schema =
+        serde_json::to_value(generator.into_root_schema_for::<T>()).expect("a schema serializes");
     if let Some(map) = schema.as_object_mut() {
         map.remove("$schema");
         map.remove("title");
+        map.insert("additionalProperties".to_owned(), Value::Bool(false));
     }
     schema
 }
@@ -217,6 +262,7 @@ fn dispatch(ctx: &Context, tool: &Tool, arguments: Value) -> Result<Reply> {
         arguments
     };
     known_keys(tool, &arguments)?;
+    let arguments = with_env(tool, arguments);
     let json = Output::Json;
     match tool.name {
         "check" => check::run(
@@ -233,9 +279,12 @@ fn dispatch(ctx: &Context, tool: &Tool, arguments: Value) -> Result<Reply> {
         "decision_create" => {
             decision::author(ctx, &parse::<DocumentArgs>(arguments)?.document, true, json)
         }
-        "decision_update" => {
-            decision::author(ctx, &parse::<DocumentArgs>(arguments)?.document, false, json)
-        }
+        "decision_update" => decision::author(
+            ctx,
+            &parse::<DocumentArgs>(arguments)?.document,
+            false,
+            json,
+        ),
         "decision_test" => decision::test(ctx, &parse(arguments)?, json),
         "decision_eval" => eval::run(ctx, &parse(arguments)?, json),
         "review_list" => review::list(&parse(arguments)?, json),
@@ -246,6 +295,44 @@ fn dispatch(ctx: &Context, tool: &Tool, arguments: Value) -> Result<Reply> {
         "model_train" => model::train_model(ctx, &parse(arguments)?, json),
         other => Err(format!("unknown tool `{other}`").into()),
     }
+}
+
+/// The long flag `--attributed-to` as the argument `attributedTo`.
+pub fn camel_case(flag: &str) -> String {
+    let mut name = String::new();
+    for (n, word) in flag.split('-').enumerate() {
+        if n == 0 {
+            name.push_str(word);
+        } else {
+            let mut letters = word.chars();
+            name.extend(letters.next().map(|c| c.to_ascii_uppercase()));
+            name.push_str(letters.as_str());
+        }
+    }
+    name
+}
+
+/// The arguments with those the caller left out filled from the environment
+/// variables the flags of the command read (`LIGHTHOUSE_ATTRIBUTED_TO`), so
+/// that a tool has the defaults of its command.
+fn with_env(tool: &Tool, mut arguments: Value) -> Value {
+    let schema = tool.input_schema();
+    let command = cli::command_at(tool.path);
+    let Some(given) = arguments.as_object_mut() else {
+        return arguments;
+    };
+    for arg in command.get_arguments() {
+        let (Some(long), Some(env)) = (arg.get_long(), arg.get_env()) else {
+            continue;
+        };
+        let name = camel_case(long);
+        let text = schema["properties"][&name]["type"] == "string";
+        let value = std::env::var(env).ok().filter(|value| !value.is_empty());
+        if let (true, Some(value), false) = (text, value, given.contains_key(&name)) {
+            given.insert(name, Value::String(value));
+        }
+    }
+    arguments
 }
 
 /// Refuses an argument the tool does not have, naming it: the structs that

@@ -5,9 +5,8 @@ use std::fmt::Write;
 
 use lighthouse_report::{Entry, GroupOptions, Grouped};
 use lighthouse_session::{
-    FindingRecord, JudgmentEvent, NewJudgment, Standing, TaskQuery, catalog_at, head,
-    long_enough, project_root, record_judgment, review_finding, review_history, review_prune,
-    review_tasks,
+    FindingRecord, JudgmentEvent, NewJudgment, Standing, TaskQuery, catalog_at, head, long_enough,
+    project_root, record_judgment, review_finding, review_history, review_prune, review_tasks,
 };
 use serde_json::{Map, Value, json};
 
@@ -38,7 +37,8 @@ pub fn list(args: &ReviewListArgs, output: Output) -> Result<Reply> {
             Detail::Full => "tasks",
         };
         let value = json!({ empty: [], "note": "no findings recorded yet: run `check` first" });
-        let notes = vec!["lighthouse: no findings recorded yet (run `lighthouse check`)".to_owned()];
+        let notes =
+            vec!["lighthouse: no findings recorded yet (run `lighthouse check`)".to_owned()];
         let reply = match output {
             Output::Json => Reply::json(value)?,
             Output::Text => Reply::default(),

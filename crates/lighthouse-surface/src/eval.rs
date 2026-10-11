@@ -44,10 +44,7 @@ pub fn run(ctx: &Context, args: &DecisionEvalArgs, output: Output) -> Result<Rep
     let report = eval(&EvalRequest {
         decision: args.id.clone(),
         repos: repos_of(ctx, &args.repo)?,
-        baseline: args
-            .baseline
-            .clone()
-            .or_else(|| default_baseline(&args.id)),
+        baseline: args.baseline.clone().or_else(|| default_baseline(&args.id)),
         candidate: args.check.clone(),
         config: ctx.config.clone(),
         audit: args.audit,

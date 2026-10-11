@@ -11,8 +11,8 @@ mod list;
 mod model;
 pub mod reply;
 mod review;
-pub mod tools;
 mod timings;
+pub mod tools;
 
 pub use cli::{Action, run};
 pub use reply::{Caller, Context, Reply};

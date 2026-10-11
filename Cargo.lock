@@ -328,6 +328,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap_complete"
+version = "4.6.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "037e2a1a92236d0aff7e845093f64661d6df4c02c9fcc61a60e9e1d736fa392f"
+dependencies = [
+ "clap",
+]
+
+[[package]]
 name = "clap_derive"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1469,6 +1478,7 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "clap",
+ "clap_complete",
  "lighthouse-engine",
  "lighthouse-mcp",
  "lighthouse-model",
@@ -1479,6 +1489,7 @@ dependencies = [
  "lighthouse-session",
  "lighthouse-spec",
  "lighthouse-store",
+ "lighthouse-surface",
  "lighthouse-test-support",
  "predicates",
  "serde_json",
@@ -1514,12 +1525,10 @@ dependencies = [
 name = "lighthouse-mcp"
 version = "0.1.0"
 dependencies = [
- "lighthouse-report",
  "lighthouse-session",
+ "lighthouse-surface",
  "rmcp",
- "serde",
  "serde_json",
- "serde_norway",
  "tokio",
 ]
 

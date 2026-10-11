@@ -1,432 +1,66 @@
 use std::{
-    env, fs,
-    path::{Path, PathBuf},
+    env,
+    ffi::OsString,
+    io::{self, Write},
     process::ExitCode,
 };
 
-use clap::{Parser, Subcommand, ValueEnum};
-use lighthouse_report::{Detail, Format};
-use lighthouse_session::{DEFAULT_CONFIG, FILE_NAME, FailOn, Session};
-use review::ReviewCommand;
+use clap::{CommandFactory, FromArgMatches};
+use cli::{Cli, Command, DocsCommand, HookAgent, SpecCommand};
+use lighthouse_surface::{Context, Reply, reply::USAGE};
 
-mod check;
-mod decisions;
+mod cli;
+mod color;
 mod docs;
 mod hook;
-mod models;
-mod review;
+mod project;
+mod reference;
 mod setup;
 mod spec;
-mod timings;
-
-/// Where `docs generate` writes the agent skill.
-const SKILL_PATH: &str = "skills/lighthouse/SKILL.md";
-
-/// What `init` keeps out of version control: the store is a local cache of
-/// one machine's checks and reviews.
-const STORE_IGNORE: &str = ".lighthouse/*.db*";
-
-/// The decision log is committed; branches that both appended merge by
-/// keeping the lines of both.
-const LOG_ATTRIBUTES: &str = ".lighthouse/decisions.jsonl merge=union";
-
-/// Most findings of a SARIF report whose fix is previewed.
-const SARIF_FIXES: usize = 200;
-
-#[derive(Parser)]
-#[command(name = "lighthouse", version, about = "Design-quality linter")]
-struct Cli {
-    #[command(subcommand)]
-    command: Command,
-}
-
-#[derive(Subcommand)]
-enum Command {
-    /// Check the project and print diagnostics.
-    ///
-    /// PATHS select which diagnostics are reported, not what is analyzed: the
-    /// whole project is always analyzed, because rules and language providers
-    /// need more than the reported files (callers, packages, build context).
-    ///
-    /// Exit codes: 0 clean, 1 an error was found (or warnings fail the run:
-    /// --strict, --max-warnings; info never does), 2 usage or runtime error,
-    /// 3 the analysis was incomplete (a file could not be read or loaded, a
-    /// plugin crashed or timed out). "Not checked" is never "passed";
-    /// --allow-incomplete reports it but does not fail on it.
-    ///
-    /// Plugins named by the config are started and run with your privileges,
-    /// like build scripts: only check projects whose config you trust. A plugin
-    /// that cannot start, or that is not the protocol version or identity its
-    /// entry names, is an error (exit 2); one that starts but crashes, times out
-    /// or answers badly is reported as incomplete (exit 3).
-    Check {
-        /// Where to report diagnostics; the whole project is analyzed anyway.
-        /// Default: the whole project.
-        paths: Vec<PathBuf>,
-        /// Report only files changed in the working tree against HEAD
-        /// (modified, added, renamed, untracked). A report filter like PATHS:
-        /// the whole project is still analyzed.
-        #[arg(long, conflicts_with = "diff")]
-        changed: bool,
-        /// Report only files changed since the merge base of BASE and HEAD,
-        /// including the working tree and untracked files. A report filter.
-        #[arg(long, value_name = "BASE")]
-        diff: Option<String>,
-        /// text, json, sarif, agent (findings grouped for a coding agent) or
-        /// agent-json (the same groups as one JSON object).
-        #[arg(long, default_value = "text")]
-        format: Format,
-        /// Print at most this many findings, errors first, and say how many
-        /// were left out. Agent formats only.
-        #[arg(long)]
-        limit: Option<usize>,
-        /// compact (default): findings grouped by decision, then by file, a
-        /// decision's text said once. full: one self-contained record per
-        /// finding. Agent formats only.
-        #[arg(long, default_value = "compact")]
-        detail: Detail,
-        /// Do not record this run in `.lighthouse/lighthouse.db` and do not
-        /// apply judgments. By default a run is recorded: findings it
-        /// no longer reports in the reported scope are marked resolved (never
-        /// when the analysis was incomplete), and findings whose latest
-        /// judgment hides them stay out of the report.
-        #[arg(long)]
-        no_store: bool,
-        /// Run every rule instead of reusing the findings of earlier runs,
-        /// which are kept in `.lighthouse/cache`. The findings, their
-        /// fingerprints and the exit code are the same either way.
-        #[arg(long)]
-        no_cache: bool,
-        /// Fail on warnings too.
-        #[arg(long)]
-        strict: bool,
-        /// Fail when there are more than N warnings (errors always fail).
-        #[arg(long, value_name = "N")]
-        max_warnings: Option<usize>,
-        /// Exit by findings even when the analysis was incomplete; the
-        /// incompleteness is still printed.
-        #[arg(long)]
-        allow_incomplete: bool,
-        /// Run only these fully qualified rule ids.
-        #[arg(long, value_delimiter = ',')]
-        rules: Vec<String>,
-        /// Print where the time went to stderr, phase by phase: reading, each
-        /// language provider, merging, analyzers, the slowest rules, identity,
-        /// the store and the report. Findings and exit code do not change.
-        #[arg(long)]
-        timings: bool,
-        /// Fix what the catalog's fixers can fix, then report what is left.
-        /// Only safe fixes of mechanical rules are applied; each is verified
-        /// (formatted, re-checked) and a file that gets worse is rolled back.
-        /// PATHS and --rules select which findings are fixed.
-        #[arg(long)]
-        fix: bool,
-        /// With --fix: print the unified diff and leave every file as it was.
-        #[arg(long, requires = "fix")]
-        dry_run: bool,
-        /// With --fix: also apply suggested fixes.
-        #[arg(long, requires = "fix")]
-        unsafe_fixes: bool,
-        /// With --fix: use this registered fixer for the selected findings
-        /// instead of the one their decision names. Its fixes count as
-        /// suggested.
-        #[arg(long, requires = "fix", value_name = "ID")]
-        fixer: Option<String>,
-        /// Ask no model: what they would judge is left to review. CI can
-        /// choose this.
-        #[arg(long)]
-        no_models: bool,
-        /// Ask models that cost about the whole project, not only the files
-        /// the run reports.
-        #[arg(long)]
-        all_models: bool,
-        /// Record what models fail as judgments attributed to them, so that
-        /// training can reproduce them from `decisions.jsonl`.
-        #[arg(long)]
-        record_model_labels: bool,
-        /// Use this config file; the project root is then the current directory.
-        #[arg(long)]
-        config: Option<PathBuf>,
-    },
-    /// Measure a decision's check against its labels: precision, FPR,
-    /// recall, FNR, selector precision, coverage and abstention, with Wilson
-    /// 95% intervals; and, with --check, a candidate check beside it.
-    Eval {
-        #[command(flatten)]
-        args: models::EvalArgs,
-        /// text or json.
-        #[arg(long, default_value = "text")]
-        format: models::Output,
-    },
-    /// Learn from labels.
-    Learn {
-        #[command(subcommand)]
-        command: models::LearnCommand,
-    },
-    /// Manage the result cache in `.lighthouse/cache`.
-    Cache {
-        #[command(subcommand)]
-        command: CacheCommand,
-    },
-    /// Review the findings `check` remembers and record judgments on them.
-    ///
-    /// Exit codes of every subcommand: 0 on success, 2 on a usage or runtime
-    /// error (unknown or ambiguous fingerprint, a suppression that does not fit the
-    /// judgment, a finding seen again since --seen, an unusable store).
-    Review {
-        #[command(subcommand)]
-        command: ReviewCommand,
-    },
-    /// Inspect and test decisions.
-    Decision {
-        #[command(subcommand)]
-        command: DecisionCommand,
-    },
-    /// Show a decision or rule: context, requirement, examples and status.
-    Explain { id: String },
-    /// Validate spec documents.
-    Spec {
-        #[command(subcommand)]
-        command: SpecCommand,
-    },
-    /// Print the JSON Schema of a kind of spec document; without a kind, list
-    /// the kinds.
-    Schema {
-        /// A kind such as `Decision` or `Project`, in any letter case.
-        kind: Option<String>,
-        /// Write the schema of every kind into this directory instead.
-        #[arg(long, value_name = "DIR", conflicts_with = "kind")]
-        write: Option<PathBuf>,
-    },
-    /// Generate or verify the Markdown docs derived from the decision catalog.
-    Docs {
-        #[command(subcommand)]
-        command: DocsCommand,
-    },
-    /// Write a default lighthouse.toml in the current directory.
-    ///
-    /// With --agent the project is also wired for a coding agent: the MCP
-    /// server, the hooks and the skill are merged into the agent's own
-    /// files without overwriting anything you wrote, and running it again
-    /// changes nothing. An existing lighthouse.toml is kept in that case.
-    Init {
-        /// Set up this coding agent as well.
-        #[arg(long, value_enum)]
-        agent: Option<Agent>,
-    },
-    /// Trust this project to run the commands it names: command fixers and the
-    /// formatters of `lighthouse.toml`. Trust is yours, kept in
-    /// `~/.lighthouse/trust.toml` for this root and the exact `lighthouse.toml`
-    /// and `.lighthouse/rules` you have read; a change to either withdraws it.
-    /// `LIGHTHOUSE_TRUST=1` trusts every project, for CI. Without trust a
-    /// command fix is declined and formatting is skipped; checks and the
-    /// verification of fixes still run.
-    ///
-    /// It lists the formatters and fixer commands it would trust and asks for
-    /// confirmation on the terminal; without a terminal it refuses unless
-    /// `--yes` says you have read the list.
-    Trust {
-        /// Withdraw the trust instead.
-        #[arg(long)]
-        revoke: bool,
-        /// Trust without asking; for scripts, after reading what is listed.
-        #[arg(long, conflicts_with = "revoke")]
-        yes: bool,
-    },
-    /// Serve the Model Context Protocol on stdio, for coding agents: tools to
-    /// check, explain, review and author decisions, and resources for the
-    /// catalog. Judgments recorded through it are attributed to a `SoftwareAgent`
-    /// (the id is $LIGHTHOUSE_REVIEWER, else the client's name).
-    Mcp,
-    /// Entry points for agent hooks. Reads the hook payload on stdin.
-    Hook {
-        #[command(subcommand)]
-        agent: HookAgent,
-    },
-}
-
-#[derive(Clone, Copy, ValueEnum)]
-enum Agent {
-    ClaudeCode,
-}
-
-#[derive(Subcommand)]
-enum HookAgent {
-    /// Claude Code hooks (see docs/agents.md).
-    ClaudeCode {
-        #[arg(value_enum)]
-        event: hook::Event,
-        /// Say that the analysis was incomplete but do not block on it.
-        #[arg(long)]
-        allow_incomplete: bool,
-    },
-}
-
-#[derive(Subcommand)]
-enum CacheCommand {
-    /// Delete the result cache, and whatever the language plugins keep in it.
-    /// Nothing but time is lost: the next check fills it again.
-    Clean,
-}
-
-#[derive(Subcommand)]
-enum DecisionCommand {
-    /// List the decisions that have a rule.
-    List {
-        /// Include every catalog decision with its implementation status.
-        #[arg(long)]
-        all: bool,
-    },
-    /// Run the examples of checked decisions: the bundled catalog and the
-    /// project's `.lighthouse/decisions`. Exits 1 when any example fails.
-    ///
-    /// Examples run in each language whose plugin the config lists (or only
-    /// in --language); a decision needs an example for every language run.
-    Test {
-        /// Decision ids; default: every checked decision.
-        ids: Vec<String>,
-        #[arg(long)]
-        language: Option<String>,
-        /// Use this config file; the project root is then the current directory.
-        #[arg(long)]
-        config: Option<PathBuf>,
-    },
-}
-
-#[derive(Subcommand)]
-enum SpecCommand {
-    /// Check every spec document under PATHS (default: the project's
-    /// configuration and `.lighthouse/decisions`): each against the schema of
-    /// its kind, and against the others: presets name decisions that exist,
-    /// fix operations name registered order keys, `extends` names a decision,
-    /// CEL compiles, examples are well formed. Exits 1 when anything is wrong.
-    Validate {
-        paths: Vec<PathBuf>,
-        /// Also run the examples of the decisions found, through the whole
-        /// engine.
-        #[arg(long)]
-        examples: bool,
-    },
-}
-
-#[derive(Subcommand)]
-enum DocsCommand {
-    /// Write the decision docs and the agent skill.
-    Generate {
-        #[arg(long, default_value = "docs")]
-        out: PathBuf,
-        /// Where the generated agent skill goes.
-        #[arg(long, default_value = SKILL_PATH)]
-        skill: PathBuf,
-    },
-    /// Exit 1 when the decision docs or the agent skill are stale.
-    Check {
-        #[arg(long, default_value = "docs")]
-        out: PathBuf,
-        #[arg(long, default_value = SKILL_PATH)]
-        skill: PathBuf,
-    },
-}
 
 type Result<T> = lighthouse_session::Result<T>;
 
 fn main() -> ExitCode {
-    match run(Cli::parse()) {
+    let args: Vec<OsString> = env::args_os().collect();
+    let matches = match Cli::command()
+        .color(color::choice(&args))
+        .try_get_matches_from(&args)
+    {
+        Ok(matches) => matches,
+        Err(e) => e.exit(),
+    };
+    let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
+    match run(&cli) {
         Ok(code) => ExitCode::from(code),
         Err(e) => {
             eprintln!("lighthouse: {e}");
-            ExitCode::from(2)
+            ExitCode::from(USAGE)
         }
     }
 }
 
-fn run(cli: Cli) -> Result<u8> {
-    match cli.command {
-        Command::Check {
-            paths,
-            changed,
-            diff,
-            format,
-            limit,
-            detail,
-            no_store,
-            no_cache,
-            strict,
-            max_warnings,
-            allow_incomplete,
-            rules,
-            timings,
-            fix,
-            dry_run,
-            unsafe_fixes,
-            fixer,
-            no_models,
-            all_models,
-            record_model_labels,
-            config,
-        } => check::run(
-            &check::Scope {
-                paths,
-                reported: check::Reported {
-                    changed,
-                    diff: diff.as_deref(),
-                },
-                only: &rules,
-                config: config.as_deref(),
-                store: !no_store,
-                cache: !no_cache,
-                models: lighthouse_session::ModelFlags {
-                    off: no_models,
-                    all: all_models,
-                    record: record_model_labels,
-                    collect: false,
-                },
-            },
-            &check::Output {
-                format,
-                limit,
-                detail,
-                fail_on: FailOn {
-                    strict,
-                    max_warnings,
-                },
-                allow_incomplete,
-                timings,
-            },
-            fix.then_some(check::FixOptions {
-                dry_run,
-                unsafe_fixes,
-                fixer,
-            }),
-        ),
-        Command::Eval { args, format } => models::evaluate(args, format),
-        Command::Learn { command } => models::learn(command),
-        Command::Cache {
-            command: CacheCommand::Clean,
-        } => cache_clean(),
-        Command::Review { command } => review::run(command),
-        Command::Decision {
-            command: DecisionCommand::List { all },
-        } => decisions::list(all),
-        Command::Decision {
-            command:
-                DecisionCommand::Test {
-                    ids,
-                    language,
-                    config,
-                },
-        } => decisions::test(&ids, language.as_deref(), config.as_deref()),
-        Command::Explain { id } => decisions::explain(&id),
-        Command::Spec { command } => match command {
-            SpecCommand::Validate { paths, examples } => spec::validate(&paths, examples),
-        },
+fn run(cli: &Cli) -> Result<u8> {
+    let config = cli.config.as_deref();
+    match &cli.command {
+        Command::Surface(action) => {
+            let ctx = Context::person(cli.config.clone());
+            Ok(emit(&lighthouse_surface::run(&ctx, action)?))
+        }
+        Command::Cache { .. } => project::cache_clean(),
+        Command::Spec {
+            command: SpecCommand::Validate { paths, examples },
+        } => spec::validate(config, paths, *examples),
         Command::Schema { kind, write } => spec::schema(kind.as_deref(), write.as_deref()),
         Command::Docs { command } => match command {
-            DocsCommand::Generate { out, skill } => docs::generate(&out, &skill),
-            DocsCommand::Check { out, skill } => docs::check(&out, &skill),
+            DocsCommand::Generate { out, skill } => docs::generate(config, out, skill),
+            DocsCommand::Check { out, skill } => docs::check(config, out, skill),
         },
-        Command::Init { agent } => init(agent),
-        Command::Trust { revoke, yes } => trust(revoke, yes),
+        Command::Completions { shell } => {
+            reference::completions((*shell).into());
+            Ok(0)
+        }
+        Command::Init { agent } => project::init(*agent),
+        Command::Trust { revoke, yes } => project::trust(config, *revoke, *yes),
         Command::Mcp => {
             lighthouse_mcp::serve()?;
             Ok(0)
@@ -437,112 +71,18 @@ fn run(cli: Cli) -> Result<u8> {
                     event,
                     allow_incomplete,
                 },
-        } => Ok(hook::run(event, allow_incomplete)),
+        } => Ok(hook::run(*event, *allow_incomplete)),
     }
 }
 
-fn cache_clean() -> Result<u8> {
-    let root = lighthouse_session::project_root()?;
-    let dir = lighthouse_session::cache_dir(&root);
-    let had = lighthouse_session::clean_cache(&root)?;
-    println!(
-        "{} {}",
-        if had {
-            "deleted"
-        } else {
-            "nothing to delete at"
-        },
-        dir.display()
-    );
-    Ok(0)
-}
-
-fn trust(revoke: bool, yes: bool) -> Result<u8> {
-    if revoke {
-        let root = lighthouse_session::project_root()?;
-        let had = lighthouse_session::revoke(&root)?;
-        println!(
-            "{} {}",
-            if had {
-                "no longer trusting"
-            } else {
-                "was not trusted:"
-            },
-            root.display()
-        );
-        return Ok(0);
+/// Data to stdout, notes to stderr; the exit code of the reply. A closed pipe
+/// ends the output quietly, like any filter.
+fn emit(reply: &Reply) -> u8 {
+    for note in &reply.notes {
+        eprintln!("{note}");
     }
-    let session = Session::load(None)?;
-    println!("{} runs:", session.root.display());
-    for command in &session.basis.commands {
-        println!("  {command}");
-    }
-    if session.basis.commands.is_empty() {
-        println!("  no formatter or fixer command");
-    }
-    if !yes && !confirmed()? {
-        return Err(
-            "not trusted: no confirmation (use a terminal, or `--yes` after reading the list)"
-                .into(),
-        );
-    }
-    let file = lighthouse_session::trust(&session.root, &session.basis)?;
-    println!(
-        "trusting {} as listed (recorded in {}); programs outside the project are trusted by command line only",
-        session.root.display(),
-        file.display()
-    );
-    Ok(0)
-}
-
-/// Asks on the terminal whether to trust; false without one.
-fn confirmed() -> Result<bool> {
-    use std::io::{IsTerminal, Write};
-    if !std::io::stdin().is_terminal() {
-        return Ok(false);
-    }
-    print!("Trust this project to run them? [y/N] ");
-    std::io::stdout().flush()?;
-    let mut answer = String::new();
-    std::io::stdin().read_line(&mut answer)?;
-    Ok(matches!(answer.trim(), "y" | "Y" | "yes"))
-}
-
-fn init(agent: Option<Agent>) -> Result<u8> {
-    let dir = env::current_dir()?;
-    let path = dir.join(FILE_NAME);
-    if path.exists() {
-        if agent.is_none() {
-            return Err(format!("{} already exists", path.display()).into());
-        }
-        println!("kept {}", path.display());
-    } else {
-        fs::write(&path, DEFAULT_CONFIG)?;
-        println!("wrote {}", path.display());
-        if ensure_line(&path.with_file_name(".gitignore"), STORE_IGNORE)? {
-            println!("added {STORE_IGNORE} to .gitignore");
-        }
-        if ensure_line(&path.with_file_name(".gitattributes"), LOG_ATTRIBUTES)? {
-            println!("added the decision log to .gitattributes (merge=union)");
-        }
-    }
-    if let Some(Agent::ClaudeCode) = agent {
-        setup::claude_code(&dir)?;
-    }
-    Ok(0)
-}
-/// Adds `line` to the file, creating it if needed; false when the file
-/// already has it.
-fn ensure_line(path: &Path, line: &str) -> Result<bool> {
-    let mut text = fs::read_to_string(path).unwrap_or_default();
-    if text.lines().any(|existing| existing.trim() == line) {
-        return Ok(false);
-    }
-    if !text.is_empty() && !text.ends_with('\n') {
-        text.push('\n');
-    }
-    text.push_str(line);
-    text.push('\n');
-    fs::write(path, text)?;
-    Ok(true)
+    let mut out = io::stdout().lock();
+    let _ = out.write_all(reply.stdout.as_bytes());
+    let _ = out.flush();
+    reply.code
 }

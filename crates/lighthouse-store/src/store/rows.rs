@@ -10,8 +10,8 @@ use rusqlite::{
 use serde_json::{Value, json};
 
 use crate::{
-    Error, MIN_PREFIX, FindingRecord, JudgmentEvent, NewJudgment, Stamp, Standing, StatusFilter, Subject,
-    SuppressionEvent, digest, judged::Judged, log, log::LoggedSuppression,
+    Error, FindingRecord, JudgmentEvent, MIN_PREFIX, NewJudgment, Stamp, Standing, StatusFilter,
+    Subject, SuppressionEvent, digest, judged::Judged, log, log::LoggedSuppression,
 };
 use lighthouse_model::{SuppressionKind, SuppressionStatus};
 

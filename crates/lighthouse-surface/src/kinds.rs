@@ -29,13 +29,6 @@ pub fn kinds() -> BTreeMap<&'static str, Value> {
     .collect()
 }
 
-/// The schema of the output kind `kind`, in any letter case.
-pub fn kind(name: &str) -> Option<(&'static str, Value)> {
-    kinds()
-        .into_iter()
-        .find(|(kind, _)| kind.eq_ignore_ascii_case(name) || schema_file(kind) == name)
-}
-
 /// The `$id` and the title of a kind's schema.
 fn document(kind: &str, mut schema: Value) -> Value {
     schema["$schema"] = json!("https://json-schema.org/draft/2020-12/schema");
@@ -122,7 +115,9 @@ fn fix_report() -> Value {
             "rounds": integer(),
             "messages": strings()
         }),
-        &["dryRun", "diff", "applied", "declined", "rounds", "messages"],
+        &[
+            "dryRun", "diff", "applied", "declined", "rounds", "messages",
+        ],
     )
 }
 
@@ -163,7 +158,14 @@ fn author_report() -> Value {
             "tested": object(json!({ "runs": integer(), "languages": integer() }), &["runs", "languages"]),
             "localPluginListed": { "type": "boolean" }, "note": string()
         }),
-        &["id", "path", "created", "tested", "localPluginListed", "note"],
+        &[
+            "id",
+            "path",
+            "created",
+            "tested",
+            "localPluginListed",
+            "note",
+        ],
     )
 }
 
@@ -186,7 +188,14 @@ fn side() -> Value {
             "model_decided": integer(), "reviews": integer(), "calls": integer(),
             "cost": { "type": "number" }
         }),
-        &["check", "metrics", "model_decided", "reviews", "calls", "cost"],
+        &[
+            "check",
+            "metrics",
+            "model_decided",
+            "reviews",
+            "calls",
+            "cost",
+        ],
     )
 }
 
@@ -235,7 +244,14 @@ fn finding() -> Value {
             "judgment": nullable(string()), "standing": nullable(string()),
             "narrowing": { "type": "boolean" }
         }),
-        &["fingerprint", "ruleId", "severity", "path", "message", "lastSeen"],
+        &[
+            "fingerprint",
+            "ruleId",
+            "severity",
+            "path",
+            "message",
+            "lastSeen",
+        ],
     )
 }
 
@@ -284,6 +300,13 @@ fn train_report() -> Value {
             "unresolved": integer(), "dataset": string(), "training_file": string(),
             "result": nullable(json!({ "type": "object" }))
         }),
-        &["decision", "model", "subjects", "unresolved", "dataset", "training_file"],
+        &[
+            "decision",
+            "model",
+            "subjects",
+            "unresolved",
+            "dataset",
+            "training_file",
+        ],
     )
 }

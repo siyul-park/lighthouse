@@ -370,7 +370,10 @@ fn full_report(
 
 /// The findings to print: all of them, or the first `limit` by severity
 /// (errors first) in their original order, and how many were left out.
-pub(crate) fn select(diagnostics: &[Diagnostic], limit: Option<usize>) -> (Vec<&Diagnostic>, usize) {
+pub(crate) fn select(
+    diagnostics: &[Diagnostic],
+    limit: Option<usize>,
+) -> (Vec<&Diagnostic>, usize) {
     let Some(limit) = limit.filter(|&l| l < diagnostics.len()) else {
         return (diagnostics.iter().collect(), 0);
     };

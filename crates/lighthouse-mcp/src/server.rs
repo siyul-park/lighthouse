@@ -2,8 +2,7 @@
 //! operations. Each call runs on the blocking pool because checks start
 //! processes and open SQLite.
 
-use std::env;
-
+use lighthouse_surface::{Context, tools};
 use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler,
     model::{
@@ -16,13 +15,10 @@ use rmcp::{
 };
 use serde_json::Value;
 
-use crate::{
-    definitions, resources,
-    tools::{Caller, call},
-};
+use crate::{definitions, resources};
 
-/// The reviewer id when the client names itself neither by `clientInfo` nor
-/// by `LIGHTHOUSE_REVIEWER`.
+/// The agent id when the client names itself by `clientInfo` and
+/// `LIGHTHOUSE_ATTRIBUTED_TO` says nothing.
 const ANONYMOUS: &str = "mcp-agent";
 
 pub struct Lighthouse;
@@ -38,8 +34,9 @@ impl ServerHandler for Lighthouse {
         .with_instructions(
             "Lighthouse remembers this project's design decisions and enforces them as rules. \
              Call `check` after changing code; fix findings (`fix` does it for decisions marked \
-             fixable, `dry_run` first) or judge the ones that ask for review with \
-             `review_resolve`. Read lighthouse://decisions/{id} for the full text of a decision.",
+             fixable, `dryRun` first) or judge the ones that ask for review with \
+             `review_list` and `review_resolve`. Read lighthouse://decisions/{id} for the full \
+             text of a decision.",
         )
     }
 
@@ -56,19 +53,24 @@ impl ServerHandler for Lighthouse {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, McpError> {
-        let caller = Caller {
-            reviewer: reviewer(&context),
-        };
+        let ctx = Context::agent(agent(&context));
         let name = request.name.to_string();
         let args = request.arguments.map_or(Value::Null, Value::Object);
-        let outcome = tokio::task::spawn_blocking(move || call(&name, args, &caller))
-            .await
-            .map_err(|e| McpError::internal_error(format!("tool panicked: {e}"), None))?;
+        let outcome = tokio::task::spawn_blocking(move || {
+            let outcome = tools::call(&ctx, &name, args);
+            (name, outcome)
+        })
+        .await
+        .map_err(|e| McpError::internal_error(format!("tool panicked: {e}"), None))?;
         let result = match outcome {
-            Ok(value) => CallToolResult::success(vec![ContentBlock::text(
-                serde_json::to_string_pretty(&value).unwrap_or_default(),
-            )]),
-            Err(message) => CallToolResult::error(vec![ContentBlock::text(message)]),
+            (name, None) => {
+                return Err(McpError::invalid_params(
+                    format!("unknown tool `{name}`"),
+                    None,
+                ));
+            }
+            (_, Some(Ok(reply))) => CallToolResult::structured(reply.value),
+            (_, Some(Err(e))) => CallToolResult::error(vec![ContentBlock::text(e.to_string())]),
         };
         Ok(result.into())
     }
@@ -111,16 +113,14 @@ impl ServerHandler for Lighthouse {
     }
 }
 
-/// `LIGHTHOUSE_REVIEWER`, else the client's name from the handshake.
-fn reviewer(context: &RequestContext<RoleServer>) -> String {
-    env::var("LIGHTHOUSE_REVIEWER")
-        .ok()
-        .filter(|id| !id.is_empty())
-        .or_else(|| {
-            context
-                .peer
-                .peer_info()
-                .map(|info| info.client_info.name.clone())
-        })
+/// The client's name from the handshake: the agent a judgment is attributed
+/// to unless `attributedTo` says otherwise (`LIGHTHOUSE_ATTRIBUTED_TO` is its
+/// default, as for the command line).
+fn agent(context: &RequestContext<RoleServer>) -> String {
+    context
+        .peer
+        .peer_info()
+        .map(|info| info.client_info.name.clone())
+        .filter(|name| !name.is_empty())
         .unwrap_or_else(|| ANONYMOUS.to_owned())
 }

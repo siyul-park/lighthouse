@@ -9,10 +9,8 @@ test = false
 doctest = false
 
 [dependencies]
-lighthouse-report.workspace = true
+lighthouse-surface.workspace = true
 lighthouse-session.workspace = true
 rmcp.workspace = true
-serde.workspace = true
 serde_json.workspace = true
-serde_norway.workspace = true
 tokio.workspace = true

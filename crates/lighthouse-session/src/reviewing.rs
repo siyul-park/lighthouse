@@ -20,7 +20,9 @@ const ATTRIBUTED_VAR: &str = "LIGHTHOUSE_ATTRIBUTED_TO";
 /// `$LIGHTHOUSE_ATTRIBUTED_TO` says; without that `default` does. A missing id
 /// is the default's when it is of the same kind.
 pub fn attribute_to(spec: Option<&str>, default: &Attribution) -> Result<Attribution> {
-    let from_env = env::var(ATTRIBUTED_VAR).ok().filter(|text| !text.is_empty());
+    let from_env = env::var(ATTRIBUTED_VAR)
+        .ok()
+        .filter(|text| !text.is_empty());
     let Some(text) = spec.map(str::to_owned).or(from_env) else {
         return Ok(default.clone());
     };

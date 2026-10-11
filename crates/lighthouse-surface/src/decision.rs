@@ -138,10 +138,7 @@ pub fn author(ctx: &Context, text: &str, create: bool, output: Output) -> Result
     let report = authored(&done);
     let verb = if done.created { "created" } else { "updated" };
     Reply::data(output, &report, || {
-        format!(
-            "{verb} {} at {}\n{}\n",
-            report.id, report.path, report.note
-        )
+        format!("{verb} {} at {}\n{}\n", report.id, report.path, report.note)
     })
 }
 

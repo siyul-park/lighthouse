@@ -27,10 +27,7 @@ fn each_base_defaults_below_home() {
 #[test]
 fn an_absolute_variable_wins_over_home() {
     let vars = [("HOME", "/home/ada"), ("XDG_CONFIG_HOME", "/etc/xdg")];
-    assert_eq!(
-        dir(Base::Config, &vars),
-        Some("/etc/xdg/lighthouse".into())
-    );
+    assert_eq!(dir(Base::Config, &vars), Some("/etc/xdg/lighthouse".into()));
     assert_eq!(
         dir(Base::Data, &vars),
         Some("/home/ada/.local/share/lighthouse".into())

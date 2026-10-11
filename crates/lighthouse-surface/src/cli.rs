@@ -5,14 +5,15 @@
 use clap::{Args, Subcommand};
 
 use crate::{
-    Result, check,
+    Result,
     args::{
         CheckArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs, DecisionTestArgs,
-        DocumentArgs, FingerprintArgs, FixOptions, ModelListArgs, ModelTrainArgs,
-        ReviewListArgs, ReviewResolveArgs,
+        DocumentArgs, FingerprintArgs, FixOptions, ModelListArgs, ModelTrainArgs, ReviewListArgs,
+        ReviewResolveArgs,
     },
-    decision, eval, model, review,
+    check, decision, eval, model,
     reply::{CheckFormat, Context, OutputArg, Reply},
+    review,
 };
 
 const CHECK_EXAMPLES: &str = "\
@@ -289,12 +290,18 @@ fn decision_command(ctx: &Context, command: &DecisionCommand) -> Result<Reply> {
     match command {
         DecisionCommand::List { args, output } => decision::list(ctx, args, output.format),
         DecisionCommand::Show { args, output } => decision::show(ctx, args, output.format),
-        DecisionCommand::Create { args, output } => {
-            decision::author(ctx, &decision::read_document(&args.document)?, true, output.format)
-        }
-        DecisionCommand::Update { args, output } => {
-            decision::author(ctx, &decision::read_document(&args.document)?, false, output.format)
-        }
+        DecisionCommand::Create { args, output } => decision::author(
+            ctx,
+            &decision::read_document(&args.document)?,
+            true,
+            output.format,
+        ),
+        DecisionCommand::Update { args, output } => decision::author(
+            ctx,
+            &decision::read_document(&args.document)?,
+            false,
+            output.format,
+        ),
         DecisionCommand::Test { args, output } => decision::test(ctx, args, output.format),
         DecisionCommand::Eval { args, output } => eval::run(ctx, args, output.format),
     }
@@ -322,20 +329,34 @@ pub fn command() -> clap::Command {
     <Tree as clap::CommandFactory>::command()
 }
 
-/// The one-line summary and the long help of the command at `path`: what the
-/// tool of that command has as `title` and `description`.
-pub fn help(path: &[&str]) -> (String, String) {
-    let mut command = command();
+/// The command at `path`, with the arguments it inherits built in.
+pub fn command_at(path: &[&str]) -> clap::Command {
+    let mut root = command();
+    root.build();
+    let mut command = root;
     for name in path {
         command = command
             .find_subcommand(name)
             .unwrap_or_else(|| panic!("no command `{name}`"))
             .clone();
     }
-    let about = command.get_about().map(ToString::to_string).unwrap_or_default();
-    let long = command
+    command
+}
+
+/// The one-line summary and the long help of the command at `path`: what the
+/// tool of that command has as `title` and `description`.
+pub fn help(path: &[&str]) -> (String, String) {
+    let command = command_at(path);
+    let about = command
+        .get_about()
+        .map(ToString::to_string)
+        .unwrap_or_default();
+    let mut long = command
         .get_long_about()
         .map(ToString::to_string)
         .unwrap_or_else(|| about.clone());
+    if let Some(examples) = command.get_after_long_help() {
+        long = format!("{long}\n\n{examples}");
+    }
     (about, long)
 }

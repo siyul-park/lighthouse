@@ -39,7 +39,7 @@ const SNIFF: usize = 8192;
 const STATE_DIR: &str = ".lighthouse";
 const EDIT_TOOLS: [&str; 3] = ["Edit", "Write", "MultiEdit"];
 
-#[derive(Clone, Copy, ValueEnum)]
+#[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum Event {
     /// After Edit, Write or MultiEdit: report the edited file.
     PostToolUse,
@@ -196,7 +196,7 @@ fn after_edit(checked: &Checked, allow_incomplete: bool) -> Option<Value> {
     if summary.reviews > 0 {
         notes.push(format!(
             "Lighthouse: {} finding(s) in the edited file ask for review, not necessarily a fix. \
-             List them with the MCP tool `review_tasks`, then fix the code or record a judgment with \
+             List them with the MCP tool `review_list`, then fix the code or record a judgment with \
              `review_resolve` (a reason is required to reject).",
             summary.reviews
         ));
@@ -287,6 +287,8 @@ fn feedback(checked: &Checked, limit: usize) -> String {
         &outcome.incomplete,
         &Briefing {
             fixes: Some(&fixes),
+            // The agent has the tools of `lighthouse mcp`: hints name them.
+            tool_form: true,
             ..checked.briefing(Some(limit))
         },
     )
