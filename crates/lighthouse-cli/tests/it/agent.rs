@@ -7,17 +7,17 @@ use assert_cmd::Command;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-const BIG: &str = "a\nb\nc\nd\ne\nf\n";
+pub(crate) const BIG: &str = "a\nb\nc\nd\ne\nf\n";
 const HELPER: &str = "pub fn run(x: Option<u8>) -> u8 {\n    x.unwrap()\n}\n";
 
-fn lighthouse(dir: &Path) -> Command {
+pub(crate) fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
     cmd.current_dir(dir);
     cmd
 }
 
 /// A text project that fails files over three lines.
-fn text_project() -> TempDir {
+pub(crate) fn text_project() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
@@ -51,7 +51,7 @@ fn rust_project(extra: &str, source: &str) -> TempDir {
     dir
 }
 
-fn edit(dir: &Path, file: &str) -> Value {
+pub(crate) fn edit(dir: &Path, file: &str) -> Value {
     json!({
         "session_id": "s1",
         "cwd": dir.to_str().unwrap(),
@@ -62,7 +62,22 @@ fn edit(dir: &Path, file: &str) -> Value {
     })
 }
 
-fn stop(dir: &Path, active: bool) -> Value {
+/// The PreToolUse payload of an edit of `file` in the session `s1`.
+pub(crate) fn pre_payload(dir: &Path, file: &str) -> Value {
+    let mut payload = edit(dir, file);
+    payload["hook_event_name"] = json!("PreToolUse");
+    payload
+}
+
+/// Records the baseline of `file`; the hook prints nothing.
+pub(crate) fn pre(dir: &Path, file: &str) {
+    assert_eq!(
+        hook(dir, &["pre-tool-use"], &pre_payload(dir, file)),
+        (0, None)
+    );
+}
+
+pub(crate) fn stop(dir: &Path, active: bool) -> Value {
     json!({
         "session_id": "s1",
         "cwd": dir.to_str().unwrap(),
@@ -72,7 +87,7 @@ fn stop(dir: &Path, active: bool) -> Value {
 }
 
 /// Runs the hook; returns its exit code and the JSON it printed, if any.
-fn hook(dir: &Path, args: &[&str], payload: &Value) -> (i32, Option<Value>) {
+pub(crate) fn hook(dir: &Path, args: &[&str], payload: &Value) -> (i32, Option<Value>) {
     let out = lighthouse(dir)
         .args(["hook", "claude-code"])
         .args(args)
@@ -84,7 +99,7 @@ fn hook(dir: &Path, args: &[&str], payload: &Value) -> (i32, Option<Value>) {
     (out.status.code().unwrap(), json)
 }
 
-fn git(dir: &Path, args: &[&str]) {
+pub(crate) fn git(dir: &Path, args: &[&str]) {
     let status = Git::new("git")
         .arg("-C")
         .arg(dir)
@@ -193,27 +208,23 @@ fn incomplete_analysis_is_stated_and_blocks_only_without_allow_incomplete() {
 }
 
 #[test]
-fn stop_blocks_on_remaining_errors_once() {
+fn stop_blocks_on_errors_the_session_introduced_once() {
     let dir = text_project();
-    git(dir.path(), &["init", "-q"]);
-    git(
-        dir.path(),
-        &["add", "small.txt", "other.txt", "lighthouse.toml"],
-    );
-    git(dir.path(), &["commit", "-q", "-m", "init"]);
+    pre(dir.path(), "small.txt");
+    fs::write(dir.path().join("small.txt"), BIG).unwrap();
 
     let (code, reply) = hook(dir.path(), &["stop"], &stop(dir.path(), false));
     assert_eq!(code, 0);
     let reply = reply.unwrap();
     assert_eq!(reply["decision"], "block");
-    assert!(reply["reason"].as_str().unwrap().contains("big.txt"));
+    assert!(reply["reason"].as_str().unwrap().contains("small.txt"));
 
     let (_, forced) = hook(dir.path(), &["stop"], &stop(dir.path(), true));
     let forced = forced.unwrap();
     assert!(forced.get("decision").is_none(), "no loop: {forced}");
     assert!(forced["systemMessage"].as_str().unwrap().contains("remain"));
 
-    fs::remove_file(dir.path().join("big.txt")).unwrap();
+    fs::remove_file(dir.path().join("small.txt")).unwrap();
     assert_eq!(
         hook(dir.path(), &["stop"], &stop(dir.path(), false)),
         (0, None)
@@ -233,9 +244,6 @@ fn hooks_report_fixable_findings_but_never_fix_them() {
     assert_eq!(code, 0);
     let reply = reply.expect("the error is fed back");
     assert!(reply.to_string().contains("declaration-groups"), "{reply}");
-    let (_, forced) = hook(dir.path(), &["stop"], &stop(dir.path(), false));
-    assert!(forced.is_some());
-
     assert_eq!(
         fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),
         source,
@@ -294,6 +302,14 @@ fn init_for_claude_code_merges_without_overwriting_and_is_idempotent() {
             .starts_with("lighthouse hook claude-code post-tool-use")
     );
     assert_eq!(settings["hooks"]["Stop"].as_array().unwrap().len(), 1);
+    let before = settings["hooks"]["PreToolUse"].as_array().unwrap();
+    assert_eq!(before.len(), 1);
+    assert_eq!(before[0]["matcher"], "Edit|Write|MultiEdit");
+    assert_eq!(
+        before[0]["hooks"][0]["command"],
+        "lighthouse hook claude-code pre-tool-use"
+    );
+    assert_eq!(before[0]["hooks"][0]["timeout"], 120);
     assert_eq!(post[1]["hooks"][0]["timeout"], 120);
     assert_eq!(settings["hooks"]["Stop"][0]["hooks"][0]["timeout"], 300);
     let skill = fs::read_to_string(dir.path().join(".claude/skills/lighthouse/SKILL.md")).unwrap();
@@ -408,30 +424,9 @@ fn a_broken_config_is_told_to_the_agent_not_swallowed() {
 }
 
 #[test]
-fn stop_without_a_commit_or_a_repository_still_reports() {
-    let fresh = text_project();
-    git(fresh.path(), &["init", "-q"]);
-    let (_, reply) = hook(fresh.path(), &["stop"], &stop(fresh.path(), false));
-    let reply = reply.unwrap();
-    assert_eq!(
-        reply["decision"], "block",
-        "no commit yet: everything is changed"
-    );
-    assert!(reply["reason"].as_str().unwrap().contains("big.txt"));
-
-    let plain = text_project();
-    let (_, reply) = hook(plain.path(), &["stop"], &stop(plain.path(), false));
-    let reason = reply.unwrap()["reason"].as_str().unwrap().to_owned();
-    assert!(reason.contains("whole project was reported"), "{reason}");
-    assert!(reason.contains("big.txt"), "{reason}");
-}
-
-#[test]
 fn stop_tells_the_agent_about_gaps_once_even_with_allow_incomplete() {
     let dir = rust_project("", "fn (((\n");
-    git(dir.path(), &["init", "-q"]);
-    git(dir.path(), &["add", "."]);
-    git(dir.path(), &["commit", "-q", "-m", "init"]);
+    pre(dir.path(), "src/lib.rs");
     let (_, first) = hook(
         dir.path(),
         &["stop", "--allow-incomplete"],

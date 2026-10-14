@@ -2,19 +2,22 @@
 //! hook protocol and `check`. It reads the hook payload on stdin, picks the
 //! report scope, runs the check and answers in the format Claude Code reads.
 //! All judgment (what is a finding, what blocks) is Lighthouse's; the hook
-//! only translates.
+//! only translates. It reports what the session introduced: PreToolUse records
+//! a file's findings before the session's first edit of it (see `baseline`),
+//! PostToolUse and Stop keep the findings that are new or updated against it.
 //!
-//! Contract used (Claude Code hooks reference): the payload carries `cwd`,
-//! `hook_event_name`, and for PostToolUse `tool_name` and `tool_input`
-//! (`file_path` for Edit, Write and MultiEdit); for Stop `stop_hook_active`
-//! says a stop hook already forced the agent to continue. Exit 0 with a JSON
+//! Contract used (Claude Code hooks reference): the payload carries `session_id`,
+//! `cwd`, `hook_event_name`, and for PreToolUse and PostToolUse `tool_name` and
+//! `tool_input` (`file_path` for Edit, Write and MultiEdit); for Stop
+//! `stop_hook_active` says a stop hook already forced the agent to continue. Exit 0 with a JSON
 //! object on stdout: `decision: "block"` with `reason` feeds the reason back to
 //! the agent (after PostToolUse the edit already happened; at Stop it keeps the
 //! agent going), `hookSpecificOutput.additionalContext` adds context without
 //! blocking, `systemMessage` shows the user a note. Exit 2 is never used: a
 //! failing hook must not block the agent. Only a payload that is not JSON
-//! exits 1 (non-blocking); a broken config, broken local decisions or a plugin
-//! that cannot start are told to the agent as "nothing was checked".
+//! exits 1 (non-blocking), and so does a PreToolUse that cannot record its
+//! baseline; for the other events a broken config, broken local decisions or a
+//! plugin that cannot start are told to the agent as "nothing was checked".
 
 use std::{
     env,
@@ -28,7 +31,7 @@ use lighthouse_report::{Briefing, Detail, Format, render_with};
 use lighthouse_session::{CheckRequest, Checked, RunStatus, SKIPPED_DIRS, Session};
 use serde_json::{Value, json};
 
-use crate::cli::Result;
+use crate::cli::{Result, baseline};
 
 /// Findings printed back to the agent by an edit and by the end of a turn.
 const EDIT_LIMIT: usize = 5;
@@ -38,12 +41,17 @@ const SNIFF: usize = 8192;
 /// The directory of Lighthouse's own state; its files are never analyzed.
 const STATE_DIR: &str = ".lighthouse";
 const EDIT_TOOLS: [&str; 3] = ["Edit", "Write", "MultiEdit"];
+/// Said with a report that had no baseline to be measured against.
+const NO_BASELINE: &str = "Lighthouse: no pre-edit baseline, so every finding in the file is shown, including ones that were there before this session; `lighthouse init --agent claude-code` adds the PreToolUse hook that records it.";
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum Event {
-    /// After Edit, Write or MultiEdit: report the edited file.
+    /// Before Edit, Write or MultiEdit: record the file's findings as the
+    /// session's baseline, once per file; prints nothing.
+    PreToolUse,
+    /// After Edit, Write or MultiEdit: report the findings the edit introduced.
     PostToolUse,
-    /// When the agent wants to stop: report the session's changed files.
+    /// When the agent wants to stop: report the findings the session introduced.
     Stop,
 }
 
@@ -76,8 +84,8 @@ fn reply(event: Event, allow_incomplete: bool, payload: &str) -> Result<Option<V
         serde_json::from_str(payload).map_err(|e| format!("the hook payload is not JSON: {e}"))?;
     let active = payload["stop_hook_active"].as_bool().unwrap_or(false);
     match answer_event(event, allow_incomplete, &payload) {
-        Ok(reply) => Ok(reply),
-        Err(e) => Ok(Some(unchecked(event, active, &e.to_string()))),
+        Err(e) => unchecked(event, active, &e.to_string()).map(Some).ok_or(e),
+        reply => reply,
     }
 }
 
@@ -92,27 +100,57 @@ fn answer_event(event: Event, allow_incomplete: bool, payload: &Value) -> Result
     let Some(session) = Session::find_in(&here)? else {
         return Ok(None);
     };
+    let root = session.root.canonicalize()?;
+    let id = baseline::session_id(payload);
     match event {
-        Event::PostToolUse => {
-            let Some(file) = edited_file(payload, &session.root) else {
+        Event::PreToolUse => {
+            let (Some(id), Some(file)) = (id, edited_file(payload, &root)) else {
                 return Ok(None);
             };
-            let checked = lighthouse_session::check(session, &request(vec![file], false))?;
-            Ok(after_edit(&checked, allow_incomplete))
+            if baseline::exists(&root, id, &file) {
+                return Ok(None);
+            }
+            let found = if root.join(&file).exists() {
+                lighthouse_session::check(session, &request(vec![root.join(&file)], false))?
+                    .outcome
+                    .diagnostics
+            } else {
+                Vec::new()
+            };
+            baseline::record(&root, id, &baseline::Baseline::of(&file, &found))?;
+            Ok(None)
+        }
+        Event::PostToolUse => {
+            let Some(file) = edited_file(payload, &root).filter(|f| root.join(f).exists()) else {
+                return Ok(None);
+            };
+            let mut checked =
+                lighthouse_session::check(session, &request(vec![root.join(&file)], true))?;
+            let before = id.and_then(|id| baseline::load(&root, id, &file));
+            if let Some(before) = &before {
+                baseline::introduced(
+                    &mut checked.outcome.diagnostics,
+                    std::slice::from_ref(before),
+                );
+            }
+            Ok(after_edit(&checked, allow_incomplete, before.is_none()))
         }
         Event::Stop => {
-            let (changed, note) = match lighthouse_session::changed(&session.root) {
-                Ok(_) => (true, None),
-                Err(e) => (
-                    false,
-                    Some(format!(
-                        "the changed files could not be listed ({e}), so the whole project was reported"
-                    )),
-                ),
-            };
-            let checked = lighthouse_session::check(session, &request(Vec::new(), changed))?;
+            let before = id
+                .map(|id| baseline::session(&root, id))
+                .unwrap_or_default();
+            let files: Vec<PathBuf> = before
+                .iter()
+                .map(|b| root.join(b.path()))
+                .filter(|f| f.exists())
+                .collect();
+            if files.is_empty() {
+                return Ok(None);
+            }
+            let mut checked = lighthouse_session::check(session, &request(files, true))?;
+            baseline::introduced(&mut checked.outcome.diagnostics, &before);
             let active = payload["stop_hook_active"].as_bool().unwrap_or(false);
-            Ok(at_stop(&checked, allow_incomplete, active, note))
+            Ok(at_stop(&checked, allow_incomplete, active))
         }
     }
 }
@@ -120,26 +158,29 @@ fn answer_event(event: Event, allow_incomplete: bool, payload: &Value) -> Result
 /// What the agent hears when Lighthouse could not run at all: a broken config
 /// or local rule, a plugin that cannot start. Nothing was checked, and that is
 /// not a pass.
-fn unchecked(event: Event, stop_hook_active: bool, error: &str) -> Value {
+/// A PreToolUse tells the agent nothing: its failure is the hook's exit code.
+fn unchecked(event: Event, stop_hook_active: bool, error: &str) -> Option<Value> {
     let text = format!(
         "Lighthouse config broken or unusable, nothing was checked (this is not a pass): {error}"
     );
     match event {
-        Event::PostToolUse => json!({
+        Event::PreToolUse => None,
+        Event::PostToolUse => Some(json!({
             "hookSpecificOutput": { "hookEventName": "PostToolUse", "additionalContext": text }
-        }),
-        Event::Stop if stop_hook_active => json!({ "systemMessage": text }),
-        Event::Stop => json!({ "decision": "block", "reason": text }),
+        })),
+        Event::Stop if stop_hook_active => Some(json!({ "systemMessage": text })),
+        Event::Stop => Some(json!({ "decision": "block", "reason": text })),
     }
 }
 
-fn request(paths: Vec<PathBuf>, changed: bool) -> CheckRequest {
+/// A check of `paths`; a baseline is not a run worth remembering (`store`).
+fn request(paths: Vec<PathBuf>, store: bool) -> CheckRequest {
     CheckRequest {
         paths,
-        changed,
+        changed: false,
         diff: None,
         rules: Vec::new(),
-        store: true,
+        store,
         cache: true,
         // An edit hook never spends on a model.
         models: lighthouse_session::ModelFlags {
@@ -149,21 +190,37 @@ fn request(paths: Vec<PathBuf>, changed: bool) -> CheckRequest {
     }
 }
 
-/// The file an editing tool changed, when it is worth checking: it exists,
-/// lies inside the project, is not in a directory Lighthouse never reads, and
-/// is text. Everything else is a cheap `None`, before any plugin starts.
+/// The project-relative path an editing tool touches, when it is worth
+/// checking: it lies inside the project (`root`, canonical), is not in a
+/// directory Lighthouse never reads, and is text when it exists. A file the
+/// tool is about to create counts. Everything else is a cheap `None`, before
+/// any plugin starts.
 fn edited_file(payload: &Value, root: &Path) -> Option<PathBuf> {
     let tool = payload["tool_name"].as_str()?;
     if !EDIT_TOOLS.contains(&tool) {
         return None;
     }
-    let path = Path::new(payload["tool_input"]["file_path"].as_str()?);
-    let absolute = path.canonicalize().ok()?;
-    let relative = absolute.strip_prefix(root.canonicalize().ok()?).ok()?;
+    let absolute = resolved(Path::new(payload["tool_input"]["file_path"].as_str()?))?;
+    let relative = absolute.strip_prefix(root).ok()?;
     let skipped = relative
         .components()
         .any(|c| c.as_os_str() == STATE_DIR || SKIPPED_DIRS.iter().any(|d| c.as_os_str() == *d));
-    (!skipped && is_text(&absolute)).then_some(absolute)
+    (!skipped && (!absolute.exists() || is_text(&absolute))).then(|| relative.to_owned())
+}
+
+/// `path` made canonical as far as it exists, so that a file about to be
+/// created resolves like one that is there; `..` in the part that does not
+/// exist is refused.
+fn resolved(path: &Path) -> Option<PathBuf> {
+    let mut missing = PathBuf::new();
+    let mut here = path;
+    loop {
+        if let Ok(found) = here.canonicalize() {
+            return Some(found.join(missing));
+        }
+        missing = Path::new(here.file_name()?).join(missing);
+        here = here.parent()?;
+    }
 }
 
 fn is_text(path: &Path) -> bool {
@@ -180,15 +237,17 @@ fn is_text(path: &Path) -> bool {
 /// block so that it fixes them (or judges them, when their decision asks for a
 /// judgment); the remaining findings that ask for review, and incompleteness,
 /// are context. Clean and complete is silent.
-fn after_edit(checked: &Checked, allow_incomplete: bool) -> Option<Value> {
+fn after_edit(checked: &Checked, allow_incomplete: bool, unbaselined: bool) -> Option<Value> {
+    let note = unbaselined.then_some(NO_BASELINE);
     let summary = checked.summary();
     let incomplete = summary.status == RunStatus::Incomplete;
     if summary.errors + summary.warnings > 0 || (incomplete && !allow_incomplete) {
         return Some(json!({
             "decision": "block",
             "reason": format!(
-                "Lighthouse found problems in the file you just edited. Fix them, then continue.\n{}",
-                feedback(checked, EDIT_LIMIT)
+                "Lighthouse found problems in the file you just edited. Fix them, then continue.\n{}{}",
+                feedback(checked, EDIT_LIMIT),
+                note.map_or_else(String::new, |n| format!("\n{n}")),
             ),
         }));
     }
@@ -208,6 +267,7 @@ fn after_edit(checked: &Checked, allow_incomplete: bool) -> Option<Value> {
         ));
     }
     (!notes.is_empty()).then(|| {
+        notes.extend(note.map(str::to_owned));
         json!({
             "hookSpecificOutput": {
                 "hookEventName": "PostToolUse",
@@ -222,12 +282,7 @@ fn after_edit(checked: &Checked, allow_incomplete: bool) -> Option<Value> {
 /// so that the agent cannot be trapped, and the user gets a note instead.
 /// `allow_incomplete` only changes the wording: the agent learns about the
 /// gap either way, but is not asked to clear it.
-fn at_stop(
-    checked: &Checked,
-    allow_incomplete: bool,
-    stop_hook_active: bool,
-    note: Option<String>,
-) -> Option<Value> {
+fn at_stop(checked: &Checked, allow_incomplete: bool, stop_hook_active: bool) -> Option<Value> {
     let summary = checked.summary();
     let incomplete = summary.status == RunStatus::Incomplete;
     let blocking = summary.errors > 0 || incomplete;
@@ -235,18 +290,17 @@ fn at_stop(
         let mut why = Vec::new();
         if summary.errors > 0 {
             why.push(format!(
-                "{} error(s) remain in the files changed this session; fix them before stopping.",
+                "{} error(s) introduced this session remain; fix them before stopping.",
                 summary.errors
             ));
         }
         if incomplete {
             why.push(if allow_incomplete {
-                "The analysis was INCOMPLETE, so the changed files are not known to be clean. Look at the gaps below and tell the user; this notice is shown once."
+                "The analysis was INCOMPLETE, so the files edited this session are not known to be clean. Look at the gaps below and tell the user; this notice is shown once."
             } else {
-                "The analysis was INCOMPLETE, so the changed files are not known to be clean. Resolve the gaps below."
+                "The analysis was INCOMPLETE, so the files edited this session are not known to be clean. Resolve the gaps below."
             }.to_owned());
         }
-        why.extend(note);
         return Some(json!({
             "decision": "block",
             "reason": format!("Lighthouse: {}\n{}", why.join(" "), feedback(checked, STOP_LIMIT)),
@@ -266,14 +320,11 @@ fn at_stop(
             parts.push(format!("{n} {what}"));
         }
     }
-    let mut message = if parts.is_empty() {
+    let message = if parts.is_empty() {
         String::new()
     } else {
-        format!("Lighthouse: {} in the changed files.", parts.join(", "))
+        format!("Lighthouse: {} introduced this session.", parts.join(", "))
     };
-    if let Some(note) = note {
-        message = format!("{message} Lighthouse: {note}.").trim().to_owned();
-    }
     (!message.is_empty()).then(|| json!({ "systemMessage": message }))
 }
 

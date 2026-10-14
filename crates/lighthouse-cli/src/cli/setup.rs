@@ -17,10 +17,12 @@ const SKILL_FILE: &str = ".claude/skills/lighthouse/SKILL.md";
 /// user: trust is the user's decision, made at a terminal.
 const DENY_TRUST: &str = "Bash(lighthouse trust:*)";
 const EDIT_TOOLS: &str = "Edit|Write|MultiEdit";
+const PRE_COMMAND: &str = "lighthouse hook claude-code pre-tool-use";
 const POST_COMMAND: &str = "lighthouse hook claude-code post-tool-use --allow-incomplete";
 const STOP_COMMAND: &str = "lighthouse hook claude-code stop --allow-incomplete";
 /// Seconds a hook may run: it analyzes the whole project, so allow a large
-/// one time; the Stop hook may also run a project-wide fallback.
+/// one time; the Stop hook checks every file the session edited.
+const PRE_TIMEOUT: u64 = 120;
 const POST_TIMEOUT: u64 = 120;
 const STOP_TIMEOUT: u64 = 300;
 /// A hook command that starts with this is ours, whatever flags it carries.
@@ -60,6 +62,7 @@ fn hooks(path: &Path) -> Result<()> {
     let hooks = object(&mut doc, "hooks", path)?;
     let mut added = Vec::new();
     for (event, matcher, command, timeout) in [
+        ("PreToolUse", Some(EDIT_TOOLS), PRE_COMMAND, PRE_TIMEOUT),
         ("PostToolUse", Some(EDIT_TOOLS), POST_COMMAND, POST_TIMEOUT),
         ("Stop", None, STOP_COMMAND, STOP_TIMEOUT),
     ] {

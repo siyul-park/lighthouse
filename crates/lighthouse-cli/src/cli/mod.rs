@@ -13,6 +13,7 @@ use command::{Cli, Command, DocsCommand, HookAgent, SpecCommand};
 
 use lighthouse_cli::surface::{Context, Reply, reply::USAGE};
 
+mod baseline;
 mod color;
 mod command;
 mod docs;

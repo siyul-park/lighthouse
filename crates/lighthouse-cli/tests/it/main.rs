@@ -10,6 +10,7 @@ mod environment;
 mod fix;
 mod fix_trust;
 mod help;
+mod hook_session;
 mod internal;
 mod judgments;
 mod mcp;

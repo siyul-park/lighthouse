@@ -9,8 +9,9 @@ Usage: lighthouse hook claude-code [OPTIONS] <EVENT>
 Arguments:
   <EVENT>
           Possible values:
-          - post-tool-use: After Edit, Write or MultiEdit: report the edited file
-          - stop:          When the agent wants to stop: report the session's changed files
+          - pre-tool-use:  Before Edit, Write or MultiEdit: record the file's findings as the session's baseline, once per file; prints nothing
+          - post-tool-use: After Edit, Write or MultiEdit: report the findings the edit introduced
+          - stop:          When the agent wants to stop: report the findings the session introduced
 
 Options:
       --allow-incomplete
