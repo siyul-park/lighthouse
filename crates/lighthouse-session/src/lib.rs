@@ -53,6 +53,7 @@ pub use lighthouse_resource::schema_file;
 pub use lighthouse_spec::FILE_NAME;
 pub use lighthouse_store::{
     FindingRecord, JudgmentEvent, NewJudgment, Standing, StatusFilter, SuppressionEvent,
+    evidence_digest,
 };
 pub use models::{Binding, BoundModel, bound_models, remote_bound};
 pub use project::{DEFAULT_CONFIG, Session, catalog_at, config_file, project_root};

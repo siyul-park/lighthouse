@@ -425,7 +425,7 @@ pub struct FixEvent {
 
 /// A hash of evidence with whitespace in its strings collapsed, so
 /// reformatting does not change what the evidence says.
-pub(crate) fn evidence_digest(evidence: &Value) -> String {
+pub fn evidence_digest(evidence: &Value) -> String {
     hash::short(&canonical(&normalize_evidence(evidence)), 8)
 }
 
