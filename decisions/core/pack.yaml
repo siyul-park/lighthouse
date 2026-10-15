@@ -11,6 +11,10 @@ spec:
       title: Limits
       intro: Size limits that keep files reviewable.
       decisions: [file-size]
+    - name: format
+      title: Format
+      intro: One tool decides the layout of a file, so a reviewer does not.
+      decisions: [formatted]
     - name: annotations
       title: Source annotations
       intro: >-

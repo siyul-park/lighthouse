@@ -5,12 +5,10 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
-    time::Duration,
 };
 
 use lighthouse_model::{Fingerprint, hash};
 use lighthouse_resource::{write_atomic, write_atomic_guarded};
-use lighthouse_spec::{Formatter, FormatterOutput, FormatterStdin};
 
 use super::{
     super::edits::{TextEdit, apply},
@@ -19,17 +17,6 @@ use super::{
     Orchestrator, Proposal,
 };
 use crate::{Error, Outcome};
-
-/// Settings files of formatters that look for them upward from the file.
-const SETTINGS: [&str; 4] = [
-    "rustfmt.toml",
-    ".rustfmt.toml",
-    ".editorconfig",
-    "rust-toolchain.toml",
-];
-
-/// How long a formatter may run on one file.
-const FORMAT_LIMIT: Duration = Duration::from_secs(60);
 
 /// What a round did to the files its proposals touch.
 #[derive(Default)]
@@ -271,102 +258,6 @@ impl Orchestrator<'_> {
             }
             return Ok(text);
         }
-        self.run_formatter(formatter, file, &text)
-    }
-
-    /// Runs `formatter` on `text` of `file`, as the command contract says.
-    fn run_formatter(
-        &self,
-        formatter: &Formatter,
-        file: &Path,
-        text: &str,
-    ) -> Result<String, String> {
-        let scratch = tempfile::tempdir().map_err(|e| e.to_string())?;
-        let copy = scratch.path().join(file);
-        if let Some(dir) = copy.parent() {
-            fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-        }
-        fs::write(&copy, text).map_err(|e| e.to_string())?;
-        self.copy_settings(file, scratch.path());
-        let path = copy.to_string_lossy().into_owned();
-        let real = file.to_string_lossy().replace('\\', "/");
-        let mut command: Vec<String> = formatter
-            .argv
-            .iter()
-            .map(|a| match a.as_str() {
-                "{file}" => path.clone(),
-                "{path}" => real.clone(),
-                other => other.to_owned(),
-            })
-            .collect();
-        let named = formatter.argv.iter().any(|a| a == "{file}");
-        if formatter.stdin == FormatterStdin::None && !named {
-            command.push(path);
-        }
-        let stdin = match formatter.stdin {
-            FormatterStdin::None => Vec::new(),
-            FormatterStdin::File => text.as_bytes().to_vec(),
-        };
-        let mut env: Vec<(String, String)> = ["PATH", "HOME", "LANG", "TMPDIR"]
-            .iter()
-            .filter_map(|k| std::env::var(k).ok().map(|v| ((*k).to_owned(), v)))
-            .collect();
-        env.extend(formatter.env.iter().map(|(k, v)| (k.clone(), v.clone())));
-        let output = lighthouse_process::run(&lighthouse_process::Spec {
-            argv: &command,
-            dir: &self.engine.ws.root,
-            stdin: &stdin,
-            env: Some(&env),
-            limit: FORMAT_LIMIT,
-            grace: Duration::from_secs(2),
-            max_output: lighthouse_process::MAX_OUTPUT,
-        })
-        .map_err(|e| format!("formatter `{}`: {e}", formatter.argv[0]))?;
-        if !output.success {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!(
-                "formatter `{}` failed: {}",
-                formatter.argv[0],
-                stderr.lines().next().unwrap_or("no message")
-            ));
-        }
-        match formatter.output {
-            FormatterOutput::InPlace => {
-                fs::read_to_string(&copy).map_err(|e| format!("formatter output: {e}"))
-            }
-            FormatterOutput::Text => String::from_utf8(output.stdout)
-                .map_err(|_| "the formatter printed text that is not UTF-8".to_owned())
-                .and_then(|out| {
-                    if out.is_empty() {
-                        Err("the formatter printed no text".to_owned())
-                    } else {
-                        Ok(out)
-                    }
-                }),
-        }
-    }
-
-    /// Copies the formatter settings files that apply to `file`, found by
-    /// walking up from its directory to the project root, to the same places in
-    /// `scratch`, so a tool that looks for them upward from the file finds them.
-    fn copy_settings(&self, file: &Path, scratch: &Path) {
-        let root = &self.engine.ws.root;
-        let mut dir = file.parent();
-        while let Some(rel) = dir {
-            for name in SETTINGS {
-                let from = root.join(rel).join(name);
-                if from.is_file() {
-                    let to = scratch.join(rel).join(name);
-                    if let Some(parent) = to.parent() {
-                        let _ = fs::create_dir_all(parent);
-                    }
-                    let _ = fs::copy(&from, &to);
-                }
-            }
-            dir = rel.parent().filter(|p| p != &rel);
-            if rel.as_os_str().is_empty() {
-                break;
-            }
-        }
+        formatter.format(&self.engine.ws.root, file, &text)
     }
 }

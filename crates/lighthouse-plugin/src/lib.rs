@@ -14,6 +14,7 @@ use lighthouse_model::{
     Applicability, Capability, Diagnostic, File, Fingerprint, Fragment, Incomplete, Options,
     Project, Reach, RunScope, Severity,
 };
+use lighthouse_process::Formatter;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use thiserror::Error;
@@ -79,6 +80,8 @@ pub struct Workspace {
     /// The name prefixes that make a function a constructor, by language id:
     /// what the provider declares, or the project's `constructorPrefixes`.
     pub constructors: BTreeMap<String, Vec<String>>,
+    /// The command that formats the files of each language, by language id.
+    pub formatters: BTreeMap<String, Formatter>,
     /// Text that stands in for the file of the same project-relative path:
     /// what a provider must read instead of the disk. Empty for a normal run;
     /// a fix run checks candidate edits this way before anything is written.
@@ -100,6 +103,7 @@ impl Workspace {
             root: root.into(),
             languages: BTreeMap::new(),
             constructors: BTreeMap::new(),
+            formatters: BTreeMap::new(),
             overlays: BTreeMap::new(),
             cache_dir: None,
         }

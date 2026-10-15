@@ -39,6 +39,38 @@ a
 b
 ```
 
+## Format
+
+One tool decides the layout of a file, so a reviewer does not.
+
+| id | title | check | fix | requirement |
+| --- | --- | --- | --- | --- |
+| [`core/formatted`](#a-file-is-as-its-formatter-writes-it) | A file is as its formatter writes it | warn · builtin |  |  |
+
+### A file is as its formatter writes it
+
+`core/formatted` · file · warn · builtin
+
+*Vertical and horizontal openness, indentation and the placement of braces are team rules, and a team keeps them by letting one tool decide, not by reviewing them (Martin, Clean Code ch. 5 Team rules). The check runs the formatter the project configures for the language of the file (`[languages.<id>] formatter`) and compares the result with the file: one finding per file, at the first line that differs, whose evidence names the formatter (`formatter`) and the line (`line`). A language with no formatter is not judged. A formatter that fails, times out or prints more than it may leaves the analysis incomplete, never clean, and runs only in a trusted project.*
+
+A file MUST equal the output of the formatter configured for its language.
+
+Derived from: Martin, Clean Code (2008), G24 Follow Standard Conventions; Martin, Clean Code (2008), ch. 5 Vertical openness and density; Martin, Clean Code (2008), ch. 5 Horizontal openness and indentation; Martin, Clean Code (2008), ch. 5 Team rules; gofmt: https://pkg.go.dev/cmd/gofmt; rustfmt: https://rust-lang.github.io/rustfmt/
+
+```go invalid
+package sample
+
+func  Run( ) int {return 1}
+```
+
+```go valid
+package sample
+
+func Run() int { return 1 }
+```
+
+Also: rust
+
 ## Source annotations
 
 A finding that is right to leave in place can be allowed where it happens, in a comment that a reviewer sees in the diff.

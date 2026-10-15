@@ -1,7 +1,7 @@
 use std::{fmt::Write as _, fs, path::Path};
 
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Catalog, Config, Decision, Example, ExampleKind};
+use lighthouse_spec::{Catalog, CheckKind, Config, Decision, Example, ExampleKind, FORMATTED};
 use serde_json::Value;
 
 use crate::{Engine, FixPlan, FixRun, ModelOptions, Outcome, unified_diff};
@@ -98,7 +98,7 @@ impl<'a> RuleTester<'a> {
         let config = config(&registry, decision, example)?;
         let engine = Engine::new(registry, config, self.catalog, dir.path())
             .map_err(|e| e.to_string())?
-            .with_trust(self.trusted);
+            .with_trust(self.trusted || formats(decision));
         let outcome = engine
             .check(&[], &[decision.id().to_owned()])
             .map_err(|e| e.to_string())?;
@@ -238,7 +238,39 @@ fn config(registry: &Registry, decision: &Decision, example: &Example) -> Result
     let mut root = toml::Table::new();
     root.insert("plugins".to_owned(), plugins.into());
     root.insert("rules".to_owned(), rules.into());
+    if formats(decision) {
+        let mut language = toml::Table::new();
+        language.insert("formatter".to_owned(), formatter(&example.language)?);
+        let mut languages = toml::Table::new();
+        languages.insert(example.language.clone(), language.into());
+        root.insert("languages".to_owned(), languages.into());
+    }
     Config::parse_inline(&root.to_string()).map_err(|e| e.to_string())
+}
+
+/// Whether the decision's check runs the formatter of the example's language.
+/// Its examples run it as the tester configures it, and trusted: nothing the
+/// project says is run.
+fn formats(decision: &Decision) -> bool {
+    decision
+        .check
+        .as_ref()
+        .is_some_and(|c| matches!(&c.kind, CheckKind::Builtin(b) if b.named() == Some(FORMATTED)))
+}
+
+/// The standard formatter of a language, as `lighthouse.toml` of the project
+/// writes it.
+fn formatter(language: &str) -> Result<toml::Value, String> {
+    let argv: &[&str] = match language {
+        "go" => &["gofmt"],
+        "rust" => &["rustfmt", "--edition", "2024", "--emit", "stdout"],
+        other => return Err(format!("no standard formatter for `{other}`")),
+    };
+    let mut table = toml::Table::new();
+    table.insert("argv".to_owned(), argv.to_vec().into());
+    table.insert("stdin".to_owned(), "file".into());
+    table.insert("output".to_owned(), "text".into());
+    Ok(table.into())
 }
 
 fn toml_value(value: &Value) -> Result<toml::Value, String> {

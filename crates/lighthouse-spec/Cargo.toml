@@ -19,6 +19,7 @@ serde_norway.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 lighthouse-model.workspace = true
+lighthouse-process.workspace = true
 lighthouse-protocol.workspace = true
 lighthouse-resource.workspace = true
 

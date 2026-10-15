@@ -8,5 +8,10 @@ publish.workspace = true
 test = false
 doctest = false
 
+[dependencies]
+schemars.workspace = true
+serde.workspace = true
+tempfile.workspace = true
+
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true

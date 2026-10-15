@@ -82,6 +82,7 @@ const REACHES: &[(&str, Option<(Reach, bool)>)] = &[
     ("core/allow", None),
     ("core/decision-naming", Some((Reach::Global, false))),
     ("core/file-size", Some((Reach::Local, false))),
+    ("core/formatted", Some((Reach::Local, false))),
     ("core/no-unused-allow", None),
     ("design/comments", Some((Reach::Local, false))),
     ("design/complexity", Some((Reach::Neighbors, false))),

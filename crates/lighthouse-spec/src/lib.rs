@@ -18,8 +18,8 @@ pub use catalog::Catalog;
 pub use catalog::load::{load_local, local_dir, local_files};
 pub use check::{
     At, Binding, BuiltinCheck, BuiltinOp, CelCheck, Check, CheckKind, CycleLevel, DEFAULT_TIMEOUT,
-    Identity, NamedRule, OrderClause, OrderReport, OrderScope, RpcCheck, Select, TemplatePart,
-    parse_template,
+    FORMATTED, Identity, NamedRule, OrderClause, OrderReport, OrderScope, RpcCheck, Select,
+    TemplatePart, parse_template,
 };
 pub use command::{
     Batch, CheckOutput, CheckStdin, CommandCheck, ExitCodes, SarifColumns, SarifSelect,

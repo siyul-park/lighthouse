@@ -15,6 +15,8 @@ use serde_json::{Map, Value};
 
 /// How long a provider may run when the check names no `timeout`.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+/// The id of the builtin check that compares a file with its formatter's output.
+pub const FORMATTED: &str = "core/formatted";
 
 /// How a decision is checked, mirroring [`crate::Fix`]: one provider selected by
 /// `type`, with the fields every provider shares. Which other fields a check

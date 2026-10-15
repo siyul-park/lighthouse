@@ -12,7 +12,7 @@ use lighthouse_model::{
 use serde_json::Value;
 
 use super::{Level, Metadata, ProjectSpec, Resource, RuleDetail, RuleSetting};
-use crate::{BuiltinCheck, Catalog, CheckKind, Decision, Pack, options::KINDS};
+use crate::{BuiltinCheck, Catalog, CheckKind, Decision, FORMATTED, Pack, options::KINDS};
 
 /// The standard projects of every pack of `catalog`, pack by pack.
 pub(crate) fn standard(catalog: &Catalog) -> Vec<Resource<ProjectSpec>> {
@@ -73,7 +73,7 @@ fn every_kind(decision: &Decision) -> Option<Vec<Value>> {
 }
 
 /// Whether the engine runs a rule for the decision: its check is a program,
-/// or one of the two annotation rules the engine serves itself.
+/// or one of the named rules the engine serves itself.
 fn runs_as_rule(decision: &Decision) -> bool {
     let Some(check) = &decision.check else {
         return false;
@@ -81,7 +81,7 @@ fn runs_as_rule(decision: &Decision) -> bool {
     match &check.kind {
         CheckKind::Cel(_) | CheckKind::Command(_) | CheckKind::Builtin(BuiltinCheck::Op(_)) => true,
         CheckKind::Builtin(BuiltinCheck::Named(named)) => {
-            [ANNOTATION_REASON, UNUSED_ALLOW].contains(&named.id.as_str())
+            [ANNOTATION_REASON, UNUSED_ALLOW, FORMATTED].contains(&named.id.as_str())
         }
         CheckKind::Rpc(_) | CheckKind::Model(_) => false,
     }

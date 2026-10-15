@@ -16,10 +16,11 @@ use std::{
     time::Duration,
 };
 
-pub use formatter::{Formatter, FormatterOutput, FormatterSpec, FormatterStdin};
+pub use formatter::FormatterSpec;
 pub use globset::GlobSet;
 use globset::{GlobBuilder, GlobSetBuilder};
 use lighthouse_model::Options;
+pub use lighthouse_process::{Formatter, FormatterOutput, FormatterStdin};
 pub use lighthouse_resource::{Format, Metadata, Resource};
 use lighthouse_resource::{documents, parse_duration, resource};
 pub use models::{

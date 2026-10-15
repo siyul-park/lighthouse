@@ -308,6 +308,10 @@ impl Engine {
             root,
             languages: config.languages().clone(),
             constructors: constructors(&registry, &config),
+            formatters: config
+                .formatters()
+                .map(|(id, formatter)| (id.to_owned(), formatter.clone()))
+                .collect(),
             overlays: BTreeMap::new(),
             cache_dir: None,
         };

@@ -172,6 +172,11 @@ impl Engine {
                 .unwrap_or_default()
                 .as_bytes(),
         );
+        part(
+            serde_json::to_string(&self.ws.formatters)
+                .unwrap_or_default()
+                .as_bytes(),
+        );
         hasher.finish_bytes()
     }
 

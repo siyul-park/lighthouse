@@ -12,7 +12,7 @@ use lighthouse_model::{
     hash,
 };
 use lighthouse_plugin::{Caching, Ctx, Error as PluginError, Rule, RuleManifest};
-use lighthouse_spec::{BuiltinCheck, BuiltinOp, CheckKind, Decision, Select};
+use lighthouse_spec::{BuiltinCheck, BuiltinOp, CheckKind, Decision, FORMATTED, Select};
 use serde_json::{Map, Value};
 
 pub(crate) use crate::eval::{render, to_json};
@@ -20,6 +20,7 @@ use crate::{
     Error,
     cel_rule::CelRule,
     command::CommandRule,
+    formatted,
     manifest::{rule_manifest, rule_options},
     ops,
 };
@@ -40,6 +41,8 @@ enum Kind {
     Order(ops::OrderRule),
     Cycle(ops::CycleRule),
     Command(CommandRule),
+    /// The file equals what the formatter of its language makes of it.
+    Formatted,
     /// The rules about allow annotations: the engine reads the annotations of
     /// the whole project and reports these findings itself, because whether
     /// an annotation is used depends on every other rule's findings. The rule
@@ -72,6 +75,9 @@ impl DeclarativeRule {
             },
             CheckKind::Command(command) => {
                 (Kind::Command(CommandRule::new(check, command)), Vec::new())
+            }
+            CheckKind::Builtin(BuiltinCheck::Named(named)) if named.id == FORMATTED => {
+                (Kind::Formatted, Vec::new())
             }
             CheckKind::Builtin(BuiltinCheck::Named(named))
                 if ANNOTATION_RULES.contains(&named.id.as_str()) =>
@@ -116,6 +122,7 @@ impl DeclarativeRule {
             Kind::Cel(rule) => rule.reach(meta.scope),
             Kind::Order(rule) => rule.reach(),
             Kind::Cycle(_) => (Reach::Global, false),
+            Kind::Formatted => (Reach::Local, false),
             Kind::Command(_) | Kind::Annotation => (Reach::Global, false),
         };
         // The findings of a program that reads the code model are stored;
@@ -168,6 +175,7 @@ impl Rule for DeclarativeRule {
             Kind::Order(rule) => rule.check(meta, ctx, &resolved),
             Kind::Cycle(rule) => rule.check(meta, ctx),
             Kind::Command(rule) => rule.check(meta, ctx, &resolved),
+            Kind::Formatted => formatted::check(meta, ctx),
             Kind::Annotation => Ok(Vec::new()),
         }
     }

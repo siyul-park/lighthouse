@@ -16,17 +16,6 @@ pub(super) fn edges_from(all: &Fragment) -> BTreeMap<SymbolId, Vec<usize>> {
     by_source
 }
 
-/// The resolved `implements` edges, as (type, interface).
-fn implementations(all: &Fragment) -> impl Iterator<Item = (&SymbolId, &SymbolId)> {
-    all.edges
-        .iter()
-        .filter(|e| e.kind == EdgeKind::Implements)
-        .filter_map(|edge| match (&edge.from, &edge.to) {
-            (Node::Symbol(ty), Target::Resolved(Node::Symbol(interface))) => Some((ty, interface)),
-            _ => None,
-        })
-}
-
 /// The interfaces each type implements, by resolved `implements` edges.
 pub(super) fn implements(all: &Fragment) -> BTreeMap<SymbolId, Vec<SymbolId>> {
     let mut found: BTreeMap<SymbolId, Vec<SymbolId>> = BTreeMap::new();
@@ -43,4 +32,15 @@ pub(super) fn implementers(all: &Fragment) -> BTreeMap<SymbolId, Vec<SymbolId>> 
         found.entry(interface.clone()).or_default().push(ty.clone());
     }
     found
+}
+
+/// The resolved `implements` edges, as (type, interface).
+fn implementations(all: &Fragment) -> impl Iterator<Item = (&SymbolId, &SymbolId)> {
+    all.edges
+        .iter()
+        .filter(|e| e.kind == EdgeKind::Implements)
+        .filter_map(|edge| match (&edge.from, &edge.to) {
+            (Node::Symbol(ty), Target::Resolved(Node::Symbol(interface))) => Some((ty, interface)),
+            _ => None,
+        })
 }

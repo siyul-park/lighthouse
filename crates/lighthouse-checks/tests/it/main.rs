@@ -14,6 +14,7 @@ mod design_placement;
 mod design_rules;
 mod directives;
 mod fixes;
+mod formatted;
 mod func_facts;
 mod go;
 mod layout;

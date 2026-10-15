@@ -280,7 +280,7 @@ fn decision_list_all_shows_status_of_every_decision() {
     let text = String::from_utf8(out.stdout).unwrap();
     for line in [
         "core/file-size\timplemented\twarn\tFiles stay small and cohesive",
-        "design/responsibility\tjudged\tinfo\tOne responsibility per symbol, and a boundary for every split",
+        "design/duplication\tjudged\tinfo\tOne implementation, one owner",
         "testing/validation\tdoc\t-\tSmallest failing contract first, validated up to the contract",
     ] {
         assert!(text.lines().any(|l| l == line), "{line}");
@@ -291,11 +291,11 @@ fn decision_list_all_shows_status_of_every_decision() {
 fn explain_describes_judged_decisions() {
     let dir = tempfile::tempdir().unwrap();
     let out = lighthouse(dir.path())
-        .args(["decision", "show", "design/responsibility"])
+        .args(["decision", "show", "design/duplication"])
         .output()
         .unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
-    assert!(text.contains("**Requirement**\n\nEach symbol MUST have one coherent responsibility"));
+    assert!(text.contains("**Requirement**\n\nMultiple implementations of the same behavior"));
     assert!(text.contains("Status: judged"));
 }
 

@@ -98,6 +98,7 @@ const ITEMS: &[&str] = &[
     "ch. 5 Vertical distance",
     "ch. 5 Horizontal size",
     "ch. 5 Horizontal openness and indentation",
+    "ch. 5 Team rules",
     "ch. 5 Dummy scopes",
     "ch. 6 Data/object anti-symmetry",
     "ch. 6 Law of Demeter",
@@ -159,7 +160,7 @@ const NOT_APPLICABLE: &[(&str, &str)] = &[
 ];
 
 /// The facts and phases that unlock an item no bundled decision covers yet.
-/// The fact table is design.md; R5c and R5d are the phases that add new kinds.
+/// The fact table is design.md; R5d is the phase that adds new kinds.
 const UNLOCKS: &[&str] = &[
     "func.gap",
     "symbol.func",
@@ -173,20 +174,15 @@ const UNLOCKS: &[&str] = &[
     "locals",
     "clones",
     "coverage",
-    "R5c",
     "R5d",
 ];
 
 /// Items waiting on a fact or phase.
 const PENDING: &[(&str, &str)] = &[
-    ("C1 Inappropriate Information", "R5c"),
-    ("C5 Commented-Out Code", "R5c"),
     ("F2 Output Arguments", "param-attributes"),
     ("F3 Flag Arguments", "param-attributes"),
-    ("F4 Dead Function", "R5c"),
     ("G1 Multiple Languages in One Source File", "events"),
     ("G3 Incorrect Behavior at the Boundaries", "coverage"),
-    ("G9 Dead Code", "R5c"),
     ("G15 Selector Arguments", "param-attributes"),
     ("G19 Use Explanatory Variables", "flow"),
     (
@@ -205,7 +201,6 @@ const PENDING: &[(&str, &str)] = &[
     ),
     ("G36 Avoid Transitive Navigation", "events"),
     ("N5 Use Long Names for Long Scopes", "locals"),
-    ("N6 Avoid Encodings", "R5c"),
     ("N7 Names Should Describe Side-Effects", "effects"),
     ("T2 Use a Coverage Tool!", "coverage"),
     (
@@ -216,15 +211,7 @@ const PENDING: &[(&str, &str)] = &[
     ("ch. 3 Command-query separation", "effects"),
     ("ch. 3 No side effects", "effects"),
     ("ch. 3 Prefer exceptions to error codes", "events"),
-    ("ch. 4 TODO comments", "R5c"),
-    ("ch. 4 Journal comments", "R5c"),
-    ("ch. 4 Closing brace comments", "R5c"),
-    ("ch. 4 Commented-out code", "R5c"),
-    ("ch. 5 Vertical openness and density", "R5c"),
-    ("ch. 5 Horizontal size", "R5c"),
-    ("ch. 5 Horizontal openness and indentation", "R5c"),
     ("ch. 6 Law of Demeter", "events"),
-    ("ch. 6 Hybrids", "R5c"),
     ("ch. 7 Don't return null", "events"),
     (
         "ch. 8 Use third-party code through boundaries",

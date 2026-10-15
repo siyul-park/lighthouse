@@ -2,6 +2,10 @@
 //! program leads its own process group on unix, so a timeout takes
 //! everything it started down with it.
 
+mod format;
+
+pub use format::{Formatter, FormatterOutput, FormatterStdin};
+
 use std::{
     io::{Read, Write},
     path::Path,
