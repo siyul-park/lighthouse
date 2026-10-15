@@ -31,9 +31,10 @@ spec:
     The option `deadKinds` names the kinds of symbol it reports; types are
     left out by default because a type used only in type positions has no
     reference edge, and constants because a constant group counts as used when
-    any member is (staticcheck U1000) and iota sentinels are never referenced. One that only tests use is left to agent review. Rust leaves dead
-    code to rustc's `dead_code` lint, which sees type positions and macro
-    arguments the index does not, so `deadKinds` is empty there.
+    any member is (staticcheck U1000) and iota sentinels are never
+    referenced. One that only tests use is left to agent review. Rust leaves
+    dead code to rustc's `dead_code` lint, which sees type positions and
+    macro arguments the index does not, so `deadKinds` is empty there.
 
     Kind `interface` (off by default and on in the strict preset): a private
     interface with members and exactly one implementing type, tests included:
