@@ -7,7 +7,8 @@
 # the strict configuration (baseline/strict-root.toml for a Cargo workspace,
 # baseline/strict-go.toml for a Go module), three times, and writes
 # baseline/<name>.json: the commit, the size, the exit code, the findings per
-# decision and the median time of each phase. Everything but the times is
+# decision, the median time of each phase and the reach of its modules and
+# symbols (the stability example, as "system"). Everything but the times is
 # deterministic. It needs no network. Go must be on PATH (GOENV_VERSION too,
 # when goenv selects it); the Go build cache should be warm.
 set -eu
@@ -16,12 +17,14 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 make -s plugins
 cargo build -q --release -p lighthouse-cli
+cargo build -q --release -p lighthouse-session --example stability
 
 python3 - "$root" "$@" <<'PY'
 import hashlib, json, os, statistics, subprocess, sys, re
 
 root, repos = sys.argv[1], sys.argv[2:]
 binary = f"{root}/target/release/lighthouse"
+probe = f"{root}/target/release/examples/stability"
 plugins = f"{root}/target/plugins"
 RUNS = 3
 SOURCES = {".go": "go", ".rs": "rust"}
@@ -100,6 +103,9 @@ with tempfile.TemporaryDirectory() as scratch:
         code, counts, incomplete, _ = results[0]
         phases = {p: round(statistics.median(r[3][p] for r in results), 1) for p in results[0][3]}
         head, dirty, diff = commit(path)
+        system = subprocess.run(
+            [probe, "--config", cfg, path], capture_output=True, text=True, check=True
+        )
         report = {
             "repo": name,
             "commit": head,
@@ -112,6 +118,7 @@ with tempfile.TemporaryDirectory() as scratch:
             "findings": dict(sorted(counts.items())),
             "findingsTotal": sum(counts.values()),
             "timingsMs": {"runs": RUNS, "median": phases},
+            "system": json.loads(system.stdout),
         }
         with open(f"{root}/baseline/{name}.json", "w") as out:
             json.dump(report, out, indent=2, sort_keys=True)
