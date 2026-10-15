@@ -11,7 +11,13 @@ spec:
   title: Files stay small and cohesive
   context: >-
     Large files tend to mix responsibilities, and splitting by size alone
-    creates arbitrary boundaries. The count is the file's lines (revive
+    creates arbitrary boundaries. The limits measure the design, not its
+    packaging: the remedy is simpler code or a concept that is reused, never
+    the same code moved elsewhere (Ousterhout, A Philosophy of Software Design
+    chs. 4 and 9; Fowler, Refactoring 2nd ed.: Inline Function, Lazy Element,
+    Middle Man). A half moved to another file that stays tied to the first
+    through private items is not a boundary (see `design/responsibility`, kind
+    `conjoined`). The count is the file's lines (revive
     `file-length-limit`), reported once per file with the kind `lines`.
 
     Kind `width` (off by default and on in the strict preset): a line wider
@@ -27,8 +33,9 @@ spec:
     tests: include
   requirement: >-
     A file SHOULD stay at or below the configured line limit (option `max`). A
-    file that is over the limit MUST be split along cohesion boundaries, not by
-    size alone. A line that can be wrapped SHOULD NOT be wider than the
+    file that is over the limit MUST be made simpler, or split along a boundary
+    whose halves are used apart, never by size alone or by moving code to a
+    file that remains tied to the first. A line that can be wrapped SHOULD NOT be wider than the
     configured number of columns (option `maxWidth`).
   severity: warn
   options:
@@ -83,6 +90,8 @@ spec:
     - Martin, Clean Code (2008), ch. 5 Vertical size and ordering
     - Martin, Clean Code (2008), ch. 5 Horizontal size
     - 'ESLint max-len: https://eslint.org/docs/latest/rules/max-len'
+    - Ousterhout, A Philosophy of Software Design (2018), chs. 4 and 9
+    - Fowler, Refactoring (2nd ed., 2018), Inline Function, Lazy Element, Middle Man
   examples:
   - name: over-limit
     language: text

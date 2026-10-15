@@ -11,10 +11,13 @@ spec:
   title: Every symbol earns its existence
   context: >-
     A symbol that earns nothing is indirection and noise (Martin, Clean Code
-    G12 Clutter): a forwarding wrapper adds a name without
-    adding meaning, a private helper with a single caller is part of that
-    caller unless it names a concept, and every public knob has to be
-    supported forever.
+    G12 Clutter): a forwarding wrapper adds a name without adding meaning, a
+    private helper with a single caller is part of that caller unless it names
+    a concept, and every public knob has to be supported forever. The limits
+    measure the design, not its packaging: the remedy is simpler code or a
+    concept that is reused, never relocation (Ousterhout, A Philosophy of
+    Software Design chs. 4 and 9; Fowler, Refactoring 2nd ed.: Inline
+    Function, Lazy Element, Middle Man).
 
     Kind `wrapper`: a function or method whose whole body forwards to one
     other function with the arguments it was given, and that is called from
@@ -135,6 +138,8 @@ spec:
     - Martin, Clean Code (2008), F4 Dead Function
     - Martin, Clean Code (2008), G12 Clutter
     - Martin, Clean Code (2008), ch. 12 Beck's four rules
+    - Ousterhout, A Philosophy of Software Design (2018), chs. 4 and 9
+    - Fowler, Refactoring (2nd ed., 2018), Inline Function, Lazy Element, Middle Man
   examples:
   - name: invalid
     language: go

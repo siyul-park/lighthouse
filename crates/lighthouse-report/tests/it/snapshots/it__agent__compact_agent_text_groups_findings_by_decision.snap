@@ -1,5 +1,6 @@
 ---
 source: crates/lighthouse-report/tests/it/agent.rs
+assertion_line: 648
 expression: "render_with(Format::Agent, &findings, &gap(), &briefing)"
 ---
 acme/custom error
@@ -11,7 +12,7 @@ design/exported-doc warn [review] — Exported symbols SHOULD have doc comments 
     func Helper() {}
   bar/bar.go:4:1 exported function Func1 must have a doc comment adc7d1d
   bar/bar.go:7:1 exported function Func2 must have a doc comment ab2cb8c {receiver=T} (note: judgment expired: decision changed)
-design/complexity warn [review] — A function SHOULD NOT exceed the limit of its role in lines, statements, cyclomatic complexity, cognitive complexity or nesting depth, and SHOULD NOT be a dependency hub or a high fan-out coordinator. Cyclomatic complexity is one path plus each `if`, `else if`, loop, error handler clause, non-default switch arm and boolean operator (`&&`, `||`). The split is by responsibility: the remedy is smaller functions, never moving the same body elsewhere. One function MUST stay at one abstraction level: intent and mechanics are not mixed in one body, so that it reads as a sequence of steps one level below its name. Mechanical checks SHOULD be preferred for directly expressible rules; heuristic signals SHOULD remain advisory and use deliberately high thresholds.
+design/complexity warn [review] — A function SHOULD NOT exceed the limit of its role in lines, statements, cyclomatic complexity, cognitive complexity or nesting depth, and SHOULD NOT be a dependency hub or a high fan-out coordinator. Cyclomatic complexity is one path plus each `if`, `else if`, loop, error handler clause, non-default switch arm and boolean operator (`&&`, `||`). The remedy is simpler code or a concept that is reused, never the same body moved elsewhere. One function MUST stay at one abstraction level: intent and mechanics are not mixed in one body, so that it reads as a sequence of steps one level below its name. Mechanical checks SHOULD be preferred for directly expressible rules; heuristic signals SHOULD remain advisory and use deliberately high thresholds.
   expected:
     package sample
 
