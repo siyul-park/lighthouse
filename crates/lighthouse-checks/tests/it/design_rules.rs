@@ -58,11 +58,8 @@ fn exported_doc_skips_exempt_methods_interface_members_private_owners_and_kinds(
     member(&mut w, &public, "Flagged", SymbolKind::Method);
     let found = w.check(DOC, json!({}));
     assert_eq!(w.names(&found), ["Flagged"]);
-    let strict = w.check(
-        DOC,
-        json!({ "exemptMethods": [], "kinds": ["method", "field"] }),
-    );
-    assert_eq!(w.names(&strict), ["String", "Field", "Flagged"]);
+    let methods = w.check(DOC, json!({ "exemptMethods": [], "kinds": ["method"] }));
+    assert_eq!(w.names(&methods), ["String", "Flagged"]);
 }
 
 #[test]

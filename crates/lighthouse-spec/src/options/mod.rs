@@ -10,6 +10,10 @@ use serde_json::{Map, Value};
 
 mod shape;
 
+/// The option of a decision that reports several kinds: a list whose items
+/// are one of the declared kinds, of which the default switches some on.
+pub(crate) const KINDS: &str = "kinds";
+
 pub use shape::{LIMIT_ROLES, NO_LIMIT, Shape, definitions, merge};
 
 /// The JSON type the values of an option must have; `number` accepts any

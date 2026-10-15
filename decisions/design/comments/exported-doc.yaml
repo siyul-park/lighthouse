@@ -43,6 +43,7 @@ spec:
     properties:
       kinds:
         type: array
+        items: { type: string, enum: [function, method, type, interface, const, var] }
         default: [function, method, type, interface, const, var]
         description: Symbol kinds that must be documented when exported.
       includeInternal:

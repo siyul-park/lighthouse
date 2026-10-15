@@ -1,10 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use lighthouse_model::{EdgeKind, RunScope, Severity};
+use serde_json::Value;
 
 use crate::{
-    Catalog, CheckKind, Decision, DecisionStatus, Error, Example, ExampleKind,
+    Catalog, CheckKind, Decision, DecisionStatus, Error, Example, ExampleKind, OptionType,
     check::{BuiltinCheck, BuiltinOp},
+    options::KINDS,
     sources::{SourceLine, has_keyword},
 };
 
@@ -265,6 +267,9 @@ fn options(decision: &Decision) -> Result<(), Error> {
             ));
         }
     }
+    if let Some(kinds) = schema.properties.get(KINDS) {
+        kinds_shape(id, kinds)?;
+    }
     for (language, spec) in &decision.languages {
         for (key, value) in &spec.options {
             let property = schema.properties.get(key).ok_or_else(|| {
@@ -283,6 +288,29 @@ fn options(decision: &Decision) -> Result<(), Error> {
                 ));
             }
         }
+    }
+    Ok(())
+}
+
+/// The `kinds` option lists kinds: `items.enum` names each one once, and the
+/// default (checked against the items with the other defaults) is some of them.
+fn kinds_shape(id: &str, kinds: &crate::OptionSchema) -> Result<(), Error> {
+    let fail = |reason: &str| Error::invalid(id, format!("option `{KINDS}` {reason}"));
+    let Some(items) = kinds
+        .items
+        .as_deref()
+        .filter(|_| kinds.kind == Some(OptionType::Array))
+    else {
+        return Err(fail("must be a list with `items`"));
+    };
+    let declared: BTreeSet<&str> = items
+        .values
+        .iter()
+        .filter_map(Value::as_str)
+        .filter(|kind| !kind.is_empty())
+        .collect();
+    if declared.is_empty() || declared.len() != items.values.len() {
+        return Err(fail("needs `items.enum`: unique, non-empty strings"));
     }
     Ok(())
 }

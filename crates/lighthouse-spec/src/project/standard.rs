@@ -1,13 +1,18 @@
 //! The projects every pack has: `<pack>/recommended` holds each enforced
 //! decision that is not `strict` at its authored severity, and
-//! `<pack>/strict` holds every enforced one, present only when some decision
-//! of the pack is strict. They derive from the decisions, so a catalog never
-//! lists them.
+//! `<pack>/strict` holds every enforced one, with every kind of a decision
+//! whose `kinds` option switches only some on by default. `strict` is present
+//! only when some decision of the pack asks for it. They derive from the
+//! decisions, so a catalog never lists them.
 
-use lighthouse_model::annotation::{ANNOTATION_REASON, UNUSED_ALLOW};
+use lighthouse_model::{
+    Options,
+    annotation::{ANNOTATION_REASON, UNUSED_ALLOW},
+};
+use serde_json::Value;
 
-use super::{Metadata, ProjectSpec, Resource, RuleSetting};
-use crate::{BuiltinCheck, Catalog, CheckKind, Decision, Pack};
+use super::{Level, Metadata, ProjectSpec, Resource, RuleDetail, RuleSetting};
+use crate::{BuiltinCheck, Catalog, CheckKind, Decision, Pack, options::KINDS};
 
 /// The standard projects of every pack of `catalog`, pack by pack.
 pub(crate) fn standard(catalog: &Catalog) -> Vec<Resource<ProjectSpec>> {
@@ -19,25 +24,34 @@ pub(crate) fn standard(catalog: &Catalog) -> Vec<Resource<ProjectSpec>> {
             .flat_map(|s| &s.decisions)
             .filter(|d| runs_as_rule(d) && d.enforced())
             .collect();
-        projects.push(project(pack, "recommended", &rules, |d| !d.strict()));
-        if rules.iter().any(|d| d.strict()) {
-            projects.push(project(pack, "strict", &rules, |_| true));
+        projects.push(project(pack, &rules, false));
+        if rules.iter().any(|d| d.strict() || every_kind(d).is_some()) {
+            projects.push(project(pack, &rules, true));
         }
     }
     projects
 }
 
-fn project(
-    pack: &Pack,
-    name: &str,
-    rules: &[&Decision],
-    include: fn(&Decision) -> bool,
-) -> Resource<ProjectSpec> {
+fn project(pack: &Pack, rules: &[&Decision], strict: bool) -> Resource<ProjectSpec> {
     let rules = rules
         .iter()
-        .filter(|d| include(d))
-        .filter_map(|d| Some((d.id().to_owned(), RuleSetting::level(d.severity()?))))
+        .filter(|d| strict || !d.strict())
+        .filter_map(|d| {
+            let level = Level::from(Some(d.severity()?));
+            let setting = match every_kind(d).filter(|_| strict) {
+                Some(kinds) => RuleSetting::Detailed(RuleDetail {
+                    level,
+                    options: Options::from_iter([(KINDS.to_owned(), Value::Array(kinds))]),
+                    generated: None,
+                    model: None,
+                    evaluation: None,
+                }),
+                None => RuleSetting::Level(level),
+            };
+            Some((d.id().to_owned(), setting))
+        })
         .collect();
+    let name = if strict { "strict" } else { "recommended" };
     Resource::new(
         Metadata::named(format!("{}/{name}", pack.id)),
         ProjectSpec {
@@ -45,6 +59,17 @@ fn project(
             ..ProjectSpec::default()
         },
     )
+}
+
+/// Every kind a decision can report, when its `kinds` option switches only
+/// some of them on by default.
+fn every_kind(decision: &Decision) -> Option<Vec<Value>> {
+    let kinds = decision.options.as_ref()?.properties.get(KINDS)?;
+    let all = &kinds.items.as_ref()?.values;
+    let on = kinds.default.as_array()?;
+    all.iter()
+        .any(|kind| !on.contains(kind))
+        .then(|| all.clone())
 }
 
 /// Whether the engine runs a rule for the decision: its check is a program,

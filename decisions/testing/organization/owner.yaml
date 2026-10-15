@@ -61,6 +61,7 @@ spec:
           of it, private modules whose items the root re-exports included.
       kinds:
         type: array
+        items: { type: string, enum: [function, method, type] }
         default: [function, method, type]
         description: >-
           Kinds of public symbols that need an owner test. Interfaces are tested

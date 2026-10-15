@@ -4,6 +4,7 @@ mod catalog;
 mod checks;
 mod fixes;
 mod kinds;
+mod kinds_option;
 mod local;
 mod models;
 mod project;

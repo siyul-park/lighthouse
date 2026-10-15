@@ -40,6 +40,9 @@ pub struct Shape {
     /// A named shape defined once by the spec, such as `#/$defs/limit`.
     #[serde(rename = "$ref", default, skip_serializing_if = "Option::is_none")]
     pub reference: Option<String>,
+    /// The values a value may be one of.
+    #[serde(rename = "enum", default, skip_serializing_if = "Vec::is_empty")]
+    pub values: Vec<Value>,
     /// The least an integer may be.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub minimum: Option<i64>,
@@ -74,6 +77,10 @@ impl Shape {
         let shape = self.target().unwrap_or(self);
         if !shape.one_of.is_empty() {
             return shape.check_one_of(value, at);
+        }
+        if !shape.values.is_empty() && !shape.values.contains(value) {
+            let names: Vec<String> = shape.values.iter().map(Value::to_string).collect();
+            return Err(format!("{at} must be one of {}", names.join(", ")));
         }
         let Some(kind) = shape.kind else {
             return Ok(());

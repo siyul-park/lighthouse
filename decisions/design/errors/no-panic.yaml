@@ -44,6 +44,7 @@ spec:
         description: Name prefixes of functions that may panic.
       kinds:
         type: array
+        items: { type: string, enum: [panic, unwrap, expect, unwrap_err, expect_err, todo, unimplemented, unreachable] }
         default: [panic, unwrap, expect, unwrap_err, expect_err, todo, unimplemented, unreachable]
         description: >-
           What to report: a Go call of `panic`, a Rust macro (`panic`, `todo`,

@@ -38,6 +38,7 @@ spec:
     properties:
       kinds:
         type: array
+        items: { type: string, enum: [function, type, interface, const, var] }
         default: [function, type, interface, const, var]
         description: >-
           Kinds of exported top-level symbols whose names are checked. Empty for
