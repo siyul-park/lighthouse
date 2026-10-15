@@ -2,6 +2,7 @@
 
 mod catalog;
 mod checks;
+mod clean_code;
 mod fixes;
 mod kinds;
 mod kinds_option;
