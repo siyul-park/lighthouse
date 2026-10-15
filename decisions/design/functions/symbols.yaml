@@ -22,6 +22,18 @@ spec:
     reported, since it can be inlined. One that adds an argument, or is
     needed as a function value, is not a wrapper.
 
+    Kind `dead` (off by default and on in the strict preset): a private
+    function, method, type, interface, constant or variable that nothing
+    calls and nothing refers to, that does not implement an interface, is no
+    test fixture and is not `main`, `init` or `_`: delete it (Martin, Clean
+    Code G9 and F4). One that only tests use is left to agent review.
+
+    Kind `interface` (off by default and on in the strict preset): a private
+    interface with members and exactly one implementing type, tests included:
+    use the type directly until a second implementation exists. An exported
+    interface with one implementation is left to agent review, since callers
+    outside the project may implement it.
+
     Helpers that are not wrappers are judged: a private function or method
     with exactly one production caller is put to a model, with the
     requirement and the examples as the question.
@@ -42,25 +54,66 @@ spec:
     options, extension points, aliases, and pass-through wrappers MUST NOT be
     exposed without a distinct contract.
   severity: warn
+  options:
+    type: object
+    properties:
+      kinds:
+        type: array
+        items: { type: string, enum: [wrapper, dead, interface] }
+        default: [wrapper]
+        description: What to report.
+    additionalProperties: false
   check:
     type: cel
-    select: function
-    where: (func.kind == 'function' || func.kind == 'method') && func.forwards_only
+    select: symbol
+    with:
+      - name: callable
+        expr: "symbol.func != null && (symbol.kind == 'function' || symbol.kind == 'method')"
+      - name: matched
+        expr: >-
+          ('wrapper' in options.kinds && callable && symbol.func.forwards_only ? ['wrapper'] : [])
+          + ('dead' in options.kinds && symbol.visibility == 'private'
+              && symbol.kind in ['function', 'method', 'type', 'interface', 'const', 'var']
+              && symbol.callers == 0 && symbol.references == 0 && !symbol.implementation
+              && symbol.test_role == '' && !(symbol.name in ['main', 'init', '_'])
+             ? ['dead'] : [])
+          + ('interface' in options.kinds && symbol.kind == 'interface'
+              && symbol.visibility == 'private' && symbol.members > 0
+              && size(symbol.implementers) == 1
+             ? ['interface'] : [])
+    where: size(matched) > 0
     review: >-
-      (func.kind == 'function' || func.kind == 'method')
-      && func.visibility == 'private' && func.name != 'main' && func.name != 'init'
-      && !func.implementation && size(callers(func).filter(c, !c.test)) == 1
+      ('wrapper' in options.kinds && callable
+        && symbol.visibility == 'private' && symbol.name != 'main' && symbol.name != 'init'
+        && !symbol.implementation && size(callers(symbol.func).filter(c, !c.test)) == 1)
+      || ('dead' in options.kinds && symbol.visibility == 'private'
+          && symbol.kind in ['function', 'method', 'type', 'interface', 'const', 'var']
+          && size(callers(symbol).filter(c, !c.test)) == 0 && symbol.callers > 0
+          && symbol.references == 0)
+      || ('interface' in options.kinds && symbol.kind == 'interface'
+          && symbol.visibility != 'private' && symbol.members > 0
+          && size(symbol.implementers) == 1)
     message: >-
-      {{ func.forwards_only ? 'private helper ' + func.name + ' is a single-use forwarding wrapper; inline it' : '' }}
+      {{ size(matched) == 0 ? ''
+         : matched[0] == 'wrapper'
+         ? 'private helper ' + symbol.name + ' is a single-use forwarding wrapper; inline it'
+         : matched[0] == 'dead'
+         ? symbol.name + ' is never used; delete it'
+         : symbol.name + ' has one implementation (' + symbol.implementers[0].name + '); use '
+           + symbol.implementers[0].name + ' directly until a second one exists' }}
     evidence:
-      kind: "'wrapper'"
-      kinds: "['wrapper']"
-      callee: func.forward_target
-      callers: func.callers
+      kind: "size(matched) > 0 ? matched[0] : ''"
+      kinds: matched
+      callee: "'wrapper' in matched ? symbol.func.forward_target : null"
+      callers: "'wrapper' in matched ? symbol.func.callers : null"
+      implementer: "'interface' in matched ? symbol.implementers[0].id : null"
+      stateless: "'interface' in matched ? symbol.implementers[0].stateless : null"
     identity:
-      subject: func.id
+      subject: symbol.id
   provenance:
     wasDerivedFrom:
+    - Martin, Clean Code (2008), G9 Dead Code
+    - Martin, Clean Code (2008), F4 Dead Function
     - Martin, Clean Code (2008), G12 Clutter
     - Martin, Clean Code (2008), ch. 12 Beck's four rules
   examples:
@@ -334,4 +387,199 @@ spec:
 
         pub fn elsewhere(store: &external::Handle) -> u8 {
             store.load(0)
+        }
+  - name: dead-go-invalid
+    language: go
+    kind: invalid
+    options: { kinds: [dead] }
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        func Run() int { return helper() }
+
+        func helper() int { return 1 }
+
+        func unused() int { return 2 }
+    expect:
+    - line: 7
+  - name: dead-go-valid
+    language: go
+    kind: valid
+    options: { kinds: [dead] }
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        func Run() int { return helper() }
+
+        func helper() int { return 1 }
+  - name: dead-rust-invalid
+    language: rust
+    kind: invalid
+    options: { kinds: [dead] }
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn run() -> i32 {
+            helper()
+        }
+
+        fn helper() -> i32 {
+            1
+        }
+
+        fn unused() -> i32 {
+            2
+        }
+    expect:
+    - line: 9
+  - name: dead-rust-valid
+    language: rust
+    kind: valid
+    options: { kinds: [dead] }
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn run() -> i32 {
+            helper()
+        }
+
+        fn helper() -> i32 {
+            1
+        }
+  - name: interface-go-invalid
+    language: go
+    kind: invalid
+    options: { kinds: [interface] }
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type store interface {
+        	Get() int
+        	Put(x int)
+        }
+
+        type memory struct{ n int }
+
+        func (m *memory) Get() int  { return m.n }
+        func (m *memory) Put(x int) { m.n = x }
+
+        func Use() int {
+        	m := &memory{}
+        	m.Put(1)
+        	return m.Get()
+        }
+    expect:
+    - line: 3
+  - name: interface-go-valid
+    language: go
+    kind: valid
+    options: { kinds: [interface] }
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type store interface {
+        	Get() int
+        	Put(x int)
+        }
+
+        type memory struct{ n int }
+
+        func (m *memory) Get() int  { return m.n }
+        func (m *memory) Put(x int) { m.n = x }
+
+        func Use() int {
+        	m := &memory{}
+        	m.Put(1)
+        	return m.Get()
+        }
+
+        type disk struct{ n int }
+
+        func (d *disk) Get() int  { return d.n }
+        func (d *disk) Put(x int) { d.n = x }
+  - name: interface-rust-invalid
+    language: rust
+    kind: invalid
+    options: { kinds: [interface] }
+    files:
+    - path: src/lib.rs
+      body: |-
+        trait Store {
+            fn get(&self) -> i32;
+            fn put(&mut self, x: i32);
+        }
+
+        struct Memory {
+            n: i32,
+        }
+
+        impl Store for Memory {
+            fn get(&self) -> i32 {
+                self.n
+            }
+
+            fn put(&mut self, x: i32) {
+                self.n = x;
+            }
+        }
+
+        pub fn run() -> i32 {
+            let mut m = Memory { n: 0 };
+            m.put(1);
+            m.get()
+        }
+    expect:
+    - line: 1
+  - name: interface-rust-valid
+    language: rust
+    kind: valid
+    options: { kinds: [interface] }
+    files:
+    - path: src/lib.rs
+      body: |-
+        trait Store {
+            fn get(&self) -> i32;
+            fn put(&mut self, x: i32);
+        }
+
+        struct Memory {
+            n: i32,
+        }
+
+        impl Store for Memory {
+            fn get(&self) -> i32 {
+                self.n
+            }
+
+            fn put(&mut self, x: i32) {
+                self.n = x;
+            }
+        }
+
+        pub fn run() -> i32 {
+            let mut m = Memory { n: 0 };
+            m.put(1);
+            m.get()
+        }
+
+        struct Disk {
+            n: i32,
+        }
+
+        impl Store for Disk {
+            fn get(&self) -> i32 {
+                self.n
+            }
+
+            fn put(&mut self, x: i32) {
+                self.n = x;
+            }
         }

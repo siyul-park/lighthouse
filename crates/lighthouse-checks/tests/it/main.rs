@@ -19,6 +19,7 @@ mod go;
 mod layout;
 mod line_widths;
 mod model_selects;
+mod module_types;
 mod neighbors;
 mod reach;
 mod rules;

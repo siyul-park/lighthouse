@@ -284,6 +284,7 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
             "design/naming",
             "design/ownership",
             "design/prefer-method",
+            "design/responsibility",
             "design/signature",
             "design/symbols",
         ]

@@ -15,7 +15,7 @@ pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, Type
 use crate::{
     Document,
     merge::{resolve_all, sites_of, sorted_union},
-    relations::{edges_from, implements},
+    relations::{edges_from, implementers, implements},
 };
 
 /// 1-based line and column.
@@ -447,6 +447,8 @@ struct Index {
     edges_from: BTreeMap<SymbolId, Vec<usize>>,
     /// The interfaces a type implements, by resolved `implements` edges.
     implements: BTreeMap<SymbolId, Vec<SymbolId>>,
+    /// The types that implement an interface: the reverse of `implements`.
+    implementers: BTreeMap<SymbolId, Vec<SymbolId>>,
 }
 
 /// One place that refers to a symbol, from an edge with a `site`.
@@ -625,6 +627,11 @@ impl Project {
         self.index.implements.get(id).map_or(&[], Vec::as_slice)
     }
 
+    /// The types that implement the interface `id`, in test files too.
+    pub fn implementers(&self, id: &SymbolId) -> &[SymbolId] {
+        self.index.implementers.get(id).map_or(&[], Vec::as_slice)
+    }
+
     /// Distinct symbols `id` has a resolved, non-heuristic `calls` edge to,
     /// excluding itself.
     pub fn callees(&self, id: &SymbolId) -> &[SymbolId] {
@@ -652,6 +659,7 @@ impl Index {
         }
         index.edges_from = edges_from(all);
         index.implements = implements(all);
+        index.implementers = implementers(all);
         for (at, function) in all.functions.iter().enumerate() {
             index.functions.insert(function.symbol.clone(), at);
         }

@@ -59,6 +59,10 @@ pub const FACTS: &[(&str, Reach)] = &[
     ("effective", Reach::Global),
     ("module_imports", Reach::Global),
     ("homonyms", Reach::Global),
+    // The types of a module, with the cohesion of their methods; the types
+    // that implement an interface, tests included.
+    ("types", Reach::Global),
+    ("implementers", Reach::Global),
 ];
 
 /// The functions of the library, by name.

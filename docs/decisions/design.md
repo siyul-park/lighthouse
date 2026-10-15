@@ -10,18 +10,51 @@ Design minimizes conceptual surface while keeping responsibility and ownership b
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`design/responsibility`](#one-responsibility-per-symbol-and-a-boundary-for-every-split) | One responsibility per symbol, and a boundary for every split | info · model |  |  |
+| [`design/responsibility`](#one-responsibility-per-symbol-and-a-boundary-for-every-split) | One responsibility per symbol, and a boundary for every split | info · cel |  |  |
 | [`design/duplication`](#one-implementation-one-owner) | One implementation, one owner | info · model |  |  |
 
 ### One responsibility per symbol, and a boundary for every split
 
-`design/responsibility` · module · info · model
+`design/responsibility` · module · info · cel
 
-*A symbol with one responsibility and a narrow contract is easy to name, test and reuse; a split without a real difference in lifecycle or invariant only adds navigation cost, and a small module that a single other module uses is that user's detail (Martin, Clean Code ch. 10: a class has one reason to change; Ousterhout, A Philosophy of Software Design ch. 4 and 9: deep modules, better together). Reuse bought by merging unrelated roles couples things that change for different reasons. Judged: the requirement and the examples are the question put to a model, for each module that is small and has a single dependent, no dependents or no declarations of its own.*
+*A symbol with one responsibility and a narrow contract is easy to name, test and reuse; a split without a real difference in lifecycle or invariant only adds navigation cost, and a small module that a single other module uses is that user's detail (Martin, Clean Code ch. 10: a class has one reason to change; Ousterhout, A Philosophy of Software Design ch. 4 and 9: deep modules, better together). Reuse bought by merging unrelated roles couples things that change for different reasons. Kinds, off by default and on in the strict preset, one finding per module at its first type that matches, the kind being the first match. `members`: a type has more public methods than `maxMembers` (Sonar S1448, classes should not have too many methods; methods that implement an interface are not counted). `cohesion`: a type with at least `minMethods` methods whose methods fall in more than one connected group, where two methods are joined by a field they both use or by a call between them (LCOM4, Hitz and Montazeri 1995). A type that implements an interface keeps its implementing methods in the groups. Judged by agent review: a small module with a single dependent, no dependents or no declarations of its own, whether it is a real boundary or its user's detail; the requirement and the examples are the question.*
 
 Each symbol MUST have one coherent responsibility, a narrow contract, and sufficient scope for every legitimate caller. Symbols MUST be separated only when responsibility, invariant, ownership, lifecycle, or abstraction level differs. Physical separation MUST represent a real responsibility, ownership, or abstraction boundary: a module separated from its only user MUST be that kind of boundary, or be merged into the user. Unrelated roles MUST NOT be combined merely to force reuse.
 
-Derived from: Martin, Clean Code (2008), ch. 10 Classes should be small; Martin, Clean Code (2008), ch. 10 Single responsibility and cohesion; Martin, Clean Code (2008), ch. 10 Organize for change; Martin, Clean Code (2008), G30 Functions Should Do One Thing
+Derived from: Martin, Clean Code (2008), ch. 10 Classes should be small; Martin, Clean Code (2008), ch. 10 Single responsibility and cohesion; Martin, Clean Code (2008), ch. 10 Organize for change; Martin, Clean Code (2008), G30 Functions Should Do One Thing; Hitz and Montazeri, Measuring Coupling and Cohesion in Object-Oriented Systems (1995): LCOM4
+
+| option | default | meaning |
+| --- | --- | --- |
+| `kinds` | `[]` | What to report. |
+| `maxMembers` | `10` | Most public methods a type may have. |
+| `minMethods` | `4` | Fewest methods a type has to have for its cohesion to be judged. |
+
+```go invalid
+package sample
+
+type Store struct{}
+
+func (s *Store) Get() int { return 1 }
+
+func (s *Store) Put() int { return 2 }
+
+func (s *Store) Drop() int { return 3 }
+```
+
+```go valid
+package sample
+
+type Store struct {
+	items []int
+}
+
+func (s *Store) Add(x int)   { s.items = append(s.items, x) }
+func (s *Store) Count() int  { return len(s.items) }
+func (s *Store) First() int  { return s.items[0] }
+func (s *Store) Last() int   { return s.items[len(s.items)-1] }
+```
+
+Also: rust
 
 ### One implementation, one owner
 
@@ -239,11 +272,15 @@ Also: rust
 
 `design/symbols` · symbol · warn · cel
 
-*A symbol that earns nothing is indirection and noise (Martin, Clean Code G12 Clutter): a forwarding wrapper adds a name without adding meaning, a private helper with a single caller is part of that caller unless it names a concept, and every public knob has to be supported forever. Kind `wrapper`: a function or method whose whole body forwards to one other function with the arguments it was given, and that is called from one place, and not used as a value, from a test or as a trait method, is reported, since it can be inlined. One that adds an argument, or is needed as a function value, is not a wrapper. Helpers that are not wrappers are judged: a private function or method with exactly one production caller is put to a model, with the requirement and the examples as the question.*
+*A symbol that earns nothing is indirection and noise (Martin, Clean Code G12 Clutter): a forwarding wrapper adds a name without adding meaning, a private helper with a single caller is part of that caller unless it names a concept, and every public knob has to be supported forever. Kind `wrapper`: a function or method whose whole body forwards to one other function with the arguments it was given, and that is called from one place, and not used as a value, from a test or as a trait method, is reported, since it can be inlined. One that adds an argument, or is needed as a function value, is not a wrapper. Kind `dead` (off by default and on in the strict preset): a private function, method, type, interface, constant or variable that nothing calls and nothing refers to, that does not implement an interface, is no test fixture and is not `main`, `init` or `_`: delete it (Martin, Clean Code G9 and F4). One that only tests use is left to agent review. Kind `interface` (off by default and on in the strict preset): a private interface with members and exactly one implementing type, tests included: use the type directly until a second implementation exists. An exported interface with one implementation is left to agent review, since callers outside the project may implement it. Helpers that are not wrappers are judged: a private function or method with exactly one production caller is put to a model, with the requirement and the examples as the question.*
 
 A simple single-use wrapper SHOULD be inlined unless its name expresses a real policy or mechanic; complex one-use mechanics require review rather than mechanical removal. A helper MUST earn its extraction: it removes semantic duplication, names reusable behavior or a policy, isolates an abstraction level, serves as a function value, or is a seam for a test; otherwise it stays in its caller. Every symbol MUST earn its existence through a distinct responsibility, invariant, ownership boundary, or reusable abstraction, and required behavior MUST use the fewest necessary symbols and the least necessary code without weakening ownership or responsibility boundaries. Generic parameter-group types, speculative options, extension points, aliases, and pass-through wrappers MUST NOT be exposed without a distinct contract.
 
-Derived from: Martin, Clean Code (2008), G12 Clutter; Martin, Clean Code (2008), ch. 12 Beck's four rules
+Derived from: Martin, Clean Code (2008), G9 Dead Code; Martin, Clean Code (2008), F4 Dead Function; Martin, Clean Code (2008), G12 Clutter; Martin, Clean Code (2008), ch. 12 Beck's four rules
+
+| option | default | meaning |
+| --- | --- | --- |
+| `kinds` | `["wrapper"]` | What to report. |
 
 ```go invalid
 package sample
@@ -335,9 +372,9 @@ Derived from: Martin, Clean Code (2008), ch. 11 Separate construction from use; 
 
 *State that any importer can assign has no owner and no invariant, state reachable from anywhere cannot keep an invariant, and two writers without a protocol mean races and broken invariants (Martin, Clean Code ch. 6 and ch. 11: data/object anti-symmetry, globals and singletons; G36 Avoid Transitive Navigation). Hand edits to a generated file are lost on the next run, and platform differences leak when they are not fenced. Kind `global` (Go; `gochecknoglobals`): an exported package-level variable, which anyone can assign. Sentinel errors, by the `Err` name prefix, are exported variables by convention and are not reported. Rust statics are judged. Everything else is judged: a type or package-level variable that holds mutable state is put to a model, with the requirement and the examples as the question.*
 
-An exported package-level variable MUST NOT hold mutable state: state belongs to an owner that guards it, and a global that never changes SHOULD be a constant or a function. Sentinel errors, by the `Err` name prefix, are exported variables by convention and are not reported. One symbol MUST own each mutable state and its transitions; shared mutable state MUST have one owner and one synchronization strategy. Private state belongs to its owner: an implementation component of an owner MAY access that owner's private state when it implements the owner's responsibility; unrelated code in the same package MUST use the owner's contract. Exported types SHOULD expose contract rather than mutable implementation state; data-only values and ABI bridge types MAY expose their fields. Retain/release and resource transitions MUST have one owner, and each resource MUST be released exactly once. Borrowed values MUST NOT cross or outlive their ownership boundary. Layout-only declarations MAY name private members but MUST NOT access runtime state. Generated files MUST change only through their generator. Platform mechanics MUST stay behind matching build constraints and owner packages.
+An exported package-level variable MUST NOT hold mutable state: state belongs to an owner that guards it, and a global that never changes SHOULD be a constant or a function. Sentinel errors, by the `Err` name prefix, are exported variables by convention and are not reported. One symbol MUST own each mutable state and its transitions; shared mutable state MUST have one owner and one synchronization strategy. Private state belongs to its owner: an implementation component of an owner MAY access that owner's private state when it implements the owner's responsibility; unrelated code in the same package MUST use the owner's contract. Exported types SHOULD expose contract rather than mutable implementation state; data-only values and ABI bridge types MAY expose their fields. A type MUST be either an object (hidden data, behaviour) or a data structure (exposed data, no behaviour), never both. Retain/release and resource transitions MUST have one owner, and each resource MUST be released exactly once. Borrowed values MUST NOT cross or outlive their ownership boundary. Layout-only declarations MAY name private members but MUST NOT access runtime state. Generated files MUST change only through their generator. Platform mechanics MUST stay behind matching build constraints and owner packages.
 
-Derived from: gochecknoglobals: https://github.com/leighmcculloch/gochecknoglobals; Martin, Clean Code (2008), ch. 6 Data/object anti-symmetry; Martin, Clean Code (2008), ch. 6 DTOs, active records; Martin, Clean Code (2008), ch. 11 Globals, singletons
+Derived from: gochecknoglobals: https://github.com/leighmcculloch/gochecknoglobals; Martin, Clean Code (2008), ch. 6 Data/object anti-symmetry; Martin, Clean Code (2008), ch. 6 DTOs, active records; Martin, Clean Code (2008), ch. 6 Hybrids; Martin, Clean Code (2008), ch. 11 Globals, singletons
 
 ```go invalid
 package config
@@ -574,7 +611,7 @@ Also: rust
 
 A comment MUST NOT only label a section of code: banner lines such as `// ---- Helpers ----`, `// ====` rules and `// MARK:` markers are a substitute for splitting, naming or ordering, and SHOULD be replaced by one of them. Comments MUST NOT narrate code, restate names, label control-flow phases, or explain obvious behavior; a better name, type, or structure SHOULD be preferred. Comments MAY be added only when clearly necessary to preserve invariants and consequences, external or cross-package constraints, rejected alternatives with evidence, or external contracts or specifications. A necessary comment MUST state the smallest sufficient fact, constraint, invariant, or consequence.
 
-Derived from: Martin, Clean Code (2008), C2 Obsolete Comment; Martin, Clean Code (2008), C3 Redundant Comment; Martin, Clean Code (2008), C4 Poorly Written Comment; Martin, Clean Code (2008), ch. 4 Position markers; Martin, Clean Code (2008), ch. 4 Redundant and noise comments; Martin, Clean Code (2008), ch. 4 Misleading comments; Martin, Clean Code (2008), ch. 4 Good comments
+Derived from: Martin, Clean Code (2008), C1 Inappropriate Information; Martin, Clean Code (2008), C2 Obsolete Comment; Martin, Clean Code (2008), C3 Redundant Comment; Martin, Clean Code (2008), C4 Poorly Written Comment; Martin, Clean Code (2008), C5 Commented-Out Code; Martin, Clean Code (2008), ch. 4 Position markers; Martin, Clean Code (2008), ch. 4 Redundant and noise comments; Martin, Clean Code (2008), ch. 4 Misleading comments; Martin, Clean Code (2008), ch. 4 Good comments; Martin, Clean Code (2008), ch. 4 TODO comments; Martin, Clean Code (2008), ch. 4 Journal comments; Martin, Clean Code (2008), ch. 4 Closing brace comments; Martin, Clean Code (2008), ch. 4 Commented-out code
 
 | option | default | meaning |
 | --- | --- | --- |

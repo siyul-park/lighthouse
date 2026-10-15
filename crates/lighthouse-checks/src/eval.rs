@@ -125,7 +125,10 @@ impl<'a> Frame<'a> {
     pub(crate) fn evidence(&self, programs: &[(String, Program)]) -> Result<Value, PluginError> {
         let mut evidence = Map::new();
         for (name, program) in programs {
-            evidence.insert(name.clone(), to_json(&self.run(program)?));
+            let value = to_json(&self.run(program)?);
+            if !value.is_null() {
+                evidence.insert(name.clone(), value);
+            }
         }
         Ok(Value::Object(evidence))
     }

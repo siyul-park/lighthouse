@@ -20,7 +20,7 @@ Size limits that keep files reviewable.
 
 A file SHOULD stay at or below the configured line limit (option `max`). A file that is over the limit MUST be split along cohesion boundaries, not by size alone. A line that can be wrapped SHOULD NOT be wider than the configured number of columns (option `maxWidth`).
 
-Derived from: revive file-length-limit: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#file-length-limit; Martin, Clean Code (2008), ch. 5 Vertical size and ordering; Martin, Clean Code (2008), ch. 5 Horizontal openness and indentation; Martin, Clean Code (2008), ch. 5 Team rules; ESLint max-len: https://eslint.org/docs/latest/rules/max-len
+Derived from: revive file-length-limit: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#file-length-limit; Martin, Clean Code (2008), ch. 5 Vertical size and ordering; Martin, Clean Code (2008), ch. 5 Horizontal size; ESLint max-len: https://eslint.org/docs/latest/rules/max-len
 
 | option | default | meaning |
 | --- | --- | --- |

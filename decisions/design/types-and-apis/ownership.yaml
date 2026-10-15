@@ -40,7 +40,8 @@ spec:
     responsibility; unrelated code in the same package MUST use the owner's
     contract. Exported types SHOULD expose contract rather than mutable
     implementation state; data-only values and ABI bridge types MAY expose
-    their fields. Retain/release and resource transitions MUST have one
+    their fields. A type MUST be either an object (hidden data, behaviour) or
+    a data structure (exposed data, no behaviour), never both. Retain/release and resource transitions MUST have one
     owner, and each resource MUST be released exactly once. Borrowed values
     MUST NOT cross or outlive their ownership boundary. Layout-only
     declarations MAY name private members but MUST NOT access runtime state.
@@ -70,6 +71,7 @@ spec:
     - 'gochecknoglobals: https://github.com/leighmcculloch/gochecknoglobals'
     - Martin, Clean Code (2008), ch. 6 Data/object anti-symmetry
     - Martin, Clean Code (2008), ch. 6 DTOs, active records
+    - Martin, Clean Code (2008), ch. 6 Hybrids
     - Martin, Clean Code (2008), ch. 11 Globals, singletons
   examples:
   - name: global-invalid

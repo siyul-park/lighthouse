@@ -95,6 +95,7 @@ const REACHES: &[(&str, Option<(Reach, bool)>)] = &[
     ("design/naming", Some((Reach::Neighbors, false))),
     ("design/ownership", Some((Reach::Neighbors, false))),
     ("design/prefer-method", Some((Reach::Neighbors, false))),
+    ("design/responsibility", Some((Reach::Global, false))),
     ("design/signature", Some((Reach::Global, false))),
     ("design/symbols", Some((Reach::Global, false))),
     ("testing/cases", Some((Reach::Global, false))),

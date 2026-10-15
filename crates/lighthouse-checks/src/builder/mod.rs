@@ -27,6 +27,7 @@ use crate::{
 };
 
 mod api;
+mod cohesion;
 mod effective;
 mod forward;
 mod gap;
@@ -58,6 +59,7 @@ pub(crate) struct Builder<'a> {
     names: Arc<homonyms::Names>,
     single: Arc<effective::Single>,
     imports: Arc<imports::Imports>,
+    types: Arc<cohesion::Types>,
     allow_suffixes: Vec<String>,
     first_test: OnceCell<Option<Value>>,
 }
@@ -95,6 +97,7 @@ impl<'a> Builder<'a> {
             names: ctx.memo.slot(),
             single: ctx.memo.slot(),
             imports: ctx.memo.slot(),
+            types: ctx.memo.slot(),
             allow_suffixes: strings(options.get("allowSuffixes")),
             first_test: OnceCell::new(),
         })
@@ -178,6 +181,21 @@ impl<'a> Builder<'a> {
         self.table.tests.with(&symbol.id, base, |base| {
             with_entries(base.as_ref(), &extras)
         })
+    }
+
+    /// A module with the facts its check asks for.
+    pub(crate) fn module(
+        &self,
+        module: &lighthouse_model::Module,
+        files: usize,
+        symbols: usize,
+        stats: &crate::modules::Stats,
+    ) -> Value {
+        let mut value = facts::module(module, files, symbols, stats);
+        if self.needs.fact("types") {
+            value["types"] = self.module_types(&module.path);
+        }
+        value
     }
 
     /// A file with the facts about its text and its symbols.
@@ -286,6 +304,26 @@ impl<'a> Builder<'a> {
                 "touched_by_tests".to_owned(),
                 json!(touched_by_tests(project, symbol)),
             );
+        }
+        if needs.fact("implementers") {
+            let types = if symbol.kind == SymbolKind::Interface {
+                project.implementers(&symbol.id)
+            } else {
+                &[]
+            };
+            let found: Vec<Value> = types
+                .iter()
+                .filter_map(|id| project.symbol(id))
+                .map(|ty| {
+                    let stateless = !project.members(&ty.id).iter().any(|m| {
+                        project
+                            .symbol(m)
+                            .is_some_and(|m| m.kind == SymbolKind::Field)
+                    });
+                    json!({ "id": ty.id.as_str(), "name": ty.name, "stateless": stateless })
+                })
+                .collect();
+            map.insert("implementers".to_owned(), json!(found));
         }
         if needs.fact("data_only") {
             map.insert("data_only".to_owned(), json!(data_only(project, symbol)));

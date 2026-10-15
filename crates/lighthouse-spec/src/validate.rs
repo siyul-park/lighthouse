@@ -415,12 +415,13 @@ fn kind_problem(decision: &Decision, kind: &CheckKind) -> Option<String> {
     }
 }
 
-/// What a model cannot be asked: a subject outside a file.
+/// What a model cannot be asked: a subject outside a file. A module is left
+/// to agent review, which lists its subjects by `review`.
 fn review_problem(reviewed: bool, select: crate::Select) -> Option<String> {
     if !reviewed {
         return None;
     }
-    if select.scope() != RunScope::File {
+    if select.scope() != RunScope::File && select != crate::Select::Module {
         return Some(format!(
             "a model cannot judge `{}`: it needs the source of a subject in a file",
             select.name()

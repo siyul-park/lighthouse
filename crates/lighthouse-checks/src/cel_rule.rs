@@ -48,6 +48,7 @@ struct Identity {
 }
 
 /// Where a finding goes, and what it is about.
+#[derive(Clone)]
 struct Place {
     file: std::path::PathBuf,
     span: Span,
@@ -288,7 +289,7 @@ impl Run<'_> {
                         continue;
                     }
                     let files = files_of.get(module.path.as_str()).map_or(0, BTreeSet::len);
-                    let value = cel_fact(&facts::module(
+                    let value = cel_fact(&self.builder.module(
                         module,
                         files,
                         *count,
@@ -401,7 +402,12 @@ impl Run<'_> {
         } else {
             (message.unwrap_or_default(), evidence.unwrap_or_default())
         };
-        let place = self.place(&frame, place)?;
+        // Like the message, the place of a subject only suspected may name what
+        // the subject does not have: it is then the default.
+        let place = match self.place(&frame, place.clone()) {
+            Err(error) if found => return Err(error),
+            placed => placed.unwrap_or(place),
+        };
         let fingerprint = match &rule.identity {
             Some(identity) => {
                 let subject = frame.string(&identity.subject, "identity.subject")?;

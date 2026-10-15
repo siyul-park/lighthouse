@@ -1,0 +1,285 @@
+{
+  "fragments": [
+    {
+      "comments": [],
+      "edges": [
+        {
+          "from": {
+            "module": "private_traits"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "private_traits::Greet#interface"
+        },
+        {
+          "from": {
+            "symbol": "private_traits::Greet#interface"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "private_traits::Greet::hello#method"
+        },
+        {
+          "from": {
+            "symbol": "private_traits::Greet#interface"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "private_traits::Greet::bye#method"
+        },
+        {
+          "from": {
+            "module": "private_traits"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "private_traits::English#type"
+        },
+        {
+          "from": {
+            "symbol": "private_traits::English#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "private_traits::English::Greet::hello#method"
+        },
+        {
+          "from": {
+            "symbol": "private_traits::English#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "private_traits::English::Greet::bye#method"
+        },
+        {
+          "from": {
+            "symbol": "private_traits::English#type"
+          },
+          "kind": "implements",
+          "resolution": "syntactic",
+          "to": "private_traits::Greet#interface"
+        }
+      ],
+      "file": {
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "String"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "private_traits::English::Greet::hello#method",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "String"
+              }
+            ]
+          },
+          "statements": 1,
+          "symbol": "private_traits::English::Greet::bye#method",
+          "tokens": 7,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "private_traits",
+          "path": "private_traits"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "private_traits::Greet#interface",
+          "kind": "interface",
+          "name": "Greet",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 4
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 31,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "private_traits::Greet::hello#method",
+          "kind": "method",
+          "name": "hello",
+          "owner": "private_traits::Greet#interface",
+          "span": {
+            "end": {
+              "col": 31,
+              "line": 2
+            },
+            "start": {
+              "col": 5,
+              "line": 2
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 29,
+              "line": 3
+            },
+            "start": {
+              "col": 5,
+              "line": 3
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "private_traits::Greet::bye#method",
+          "kind": "method",
+          "name": "bye",
+          "owner": "private_traits::Greet#interface",
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 3
+            },
+            "start": {
+              "col": 5,
+              "line": 3
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 16,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "private_traits::English#type",
+          "kind": "type",
+          "name": "English",
+          "span": {
+            "end": {
+              "col": 16,
+              "line": 6
+            },
+            "start": {
+              "col": 1,
+              "line": 6
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 11
+            },
+            "start": {
+              "col": 5,
+              "line": 9
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "private_traits::English::Greet::hello#method",
+          "kind": "method",
+          "name": "hello",
+          "owner": "private_traits::English#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 11
+            },
+            "start": {
+              "col": 5,
+              "line": 9
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 15
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "private_traits::English::Greet::bye#method",
+          "kind": "method",
+          "name": "bye",
+          "owner": "private_traits::English#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 15
+            },
+            "start": {
+              "col": 5,
+              "line": 13
+            }
+          },
+          "visibility": "private"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": []
+}

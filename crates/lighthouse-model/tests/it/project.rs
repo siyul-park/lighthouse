@@ -486,6 +486,11 @@ fn project_implements_follows_the_interfaces_of_a_type() {
         std::slice::from_ref(&reader.id)
     );
     assert!(project.implements(&reader.id).is_empty());
+    assert_eq!(
+        project.implementers(&reader.id),
+        std::slice::from_ref(&store.id)
+    );
+    assert!(project.implementers(&store.id).is_empty());
 }
 
 fn file_of(symbol: &Symbol) -> File {

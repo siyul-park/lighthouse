@@ -20,11 +20,13 @@ const LOCAL_HEAD: &str = "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetad
 fn reviewed(mut spec: Value) -> String {
     let review = spec["check"]["review"].take();
     spec["check"]["where"] = review;
-    spec["check"].as_object_mut().unwrap().remove("review");
-    let name = if spec["check"]["select"] == "function" {
-        "func.name"
-    } else {
-        "symbol.name"
+    let check = spec["check"].as_object_mut().unwrap();
+    check.remove("review");
+    check.remove("at");
+    let name = match spec["check"]["select"].as_str() {
+        Some("function") => "func.name",
+        Some("module") => "module.path",
+        _ => "symbol.name",
     };
     spec["check"]["message"] = json!(format!("{{{{ {name} }}}}"));
     spec["examples"] = serde_json::from_str(EXAMPLES_JSON).unwrap();
