@@ -21,6 +21,11 @@ plugins:
 	cp target/release/model-http $(PLUGINS)/model-http/model-http.new
 	mv -f $(PLUGINS)/model-http/model-http.new $(PLUGINS)/model-http/model-http
 	cp plugins/model-http/lighthouse-plugin.toml $(PLUGINS)/model-http/
+	mkdir -p $(PLUGINS)/model-local
+	cargo build --release -p model-local
+	cp target/release/model-local $(PLUGINS)/model-local/model-local.new
+	mv -f $(PLUGINS)/model-local/model-local.new $(PLUGINS)/model-local/model-local
+	cp plugins/model-local/lighthouse-plugin.toml $(PLUGINS)/model-local/
 
 test: plugins
 	cargo test --workspace

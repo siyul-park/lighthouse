@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "plugins/fake-model", "plugins/lang-rust", "plugins/model-http"]
+members = ["crates/*", "plugins/fake-model", "plugins/lang-rust", "plugins/model-http", "plugins/model-local"]
 
 [workspace.package]
 version = "0.1.0"

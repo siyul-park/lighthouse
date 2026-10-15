@@ -1,0 +1,131 @@
+//! A training file as the learners need it: the text of each labelled
+//! subject with its label, weight and group, and the examples the decision's
+//! question shows.
+
+use std::collections::BTreeMap;
+
+use lighthouse_protocol::{Question, State, TrainingLine};
+use serde_json::Value;
+
+/// One labelled subject.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Line {
+    pub text: String,
+    /// 1 for a fail, 0 for a pass.
+    pub label: f64,
+    pub weight: f64,
+    pub group: String,
+    /// Who gave the label: `person`, `agent` or `model`.
+    pub source: String,
+}
+
+/// What a training file holds.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Dataset {
+    pub decision: String,
+    pub lines: Vec<Line>,
+    /// The code of the examples of what fails, and of what passes.
+    pub invalid: Vec<String>,
+    pub valid: Vec<String>,
+}
+
+/// Reads a JSON Lines training file.
+pub fn parse(text: &str) -> Result<Dataset, String> {
+    let mut lines = Vec::new();
+    let mut question: Option<Question> = None;
+    let mut decision = String::new();
+    for (at, line) in text.lines().enumerate() {
+        let read = |e: serde_json::Error| format!("line {}: {e}", at + 1);
+        let parsed: TrainingLine = serde_json::from_str(line).map_err(read)?;
+        let [asked, state, answer] = &parsed.messages[..] else {
+            return Err(format!("line {}: expected three messages", at + 1));
+        };
+        let state: State = serde_json::from_str(&state.content).map_err(read)?;
+        let answer: Value = serde_json::from_str(&answer.content).map_err(read)?;
+        if question.is_none() {
+            question = Some(serde_json::from_str(&asked.content).map_err(read)?);
+            decision.clone_from(&parsed.decision);
+        }
+        lines.push(Line {
+            text: state.text,
+            label: f64::from(u8::from(answer["noul"].as_f64().unwrap_or(0.0) >= 0.5)),
+            weight: parsed.weight,
+            group: parsed.group,
+            source: source_of(&parsed.attribution).to_owned(),
+        });
+    }
+    let question = question.ok_or("the training file has no line")?;
+    let code = |examples: &[lighthouse_protocol::Example]| {
+        examples.iter().map(|e| e.code.clone()).collect()
+    };
+    Ok(Dataset {
+        decision,
+        lines,
+        invalid: code(&question.criteria.fail.examples),
+        valid: code(&question.criteria.pass.examples),
+    })
+}
+
+/// How many lines each source gave.
+pub fn sources(lines: &[Line]) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for line in lines {
+        *counts.entry(line.source.clone()).or_insert(0) += 1;
+    }
+    counts
+}
+
+/// The kind of source a PROV `wasAttributedTo` object stands for.
+fn source_of(attribution: &Value) -> &'static str {
+    match (
+        attribution["type"].as_str(),
+        attribution["hadRole"].as_str(),
+    ) {
+        (Some("SoftwareAgent"), Some("model")) => "model",
+        (Some("SoftwareAgent"), _) => "agent",
+        _ => "person",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lighthouse_protocol::ResultKind;
+
+    use super::*;
+    use crate::fixture::file;
+
+    #[test]
+    fn a_training_file_gives_lines_and_the_examples_of_the_question() {
+        let text = file(&[
+            (
+                "fn a() {}",
+                ResultKind::Fail,
+                "a.go",
+                r#"{"type":"Person"}"#,
+            ),
+            (
+                "fn b() {}",
+                ResultKind::Pass,
+                "a.go",
+                r#"{"type":"SoftwareAgent","hadRole":"model"}"#,
+            ),
+        ]);
+        let dataset = parse(&text).unwrap();
+
+        assert_eq!(dataset.decision, "d/x");
+        assert_eq!(dataset.invalid, ["bad", "worse"]);
+        assert_eq!(dataset.valid, ["good"]);
+        let labels: Vec<f64> = dataset.lines.iter().map(|l| l.label).collect();
+        assert_eq!(labels, [1.0, 0.0]);
+        assert_eq!(dataset.lines[0].weight, 0.7);
+        assert_eq!(dataset.lines[0].group, "a.go");
+        assert_eq!(sources(&dataset.lines)["model"], 1);
+        assert_eq!(sources(&dataset.lines)["person"], 1);
+    }
+
+    #[test]
+    fn an_empty_or_broken_file_says_why() {
+        assert!(parse("").unwrap_err().contains("no line"));
+        assert!(parse("{").unwrap_err().contains("line 1"));
+    }
+}

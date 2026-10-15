@@ -1,0 +1,20 @@
+[package]
+name = "model-local"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "model-local"
+path = "src/main.rs"
+
+[dependencies]
+base64 = "0.22"
+fastembed = "=7.1.1"
+lighthouse-model.workspace = true
+lighthouse-protocol.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
