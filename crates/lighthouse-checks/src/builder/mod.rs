@@ -38,6 +38,7 @@ mod measures;
 mod ownership;
 mod parent;
 mod role;
+mod stability;
 mod unit;
 mod widths;
 
@@ -63,6 +64,7 @@ pub(crate) struct Builder<'a> {
     imports: Arc<imports::Imports>,
     types: Arc<cohesion::Types>,
     parents: Arc<parent::Parents>,
+    stabilities: Arc<stability::Stabilities>,
     allow_suffixes: Vec<String>,
     first_test: OnceCell<Option<Value>>,
 }
@@ -102,6 +104,7 @@ impl<'a> Builder<'a> {
             imports: ctx.memo.slot(),
             types: ctx.memo.slot(),
             parents: ctx.memo.slot(),
+            stabilities: ctx.memo.slot(),
             allow_suffixes: strings(options.get("allowSuffixes")),
             first_test: OnceCell::new(),
         })
@@ -202,6 +205,9 @@ impl<'a> Builder<'a> {
         if self.needs.fact("parent") {
             value["parent"] = self.module_parent(module);
         }
+        if self.needs.fact("stability") {
+            value["stability"] = self.module_stability(module);
+        }
         value
     }
 
@@ -261,6 +267,9 @@ impl<'a> Builder<'a> {
         }
         if needs.function("unit") {
             map.insert("__unit".to_owned(), self.unit(symbol, summary));
+        }
+        if needs.function("reach") {
+            map.insert("__reach".to_owned(), self.reach(symbol));
         }
         if needs.function("owner") {
             map.insert("__owner".to_owned(), self.owner(symbol));

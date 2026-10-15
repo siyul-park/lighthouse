@@ -66,6 +66,9 @@ pub const FACTS: &[(&str, Reach)] = &[
     // How a module is tied to its parent module, by what the symbols of both
     // use of each other.
     ("parent", Reach::Global),
+    // How far a module reaches the others through what its symbols use and
+    // import.
+    ("stability", Reach::Global),
 ];
 
 /// The functions of the library, by name.
@@ -78,6 +81,8 @@ pub const FUNCTIONS: &[(&str, Reach)] = &[
     ("tests", Reach::Global),
     // A function with the single-use helpers it calls, transitively.
     ("unit", Reach::Global),
+    // How far a symbol reaches the others through what the symbols use.
+    ("reach", Reach::Global),
     ("annotations", Reach::Local),
     // The order keys of this crate rank a declaration by its own file and
     // owner.

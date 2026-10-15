@@ -25,6 +25,7 @@ mod neighbors;
 mod reach;
 mod rules;
 mod rust;
+mod stability;
 mod support;
 mod testing_rules;
 mod unit_facts;

@@ -35,9 +35,21 @@ pub(crate) fn flagged(
     condition: &str,
     options: &Value,
 ) -> BTreeSet<(String, u32)> {
+    flagged_in(world, select, "", condition, options)
+}
+
+/// Like [`flagged`], for a decision whose scope also says `extra`, such as
+/// `tests: include`.
+pub(crate) fn flagged_in(
+    world: &World,
+    select: &str,
+    extra: &str,
+    condition: &str,
+    options: &Value,
+) -> BTreeSet<(String, u32)> {
     let subject = if select == "module" { "module" } else { "file" };
     let text = format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/facts\n  labels:\n    lighthouse/pack: local\n    lighthouse/section: rules\nspec:\n  title: Facts\n  context: A check.\n  scope: {{ subject: {subject} }}\n  requirement: A check MUST hold.\n  severity: warn\n  options:\n    type: object\n    properties:\n      visibilityGroups: {{ type: boolean, default: true, description: Groups by visibility. }}\n    additionalProperties: false\n  check:\n    type: cel\n    select: {select}\n    where: {}\n    message: \"{{{{ {} }}}}\"\n{EXAMPLES}",
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/facts\n  labels:\n    lighthouse/pack: local\n    lighthouse/section: rules\nspec:\n  title: Facts\n  context: A check.\n  scope: {{ subject: {subject}{extra} }}\n  requirement: A check MUST hold.\n  severity: warn\n  options:\n    type: object\n    properties:\n      visibilityGroups: {{ type: boolean, default: true, description: Groups by visibility. }}\n    additionalProperties: false\n  check:\n    type: cel\n    select: {select}\n    where: {}\n    message: \"{{{{ {} }}}}\"\n{EXAMPLES}",
         serde_json::to_string(condition).unwrap(),
         match select {
             "function" => "func.name",

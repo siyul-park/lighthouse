@@ -1,5 +1,7 @@
 mod cognitive;
 mod fan;
+mod graph;
+pub mod reach;
 
 use std::{collections::BTreeMap, sync::LazyLock};
 
@@ -43,7 +45,7 @@ pub struct Size {
 
 /// The measures of one function that add up over the functions of a unit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Own {
+pub struct Own {
     pub lines: u32,
     pub statements: u32,
     pub cyclomatic: u32,
@@ -164,7 +166,7 @@ pub fn is_flat_dispatch(summary: &FunctionSummary) -> bool {
 
 /// What the analyzers measure for a function, read without the file scope
 /// of their facts, so that a function of another file can be measured too.
-pub(crate) fn own(project: &Project, symbol: &Symbol, summary: &FunctionSummary) -> Own {
+pub fn own(project: &Project, symbol: &Symbol, summary: &FunctionSummary) -> Own {
     let Size { statements, lines } = size(project, symbol, summary);
     Own {
         lines,
