@@ -145,6 +145,58 @@ fn the_probabilities_models_gave_score_the_labelled_subjects_they_answered() {
 }
 
 #[test]
+fn finish_keeps_each_score_of_every_repository_sorted_by_repo_and_fingerprint() {
+    let mut gathered = Gathered::default();
+    for (name, fingerprint, truth, p) in [
+        ("zed", "b", Truth::Fail, 0.9),
+        ("cel", "c", Truth::Pass, 0.2),
+        ("cel", "a", Truth::NotApplicable, 0.5),
+        ("cel", "b", Truth::Fail, 0.7),
+    ] {
+        let mut run = Run {
+            diagnostics: vec![flagged(fingerprint, "a.rs")],
+            ..Run::default()
+        };
+        run.probabilities = [(fingerprint.to_owned(), p)].into();
+        let repo = Repo {
+            name: Some(name.to_owned()),
+            dir: PathBuf::from("."),
+        };
+        gathered.add(grade(
+            &request(None),
+            &repo,
+            policy(),
+            &[label(fingerprint, truth, None)],
+            &Found::of(&run),
+            None,
+        ));
+    }
+    let side = gathered.finish(&request(None), false).unwrap().current;
+    // The `notApplicable` label is about the selector and is not scored.
+    let kept: Vec<_> = side
+        .scores
+        .iter()
+        .map(|s| {
+            (
+                s.repo.as_deref(),
+                s.fingerprint.as_str(),
+                s.violates,
+                s.probability,
+            )
+        })
+        .collect();
+    assert_eq!(
+        kept,
+        [
+            (Some("cel"), "b", true, 0.7),
+            (Some("cel"), "c", false, 0.2),
+            (Some("zed"), "b", true, 0.9),
+        ]
+    );
+    assert_eq!(side.metrics.answered, 3);
+}
+
+#[test]
 fn grade_pairs_the_candidate_with_the_current_check_and_reads_examples_as_shown() {
     let current = found(&[("one", "a.rs")]);
     let beside = found(&[]);

@@ -94,6 +94,7 @@ pub fn analyze(ctx: &Context, args: &CheckArgs) -> Result<Checked> {
         models: ModelFlags {
             off: args.no_models,
             all: args.all_models,
+            subjects: None,
             record: args.record_model_labels,
             collect: false,
         },

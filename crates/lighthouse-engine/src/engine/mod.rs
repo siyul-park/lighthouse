@@ -284,6 +284,10 @@ pub struct ModelOptions {
     /// Ask models that cost about the whole project, not only the files the
     /// run reports.
     pub all: bool,
+    /// Ask models only about these subjects (their fingerprints), wherever
+    /// they are; the rest are left to review. Overrides `all` and the report
+    /// scope for what models are asked.
+    pub subjects: Option<BTreeSet<String>>,
     /// Keep the subjects rules put to models in [`Outcome::subjects`].
     pub collect: bool,
     /// The model a revision attached to a decision, by decision id.

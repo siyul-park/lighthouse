@@ -30,6 +30,8 @@ pub(super) struct RunModels<'a> {
     /// The paths whose findings the run reports; the whole project when it
     /// asks about everything.
     scopes: Option<&'a [PathBuf]>,
+    /// The only subjects models are asked about, by fingerprint.
+    subjects: Option<&'a BTreeSet<String>>,
     budget: AtomicUsize,
     answers: Option<Cache>,
     /// Models are not asked: the subjects stay for review.
@@ -100,7 +102,8 @@ impl<'a> RunModels<'a> {
             host,
             binding,
             attached: &options.attached,
-            scopes: (!options.all).then_some(scopes),
+            scopes: (!options.all && options.subjects.is_none()).then_some(scopes),
+            subjects: options.subjects.as_ref(),
             budget: AtomicUsize::new(binding.budget),
             answers: cache_dir.and_then(|dir| Cache::open(dir, DEFAULT_LIMIT).ok()),
             off: options.off,
@@ -236,8 +239,12 @@ impl<'a> RunModels<'a> {
             .insert(note);
     }
 
-    /// Whether a subject lies in the files the run reports.
+    /// Whether models are asked about a subject: it is one the run is limited
+    /// to, else it lies in the files the run reports.
     pub(super) fn reported(&self, subject: &Subject) -> bool {
+        if let Some(only) = self.subjects {
+            return only.contains(&subject.key);
+        }
         self.scopes.is_none_or(|scopes| {
             scopes
                 .iter()

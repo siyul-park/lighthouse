@@ -188,7 +188,11 @@ fn side() -> Value {
                 "ece": nullable(json!({ "type": "number" }))
             }), &[]),
             "model_decided": integer(), "reviews": integer(), "calls": integer(),
-            "cost": { "type": "number" }
+            "cost": { "type": "number" },
+            "scores": list_of(object(json!({
+                "fingerprint": string(), "repo": nullable(string()),
+                "violates": { "type": "boolean" }, "probability": { "type": "number" }
+            }), &["fingerprint", "violates", "probability"]))
         }),
         &[
             "check",
@@ -197,6 +201,7 @@ fn side() -> Value {
             "reviews",
             "calls",
             "cost",
+            "scores",
         ],
     )
 }

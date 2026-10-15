@@ -2,7 +2,7 @@
 //! it, on the repositories its labels come from, and hands what they found to
 //! the host's evaluation (`lighthouse_ml::evaluate`).
 
-use std::{env, path::Path};
+use std::{collections::BTreeSet, env, path::Path};
 
 use lighthouse_engine::ModelOptions;
 use lighthouse_ml::{
@@ -87,12 +87,21 @@ fn one(request: &EvalRequest, repo: &Repo, inputs: &Inputs) -> Result<Part> {
     .into_iter()
     .filter(|l| l.weight >= Source::Person.weight())
     .collect();
-    let current = run(request, inputs.config, &request.decision, None)?;
+    // Models are asked about the labelled subjects only; a label with an
+    // observed outcome (an example) is graded without a run.
+    let asked = labels
+        .iter()
+        .filter(|l| l.observed.is_none())
+        .map(|l| l.key.clone())
+        .collect();
+    let current = run(request, inputs.config, &request.decision, None, Some(asked))?;
     let Some(file) = inputs.candidate else {
         return Ok(grade(request, repo, policy, &labels, &current, None));
     };
     let (id, setup) = Setup::read(&session.root, file)?;
-    let found = run(request, inputs.config, &id, Some(&setup))?;
+    // The candidate's fingerprints are not known before it runs, so it asks
+    // models about everything it selects.
+    let found = run(request, inputs.config, &id, Some(&setup), None)?;
     let beside = candidate_session(inputs.config, &setup, &id)?;
     let shown = if inputs.examples {
         samples::shown(&beside, &beside.catalog()?, &decision, &id, &models)?
@@ -127,6 +136,7 @@ fn run(
     config: Option<&Path>,
     rule: &str,
     setup: Option<&Setup>,
+    subjects: Option<BTreeSet<String>>,
 ) -> Result<Found> {
     let session = match setup {
         Some(setup) => candidate_session(config, setup, rule)?,
@@ -140,6 +150,7 @@ fn run(
             cache: false,
             models: ModelFlags {
                 all: true,
+                subjects,
                 collect: request.audit.is_some(),
                 ..ModelFlags::default()
             },

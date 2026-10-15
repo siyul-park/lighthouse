@@ -62,6 +62,22 @@ pub struct Side {
     /// Questions put to models, and what they cost.
     pub calls: usize,
     pub cost: f64,
+    /// The probability each labelled subject was given, by repository and
+    /// fingerprint: the raw answers the metrics are computed from, so that
+    /// reports can be pooled.
+    pub scores: Vec<Score>,
+}
+
+/// What a model gave a labelled subject.
+#[derive(Debug, Clone, Serialize)]
+pub struct Score {
+    /// The label's fingerprint.
+    pub fingerprint: String,
+    pub repo: Option<String>,
+    /// Whether the label says the subject violates the requirement.
+    pub violates: bool,
+    /// P(fail) the model gave.
+    pub probability: f64,
 }
 
 /// The result of an evaluation.
@@ -151,9 +167,19 @@ impl Found {
 
     /// The probability of failing a model gave the subject of a label this
     /// run was shown, found by the place `current` knows it at.
-    fn scored(&self, current: &Found, label: &Label) -> Option<(Truth, f64)> {
+    /// A `notApplicable` label is about the selector and is not scored.
+    fn scored(&self, current: &Found, label: &Label, repo: &Repo) -> Option<Score> {
         let place = current.place.get(&label.key)?;
-        Some((label.truth, *self.probabilities.get(place)?))
+        Some(Score {
+            fingerprint: label.key.clone(),
+            repo: repo.name.clone(),
+            violates: match label.truth {
+                Truth::Fail => true,
+                Truth::Pass => false,
+                Truth::NotApplicable => return None,
+            },
+            probability: *self.probabilities.get(place)?,
+        })
     }
 
     fn outcome_of(&self, label: &Label) -> Outcome {
@@ -244,7 +270,7 @@ pub fn grade(
         candidate: Vec::new(),
         scored: labels
             .iter()
-            .filter_map(|l| current.scored(current, l))
+            .filter_map(|l| current.scored(current, l, repo))
             .collect(),
         candidate_scored: Vec::new(),
         pairs: Vec::new(),
@@ -280,7 +306,7 @@ pub fn grade(
         };
         part.candidate.push((label.truth, now));
         part.candidate_scored
-            .extend(candidate.found.scored(current, label));
+            .extend(candidate.found.scored(current, label, repo));
         part.pairs.push((was, now));
     }
     part.candidate_decided = assemble::Usage::of(candidate.found);

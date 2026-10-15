@@ -361,6 +361,38 @@
             "reviews": {
               "minimum": 0,
               "type": "integer"
+            },
+            "scores": {
+              "items": {
+                "properties": {
+                  "fingerprint": {
+                    "type": "string"
+                  },
+                  "probability": {
+                    "type": "number"
+                  },
+                  "repo": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "violates": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "fingerprint",
+                  "violates",
+                  "probability"
+                ],
+                "type": "object"
+              },
+              "type": "array"
             }
           },
           "required": [
@@ -369,7 +401,8 @@
             "model_decided",
             "reviews",
             "calls",
-            "cost"
+            "cost",
+            "scores"
           ],
           "type": "object"
         },
@@ -692,6 +725,38 @@
         "reviews": {
           "minimum": 0,
           "type": "integer"
+        },
+        "scores": {
+          "items": {
+            "properties": {
+              "fingerprint": {
+                "type": "string"
+              },
+              "probability": {
+                "type": "number"
+              },
+              "repo": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "violates": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "fingerprint",
+              "violates",
+              "probability"
+            ],
+            "type": "object"
+          },
+          "type": "array"
         }
       },
       "required": [
@@ -700,7 +765,8 @@
         "model_decided",
         "reviews",
         "calls",
-        "cost"
+        "cost",
+        "scores"
       ],
       "type": "object"
     },

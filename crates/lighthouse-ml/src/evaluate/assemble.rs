@@ -4,7 +4,7 @@ use lighthouse_spec::Evaluation;
 
 use crate::{
     Result,
-    evaluate::{CAVEAT, EvalReport, EvalRequest, Found, Side, write_audit},
+    evaluate::{CAVEAT, EvalReport, EvalRequest, Found, Score, Side, write_audit},
     metrics::{Outcome, Truth, agreement, evaluate},
 };
 
@@ -14,8 +14,8 @@ pub struct Part {
     pub(super) current: Vec<(Truth, Outcome)>,
     pub(super) candidate: Vec<(Truth, Outcome)>,
     /// The probabilities of failing models gave the labelled subjects.
-    pub(super) scored: Vec<(Truth, f64)>,
-    pub(super) candidate_scored: Vec<(Truth, f64)>,
+    pub(super) scored: Vec<Score>,
+    pub(super) candidate_scored: Vec<Score>,
     pub(super) pairs: Vec<(Outcome, Outcome)>,
     pub(super) decided: Usage,
     pub(super) candidate_decided: Usage,
@@ -74,29 +74,38 @@ impl Gathered {
             self.parts.iter().flat_map(|p| pick(p).clone()).collect()
         };
         let current = pool(|p| &p.current);
-        let side = |check: String,
-                    pairs: &[(Truth, Outcome)],
-                    scored: &[(Truth, f64)],
-                    used: Usage| Side {
-            check,
-            metrics: evaluate(pairs, scored),
-            model_decided: used.decided,
-            reviews: used.reviews,
-            calls: used.calls,
-            cost: used.cost,
-        };
+        let side =
+            |check: String, pairs: &[(Truth, Outcome)], mut scores: Vec<Score>, used: Usage| {
+                scores.sort_by(|a, b| (&a.repo, &a.fingerprint).cmp(&(&b.repo, &b.fingerprint)));
+                let scored: Vec<(Truth, f64)> = scores
+                    .iter()
+                    .map(|s| {
+                        let truth = if s.violates { Truth::Fail } else { Truth::Pass };
+                        (truth, s.probability)
+                    })
+                    .collect();
+                Side {
+                    check,
+                    metrics: evaluate(pairs, &scored),
+                    model_decided: used.decided,
+                    reviews: used.reviews,
+                    calls: used.calls,
+                    cost: used.cost,
+                    scores,
+                }
+            };
         let sum = |pick: fn(&Part) -> Usage| {
             self.parts
                 .iter()
                 .fold(Usage::default(), |a, p| a.plus(pick(p)))
         };
-        let pool_scored = |pick: fn(&Part) -> &Vec<(Truth, f64)>| -> Vec<(Truth, f64)> {
+        let pool_scored = |pick: fn(&Part) -> &Vec<Score>| -> Vec<Score> {
             self.parts.iter().flat_map(|p| pick(p).clone()).collect()
         };
         let current_side = side(
             first.check.clone(),
             &current,
-            &pool_scored(|p| &p.scored),
+            pool_scored(|p| &p.scored),
             sum(|p| p.decided),
         );
         let candidate_side = with_candidate.then(|| {
@@ -104,7 +113,7 @@ impl Gathered {
             side(
                 first.candidate_check.clone().unwrap_or_default(),
                 &pairs,
-                &pool_scored(|p| &p.candidate_scored),
+                pool_scored(|p| &p.candidate_scored),
                 sum(|p| p.candidate_decided),
             )
         });

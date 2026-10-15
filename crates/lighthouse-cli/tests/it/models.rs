@@ -53,7 +53,7 @@ fn provider(mode: &str) -> String {
 }
 
 /// The bound model: answers by the source of the subject.
-fn bound() -> String {
+pub(crate) fn bound() -> String {
     provider("command")
 }
 

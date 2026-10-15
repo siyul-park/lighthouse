@@ -42,12 +42,15 @@ pub struct CheckRequest {
 }
 
 /// What a run may do with models.
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 pub struct ModelFlags {
     /// Ask no model: what they would judge is left to review (`--no-models`).
     pub off: bool,
     /// Ask models that cost about the whole project (`--all-models`).
     pub all: bool,
+    /// Ask models only about these subjects (their fingerprints), wherever
+    /// they are.
+    pub subjects: Option<BTreeSet<String>>,
     /// Record what models fail as judgments attributed to them
     /// (`--record-model-labels`), so that training can reproduce them.
     pub record: bool,
@@ -226,6 +229,7 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     let engine = engine.with_models(ModelOptions {
         off: request.models.off,
         all: request.models.all,
+        subjects: request.models.subjects.clone(),
         collect: request.models.collect,
         attached,
     });

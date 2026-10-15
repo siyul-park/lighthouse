@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     cache_fixtures::write,
-    models::{count, project, results},
+    models::{bound, count, project, results},
 };
 
 const RPC: &str = "[models]\nclassification = \"fake/m1\"\n[models.providers.fake]\ntype = \"rpc\"\nplugin = \"fake-model\"\noptions = { tag = 1 }\n";
@@ -128,6 +128,39 @@ fn eval_measures_the_check_with_a_model_plugin_bound() {
     assert_eq!(report["current"]["model_decided"], 1);
     assert_eq!(report["policy"]["precision"], 0.9);
     assert_eq!(report["meets_policy"], true);
+}
+
+#[test]
+fn eval_asks_models_only_about_the_labelled_subjects_and_keeps_each_score() {
+    let dir = project(&bound());
+    baseline(dir.path());
+    let out = lighthouse(
+        dir.path(),
+        &[
+            "decision",
+            "eval",
+            "local/naming-ban",
+            "--baseline",
+            "labels.tsv",
+            "--format",
+            "json",
+        ],
+    );
+    let report = json(&out);
+    // Two of the three review subjects are labelled; `maybe_good` is not asked.
+    assert_eq!(report["current"]["calls"], 2);
+    assert_eq!(
+        fs::read_to_string(dir.path().join("calls")).unwrap().len(),
+        2
+    );
+    let scores = report["current"]["scores"].as_array().unwrap();
+    assert_eq!(scores.len(), 2, "{scores:?}");
+    let fingerprints: Vec<_> = scores.iter().map(|s| s["fingerprint"].clone()).collect();
+    let mut sorted = fingerprints.clone();
+    sorted.sort_by_key(|f| f.as_str().unwrap().to_owned());
+    assert_eq!(fingerprints, sorted);
+    assert!(scores.iter().all(|s| s["probability"].is_number()));
+    assert_eq!(scores.iter().filter(|s| s["violates"] == true).count(), 1);
 }
 
 #[test]

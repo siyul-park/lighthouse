@@ -422,6 +422,38 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
               "reviews": {
                 "minimum": 0,
                 "type": "integer"
+              },
+              "scores": {
+                "items": {
+                  "properties": {
+                    "fingerprint": {
+                      "type": "string"
+                    },
+                    "probability": {
+                      "type": "number"
+                    },
+                    "repo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "violates": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "fingerprint",
+                    "violates",
+                    "probability"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
               }
             },
             "required": [
@@ -430,7 +462,8 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
               "model_decided",
               "reviews",
               "calls",
-              "cost"
+              "cost",
+              "scores"
             ],
             "type": "object"
           },
@@ -753,6 +786,38 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
           "reviews": {
             "minimum": 0,
             "type": "integer"
+          },
+          "scores": {
+            "items": {
+              "properties": {
+                "fingerprint": {
+                  "type": "string"
+                },
+                "probability": {
+                  "type": "number"
+                },
+                "repo": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "violates": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "fingerprint",
+                "violates",
+                "probability"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -761,7 +826,8 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
           "model_decided",
           "reviews",
           "calls",
-          "cost"
+          "cost",
+          "scores"
         ],
         "type": "object"
       },
