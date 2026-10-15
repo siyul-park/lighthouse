@@ -105,6 +105,23 @@ fn a_provider_is_declared_by_spec_or_by_command_and_openai_is_built_in() {
 }
 
 #[test]
+fn local_is_built_in_and_costs_nothing_and_cannot_be_declared() {
+    let ModelProvider::Rpc {
+        plugin,
+        options,
+        cost,
+    } = binding().provider("local").unwrap()
+    else {
+        panic!("local is a plugin's provider");
+    };
+    assert_eq!(plugin, "model-local");
+    assert!(options.is_empty());
+    assert_eq!(cost, Some(0.0));
+    assert!(!binding().provider("local").unwrap().remote());
+    assert!(lighthouse_spec::RESERVED_PROVIDERS.contains(&"local"));
+}
+
+#[test]
 fn logprobs_and_extra_body_travel_in_the_options_and_unknown_fields_are_rejected() {
     let config = Config::parse_inline(
         "[models.providers.lp]\nspec = \"openai\"\nlogprobs = true\n\

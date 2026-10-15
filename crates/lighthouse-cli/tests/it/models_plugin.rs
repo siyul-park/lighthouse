@@ -214,10 +214,10 @@ fn model_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
     assert_eq!(trained["result"]["status"], "succeeded");
     assert_eq!(trained["result"]["fine_tuned_model"], "learned@sha256:abc");
     assert_eq!(trained["unresolved"], 0);
-    // Three reviewed rows and one example.
-    assert_eq!(trained["subjects"], 4);
+    // The three reviewed rows; the example is no row to learn from.
+    assert_eq!(trained["subjects"], 3);
     assert_eq!(trained["by_source"]["tsv"], 3);
-    assert_eq!(trained["by_source"]["example"], 1);
+    assert!(trained["by_source"].get("example").is_none());
 
     // The dataset is a file of the host's store named by its digest, in
     // canonical JSON, one training line per subject.
@@ -227,7 +227,7 @@ fn model_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
         .join(format!(".lighthouse/datasets/sha256/{hex}.jsonl"));
     let text = fs::read_to_string(&path).unwrap();
     assert_eq!(format!("{:x}", Sha256::digest(text.as_bytes())), hex);
-    assert_eq!(text.lines().count(), 4);
+    assert_eq!(text.lines().count(), 3);
     for line in text.lines() {
         let parsed: Value = serde_json::from_str(line).unwrap();
         assert_eq!(parsed["messages"].as_array().unwrap().len(), 3);
@@ -235,13 +235,29 @@ fn model_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
         assert_eq!(line, lighthouse_model::canonical(&parsed));
     }
 
-    // The model was handed the same lines.
+    // The model was handed the same lines, and keeps them in the store of
+    // models; the result shows its card.
     let kept = fs::read_to_string(
         dir.path()
-            .join(".lighthouse/models/fake/local-naming-ban/subjects.json"),
+            .join(format!(".lighthouse/models/sha256/{hex}.json")),
     )
     .unwrap();
-    let subjects: Vec<Value> = serde_json::from_str(&kept).unwrap();
-    assert_eq!(subjects.len(), 4);
+    let artifact: Value = serde_json::from_str(&kept).unwrap();
+    let subjects = artifact["subjects"].as_array().unwrap();
+    assert_eq!(subjects.len(), 3);
     assert!(subjects.iter().any(|s| s["weight"] == 1.0));
+    assert_eq!(trained["card"]["chosen"], "fake");
+
+    let out = lighthouse(
+        dir.path(),
+        &[
+            "model",
+            "train",
+            "local/naming-ban",
+            "--baseline",
+            "labels.tsv",
+        ],
+    );
+    let shown = String::from_utf8_lossy(&out.stdout);
+    assert!(shown.contains("chosen fake (brier 0.2500)"), "{shown}");
 }

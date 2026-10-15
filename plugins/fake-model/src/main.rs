@@ -3,7 +3,7 @@
 //! surely not, anything else unsure.
 //!
 //! Without arguments it is a plugin speaking the protocol (`classify` and
-//! `train`, which keeps what it was given in the directory it is told). As a
+//! `train`, which keeps what it was given in the store it is told). As a
 //! `command` provider it has three modes: `command` reads a System One body
 //! on stdin and prints the answer, appending a mark to the file `calls` for
 //! each run; `weak` answers 0.5 in an envelope, as fenced text; `fail` exits
@@ -79,7 +79,8 @@ impl Handler for Fake {
         let hex = request
             .training_file
             .strip_prefix("sha256:")
-            .ok_or("the training file is not a digest")?;
+            .ok_or("the training file is not a digest")?
+            .to_owned();
         let datasets = request
             .metadata
             .get("datasets")
@@ -93,13 +94,15 @@ impl Handler for Fake {
             .map(serde_json::from_str)
             .collect::<Result<_, _>>()
             .map_err(|e| format!("a training line: {e}"))?;
-        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        let write = |name: &str, value: Value| {
-            fs::write(format!("{dir}/{name}"), value.to_string()).map_err(|e| e.to_string())
-        };
-        write("subjects.json", Value::Array(lines.clone()))?;
-        write("metrics.json", json!({"n": lines.len()}))?;
-        let result_file = format!("{dir}/metrics.json");
+        // An artifact of the store, named by the digest of the dataset.
+        let store = format!("{dir}/sha256");
+        fs::create_dir_all(&store).map_err(|e| e.to_string())?;
+        let artifact = json!({
+            "card": {"rows": lines.len(), "chosen": "fake", "metrics": {"brier": 0.25}, "band": {"upper": null, "lower": null}},
+            "subjects": lines,
+        });
+        fs::write(format!("{store}/{hex}.json"), artifact.to_string())
+            .map_err(|e| e.to_string())?;
         Ok(FineTuningJob {
             id: "ftjob-1".to_owned(),
             created_at: 0,
@@ -118,7 +121,7 @@ impl Handler for Fake {
             method: Some(request.method),
             metadata: Some(request.metadata),
             fine_tuned_model: Some("learned@sha256:abc".to_owned()),
-            result_files: vec![result_file],
+            result_files: vec![format!("sha256:{hex}")],
             error: None,
         })
     }

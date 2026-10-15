@@ -24,6 +24,9 @@ const SPECS: [(&str, &str, &str); 2] = [
 /// The plugin that speaks the standard APIs.
 pub const API_PLUGIN: &str = "model-http";
 
+/// The plugin that learns from a decision's labels, on this machine.
+pub const LOCAL_PLUGIN: &str = "model-local";
+
 /// Names a project may not give a provider: they belong to the providers
 /// Lighthouse will predefine.
 pub const RESERVED: [&str; 2] = ["local", "anthropic"];
@@ -367,8 +370,16 @@ impl ModelBinding {
 }
 
 /// The providers Lighthouse predefines: the standard APIs, at their own
-/// service. Declare a provider of the same name to override one.
+/// service, and `local`, which costs nothing. Declare a provider of the same
+/// name to override an API; `local` is reserved.
 pub fn builtin(name: &str) -> Option<ModelProvider> {
+    if name == "local" {
+        return Some(ModelProvider::Rpc {
+            plugin: LOCAL_PLUGIN.to_owned(),
+            options: Map::new(),
+            cost: Some(0.0),
+        });
+    }
     SPECS.iter().find(|(spec, ..)| *spec == name)?;
     ProviderSpec::Api(ApiProvider {
         spec: Names::One(name.to_owned()),

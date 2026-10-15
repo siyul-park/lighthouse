@@ -9,7 +9,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     "openWorldHint": false,
     "readOnlyHint": false
   },
-  "description": "Fit a model on the labels of a decision.\n\nThe labels are its examples, the baseline rows, the judgments recorded under its current meaning version, and optionally the answers of another model. Writes the dataset under `.lighthouse/datasets/` and the artifact under `.lighthouse/models/`; it binds nothing.\n\nExamples:\n  lighthouse model train design/prefer-method\n  lighthouse model train design/prefer-method --model local/general --repo cel=../cel\n  lighthouse model train design/prefer-method --from-model openai/gpt-5 --format json",
+  "description": "Fit a model on the labels of a decision.\n\nThe labels are the baseline rows, the judgments recorded under its current meaning version, and optionally the answers of another model; the decision's examples ride in the question. Writes the dataset under `.lighthouse/datasets/` and the model under `.lighthouse/models/`, named by its digest; it binds nothing (bind `local/learned@sha256:<hex>`).\n\nExamples:\n  lighthouse model train design/prefer-method\n  lighthouse model train design/prefer-method --model local/learned --repo cel=../cel\n  lighthouse model train design/prefer-method --from-model openai/gpt-5 --format json",
   "inputSchema": {
     "additionalProperties": false,
     "description": "`model train`.",

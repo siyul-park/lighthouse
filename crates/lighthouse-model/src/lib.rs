@@ -10,6 +10,7 @@ mod review;
 mod scope;
 mod text;
 mod ucm;
+mod wilson;
 
 pub use canonical::canonical;
 pub use diagnostic::{Diagnostic, Fingerprint, Incomplete, Severity, UnknownSeverity};
@@ -28,6 +29,7 @@ pub use ucm::{
     FunctionSummary, Module, Node, Position, Project, Resolution, Signature, Site, Span, Symbol,
     SymbolId, SymbolKind, SymbolRole, Target, TestCase, TestStyle, TypeRef, Visibility,
 };
+pub use wilson::wilson;
 
 /// Rule options as configured in `lighthouse.toml`.
 pub type Options = serde_json::Map<String, serde_json::Value>;

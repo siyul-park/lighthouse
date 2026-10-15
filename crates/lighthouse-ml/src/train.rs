@@ -5,15 +5,16 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
+    fs,
     path::{Path, PathBuf},
 };
 
 use lighthouse_plugin::{
     Classifier, CreateFineTuningJobRequest, DecisionRef, FineTuneMethod, FineTuneSupervisedMethod,
-    FineTuningJob, Question, ResultKind, Subject, SystemOneRequest, UPPER, decide,
+    FineTuningJob, MODELS_DIR, Question, ResultKind, Subject, SystemOneRequest, UPPER, decide,
 };
 use serde::Serialize;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::{
     Result,
@@ -56,6 +57,8 @@ pub struct Trained {
     pub training_file: String,
     /// The job the trainer gave; `None` when no model that learns is bound.
     pub result: Option<FineTuningJob>,
+    /// The card of the artifact the job made, when it is in the store.
+    pub card: Option<Value>,
 }
 
 /// What one repository gave to a training run: rows, each with where it came
@@ -82,11 +85,7 @@ impl Rows {
         decision: &DecisionRef,
     ) -> Result<Self> {
         let (mut rows, seen) = rows_of(labels, observed);
-        let unresolved = labels
-            .iter()
-            .filter(|l| l.truth != Truth::NotApplicable)
-            .count()
-            - rows.len();
+        let unresolved = labels.iter().filter(|l| teaches(l)).count() - rows.len();
         if let Some(teacher) = teacher {
             let unlabelled = observed
                 .iter()
@@ -141,6 +140,7 @@ pub fn train(request: &TrainRequest, parts: Vec<Rows>, target: &Target) -> Resul
         ))?),
         None => None,
     };
+    let card = result.as_ref().and_then(|job| card_of(target.root, job));
     Ok(Trained {
         decision: request.decision.clone(),
         model: reference.unwrap_or_default().to_owned(),
@@ -150,18 +150,26 @@ pub fn train(request: &TrainRequest, parts: Vec<Rows>, target: &Target) -> Resul
         dataset: written.path,
         training_file: written.digest,
         result,
+        card,
     })
 }
 
+/// Whether a label is a row to learn from. A `notApplicable` label teaches
+/// nothing to a classifier, and a catalog example is not drawn from the
+/// distribution of the labels (every invalid one is a positive): examples
+/// already ride in each line's question.
+fn teaches(label: &Label) -> bool {
+    label.truth != Truth::NotApplicable && label.source != Source::Example
+}
+
 /// The labels with a subject to learn from, as rows, and the keys they cover.
-/// A `notApplicable` label teaches nothing to a classifier.
 fn rows_of(
     labels: &[Label],
     observed: &BTreeMap<String, Subject>,
 ) -> (Vec<Sourced>, BTreeSet<String>) {
     let mut rows = Vec::new();
     let mut seen = BTreeSet::new();
-    for label in labels {
+    for label in labels.iter().filter(|l| teaches(l)) {
         let kind = match label.truth {
             Truth::Fail => ResultKind::Fail,
             Truth::Pass => ResultKind::Pass,
@@ -255,20 +263,21 @@ fn job(
             ),
             (
                 "dir".to_owned(),
-                artifact_dir(root, reference, decision)
-                    .to_string_lossy()
-                    .into_owned(),
+                root.join(MODELS_DIR).to_string_lossy().into_owned(),
             ),
         ]),
         options: serde_json::Map::new(),
     }
 }
 
-/// Where a model keeps what it learned for a decision:
-/// `.lighthouse/models/<provider>/<decision>/`.
-fn artifact_dir(root: &Path, reference: &str, decision: &str) -> PathBuf {
-    let provider = reference.split('/').next().unwrap_or(reference);
-    root.join(".lighthouse/models")
-        .join(provider)
-        .join(decision.replace('/', "-"))
+/// The card of the artifact the job's first result file names, when that is
+/// a `sha256:<hex>` document of the store.
+fn card_of(root: &Path, job: &FineTuningJob) -> Option<Value> {
+    let hex = job.result_files.first()?.strip_prefix("sha256:")?;
+    let path = root
+        .join(MODELS_DIR)
+        .join("sha256")
+        .join(format!("{hex}.json"));
+    let artifact: Value = serde_json::from_str(&fs::read_to_string(path).ok()?).ok()?;
+    artifact.get("card").cloned()
 }

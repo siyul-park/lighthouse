@@ -181,3 +181,42 @@ fn engine_with_commands_builds_the_command_models_of_a_trusted_project() {
     let refused = untrusted.model("prog/m").unwrap();
     assert_eq!(refused.manifest().id, "prog/m");
 }
+
+#[test]
+fn a_project_cannot_declare_the_reserved_provider_local() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = Config::parse_inline(
+        "plugins = [\"echo\"]\n[models]\nclassification = \"local/echo\"\n\
+         [models.providers.local]\ntype = \"rpc\"\nplugin = \"echo\"\n",
+    )
+    .unwrap();
+    let error = Engine::new(registry(), config, Catalog::bundled(), dir.path())
+        .err()
+        .expect("local is reserved");
+    assert!(error.to_string().contains("reserved"), "{error}");
+}
+
+#[test]
+fn a_trained_model_is_another_model_to_the_answer_cache_by_its_digest() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = Config::parse_inline(
+        "plugins = [\"echo\"]\n[models.providers.work]\ntype = \"rpc\"\nplugin = \"echo\"\n",
+    )
+    .unwrap();
+    let engine = Engine::new(registry(), config, Catalog::bundled(), dir.path())
+        .unwrap()
+        .with_models(ModelOptions::default());
+    let manifest = |digest: &str| {
+        engine
+            .model(&format!("work/learned@sha256:{digest}"))
+            .unwrap()
+            .manifest()
+            .clone()
+    };
+
+    // The answer cache key is made of the manifest's id and version.
+    let (first, second) = (manifest("aa"), manifest("bb"));
+    assert_ne!(first.id, second.id);
+    assert_ne!(first.version, second.version);
+    assert_eq!(first.version, manifest("aa").version);
+}

@@ -28,6 +28,12 @@ pub use model::{
     },
 };
 
+/// Where models are stored by content, under the project root:
+/// `sha256/<hex>.json` in it is one trained model. A trainer is told the
+/// directory in the `dir` of its request; a model that serves a trained model
+/// finds it under the root it was initialized with.
+pub const MODELS_DIR: &str = ".lighthouse/models";
+
 /// Protocol version spoken by this crate. Peers must agree on it exactly.
 pub const VERSION: &str = "0.2";
 

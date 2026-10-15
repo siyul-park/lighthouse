@@ -3,6 +3,7 @@
 //! decision is bound to. The wire types are the protocol's: a model is trained
 //! on what it is later asked about.
 
+pub use lighthouse_protocol::MODELS_DIR;
 pub use lighthouse_protocol::{
     Answer, Capabilities, CreateFineTuningJobRequest, DecisionRef, Example, FineTuneJobError,
     FineTuneMethod, FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,

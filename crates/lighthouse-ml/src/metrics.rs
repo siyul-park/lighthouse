@@ -1,13 +1,11 @@
 //! The metrics of evaluating a check against labels, with Wilson 95%
 //! intervals. A proportion over nothing is `None`, never zero.
 
+use lighthouse_model::wilson;
 use serde::Serialize;
 
 /// The equal-width bins of P(fail) the expected calibration error uses.
 const BINS: usize = 10;
-
-/// z for a 95% interval.
-const Z: f64 = 1.959_963_984_540_054;
 
 /// A proportion with its Wilson 95% interval.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -25,17 +23,13 @@ impl Rate {
         if of == 0 {
             return None;
         }
-        let n = of as f64;
-        let p = hits as f64 / n;
-        let z2 = Z * Z;
-        let centre = (p + z2 / (2.0 * n)) / (1.0 + z2 / n);
-        let half = Z * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt() / (1.0 + z2 / n);
+        let (low, high) = wilson(hits as f64, of as f64);
         Some(Self {
             hits,
             of,
-            value: p,
-            low: (centre - half).max(0.0),
-            high: (centre + half).min(1.0),
+            value: hits as f64 / of as f64,
+            low,
+            high,
         })
     }
 }

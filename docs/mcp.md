@@ -229,11 +229,11 @@ Result: [ModelList](../schema/model-list.schema.json).
 
 Fit a model on the labels of a decision.
 
-The labels are its examples, the baseline rows, the judgments recorded under its current meaning version, and optionally the answers of another model. Writes the dataset under `.lighthouse/datasets/` and the artifact under `.lighthouse/models/`; it binds nothing.
+The labels are the baseline rows, the judgments recorded under its current meaning version, and optionally the answers of another model; the decision's examples ride in the question. Writes the dataset under `.lighthouse/datasets/` and the model under `.lighthouse/models/`, named by its digest; it binds nothing (bind `local/learned@sha256:<hex>`).
 
 Examples:
   lighthouse model train design/prefer-method
-  lighthouse model train design/prefer-method --model local/general --repo cel=../cel
+  lighthouse model train design/prefer-method --model local/learned --repo cel=../cel
   lighthouse model train design/prefer-method --from-model openai/gpt-5 --format json
 
 Result: [TrainReport](../schema/train-report.schema.json).

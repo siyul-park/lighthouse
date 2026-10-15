@@ -87,5 +87,27 @@ fn train_text(trained: &Trained) -> String {
         }
         None => out.push_str("no model that learns is bound: nothing was trained\n"),
     }
+    if let Some(card) = &trained.card {
+        let _ = writeln!(out, "{}", card_line(card));
+    }
     out
+}
+
+/// What the trainer measured, in a line: the candidate it chose, its Brier
+/// score out of fold and the abstain band.
+fn card_line(card: &serde_json::Value) -> String {
+    let number = |pointer: &str, places: usize| {
+        card.pointer(pointer)
+            .and_then(serde_json::Value::as_f64)
+            .map_or_else(|| "-".to_owned(), |n| format!("{n:.places$}"))
+    };
+    format!(
+        "chosen {} (brier {}), band upper {} lower {}",
+        card.pointer("/chosen")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("-"),
+        number("/metrics/brier", 4),
+        number("/band/upper", 4),
+        number("/band/lower", 4),
+    )
 }

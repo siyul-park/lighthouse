@@ -28,9 +28,9 @@ pub use models::{
     Answer, Ask, Capabilities, Classifier, CreateFineTuningJobRequest, Decided, DecisionRef,
     Example, FineTuneJobError, FineTuneMethod, FineTuneSupervisedHyperparameters,
     FineTuneSupervisedMethod, FineTuningJob, FineTuningJobStatus, Judged, LineKeys,
-    ListModelResponse, Model, Models, Neighbor, NoModels, Open, Question, ResultKind, Settle,
-    State, Subject, SubjectContext, Supports, SystemOneRequest, SystemOneResponse, TrainingLine,
-    UPPER, decide,
+    ListModelResponse, MODELS_DIR, Model, Models, Neighbor, NoModels, Open, Question, ResultKind,
+    Settle, State, Subject, SubjectContext, Supports, SystemOneRequest, SystemOneResponse,
+    TrainingLine, UPPER, decide,
 };
 pub use notices::Notices;
 pub use registry::{Registry, plugin_of};

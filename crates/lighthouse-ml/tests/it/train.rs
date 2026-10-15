@@ -65,6 +65,29 @@ fn rows_of_labels_with_a_subject_count_and_the_rest_are_unresolved() {
 }
 
 #[test]
+fn examples_are_not_rows_because_the_question_already_shows_them() {
+    let observed = BTreeMap::from([("seen".to_owned(), subject()), ("ex".to_owned(), subject())]);
+    let labels = [
+        label("seen", Truth::Fail, Source::Person),
+        label("ex", Truth::Pass, Source::Example),
+    ];
+    let decision = Catalog::bundled().decision(RULE).unwrap().reference();
+    let rows = Rows::of(&labels, &observed, None, &decision).unwrap();
+
+    let dir = tempfile::tempdir().unwrap();
+    let target = Target {
+        root: dir.path(),
+        reference: None,
+        decision: &decision,
+        model: None,
+    };
+    let trained = train(&request(), vec![rows], &target).unwrap();
+    assert_eq!(trained.subjects, 1);
+    assert_eq!(trained.unresolved, 0);
+    assert!(!trained.by_source.contains_key("example"));
+}
+
+#[test]
 fn train_writes_the_same_dataset_for_the_same_labels_and_no_job_without_a_model() {
     let decision = Catalog::bundled().decision(RULE).unwrap().reference();
     let dir = tempfile::tempdir().unwrap();
