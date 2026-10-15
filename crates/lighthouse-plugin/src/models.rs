@@ -93,6 +93,13 @@ pub trait Models: Send + Sync {
         false
     }
 
+    /// Whether the run puts the subjects `rule` suspects to models: a model is
+    /// bound to its decision, or the run asks for model work. Otherwise the
+    /// rule skips its `review` route.
+    fn asks(&self, _rule: &str) -> bool {
+        false
+    }
+
     /// Keeps subjects seen.
     fn observe(&self, _subjects: Vec<Subject>) {}
 

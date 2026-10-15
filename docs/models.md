@@ -14,7 +14,11 @@ declared as a provider later.
 
 ## Run time
 
-A rule hands the subjects it suspects (`review`) to `Ctx::models`. The rule only queues the
+A rule evaluates its `review` route only when the run asks its models (`Models::asks`): a model is
+bound to its decision through a Revision, `rules."<id>".model` or `[models] classification`, or
+the run passes `--all-models` or collects subjects. Otherwise the route is skipped, nothing is
+reported for it, and the rule's findings stay cacheable (a rule that asks is never stored). The
+`where` part is unaffected. A rule hands the subjects it suspects (`review`) to `Ctx::models`. The rule only queues the
 questions; the engine flushes them after the rules of a file (`engine/batch.rs`), one request per
 subject with up to 32 questions (one per decision), so that a subject is sent once however many
 decisions ask about it. The engine resolves the decision's bindings (Revision, rule, project

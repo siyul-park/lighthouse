@@ -14,6 +14,7 @@ use std::{
 
 use crate::cache::{Cache, Digest, Digests, Key, KeyBuilder, Stored};
 use lighthouse_model::{Reach, TestScope, hash::Hasher};
+use lighthouse_plugin::Models;
 use serde::{Deserialize, Serialize};
 
 use super::*;
@@ -97,6 +98,7 @@ impl Engine {
         &self,
         project: &Project,
         selected: &[&dyn Rule],
+        models: &dyn Models,
         notices: &mut BTreeSet<String>,
     ) -> Option<RunCache> {
         let settings = self.cache.as_ref()?;
@@ -105,7 +107,7 @@ impl Engine {
                 cache,
                 digests: Digests::of(project)?,
                 documents: crate::cache::documents(project.documents())?,
-                plans: self.plans(selected),
+                plans: self.plans(selected, models),
             })
         });
         match opened {
@@ -117,13 +119,17 @@ impl Engine {
         }
     }
 
-    /// The prefix of the keys of each selected rule that may be cached.
-    fn plans(&self, selected: &[&dyn Rule]) -> HashMap<String, Plan> {
+    /// The prefix of the keys of each selected rule that may be cached: not one
+    /// whose `review` route the models are asked about this run.
+    fn plans(&self, selected: &[&dyn Rule], models: &dyn Models) -> HashMap<String, Plan> {
         let base = self.cache_base();
         selected
             .iter()
             .filter_map(|rule| {
                 let meta = rule.manifest();
+                if rule.reviews() && models.asks(&meta.id) {
+                    return None;
+                }
                 let caching = meta.caching.as_ref()?;
                 let mut prefix = KeyBuilder::new();
                 prefix

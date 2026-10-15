@@ -69,12 +69,12 @@ spec:
       kind: valid
       canonical: true
       files:
-        - path: decisions/design/no-private-types.yaml
+        - path: decisions/design/prefer-method.yaml
           body: |-
             apiVersion: lighthouse/v1alpha1
             kind: Decision
             metadata:
-              name: design/no-private-types
+              name: design/prefer-method
               labels:
                 lighthouse/pack: design
     - name: noun-phrase-and-limit

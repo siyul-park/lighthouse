@@ -305,6 +305,11 @@ pub trait Rule: Send + Sync {
     fn manifest(&self) -> &RuleManifest;
     fn validate(&self, options: &Options) -> Result<(), Error>;
     fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, Error>;
+    /// Whether the rule puts subjects to models (a `review` route). Its findings
+    /// are stored only for a run that does not ask the models.
+    fn reviews(&self) -> bool {
+        false
+    }
 }
 
 /// A bundle of language providers, analyzers, rules and fixers, all of whose

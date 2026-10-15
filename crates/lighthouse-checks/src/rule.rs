@@ -123,7 +123,6 @@ impl DeclarativeRule {
         // annotation rules, which the engine reports itself, are not.
         meta.caching = match kind {
             Kind::Command(_) | Kind::Annotation => None,
-            Kind::Cel(ref rule) if rule.reviews() => None,
             _ => Some(Caching {
                 reach,
                 positions,
@@ -148,6 +147,10 @@ impl Rule for DeclarativeRule {
     /// The metadata of the decision the rule was built from.
     fn manifest(&self) -> &RuleManifest {
         &self.meta
+    }
+
+    fn reviews(&self) -> bool {
+        matches!(&*self.kind, Kind::Cel(rule) if rule.reviews())
     }
 
     /// Accepts the options when they resolve against the decision's declared

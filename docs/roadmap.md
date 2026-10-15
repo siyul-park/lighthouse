@@ -163,7 +163,7 @@ Public adoption waits until the loop has been shown working.
 ## Known gaps
 - A per-language check, `spec.languages.<id>.check`, does not exist. A decision whose
   deterministic part rests on facts only some providers give (`design/concurrency`,
-  `no-stored-context`, `error-identity`, `no-private-types`: Go only) guards its `where` on
+  `stored-context`, `compare` and `assert` of `design/errors`, `unexported` of `design/signature`: Go only) guards its `where` on
   the language and cannot keep a `model` check for the others.
 - `testing/cases` cannot tell a helper that returns or asserts on the target's
   result from one that only builds with it (a data-flow fact: built or consumed against

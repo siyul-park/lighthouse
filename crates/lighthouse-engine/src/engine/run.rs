@@ -29,7 +29,9 @@ impl Engine {
         self.validate_only(only)?;
         let selected = self.select_rules(only);
         let mut progress = self.begin(reported)?;
-        let loaded = self.load(&selected, overlays, &mut progress);
+        let scopes = progress.scopes.clone();
+        let models = self.run_models(&scopes);
+        let loaded = self.load(&selected, &models, overlays, &mut progress);
         let memo = Memo::default();
         let facts = self.analyze(
             &selected,
@@ -38,8 +40,6 @@ impl Engine {
             &memo,
             &mut progress.timings,
         )?;
-        let scopes = progress.scopes.clone();
-        let models = self.run_models(&scopes);
         let scene = Scene {
             rules: &selected,
             inputs: &loaded.inputs,
@@ -127,7 +127,13 @@ impl Engine {
 
     /// Reads the files, has the providers index them, and finds the project's
     /// own documents when a selected rule is about them.
-    fn load(&self, selected: &[&dyn Rule], overlays: &Overlays, progress: &mut Progress) -> Loaded {
+    fn load(
+        &self,
+        selected: &[&dyn Rule],
+        models: &super::models::RunModels,
+        overlays: &Overlays,
+        progress: &mut Progress,
+    ) -> Loaded {
         let started = Instant::now();
         let inputs = self.read(
             overlays,
@@ -152,7 +158,7 @@ impl Engine {
             project
         };
         let started = Instant::now();
-        let cache = self.open_cache(&project, selected, &mut progress.outcome.notices);
+        let cache = self.open_cache(&project, selected, models, &mut progress.outcome.notices);
         progress.timings.hashing = started.elapsed();
         Loaded {
             inputs,

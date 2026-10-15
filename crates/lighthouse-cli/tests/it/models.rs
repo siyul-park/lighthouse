@@ -137,17 +137,35 @@ fn a_bound_model_fails_what_it_is_sure_of_and_the_rest_is_left_to_review() {
 }
 
 #[test]
-fn without_a_binding_or_with_models_off_every_abstention_is_a_review() {
-    for (models, args) in [(String::new(), &[][..]), (bound(), &["--no-models"][..])] {
+fn without_a_binding_or_with_models_off_a_review_route_is_skipped_unless_all_models_are_asked() {
+    let cases = [
+        (String::new(), &[][..], 0),
+        (bound(), &["--no-models"][..], 0),
+        (String::new(), &["--all-models"][..], 3),
+        (bound(), &["--no-models", "--all-models"][..], 3),
+    ];
+    for (models, args, reviews) in cases {
         let dir = project(&models);
         let mut all = vec!["--no-cache"];
         all.extend(args);
         let (_, log) = check(dir.path(), &all);
         let found = results(&log);
         assert_eq!(count(&found, "fail"), 1, "{found:?}");
-        assert_eq!(count(&found, "review"), 3, "{found:?}");
+        assert_eq!(count(&found, "review"), reviews, "{found:?}");
         assert_eq!(calls(dir.path()), 0);
     }
+}
+
+#[test]
+fn an_unbound_cached_run_reports_what_a_cold_run_reports() {
+    let dir = project("");
+    let (_, cold) = check(dir.path(), &["--no-cache"]);
+    let (_, filled) = check(dir.path(), &[]);
+    let (_, warm) = check(dir.path(), &[]);
+    assert_eq!(count(&results(&cold), "fail"), 1);
+    assert_eq!(results(&filled), results(&cold));
+    assert_eq!(results(&warm), results(&cold));
+    assert_eq!(count(&results(&warm), "review"), 0);
 }
 
 #[test]

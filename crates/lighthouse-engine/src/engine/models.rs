@@ -268,6 +268,10 @@ impl Models for RunModels<'_> {
         self.collect
     }
 
+    fn asks(&self, rule: &str) -> bool {
+        self.collect || self.scopes.is_none() || !self.cascade(rule).is_empty()
+    }
+
     fn observe(&self, subjects: Vec<Subject>) {
         let mut seen = self.seen.lock().unwrap_or_else(PoisonError::into_inner);
         for subject in subjects {

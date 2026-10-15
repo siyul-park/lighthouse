@@ -49,6 +49,7 @@ fn fingerprints(dir: &Path) -> BTreeMap<String, String> {
             "--no-store",
             "--no-cache",
             "--no-models",
+            "--all-models",
             "--format",
             "json",
             "--detail",

@@ -120,8 +120,7 @@ impl CelRule {
         })
     }
 
-    /// Whether some subjects are put to the models. A rule that does is not
-    /// stored by the host: a model's answers are kept by the models.
+    /// Whether the check has a route that puts subjects to the models.
     pub(crate) fn reviews(&self) -> bool {
         self.review.is_some()
     }
@@ -153,8 +152,10 @@ impl CelRule {
         options: &Map<String, Value>,
     ) -> Result<Vec<Diagnostic>, PluginError> {
         let builder = Builder::new(ctx, &self.needs, options, &meta.id)?;
+        let reviewing = self.reviews() && ctx.models.asks(&meta.id);
         let run = Run {
             rule: self,
+            reviewing,
             meta,
             builder,
             options: cel_fact(&Value::Object(options.clone())),
@@ -164,7 +165,7 @@ impl CelRule {
             lighthouse_model::RunScope::File => run.check_file(ctx),
             lighthouse_model::RunScope::Project => run.check_project(ctx),
         }?;
-        if let Some(review) = &self.review {
+        if let Some(review) = self.review.as_ref().filter(|_| reviewing) {
             found.extend(review.settle(ctx, meta, run.candidates.take()));
         }
         Ok(found)
@@ -173,6 +174,8 @@ impl CelRule {
 
 struct Run<'a> {
     rule: &'a CelRule,
+    /// Whether the `review` route is evaluated: the run asks the models of this rule.
+    reviewing: bool,
     meta: &'a RuleManifest,
     builder: Builder<'a>,
     options: Fact,
@@ -383,7 +386,8 @@ impl Run<'_> {
             frame.set_cel(name, bound);
         }
         let found = frame.truth(&rule.condition)?;
-        match (&rule.review, found) {
+        let review = rule.review.as_ref().filter(|_| self.reviewing);
+        match (review, found) {
             (None, false) => return Ok(None),
             (Some(review), false) if !review.asks(&frame)? => return Ok(None),
             _ => {}
@@ -419,7 +423,7 @@ impl Run<'_> {
         );
         diagnostic.symbol = place.symbol.map(|id| id.as_str().to_owned());
         diagnostic.evidence = evidence;
-        if let Some(review) = &rule.review {
+        if let Some(review) = review {
             let fact = review.fact_of(&frame)?;
             self.candidates.borrow_mut().push(Candidate {
                 diagnostic: diagnostic.clone(),
