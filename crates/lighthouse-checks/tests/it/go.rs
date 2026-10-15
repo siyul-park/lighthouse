@@ -326,6 +326,16 @@ fn engine_checks_a_multi_file_go_package() {
     let want = [
         (
             "store/load.go",
+            line_of(LOAD, "func (s *Store) a()"),
+            "design/symbols",
+        ),
+        (
+            "store/load.go",
+            line_of(LOAD, "func (s *Store) b()"),
+            "design/symbols",
+        ),
+        (
+            "store/load.go",
             line_of(LOAD, "func (s *Store) load"),
             "design/symbols",
         ),

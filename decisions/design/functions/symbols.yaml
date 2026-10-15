@@ -22,7 +22,7 @@ spec:
     reported, since it can be inlined. One that adds an argument, or is
     needed as a function value, is not a wrapper.
 
-    Kind `dead` (off by default and on in the strict preset): a private
+    Kind `dead` (on by default; Rust is off through `deadKinds`): a private
     function, method or variable that nothing calls and nothing refers to,
     that does not implement an interface, is no test fixture and is not
     `main`, `init` or `_`: delete it (Martin, Clean Code G9 and F4). Members
@@ -67,7 +67,7 @@ spec:
       kinds:
         type: array
         items: { type: string, enum: [wrapper, dead, interface] }
-        default: [wrapper]
+        default: [wrapper, dead]
         description: What to report.
       deadKinds:
         type: array
