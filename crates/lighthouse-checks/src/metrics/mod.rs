@@ -41,6 +41,15 @@ pub struct Size {
     pub lines: u32,
 }
 
+/// The measures of one function that add up over the functions of a unit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Own {
+    pub lines: u32,
+    pub statements: u32,
+    pub cyclomatic: u32,
+    pub cognitive: u32,
+}
+
 /// The plugin providing the `metrics/*` analyzers; stateless.
 pub struct Metrics;
 
@@ -151,6 +160,18 @@ pub fn is_flat_dispatch(summary: &FunctionSummary) -> bool {
     summary.max_nesting <= FLAT_DISPATCH_NESTING
         && top_level.next().is_some_and(|f| f.kind == FlowKind::Switch)
         && top_level.next().is_none()
+}
+
+/// What the analyzers measure for a function, read without the file scope
+/// of their facts, so that a function of another file can be measured too.
+pub(crate) fn own(project: &Project, symbol: &Symbol, summary: &FunctionSummary) -> Own {
+    let Size { statements, lines } = size(project, symbol, summary);
+    Own {
+        lines,
+        statements,
+        cyclomatic: cyclomatic(project, symbol, summary),
+        cognitive: cognitive::score(project, symbol, summary),
+    }
 }
 
 fn size(_: &Project, symbol: &Symbol, summary: &FunctionSummary) -> Size {

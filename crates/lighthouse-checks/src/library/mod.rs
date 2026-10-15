@@ -1,7 +1,7 @@
 //! The standard functions of CEL expressions over the code model:
 //! `metrics(n)`, `callers(n)`, `callees(n)`, `edges(n, kind)`, `owner(n)`,
 //! `tests(n)`, `annotations(n)`, `rank(n, key)`, `exposed(n, internal)`,
-//! `limit(n, max)` and `counted(n, count, what)`,
+//! `unit(func)`, `limit(n, max)` and `counted(n, count, what)`,
 //! the module path helpers `globMatch(path, glob)` and
 //! `layerOf(module, layers)`, and the text helpers `join`, `lines`, `trim`,
 //! `trimPrefixes`, `trimSuffixes`, `trimLeft`, `trimRight`, `leadingRun`,
@@ -29,7 +29,7 @@ use cel::{
 
 /// The functions the library defines and the hidden field of a node each one
 /// reads.
-pub(crate) const FUNCTIONS: [(&str, &str); 8] = [
+pub(crate) const FUNCTIONS: [(&str, &str); 9] = [
     ("metrics", "__metrics"),
     ("callers", "__callers"),
     ("callees", "__callees"),
@@ -38,6 +38,7 @@ pub(crate) const FUNCTIONS: [(&str, &str); 8] = [
     ("annotations", "__annotations"),
     ("edges", "__edges"),
     ("rank", "__ranks"),
+    ("unit", "__unit"),
 ];
 
 /// What the expressions of a check ask for, found from their source text.

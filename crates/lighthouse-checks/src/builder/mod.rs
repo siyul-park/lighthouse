@@ -36,7 +36,9 @@ mod homonyms;
 mod imports;
 mod measures;
 mod ownership;
+mod parent;
 mod role;
+mod unit;
 mod widths;
 
 use forward::{cyclic, forwarded};
@@ -60,6 +62,7 @@ pub(crate) struct Builder<'a> {
     single: Arc<effective::Single>,
     imports: Arc<imports::Imports>,
     types: Arc<cohesion::Types>,
+    parents: Arc<parent::Parents>,
     allow_suffixes: Vec<String>,
     first_test: OnceCell<Option<Value>>,
 }
@@ -98,6 +101,7 @@ impl<'a> Builder<'a> {
             single: ctx.memo.slot(),
             imports: ctx.memo.slot(),
             types: ctx.memo.slot(),
+            parents: ctx.memo.slot(),
             allow_suffixes: strings(options.get("allowSuffixes")),
             first_test: OnceCell::new(),
         })
@@ -195,6 +199,9 @@ impl<'a> Builder<'a> {
         if self.needs.fact("types") {
             value["types"] = self.module_types(&module.path);
         }
+        if self.needs.fact("parent") {
+            value["parent"] = self.module_parent(module);
+        }
         value
     }
 
@@ -251,6 +258,9 @@ impl<'a> Builder<'a> {
                 "__callees".to_owned(),
                 self.nodes(project.callees(&symbol.id)),
             );
+        }
+        if needs.function("unit") {
+            map.insert("__unit".to_owned(), self.unit(symbol, summary));
         }
         if needs.function("owner") {
             map.insert("__owner".to_owned(), self.owner(symbol));

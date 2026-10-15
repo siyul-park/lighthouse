@@ -85,7 +85,7 @@ const REACHES: &[(&str, Option<(Reach, bool)>)] = &[
     ("core/formatted", Some((Reach::Local, false))),
     ("core/no-unused-allow", None),
     ("design/comments", Some((Reach::Local, false))),
-    ("design/complexity", Some((Reach::Neighbors, false))),
+    ("design/complexity", Some((Reach::Global, false))),
     ("design/concurrency", Some((Reach::Local, false))),
     ("design/constructors", Some((Reach::Local, false))),
     ("design/declaration-groups", Some((Reach::Local, false))),

@@ -63,6 +63,9 @@ pub const FACTS: &[(&str, Reach)] = &[
     // that implement an interface, tests included.
     ("types", Reach::Global),
     ("implementers", Reach::Global),
+    // How a module is tied to its parent module, by what the symbols of both
+    // use of each other.
+    ("parent", Reach::Global),
 ];
 
 /// The functions of the library, by name.
@@ -73,6 +76,8 @@ pub const FUNCTIONS: &[(&str, Reach)] = &[
     ("owner", Reach::Neighbors),
     ("edges", Reach::Neighbors),
     ("tests", Reach::Global),
+    // A function with the single-use helpers it calls, transitively.
+    ("unit", Reach::Global),
     ("annotations", Reach::Local),
     // The order keys of this crate rank a declaration by its own file and
     // owner.
