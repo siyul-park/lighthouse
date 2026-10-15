@@ -16,7 +16,7 @@ Size limits that keep files reviewable.
 
 `core/file-size` · file · warn · cel
 
-*Large files tend to mix responsibilities, and splitting by size alone creates arbitrary boundaries. The count is the file's lines (revive `file-length-limit`), reported once per file with the kind `lines`. Kind `width` (off by default and on in the strict preset): a line wider than `maxWidth` columns, counted in characters with a tab as one (ESLint `max-len`, Checkstyle `LineLength`). A comment that is one URL, a single string literal and an import line cannot be wrapped and are not counted. A file reports once, with the kind that matched first.*
+*Large files tend to mix responsibilities, and splitting by size alone creates arbitrary boundaries. The count is the file's lines (revive `file-length-limit`), reported once per file with the kind `lines`. Kind `width` (off by default and on in the strict preset): a line wider than `maxWidth` columns, counted in characters with a tab as one (ESLint `max-len`, Checkstyle `LineLength`). A comment that is one URL, a single string literal and an import line cannot be wrapped and are not counted. Only files of a language provider are counted: prose and data have no syntax to wrap at. A file reports once, with the kind that matched first.*
 
 A file SHOULD stay at or below the configured line limit (option `max`). A file that is over the limit MUST be split along cohesion boundaries, not by size alone. A line that can be wrapped SHOULD NOT be wider than the configured number of columns (option `maxWidth`).
 
@@ -38,6 +38,8 @@ c
 a
 b
 ```
+
+Also: go
 
 ## Format
 

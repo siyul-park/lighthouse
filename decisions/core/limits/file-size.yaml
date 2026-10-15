@@ -18,7 +18,8 @@ spec:
     than `maxWidth` columns, counted in characters with a tab as one (ESLint
     `max-len`, Checkstyle `LineLength`). A comment that is one URL, a single
     string literal and an import line cannot be wrapped and are not counted.
-    A file reports once, with the kind that matched first.
+    Only files of a language provider are counted: prose and data have no
+    syntax to wrap at. A file reports once, with the kind that matched first.
   scope:
     domain: code
     subject: file
@@ -52,7 +53,7 @@ spec:
     with:
       - name: wide
         expr: >-
-          'width' in options.kinds
+          'width' in options.kinds && file.lang != 'text'
           ? file.line_widths.filter(l, l.width > options.maxWidth && !l.exempt)
           : []
       - name: matched
@@ -107,8 +108,41 @@ spec:
         a
         b
   - name: wide-line
-    language: text
+    language: go
     kind: invalid
+    options:
+      kinds: [width]
+      maxWidth: 20
+    files:
+    - path: wide.go
+      body: |-
+        package sample
+
+        // a line that is far too wide
+        var a = 1
+    expect:
+    - line: 3
+  - name: wide-exempt
+    language: go
+    kind: valid
+    canonical: true
+    options:
+      kinds: [width]
+      maxWidth: 20
+    files:
+    - path: exempt.go
+      body: |-
+        package sample
+
+        // https://example.com/a/very/long/address
+        import "some/very/long/module/path"
+
+        var n = []string{
+        	"a single string literal that cannot wrap",
+        }
+  - name: wide-text
+    language: text
+    kind: valid
     options:
       kinds: [width]
       maxWidth: 10
@@ -116,19 +150,4 @@ spec:
     - path: wide.txt
       body: |-
         short
-        a line that is far too wide
-    expect:
-    - line: 2
-  - name: wide-exempt
-    language: text
-    kind: valid
-    options:
-      kinds: [width]
-      maxWidth: 10
-    files:
-    - path: exempt.txt
-      body: |-
-        short
-        // https://example.com/a/very/long/address
-        "a single string literal that cannot wrap",
-        import some.very.long.module.path
+        a prose line that is far too wide but is not source
