@@ -302,7 +302,7 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
     assert!(recommended["design/naming"].options.is_empty());
     assert_eq!(
         preset("design/strict")["design/naming"].options["kinds"],
-        json!(["qualifier", "words"])
+        json!(["qualifier", "words", "encoding"])
     );
     assert_eq!(preset("testing/recommended").len(), 4);
 }

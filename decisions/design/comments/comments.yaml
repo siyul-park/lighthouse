@@ -22,6 +22,16 @@ spec:
     are Markdown and never banners; a plain `//` or block comment made only of
     banner lines is reported.
 
+    Further kinds, all off by default and on in the strict preset, apply to
+    comments that are prose: not documentation, without a code fence and not
+    a directive (`go:`, `+build`, `nolint`, `lint:`, `lighthouse-`, `#[`,
+    `SAFETY:`, `noqa`, `tool:name`). `code`: a comment that is not attached
+    to a declaration and whose every line looks like code (`codePatterns`);
+    delete it, version control keeps history (fix, suggested). `history`: a
+    line that records who changed what and when (`historyPatterns`). `closing`:
+    a comment after a closing brace that names the block it closes. `todo`: a
+    comment that starts with one of `todoKeywords`.
+
     Narration and facts are judged: every other comment that is not
     documentation, a directive or generated code is put to a model, with the
     requirement and the examples as the question.
@@ -44,6 +54,11 @@ spec:
   options:
     type: object
     properties:
+      kinds:
+        type: array
+        items: { type: string, enum: [banner, code, history, closing, todo] }
+        default: [banner]
+        description: What to report.
       minRun:
         type: integer
         default: 3
@@ -56,6 +71,25 @@ spec:
         type: array
         default: ["MARK:", "#region", "#endregion"]
         description: Line prefixes that label a section on their own.
+      codePatterns:
+        type: array
+        default:
+          - '[;{}]$'
+          - '^(if|for|switch|select|return|func|fn|let|var|const|import|package|use|match|defer|go|impl|pub|struct|type)\b.*[({=;]'
+          - '^[A-Za-z_][\w.]*(\[[^\]]*\])?\s*(:=|=|\+=|-=|\*=)\s*\S'
+          - '^[A-Za-z_][\w.]*\(.*\)[;,]?$'
+        description: Regular expressions a line of commented-out code matches.
+      historyPatterns:
+        type: array
+        default:
+          - '(?i)^(changed|modified|added|removed|fixed|updated)\s+(by|on)\b'
+          - '(?i)^(author|created by|modified by|written by)\s*:'
+          - '^\d{4}-\d{2}-\d{2}\b.*(?i:\b(added|changed|fixed|removed|by)\b)'
+        description: Regular expressions a line that records history matches.
+      todoKeywords:
+        type: array
+        default: [TODO, FIXME, BUG, HACK, XXX]
+        description: Words that start a comment that defers work.
     additionalProperties: false
   check:
     type: cel
@@ -79,19 +113,51 @@ spec:
             : trim(trimRight(trim(drop(b, leadingRun(b, options.ruleChars))), options.ruleChars)))
       - name: named
         expr: texts.filter(t, t != '')
-      - name: banner
+      - name: directive
         expr: >-
-          comment.standalone && !documentation && size(bodies) > 0
-          && bodies.all(b, options.labels.exists(m, b.startsWith(m))
-                           || leadingRun(b, options.ruleChars) >= options.minRun)
-    where: banner
+          size(bodies) > 0
+          && (['go:', '+build', 'nolint', 'lint:', 'lighthouse-', '#[', 'SAFETY:', 'noqa']
+                .exists(p, bodies[0].startsWith(p))
+              || bodies[0].matches('^[a-z]+:[a-z]'))
+      - name: prose
+        expr: "!documentation && !comment.text.contains('```') && !directive"
+      - name: matched
+        expr: >-
+          ('banner' in options.kinds && comment.standalone && !documentation && size(bodies) > 0
+            && bodies.all(b, options.labels.exists(m, b.startsWith(m))
+                             || leadingRun(b, options.ruleChars) >= options.minRun)
+            ? ['banner'] : [])
+          + ('code' in options.kinds && prose && !comment.attached && size(bodies) >= 1
+            && bodies.all(b, options.codePatterns.exists(p, b.matches(p)))
+            ? ['code'] : [])
+          + ('history' in options.kinds
+            && bodies.exists(b, options.historyPatterns.exists(p, b.matches(p)))
+            ? ['history'] : [])
+          + ('closing' in options.kinds && comment.before == '}' && size(bodies) == 1
+            && bodies[0].matches('(?i)^(end\\b|(if|else|for|switch|select|case|func|fn|loop|match|while|impl|mod|struct|try)\\b)')
+            ? ['closing'] : [])
+          + ('todo' in options.kinds && prose && size(bodies) > 0
+            && options.todoKeywords.exists(k, bodies[0].matches('^' + k + '\\b'))
+            ? ['todo'] : [])
+    where: size(matched) > 0
     review: >-
       !comment.generated && !comment.attached && !documentation && size(bodies) > 0
       && !bodies[0].startsWith('lighthouse-')
-    message: "{{ banner ? 'comment labels a section instead of stating a fact; name the code or split it instead' : '' }}"
+    message: >-
+      {{ size(matched) == 0 ? ''
+         : matched[0] == 'banner'
+         ? 'comment labels a section instead of stating a fact; name the code or split it instead'
+         : matched[0] == 'code'
+         ? 'comment holds code; delete it, version control keeps history'
+         : matched[0] == 'history'
+         ? 'comment records history or authorship; version control keeps it'
+         : matched[0] == 'closing'
+         ? 'comment marks a closing brace; shorten the block instead'
+         : options.todoKeywords.filter(k, bodies[0].matches('^' + k + '\\b'))[0]
+           + ' comment: do it, file it, or delete it' }}
     evidence:
-      kind: "'banner'"
-      kinds: "['banner']"
+      kind: "size(matched) > 0 ? matched[0] : ''"
+      kinds: matched
       comment: comment.text
       label: "size(named) > 0 ? named[0] : ''"
     identity:
@@ -102,7 +168,7 @@ spec:
     type: ops
     ops:
       - op: delete
-        when: finding.evidence.kind == 'banner'
+        when: finding.evidence.kind in ['banner', 'code']
         file: finding.file
         span: finding.span
   provenance:
@@ -203,3 +269,234 @@ spec:
       body: |-
         // The wire format counts from zero; callers expect one-based totals.
         count++
+  - name: code-go-invalid
+    language: go
+    kind: invalid
+    options:
+      kinds: [code]
+    fixed:
+    - path: example.go
+      body: |-
+        package sample
+
+        func run() {}
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // total := compute(a, b)
+        // fmt.Println(total)
+
+        func run() {}
+    expect:
+    - line: 3
+  - name: code-go-valid
+    language: go
+    kind: valid
+    options:
+      kinds: [code]
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // The total is computed once: compute(a, b) is costly.
+
+        func run() {}
+  - name: code-rust-invalid
+    language: rust
+    kind: invalid
+    options:
+      kinds: [code]
+    fixed:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store;
+    files:
+    - path: src/lib.rs
+      body: |-
+        // let total = compute(a, b);
+
+        pub struct Store;
+    expect:
+    - line: 1
+  - name: code-rust-valid
+    language: rust
+    kind: valid
+    options:
+      kinds: [code]
+    files:
+    - path: src/lib.rs
+      body: |-
+        // The total is computed once because compute is costly.
+
+        pub struct Store;
+  - name: history-go-invalid
+    language: go
+    kind: invalid
+    options:
+      kinds: [history]
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // Modified by jdoe on 2020-01-01
+
+        func run() {}
+    expect:
+    - line: 3
+  - name: history-go-valid
+    language: go
+    kind: valid
+    options:
+      kinds: [history]
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // The format changed in version 2; readers accept both.
+
+        func run() {}
+  - name: history-rust-invalid
+    language: rust
+    kind: invalid
+    options:
+      kinds: [history]
+    files:
+    - path: src/lib.rs
+      body: |-
+        // Author: jdoe
+
+        pub struct Store;
+    expect:
+    - line: 1
+  - name: history-rust-valid
+    language: rust
+    kind: valid
+    options:
+      kinds: [history]
+    files:
+    - path: src/lib.rs
+      body: |-
+        // The author field is optional on the wire.
+
+        pub struct Store;
+  - name: closing-go-invalid
+    language: go
+    kind: invalid
+    options:
+      kinds: [closing]
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        func run(x int) int {
+        	if x > 0 {
+        		return x
+        	} // end if
+        	return 0
+        }
+    expect:
+    - line: 6
+  - name: closing-go-valid
+    language: go
+    kind: valid
+    options:
+      kinds: [closing]
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        func run(x int) int {
+        	if x > 0 {
+        		return x
+        	} // a negative value falls back to zero
+        	return 0
+        }
+  - name: closing-rust-invalid
+    language: rust
+    kind: invalid
+    options:
+      kinds: [closing]
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn run(x: i32) -> i32 {
+            if x > 0 {
+                return x;
+            } // end if
+            0
+        }
+    expect:
+    - line: 4
+  - name: closing-rust-valid
+    language: rust
+    kind: valid
+    options:
+      kinds: [closing]
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn run(x: i32) -> i32 {
+            if x > 0 {
+                return x;
+            } // a negative value falls back to zero
+            0
+        }
+  - name: todo-go-invalid
+    language: go
+    kind: invalid
+    options:
+      kinds: [todo]
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // TODO: handle the empty case
+
+        func run() {}
+    expect:
+    - line: 3
+  - name: todo-go-valid
+    language: go
+    kind: valid
+    options:
+      kinds: [todo]
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // Todo items are kept in insertion order.
+
+        func run() {}
+  - name: todo-rust-invalid
+    language: rust
+    kind: invalid
+    options:
+      kinds: [todo]
+    files:
+    - path: src/lib.rs
+      body: |-
+        // FIXME: handle the empty case
+
+        pub struct Store;
+    expect:
+    - line: 1
+  - name: todo-rust-valid
+    language: rust
+    kind: valid
+    options:
+      kinds: [todo]
+    files:
+    - path: src/lib.rs
+      body: |-
+        // Fixtures are kept in insertion order.
+
+        pub struct Store;

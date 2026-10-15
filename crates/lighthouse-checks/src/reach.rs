@@ -37,6 +37,7 @@ pub const FACTS: &[(&str, Reach)] = &[
     // method of its owner; and the function fact a symbol carries as `func`.
     ("gap", Reach::Local),
     ("func", Reach::Local),
+    ("line_widths", Reach::Local),
     ("data_only", Reach::Neighbors),
     ("helper_user", Reach::Neighbors),
     ("receiver_affinity", Reach::Neighbors),

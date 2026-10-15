@@ -13,6 +13,12 @@ spec:
     Large files tend to mix responsibilities, and splitting by size alone
     creates arbitrary boundaries. The count is the file's lines (revive
     `file-length-limit`), reported once per file with the kind `lines`.
+
+    Kind `width` (off by default and on in the strict preset): a line wider
+    than `maxWidth` columns, counted in characters with a tab as one (ESLint
+    `max-len`, Checkstyle `LineLength`). A comment that is one URL, a single
+    string literal and an import line cannot be wrapped and are not counted.
+    A file reports once, with the kind that matched first.
   scope:
     domain: code
     subject: file
@@ -21,34 +27,62 @@ spec:
   requirement: >-
     A file SHOULD stay at or below the configured line limit (option `max`). A
     file that is over the limit MUST be split along cohesion boundaries, not by
-    size alone.
+    size alone. A line that can be wrapped SHOULD NOT be wider than the
+    configured number of columns (option `maxWidth`).
   severity: warn
   options:
     type: object
     properties:
+      kinds:
+        type: array
+        items: { type: string, enum: [lines, width] }
+        default: [lines]
+        description: What to report.
       max:
         type: integer
         default: 1000
         description: Largest number of lines a file may have.
+      maxWidth:
+        type: integer
+        default: 120
+        description: Widest a line may be, in characters.
     additionalProperties: false
   check:
     type: cel
-    where: file.lines > options.max
-    message: "file has {{ file.lines }} lines, limit is {{ options.max }}"
+    with:
+      - name: wide
+        expr: >-
+          'width' in options.kinds
+          ? file.line_widths.filter(l, l.width > options.maxWidth && !l.exempt)
+          : []
+      - name: matched
+        expr: >-
+          ('lines' in options.kinds && file.lines > options.max ? ['lines'] : [])
+          + (size(wide) > 0 ? ['width'] : [])
+    where: size(matched) > 0
+    message: >-
+      {{ size(matched) == 0 ? ''
+         : matched[0] == 'lines'
+         ? 'file has ' + string(file.lines) + ' lines, limit is ' + string(options.max)
+         : string(size(wide)) + ' lines are wider than ' + string(options.maxWidth)
+           + ' columns (first: line ' + string(wide[0].line) + ')' }}
     evidence:
-      kind: "'lines'"
-      kinds: "['lines']"
+      kind: "size(matched) > 0 ? matched[0] : ''"
+      kinds: matched
       lines: file.lines
       max: options.max
     at:
-      line: options.max + 1
-      endLine: file.lines
+      line: "size(matched) > 0 && matched[0] == 'width' ? wide[0].line : options.max + 1"
+      endLine: "size(matched) > 0 && matched[0] == 'width' ? wide[0].line : file.lines"
     identity:
       subject: file.path
   provenance:
     wasDerivedFrom:
     - 'revive file-length-limit: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#file-length-limit'
     - Martin, Clean Code (2008), ch. 5 Vertical size and ordering
+    - Martin, Clean Code (2008), ch. 5 Horizontal openness and indentation
+    - Martin, Clean Code (2008), ch. 5 Team rules
+    - 'ESLint max-len: https://eslint.org/docs/latest/rules/max-len'
   examples:
   - name: over-limit
     language: text
@@ -73,3 +107,29 @@ spec:
       body: |-
         a
         b
+  - name: wide-line
+    language: text
+    kind: invalid
+    options:
+      kinds: [width]
+      maxWidth: 10
+    files:
+    - path: wide.txt
+      body: |-
+        short
+        a line that is far too wide
+    expect:
+    - line: 2
+  - name: wide-exempt
+    language: text
+    kind: valid
+    options:
+      kinds: [width]
+      maxWidth: 10
+    files:
+    - path: exempt.txt
+      body: |-
+        short
+        // https://example.com/a/very/long/address
+        "a single string literal that cannot wrap",
+        import some.very.long.module.path

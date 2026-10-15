@@ -29,6 +29,12 @@ spec:
     lower-to-upper change and at the end of an acronym: `parseHTTPRequest` and
     `parse_http_request` have three.
 
+    `encoding` (off by default and on in the strict preset): a name that
+    carries its type or scope in a prefix, matched by the patterns of
+    `encodings` (Hungarian notation `strName`, member prefix `m_name`, an
+    `I` before the name of an interface), optionally limited to some kinds
+    of symbol (Clean Code N6, ch. 2 Avoid Encodings).
+
     The rest is judged: whether a name is minimal, singular or plural, a
     predicate that states its form, an action verb that does not hide a
     query, a one-letter name that outlives a tiny scope, a standard
@@ -64,7 +70,7 @@ spec:
     properties:
       kinds:
         type: array
-        items: { type: string, enum: [qualifier, words] }
+        items: { type: string, enum: [qualifier, words, encoding] }
         default: [qualifier]
         description: What to report.
       symbols:
@@ -80,6 +86,24 @@ spec:
         type: integer
         default: 3
         description: Most words a name may have.
+      encodings:
+        type: array
+        items:
+          type: object
+          properties:
+            pattern: { type: string }
+            kinds:
+              type: array
+              items: { type: string }
+          required: [pattern]
+        default:
+          - pattern: '^m_[A-Za-z]'
+          - pattern: '^(str|sz|psz|lp|lpsz|arr|dw)[A-Z]'
+          - pattern: '^I[A-Z][a-z]'
+            kinds: [interface]
+        description: >-
+          Prefixes that encode the type or scope of a name: a `pattern`, and the
+          `kinds` of symbol it applies to (all when absent).
     additionalProperties: false
   languages:
     rust:
@@ -104,6 +128,10 @@ spec:
             && !(symbol.kind == 'function' && symbol.name == 'main') && size(repeated) > 0
             ? ['qualifier'] : [])
           + ('words' in options.kinds && word_count > options.maxWords ? ['words'] : [])
+          + ('encoding' in options.kinds
+            && options.encodings.exists(e, symbol.name.matches(e.pattern)
+                                           && (!has(e.kinds) || symbol.kind in e.kinds))
+            ? ['encoding'] : [])
     where: size(matched) > 0
     review: >-
       size(matched) == 0 && !symbol.test && !symbol.generated
@@ -114,6 +142,8 @@ spec:
       {{ size(matched) == 0 ? ''
          : matched[0] == 'qualifier'
          ? symbol.kind + ' ' + symbol.name + ' repeats its module name `' + repeated[0].name + '`; callers already write it'
+         : matched[0] == 'encoding'
+         ? symbol.name + ' encodes its type or scope in its name; drop the prefix'
          : symbol.kind + ' ' + symbol.name + ' has ' + string(word_count) + ' words, limit is ' + string(options.maxWords) }}
     evidence:
       kind: "size(matched) > 0 ? matched[0] : ''"
@@ -131,6 +161,7 @@ spec:
     - Martin, Clean Code (2008), N2 Choose Names at the Appropriate Level of Abstraction
     - Martin, Clean Code (2008), N3 Use Standard Nomenclature Where Possible
     - Martin, Clean Code (2008), N4 Unambiguous Names
+    - Martin, Clean Code (2008), N6 Avoid Encodings
   examples:
   - name: invalid
     language: go
@@ -303,3 +334,47 @@ spec:
     options:
       kinds:
       - words
+  - name: encoding-go-invalid
+    language: go
+    kind: invalid
+    options:
+      kinds: [encoding]
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type IReader interface{ Read() }
+    expect:
+    - line: 3
+  - name: encoding-go-valid
+    language: go
+    kind: valid
+    options:
+      kinds: [encoding]
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type Reader interface{ Read() }
+
+        type Item struct{}
+  - name: encoding-rust-invalid
+    language: rust
+    kind: invalid
+    options:
+      kinds: [encoding]
+    files:
+    - path: src/lib.rs
+      body: pub fn m_total() {}
+    expect:
+    - line: 1
+  - name: encoding-rust-valid
+    language: rust
+    kind: valid
+    options:
+      kinds: [encoding]
+    files:
+    - path: src/lib.rs
+      body: pub fn total() {}

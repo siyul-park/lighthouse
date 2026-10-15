@@ -36,6 +36,7 @@ mod imports;
 mod measures;
 mod ownership;
 mod role;
+mod widths;
 
 use forward::{cyclic, forwarded};
 use measures::{Measures, measures};
@@ -114,14 +115,18 @@ impl<'a> Builder<'a> {
             .lines()
             .nth(comment.span.start.line.saturating_sub(1) as usize)
             .unwrap_or("");
-        let before = line.get(..comment.span.start.col.saturating_sub(1) as usize);
+        let before = line
+            .get(..comment.span.start.col.saturating_sub(1) as usize)
+            .unwrap_or("")
+            .trim();
         json!({
             "file": comment.file.to_string_lossy(),
             "text": comment.text,
             "line": comment.span.start.line,
             "end_line": comment.span.end.line,
             "col": comment.span.start.col,
-            "standalone": before.is_none_or(|b| b.trim().is_empty()),
+            "standalone": before.is_empty(),
+            "before": before,
             "generated": self.project.file(&comment.file).is_none_or(|f| f.generated),
             "attached": comment.attached_to.is_some(),
         })
@@ -181,6 +186,9 @@ impl<'a> Builder<'a> {
         // Whether a file is generated is what the merged model says, not what
         // the run read from disk.
         value["generated"] = json!(self.project.file(&file.path).is_none_or(|f| f.generated));
+        if self.needs.fact("line_widths") {
+            value["line_widths"] = widths::line_widths(text);
+        }
         if self.needs.fact("private_reach") {
             value["private_reach"] = self.private_reach(file);
             value["module"] = json!(self.file_module(file).unwrap_or_default());
