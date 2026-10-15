@@ -7,7 +7,8 @@
 //! `command` provider it has three modes: `command` reads a System One body
 //! on stdin and prints the answer, appending a mark to the file `calls` for
 //! each run; `weak` answers 0.5 in an envelope, as fenced text; `fail` exits
-//! with an error.
+//! with an error. `command` and `fail` mark the file named by a second
+//! argument instead of `calls`, to tell several models apart.
 
 use std::{
     collections::BTreeMap,
@@ -127,7 +128,10 @@ fn main() -> ExitCode {
     match std::env::args().nth(1).as_deref() {
         Some("command") => command(),
         Some("weak") => weak(),
-        Some("fail") => ExitCode::from(3),
+        Some("fail") => match mark() {
+            Ok(()) => ExitCode::from(3),
+            Err(_) => ExitCode::FAILURE,
+        },
         _ => match serve(stdin().lock(), stdout().lock(), &mut Fake) {
             Ok(()) => ExitCode::SUCCESS,
             Err(e) => {
@@ -147,14 +151,7 @@ fn command() -> ExitCode {
     let Ok(request) = serde_json::from_str::<Value>(&input) else {
         return ExitCode::FAILURE;
     };
-    // Runs are concurrent: an append of one byte is atomic, a read and
-    // rewrite is not.
-    let marked = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("calls")
-        .and_then(|mut file| file.write_all(b"x"));
-    if marked.is_err() {
+    if mark().is_err() {
         return ExitCode::FAILURE;
     }
     let noul = noul_of(request["state"]["text"].as_str().unwrap_or_default());
@@ -168,6 +165,19 @@ fn command() -> ExitCode {
         .collect();
     println!("{}", json!({"model": request["model"], "answers": answers}));
     ExitCode::SUCCESS
+}
+
+/// Appends a mark to the file of calls. Runs are concurrent: an append of one
+/// byte is atomic, a read and rewrite is not.
+fn mark() -> std::io::Result<()> {
+    let name = std::env::args()
+        .nth(2)
+        .unwrap_or_else(|| "calls".to_owned());
+    fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(name)
+        .and_then(|mut file| file.write_all(b"x"))
 }
 
 /// A model that is unsure of everything, answering as text in an envelope.

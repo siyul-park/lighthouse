@@ -45,7 +45,7 @@ fn fake_model() -> String {
 }
 
 /// A project binding `fake/any` to the command provider in `mode`.
-fn provider(mode: &str) -> String {
+pub(crate) fn provider(mode: &str) -> String {
     format!(
         "[models]\nclassification = \"fake/any\"\n[models.providers.fake]\ntype = \"command\"\nargv = [{:?}, {mode:?}]\n",
         fake_model()
@@ -282,4 +282,104 @@ fn an_abstention_falls_through_the_layers_and_a_prompt_command_answers_through_a
     // The rule's own model is unsure of everything, so the project's decides.
     assert_eq!(count(&found, "fail"), 2, "{found:?}");
     assert_eq!(count(&found, "review"), 2, "{found:?}");
+}
+
+/// A route of command models, each `(name, mode)` marking `<name>-calls`.
+fn route(models: &[(&str, &str)], routing: &str) -> String {
+    let names: Vec<String> = models
+        .iter()
+        .map(|(name, _)| format!("\"{name}/m\""))
+        .collect();
+    let mut text = format!(
+        "[models]\nclassification = [{}]\nrouting = {routing:?}\n",
+        names.join(", ")
+    );
+    for (name, mode) in models {
+        text.push_str(&format!(
+            "[models.providers.{name}]\ntype = \"command\"\nargv = [{:?}, {mode:?}, \"{name}-calls\"]\n",
+            fake_model()
+        ));
+    }
+    text
+}
+
+/// A project of `route`, with `extra` more subjects the models are unsure of.
+fn routed(models: &[(&str, &str)], routing: &str, extra: usize) -> tempfile::TempDir {
+    let dir = project(&route(models, routing));
+    let more: String = (0..extra)
+        .map(|n| format!("pub fn maybe_{n}() {{}}\n"))
+        .collect();
+    write(dir.path(), "src/more.rs", &more);
+    write(dir.path(), "src/lib.rs", &format!("{LIB}mod more;\n"));
+    dir
+}
+
+fn marks(dir: &Path, name: &str) -> usize {
+    fs::read_to_string(dir.join(format!("{name}-calls"))).map_or(0, |t| t.len())
+}
+
+/// The run's report as JSON; one worker, so that requests to a model that
+/// fails are counted in the order they are made.
+fn routed_check(dir: &Path) -> Value {
+    let out = Command::cargo_bin("lighthouse")
+        .unwrap()
+        .current_dir(dir)
+        .env("LIGHTHOUSE_TRUST", "1")
+        .env("RAYON_NUM_THREADS", "1")
+        .args([
+            "check",
+            "--no-store",
+            "--no-cache",
+            "--format",
+            "json",
+            "--detail",
+            "full",
+        ])
+        .output()
+        .unwrap();
+    serde_json::from_slice(&out.stdout).unwrap()
+}
+
+#[test]
+fn a_request_moves_to_the_next_model_of_a_route_when_a_model_fails_and_a_failing_model_is_given_up()
+{
+    let dir = routed(&[("bad", "fail"), ("good", "command")], "ordered", 4);
+    let report = routed_check(dir.path());
+    let notices = report["messages"].to_string();
+    assert!(notices.contains("model bad/m failed"), "{notices}");
+    assert!(notices.contains("bad/m failed 3 times"), "{notices}");
+    // Three subjects asked and failed; the four others skip it.
+    assert_eq!(marks(dir.path(), "bad"), 3);
+    assert_eq!(marks(dir.path(), "good"), 7);
+    let decided: Vec<_> = report["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|f| f["evidence"]["model"].as_str())
+        .collect();
+    assert_eq!(decided.len(), 1, "{report}");
+    assert!(decided[0].starts_with("good/m@"), "{decided:?}");
+}
+
+#[test]
+fn round_robin_starts_each_request_at_the_next_model() {
+    let dir = routed(&[("a", "command"), ("b", "command")], "round-robin", 1);
+    routed_check(dir.path());
+    assert_eq!((marks(dir.path(), "a"), marks(dir.path(), "b")), (2, 2));
+}
+
+#[test]
+fn an_abstaining_model_does_not_fall_back_to_the_next_of_its_route() {
+    let models = format!(
+        "[models]\nclassification = [\"weak/m\", \"good/m\"]\n\
+         [models.providers.weak]\ntype = \"command\"\nargv = [{fake:?}, \"weak\"]\nstdin = \"prompt\"\npointer = \"/result\"\n\
+         [models.providers.good]\ntype = \"command\"\nargv = [{fake:?}, \"command\", \"good-calls\"]\n",
+        fake = fake_model()
+    );
+    let dir = project(&models);
+    let (_, log) = check(dir.path(), &["--no-cache"]);
+    let found = results(&log);
+    assert_eq!(count(&found, "fail"), 1, "{found:?}");
+    assert_eq!(count(&found, "review"), 3, "{found:?}");
+    assert_eq!(marks(dir.path(), "good"), 0);
 }

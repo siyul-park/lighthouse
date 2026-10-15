@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     cache_fixtures::write,
-    models::{bound, count, project, results},
+    models::{bound, count, project, provider, results},
 };
 
 const RPC: &str = "[models]\nclassification = \"fake/m1\"\n[models.providers.fake]\ntype = \"rpc\"\nplugin = \"fake-model\"\noptions = { tag = 1 }\n";
@@ -160,7 +160,34 @@ fn eval_asks_models_only_about_the_labelled_subjects_and_keeps_each_score() {
     sorted.sort_by_key(|f| f.as_str().unwrap().to_owned());
     assert_eq!(fingerprints, sorted);
     assert!(scores.iter().all(|s| s["probability"].is_number()));
+    assert!(
+        scores
+            .iter()
+            .all(|s| s["model"].as_str().unwrap().starts_with("fake/any@"))
+    );
     assert_eq!(scores.iter().filter(|s| s["violates"] == true).count(), 1);
+}
+
+#[test]
+fn eval_says_which_models_failed() {
+    let dir = project(&provider("fail"));
+    baseline(dir.path());
+    let out = lighthouse(
+        dir.path(),
+        &[
+            "decision",
+            "eval",
+            "local/naming-ban",
+            "--baseline",
+            "labels.tsv",
+            "--format",
+            "json",
+        ],
+    );
+    let report = json(&out);
+    let notices = report["current"]["notices"].to_string();
+    assert!(notices.contains("model fake/any failed"), "{notices}");
+    assert_eq!(report["current"]["scores"].as_array().unwrap().len(), 0);
 }
 
 #[test]

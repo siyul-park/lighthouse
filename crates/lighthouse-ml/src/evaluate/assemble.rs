@@ -1,5 +1,7 @@
 //! Putting what each repository gave into one report.
 
+use std::collections::BTreeSet;
+
 use lighthouse_spec::Evaluation;
 
 use crate::{
@@ -16,6 +18,9 @@ pub struct Part {
     /// The probabilities of failing models gave the labelled subjects.
     pub(super) scored: Vec<Score>,
     pub(super) candidate_scored: Vec<Score>,
+    /// The notices of the run of each check.
+    pub(super) notices: Vec<String>,
+    pub(super) candidate_notices: Vec<String>,
     pub(super) pairs: Vec<(Outcome, Outcome)>,
     pub(super) decided: Usage,
     pub(super) candidate_decided: Usage,
@@ -74,26 +79,30 @@ impl Gathered {
             self.parts.iter().flat_map(|p| pick(p).clone()).collect()
         };
         let current = pool(|p| &p.current);
-        let side =
-            |check: String, pairs: &[(Truth, Outcome)], mut scores: Vec<Score>, used: Usage| {
-                scores.sort_by(|a, b| (&a.repo, &a.fingerprint).cmp(&(&b.repo, &b.fingerprint)));
-                let scored: Vec<(Truth, f64)> = scores
-                    .iter()
-                    .map(|s| {
-                        let truth = if s.violates { Truth::Fail } else { Truth::Pass };
-                        (truth, s.probability)
-                    })
-                    .collect();
-                Side {
-                    check,
-                    metrics: evaluate(pairs, &scored),
-                    model_decided: used.decided,
-                    reviews: used.reviews,
-                    calls: used.calls,
-                    cost: used.cost,
-                    scores,
-                }
-            };
+        let side = |check: String,
+                    pairs: &[(Truth, Outcome)],
+                    mut scores: Vec<Score>,
+                    notices: BTreeSet<String>,
+                    used: Usage| {
+            scores.sort_by(|a, b| (&a.repo, &a.fingerprint).cmp(&(&b.repo, &b.fingerprint)));
+            let scored: Vec<(Truth, f64)> = scores
+                .iter()
+                .map(|s| {
+                    let truth = if s.violates { Truth::Fail } else { Truth::Pass };
+                    (truth, s.probability)
+                })
+                .collect();
+            Side {
+                check,
+                metrics: evaluate(pairs, &scored),
+                model_decided: used.decided,
+                reviews: used.reviews,
+                calls: used.calls,
+                cost: used.cost,
+                scores,
+                notices: notices.into_iter().collect(),
+            }
+        };
         let sum = |pick: fn(&Part) -> Usage| {
             self.parts
                 .iter()
@@ -102,10 +111,14 @@ impl Gathered {
         let pool_scored = |pick: fn(&Part) -> &Vec<Score>| -> Vec<Score> {
             self.parts.iter().flat_map(|p| pick(p).clone()).collect()
         };
+        let pool_notices = |pick: fn(&Part) -> &Vec<String>| -> BTreeSet<String> {
+            self.parts.iter().flat_map(|p| pick(p).clone()).collect()
+        };
         let current_side = side(
             first.check.clone(),
             &current,
             pool_scored(|p| &p.scored),
+            pool_notices(|p| &p.notices),
             sum(|p| p.decided),
         );
         let candidate_side = with_candidate.then(|| {
@@ -114,6 +127,7 @@ impl Gathered {
                 first.candidate_check.clone().unwrap_or_default(),
                 &pairs,
                 pool_scored(|p| &p.candidate_scored),
+                pool_notices(|p| &p.candidate_notices),
                 sum(|p| p.candidate_decided),
             )
         });

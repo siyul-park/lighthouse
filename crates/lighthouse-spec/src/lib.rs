@@ -42,9 +42,10 @@ pub(crate) use pack::{PackSpec, SectionSpec};
 pub use project::{
     ApiProvider, Config, Evaluation, FILE_NAME, FILE_NAMES, Formatter, FormatterOutput,
     FormatterSpec, FormatterStdin, GeneratedCheck, GeneratedSpec, GlobSet, Layer, Level,
-    ModelBinding, ModelInput, ModelOutput, ModelProvider, ModelsSpec, OverrideSpec, PluginEntry,
-    PluginRef, PluginRefSpec, ProjectError, ProjectLanguage, ProjectSpec, Projects, ProviderSpec,
-    RESERVED as RESERVED_PROVIDERS, RuleConfig, RuleDetail, RuleSetting, Rules, Specs, glob_set,
+    ModelBinding, ModelInput, ModelOutput, ModelProvider, ModelsSpec, Names, OverrideSpec,
+    PluginEntry, PluginRef, PluginRefSpec, ProjectError, ProjectLanguage, ProjectSpec, Projects,
+    ProviderSpec, RESERVED as RESERVED_PROVIDERS, Routing, RuleConfig, RuleDetail, RuleSetting,
+    Rules, glob_set,
 };
 pub(crate) use sources::SourceMapSpec;
 

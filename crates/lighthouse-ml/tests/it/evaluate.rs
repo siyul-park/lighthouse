@@ -116,7 +116,7 @@ fn the_probabilities_models_gave_score_the_labelled_subjects_they_answered() {
     };
     run.probabilities = [("one", 0.95), ("two", 0.2)]
         .into_iter()
-        .map(|(fingerprint, p)| (fingerprint.to_owned(), p))
+        .map(|(fingerprint, p)| (fingerprint.to_owned(), (p, "m/x@1".to_owned())))
         .collect();
     let labels = [
         label("one", Truth::Fail, None),
@@ -157,7 +157,7 @@ fn finish_keeps_each_score_of_every_repository_sorted_by_repo_and_fingerprint() 
             diagnostics: vec![flagged(fingerprint, "a.rs")],
             ..Run::default()
         };
-        run.probabilities = [(fingerprint.to_owned(), p)].into();
+        run.probabilities = [(fingerprint.to_owned(), (p, "m/x@1".to_owned()))].into();
         let repo = Repo {
             name: Some(name.to_owned()),
             dir: PathBuf::from("."),
@@ -194,6 +194,29 @@ fn finish_keeps_each_score_of_every_repository_sorted_by_repo_and_fingerprint() 
         ]
     );
     assert_eq!(side.metrics.answered, 3);
+    assert!(side.scores.iter().all(|s| s.model == "m/x@1"));
+}
+
+#[test]
+fn the_notices_of_the_run_are_kept_on_the_side_without_repeats() {
+    let mut gathered = Gathered::default();
+    for _ in 0..2 {
+        let run = Run {
+            notices: ["model m/x failed".to_owned()].into(),
+            ..Run::default()
+        };
+        gathered.add(grade(
+            &request(None),
+            &repo(),
+            policy(),
+            &[],
+            &Found::of(&run),
+            None,
+        ));
+    }
+    let side = gathered.finish(&request(None), false).unwrap().current;
+
+    assert_eq!(side.notices, ["model m/x failed"]);
 }
 
 #[test]

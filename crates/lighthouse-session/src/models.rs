@@ -26,7 +26,7 @@ pub enum Binding {
 pub struct BoundModel {
     /// `<provider>/<model>`.
     pub model: String,
-    /// The decision it judges; none for the classification model.
+    /// The decision it judges; none for the classification models.
     pub decision: Option<String>,
     pub binding: Binding,
     /// Whether asking it reaches a service outside the machine.
@@ -47,27 +47,30 @@ pub fn bound_models(session: &Session, decisions: &[String]) -> Result<Vec<Bound
             .is_some_and(|provider| provider.remote())
     };
     let mut found = Vec::new();
-    if let Some(model) = &bound.classification
-        && selector.is_empty()
-    {
+    let mut bind = |model: &String, decision: Option<&String>, binding| {
         found.push(BoundModel {
             model: model.clone(),
-            decision: None,
-            binding: Binding::Classification,
+            decision: decision.cloned(),
+            binding,
             remote: remote(model),
         });
+    };
+    if selector.is_empty() {
+        for model in &bound.classification {
+            bind(model, None, Binding::Classification);
+        }
     }
     let attached: BTreeMap<String, String> = attached_models(&session.root, &catalog);
-    let rules = bound.rules.iter().map(|(d, m)| (d, m, Binding::Rule));
-    let trained = attached.iter().map(|(d, m)| (d, m, Binding::Attached));
-    for (decision, model, binding) in rules.chain(trained) {
+    for (decision, models) in &bound.rules {
         if selector.matches(decision) {
-            found.push(BoundModel {
-                model: model.clone(),
-                decision: Some(decision.clone()),
-                binding,
-                remote: remote(model),
-            });
+            for model in models {
+                bind(model, Some(decision), Binding::Rule);
+            }
+        }
+    }
+    for (decision, model) in &attached {
+        if selector.matches(decision) {
+            bind(model, Some(decision), Binding::Attached);
         }
     }
     Ok(found)

@@ -119,7 +119,7 @@ impl ModelProvider {
 pub struct ApiProvider {
     /// The API: `openai` (Chat Completions, which OpenRouter, Ollama, vLLM
     /// and LM Studio also speak) or `typesafe` (System One). Others will join.
-    pub spec: Specs,
+    pub spec: Names,
     /// Where requests go. Default: the spec's own service.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_url: Option<String>,
@@ -141,16 +141,17 @@ pub struct ApiProvider {
     pub extra_body: Option<Map<String, Value>>,
 }
 
-/// One standard API, or several a provider speaks: each operation uses the
-/// one that covers it (classification: `typesafe`, else `openai`).
+/// One name or several, in the order written: the standard APIs a provider
+/// speaks (each operation uses the one that covers it: classification
+/// `typesafe`, else `openai`), or the models of a route.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
-pub enum Specs {
+pub enum Names {
     One(String),
     Many(Vec<String>),
 }
 
-impl Specs {
+impl Names {
     /// The names, in the order written.
     pub fn names(&self) -> Vec<&str> {
         match self {
@@ -158,6 +159,22 @@ impl Specs {
             Self::Many(names) => names.iter().map(String::as_str).collect(),
         }
     }
+
+    fn owned(&self) -> Vec<String> {
+        self.names().into_iter().map(str::to_owned).collect()
+    }
+}
+
+/// Which model of a route a request goes to first.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Routing {
+    /// The first model, then the others in the order written.
+    #[default]
+    Ordered,
+    /// Each request starts at the next model, so load is spread; the others
+    /// follow in the order written, wrapping.
+    RoundRobin,
 }
 
 /// A provider as the project writes it.
@@ -215,11 +232,15 @@ impl ProviderSpec {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ModelsSpec {
-    /// The model (`<provider>/<model>`) that judges a decision no rule binds
-    /// and no trained model is attached to. When it abstains, the subject is
-    /// left to agent review.
+    /// The model (`<provider>/<model>`), or the route of several, that judges
+    /// a decision no rule binds and no trained model is attached to. A request
+    /// moves to the next model of a route when one fails. When the route
+    /// abstains, the subject is left to agent review.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub classification: Option<String>,
+    pub classification: Option<Names>,
+    /// Which model of a route a request starts at. Default: `ordered`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub routing: Option<Routing>,
     /// Requests a run may send to models that cost something; the subjects
     /// of the rest are left to review. Default: 200.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -263,10 +284,12 @@ impl Default for Evaluation {
 /// `models` table and its rules.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ModelBinding {
-    /// The project's model for decisions no rule binds.
-    pub classification: Option<String>,
-    /// The instance a rule names for its decision, by decision id.
-    pub rules: BTreeMap<String, String>,
+    /// The project's route for decisions no rule binds.
+    pub classification: Vec<String>,
+    /// The route a rule names for its decision, by decision id.
+    pub rules: BTreeMap<String, Vec<String>>,
+    /// Which model of a route a request starts at.
+    pub routing: Routing,
     /// The providers the project defines, by name.
     pub providers: BTreeMap<String, ModelProvider>,
     /// Providers that cannot work, by name, and why.
@@ -286,7 +309,7 @@ impl ModelBinding {
         let mut evaluation = BTreeMap::new();
         for (id, detail) in details {
             if let Some(model) = &detail.model {
-                rules.insert(id.clone(), model.clone());
+                rules.insert(id.clone(), model.owned());
             }
             if let Some(policy) = detail.evaluation {
                 evaluation.insert(id.clone(), policy);
@@ -302,8 +325,13 @@ impl ModelBinding {
             };
         }
         Self {
-            classification: models.classification.clone(),
+            classification: models
+                .classification
+                .as_ref()
+                .map(Names::owned)
+                .unwrap_or_default(),
             rules,
+            routing: models.routing.unwrap_or_default(),
             providers,
             invalid,
             evaluation,
@@ -328,7 +356,7 @@ impl ModelBinding {
     pub fn ids(&self) -> impl Iterator<Item = &str> {
         self.classification
             .iter()
-            .chain(self.rules.values())
+            .chain(self.rules.values().flatten())
             .map(String::as_str)
     }
 
@@ -343,7 +371,7 @@ impl ModelBinding {
 pub fn builtin(name: &str) -> Option<ModelProvider> {
     SPECS.iter().find(|(spec, ..)| *spec == name)?;
     ProviderSpec::Api(ApiProvider {
-        spec: Specs::One(name.to_owned()),
+        spec: Names::One(name.to_owned()),
         base_url: None,
         key_env: None,
         cost: None,

@@ -123,15 +123,16 @@ most specific layer to the least, and an **abstention falls through** to the nex
 | Layer | Where | Set by |
 | --- | --- | --- |
 | 1. Trained for this decision | a `Revision` record in `decisions.jsonl` naming the model id and version; the artifact is local and rebuildable | Lighthouse trains on request (`lighthouse model train <decision>`); a person or agent approves the revision |
-| 2. Project, per decision | `[rules."<id>"] model = "…"` | the project |
-| 3. Project default | `[models] classification = "…"`, `embedding = "…"` | the project |
+| 2. Project, per decision | `[rules."<id>"] model = "…"` (one model or a route) | the project |
+| 3. Project default | `[models] classification = "…"` (one model or a route), `embedding = "…"` | the project |
 | 4. Agent | a review task | always available |
 
 A model is named `<provider>/<model>`, split at the first `/`. The standard API specs are built in (`openai`: OpenAI's API at api.openai.com/v1, key in `OPENAI_API_KEY`; `typesafe`: TypeSafe's System One at api.typesafe.ai, key in `TYPESAFE_API_KEY`); any other service is a provider the project declares, with the same `rpc` or `command` union as checks and fixes. OpenRouter, Ollama, vLLM and LM Studio speak the `openai` spec:
 
 ```toml
 [models]
-classification = "openrouter/qwen/qwen3-coder:free"
+classification = "openrouter/qwen/qwen3-coder:free"  # or a route: ["nvidia/nvidia/nemotron-3-super-120b-a12b", "openrouter/nvidia/nemotron-3-super-120b-a12b:free"]
+routing = "ordered"               # or "round-robin" for a route of several
 budget = 200                      # subjects per run put to models that cost; the rest stay `review`
 
 [models.providers.openrouter]     # a recipe: any OpenAI-compatible service; free models first
@@ -162,15 +163,22 @@ spec = "openai"
 baseUrl = "http://localhost:11434/v1"
 cost = 0
 
-[models.providers.claude]         # the Claude CLI on a subscription, verbalized only; any program that reads a request and prints JSON works
+[models.providers.nvidia]         # NVIDIA NIM: free, rate-limited; logprobs are rounded to 0.5 nats
+spec = "openai"
+baseUrl = "https://integrate.api.nvidia.com/v1"
+keyEnv = "NVIDIA_API_KEY"
+logprobs = true
+extraBody = { chat_template_kwargs = { enable_thinking = false } }  # the first token is the answer
+cost = 1
+# reference: nvidia/nvidia/nemotron-3-super-120b-a12b, nvidia/nvidia/nemotron-3.5-lightning-30b-a3b
+
+[models.providers.script]         # any program that reads a request and prints JSON works
 type = "command"
-argv = ["claude", "-p", "--model", "{model}", "--output-format", "json",
-        "--tools", "", "--setting-sources", "", "--strict-mcp-config",
-        "--no-session-persistence", "--system-prompt", "You classify code. Reply with JSON only."]
-stdin = "prompt"                  # `prompt` (text asking for {noul}) or `request` (TypeSafe's body)
-pointer = "/result"               # RFC 6901 pointer to the answer inside an envelope
+argv = ["./scripts/classify", "{model}"]
+stdin = "request"                 # `request` (TypeSafe's body) or `prompt` (text asking for {noul})
+# pointer = "/result"             # RFC 6901 pointer to the answer inside an envelope
 timeout = "120s"
-# reference: claude/haiku
+# reference: script/fast
 
 [rules."design/naming-result"]
 level = "info"
@@ -180,6 +188,11 @@ evaluation = { precision = 0.9 }          # recall = 0.8 optional
 
 - **How a chat model answers.** By default the model is asked for `{"noul": p}` under a `json_schema` response format: a verbalized probability. With `logprobs = true` (OpenAI's own parameter name) the model is asked for one word, `true` if the subject violates the requirement and `false` if it complies (the names of the criteria in the prompt), with `logprobs`, `top_logprobs = 20`, `max_tokens = 1` and `temperature = 0`; P(fail) is p_true / (p_true + p_false) over the first answer token's top log probabilities, after trimming, lower-casing and stripping punctuation (the OpenAI Cookbook's classification recipe, renormalized over the labels as in Zhao et al., ICML 2021). The answer token is the first sampled token that is neither blank nor a closing reasoning tag such as `</think>`. Neither label among the top 20 is an abstention; a response without `logprobs` is a provider error naming the model, never read as verbalized. The answering model id is `<model>@<version>-logprobs`, so the two modes never share a cache entry or an eval row. Use it for a non-reasoning model, or one whose reasoning is merely forced: a model that reasons needs room for it, as in the `openrouter-logprobs` recipe.
 - **`extraBody`** is a JSON object merged shallowly into every request body of a `spec = "openai"` provider (the OpenAI SDK's `extra_body`); its keys override the body's own, `max_tokens` included. It carries service-specific parameters, such as OpenRouter's `provider.require_parameters`, without code for any service.
+- **A route.** A binding is one reference or a list of them; a list is one layer, and a layer is asked as one: its models are tried in turn.
+  - `routing = "ordered"` (default) starts every request at the first model; `"round-robin"` starts consecutive requests at consecutive models, the others following in the order written, wrapping.
+  - A request moves to the next model only when a model fails (an HTTP error including 429 and 5xx, a timeout, missing `logprobs`, unusable output) or the budget refuses a model that costs. An abstention or an unsure answer goes to the next layer, never the next model.
+  - A model that fails 3 times in a run is skipped for the rest of it, with one notice (LiteLLM's `allowed_fails`). With every model out, the subject stays for review.
+  - A kept answer of any model of the route is used before a request is sent; the model that answered is the one `evidence.model` and `eval`'s `scores[].model` name, and `eval` lists the run's notices per check, so a failing model is not silent.
 - The `spec` providers are served by the `model-http` plugin, which must be listed in `plugins`. A `command` provider reuses the command contract (no shell, its own process group, a time limit, a cap on output, an environment cleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG` and `TMPDIR` plus the declared `env` and `keyEnv`, project trust) and its program is part of what trust covers. An answer that does not fit the shape is no answer, and the subject stays for review.
 - The engine keys off the capabilities a model declares, never its name: `deterministic`, `abstains` and `cost`. The budget and the report scope (changed files, or everything with `--all-models`) limit only the models with a `cost` above 0; an answer is cached under the model, its version, the check's revision and the subject. A model that fails never makes a run incomplete (exit 3): its subjects stay for review.
 - Subjects nothing decided (an abstention, an unsure answer, no bound model, the budget spent, a failed model, `--no-models`) are reported as SARIF results of kind `review`, in the report scope only, and as review tasks in the agent output, grouped. They never change the exit code.

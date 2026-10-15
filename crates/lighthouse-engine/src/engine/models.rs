@@ -1,7 +1,8 @@
 //! The models of a run: which model judges a decision, what asking costs, and
 //! the answers kept between runs. A rule hands over the subjects it suspects;
-//! this puts them to the models of the decision's bindings, most specific
-//! first, and an abstention or an unsure answer goes on to the next.
+//! this puts them to the routes of the decision's bindings, most specific
+//! first, and an abstention or an unsure answer goes on to the next. A route
+//! is one model or several: a failure moves a request to the next of them.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -15,10 +16,39 @@ use std::{
 use crate::cache::{Cache, DEFAULT_LIMIT, KeyBuilder};
 use lighthouse_model::{Diagnostic, hash};
 use lighthouse_plugin::{Ask, Classifier, Judged, Model, Models, Open, Question, Settle, Subject};
-use lighthouse_spec::ModelBinding;
+use lighthouse_spec::{ModelBinding, Routing};
 use serde::{Deserialize, Serialize};
 
 use super::{batch::Pending, instance::Host};
+
+/// Failures of a model, in one run, after which it is no longer asked.
+pub(super) const ALLOWED_FAILS: usize = 3;
+
+/// A layer of the cascade: the models one binding names, tried in turn.
+pub(super) struct Route<'a> {
+    /// The references of the models, joined with `,`.
+    pub(super) id: String,
+    models: Vec<Arc<dyn Classifier + 'a>>,
+    /// Requests that went through the route this run, to rotate its models.
+    turn: Arc<AtomicUsize>,
+}
+
+impl<'a> Route<'a> {
+    /// The models in the order a request tries them: as written, or rotated
+    /// by one more than the request before.
+    pub(super) fn order(&self, routing: Routing) -> Vec<&Arc<dyn Classifier + 'a>> {
+        let start = match routing {
+            Routing::Ordered => 0,
+            Routing::RoundRobin => self.turn.fetch_add(1, Ordering::SeqCst) % self.models.len(),
+        };
+        self.models
+            .iter()
+            .cycle()
+            .skip(start)
+            .take(self.models.len())
+            .collect()
+    }
+}
 
 /// What a run needs to ask models: who is bound, how much may be spent, and
 /// where answers are kept.
@@ -38,9 +68,13 @@ pub(super) struct RunModels<'a> {
     off: bool,
     collect: bool,
     seen: Mutex<BTreeMap<String, Subject>>,
-    /// The probability of failing each subject was given, by fingerprint: the
-    /// answer of the last model that gave one.
-    answered: Mutex<BTreeMap<String, f64>>,
+    /// The probability of failing each subject was given, by fingerprint, and
+    /// the model that gave it: the answer of the last one that gave one.
+    answered: Mutex<BTreeMap<String, (f64, String)>>,
+    /// Failures of each model this run, and the last reason, by reference.
+    fails: Mutex<BTreeMap<String, (usize, String)>>,
+    /// Requests that went through each route, by route id.
+    turns: Mutex<BTreeMap<String, Arc<AtomicUsize>>>,
     notes: Mutex<BTreeSet<String>>,
     /// Models built so far, by reference; `None` for one that cannot serve.
     built: Mutex<BTreeMap<String, Option<Arc<dyn Classifier + 'a>>>>,
@@ -110,6 +144,8 @@ impl<'a> RunModels<'a> {
             collect: options.collect,
             seen: Mutex::default(),
             answered: Mutex::default(),
+            fails: Mutex::default(),
+            turns: Mutex::default(),
             notes: Mutex::default(),
             built: Mutex::default(),
             queued: Mutex::default(),
@@ -127,19 +163,53 @@ impl<'a> RunModels<'a> {
             .clone()
     }
 
-    /// The probabilities of failing the models gave this run, by fingerprint.
-    pub(super) fn probabilities(&self) -> BTreeMap<String, f64> {
+    /// The probabilities of failing the models gave this run, by fingerprint,
+    /// with the model that gave each.
+    pub(super) fn probabilities(&self) -> BTreeMap<String, (f64, String)> {
         self.answered
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
     }
 
-    pub(super) fn record(&self, subject: &Subject, noul: f64) {
+    pub(super) fn record(&self, subject: &Subject, noul: f64, model: &str) {
         self.answered
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .insert(subject.key.clone(), noul);
+            .insert(subject.key.clone(), (noul, model.to_owned()));
+    }
+
+    /// Notes that `manifest`'s model failed, and returns the reason.
+    pub(super) fn report(&self, manifest: &Model, reason: String) -> String {
+        self.note(format!(
+            "model {} failed, its subjects are left to review: {reason}",
+            manifest.id
+        ));
+        reason
+    }
+
+    /// Counts a failure of the whole request to a model; at [`ALLOWED_FAILS`]
+    /// the model is skipped for the rest of the run. Returns the reason.
+    pub(super) fn fail(&self, manifest: &Model, reason: String) -> String {
+        let reason = self.report(manifest, reason);
+        let mut fails = self.fails.lock().unwrap_or_else(PoisonError::into_inner);
+        let (count, last) = fails.entry(manifest.id.clone()).or_default();
+        *count += 1;
+        last.clone_from(&reason);
+        if *count == ALLOWED_FAILS {
+            self.note(format!(
+                "model {} failed {ALLOWED_FAILS} times; it is skipped for the rest of the run",
+                manifest.id
+            ));
+        }
+        reason
+    }
+
+    /// Why a model is skipped, when it failed [`ALLOWED_FAILS`] times.
+    pub(super) fn cooled(&self, reference: &str) -> Option<String> {
+        let fails = self.fails.lock().unwrap_or_else(PoisonError::into_inner);
+        let (count, last) = fails.get(reference)?;
+        (*count >= ALLOWED_FAILS).then(|| last.clone())
     }
 
     /// How many questions were put to models this run, and what they cost.
@@ -170,29 +240,40 @@ impl<'a> RunModels<'a> {
         notes
     }
 
-    /// The models that judge the rule's decision, most specific binding first:
-    /// the model a revision attached, the model the rule names, the project's.
-    /// A reference that does not resolve, or whose model cannot classify, is
-    /// skipped with a notice: that layer abstains.
-    pub(super) fn cascade(&self, rule: &str) -> Vec<Arc<dyn Classifier + 'a>> {
+    /// The routes that judge the rule's decision, most specific binding first:
+    /// the model a revision attached, the models the rule names, the
+    /// project's. A reference that does not resolve, or whose model cannot
+    /// classify, is skipped with a notice; a route left with none abstains.
+    pub(super) fn cascade(&self, rule: &str) -> Vec<Route<'a>> {
         if self.off {
             return Vec::new();
         }
+        let attached = self.attached.get(rule).map(|model| vec![model.clone()]);
         let layers = [
-            self.attached.get(rule),
-            self.binding.rules.get(rule),
-            self.binding.classification.as_ref(),
+            attached,
+            self.binding.rules.get(rule).cloned(),
+            Some(self.binding.classification.clone()),
         ];
-        let mut found: Vec<Arc<dyn Classifier + 'a>> = Vec::new();
-        for reference in layers.into_iter().flatten() {
-            let Some(model) = self.model(reference) else {
+        let mut found: Vec<Route<'a>> = Vec::new();
+        for references in layers.into_iter().flatten() {
+            let models: Vec<_> = references.iter().filter_map(|r| self.model(r)).collect();
+            if models.is_empty() {
                 continue;
-            };
-            if found.iter().all(|m| m.manifest().id != *reference) {
-                found.push(model);
+            }
+            let ids: Vec<&str> = models.iter().map(|m| m.manifest().id.as_str()).collect();
+            let id = ids.join(",");
+            if found.iter().all(|route| route.id != id) {
+                let turn = self.turn(&id);
+                found.push(Route { id, models, turn });
             }
         }
         found
+    }
+
+    /// The counter of the route `id`, shared by every layer that names it.
+    fn turn(&self, id: &str) -> Arc<AtomicUsize> {
+        let mut turns = self.turns.lock().unwrap_or_else(PoisonError::into_inner);
+        Arc::clone(turns.entry(id.to_owned()).or_default())
     }
 
     /// The model of `reference`, built once per run.
@@ -306,8 +387,8 @@ impl Models for RunModels<'_> {
     }
 
     fn queue(&self, group: &str, ask: Ask, settle: Settle) -> Option<Vec<Diagnostic>> {
-        let models = self.cascade(&ask.rule);
-        if models.is_empty() {
+        let routes = self.cascade(&ask.rule);
+        if routes.is_empty() {
             let unbound = vec![Judged::Open(Open::Unbound); ask.subjects.len()];
             return Some(settle(unbound));
         }
@@ -319,7 +400,7 @@ impl Models for RunModels<'_> {
             .push(Pending {
                 ask,
                 settle,
-                models,
+                routes,
             });
         None
     }

@@ -103,8 +103,11 @@ fn gather(
     let reference = request
         .model
         .clone()
-        .or_else(|| binding.rules.get(&request.decision).cloned())
-        .or_else(|| binding.classification.clone());
+        .or_else(|| {
+            let route = binding.rules.get(&request.decision);
+            route.and_then(|models| models.first()).cloned()
+        })
+        .or_else(|| binding.classification.first().cloned());
     let table = baseline.map(|file| Baseline {
         file,
         repo: repo.name.as_deref(),

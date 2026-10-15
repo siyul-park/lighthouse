@@ -66,6 +66,9 @@ pub struct Side {
     /// fingerprint: the raw answers the metrics are computed from, so that
     /// reports can be pooled.
     pub scores: Vec<Score>,
+    /// What went wrong with the models, or was worth saying: the notices of
+    /// the run, so that a failing model is not silent.
+    pub notices: Vec<String>,
 }
 
 /// What a model gave a labelled subject.
@@ -78,6 +81,8 @@ pub struct Score {
     pub violates: bool,
     /// P(fail) the model gave.
     pub probability: f64,
+    /// The model that gave it: `<reference>@<version>`.
+    pub model: String,
 }
 
 /// The result of an evaluation.
@@ -110,8 +115,10 @@ pub struct Found {
     reviews: usize,
     calls: usize,
     cost: f64,
-    /// The probability of failing models gave, by place.
-    probabilities: BTreeMap<String, f64>,
+    /// The probability of failing models gave, by place, with the model.
+    probabilities: BTreeMap<String, (f64, String)>,
+    /// The notices of the run.
+    notices: Vec<String>,
     /// Selected subjects the check did not flag, for an audit, with the
     /// place each is at.
     unflagged: Vec<(String, String)>,
@@ -146,8 +153,9 @@ impl Found {
         found.probabilities = run
             .probabilities
             .iter()
-            .filter_map(|(fp, p)| Some((found.place.get(fp)?.clone(), *p)))
+            .filter_map(|(fp, answer)| Some((found.place.get(fp)?.clone(), answer.clone())))
             .collect();
+        found.notices = run.notices.iter().cloned().collect();
         found.calls = run.model_calls;
         found.cost = run.model_cost;
         let flagged: BTreeSet<&String> = found.by_fingerprint.keys().collect();
@@ -170,6 +178,7 @@ impl Found {
     /// A `notApplicable` label is about the selector and is not scored.
     fn scored(&self, current: &Found, label: &Label, repo: &Repo) -> Option<Score> {
         let place = current.place.get(&label.key)?;
+        let (probability, model) = self.probabilities.get(place)?;
         Some(Score {
             fingerprint: label.key.clone(),
             repo: repo.name.clone(),
@@ -178,7 +187,8 @@ impl Found {
                 Truth::Pass => false,
                 Truth::NotApplicable => return None,
             },
-            probability: *self.probabilities.get(place)?,
+            probability: *probability,
+            model: model.clone(),
         })
     }
 
@@ -272,6 +282,8 @@ pub fn grade(
             .iter()
             .filter_map(|l| current.scored(current, l, repo))
             .collect(),
+        notices: current.notices.clone(),
+        candidate_notices: Vec::new(),
         candidate_scored: Vec::new(),
         pairs: Vec::new(),
         decided: assemble::Usage::of(current),
@@ -310,6 +322,7 @@ pub fn grade(
         part.pairs.push((was, now));
     }
     part.candidate_decided = assemble::Usage::of(candidate.found);
+    part.candidate_notices.clone_from(&candidate.found.notices);
     part.audit = audit_rows(request, repo, candidate.found);
     part.candidate_check = Some(candidate.id);
     part

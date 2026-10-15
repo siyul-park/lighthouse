@@ -3,7 +3,7 @@
 
 use lighthouse_model::Severity;
 use lighthouse_spec::{
-    Config, Evaluation, ModelBinding, ModelCheck, ModelProvider, Select, Subject,
+    Config, Evaluation, ModelBinding, ModelCheck, ModelProvider, Routing, Select, Subject,
 };
 
 const PROJECT: &str = r#"
@@ -18,15 +18,14 @@ spec = "openai"
 baseUrl = "https://openrouter.ai/api/v1"
 keyEnv = "OPENROUTER_API_KEY"
 
-[models.providers.claude]
+[models.providers.script]
 type = "command"
-argv = ["claude", "-p", "--model", "{model}"]
-stdin = "prompt"
-pointer = "/result"
+argv = ["./scripts/classify", "{model}"]
+stdin = "request"
 
 [rules."design/prefer-method"]
 level = "warn"
-model = "claude/sonnet"
+model = "script/sonnet"
 evaluation = { precision = 0.95, recall = 0.8 }
 "#;
 
@@ -47,14 +46,40 @@ fn a_reference_is_a_provider_and_a_model_split_at_the_first_slash() {
 #[test]
 fn the_project_binds_models_by_reference_and_limits_what_they_cost() {
     let binding = binding();
-    assert_eq!(
-        binding.classification.as_deref(),
-        Some("openrouter/qwen/qwen3-coder:free")
-    );
-    assert_eq!(binding.rules["design/prefer-method"], "claude/sonnet");
+    assert_eq!(binding.classification, ["openrouter/qwen/qwen3-coder:free"]);
+    assert_eq!(binding.rules["design/prefer-method"], ["script/sonnet"]);
+    assert_eq!(binding.routing, Routing::Ordered);
     assert_eq!(binding.budget, 50);
     let ids: Vec<_> = binding.ids().collect();
-    assert_eq!(ids, ["openrouter/qwen/qwen3-coder:free", "claude/sonnet"]);
+    assert_eq!(ids, ["openrouter/qwen/qwen3-coder:free", "script/sonnet"]);
+}
+
+const ROUTE: &str = r#"
+[models]
+classification = ["a/one", "b/two"]
+routing = "round-robin"
+
+[rules."design/naming"]
+level = "warn"
+model = ["c/three", "a/one"]
+"#;
+
+#[test]
+fn a_binding_is_one_model_or_a_route_of_several_in_the_order_written() {
+    let binding = Config::parse_inline(ROUTE).unwrap().models().clone();
+
+    assert_eq!(binding.classification, ["a/one", "b/two"]);
+    assert_eq!(binding.rules["design/naming"], ["c/three", "a/one"]);
+    assert_eq!(binding.routing, Routing::RoundRobin);
+    let ids: Vec<_> = binding.ids().collect();
+    assert_eq!(ids, ["a/one", "b/two", "c/three", "a/one"]);
+}
+
+#[test]
+fn an_unknown_routing_is_rejected() {
+    let error = Config::parse_inline("[models]\nrouting = \"random\"\n").unwrap_err();
+
+    assert!(error.to_string().contains("random"), "{error}");
 }
 
 #[test]
@@ -69,7 +94,7 @@ fn a_provider_is_declared_by_spec_or_by_command_and_openai_is_built_in() {
     assert_eq!(plugin, "model-http");
     assert_eq!(options["baseUrl"], "https://openrouter.ai/api/v1");
     assert!(matches!(
-        binding.provider("claude"),
+        binding.provider("script"),
         Some(ModelProvider::Command { .. })
     ));
     let ModelProvider::Rpc { options, .. } = binding.provider("openai").unwrap() else {
@@ -149,7 +174,7 @@ fn model_provider_remote() {
         "a standard API is a service outside the machine"
     );
     assert!(
-        !binding.provider("claude").unwrap().remote(),
+        !binding.provider("script").unwrap().remote(),
         "a program that is given no key stays on the machine"
     );
 }

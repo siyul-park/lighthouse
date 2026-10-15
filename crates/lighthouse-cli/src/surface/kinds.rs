@@ -191,8 +191,10 @@ fn side() -> Value {
             "cost": { "type": "number" },
             "scores": list_of(object(json!({
                 "fingerprint": string(), "repo": nullable(string()),
-                "violates": { "type": "boolean" }, "probability": { "type": "number" }
-            }), &["fingerprint", "violates", "probability"]))
+                "violates": { "type": "boolean" }, "probability": { "type": "number" },
+                "model": string()
+            }), &["fingerprint", "violates", "probability", "model"])),
+            "notices": list_of(string())
         }),
         &[
             "check",
@@ -202,6 +204,7 @@ fn side() -> Value {
             "calls",
             "cost",
             "scores",
+            "notices",
         ],
     )
 }

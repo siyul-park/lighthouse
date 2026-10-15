@@ -358,6 +358,12 @@
               "minimum": 0,
               "type": "integer"
             },
+            "notices": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
             "reviews": {
               "minimum": 0,
               "type": "integer"
@@ -366,6 +372,9 @@
               "items": {
                 "properties": {
                   "fingerprint": {
+                    "type": "string"
+                  },
+                  "model": {
                     "type": "string"
                   },
                   "probability": {
@@ -388,7 +397,8 @@
                 "required": [
                   "fingerprint",
                   "violates",
-                  "probability"
+                  "probability",
+                  "model"
                 ],
                 "type": "object"
               },
@@ -402,7 +412,8 @@
             "reviews",
             "calls",
             "cost",
-            "scores"
+            "scores",
+            "notices"
           ],
           "type": "object"
         },
@@ -722,6 +733,12 @@
           "minimum": 0,
           "type": "integer"
         },
+        "notices": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "reviews": {
           "minimum": 0,
           "type": "integer"
@@ -730,6 +747,9 @@
           "items": {
             "properties": {
               "fingerprint": {
+                "type": "string"
+              },
+              "model": {
                 "type": "string"
               },
               "probability": {
@@ -752,7 +772,8 @@
             "required": [
               "fingerprint",
               "violates",
-              "probability"
+              "probability",
+              "model"
             ],
             "type": "object"
           },
@@ -766,7 +787,8 @@
         "reviews",
         "calls",
         "cost",
-        "scores"
+        "scores",
+        "notices"
       ],
       "type": "object"
     },

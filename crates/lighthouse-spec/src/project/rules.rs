@@ -90,11 +90,11 @@ pub struct RuleDetail {
     /// whatever the decision's scope and the project's `generated.check` say.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub generated: Option<bool>,
-    /// The model plugin that judges this decision, before the project's
-    /// `models.classification`. When it abstains, the subject is left to
-    /// agent review.
+    /// The model, or the route of several, that judges this decision, before
+    /// the project's `models.classification`. When it abstains, the subject is
+    /// left to agent review.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
+    pub model: Option<super::models::Names>,
     /// How `lighthouse eval` judges this rule's check.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evaluation: Option<super::models::Evaluation>,

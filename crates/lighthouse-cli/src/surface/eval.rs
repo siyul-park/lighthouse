@@ -120,6 +120,9 @@ fn side(out: &mut String, label: &str, side: &Side) {
         "  decided by a model: {}, left to review: {}, questions asked: {} (cost {})",
         side.model_decided, side.reviews, side.calls, side.cost
     );
+    for notice in &side.notices {
+        let _ = writeln!(out, "  note: {notice}");
+    }
 }
 
 fn rate_text(rate: Option<Rate>) -> String {

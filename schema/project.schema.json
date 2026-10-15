@@ -42,7 +42,7 @@
           ]
         },
         "spec": {
-          "$ref": "#/$defs/Specs",
+          "$ref": "#/$defs/Names",
           "description": "The API: `openai` (Chat Completions, which OpenRouter, Ollama, vLLM\nand LM Studio also speak) or `typesafe` (System One). Others will join."
         }
       },
@@ -373,11 +373,15 @@
           ]
         },
         "classification": {
-          "description": "The model (`<provider>/<model>`) that judges a decision no rule binds\nand no trained model is attached to. When it abstains, the subject is\nleft to agent review.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Names"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model (`<provider>/<model>`), or the route of several, that judges\na decision no rule binds and no trained model is attached to. A request\nmoves to the next model of a route when one fails. When the route\nabstains, the subject is left to agent review."
         },
         "providers": {
           "additionalProperties": {
@@ -385,9 +389,34 @@
           },
           "description": "The providers the project defines, by name; a name that is built in\noverrides it.",
           "type": "object"
+        },
+        "routing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Routing"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Which model of a route a request starts at. Default: `ordered`."
         }
       },
       "type": "object"
+    },
+    "Names": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ],
+      "description": "One name or several, in the order written: the standard APIs a provider\nspeaks (each operation uses the one that covers it: classification\n`typesafe`, else `openai`), or the models of a route."
     },
     "OverrideSpec": {
       "additionalProperties": false,
@@ -541,6 +570,21 @@
       ],
       "description": "A provider as the project writes it."
     },
+    "Routing": {
+      "description": "Which model of a route a request goes to first.",
+      "oneOf": [
+        {
+          "const": "ordered",
+          "description": "The first model, then the others in the order written.",
+          "type": "string"
+        },
+        {
+          "const": "round-robin",
+          "description": "Each request starts at the next model, so load is spread; the others\nfollow in the order written, wrapping.",
+          "type": "string"
+        }
+      ]
+    },
     "RuleDetail": {
       "additionalProperties": false,
       "description": "A level with options.",
@@ -567,11 +611,15 @@
           "$ref": "#/$defs/Level"
         },
         "model": {
-          "description": "The model plugin that judges this decision, before the project's\n`models.classification`. When it abstains, the subject is left to\nagent review.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Names"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model, or the route of several, that judges this decision, before\nthe project's `models.classification`. When it abstains, the subject is\nleft to agent review."
         },
         "options": {
           "additionalProperties": true,
@@ -594,20 +642,6 @@
         }
       ],
       "description": "How a rule is written in a spec: `warn`, `off`, or\n`{ level: warn, options: { max: 10 } }`."
-    },
-    "Specs": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        }
-      ],
-      "description": "One standard API, or several a provider speaks: each operation uses the\none that covers it (classification: `typesafe`, else `openai`)."
     }
   },
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/project.schema.json",

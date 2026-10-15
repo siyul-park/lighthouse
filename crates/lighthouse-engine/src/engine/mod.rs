@@ -120,7 +120,7 @@ pub struct Outcome {
     pub subjects: BTreeMap<String, lighthouse_plugin::Subject>,
     /// The probability of failing that models gave each subject this run,
     /// by fingerprint, whether or not it reached the band.
-    pub probabilities: BTreeMap<String, f64>,
+    pub probabilities: BTreeMap<String, (f64, String)>,
     /// Requests put to models this run (answers from the cache are not
     /// counted), and what they cost.
     pub model_calls: usize,
