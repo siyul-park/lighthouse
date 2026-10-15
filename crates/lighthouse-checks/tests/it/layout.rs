@@ -1,10 +1,10 @@
 //! The vocabulary the ordering checks and order keys share.
 
 use lighthouse_checks::layout::{
-    declarations, exposed, has_word_prefix, is_declaration, owner_key,
+    declarations, declarations_in, exposed, has_word_prefix, is_declaration, owner_key,
 };
 use lighthouse_model::{
-    File, Fragment, Position, Project, Span, Symbol, SymbolId, SymbolKind, Visibility,
+    File, Fragment, Position, Project, Span, Symbol, SymbolId, SymbolKind, SymbolRole, Visibility,
 };
 use lighthouse_plugin::{Ctx, NoKeys, Workspace};
 
@@ -75,6 +75,32 @@ fn declarations_lists_each_module_of_a_file_in_source_order() {
         .map(|l| l.iter().map(|s| s.name.as_str()).collect())
         .collect();
     assert_eq!(names, [["Store", "Open", "Get"]]);
+}
+
+#[test]
+fn declarations_in_a_test_file_are_its_fixtures_in_source_order() {
+    let mut late = symbol("late", SymbolKind::Function, None, 9);
+    late.role = Some(SymbolRole::Fixture);
+    let mut early = symbol("early", SymbolKind::Function, None, 2);
+    early.role = Some(SymbolRole::Fixture);
+    let case = symbol("TestLate", SymbolKind::Function, None, 5);
+    let test_file = File {
+        test: true,
+        ..file()
+    };
+    let project = Project::merge([Fragment {
+        files: vec![test_file.clone()],
+        symbols: vec![late, case, early],
+        ..Fragment::default()
+    }]);
+
+    let lists = declarations_in(&project, &test_file);
+
+    let names: Vec<Vec<&str>> = lists
+        .iter()
+        .map(|l| l.iter().map(|s| s.name.as_str()).collect())
+        .collect();
+    assert_eq!(names, [["early", "late"]]);
 }
 
 #[test]
