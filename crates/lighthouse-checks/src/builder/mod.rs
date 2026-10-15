@@ -19,7 +19,7 @@ use lighthouse_plugin::{Ctx, Error, KeyCtx, OrderKey, Workspace};
 use serde_json::{Map, Value, json};
 
 use crate::{
-    eval::{Fact, cel_fact, with_entries},
+    eval::{Fact, cel_fact, with_entries, with_fact},
     facts,
     library::Needs,
     naming::{Naming, Tests},
@@ -29,6 +29,7 @@ use crate::{
 mod api;
 mod effective;
 mod forward;
+mod gap;
 mod hidden;
 mod homonyms;
 mod imports;
@@ -137,12 +138,20 @@ impl<'a> Builder<'a> {
     pub(crate) fn symbol_fact(&self, symbol: &Symbol) -> Fact {
         let extras = self.extras(symbol, self.project.function(&symbol.id));
         let base = || Some(cel_fact(&facts::symbol(self.project, symbol)));
-        self.table
+        let fact = self
+            .table
             .symbols
             .with(&symbol.id, base, |base| {
                 with_entries(base.as_ref(), &extras)
             })
-            .unwrap_or_else(|| cel_fact(&Value::Null))
+            .unwrap_or_else(|| cel_fact(&Value::Null));
+        if !self.needs.fact("func") {
+            return fact;
+        }
+        let func = self
+            .function_fact(symbol)
+            .unwrap_or_else(|| cel_fact(&Value::Null));
+        with_fact(fact, "func", func)
     }
 
     /// Like [`Builder::function`], in the form the CEL runtime holds it.
@@ -283,6 +292,9 @@ impl<'a> Builder<'a> {
                 "file_first_test".to_owned(),
                 self.first_test(symbol).unwrap_or_else(|| json!({})),
             );
+        }
+        if needs.fact("gap") {
+            map.insert("gap".to_owned(), self.gap(symbol));
         }
         if needs.fact("helper_user") {
             map.insert("helper_user".to_owned(), self.helper_user(symbol));

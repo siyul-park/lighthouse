@@ -2,7 +2,7 @@
 //! and the vocabulary that tells a declaration's owner and visibility. Order
 //! keys registered by other plugins use the same vocabulary.
 
-use lighthouse_model::{Project, Symbol, SymbolKind, SymbolRole, Visibility};
+use lighthouse_model::{File, Project, Symbol, SymbolKind, SymbolRole, Visibility};
 use lighthouse_plugin::Ctx;
 
 /// Declarations of the focused file in source order, one list per module the
@@ -12,18 +12,20 @@ use lighthouse_plugin::Ctx;
 /// except the fixtures of a test file, which are ordered like any other
 /// declarations.
 pub fn declarations<'a>(ctx: &Ctx<'a>) -> Vec<Vec<&'a Symbol>> {
-    let Some((file, _)) = ctx.file else {
-        return Vec::new();
-    };
-    let mut all: Vec<&Symbol> = ctx
-        .project
+    ctx.file
+        .map_or_else(Vec::new, |(file, _)| declarations_in(ctx.project, file))
+}
+
+/// [`declarations`] of `file`.
+pub fn declarations_in<'a>(project: &'a Project, file: &File) -> Vec<Vec<&'a Symbol>> {
+    let mut all: Vec<&Symbol> = project
         .symbols_in(&file.path)
-        .filter(|s| is_declaration(ctx.project, s))
+        .filter(|s| is_declaration(project, s))
         .filter(|s| {
             if file.test {
                 s.role == Some(SymbolRole::Fixture)
             } else {
-                !ctx.project.in_test(&s.id)
+                !project.in_test(&s.id)
             }
         })
         .collect();

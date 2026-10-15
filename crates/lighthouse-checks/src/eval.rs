@@ -238,3 +238,18 @@ pub(crate) fn with_entries(base: &dyn Val, extra: &Map<String, Value>) -> Fact {
     }
     Box::new(CelMap::from(entries))
 }
+
+/// A copy of the map `base` with the entry `name` set to `value`; `base`
+/// itself when it is no map.
+pub(crate) fn with_fact(base: Fact, name: &str, value: Fact) -> Fact {
+    let Some(map) = base.downcast_ref::<CelMap>() else {
+        return base;
+    };
+    let mut entries: HashMap<CelMapKey, Fact> = map
+        .inner()
+        .iter()
+        .map(|(key, value)| (key.clone(), value.clone_as_boxed()))
+        .collect();
+    entries.insert(CelMapKey::String(CelString::from(name)), value);
+    Box::new(CelMap::from(entries))
+}
