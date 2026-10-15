@@ -23,10 +23,14 @@ spec:
     needed as a function value, is not a wrapper.
 
     Kind `dead` (off by default and on in the strict preset): a private
-    function, method, type, interface, constant or variable that nothing
-    calls and nothing refers to, that does not implement an interface, is no
-    test fixture and is not `main`, `init` or `_`: delete it (Martin, Clean
-    Code G9 and F4). One that only tests use is left to agent review.
+    function, method, constant or variable that nothing calls and nothing
+    refers to, that does not implement an interface, is no test fixture and is
+    not `main`, `init` or `_`: delete it (Martin, Clean Code G9 and F4). The
+    option `deadKinds` names the kinds of symbol it reports; types are left
+    out by default because a type used only in type positions has no reference
+    edge. One that only tests use is left to agent review. Rust leaves dead
+    code to rustc's `dead_code` lint, which sees type positions and macro
+    arguments the index does not, so `deadKinds` is empty there.
 
     Kind `interface` (off by default and on in the strict preset): a private
     interface with members and exactly one implementing type, tests included:
@@ -62,7 +66,16 @@ spec:
         items: { type: string, enum: [wrapper, dead, interface] }
         default: [wrapper]
         description: What to report.
+      deadKinds:
+        type: array
+        items: { type: string, enum: [function, method, type, interface, const, var] }
+        default: [function, method, const, var]
+        description: Symbol kinds the dead kind reports; types are left out because a type used only in type positions has no reference edge.
     additionalProperties: false
+  languages:
+    rust:
+      options:
+        deadKinds: []
   check:
     type: cel
     select: symbol
@@ -73,7 +86,7 @@ spec:
         expr: >-
           ('wrapper' in options.kinds && callable && symbol.func.forwards_only ? ['wrapper'] : [])
           + ('dead' in options.kinds && symbol.visibility == 'private'
-              && symbol.kind in ['function', 'method', 'type', 'interface', 'const', 'var']
+              && symbol.kind in options.deadKinds
               && symbol.callers == 0 && symbol.references == 0 && !symbol.implementation
               && symbol.test_role == '' && !(symbol.name in ['main', 'init', '_'])
              ? ['dead'] : [])
@@ -87,7 +100,7 @@ spec:
         && symbol.visibility == 'private' && symbol.name != 'main' && symbol.name != 'init'
         && !symbol.implementation && size(callers(symbol.func).filter(c, !c.test)) == 1)
       || ('dead' in options.kinds && symbol.visibility == 'private'
-          && symbol.kind in ['function', 'method', 'type', 'interface', 'const', 'var']
+          && symbol.kind in options.deadKinds
           && size(callers(symbol).filter(c, !c.test)) == 0 && symbol.callers > 0
           && symbol.references == 0)
       || ('interface' in options.kinds && symbol.kind == 'interface'
@@ -416,9 +429,9 @@ spec:
         func Run() int { return helper() }
 
         func helper() int { return 1 }
-  - name: dead-rust-invalid
+  - name: dead-rust-off
     language: rust
-    kind: invalid
+    kind: valid
     options: { kinds: [dead] }
     files:
     - path: src/lib.rs
@@ -433,22 +446,6 @@ spec:
 
         fn unused() -> i32 {
             2
-        }
-    expect:
-    - line: 9
-  - name: dead-rust-valid
-    language: rust
-    kind: valid
-    options: { kinds: [dead] }
-    files:
-    - path: src/lib.rs
-      body: |-
-        pub fn run() -> i32 {
-            helper()
-        }
-
-        fn helper() -> i32 {
-            1
         }
   - name: interface-go-invalid
     language: go
