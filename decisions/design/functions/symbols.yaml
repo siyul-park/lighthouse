@@ -23,12 +23,15 @@ spec:
     needed as a function value, is not a wrapper.
 
     Kind `dead` (off by default and on in the strict preset): a private
-    function, method, constant or variable that nothing calls and nothing
-    refers to, that does not implement an interface, is no test fixture and is
-    not `main`, `init` or `_`: delete it (Martin, Clean Code G9 and F4). The
-    option `deadKinds` names the kinds of symbol it reports; types are left
-    out by default because a type used only in type positions has no reference
-    edge. One that only tests use is left to agent review. Rust leaves dead
+    function, method or variable that nothing calls and nothing refers to,
+    that does not implement an interface, is no test fixture and is not
+    `main`, `init` or `_`: delete it (Martin, Clean Code G9 and F4). Members
+    of an interface or trait are declarations, not code, and functions without
+    a body are implemented elsewhere (Go assembly), so neither is reported.
+    The option `deadKinds` names the kinds of symbol it reports; types are
+    left out by default because a type used only in type positions has no
+    reference edge, and constants because a constant group counts as used when
+    any member is (staticcheck U1000) and iota sentinels are never referenced. One that only tests use is left to agent review. Rust leaves dead
     code to rustc's `dead_code` lint, which sees type positions and macro
     arguments the index does not, so `deadKinds` is empty there.
 
@@ -69,8 +72,8 @@ spec:
       deadKinds:
         type: array
         items: { type: string, enum: [function, method, type, interface, const, var] }
-        default: [function, method, const, var]
-        description: Symbol kinds the dead kind reports; types are left out because a type used only in type positions has no reference edge.
+        default: [function, method, var]
+        description: Symbol kinds the dead kind reports; types are left out because a type used only in type positions has no reference edge, and constants because a constant group is used when any member is and iota sentinels are never referenced.
     additionalProperties: false
   languages:
     rust:
@@ -82,11 +85,13 @@ spec:
     with:
       - name: callable
         expr: "symbol.func != null && (symbol.kind == 'function' || symbol.kind == 'method')"
+      - name: declared
+        expr: "symbol.owner_kind == 'interface' || (symbol.func == null && symbol.kind in ['function', 'method'])"
       - name: matched
         expr: >-
           ('wrapper' in options.kinds && callable && symbol.func.forwards_only ? ['wrapper'] : [])
           + ('dead' in options.kinds && symbol.visibility == 'private'
-              && symbol.kind in options.deadKinds
+              && symbol.kind in options.deadKinds && !declared
               && symbol.callers == 0 && symbol.references == 0 && !symbol.implementation
               && symbol.test_role == '' && !(symbol.name in ['main', 'init', '_'])
              ? ['dead'] : [])
@@ -100,7 +105,7 @@ spec:
         && symbol.visibility == 'private' && symbol.name != 'main' && symbol.name != 'init'
         && !symbol.implementation && size(callers(symbol.func).filter(c, !c.test)) == 1)
       || ('dead' in options.kinds && symbol.visibility == 'private'
-          && symbol.kind in options.deadKinds
+          && symbol.kind in options.deadKinds && !declared
           && size(callers(symbol).filter(c, !c.test)) == 0 && symbol.callers > 0
           && symbol.references == 0)
       || ('interface' in options.kinds && symbol.kind == 'interface'
@@ -429,6 +434,36 @@ spec:
         func Run() int { return helper() }
 
         func helper() int { return 1 }
+  - name: dead-go-interface-member
+    language: go
+    kind: valid
+    options: { kinds: [dead] }
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        type marker interface {
+            isMarker()
+        }
+
+        type node struct{}
+
+        func (node) isMarker() {}
+
+        func Mark(m marker) bool { return m != nil }
+  - name: dead-go-bodyless
+    language: go
+    kind: valid
+    options: { kinds: [dead] }
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        func exit()
+
+        func Run() int { return 1 }
   - name: dead-rust-off
     language: rust
     kind: valid
