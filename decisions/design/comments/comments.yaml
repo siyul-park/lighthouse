@@ -25,7 +25,7 @@ spec:
     Further kinds, all off by default and on in the strict preset, apply to
     comments that are prose: not documentation, without a code fence and not
     a directive (`go:`, `+build`, `nolint`, `lint:`, `lighthouse-`, `#[`,
-    `SAFETY:`, `noqa`, `tool:name`). `code`: a comment that is not attached
+    `SAFETY:`, `noqa`, `tool:name`). `code`: a standalone comment that is not attached
     to a declaration and whose every line looks like code (`codePatterns`);
     delete it, version control keeps history (fix, suggested). `history`: a
     line that records who changed what and when (`historyPatterns`). `closing`:
@@ -74,10 +74,10 @@ spec:
       codePatterns:
         type: array
         default:
-          - '[;{}]$'
+          - '[;{]$|^}'
           - '^(if|for|switch|select|return|func|fn|let|var|const|import|package|use|match|defer|go|impl|pub|struct|type)\b.*[({=;]'
           - '^[A-Za-z_][\w.]*(\[[^\]]*\])?\s*(:=|=|\+=|-=|\*=)\s*\S'
-          - '^[A-Za-z_][\w.]*\(.*\)[;,]?$'
+          - '^[A-Za-z_][\w.]*\(.*["''`0-9].*\)[;,]?$'
         description: Regular expressions a line of commented-out code matches.
       historyPatterns:
         type: array
@@ -127,7 +127,7 @@ spec:
             && bodies.all(b, options.labels.exists(m, b.startsWith(m))
                              || leadingRun(b, options.ruleChars) >= options.minRun)
             ? ['banner'] : [])
-          + ('code' in options.kinds && prose && !comment.attached && size(bodies) >= 1
+          + ('code' in options.kinds && prose && comment.standalone && !comment.attached && size(bodies) >= 1
             && bodies.all(b, options.codePatterns.exists(p, b.matches(p)))
             ? ['code'] : [])
           + ('history' in options.kinds
@@ -292,7 +292,7 @@ spec:
         package sample
 
         // total := compute(a, b)
-        // fmt.Println(total)
+        // fmt.Println("total", total)
 
         func run() {}
     expect:
