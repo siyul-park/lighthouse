@@ -23,7 +23,7 @@ use crate::{
 
 /// The plugin's id.
 pub const ID: &str = "model-local";
-/// The one model it offers.
+/// The model part of a reference it serves: `learned@sha256:<hex>`.
 pub const MODEL: &str = "learned";
 
 pub struct Plugin {
@@ -57,7 +57,7 @@ impl Handler for Plugin {
             models: ListModelResponse {
                 object: "list".to_owned(),
                 data: vec![Model {
-                    id: MODEL.to_owned(),
+                    id: ID.to_owned(),
                     object: "model".to_owned(),
                     created: 0,
                     owned_by: ID.to_owned(),

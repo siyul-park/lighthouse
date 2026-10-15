@@ -150,6 +150,33 @@ fn noul(plugin: &mut Plugin, model: &str, key: &str, text: &str) -> Result<f64, 
 }
 
 #[test]
+fn the_process_lists_the_models_its_manifest_provides() {
+    let root = tempfile::tempdir().unwrap();
+    let manifest = include_str!("../lighthouse-plugin.toml");
+    let result = Plugin::new(fake)
+        .initialize(InitializeParams {
+            root: root.path().display().to_string(),
+            protocol_version: VERSION.to_owned(),
+            client_info: ClientInfo {
+                name: "test".to_owned(),
+                version: "0".to_owned(),
+            },
+        })
+        .unwrap();
+
+    let ids: Vec<String> = result
+        .models
+        .data
+        .iter()
+        .map(|m| format!("\"{}\"", m.id))
+        .collect();
+    assert!(
+        manifest.contains(&format!("models = [{}]", ids.join(", "))),
+        "{ids:?}"
+    );
+}
+
+#[test]
 fn a_trained_model_answers_its_decision_by_what_it_learned() {
     let root = tempfile::tempdir().unwrap();
     let (mut plugin, hex) = project(root.path(), fake, &dataset(12, 12));
