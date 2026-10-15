@@ -36,6 +36,9 @@ pub(super) struct RunModels<'a> {
     off: bool,
     collect: bool,
     seen: Mutex<BTreeMap<String, Subject>>,
+    /// The probability of failing each subject was given, by fingerprint: the
+    /// answer of the last model that gave one.
+    answered: Mutex<BTreeMap<String, f64>>,
     notes: Mutex<BTreeSet<String>>,
     /// Models built so far, by reference; `None` for one that cannot serve.
     built: Mutex<BTreeMap<String, Option<Arc<dyn Classifier + 'a>>>>,
@@ -103,6 +106,7 @@ impl<'a> RunModels<'a> {
             off: options.off,
             collect: options.collect,
             seen: Mutex::default(),
+            answered: Mutex::default(),
             notes: Mutex::default(),
             built: Mutex::default(),
             queued: Mutex::default(),
@@ -118,6 +122,21 @@ impl<'a> RunModels<'a> {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
+    }
+
+    /// The probabilities of failing the models gave this run, by fingerprint.
+    pub(super) fn probabilities(&self) -> BTreeMap<String, f64> {
+        self.answered
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    pub(super) fn record(&self, subject: &Subject, noul: f64) {
+        self.answered
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(subject.key.clone(), noul);
     }
 
     /// How many questions were put to models this run, and what they cost.

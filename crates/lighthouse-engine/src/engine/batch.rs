@@ -45,6 +45,9 @@ impl<'a> RunModels<'a> {
                 .flat_map_iter(|items| self.ask_group(&pending, layer, items))
                 .collect();
             for ((p, i), answer) in answers {
+                if let Ok(noul) = answer {
+                    self.record(&pending[p].ask.subjects[i], noul);
+                }
                 judged[p][i] = verdict(&pending[p], layer, answer);
             }
         }

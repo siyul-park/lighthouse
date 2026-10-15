@@ -108,6 +108,43 @@ fn found_of_a_run_keeps_what_the_check_flagged_by_fingerprint_and_place() {
 }
 
 #[test]
+fn the_probabilities_models_gave_score_the_labelled_subjects_they_answered() {
+    let mut run = Run {
+        diagnostics: vec![flagged("one", "a.rs")],
+        reviews: vec![flagged("two", "a.rs"), flagged("three", "a.rs")],
+        ..Run::default()
+    };
+    run.probabilities = [("one", 0.95), ("two", 0.2)]
+        .into_iter()
+        .map(|(fingerprint, p)| (fingerprint.to_owned(), p))
+        .collect();
+    let labels = [
+        label("one", Truth::Fail, None),
+        label("two", Truth::Pass, None),
+        label("three", Truth::Pass, None),
+    ];
+    let mut gathered = Gathered::default();
+    gathered.add(grade(
+        &request(None),
+        &repo(),
+        policy(),
+        &labels,
+        &Found::of(&run),
+        None,
+    ));
+    let metrics = gathered
+        .finish(&request(None), false)
+        .unwrap()
+        .current
+        .metrics;
+    // "three" abstained: counted in the labels, not scored.
+    assert_eq!(metrics.labelled, 3);
+    assert_eq!(metrics.answered, 2);
+    assert!((metrics.brier.unwrap() - (0.0025 + 0.04) / 2.0).abs() < 1e-9);
+    assert_eq!(metrics.auroc, Some(1.0));
+}
+
+#[test]
 fn grade_pairs_the_candidate_with_the_current_check_and_reads_examples_as_shown() {
     let current = found(&[("one", "a.rs")]);
     let beside = found(&[]);

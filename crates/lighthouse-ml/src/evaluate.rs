@@ -19,7 +19,7 @@ use serde::Serialize;
 use crate::{
     Result,
     labels::{Label, Shown},
-    metrics::{Metrics, Outcome, Rate},
+    metrics::{Metrics, Outcome, Rate, Truth},
 };
 
 mod assemble;
@@ -94,6 +94,8 @@ pub struct Found {
     reviews: usize,
     calls: usize,
     cost: f64,
+    /// The probability of failing models gave, by place.
+    probabilities: BTreeMap<String, f64>,
     /// Selected subjects the check did not flag, for an audit, with the
     /// place each is at.
     unflagged: Vec<(String, String)>,
@@ -125,6 +127,11 @@ impl Found {
             found.by_place.insert(place.clone(), result);
             found.place.insert(fp, place);
         }
+        found.probabilities = run
+            .probabilities
+            .iter()
+            .filter_map(|(fp, p)| Some((found.place.get(fp)?.clone(), *p)))
+            .collect();
         found.calls = run.model_calls;
         found.cost = run.model_cost;
         let flagged: BTreeSet<&String> = found.by_fingerprint.keys().collect();
@@ -140,6 +147,13 @@ impl Found {
             })
             .collect();
         found
+    }
+
+    /// The probability of failing a model gave the subject of a label this
+    /// run was shown, found by the place `current` knows it at.
+    fn scored(&self, current: &Found, label: &Label) -> Option<(Truth, f64)> {
+        let place = current.place.get(&label.key)?;
+        Some((label.truth, *self.probabilities.get(place)?))
     }
 
     fn outcome_of(&self, label: &Label) -> Outcome {
@@ -228,6 +242,11 @@ pub fn grade(
             .map(|l| (l.truth, current.outcome_of(l)))
             .collect(),
         candidate: Vec::new(),
+        scored: labels
+            .iter()
+            .filter_map(|l| current.scored(current, l))
+            .collect(),
+        candidate_scored: Vec::new(),
         pairs: Vec::new(),
         decided: assemble::Usage::of(current),
         candidate_decided: assemble::Usage::default(),
@@ -260,6 +279,8 @@ pub fn grade(
                 .unwrap_or(Outcome::Unselected)
         };
         part.candidate.push((label.truth, now));
+        part.candidate_scored
+            .extend(candidate.found.scored(current, label));
         part.pairs.push((was, now));
     }
     part.candidate_decided = assemble::Usage::of(candidate.found);

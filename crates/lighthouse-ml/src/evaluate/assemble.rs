@@ -13,6 +13,9 @@ pub struct Part {
     pub(super) policy: Evaluation,
     pub(super) current: Vec<(Truth, Outcome)>,
     pub(super) candidate: Vec<(Truth, Outcome)>,
+    /// The probabilities of failing models gave the labelled subjects.
+    pub(super) scored: Vec<(Truth, f64)>,
+    pub(super) candidate_scored: Vec<(Truth, f64)>,
     pub(super) pairs: Vec<(Outcome, Outcome)>,
     pub(super) decided: Usage,
     pub(super) candidate_decided: Usage,
@@ -71,9 +74,12 @@ impl Gathered {
             self.parts.iter().flat_map(|p| pick(p).clone()).collect()
         };
         let current = pool(|p| &p.current);
-        let side = |check: String, pairs: &[(Truth, Outcome)], used: Usage| Side {
+        let side = |check: String,
+                    pairs: &[(Truth, Outcome)],
+                    scored: &[(Truth, f64)],
+                    used: Usage| Side {
             check,
-            metrics: evaluate(pairs),
+            metrics: evaluate(pairs, scored),
             model_decided: used.decided,
             reviews: used.reviews,
             calls: used.calls,
@@ -84,12 +90,21 @@ impl Gathered {
                 .iter()
                 .fold(Usage::default(), |a, p| a.plus(pick(p)))
         };
-        let current_side = side(first.check.clone(), &current, sum(|p| p.decided));
+        let pool_scored = |pick: fn(&Part) -> &Vec<(Truth, f64)>| -> Vec<(Truth, f64)> {
+            self.parts.iter().flat_map(|p| pick(p).clone()).collect()
+        };
+        let current_side = side(
+            first.check.clone(),
+            &current,
+            &pool_scored(|p| &p.scored),
+            sum(|p| p.decided),
+        );
         let candidate_side = with_candidate.then(|| {
             let pairs = pool(|p| &p.candidate);
             side(
                 first.candidate_check.clone().unwrap_or_default(),
                 &pairs,
+                &pool_scored(|p| &p.candidate_scored),
                 sum(|p| p.candidate_decided),
             )
         });

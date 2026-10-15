@@ -24,6 +24,7 @@ pub use model::{
     },
     prompt::{
         json_in, noul_of, prompt, response_schema, subject as subject_text, system as system_text,
+        system_label as system_label_text,
     },
 };
 

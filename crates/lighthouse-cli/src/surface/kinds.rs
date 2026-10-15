@@ -183,7 +183,9 @@ fn side() -> Value {
             "check": string(),
             "metrics": object(json!({
                 "precision": rate(), "fpr": rate(), "recall": rate(), "fnr": rate(),
-                "selector_precision": rate(), "coverage": rate(), "abstention": rate()
+                "selector_precision": rate(), "coverage": rate(), "abstention": rate(),
+                "answered": integer(), "brier": nullable(json!({ "type": "number" })), "auroc": nullable(json!({ "type": "number" })),
+                "ece": nullable(json!({ "type": "number" }))
             }), &[]),
             "model_decided": integer(), "reviews": integer(), "calls": integer(),
             "cost": { "type": "number" }

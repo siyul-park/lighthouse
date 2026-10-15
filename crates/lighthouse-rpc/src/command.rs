@@ -179,7 +179,7 @@ fn command_env(
     declared: &BTreeMap<String, String>,
     key_env: Option<&str>,
 ) -> Vec<(String, String)> {
-    let mut env: Vec<(String, String)> = ["PATH", "HOME", "LANG", "TMPDIR"]
+    let mut env: Vec<(String, String)> = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "TMPDIR"]
         .into_iter()
         .chain(key_env)
         .filter_map(|k| std::env::var(k).ok().map(|v| (k.to_owned(), v)))

@@ -80,6 +80,29 @@ fn a_provider_is_declared_by_spec_or_by_command_and_openai_is_built_in() {
 }
 
 #[test]
+fn logprobs_and_extra_body_travel_in_the_options_and_unknown_fields_are_rejected() {
+    let config = Config::parse_inline(
+        "[models.providers.lp]\nspec = \"openai\"\nlogprobs = true\n\
+         extraBody = { provider = { require_parameters = true }, max_tokens = 1024 }\n",
+    )
+    .unwrap();
+    let ModelProvider::Rpc { options, .. } = config.models().provider("lp").unwrap() else {
+        panic!("a spec provider is a model-http provider");
+    };
+    assert_eq!(options["logprobs"], true);
+    assert_eq!(options["extraBody"]["provider"]["require_parameters"], true);
+    assert_eq!(options["extraBody"]["max_tokens"], 1024);
+    let plain = binding().provider("openrouter").unwrap();
+    let ModelProvider::Rpc { options, .. } = plain else {
+        panic!("a spec provider is a model-http provider");
+    };
+    assert!(!options.contains_key("logprobs") && !options.contains_key("extraBody"));
+
+    let unknown = "[models.providers.x]\nspec = \"openai\"\nlogprob = true\n";
+    assert!(Config::parse_inline(unknown).is_err());
+}
+
+#[test]
 fn a_provider_naming_an_unknown_spec_is_invalid() {
     let bad = Config::parse_inline("[models.providers.x]\nspec = \"nope\"\n").unwrap();
     assert!(bad.models().invalid.contains_key("x"));

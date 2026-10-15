@@ -19,10 +19,25 @@
             "null"
           ]
         },
+        "extraBody": {
+          "additionalProperties": true,
+          "description": "A JSON object merged shallowly into every request body, its keys\noverriding the body's own (the OpenAI SDK's `extra_body`).",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
         "keyEnv": {
           "description": "The environment variable that holds the API key; none for a service\nthat needs no key. Default: the spec's own.",
           "type": [
             "string",
+            "null"
+          ]
+        },
+        "logprobs": {
+          "description": "Read the answer from the probability of the first token (`yes` or\n`no`) instead of asking for a number; OpenAI's `logprobs` parameter.\nOnly for a model whose first token is the answer. Default: false.",
+          "type": [
+            "boolean",
             "null"
           ]
         },
@@ -240,7 +255,7 @@
       "description": "A provider of models, named under `[models.providers.<name>]`: a provider,\nas a check or a fix is. A model is named `<provider>/<model>`.",
       "oneOf": [
         {
-          "description": "A plugin process that offers models. The `options` say how to reach\nthem (`spec`, `baseUrl`, `keyEnv` for `model-http`); the model part of\nthe reference goes with every request.",
+          "description": "A plugin process that offers models. The `options` say how to reach\nthem (`spec`, `baseUrl`, `keyEnv`, `logprobs`, `extraBody` for `model-http`); the model part of\nthe reference goes with every request.",
           "properties": {
             "cost": {
               "description": "What one answer costs, when the plugin's own figure is not right.",
@@ -270,7 +285,7 @@
           "type": "object"
         },
         {
-          "description": "Any program that reads a request and prints an answer, under the\nprocess contract: no shell, its own process group, a time limit, a cap\non output, an environment cleared to `PATH`, `HOME`, `LANG`, `TMPDIR`,\nthe declared `env` and the variable `keyEnv` names, and the project's\ntrust. An answer that does not fit the task's shape is an abstention.",
+          "description": "Any program that reads a request and prints an answer, under the\nprocess contract: no shell, its own process group, a time limit, a cap\non output, an environment cleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`,\n`TMPDIR`, the declared `env` and the variable `keyEnv` names, and the project's\ntrust. An answer that does not fit the task's shape is an abstention.",
           "properties": {
             "argv": {
               "description": "The program and its arguments; `{model}` stands for the model part\nof the reference.",

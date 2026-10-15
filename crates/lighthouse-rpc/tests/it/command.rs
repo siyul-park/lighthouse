@@ -69,3 +69,21 @@ fn command_new_is_none_for_a_provider_that_is_not_a_command() {
 
     assert!(Command::new(dir.path(), "p/m", "m", &provider).is_none());
 }
+
+#[test]
+fn command_new_gives_the_program_the_login_variables_and_no_other_of_the_environment() {
+    let dir = tempfile::tempdir().unwrap();
+    let provider = provider(r#"["sh", "-c", "env | cut -d= -f1 | tr '\\n' ' ' >&2; exit 1"]"#);
+
+    let command = Command::new(dir.path(), "p/m", "m", &provider).unwrap();
+    let failed = command.classify(&request()).unwrap_err().to_string();
+
+    for name in ["PATH", "HOME", "USER", "LOGNAME"] {
+        assert_eq!(
+            failed.contains(&format!("{name} ")),
+            std::env::var(name).is_ok(),
+            "{name}: {failed}"
+        );
+    }
+    assert!(!failed.contains("CARGO"), "{failed}");
+}

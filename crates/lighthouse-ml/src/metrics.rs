@@ -3,6 +3,9 @@
 
 use serde::Serialize;
 
+/// The equal-width bins of P(fail) the expected calibration error uses.
+const BINS: usize = 10;
+
 /// z for a 95% interval.
 const Z: f64 = 1.959_963_984_540_054;
 
@@ -73,14 +76,30 @@ pub struct Metrics {
     /// The share of selected subjects the check decided.
     pub coverage: Option<Rate>,
     pub abstention: Option<Rate>,
+    /// Labelled subjects a model gave a probability of failing; the rest
+    /// abstained and are counted, not scored.
+    pub answered: usize,
+    /// Mean (P(fail) - y)^2 over the answered subjects, y = 1 for a `fail`
+    /// (scikit-learn's `brier_score_loss`).
+    pub brier: Option<f64>,
+    /// The probability that a `fail` is given a higher P(fail) than a `pass`,
+    /// ties counting half (scikit-learn's `roc_auc_score`); `None` when one
+    /// class is missing.
+    pub auroc: Option<f64>,
+    /// Expected calibration error over the answered subjects: the bins of P(fail)
+    /// weigh the gap between the share of fails and the mean P(fail)
+    /// (Guo et al., ICML 2017).
+    pub ece: Option<f64>,
 }
 
-/// Evaluates `pairs` of (truth, outcome). An unselected `fail` is a missed
+/// Evaluates `pairs` of (truth, outcome), and the probabilities of failing
+/// `scored` (truth, P(fail)) that models gave the labelled subjects; a
+/// `notApplicable` label is about the selector and is not scored. An unselected `fail` is a missed
 /// violation; an unselected `pass` is a correct silence. A subject labelled
 /// `fail` that was left to review was not found, so it is a miss (recall
 /// counts it); a subject left to review is in no precision, and in coverage
 /// only.
-pub fn evaluate(pairs: &[(Truth, Outcome)]) -> Metrics {
+pub fn evaluate(pairs: &[(Truth, Outcome)], scored: &[(Truth, f64)]) -> Metrics {
     let count = |want: &dyn Fn(&(Truth, Outcome)) -> bool| pairs.iter().filter(|p| want(p)).count();
     let selected = |p: &(Truth, Outcome)| p.1 != Outcome::Unselected;
     let tp = count(&|p| *p == (Truth::Fail, Outcome::Fail));
@@ -92,6 +111,14 @@ pub fn evaluate(pairs: &[(Truth, Outcome)]) -> Metrics {
     let chosen = count(&|p| selected(p));
     let not_applicable = count(&|p| selected(p) && p.0 == Truth::NotApplicable);
     let reviewed = count(&|p| p.1 == Outcome::Review);
+    let scored: Vec<(bool, f64)> = scored
+        .iter()
+        .filter_map(|&(truth, p)| match truth {
+            Truth::Fail => Some((true, p)),
+            Truth::Pass => Some((false, p)),
+            Truth::NotApplicable => None,
+        })
+        .collect();
     Metrics {
         labelled: pairs.len(),
         precision: Rate::new(tp, tp + fp),
@@ -101,10 +128,64 @@ pub fn evaluate(pairs: &[(Truth, Outcome)]) -> Metrics {
         selector_precision: Rate::new(chosen - not_applicable, chosen),
         coverage: Rate::new(chosen - reviewed, chosen),
         abstention: Rate::new(reviewed, chosen),
+        answered: scored.len(),
+        brier: brier(&scored),
+        auroc: auroc(&scored),
+        ece: ece(&scored),
     }
 }
 
 /// The share of subjects two checks answer the same way.
 pub fn agreement(pairs: &[(Outcome, Outcome)]) -> Option<Rate> {
     Rate::new(pairs.iter().filter(|(a, b)| a == b).count(), pairs.len())
+}
+
+/// The mean squared distance of P(fail) from the label, `true` for a fail.
+fn brier(scored: &[(bool, f64)]) -> Option<f64> {
+    let sum: f64 = scored
+        .iter()
+        .map(|&(fail, p)| (p - f64::from(u8::from(fail))).powi(2))
+        .sum();
+    (!scored.is_empty()).then(|| sum / scored.len() as f64)
+}
+
+/// The Mann-Whitney statistic over every (fail, pass) pair.
+fn auroc(scored: &[(bool, f64)]) -> Option<f64> {
+    let of = |want: bool| -> Vec<f64> {
+        scored
+            .iter()
+            .filter(|&&(fail, _)| fail == want)
+            .map(|&(_, p)| p)
+            .collect()
+    };
+    let (fails, passes) = (of(true), of(false));
+    if fails.is_empty() || passes.is_empty() {
+        return None;
+    }
+    let wins: f64 = fails
+        .iter()
+        .flat_map(|f| passes.iter().map(move |p| (f, p)))
+        .map(|(f, p)| match f.total_cmp(p) {
+            std::cmp::Ordering::Greater => 1.0,
+            std::cmp::Ordering::Equal => 0.5,
+            std::cmp::Ordering::Less => 0.0,
+        })
+        .sum();
+    Some(wins / (fails.len() * passes.len()) as f64)
+}
+
+/// Σ_b (n_b / N) · |mean(y)_b - mean(p)_b| over [`BINS`] equal-width bins,
+/// which is Σ_b |fails_b - Σp_b| / N.
+fn ece(scored: &[(bool, f64)]) -> Option<f64> {
+    let mut bins = [(0usize, 0.0f64, 0.0f64); BINS];
+    for &(fail, p) in scored {
+        let at = ((p * BINS as f64) as usize).min(BINS - 1);
+        let (n, fails, sum) = bins[at];
+        bins[at] = (n + 1, fails + f64::from(u8::from(fail)), sum + p);
+    }
+    let gap: f64 = bins
+        .iter()
+        .map(|&(_, fails, sum)| (fails - sum).abs() / scored.len() as f64)
+        .sum();
+    (!scored.is_empty()).then_some(gap)
 }

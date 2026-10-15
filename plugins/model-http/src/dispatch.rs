@@ -43,6 +43,8 @@ mod tests {
             specs: specs.iter().map(|s| (*s).to_owned()).collect(),
             base_url: "https://x".to_owned(),
             key_env: None,
+            logprobs: false,
+            extra_body: serde_json::Map::new(),
         }
     }
 

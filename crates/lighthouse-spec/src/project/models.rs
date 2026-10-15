@@ -54,7 +54,7 @@ pub enum ModelOutput {
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum ModelProvider {
     /// A plugin process that offers models. The `options` say how to reach
-    /// them (`spec`, `baseUrl`, `keyEnv` for `model-http`); the model part of
+    /// them (`spec`, `baseUrl`, `keyEnv`, `logprobs`, `extraBody` for `model-http`); the model part of
     /// the reference goes with every request.
     Rpc {
         /// A listed plugin that offers models.
@@ -67,8 +67,8 @@ pub enum ModelProvider {
     },
     /// Any program that reads a request and prints an answer, under the
     /// process contract: no shell, its own process group, a time limit, a cap
-    /// on output, an environment cleared to `PATH`, `HOME`, `LANG`, `TMPDIR`,
-    /// the declared `env` and the variable `keyEnv` names, and the project's
+    /// on output, an environment cleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`,
+    /// `TMPDIR`, the declared `env` and the variable `keyEnv` names, and the project's
     /// trust. An answer that does not fit the task's shape is an abstention.
     Command {
         /// The program and its arguments; `{model}` stands for the model part
@@ -130,6 +130,15 @@ pub struct ApiProvider {
     /// What one answer costs. Default: 1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost: Option<f64>,
+    /// Read the answer from the probability of the first token (`yes` or
+    /// `no`) instead of asking for a number; OpenAI's `logprobs` parameter.
+    /// Only for a model whose first token is the answer. Default: false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logprobs: Option<bool>,
+    /// A JSON object merged shallowly into every request body, its keys
+    /// overriding the body's own (the OpenAI SDK's `extra_body`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra_body: Option<Map<String, Value>>,
 }
 
 /// One standard API, or several a provider speaks: each operation uses the
@@ -185,6 +194,12 @@ impl ProviderSpec {
                 );
                 let key_env = api.key_env.as_deref().unwrap_or(key);
                 options.insert("keyEnv".to_owned(), Value::from(key_env));
+                if let Some(logprobs) = api.logprobs {
+                    options.insert("logprobs".to_owned(), Value::from(logprobs));
+                }
+                if let Some(extra) = &api.extra_body {
+                    options.insert("extraBody".to_owned(), Value::Object(extra.clone()));
+                }
                 Ok(ModelProvider::Rpc {
                     plugin: API_PLUGIN.to_owned(),
                     options,
@@ -332,6 +347,8 @@ pub fn builtin(name: &str) -> Option<ModelProvider> {
         base_url: None,
         key_env: None,
         cost: None,
+        logprobs: None,
+        extra_body: None,
     })
     .resolve()
     .ok()

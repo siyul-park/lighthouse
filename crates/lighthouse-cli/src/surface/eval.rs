@@ -105,6 +105,16 @@ fn side(out: &mut String, label: &str, side: &Side) {
     ] {
         let _ = writeln!(out, "  {name}: {}", rate_text(rate));
     }
+    let score = |value: Option<f64>| value.map_or_else(|| "-".to_owned(), |v| format!("{v:.3}"));
+    let _ = writeln!(
+        out,
+        "  Brier: {}, ECE: {}, AUROC: {} (answered {} of {} labelled)",
+        score(m.brier),
+        score(m.ece),
+        score(m.auroc),
+        m.answered,
+        m.labelled
+    );
     let _ = writeln!(
         out,
         "  decided by a model: {}, left to review: {}, questions asked: {} (cost {})",

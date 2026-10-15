@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use lighthouse_protocol::{
     Capabilities, DecisionRef, Example, ListModelResponse, Model, Question, ResultKind, State,
     Subject, SubjectContext, Supports, SystemOneRequest, json_in, noul_of, prompt, response_schema,
-    subject_text, system_text,
+    subject_text, system_label_text, system_text,
 };
 use serde_json::json;
 
@@ -58,6 +58,20 @@ fn the_system_text_carries_the_instructions_the_decision_and_its_examples() {
     assert!(text.contains("Is it small?") && text.contains("design/x"));
     assert!(text.contains("Criterion true") && text.contains("func big() {}"));
     assert!(text.contains("noul"));
+}
+
+#[test]
+fn the_label_system_text_asks_for_a_word_instead_of_a_probability() {
+    let question = Question::of(&decision());
+    let text = system_label_text("design/x", &question);
+    assert!(text.contains("Answer with one word") && text.contains("func big() {}"));
+    assert!(!text.contains("noul") && !text.contains("JSON"));
+    // Only the reply instruction differs.
+    let rest = |text: &str| {
+        text.split_once("\n\nDecision")
+            .map(|(_, rest)| rest.to_owned())
+    };
+    assert_eq!(rest(&text), rest(&system_text("design/x", &question)));
 }
 
 #[test]

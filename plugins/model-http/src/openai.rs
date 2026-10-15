@@ -5,18 +5,26 @@
 
 use async_openai::types::chat::{CreateChatCompletionRequest, CreateChatCompletionResponse};
 use lighthouse_protocol::HandlerError;
+use serde_json::{Map, Value};
 
 use crate::{endpoint::Endpoint, http::Client};
 
-/// `createChatCompletion`: `POST /chat/completions`. A refusal comes back
-/// as the error body the service answered; an error body in a 200 response
-/// is carried the same way.
+/// `createChatCompletion`: `POST /chat/completions`. `fixed` holds fields the
+/// request type cannot carry; the body is the request, then `fixed`, then the
+/// endpoint's `extraBody`, each overriding the one before. A refusal comes
+/// back as the error body the service answered; an error body in a 200
+/// response is carried the same way.
 pub fn create_chat_completion(
     client: &dyn Client,
     endpoint: &Endpoint,
     request: &CreateChatCompletionRequest,
+    fixed: Map<String, Value>,
 ) -> Result<CreateChatCompletionResponse, HandlerError> {
-    let body = serde_json::to_value(request).map_err(|e| e.to_string())?;
+    let mut body = serde_json::to_value(request).map_err(|e| e.to_string())?;
+    if let Some(fields) = body.as_object_mut() {
+        fields.extend(fixed);
+        fields.extend(endpoint.extra_body.clone());
+    }
     let response = client.post(
         &endpoint.url("chat/completions"),
         endpoint.key()?.as_deref(),
@@ -37,7 +45,7 @@ mod tests {
     use async_openai::types::chat::{
         ChatCompletionRequestMessage, ChatCompletionRequestUserMessage,
     };
-    use serde_json::{Value, json};
+    use serde_json::json;
 
     use super::*;
     use crate::recording::Recording;
@@ -59,7 +67,7 @@ mod tests {
     fn it_posts_to_chat_completions_and_reads_the_documented_response() {
         let client = Recording::replying(vec![serde_json::from_str(COMPLETION).unwrap()]);
         let endpoint = Endpoint::at("openai", "https://api.openai.com/v1/");
-        let response = create_chat_completion(&client, &endpoint, &request()).unwrap();
+        let response = create_chat_completion(&client, &endpoint, &request(), Map::new()).unwrap();
         assert_eq!(
             response.choices[0].message.content.as_deref(),
             Some("Hello! How can I help you today?")
@@ -71,11 +79,29 @@ mod tests {
     }
 
     #[test]
+    fn extra_body_overrides_the_body_and_the_fixed_fields() {
+        let client = Recording::replying(vec![serde_json::from_str(COMPLETION).unwrap()]);
+        let mut endpoint = Endpoint::at("openai", "https://x");
+        endpoint.extra_body = json!({"max_tokens": 1024, "provider": {"a": 1}, "model": "other"})
+            .as_object()
+            .unwrap()
+            .clone();
+        let fixed = json!({"max_tokens": 1}).as_object().unwrap().clone();
+        create_chat_completion(&client, &endpoint, &request(), fixed).unwrap();
+        let body = &client.asked()[0].1;
+        assert_eq!(body["max_tokens"], 1024);
+        assert_eq!(body["provider"]["a"], 1);
+        assert_eq!(body["model"], "other");
+        assert_eq!(body["messages"][0]["role"], "user");
+    }
+
+    #[test]
     fn an_error_body_is_carried_as_data() {
         let error = json!({"message": "rate limited", "type": "requests"});
         let client = Recording::replying(vec![json!({ "error": error })]);
         let endpoint = Endpoint::at("openai", "https://x");
-        let failed = create_chat_completion(&client, &endpoint, &request()).unwrap_err();
+        let failed =
+            create_chat_completion(&client, &endpoint, &request(), Map::new()).unwrap_err();
         assert_eq!(failed.data, Some(error));
     }
 
@@ -83,6 +109,6 @@ mod tests {
     fn a_response_of_another_shape_fails() {
         let client = Recording::replying(vec![Value::Null]);
         let endpoint = Endpoint::at("openai", "https://x");
-        assert!(create_chat_completion(&client, &endpoint, &request()).is_err());
+        assert!(create_chat_completion(&client, &endpoint, &request(), Map::new()).is_err());
     }
 }

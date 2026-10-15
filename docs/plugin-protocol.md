@@ -174,7 +174,7 @@ System One body to the API.
   passes, with the valid ones.
 - `model` is the part of the reference after the provider (`openrouter/qwen/qwen3-coder:free`
   sends `qwen/qwen3-coder:free`). Beside System One's body (`SystemOneRequest`) Lighthouse sends
-  `options`, the provider's `options`, for a plugin that needs them (`spec`, `baseUrl`, `keyEnv`);
+  `options`, the provider's `options`, for a plugin that needs them (`spec`, `baseUrl`, `keyEnv`, `logprobs`, `extraBody`);
   they are never part of the body a remote server gets.
 
 It answers `{model, answers: {<decision id>: {type: "noul", noul}}, usage}`: `noul` is the
@@ -599,7 +599,7 @@ Rust with a notice.
 ## `model-http`
 
 Models behind the standard HTTP APIs, as a provider in `lighthouse.toml`
-(`spec = "openai"` or a list such as `["openai", "typesafe"]`, `baseUrl`, `keyEnv`; see
+(`spec = "openai"` or a list such as `["openai", "typesafe"]`, `baseUrl`, `keyEnv`, `logprobs`, `extraBody`; see
 [rule-pipeline.md](rule-pipeline.md#models)). Each operation uses the spec that covers it:
 classification uses `typesafe` when listed, else `openai`.
 
