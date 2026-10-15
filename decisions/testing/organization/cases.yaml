@@ -1,0 +1,225 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/cases
+  uid: 4428ab36-fed5-40eb-8ed3-6dcf7c1a1a15
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: organization
+spec:
+  title: Cases are behaviors, written simply and asserted through the standard library
+  context: >-
+    A case is one behavior with its target, input, operation and expected result
+    visible (Martin, Clean Code ch. 9: clean tests, one concept per test), and
+    the same behavior over many inputs is one table, different scenarios one
+    case each, in one case style at one level, at most two levels deep. Kind
+    `manual` is the one a fact tells apart; the rest is judged: the requirement
+    and the examples are the question put to a model for each test function.
+
+    A hand-written compare-and-fail repeats what the project's assertion
+    library already states, with worse failure output.
+
+    The decision applies to a module whose files import one of the
+    `libraries` somewhere: where no assertion library is in use, a plain
+    compare-and-fail is the standard form and there is nothing to prefer. A
+    benchmark (`Benchmark*`) is not judged: its loop checks a result without
+    an assertion library's overhead.
+
+    Go: The library is `github.com/stretchr/testify/require`. A function
+    of a test file that has an `if` with no `else` whose condition
+    compares or negates and whose only effect is `t.Fatal`, `t.Fatalf`,
+    `t.Error`, `t.Errorf`, `t.Fail` or `t.FailNow` is reported with the
+    number of such checks. A check that does more than fail, such as one
+    that also returns, is not a plain assertion.
+
+    Rust: Use `assert_eq!`, `assert_ne!` and `assert!` with a message
+    instead of helpers that compare and `panic!`. Not enforced for Rust,
+    whose provider does not count hand-written checks.
+  scope:
+    domain: code
+    subject: test
+    tests: only
+  requirement: >-
+    Tests SHOULD assert through the project's standard assertion library, and a
+    test helper SHOULD NOT reimplement a comparison and failure that the library
+    already provides. A case MUST represent behavior, not a branch or
+    implementation path, and MUST contain the behavior it claims to specify.
+    Assertions outside cases SHOULD describe setup, preconditions, or test-wide
+    invariants, not case behavior. A test function MUST use either table cases
+    or scenario cases, never both, and SHOULD use one case style per level.
+    Tests MUST NOT mix different writing styles or abstraction levels at one
+    level. Test structure MUST serve the contract rather than implementation
+    shape or coverage, and MUST have at most two levels: the test function and
+    its direct cases. Same behavior over many inputs MUST use one inline table
+    of named inputs and expected outputs, each entry one case; cases that
+    specify the same behavior MUST be merged into one case or one table.
+    Different scenarios MUST use one case per scenario, named for the behavior
+    it states. Table data and generation code MUST remain simple enough to read
+    as specification. A test MUST expose the target, input, operation, and
+    expected result in the case; the target and its behavior MUST remain visible.
+    Wrappers, builders, or helpers MUST NOT hide the target call or result being
+    specified, and MUST NOT be added merely for reuse; setup helpers MAY exist
+    only when the specified behavior remains visible.
+  severity: warn
+  options:
+    type: object
+    properties:
+      kinds:
+        type: array
+        items: { type: string, enum: [manual] }
+        default: [manual]
+        description: What to report.
+      libraries:
+        type: array
+        items:
+          type: string
+        default: ["github.com/stretchr/testify"]
+        description: >-
+          Import paths (or their prefixes) of the assertion libraries; a module
+          that imports none of them is not judged.
+    additionalProperties: false
+  check:
+    type: cel
+    select: function
+    with:
+      - name: manual
+        expr: >-
+          'manual' in options.kinds && func.manual_assertions > 0
+          && !func.name.startsWith('Benchmark')
+          && func.module_imports.exists(i, options.libraries.exists(l, i == l || i.startsWith(l + '/')))
+    where: manual
+    review: "func.kind == 'test' && !func.name.startsWith('Benchmark')"
+    message: >-
+      {{ !manual ? ''
+         : (func.kind == 'test' ? 'test' : func.test_role == 'test-helper' ? 'test helper' : 'function')
+           + ' ' + func.name + ' compares and fails by hand ' + string(func.manual_assertions)
+           + " time(s); use the project's assertion library" }}
+    evidence:
+      kind: "manual ? 'manual' : ''"
+      kinds: "manual ? ['manual'] : []"
+      symbol: func.id
+      manual_assertions: func.manual_assertions
+    identity:
+      subject: func.id
+  provenance:
+    wasDerivedFrom:
+    - Meszaros, xUnit Test Patterns, Obscure Test
+    - Martin, Clean Code (2008), ch. 9 Clean tests
+    - Martin, Clean Code (2008), ch. 9 Single concept per test
+    - Martin, Clean Code (2008), ch. 9 One assert per test
+  examples:
+  - name: hand-written-comparison
+    language: go
+    kind: invalid
+    options:
+      kinds:
+      - manual
+      libraries:
+      - testing
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
+
+        go 1.26
+    - path: store.go
+      body: |-
+        package store
+
+        func Get() int { return 1 }
+    - path: store_test.go
+      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
+        TestGet(t *testing.T) {\n\tif got := store.Get(); got != 1 {\n\t\tt.Fatalf(\"got
+        %d\", got)\n\t}\n}"
+    expect:
+    - line: 9
+  - name: no-assertion-library-in-use
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
+
+        go 1.26
+    - path: store.go
+      body: |-
+        package store
+
+        func Get() int { return 1 }
+    - path: store_test.go
+      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
+        TestGet(t *testing.T) {\n\tif got := store.Get(); got != 1 {\n\t\tt.Fatalf(\"got
+        %d\", got)\n\t}\n}"
+    options:
+      kinds:
+      - manual
+  - name: benchmark-loop
+    language: go
+    kind: valid
+    options:
+      kinds:
+      - manual
+      libraries:
+      - testing
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
+
+        go 1.26
+    - path: store.go
+      body: |-
+        package store
+
+        func Get() int { return 1 }
+    - path: store_test.go
+      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
+        BenchmarkGet(b *testing.B) {\n\tfor range b.N {\n\t\tif got := store.Get();
+        got != 1 {\n\t\t\tb.Fatalf(\"got %d\", got)\n\t\t}\n\t}\n}"
+  - name: check-that-does-more
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
+
+        go 1.26
+    - path: store.go
+      body: |-
+        package store
+
+        func Get() int { return 1 }
+    - path: store_test.go
+      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
+        TestGet(t *testing.T) {\n\tgot := store.Get()\n\tif got != 1 {\n\t\tt.Errorf(\"got
+        %d\", got)\n\t\treturn\n\t}\n}"
+    options:
+      kinds:
+      - manual
+  - name: rust-assert-macros
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn get() -> i32 {
+            1
+        }
+
+        #[cfg(test)]
+        mod tests {
+            use super::*;
+
+            #[test]
+            fn get_returns_one() {
+                assert_eq!(get(), 1);
+            }
+        }
+    options:
+      kinds:
+      - manual

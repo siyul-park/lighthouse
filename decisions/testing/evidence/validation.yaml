@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: testing/validation
+  uid: 03849464-a542-4bd3-941e-f292e9b84e3d
+  labels:
+    lighthouse/pack: testing
+    lighthouse/section: evidence
+spec:
+  title: Smallest failing contract first, validated up to the contract
+  context: >-
+    Seeing the contract fail first proves the test can fail. Validation starts
+    with the smallest useful falsification and expands only as far as the
+    affected contract requires. Generated output and documentation freshness
+    are repository gates, not test-completeness rules.
+  scope:
+    domain: code
+    subject: test
+    tests: only
+  requirement: >-
+    For each behavior change, the agent MUST state the contract and invariants,
+    write the narrowest falsifying test, observe the expected failure when
+    practical, implement the smallest owning change, and run focused checks
+    followed by applicable structural and repository gates. The smallest
+    falsifying check MUST be run first. Package, race, coverage, architecture,
+    and repository checks MUST be applied when relevant; only genuinely
+    inapplicable checks MAY be skipped, and the reason MUST be stated.
+    Generated output and documentation freshness MUST be enforced as
+    repository gates, not as test-completeness rules. The repository MUST
+    build with one command and run its tests with one command, so every gate
+    above is a single step.
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), E1 Build Requires More Than One Step
+    - Martin, Clean Code (2008), E2 Tests Require More Than One Step

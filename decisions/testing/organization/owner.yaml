@@ -8,17 +8,25 @@ metadata:
     lighthouse/pack: testing
     lighthouse/section: organization
 spec:
-  title: Every public symbol has an owner test
+  title: Every public symbol has exactly one owner test
   context: >-
     A contract without an owner test has no place to read or extend its
-    specification.
+    specification, and several semantic owners split one contract across
+    places and let them contradict.
+
+    Kinds. `missing`: a public symbol that has no owner test. `duplicate`: a
+    public symbol that has two or more owner tests; keep one top-level test and
+    make the rest cases of it. Evidence `owner_tests` lists the owners.
 
     Go: The owner of a function or type is `TestName`, of a method
     `TestType_Method`. A symbol that no test names and no test code calls
     or references is reported; a type counts as tested when one of its
     members is. Only modules that have tests are judged. Types without
     methods and interfaces are not required to have one, nor are methods
-    that implement an interface method.
+    that implement an interface method. `TestGet` and `TestGet_Missing` both
+    own `Get`: the second is a case of the first, written with `t.Run`. A name
+    matches the longest symbol it starts with, so `TestStore_Get_Missing`
+    belongs to the method `Get`, not to the type `Store`.
 
     Rust: The owner of a function or type is the test named after it in
     snake case (`get`, `store`), of a method `type_method`. A public item
@@ -27,17 +35,26 @@ spec:
     count for every module of it, including public items that the crate
     root re-exports from private modules, and a method call on a value of
     unknown type counts for the public methods of that name. Methods of
-    trait impls and types without methods are not required to have one.
+    trait impls and types without methods are not required to have one. Rust
+    tests are many small functions, so names that merely extend a symbol's
+    name are not owners; two tests with exactly the name of one item (in
+    different test crates, or inline and in `tests/`) are.
   scope:
     domain: code
     subject: test
   requirement: >-
     Each public symbol SHOULD have one top-level test function, and exported
-    contracts MUST have an owning test.
+    contracts MUST have an owning test. A public symbol MUST NOT have multiple
+    semantic owner test functions.
   severity: warn
   options:
     type: object
     properties:
+      kinds:
+        type: array
+        items: { type: string, enum: [missing, duplicate] }
+        default: [missing, duplicate]
+        description: What to report.
       testPrefix:
         type: string
         default: Test
@@ -59,17 +76,18 @@ spec:
           Count the tests of a module that tests an ancestor module as tests of
           the nested module too: the integration tests of a Rust crate test all
           of it, private modules whose items the root re-exports included.
-      kinds:
+      symbols:
         type: array
         items: { type: string, enum: [function, method, type] }
         default: [function, method, type]
         description: >-
-          Kinds of public symbols that need an owner test. Interfaces are tested
-          through their implementations and are left out by default.
+          Kinds of public symbols that need an owner test (kind `missing`).
+          Interfaces are tested through their implementations and are left out
+          by default.
       includeInternal:
         type: boolean
         default: false
-        description: Also require owner tests for symbols public only inside the project.
+        description: Also judge symbols public only inside the project.
       includeDataTypes:
         type: boolean
         default: false
@@ -122,194 +140,343 @@ spec:
     with:
       - name: owner
         expr: owner(symbol)
-    where: >-
-      (symbol.kind == 'method'
-          ? (owner.kind == 'type' && exposed(owner, options.includeInternal))
-          : owner.kind == '')
-      && !symbol.implementation
-      && (options.includeDataTypes || !symbol.data_only)
-      && exposed(symbol, options.includeInternal)
-      && options.kinds.exists(k, k == symbol.kind)
-      && !(symbol.kind == 'method' && options.exemptMethods.exists(m, m == symbol.name))
-      && symbol.module_tested
-      && size(tests(symbol)) == 0 && !symbol.touched_by_tests
-    message: "public {{ symbol.kind }} {{ symbol.name }} has no owner test; add one top-level test for it"
+      - name: owners
+        expr: tests(symbol)
+      - name: missing
+        expr: >-
+          'missing' in options.kinds
+          && (symbol.kind == 'method'
+              ? (owner.kind == 'type' && exposed(owner, options.includeInternal))
+              : owner.kind == '')
+          && !symbol.implementation
+          && (options.includeDataTypes || !symbol.data_only)
+          && exposed(symbol, options.includeInternal)
+          && options.symbols.exists(k, k == symbol.kind)
+          && !(symbol.kind == 'method' && options.exemptMethods.exists(m, m == symbol.name))
+          && symbol.module_tested
+          && size(owners) == 0 && !symbol.touched_by_tests
+      - name: duplicate
+        expr: >-
+          'duplicate' in options.kinds
+          && exposed(symbol, options.includeInternal)
+          && (symbol.kind == 'function' || symbol.kind == 'method'
+              || symbol.kind == 'type' || symbol.kind == 'interface')
+          && size(owners) >= 2
+    where: missing || duplicate
+    message: >-
+      {{ missing
+         ? 'public ' + symbol.kind + ' ' + symbol.name + ' has no owner test; add one top-level test for it'
+         : 'public ' + symbol.kind + ' ' + symbol.name + ' has ' + string(size(owners))
+           + ' owner tests; keep one top-level test and make the rest cases of it' }}
     evidence:
+      kind: "missing ? 'missing' : 'duplicate'"
+      kinds: "(missing ? ['missing'] : []) + (duplicate ? ['duplicate'] : [])"
       symbol: symbol.id
+      owner_tests: owners.map(t, t.symbol)
     identity:
       subject: symbol.id
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), T1 Insufficient Tests
+    - Martin, Clean Code (2008), T3 Don't Skip Trivial Tests
   examples:
-    - name: invalid
-      language: go
-      kind: invalid
-      files:
-        - path: go.mod
-          body: |-
-            module example.com/store
+  - name: missing-invalid
+    language: go
+    kind: invalid
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
 
-            go 1.26
-        - path: store.go
-          body: |-
-            package store
+        go 1.26
+    - path: store.go
+      body: |-
+        package store
 
-            func Get() int { return 1 }
+        func Get() int { return 1 }
 
-            func Put() int { return 2 }
-        - path: store_test.go
-          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc TestGet(t *testing.T) {\n\tif store.Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}"
-      expect:
-        - line: 5
-    - name: valid
-      language: go
-      kind: valid
-      files:
-        - path: go.mod
-          body: |-
-            module example.com/store
+        func Put() int { return 2 }
+    - path: store_test.go
+      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
+        TestGet(t *testing.T) {\n\tif store.Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}"
+    expect:
+    - line: 5
+    options:
+      kinds:
+      - missing
+  - name: missing-valid
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
 
-            go 1.26
-        - path: store.go
-          body: |-
-            package store
+        go 1.26
+    - path: store.go
+      body: |-
+        package store
 
-            func Get() int { return 1 }
+        func Get() int { return 1 }
 
-            func Put() int { return 2 }
-        - path: store_test.go
-          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc TestGet(t *testing.T) {\n\tif store.Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}\n\nfunc TestPutFlow(t *testing.T) {\n\tif store.Put() != 2 {\n\t\tt.Fatal(\"put\")\n\t}\n}"
-    - name: no-tests-at-all
-      language: go
-      kind: valid
-      canonical: true
-      files:
-        - path: store.go
-          body: |-
-            package store
+        func Put() int { return 2 }
+    - path: store_test.go
+      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
+        TestGet(t *testing.T) {\n\tif store.Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}\n\nfunc
+        TestPutFlow(t *testing.T) {\n\tif store.Put() != 2 {\n\t\tt.Fatal(\"put\")\n\t}\n}"
+    options:
+      kinds:
+      - missing
+  - name: missing-no-tests-at-all
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: store.go
+      body: |-
+        package store
 
-            func Get() int { return 1 }
-    - name: rust-invalid
-      language: rust
-      kind: invalid
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub fn get() -> u8 {
-                1
-            }
+        func Get() int { return 1 }
+    options:
+      kinds:
+      - missing
+  - name: missing-rust-invalid
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn get() -> u8 {
+            1
+        }
 
-            pub fn put() -> u8 {
-                2
-            }
-        - path: tests/store.rs
-          body: |-
-            #[test]
-            fn get() {
-                assert_eq!(workspace::get(), 1);
-            }
-      expect:
-        - line: 5
-    - name: rust-valid
-      language: rust
-      kind: valid
-      canonical: true
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub fn get() -> u8 {
-                1
-            }
-        - path: tests/store.rs
-          body: |-
-            #[test]
-            fn get() {
-                assert_eq!(workspace::get(), 1);
-            }
-    - name: rust-submodule-invalid
-      language: rust
-      kind: invalid
-      files:
-        - path: src/lib.rs
-          body: |-
-            mod shapes;
+        pub fn put() -> u8 {
+            2
+        }
+    - path: tests/store.rs
+      body: |-
+        #[test]
+        fn get() {
+            assert_eq!(workspace::get(), 1);
+        }
+    expect:
+    - line: 5
+    options:
+      kinds:
+      - missing
+  - name: missing-rust-valid
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn get() -> u8 {
+            1
+        }
+    - path: tests/store.rs
+      body: |-
+        #[test]
+        fn get() {
+            assert_eq!(workspace::get(), 1);
+        }
+    options:
+      kinds:
+      - missing
+  - name: missing-rust-submodule-invalid
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        mod shapes;
 
-            pub use shapes::{area, perimeter};
-        - path: src/shapes.rs
-          body: |-
-            pub fn area() -> u8 {
-                1
-            }
+        pub use shapes::{area, perimeter};
+    - path: src/shapes.rs
+      body: |-
+        pub fn area() -> u8 {
+            1
+        }
 
-            pub fn perimeter() -> u8 {
-                4
-            }
-        - path: tests/shapes.rs
-          body: |-
-            #[test]
-            fn area() {
-                assert_eq!(workspace::area(), 1);
-            }
-      expect:
-        - line: 5
-    - name: rust-reexport-from-private-module
-      language: rust
-      kind: valid
-      files:
-        - path: src/lib.rs
-          body: |-
-            mod shapes;
+        pub fn perimeter() -> u8 {
+            4
+        }
+    - path: tests/shapes.rs
+      body: |-
+        #[test]
+        fn area() {
+            assert_eq!(workspace::area(), 1);
+        }
+    expect:
+    - line: 5
+    options:
+      kinds:
+      - missing
+  - name: missing-rust-reexport-from-private-module
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        mod shapes;
 
-            pub use shapes::area;
-        - path: src/shapes.rs
-          body: |-
-            pub fn area() -> u8 {
-                1
-            }
-        - path: tests/shapes.rs
-          body: |-
-            #[test]
-            fn area() {
-                assert_eq!(workspace::area(), 1);
-            }
-    - name: rust-method-on-unknown-receiver
-      language: rust
-      kind: valid
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub struct Registry;
+        pub use shapes::area;
+    - path: src/shapes.rs
+      body: |-
+        pub fn area() -> u8 {
+            1
+        }
+    - path: tests/shapes.rs
+      body: |-
+        #[test]
+        fn area() {
+            assert_eq!(workspace::area(), 1);
+        }
+    options:
+      kinds:
+      - missing
+  - name: missing-rust-method-on-unknown-receiver
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Registry;
 
-            impl Registry {
-                pub fn register(&self) {}
-            }
+        impl Registry {
+            pub fn register(&self) {}
+        }
 
-            pub fn get() -> u8 {
-                1
-            }
-        - path: tests/registry.rs
-          body: |-
-            #[test]
-            fn get() {
-                assert_eq!(workspace::get(), 1);
-                let registry = unknown::build();
-                registry.register();
-            }
-    - name: go-interface-implementation
-      language: go
-      kind: valid
-      files:
-        - path: go.mod
-          body: |-
-            module example.com/store
+        pub fn get() -> u8 {
+            1
+        }
+    - path: tests/registry.rs
+      body: |-
+        #[test]
+        fn get() {
+            assert_eq!(workspace::get(), 1);
+            let registry = unknown::build();
+            registry.register();
+        }
+    options:
+      kinds:
+      - missing
+  - name: missing-go-interface-implementation
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
 
-            go 1.26
-        - path: store.go
-          body: |-
-            package store
+        go 1.26
+    - path: store.go
+      body: |-
+        package store
 
-            type getter interface{ Get() int }
+        type getter interface{ Get() int }
 
-            type Store struct{}
+        type Store struct{}
 
-            func (Store) Get() int { return 1 }
-        - path: store_test.go
-          body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc TestStore(t *testing.T) {\n\tif (store.Store{}) != (store.Store{}) {\n\t\tt.Fatal(\"store\")\n\t}\n}"
+        func (Store) Get() int { return 1 }
+    - path: store_test.go
+      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
+        TestStore(t *testing.T) {\n\tif (store.Store{}) != (store.Store{}) {\n\t\tt.Fatal(\"store\")\n\t}\n}"
+    options:
+      kinds:
+      - missing
+  - name: duplicate-invalid
+    language: go
+    kind: invalid
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
+
+        go 1.26
+    - path: store.go
+      body: |-
+        package store
+
+        func Get() int { return 1 }
+    - path: store_test.go
+      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
+        TestGet(t *testing.T) {\n\tif store.Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}\n\nfunc
+        TestGet_Missing(t *testing.T) {\n\tif store.Get() != 1 {\n\t\tt.Fatal(\"missing\")\n\t}\n}"
+    expect:
+    - line: 3
+    options:
+      kinds:
+      - duplicate
+  - name: duplicate-valid
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |-
+        module example.com/store
+
+        go 1.26
+    - path: store.go
+      body: |-
+        package store
+
+        type Store struct{}
+
+        func (s *Store) Get() int { return 1 }
+    - path: store_test.go
+      body: "package store_test\n\nimport (\n\t\"testing\"\n\n\t\"example.com/store\"\n)\n\nfunc
+        TestStore(t *testing.T) {\n\ts := &store.Store{}\n\t_ = s\n}\n\nfunc TestStore_Get(t
+        *testing.T) {\n\ts := &store.Store{}\n\tif s.Get() != 1 {\n\t\tt.Fatal(\"get\")\n\t}\n}"
+    options:
+      kinds:
+      - duplicate
+  - name: duplicate-rust-invalid
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn get() -> u8 {
+            1
+        }
+    - path: tests/first.rs
+      body: |-
+        #[test]
+        fn get() {
+            assert_eq!(workspace::get(), 1);
+        }
+    - path: tests/second.rs
+      body: |-
+        #[test]
+        fn get() {
+            assert_eq!(workspace::get(), 1);
+        }
+    expect:
+    - line: 1
+    options:
+      kinds:
+      - duplicate
+  - name: duplicate-rust-valid
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub fn get() -> u8 {
+            1
+        }
+    - path: tests/store.rs
+      body: |-
+        #[test]
+        fn get() {
+            assert_eq!(workspace::get(), 1);
+        }
+
+        #[test]
+        fn get_is_stable() {
+            assert_eq!(workspace::get(), workspace::get());
+        }
+    options:
+      kinds:
+      - duplicate

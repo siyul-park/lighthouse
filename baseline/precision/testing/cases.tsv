@@ -1,6 +1,15 @@
-# retained: yes
-# R4: all 13 findings after the refinements
+# retained: yes (testing/no-hidden-target)
+# R4 review before the creation-helper fix; unclear counts as not TP (testing/no-hidden-target)
+# retained: yes (testing/standard-assertions)
+# R4: all 13 findings after the refinements (testing/standard-assertions)
 fingerprint	repo	location	verdict	reason
+81173f7df152c8e6406eb4b8bd2d45ad212a654c2e87990aee27499871b8c313	cel	ext/native_test.go:283	FP	testNativeEnv builds a *cel.Env with NativeTypes() as an option; asserts nothing
+62131c98944677d028ebd3577b5b710346081e282bf43baffcf465a9e30098fe	cel	ext/sets_test.go:282	FP	testSetsEnv (sets_test.go:478) returns an Env built with Sets(); the case calls env.Parse/Check/eval
+f6c95ab2cddfa0b6d9e4d76d6678bfc22b1716cfcbc32a5648f3869831fb3a5f	cel	ext/regex_test.go:94	FP	testRegexEnv (regex_test.go:264) is an Env builder
+f809a8742cd7c0f205d2db576841e5a500cddc8d6e69d5387e7c11362340256b	cel	ext/math_test.go:196	FP	testMathEnv Env builder
+950a9cf877946b49470e92065e55b21b34eb9d7d5627e2a51259557456abdbd1	cel	ext/comprehensions_test.go:185	FP	testCompreEnv Env builder
+7db8673ef2187ebb6ad980a22663e0c9ef25918c7d0c1e64224244779341fd93	cel	ext/protos_test.go:62	FP	testProtosEnv Env builder
+80f408102a53935788591523e731186696cb057d7956a738b6f9e8f752dca34e	cel	ext/lists_test.go:79	FP	testListsEnv Env builder
 ecb264ba7003cffc2e813976932f9c2da2ce1854b1d0bd497c217f61c33bcaed	qlbridge	datasource/files/filesource_test.go:99	TP	a hand-written compare-and-fail in a module that uses the assertion library
 d84f581e305d00ff2a4410351d2d8a0008bc3f3e1848da6dba2304643521e9d4	qlbridge	datasource/files/json_test.go:87	TP	mixed with assert
 b9e96008deb891de4f4a8a25080be52b6136d5059aeca1b8d6549bb6f6f75a18	qlbridge	exec/sqldriver_test.go:32	TP	mixed with assert

@@ -80,6 +80,10 @@ spec:
         when: "finding.evidence.role == 'test-helper'"
         node: finding.evidence.symbol
         after: finding.evidence.after
+  provenance:
+    wasDerivedFrom:
+      - "Martin, Clean Code (2008), ch. 5 Vertical size and ordering"
+      - "Martin, Clean Code (2008), G24 Follow Standard Conventions"
   examples:
     - name: fixture-after-test
       language: go
