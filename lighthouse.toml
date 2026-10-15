@@ -22,11 +22,9 @@ formatter = { argv = ["gofmt"], stdin = "file", output = "text" }
 formatter = { argv = ["rustfmt", "--edition", "2024", "--emit", "stdout"], stdin = "file", output = "text" }
 
 [spec.rules]
-"core/max-lines" = { level = "warn", options = { max = 1000 } }
+"core/file-size" = { level = "warn", options = { max = 1000 } }
 # Four words: the visitor methods of syn and the field names of SARIF are not ours to rename.
-"design/max-name-words" = { level = "warn", options = { max = 4 } }
-"design/feature-envy" = "info"
-"design/misplaced-symbol" = "info"
+"design/naming" = { level = "warn", options = { kinds = ["qualifier", "words"], maxWords = 4 } }
 
 # The workspace layers, top down: a crate imports crates of the layers below
 # it and never a peer of its own layer. The crate labels of binaries carry
@@ -49,12 +47,12 @@ options.layers = [
 # project's own design.
 [[spec.overrides]]
 files = ["crates/lighthouse-rpc/tests/conformance/**"]
-rules = { "core/max-lines" = "off", "design/complexity" = "off", "design/coupling" = "off", "design/exported-doc" = "off", "design/no-single-use-wrapper" = "off", "design/declaration-groups" = "off", "design/contiguity" = "off", "design/callers-before-callees" = "off", "design/no-banners" = "off", "design/no-redundant-qualifiers" = "off", "design/no-mutable-globals" = "off", "testing/external-package" = "off", "testing/owner" = "off", "testing/unique-owner" = "off" }
+rules = { "core/file-size" = "off", "design/complexity" = { level = "warn", options = { kinds = ["lines", "statements", "cognitive", "nesting"] } }, "design/exported-doc" = "off", "design/symbols" = "off", "design/declaration-groups" = "off", "design/layout" = "off", "design/comments" = "off", "design/naming" = "off", "design/ownership" = "off", "testing/public-boundary" = "off", "testing/owner" = "off" }
 
 [[spec.overrides]]
 files = ["docs/decisions/**", "schema/**", "protocol/schema/**"]
-rules = { "core/max-lines" = "off" }
+rules = { "core/file-size" = "off" }
 
 [[spec.overrides]]
 files = ["**/*.lock"]
-rules = { "core/max-lines" = "off" }
+rules = { "core/file-size" = "off" }

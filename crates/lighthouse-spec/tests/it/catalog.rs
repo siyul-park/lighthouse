@@ -25,7 +25,7 @@ fn a_finding_asks_for_review_unless_its_decision_authored_an_error_or_a_judgment
         assert_eq!(authored.needs_review(false), asks, "{authored}");
         assert!(!authored.needs_review(true), "{authored} judged");
     }
-    let warn = bundled("design/no-panic");
+    let warn = bundled("design/errors");
     assert!(authored_severity(Severity::Error, Some(warn)).needs_review(false));
     let definitive = bundled("design/declaration-groups");
     assert!(!authored_severity(Severity::Warn, Some(definitive)).needs_review(false));
@@ -33,7 +33,7 @@ fn a_finding_asks_for_review_unless_its_decision_authored_an_error_or_a_judgment
 
 #[test]
 fn decision_severity() {
-    let mut decision = bundled("design/error-identity").clone();
+    let mut decision = bundled("design/errors").clone();
     assert_eq!(decision.severity(), Some(Severity::Warn));
     decision = decision.map_spec(|spec| lighthouse_spec::DecisionSpec {
         severity: Some(Severity::Error),
@@ -75,7 +75,7 @@ fn subject_run_scope() {
 
 #[test]
 fn decision_resolve_options() {
-    let decision = bundled("core/max-lines").clone().map_spec(|mut spec| {
+    let decision = bundled("core/file-size").clone().map_spec(|mut spec| {
         spec.languages
             .entry("go".to_owned())
             .or_default()
@@ -148,10 +148,10 @@ fn shape() {
 
 #[test]
 fn example_file_text() {
-    let files = &bundled("design/error-identity").examples[0].files;
+    let files = &bundled("design/errors").examples[0].files;
     assert!(matches!(files[0].content, Content::File(_)));
     assert!(files[0].text().contains("fmt.Errorf"));
-    let inline = &bundled("design/no-single-use-wrapper").examples[0].files[0];
+    let inline = &bundled("design/symbols").examples[0].files[0];
     assert!(matches!(inline.content, Content::Inline(_)));
     assert_eq!(ExampleFile::inline("a.go", "package a").text(), "package a");
 }
@@ -332,10 +332,10 @@ mod overlay {
 
 #[test]
 fn the_authored_severity_follows_the_decision_else_what_was_reported() {
-    let warn = bundled("design/no-panic");
+    let warn = bundled("design/errors");
     assert_eq!(
         authored_severity(Severity::Error, Some(warn)),
-        Severity::Info
+        Severity::Warn
     );
     assert_eq!(authored_severity(Severity::Error, None), Severity::Error);
     assert_eq!(authored_severity(Severity::Warn, None), Severity::Warn);
@@ -415,19 +415,24 @@ fn write_local_refuses_names_and_targets_that_leave_the_directory() {
 
 #[test]
 fn decision_strict() {
-    assert!(bundled("design/no-panic").strict());
+    let labelled = decision("local/x", "rules", SPEC).replace(
+        "    lighthouse/section: rules\n",
+        "    lighthouse/section: rules\n    lighthouse/preset: strict\n",
+    );
+    let catalog = Catalog::from_local(files(&[("x.yaml", labelled)])).unwrap();
+    assert!(catalog.decision("local/x").unwrap().strict());
     assert!(!bundled("design/exported-doc").strict());
 }
 
 #[test]
 fn scope_applicability() {
-    let scope = bundled("testing/external-package").scope;
+    let scope = bundled("testing/public-boundary").scope;
     assert_eq!(
         scope.applicability().tests,
         lighthouse_model::TestScope::Only
     );
     assert!(!scope.applicability().generated);
-    let all = bundled("core/max-lines").scope.applicability();
+    let all = bundled("core/file-size").scope.applicability();
     assert!(all.generated);
     assert_eq!(all.tests, lighthouse_model::TestScope::Include);
 }
@@ -443,34 +448,31 @@ fn a_document_without_an_envelope_is_a_document_error() {
 
 #[test]
 fn with_uid_gives_a_decision_the_identity_it_keeps_across_renames() {
-    let decision = bundled("core/allow-annotation").clone();
+    let decision = bundled("core/allow").clone();
     let uid = "5d6b1c1e-2b0e-4a43-9a3e-0f1b6f5d2a11";
     assert_eq!(decision.with_uid(uid).uid(), Some(uid));
 }
 
 #[test]
 fn an_object_limit_merges_over_the_default_and_the_language() {
-    let decision = bundled("design/max-params");
+    let decision = bundled("design/signature");
     let none = Map::new();
-    let go = decision.resolve_options(&none, Some("go")).unwrap();
-    assert_eq!(go["max"]["default"], 8);
-    assert_eq!(go["max"]["constructor"], 9);
-    assert_eq!(go["max"]["test"], -1);
-    let rust = decision.resolve_options(&none, Some("rust")).unwrap();
-    assert_eq!(rust["max"]["default"], 7);
-    assert_eq!(rust["max"]["constructor"], 8);
-    assert_eq!(rust["max"]["entrypoint"], -1, "kept from the default");
+    let params = |options: &Map<String, serde_json::Value>, language| {
+        decision.resolve_options(options, language).unwrap()["limits"]["params"].clone()
+    };
+    let go = params(&none, Some("go"));
+    assert_eq!(go["default"], 8);
+    assert_eq!(go["constructor"], 9);
+    assert_eq!(go["test"], -1);
+    let rust = params(&none, Some("rust"));
+    assert_eq!(rust["default"], 7);
+    assert_eq!(rust["constructor"], 8);
+    assert_eq!(rust["entrypoint"], -1);
 
-    let partial = Map::from_iter([("max".to_owned(), json!({ "default": 5 }))]);
-    let merged = decision.resolve_options(&partial, Some("rust")).unwrap();
-    assert_eq!(merged["max"]["default"], 5);
-    assert_eq!(merged["max"]["constructor"], 8, "the language's role stays");
-
-    let whole = Map::from_iter([("max".to_owned(), json!(3))]);
-    let single = decision.resolve_options(&whole, None).unwrap();
-    assert_eq!(single["max"], 3, "an integer replaces the object");
-    let off = Map::from_iter([("max".to_owned(), json!(-1))]);
-    assert_eq!(decision.resolve_options(&off, None).unwrap()["max"], -1);
+    let whole = Map::from_iter([("limits".to_owned(), json!({ "params": 3 }))]);
+    assert_eq!(params(&whole, None), 3, "an integer replaces the object");
+    let off = Map::from_iter([("limits".to_owned(), json!({ "params": -1 }))]);
+    assert_eq!(params(&off, None), -1);
 }
 
 #[test]

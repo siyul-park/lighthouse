@@ -24,7 +24,7 @@ argv = ["claude", "-p", "--model", "{model}"]
 stdin = "prompt"
 pointer = "/result"
 
-[rules."design/feature-envy"]
+[rules."design/prefer-method"]
 level = "warn"
 model = "claude/sonnet"
 evaluation = { precision = 0.95, recall = 0.8 }
@@ -51,7 +51,7 @@ fn the_project_binds_models_by_reference_and_limits_what_they_cost() {
         binding.classification.as_deref(),
         Some("openrouter/qwen/qwen3-coder:free")
     );
-    assert_eq!(binding.rules["design/feature-envy"], "claude/sonnet");
+    assert_eq!(binding.rules["design/prefer-method"], "claude/sonnet");
     assert_eq!(binding.budget, 50);
     let ids: Vec<_> = binding.ids().collect();
     assert_eq!(ids, ["openrouter/qwen/qwen3-coder:free", "claude/sonnet"]);
@@ -88,7 +88,7 @@ fn a_provider_naming_an_unknown_spec_is_invalid() {
 #[test]
 fn the_evaluation_policy_of_a_rule_defaults_to_nine_tenths_and_tolerating_misses() {
     let binding = binding();
-    let policy = binding.policy("design/feature-envy");
+    let policy = binding.policy("design/prefer-method");
     assert_eq!((policy.precision, policy.recall), (0.95, Some(0.8)));
     assert_eq!(binding.policy("other/rule"), Evaluation::default());
     assert_eq!(Evaluation::default().precision, 0.9);

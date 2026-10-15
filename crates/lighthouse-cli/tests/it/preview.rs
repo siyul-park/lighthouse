@@ -158,14 +158,14 @@ fn a_delete_fix_replaces_a_region_with_nothing() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|r| r["ruleId"] == "design/no-banners")
+        .find(|r| r["ruleId"] == "design/comments")
         .unwrap_or_else(|| panic!("{sarif}"));
     let replacement = &banner["fixes"][0]["artifactChanges"][0]["replacements"][0];
     assert_eq!(replacement["insertedContent"]["text"], "");
     assert_eq!(replacement["deletedRegion"]["startLine"], 1);
 
     let compact = report(&dir, &[]);
-    let group = group(&compact, "design/no-banners");
+    let group = group(&compact, "design/comments");
     assert_eq!(instance(&group)[3]["fix"]["safety"], "suggested", "{group}");
     assert!(
         group["apply"]

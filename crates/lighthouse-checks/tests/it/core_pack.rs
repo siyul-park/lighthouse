@@ -48,7 +48,7 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
         models: &lighthouse_plugin::NoModels,
     };
     registry
-        .rule("core/max-lines")
+        .rule("core/file-size")
         .unwrap()
         .check(&ctx, options)
 }
@@ -58,7 +58,7 @@ fn registry_is_valid_and_exposes_core() {
     let registry = lighthouse_checks::registry();
     registry.validate().unwrap();
     assert!(registry.has_plugin("core"));
-    let meta = registry.rule("core/max-lines").unwrap().manifest();
+    let meta = registry.rule("core/file-size").unwrap().manifest();
     assert_eq!(meta.scope, RunScope::File);
     assert!(
         meta.analyzers.is_empty(),
@@ -69,12 +69,11 @@ fn registry_is_valid_and_exposes_core() {
 #[test]
 fn a_rule_exists_for_a_decision_a_program_checks() {
     let registry = lighthouse_checks::registry();
-    let meta = registry.rule("core/max-lines").unwrap().manifest();
-    assert_eq!(meta.id, "core/max-lines");
+    let meta = registry.rule("core/file-size").unwrap().manifest();
+    assert_eq!(meta.id, "core/file-size");
     assert_eq!(meta.severity, Severity::Warn);
     assert_eq!(meta.scope, RunScope::File);
-    assert!(registry.rule("design/advisory-signals").is_none());
-    for annotation in ["core/allow-reason", "core/no-unused-allow"] {
+    for annotation in ["core/allow", "core/no-unused-allow"] {
         assert!(registry.rule(annotation).is_some(), "{annotation}");
     }
 }
@@ -90,7 +89,7 @@ fn recommended_preset_derives_levels_from_rule_meta() {
         .collect();
     let got: BTreeMap<_, _> = preset.iter().map(|(id, c)| (id.clone(), c.level)).collect();
     assert_eq!(got, want);
-    assert_eq!(want["core/max-lines"], Some(Severity::Warn));
+    assert_eq!(want["core/file-size"], Some(Severity::Warn));
 }
 
 #[test]
@@ -122,14 +121,17 @@ fn rule_reports_lines_beyond_the_limit() {
     let found = run_rule("a\nb\nc\n", &options(2)).unwrap();
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].span.start.line, 3);
-    assert_eq!(found[0].evidence, json!({ "lines": 3, "max": 2 }));
+    assert_eq!(
+        found[0].evidence,
+        json!({ "kind": "lines", "kinds": ["lines"], "lines": 3, "max": 2 })
+    );
     assert!(run_rule("a\nb\n", &options(2)).unwrap().is_empty());
 }
 
 #[test]
 fn rule_validates_options() {
     let registry = lighthouse_checks::registry();
-    let rule = registry.rule("core/max-lines").unwrap();
+    let rule = registry.rule("core/file-size").unwrap();
     rule.validate(&Options::new()).unwrap();
     rule.validate(&options(5)).unwrap();
     let bad: Options = serde_json::from_value(json!({ "mx": 5 })).unwrap();
@@ -236,12 +238,7 @@ fn the_bundled_fixes_say_what_each_rule_needs_to_be_fixed() {
     for id in ["design/declaration-groups", "testing/file-layout"] {
         assert_eq!(safety(id).as_deref(), Some("safe"), "{id}");
     }
-    for id in [
-        "design/contiguity",
-        "design/callers-before-callees",
-        "design/no-banners",
-        "core/no-unused-allow",
-    ] {
+    for id in ["design/layout", "design/comments", "core/no-unused-allow"] {
         assert_eq!(safety(id).as_deref(), Some("suggested"), "{id}");
     }
 }
@@ -275,70 +272,20 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
     assert_eq!(
         design,
         [
-            "design/adjacent-siblings",
-            "design/boundary-splits",
-            "design/callers-before-callees",
-            "design/clones",
-            "design/cognitive-complexity",
-            "design/coherent-responsibility",
+            "design/comments",
             "design/complexity",
-            "design/consumer-interfaces",
-            "design/context-first",
-            "design/contiguity",
-            "design/coupling",
+            "design/concurrency",
+            "design/constructors",
             "design/declaration-groups",
-            "design/encapsulated-state",
-            "design/error-categories",
-            "design/error-identity",
-            "design/error-translation",
-            "design/explicit-shutdown",
+            "design/errors",
             "design/exported-doc",
-            "design/factual-comments",
-            "design/feature-envy",
-            "design/general-extraction",
-            "design/general-lower-levels",
-            "design/justified-helpers",
-            "design/justified-symbols",
             "design/layers",
             "design/layout",
-            "design/max-depth",
-            "design/max-lines-per-function",
-            "design/max-name-words",
-            "design/max-params",
-            "design/max-results",
-            "design/max-statements",
-            "design/minimal-names",
-            "design/misplaced-symbol",
-            "design/narrow-inputs",
-            "design/no-banners",
-            "design/no-exposed-state",
-            "design/no-forced-reuse",
-            "design/no-generated-edits",
-            "design/no-mutable-globals",
-            "design/no-narration",
-            "design/no-overlapping-symbols",
-            "design/no-panic",
-            "design/no-private-types",
-            "design/no-redundant-qualifiers",
-            "design/no-single-use-wrapper",
-            "design/no-speculative-api",
-            "design/no-state-in-errors",
-            "design/no-stored-context",
-            "design/optional-options",
-            "design/owner-file",
-            "design/plural-collections",
-            "design/predicate-names",
+            "design/naming",
+            "design/ownership",
             "design/prefer-method",
-            "design/reserved-verbs",
-            "design/resource-owner",
-            "design/scoped-borrows",
-            "design/short-names",
-            "design/single-abstraction-level",
-            "design/standard-abbreviations",
-            "design/state-owner",
-            "design/stateless-layout",
-            "design/top-down-order",
-            "design/validated-constructors",
+            "design/signature",
+            "design/symbols",
         ]
     );
     let design: Vec<_> = design
@@ -350,16 +297,12 @@ fn bundled_plugins_provide_only_the_fallback_text_language() {
         })
         .collect();
     let recommended = preset("design/recommended");
-    assert_eq!(recommended.len(), design.len() - 4);
-    for strict in [
-        "design/max-name-words",
-        "design/feature-envy",
-        "design/misplaced-symbol",
-        "design/no-panic",
-    ] {
-        assert!(!recommended.contains_key(strict), "{strict}");
-    }
+    assert_eq!(recommended.len(), design.len());
     assert!(recommended.contains_key("design/layers"));
-    assert_eq!(preset("design/strict").len(), design.len());
-    assert_eq!(preset("testing/recommended").len(), 6);
+    assert!(recommended["design/naming"].options.is_empty());
+    assert_eq!(
+        preset("design/strict")["design/naming"].options["kinds"],
+        json!(["qualifier", "words"])
+    );
+    assert_eq!(preset("testing/recommended").len(), 4);
 }

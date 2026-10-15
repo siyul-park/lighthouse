@@ -9,7 +9,7 @@ use lighthouse_plugin::Subject;
 use lighthouse_spec::Catalog;
 use serde_json::json;
 
-const RULE: &str = "core/max-lines";
+const RULE: &str = "core/file-size";
 
 fn request() -> TrainRequest {
     TrainRequest {

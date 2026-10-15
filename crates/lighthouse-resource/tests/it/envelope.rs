@@ -170,5 +170,5 @@ fn is_uid_accepts_only_the_canonical_lowercase_v4_form() {
     assert!(!lighthouse_resource::is_uid(
         "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
     ));
-    assert!(!lighthouse_resource::is_uid("core/max-lines"));
+    assert!(!lighthouse_resource::is_uid("core/file-size"));
 }

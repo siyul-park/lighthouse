@@ -69,11 +69,11 @@ fn a_cel_check_reads_its_select_where_message_and_evidence() {
 #[test]
 fn the_short_name_of_a_decision_is_its_name_inside_the_pack() {
     let decision = lighthouse_spec::Catalog::bundled()
-        .decision("design/minimal-names")
+        .decision("design/naming")
         .unwrap();
 
-    assert_eq!(decision.short_name(), "minimal-names");
-    assert_eq!(decision.id(), "design/minimal-names");
+    assert_eq!(decision.short_name(), "naming");
+    assert_eq!(decision.id(), "design/naming");
     let id: &str = Decision::id(decision);
     assert!(id.starts_with(decision.pack()));
 }

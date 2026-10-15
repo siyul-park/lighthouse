@@ -11,23 +11,29 @@ use lighthouse_model::{EdgeKind, SymbolKind};
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 
-const EXAMPLES: &str = "  examples:
-    - name: bad
-      language: text
-      kind: invalid
-      files: [{ path: a.txt, body: x }]
-      expect: [{ line: 1 }]
-    - name: good
-      language: text
-      kind: valid
-      files: [{ path: a.txt, body: x }]
-";
+const EXAMPLES_JSON: &str = r#"[{"name":"bad","language":"text","kind":"invalid","files":[{"path":"a.txt","body":"x"}],"expect":[{"line":1}]},{"name":"good","language":"text","kind":"valid","files":[{"path":"a.txt","body":"x"}]}]"#;
 
-/// What the model decision `id` selects in `world`, sorted: the names of its
-/// subjects (`symbol.name`, or `module.path` for a module decision).
-fn selected(world: &World, id: &str, subject: &str) -> Vec<String> {
-    let bundled = Catalog::bundled().decision(id).expect("a bundled decision");
-    let spec: Value = serde_json::to_value(bundled.spec()).unwrap();
+const LOCAL_HEAD: &str = "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/select\n  labels:\n    lighthouse/pack: local\n    lighthouse/section: rules\nspec: ";
+
+/// The decision `spec` whose `where` is the `review` route of its cel check:
+/// what the check puts to a model.
+fn reviewed(mut spec: Value) -> String {
+    let review = spec["check"]["review"].take();
+    spec["check"]["where"] = review;
+    spec["check"].as_object_mut().unwrap().remove("review");
+    let name = if spec["check"]["select"] == "function" {
+        "func.name"
+    } else {
+        "symbol.name"
+    };
+    spec["check"]["message"] = json!(format!("{{{{ {name} }}}}"));
+    spec["examples"] = serde_json::from_str(EXAMPLES_JSON).unwrap();
+    spec.as_object_mut().unwrap().remove("fix");
+    format!("{}{}", LOCAL_HEAD, serde_json::to_string(&spec).unwrap())
+}
+
+/// The model decision `id` whose `select` is the `where` of a cel check.
+fn selecting(spec: &Value, id: &str, subject: &str) -> String {
     let select = spec["check"]["select"]
         .as_str()
         .unwrap_or_else(|| panic!("{id} has a select"));
@@ -36,10 +42,22 @@ fn selected(world: &World, id: &str, subject: &str) -> Vec<String> {
     } else {
         "symbol.name"
     };
-    let text = format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/select\n  labels:\n    lighthouse/pack: local\n    lighthouse/section: rules\nspec:\n  title: Select\n  context: A select.\n  scope: {{ subject: {subject} }}\n  requirement: A select MUST hold.\n  severity: warn\n  check:\n    type: cel\n    where: {}\n    message: \"{{{{ {name} }}}}\"\n{EXAMPLES}",
+    format!(
+        "{LOCAL_HEAD}{{\"title\":\"Select\",\"context\":\"A select.\",\"scope\":{{\"subject\":\"{subject}\"}},\"requirement\":\"A select MUST hold.\",\"severity\":\"warn\",\"check\":{{\"type\":\"cel\",\"where\":{},\"message\":\"{{{{ {name} }}}}\"}},\"examples\":{EXAMPLES_JSON}}}",
         serde_json::to_string(select).unwrap()
-    );
+    )
+}
+
+/// What the model decision `id` selects in `world`, sorted: the names of its
+/// subjects (`symbol.name`, or `module.path` for a module decision).
+fn selected(world: &World, id: &str, subject: &str) -> Vec<String> {
+    let bundled = Catalog::bundled().decision(id).expect("a bundled decision");
+    let spec: Value = serde_json::to_value(bundled.spec()).unwrap();
+    let text = if spec["check"]["type"] == "cel" {
+        reviewed(spec)
+    } else {
+        selecting(&spec, id, subject)
+    };
     let catalog = Catalog::from_local(BTreeMap::from([("select.yaml".to_owned(), text)])).unwrap();
     let plugin = Declarative::from_catalog("local", &catalog).unwrap();
     let mut found: Vec<String> = world
@@ -76,22 +94,15 @@ fn justified_helpers_asks_about_a_private_function_with_one_production_caller() 
         .unwrap()
         .clone();
     w.edge(EdgeKind::Calls, &other, &shared);
-    assert_eq!(
-        selected(&w, "design/justified-helpers", "symbol"),
-        ["helper"]
-    );
+    assert_eq!(selected(&w, "design/symbols", "symbol"), ["helper"]);
 }
 
 #[test]
-fn terminology_asks_about_a_public_type_another_module_also_declares() {
+fn naming_asks_about_a_one_letter_name_and_a_function_returning_a_bool() {
     let mut w = World::default();
-    w.symbol("a", "Account", SymbolKind::Type, "a/a.ucm");
-    w.symbol("b", "Account", SymbolKind::Type, "b/a.ucm");
+    w.symbol("a", "x", SymbolKind::Type, "a/a.ucm");
     w.symbol("a", "Invoice", SymbolKind::Type, "a/a.ucm");
-    assert_eq!(
-        selected(&w, "design/terminology", "symbol"),
-        ["Account", "Account"]
-    );
+    assert_eq!(selected(&w, "design/naming", "symbol"), ["x"]);
 }
 
 #[test]
@@ -114,7 +125,7 @@ fn meaningful_separation_asks_about_a_small_module_with_one_user() {
         w.import(from, to);
     }
     assert_eq!(
-        selected(&w, "design/meaningful-separation", "module"),
+        selected(&w, "design/responsibility", "module"),
         ["app", "tiny"]
     );
 }
@@ -125,5 +136,5 @@ fn owner_file_asks_about_a_method_declared_away_from_its_type() {
     let store = w.symbol("m", "Store", SymbolKind::Type, "m/store.ucm");
     w.member(&store, "Near", SymbolKind::Method, "m/store.ucm");
     w.member(&store, "Far", SymbolKind::Method, "m/total.ucm");
-    assert_eq!(selected(&w, "design/owner-file", "symbol"), ["Far"]);
+    assert_eq!(selected(&w, "design/layout", "symbol"), ["Far"]);
 }

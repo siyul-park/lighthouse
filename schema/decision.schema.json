@@ -97,63 +97,6 @@
           "type": "object"
         },
         {
-          "description": "Declarations that belong together stay together: nothing but members\nof the same `group` may separate two of them.",
-          "properties": {
-            "contiguous": {
-              "description": "The group is contiguous: no separator at all. The default when\n`maxDistance` is not given.",
-              "type": "boolean"
-            },
-            "evidence": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "description": "Evidence fields, each a CEL expression over the same variables.",
-              "type": "object"
-            },
-            "group": {
-              "description": "CEL over a declaration (`symbol`) that gives the key of the group\nit belongs to; empty when it belongs to none.",
-              "type": "string"
-            },
-            "maxDistance": {
-              "description": "How many separating declarations a group tolerates between two of\nits members.",
-              "format": "uint32",
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "message": {
-              "description": "Text over `symbol` (the member separated from the group),\n`previous` (the member before it), `separators` (the declarations\nbetween, as a list), `count` and `options`.",
-              "type": "string"
-            },
-            "op": {
-              "const": "proximity",
-              "type": "string"
-            },
-            "separator": {
-              "description": "CEL over `between`, a declaration lying between two members of the\ngroup, and `member` (the later one) and `key` (the group's key):\ntrue for a declaration that splits the group. Default: any\ndeclaration that is not in the group.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "when": {
-              "description": "CEL over `file`: the check runs on the files it is true for.",
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          "required": [
-            "op",
-            "group",
-            "message"
-          ],
-          "type": "object"
-        },
-        {
           "description": "No dependency cycle over edges of one kind.",
           "properties": {
             "edge": {
@@ -1098,7 +1041,7 @@
           "type": "object"
         },
         "name": {
-          "description": "Fully qualified name, such as `design/minimal-names`.",
+          "description": "Fully qualified name, such as `design/naming`.",
           "type": "string"
         },
         "uid": {

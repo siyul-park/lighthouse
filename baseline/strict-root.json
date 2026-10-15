@@ -9,13 +9,11 @@
   ],
   "exitCode": 0,
   "findings": {
-    "core/max-lines": 14,
-    "design/feature-envy": 6,
-    "design/max-name-words": 6,
-    "design/misplaced-symbol": 9,
-    "design/no-panic": 20
+    "core/file-size": 14,
+    "design/errors": 20,
+    "design/naming": 6
   },
-  "findingsTotal": 55,
+  "findingsTotal": 40,
   "incomplete": 0,
   "repo": "strict-root",
   "sources": {

@@ -31,15 +31,15 @@ Examples:
 
 const EVAL_EXAMPLES: &str = "\
 Examples:
-  lighthouse decision eval design/feature-envy
-  lighthouse decision eval design/feature-envy --check candidate.yaml --format json
-  lighthouse decision eval design/feature-envy --repo cel=../cel --audit 50";
+  lighthouse decision eval design/prefer-method
+  lighthouse decision eval design/prefer-method --check candidate.yaml --format json
+  lighthouse decision eval design/prefer-method --repo cel=../cel --audit 50";
 
 const TRAIN_EXAMPLES: &str = "\
 Examples:
-  lighthouse model train design/feature-envy
-  lighthouse model train design/feature-envy --model local/general --repo cel=../cel
-  lighthouse model train design/feature-envy --from-model openai/gpt-5 --format json";
+  lighthouse model train design/prefer-method
+  lighthouse model train design/prefer-method --model local/general --repo cel=../cel
+  lighthouse model train design/prefer-method --from-model openai/gpt-5 --format json";
 
 /// A command of the agent loop, with its arguments.
 #[derive(Debug, Subcommand)]

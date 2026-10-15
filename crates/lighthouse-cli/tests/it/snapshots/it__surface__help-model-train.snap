@@ -10,7 +10,7 @@ Usage: lighthouse model train [OPTIONS] <ID>
 
 Arguments:
   <ID>
-          The decision whose labels the model learns, such as `design/feature-envy`
+          The decision whose labels the model learns, such as `design/prefer-method`
 
 Options:
       --config <FILE>
@@ -50,6 +50,6 @@ Options:
           Print help (see a summary with '-h')
 
 Examples:
-  lighthouse model train design/feature-envy
-  lighthouse model train design/feature-envy --model local/general --repo cel=../cel
-  lighthouse model train design/feature-envy --from-model openai/gpt-5 --format json
+  lighthouse model train design/prefer-method
+  lighthouse model train design/prefer-method --model local/general --repo cel=../cel
+  lighthouse model train design/prefer-method --from-model openai/gpt-5 --format json

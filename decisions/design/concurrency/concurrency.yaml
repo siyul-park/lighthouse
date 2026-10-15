@@ -1,0 +1,260 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/concurrency
+  uid: bec19263-cf17-4684-9885-cb5eabdb378a
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: concurrency
+spec:
+  title: Cancellation is explicit and tasks can be stopped
+  context: >-
+    A uniform position makes cancellation visible and checkable, a request
+    context outliving its request carries stale cancellation, and a task
+    nobody can stop leaks and blocks shutdown (Martin, Clean Code ch. 13).
+
+    Kinds, one finding per symbol (Go; Rust has no context parameter and its
+    tasks are judged). `context-first`: a function takes a `context.Context`
+    that is not its first parameter (`revive` `context-as-argument`);
+    `allowTypesBefore` names the types that may come before it, such as
+    `*testing.T`. `stored-context`: a struct field of type `context.Context`
+    (`containedctx`); a cancel function is not a context.
+
+    Long-lived tasks and shutdown paths are judged: they need the lifetime of
+    a goroutine, which no fact carries, so the requirement and the examples
+    are the question put to a model.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Blocking, I/O, and process-boundary operations MUST take the cancellation
+    context as their first parameter. Request contexts MUST NOT be stored in
+    long-lived objects. Long-lived concurrent tasks MUST have an explicit
+    shutdown path.
+  severity: warn
+  options:
+    type: object
+    properties:
+      kinds:
+        type: array
+        items: { type: string, enum: [context-first, stored-context] }
+        default: [context-first, stored-context]
+        description: What to report.
+      allowTypesBefore:
+        type: array
+        default: []
+        description: >-
+          Types, as written with their full package path (`*testing.T`), that
+          may come before the context.
+    additionalProperties: false
+  check:
+    type: cel
+    select: symbol
+    with:
+      - name: params
+        expr: >-
+          symbol.lang == 'go' && symbol.func != null ? symbol.func.signature.params : []
+      - name: matched
+        expr: >-
+          (params.exists(c, c.text == 'context.Context' && c.index > 0
+            && params.exists(b, b.index < c.index && !(b.text in options.allowTypesBefore)))
+            ? ['context-first'] : [])
+          + (symbol.kind == 'field' && symbol.lang == 'go' && symbol.type_ref.text == 'context.Context'
+            ? ['stored-context'] : [])
+      - name: found
+        expr: matched.filter(k, k in options.kinds)
+    where: size(found) > 0
+    message: >-
+      {{ size(found) == 0 ? ''
+         : found[0] == 'context-first'
+         ? 'context.Context should be the first parameter of ' + symbol.name
+         : 'found a struct that contains a context.Context field: ' + symbol.name }}
+    evidence:
+      kind: "size(found) > 0 ? found[0] : ''"
+      kinds: found
+      params: params.map(p, p.text)
+    identity:
+      subject: symbol.id
+  provenance:
+    wasDerivedFrom:
+    - 'revive context-as-argument, option allow-types-before: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#context-as-argument'
+    - 'containedctx: https://github.com/sivchari/containedctx'
+    - 'revive context-as-argument: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#context-as-argument'
+    - 'Martin, Clean Code (2008), ch. 13 Concurrency: SRP, limit shared data'
+    - Martin, Clean Code (2008), ch. 13 Shared objects and shutdown
+  examples:
+  - name: context-first-invalid
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        import "context"
+
+        func Fetch(url string, ctx context.Context) ([]byte, error) { return nil, ctx.Err() }
+    expect:
+    - line: 5
+    options:
+      kinds:
+      - context-first
+  - name: context-first-valid
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        import "context"
+
+        func Fetch(ctx context.Context, url string) ([]byte, error) { return nil, ctx.Err() }
+    options:
+      kinds:
+      - context-first
+  - name: context-first-allowed-type-before
+    language: go
+    kind: valid
+    options:
+      kinds:
+      - context-first
+      allowTypesBefore:
+      - "*testing.T"
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        import (
+          "context"
+          "testing"
+        )
+
+        func Setup(t *testing.T, ctx context.Context) { _ = ctx.Err() }
+  - name: context-first-type-not-allowed
+    language: go
+    kind: invalid
+    options:
+      kinds:
+      - context-first
+      allowTypesBefore:
+      - "*testing.T"
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        import (
+          "context"
+          "testing"
+        )
+
+        func Setup(t *testing.T, name string, ctx context.Context) { _ = ctx.Err() }
+    expect:
+    - line: 8
+  - name: context-first-a-method
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        import "context"
+
+        type Client struct{}
+
+        func (c *Client) Get(url string, ctx context.Context) error { return ctx.Err() }
+    expect:
+    - line: 7
+    options:
+      kinds:
+      - context-first
+  - name: context-first-rust-is-judged-by-review
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Ctx;
+
+        pub fn fetch(url: &str, ctx: &Ctx) -> usize {
+            let _ = ctx;
+            url.len()
+        }
+    options:
+      kinds:
+      - context-first
+  - name: stored-context-invalid
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        import "context"
+
+        type Worker struct {
+          ctx  context.Context
+          name string
+        }
+    expect:
+    - line: 6
+    options:
+      kinds:
+      - stored-context
+  - name: stored-context-valid
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        import "context"
+
+        type Worker struct{ name string }
+
+        func (w *Worker) Run(ctx context.Context) error { return ctx.Err() }
+    options:
+      kinds:
+      - stored-context
+  - name: stored-context-a-cancel-function
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        import "context"
+
+        type Holder struct{ cancel context.CancelFunc }
+    options:
+      kinds:
+      - stored-context
+  - name: stored-context-rust-is-judged-by-review
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Ctx;
+
+        pub struct Worker {
+            ctx: Ctx,
+        }
+
+        impl Worker {
+            pub fn new(ctx: Ctx) -> Self {
+                Self { ctx }
+            }
+        }
+    options:
+      kinds:
+      - stored-context

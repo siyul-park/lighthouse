@@ -433,8 +433,8 @@ fn review_problem(reviewed: bool, select: crate::Select) -> Option<String> {
 fn scope_problem(op: &BuiltinOp, subject: crate::Subject) -> Option<String> {
     let per_file = subject.run_scope() == RunScope::File;
     match (op, per_file) {
-        (BuiltinOp::Order { .. } | BuiltinOp::Proximity { .. }, false) => Some(format!(
-            "an `order` or `proximity` check judges one file at a time, which a `{subject}` decision does not"
+        (BuiltinOp::Order { .. }, false) => Some(format!(
+            "an `order` check judges one file at a time, which a `{subject}` decision does not"
         )),
         (BuiltinOp::Cycle { .. }, true) => Some(format!(
             "a `cycle` check judges the whole project, which a `{subject}` decision does not"
@@ -472,30 +472,6 @@ fn op_problem(op: &BuiltinOp) -> Option<String> {
                 }
             }
             None
-        }
-        BuiltinOp::Proximity {
-            when,
-            group,
-            separator,
-            max_distance,
-            contiguous,
-            message,
-            evidence,
-        } => {
-            if *contiguous && max_distance.is_some_and(|d| d > 0) {
-                return Some(
-                    "check: `contiguous` and a positive `maxDistance` disagree".to_owned(),
-                );
-            }
-            [("group", Some(group)), ("separator", separator.as_ref())]
-                .into_iter()
-                .filter_map(|(what, source)| Some((what, source?)))
-                .find_map(|(what, source)| {
-                    cel::Program::compile(source)
-                        .err()
-                        .map(|e| format!("check {what}: {e}"))
-                })
-                .or_else(|| expressions(when.as_ref(), message, evidence))
         }
         BuiltinOp::Cycle { edge, .. } => edge
             .parse::<EdgeKind>()

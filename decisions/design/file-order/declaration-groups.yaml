@@ -135,6 +135,10 @@ spec:
         when: "finding.evidence.before == ''"
         scope: file
         by: [design/group]
+  provenance:
+    wasDerivedFrom:
+      - "Martin, Clean Code (2008), G24 Follow Standard Conventions"
+      - "Martin, Clean Code (2008), ch. 10 Class organization"
   examples:
     - name: invalid
       language: go

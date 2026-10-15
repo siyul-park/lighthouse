@@ -213,9 +213,9 @@ fn review_show_and_text_listings_describe_a_finding() {
     let dir = rust_project(&[("src/lib.rs", HELPER)]);
     assert_eq!(stdout(lighthouse(dir.path()).args(["review", "list"])), "");
     lighthouse(dir.path()).arg("check").assert().success();
-    let fingerprint = fingerprint_of(&dir, "design/no-panic");
+    let fingerprint = fingerprint_of(&dir, "design/errors");
     let list =
-        stdout(lighthouse(dir.path()).args(["review", "list", "--decision", "design/no-panic"]));
+        stdout(lighthouse(dir.path()).args(["review", "list", "--decision", "design/errors"]));
     assert_eq!(list.lines().count(), 1);
     assert!(list.starts_with(&fingerprint[..12]), "{list}");
     assert!(list.contains("\topen\t-\t"), "{list}");

@@ -239,7 +239,7 @@ pub struct DecisionTestArgs {
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DecisionEvalArgs {
-    /// The decision, such as `design/feature-envy`.
+    /// The decision, such as `design/prefer-method`.
     #[arg(value_name = "ID")]
     pub id: String,
     /// A repository the labels are about, `name=dir`, where `name` is the
@@ -347,7 +347,7 @@ pub struct ModelListArgs {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ModelTrainArgs {
     /// The decision whose labels the model learns, such as
-    /// `design/feature-envy`.
+    /// `design/prefer-method`.
     #[arg(value_name = "ID")]
     pub id: String,
     /// The model to train, `<provider>/<model>`. Default: the one bound to

@@ -144,9 +144,7 @@ fn suggested_fixes_wait_for_unsafe_fixes() {
         .args(["check", "--fix"])
         .assert()
         .success()
-        .stderr(predicate::str::contains(
-            "not fixed a.go:3 design/no-banners",
-        ))
+        .stderr(predicate::str::contains("not fixed a.go:3 design/comments"))
         .stderr(predicate::str::contains("--unsafe-fixes"));
     assert_eq!(read(&dir, "a.go"), banner);
 
@@ -155,7 +153,7 @@ fn suggested_fixes_wait_for_unsafe_fixes() {
         .assert()
         .success()
         .stderr(predicate::str::contains(
-            "fixed design/no-banners [suggested]",
+            "fixed design/comments [suggested]",
         ));
     assert_eq!(
         read(&dir, "a.go"),
@@ -641,7 +639,7 @@ fn a_run_without_the_store_still_honors_the_committed_decisions() {
             "--detail",
             "full",
             "--decision",
-            "design/no-banners",
+            "design/comments",
         ])
         .output()
         .unwrap();

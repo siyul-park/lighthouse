@@ -11,28 +11,30 @@ design/exported-doc warn [review] — Exported symbols SHOULD have doc comments 
     func Helper() {}
   bar/bar.go:4:1 exported function Func1 must have a doc comment adc7d1d
   bar/bar.go:7:1 exported function Func2 must have a doc comment ab2cb8c {receiver=T} (note: judgment expired: decision changed)
-design/coupling warn [review] — Coupling SHOULD be judged from direct intra-package fan-in and fan-out, that is the functions and methods of the same package that call a symbol or are called by it, against deliberately high thresholds. Calls from other packages and from tests do not count: a widely used public function is a service, not a hub.
+design/complexity warn [review] — A function SHOULD NOT exceed the limit of its role in lines, statements, cyclomatic complexity, cognitive complexity or nesting depth, and SHOULD NOT be a dependency hub or a high fan-out coordinator. Cyclomatic complexity is one path plus each `if`, `else if`, loop, error handler clause, non-default switch arm and boolean operator (`&&`, `||`). The split is by responsibility: the remedy is smaller functions, never moving the same body elsewhere. One function MUST stay at one abstraction level: intent and mechanics are not mixed in one body, so that it reads as a sequence of steps one level below its name. Mechanical checks SHOULD be preferred for directly expressible rules; heuristic signals SHOULD remain advisory and use deliberately high thresholds.
   expected:
     package sample
 
-    func hub() {
-    	left()
-    	right()
+    func total(a, b int) int {
+        sum := a
+
+        sum += b
+
+        return sum
     }
-
-    func left()  {}
-    func right() {}
-
-    func a() { hub() }
-    func b() { hub() }
   evidence: callees=["a","b c"] fan_in=2 fan_out=14 symbol=jit::compile#function
-  internal/jit/compile.go:350:1 function coordinates 14 collaborators in its package 5da1c26
-design/no-panic info [review] — Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
+  internal/jit/compile.go:350:1 function coordinates 14 collaborators in its package 95c1bd4
+design/errors info (authored warn) [review] — Dependency identity MUST be preserved when callers depend on it; context added to an error MUST keep the cause reachable: an error MUST be compared with `errors.Is`, asserted with `errors.As` and wrapped with `%w`. Semantic errors MUST use stable, named error values or types, and semantic categories MUST NOT be created from ad hoc formatted messages alone. Error categories MUST be translated only at their owning boundary. Errors MUST NOT expose private or sensitive process state. Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
   expected:
-    pub fn parse(text: &str) -> Result<u32, std::num::ParseIntError> {
-        text.parse()
+    #[derive(PartialEq)]
+    pub enum Failure {
+        Missing,
     }
-  src/lib.rs:7:1 private helper has one caller f999fb1
+
+    pub fn is_missing(err: &Failure) -> bool {
+        *err == Failure::Missing
+    }
+  src/lib.rs:7:1 private helper has one caller 46aa779
 broken.go: incomplete: type error
 resolve: lighthouse review resolve <fingerprint> --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>
 judgments: fail=the finding is right; add `suppress` with a justification to leave it in place; pass=false positive: the code conforms; notApplicable=the decision does not apply here; a hint to narrow it

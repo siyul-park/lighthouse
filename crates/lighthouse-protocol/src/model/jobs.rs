@@ -109,7 +109,7 @@ pub struct FineTuneMethod {
 /// dataset store; `metadata` names the `decision`, the `datasets` directory
 /// the file is in (`<hex>.jsonl` under `sha256/`) and the `dir` the artifact
 /// goes to.
-// lighthouse-disable-next-line design/max-name-words -- Matches OpenAI request type.
+// lighthouse-disable-next-line design/naming -- Matches OpenAI request type.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct CreateFineTuningJobRequest {
     pub model: String,

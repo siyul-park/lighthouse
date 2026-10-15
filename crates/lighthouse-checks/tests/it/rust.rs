@@ -34,9 +34,9 @@ fn the_design_decisions_have_rust_examples() {
     let catalog = lighthouse_spec::Catalog::bundled();
     for id in [
         "design/complexity",
-        "design/coupling",
+        "design/complexity",
         "design/exported-doc",
-        "design/no-single-use-wrapper",
+        "design/symbols",
     ] {
         let decision = catalog.decision(id).unwrap();
         let rust: Vec<_> = decision

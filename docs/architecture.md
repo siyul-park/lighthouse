@@ -79,7 +79,7 @@ documents):
 apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
-  name: core/max-lines        # the id, `<namespace>/<kebab-name>`
+  name: core/file-size        # the id, `<namespace>/<kebab-name>`
   uid: 8a4f0a2c-6b57-4a8e-9a42-0d2f3b9f5c11   # identity, a UUID v4 assigned once
   labels: { lighthouse/pack: core, lighthouse/section: limits }
   annotations: {}
@@ -101,7 +101,7 @@ the name, so renaming a decision touches no record: fingerprints and judgments a
 seeded by the uid. `decision_create` assigns one, and `spec validate` asks for one and
 refuses two decisions with the same.
 
-Conventions: keys are lowerCamelCase, option names included (`hubFanIn`), durations are strings (`30s`), enums are lowercase kebab,
+Conventions: keys are lowerCamelCase, option names included (`maxWords`), durations are strings (`30s`), enums are lowercase kebab,
 paths are relative with `/`. A decision belongs to a pack and section by its
 labels; the `Pack` document only orders them, so where the file lies carries no
 meaning. `scope` is `{domain, subject, generated, tests}` (`domain` is `code`; `generated: true` makes generated code a subject, default false; `tests: exclude|include|only`, default `exclude`, set explicitly where a decision is about tests or covers them). The host tells generated code apart once (the provider's marker such as Go's `// Code generated ... DO NOT EDIT.`, `.gitattributes` `linguist-generated`, the project's `[generated] files`) and the engine leaves out the subjects the scope excludes before any check runs, so no expression guards against `generated` or `test`. A project overrides it with `[generated] check = "skip"|"include"` for all decisions, or `rules."<id>".generated = true|false` for one. A `cel` check's `select` defaults to the scope's subject. `options` is a JSON
@@ -142,7 +142,7 @@ judgment that can take effect.
 Every implemented rule belongs to a catalog decision whose `check` is
 one provider of the union `builtin | cel | command | rpc | model`, with the common fields `requires` and `timeout`:
 
-- `builtin` is a standard, decision-agnostic operation (`order`, `proximity`, `cycle`) or, for the two rules the engine reports itself (`core/allow-reason`, `core/no-unused-allow`), a rule named by `id`.
+- `builtin` is a standard, decision-agnostic operation (`order`, `cycle`) or, for the two rules the engine reports itself (`core/allow`, `core/no-unused-allow`), a rule named by `id`.
 - `cel` is an expression over the code model, written in the decision, with the standard function library `metrics callers callees edges owner tests annotations rank exposed limit counted`, the module path helpers `globMatch layerOf` and the text helpers `lines trim join trimPrefixes trimSuffixes trimLeft trimRight leadingRun drop`.
   - A function node has a `role`, computed once for every rule, the first that fits: `test`, `implementation` (it satisfies an interface or trait), `constructor` (named by the language's `constructorPrefixes`, or a Rust associated function returning its owner), `entrypoint` (Go `main`/`init`, Rust `main` of a binary), then `method` or `function`. The test sub-role of a test-file declaration is `test_role`.
   - A limit option is declared `$ref: '#/$defs/limit'`: an integer for every role, or an object with `default` and one entry per role (`function method constructor implementation entrypoint test`), each an integer or null for no limit. `limit(node, max)` gives the value for the node's role, and `counted(node, n, what)` says it (`NewServer needs 9 parameters`, `parse has 9 parameters`).
@@ -468,7 +468,7 @@ because it is reviewed in the diff, and the report counts what it suppressed (`N
 it is a suppression of kind `inSource`, the same type a reviewer's `external` one has, and
 SARIF lists the suppressed finding with it. The reason is required on every form that disables: a
 directive without one is ignored and reported by the error rule
-`core/allow-reason`. A directive or range whose rule no longer fires there, or is not
+`core/allow`. A directive or range whose rule no longer fires there, or is not
 enabled, an `lighthouse-enable` that closes nothing and a directive that names no id are
 reported by `core/no-unused-allow` so annotations do not rot (when `--decision` leaves the
 annotated rule out of the run, nothing is said). A second `lighthouse-disable` of an id
@@ -490,7 +490,7 @@ without another lookup. The hooks print the same findings as one text block per 
 for the agent to read:
 
 ```text
-design/no-panic  info (heuristic)  src/lib.rs:2:7
+design/errors  info (heuristic)  src/lib.rs:2:7
   owner:       demo::run#function
   message:     .unwrap() can panic in run: return an error instead
   requirement: Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
@@ -639,9 +639,9 @@ the run that ends the fixing resolves the findings the fixes removed.
 
 Bundled fixes: `design/declaration-groups` (a `reorder` by `design/group`, plus a `move`
 for constructors) and `testing/file-layout` (a `move` of a fixture above, or a helper
-below, the tests) are safe; `design/contiguity` and
-`design/callers-before-callees` (a `move` next to the related symbol or the caller),
-`design/no-banners` and `core/no-unused-allow` (a `delete` of the comment or the
+below, the tests) are safe; `design/layout` and
+`design/layout` (a `move` next to the related symbol or the caller),
+`design/comments` and `core/no-unused-allow` (a `delete` of the comment or the
 annotation line) are suggested. An `impl` block is not a symbol, so
 reordering a Rust file cannot move one: such findings are declined and fixed by hand.
 `lighthouse check .` on this repository is clean, and `check --fix` brought it there.
@@ -719,7 +719,7 @@ See [agents.md](agents.md).
 ## Dogfooding
 
 Lighthouse checks its own sources. The repository's `lighthouse.toml` enables the
-bundled `core`, `design` and `testing` plugins with their recommended projects (`<plugin>/strict` adds the advice that is too noisy to recommend, such as `design/no-panic`) and
+bundled `core`, `design` and `testing` plugins with their recommended projects (`<plugin>/strict` adds the advice that is too noisy to recommend, such as `design/errors`) and
 the Go and Rust plugins built by `make plugins`, and `make lint` (part of `make ci`)
 ends with `lighthouse check .`, which must exit 0: a finding is either fixed in the code, or it exposes a rule or
 provider that is imprecise, and that is fixed instead of silenced. The only
@@ -731,5 +731,5 @@ The Rust plugin resolves names syntactically, so its edges are a lower bound
 that count callers therefore have to fail safe: a method called through a
 receiver whose type is not written in the code is recorded as a possible use of
 every non-`pub` method of that name (a `heuristic` edge that counting analyses
-ignore), which keeps `design/no-single-use-wrapper` from
+ignore), which keeps `design/symbols` from
 reporting a method that has an unseen caller.

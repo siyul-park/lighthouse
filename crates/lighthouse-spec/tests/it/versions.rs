@@ -159,7 +159,7 @@ mod write {
 
 #[test]
 fn decision_version_changes_with_its_definition() {
-    let decision = bundled("core/max-lines");
+    let decision = bundled("core/file-size");
     assert_eq!(decision.version().len(), 16);
     assert_eq!(decision.version(), decision.clone().version());
     let edited = decision.clone().map_spec(|mut spec| {
@@ -178,7 +178,7 @@ fn catalog_version_changes_with_any_decision() {
 
 #[test]
 fn meaning_version_ignores_wording_examples_option_descriptions_and_adr_prose() {
-    let decision = bundled("design/coupling");
+    let decision = bundled("design/complexity");
     let reworded = decision.clone().map_spec(|mut spec| {
         spec.context.push_str(" More prose.");
         spec.examples.clear();
@@ -195,7 +195,7 @@ fn meaning_version_ignores_wording_examples_option_descriptions_and_adr_prose() 
 
 #[test]
 fn meaning_version_follows_what_the_decision_demands() {
-    let decision = bundled("design/coupling");
+    let decision = bundled("design/complexity");
     let changed = |change: fn(&mut lighthouse_spec::DecisionSpec)| {
         decision
             .clone()
@@ -237,7 +237,7 @@ fn meaning_version_follows_what_the_decision_demands() {
 
 #[test]
 fn how_a_decision_is_checked_changes_its_check_revision_and_never_its_meaning() {
-    let decision = bundled("design/coupling");
+    let decision = bundled("design/complexity");
     let unchecked = decision.clone().map_spec(|mut spec| {
         spec.check = None;
         spec

@@ -1,5 +1,5 @@
 //! The rule a decision's `check` compiles into: a CEL expression over the code
-//! model, a standard operation (`order`, `proximity`, `cycle`), a program, or
+//! model, a standard operation (`order`, `cycle`), a program, or
 //! the name of an annotation rule the engine serves.
 //! The decision supplies id, severity, scope, options and the examples that
 //! `lighthouse decision test` runs.
@@ -38,7 +38,6 @@ pub(crate) struct DeclarativeRule {
 enum Kind {
     Cel(Box<CelRule>),
     Order(ops::OrderRule),
-    Proximity(ops::ProximityRule),
     Cycle(ops::CycleRule),
     Command(CommandRule),
     /// The rules about allow annotations: the engine reads the annotations of
@@ -68,11 +67,6 @@ impl DeclarativeRule {
                     let rule = ops::OrderRule::new(id, op)?;
                     let analyzers = rule.analyzers();
                     (Kind::Order(rule), analyzers)
-                }
-                BuiltinOp::Proximity { .. } => {
-                    let rule = ops::ProximityRule::new(id, op)?;
-                    let analyzers = rule.analyzers();
-                    (Kind::Proximity(rule), analyzers)
                 }
                 BuiltinOp::Cycle { .. } => (Kind::Cycle(ops::CycleRule::new(id, op)?), Vec::new()),
             },
@@ -121,7 +115,6 @@ impl DeclarativeRule {
         let (reach, positions) = match &kind {
             Kind::Cel(rule) => rule.reach(meta.scope),
             Kind::Order(rule) => rule.reach(),
-            Kind::Proximity(rule) => rule.reach(),
             Kind::Cycle(_) => (Reach::Global, false),
             Kind::Command(_) | Kind::Annotation => (Reach::Global, false),
         };
@@ -170,7 +163,6 @@ impl Rule for DeclarativeRule {
         match self.kind.as_ref() {
             Kind::Cel(rule) => rule.check(meta, ctx, &resolved),
             Kind::Order(rule) => rule.check(meta, ctx, &resolved),
-            Kind::Proximity(rule) => rule.check(meta, ctx, &resolved),
             Kind::Cycle(rule) => rule.check(meta, ctx),
             Kind::Command(rule) => rule.check(meta, ctx, &resolved),
             Kind::Annotation => Ok(Vec::new()),

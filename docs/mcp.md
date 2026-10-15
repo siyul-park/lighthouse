@@ -138,9 +138,9 @@ Measure a decision's check against its labels.
 Reports precision, FPR, recall, FNR, selector precision, coverage and abstention, each with a Wilson 95% interval, the model calls and their cost, and a verdict against the decision's evaluation policy (`rules."<id>".evaluation`). With --check, a candidate decision file is measured beside it and their agreement is reported. Labelled positives come mostly from flagged findings, so recall is an upper bound; --audit writes unflagged selected subjects for a person to label.
 
 Examples:
-  lighthouse decision eval design/feature-envy
-  lighthouse decision eval design/feature-envy --check candidate.yaml --format json
-  lighthouse decision eval design/feature-envy --repo cel=../cel --audit 50
+  lighthouse decision eval design/prefer-method
+  lighthouse decision eval design/prefer-method --check candidate.yaml --format json
+  lighthouse decision eval design/prefer-method --repo cel=../cel --audit 50
 
 Result: [EvalReport](../schema/eval-report.schema.json).
 
@@ -149,7 +149,7 @@ Result: [EvalReport](../schema/eval-report.schema.json).
 | `audit` | integer \| null | `null` | Write this many selected subjects the check did not flag to a table for a person to label (`TP` or `FP`), to measure recall. |
 | `baseline` | string \| null | `null` | A table of reviewed findings. Default: `baseline/precision/<id>.tsv` when it exists. |
 | `check` | string \| null | `null` | A decision file whose check is evaluated beside the current one. |
-| `id` (required) | string |  | The decision, such as `design/feature-envy`. |
+| `id` (required) | string |  | The decision, such as `design/prefer-method`. |
 | `repo` | string[] | `[]` | A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project. |
 
 ## review_list
@@ -232,9 +232,9 @@ Fit a model on the labels of a decision.
 The labels are its examples, the baseline rows, the judgments recorded under its current meaning version, and optionally the answers of another model. Writes the dataset under `.lighthouse/datasets/` and the artifact under `.lighthouse/models/`; it binds nothing.
 
 Examples:
-  lighthouse model train design/feature-envy
-  lighthouse model train design/feature-envy --model local/general --repo cel=../cel
-  lighthouse model train design/feature-envy --from-model openai/gpt-5 --format json
+  lighthouse model train design/prefer-method
+  lighthouse model train design/prefer-method --model local/general --repo cel=../cel
+  lighthouse model train design/prefer-method --from-model openai/gpt-5 --format json
 
 Result: [TrainReport](../schema/train-report.schema.json).
 
@@ -242,6 +242,6 @@ Result: [TrainReport](../schema/train-report.schema.json).
 | --- | --- | --- | --- |
 | `baseline` | string \| null | `null` | A table of reviewed findings (`fingerprint repo location verdict`). |
 | `fromModel` | string \| null | `null` | Also label the subjects nobody labelled with this model's answers (weight 0.5): a fail where it is sure of one, a pass where it is sure of the other. `<provider>/<model>`. |
-| `id` (required) | string |  | The decision whose labels the model learns, such as `design/feature-envy`. |
+| `id` (required) | string |  | The decision whose labels the model learns, such as `design/prefer-method`. |
 | `model` | string \| null | `null` | The model to train, `<provider>/<model>`. Default: the one bound to the decision. |
 | `repo` | string[] | `[]` | A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project. |

@@ -10,7 +10,7 @@ use lighthouse_model::{Diagnostic, Fingerprint, Position, Severity, Span};
 use lighthouse_spec::{Catalog, Evaluation};
 use serde_json::json;
 
-const RULE: &str = "core/max-lines";
+const RULE: &str = "core/file-size";
 
 fn request(audit: Option<usize>) -> EvalRequest {
     EvalRequest {

@@ -36,7 +36,7 @@ lighthouse review resolve 395d1985afe8 --judgment fail --suppress intentional-ex
   CI see the same decisions.
 - **At the code, when it belongs there.** A decision about one place can be written
   where it happens and reviewed in the diff:
-  `// lighthouse-disable-next-line design/coupling -- composition root wires every service`
+  `// lighthouse-disable-next-line design/complexity -- composition root wires every service`
   (ESLint's directive forms; `-line`, and `lighthouse-disable` / `lighthouse-enable` ranges too).
   Directives that stop matching anything are reported, so they cannot rot.
 - **Valid while it still applies.** A judgment holds while the decision's meaning and the
@@ -56,7 +56,7 @@ so docs, linter and agent cannot disagree.
 apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
-  name: design/no-single-use-wrapper
+  name: design/symbols
   labels: { lighthouse/pack: design, lighthouse/section: functions }
 spec:
   title: Inline single-use wrappers
@@ -102,7 +102,7 @@ A hook runs `lighthouse check` on what the agent just changed and returns feedba
 agent can act on:
 
 ```text
-design/no-panic  info (heuristic)  src/lib.rs:2:7
+design/errors  info (heuristic)  src/lib.rs:2:7
   owner:       demo::run#function
   message:     .unwrap() can panic in run: return an error instead
   requirement: Panic MUST be limited to impossible programmer errors, `Must*`-style APIs, or documented hot-path invariants with one recovery boundary; normal runtime failures MUST return errors.
@@ -135,7 +135,7 @@ make plugins                                  # language plugins into target/plu
 lighthouse init                               # writes lighthouse.toml
 lighthouse check                              # analyze the project
 lighthouse check --changed --format json      # what the working tree changed, for an agent
-lighthouse decision show design/no-single-use-wrapper  # context, requirement, examples
+lighthouse decision show design/symbols  # context, requirement, examples
 lighthouse review list                        # findings Lighthouse remembers
 lighthouse decision test                      # run every decision's examples
 ```
@@ -152,7 +152,7 @@ plugins = [{ id = "lang-go", path = "target/plugins/lang-go" }, "design"]
 extends = ["design/recommended"]
 
 [spec.rules]
-"design/max-params" = { level = "warn", options = { max = { default = 6, constructor = 8 } } }
+"design/signature" = { level = "warn", options = { max = { default = 6, constructor = 8 } } }
 ```
 
 Exit codes: `0` clean, `1` an error (a warning too with `--strict` or `--max-warnings N`), `2` usage or configuration error, `3` analysis

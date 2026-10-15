@@ -56,7 +56,7 @@ fn an_edit_that_introduces_an_error_blocks_with_that_finding_only() {
     pre(dir.path(), "small.txt");
     fs::write(dir.path().join("small.txt"), BIG).unwrap();
     let reason = reason(post(dir.path(), "small.txt").1);
-    assert!(reason.contains("core/max-lines"), "{reason}");
+    assert!(reason.contains("core/file-size"), "{reason}");
     assert!(reason.contains("small.txt"), "{reason}");
     assert!(!reason.contains("no pre-edit baseline"), "{reason}");
 }

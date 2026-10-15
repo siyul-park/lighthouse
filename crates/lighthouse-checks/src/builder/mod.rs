@@ -123,6 +123,7 @@ impl<'a> Builder<'a> {
             "col": comment.span.start.col,
             "standalone": before.is_none_or(|b| b.trim().is_empty()),
             "generated": self.project.file(&comment.file).is_none_or(|f| f.generated),
+            "attached": comment.attached_to.is_some(),
         })
     }
 

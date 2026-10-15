@@ -21,7 +21,7 @@ pub(crate) fn text_project() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("lighthouse.toml"),
-        lighthouse_test_support::project("plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"error\", options = { max = 3 } }\n"),
+        lighthouse_test_support::project("plugins = [\"core\"]\n[rules]\n\"core/file-size\" = { level = \"error\", options = { max = 3 } }\n"),
     )
     .unwrap();
     fs::write(dir.path().join("big.txt"), BIG).unwrap();
@@ -119,7 +119,7 @@ fn an_edit_with_errors_is_fed_back_as_a_block() {
     let reply = reply.unwrap();
     assert_eq!(reply["decision"], "block");
     let reason = reply["reason"].as_str().unwrap();
-    assert!(reason.contains("core/max-lines"), "{reason}");
+    assert!(reason.contains("core/file-size"), "{reason}");
     assert!(reason.contains("big.txt"), "{reason}");
     assert!(
         !reason.contains("other.txt"),
@@ -168,7 +168,10 @@ fn a_directory_without_lighthouse_is_left_alone_and_a_bad_payload_does_not_block
 
 #[test]
 fn review_findings_are_context_not_a_block() {
-    let dir = rust_project("[rules]\n\"design/exported-doc\" = \"off\"\n", HELPER);
+    let dir = rust_project(
+        "[rules]\n\"design/exported-doc\" = \"off\"\n\"design/errors\" = \"info\"\n",
+        HELPER,
+    );
     let (code, reply) = hook(
         dir.path(),
         &["post-tool-use"],

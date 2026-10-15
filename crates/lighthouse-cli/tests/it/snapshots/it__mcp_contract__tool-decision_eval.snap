@@ -9,7 +9,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     "openWorldHint": false,
     "readOnlyHint": true
   },
-  "description": "Measure a decision's check against its labels.\n\nReports precision, FPR, recall, FNR, selector precision, coverage and abstention, each with a Wilson 95% interval, the model calls and their cost, and a verdict against the decision's evaluation policy (`rules.\"<id>\".evaluation`). With --check, a candidate decision file is measured beside it and their agreement is reported. Labelled positives come mostly from flagged findings, so recall is an upper bound; --audit writes unflagged selected subjects for a person to label.\n\nExamples:\n  lighthouse decision eval design/feature-envy\n  lighthouse decision eval design/feature-envy --check candidate.yaml --format json\n  lighthouse decision eval design/feature-envy --repo cel=../cel --audit 50",
+  "description": "Measure a decision's check against its labels.\n\nReports precision, FPR, recall, FNR, selector precision, coverage and abstention, each with a Wilson 95% interval, the model calls and their cost, and a verdict against the decision's evaluation policy (`rules.\"<id>\".evaluation`). With --check, a candidate decision file is measured beside it and their agreement is reported. Labelled positives come mostly from flagged findings, so recall is an upper bound; --audit writes unflagged selected subjects for a person to label.\n\nExamples:\n  lighthouse decision eval design/prefer-method\n  lighthouse decision eval design/prefer-method --check candidate.yaml --format json\n  lighthouse decision eval design/prefer-method --repo cel=../cel --audit 50",
   "inputSchema": {
     "additionalProperties": false,
     "description": "`decision eval`.",
@@ -41,7 +41,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         ]
       },
       "id": {
-        "description": "The decision, such as `design/feature-envy`.",
+        "description": "The decision, such as `design/prefer-method`.",
         "type": "string"
       },
       "repo": {

@@ -1,4 +1,4 @@
-//! The standard operations of a `builtin` check: `order`, `proximity` and
+//! The standard operations of a `builtin` check: `order` and
 //! `cycle`. They judge what an expression over one value cannot, the shape of
 //! a whole file or of the dependency graph, and know nothing about any
 //! decision: the keys, the groups, the wording and the evidence come from the
@@ -34,17 +34,6 @@ struct Clause {
     when: Option<Program>,
     message: Template,
     evidence: Vec<(String, Program)>,
-}
-
-/// `proximity`: declarations that belong together stay together.
-pub(crate) struct ProximityRule {
-    when: Option<Program>,
-    group: Program,
-    separator: Option<Program>,
-    max_distance: usize,
-    message: Template,
-    evidence: Vec<(String, Program)>,
-    needs: Needs,
 }
 
 /// `cycle`: no dependency cycle over edges of one kind.
@@ -230,136 +219,6 @@ impl Clause {
                 by_owner.into_iter().map(|(_, list)| list).collect()
             }
         }
-    }
-}
-
-impl ProximityRule {
-    pub(crate) fn new(id: &str, op: &BuiltinOp) -> Result<Self, Error> {
-        let BuiltinOp::Proximity {
-            when,
-            group,
-            separator,
-            max_distance,
-            message,
-            evidence,
-            ..
-        } = op
-        else {
-            return Err(Error::invalid(id, "not a proximity check"));
-        };
-        let mut sources: Vec<&str> = vec![group.as_str(), message.as_str()];
-        sources.extend(when.as_deref());
-        sources.extend(separator.as_deref());
-        sources.extend(evidence.values().map(String::as_str));
-        Ok(Self {
-            when: when
-                .as_deref()
-                .map(|w| compile(id, "when", w))
-                .transpose()?,
-            group: compile(id, "group", group)?,
-            separator: separator
-                .as_deref()
-                .map(|s| compile(id, "separator", s))
-                .transpose()?,
-            max_distance: max_distance.unwrap_or(0) as usize,
-            message: Template::compile(id, "message", message)?,
-            evidence: compile_all(id, "evidence", evidence)?,
-            needs: Needs::of(sources),
-        })
-    }
-
-    pub(crate) fn analyzers(&self) -> Vec<String> {
-        Vec::new()
-    }
-
-    /// Declarations that belong together stay together within a file.
-    pub(crate) fn reach(&self) -> (Reach, bool) {
-        reach::of(&self.needs)
-    }
-
-    pub(crate) fn check(
-        &self,
-        meta: &RuleManifest,
-        ctx: &Ctx,
-        options: &Map<String, Value>,
-    ) -> Result<Vec<Diagnostic>, PluginError> {
-        let builder = Builder::new(ctx, &self.needs, options, &meta.id)?;
-        if !applies(&meta.id, self.when.as_ref(), &builder, ctx, options)? {
-            return Ok(Vec::new());
-        }
-        let base = library::context();
-        let mut found = Vec::new();
-        for module in declarations(ctx) {
-            let values: Vec<Value> = module.iter().map(|s| builder.symbol(s)).collect();
-            let mut keys = Vec::new();
-            for value in &values {
-                let mut frame = Frame::new(&meta.id, &base);
-                frame.set("symbol", value)?;
-                frame.options(options)?;
-                keys.push(frame.string(&self.group, "group")?);
-            }
-            for (at, key) in keys.iter().enumerate() {
-                if key.is_empty() {
-                    continue;
-                }
-                let Some(before) = keys[..at].iter().rposition(|k| k == key) else {
-                    continue;
-                };
-                let mut separators = Vec::new();
-                for between in before + 1..at {
-                    if self.separates(
-                        &base,
-                        meta,
-                        options,
-                        (&values[between], &keys[between]),
-                        (&values[at], key),
-                    )? {
-                        separators.push(between);
-                    }
-                }
-                if separators.len() <= self.max_distance {
-                    continue;
-                }
-                let mut frame = Frame::new(&meta.id, &base);
-                frame.set("symbol", &values[at])?;
-                frame.set("previous", &values[before])?;
-                frame.set(
-                    "separators",
-                    &Value::Array(separators.iter().map(|i| values[*i].clone()).collect()),
-                )?;
-                frame.set("count", &json!(separators.len()))?;
-                frame.options(options)?;
-                found.push(finding(
-                    meta,
-                    module[at],
-                    frame.text(&self.message)?,
-                    frame.evidence(&self.evidence)?,
-                    "",
-                ));
-            }
-        }
-        Ok(found)
-    }
-
-    /// Whether `between` separates `member` from the member before it; each is
-    /// a value with its key.
-    fn separates(
-        &self,
-        base: &cel::Context<'static>,
-        meta: &RuleManifest,
-        options: &Map<String, Value>,
-        (between, between_key): (&Value, &str),
-        (member, key): (&Value, &str),
-    ) -> Result<bool, PluginError> {
-        let Some(separator) = &self.separator else {
-            return Ok(between_key != key);
-        };
-        let mut frame = Frame::new(&meta.id, base);
-        frame.set("between", between)?;
-        frame.set("member", member)?;
-        frame.set("key", &json!(key))?;
-        frame.options(options)?;
-        frame.truth(separator)
     }
 }
 

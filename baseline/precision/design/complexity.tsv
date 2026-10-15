@@ -1,6 +1,34 @@
-# retained: yes
-# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run
+# retained: yes (design/cognitive-complexity)
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run (design/cognitive-complexity)
+# retained: yes (design/complexity)
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run (design/complexity)
+# retained: yes (design/max-depth)
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run (design/max-depth)
+# retained: yes (design/max-lines-per-function)
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run (design/max-lines-per-function)
+# retained: yes (design/max-statements)
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run (design/max-statements)
 fingerprint	repo	location	verdict	reason
+fdafff7cd1af920532c8b16ae79a4fe59a6cf75e54f4acd574e2e01f1bb03eaf	minivm	internal/vigil/declarations.go:531 privateType	TP	41 cognitive complexity points over the limit of its role
+a640310e8437d0e8f90a120638934599324d2e68ff4465834bb39aa516c0371e	minivm	internal/asm/arm64/encoder.go:204 Encode	TP	251 cognitive complexity points over the limit of its role
+07430d3a5f44e373b03d0085b3e6d989fa4f1cb09a89015d0d2046400f613691	minivm	internal/vigil/ownership.go:12 boundary	TP	36 cognitive complexity points over the limit of its role
+44b787ff1489f8008bceaa2528cf3c3663b933ac3e29fac352a1cf65b6fbbb35	minivm	internal/jit/compile/compile.go:350 function	TP	33 cognitive complexity points over the limit of its role
+a7234f4d57622124fca0695bf7e3422cf4d065cc9705e5cead0300619f3259c1	cel	interpreter/attribute_patterns.go:250 matchesUnknownPatterns	TP	48 cognitive complexity points over the limit of its role
+28b5fd3959a61481022de3bb6a0b1dfc692323b5e575d4f11130e3b2d8fa4805	qlbridge	lex/lexer.go:1408 lexIdentifierOfTypeNoWs	TP	60 cognitive complexity points over the limit of its role
+c605871c0ee722b70289d74b6f972ded04c6821547f7ce57686fbb40264bf810	qlbridge	rel/sql_rewrite.go:222 joinNodesForFrom	TP	47 cognitive complexity points over the limit of its role
+8b6b7a3a6688a62bc6f98e0ee4df064c9b28745a760e3e5af03048e54cbbcd30	cel	cel/folding.go:434 adaptLiteral	TP	52 cognitive complexity points over the limit of its role
+a37b5b83bad95fa00f1123ac9571f46a00261c85813adee645b58efc811626a7	cel	cel/env.go:181 ToConfig	TP	56 cognitive complexity points over the limit of its role
+0ed93e8a7e9efe9a2636442b39521877e2178c9a5956b76f78db891d030016e8	qlbridge	plan/planner_select.go:27 WalkSelect	TP	35 cognitive complexity points over the limit of its role
+2b64b86d7316a561539b874d744e6df78d00daee79851ae080dd90402a994d9e	cel	parser/unescape.go:104 unescapeChar	TP	32 cognitive complexity points over the limit of its role
+3f7bd927bd58ba882521868484aea3c8062c5abcfff9c551358aac3909997cc2	qlbridge	exec/groupby.go:180 Run	TP	45 cognitive complexity points over the limit of its role
+351a5d4fdf079ea466d696c36a1234277c82db215283cabd9548792aca9adc1f	qlbridge	expr/builtins/filter.go:212 FilterMatchEval	TP	71 cognitive complexity points over the limit of its role
+072de2889abbfc95c6148d691b7bd592aa7b1bbe38cd6415b1f1e0698f3f2d16	qlbridge	plan/projection.go:90 loadFinal	TP	53 cognitive complexity points over the limit of its role
+d94500052934464d71e33ec8cfba35cbeadf218dcecb3b07c60558e5c8879c0d	minivm	analysis/blocks.go:30 Blocks	TP	58 cognitive complexity points over the limit of its role
+a5312c053ae7ba02331eebe3857d7d8b42605c9f802df32ab19a17acf6fc12bc	minivm	internal/codegen/lower.go:323 resolve	TP	32 cognitive complexity points over the limit of its role
+29352ddfe1eea85da941a4e96f8d1d38aa7db5867defa22658469b047bf6f106	qlbridge	lex/lexer.go:834 LexStatement	TP	97 cognitive complexity points over the limit of its role
+10837a83d6d5e3eafc53a9f7c9d71887a46a75e73eca7bc6420581f280c0a345	minivm	internal/vigil/declarations.go:14 docs	TP	41 cognitive complexity points over the limit of its role
+ac0e832e566d72d4f1f03b5b9b192ad3efc968e07dc2b4e76f00db176d87ae0d	qlbridge	exec/join.go:145 Run	TP	48 cognitive complexity points over the limit of its role
+0ec600ed92d70c98ab84827b63d922ca07a628218b331816961fb2818776d8eb	cel	common/stdlib/standard.go:40 init	TP	36 cognitive complexity points over the limit of its role
 a7648c8ac53fe0a93a0f9616dfe9ffb0cb4b9290701eac1c19267a0c554c7ef9	cel	interpreter/attributes.go:951 qualifyInternal	TP	43 decision paths over the limit of its role
 af48ce261deb4feb8916f38865994342de1f8d213ded5f9f6acc2d197842cc60	minivm	internal/ssa/verify.go:125 operation	TP	44 decision paths over the limit of its role
 4d391f77dc6649179c06663b63d990d4e70843cdd4919f606153abc38904b59a	minivm	transform/hoist.go:27 Run	TP	46 decision paths over the limit of its role
@@ -24,3 +52,63 @@ aed0aaed1789fed544d888aa0ddc9049814fccd893fd745bd90b6b4a3c65d331	minivm	internal
 cb2ae56d1c284b462ee7de4f2eca789d44b0075cf206e612cf416c2f036bf2fc	qlbridge	rel/sql.go:1002 Equal	TP	36 decision paths over the limit of its role
 be11ff287a58da7cb5c30c4cecde27f74bff45c3b9e4147946a875e01e79d146	cel	ext/formatting_v2.go:45 format	TP	37 decision paths over the limit of its role
 6bb793a0d4c512382b5e299254e657de90f90d4ee60d4efce0fade1dabdbcd17	qlbridge	lex/lexer.go:1408 lexIdentifierOfTypeNoWs	TP	32 decision paths over the limit of its role
+07779c2e0f2110db1ab0ee791b9f8ed0d4ba0557efc5a71c627f93796038fb5a	qlbridge	lex/lexer.go:834 LexStatement	TP	7 levels of nesting over the limit of its role
+e7c4e0166e43a05fc9bdbf798c6859f81636e91b9c38dd25e5fa2ce7dbb11768	minivm	internal/asm/alloc.go:150 liveness	TP	5 levels of nesting over the limit of its role
+4f782a13a46a838054d464852c5192d069bfe500befe823a3e32763782150f14	qlbridge	exec/mutations.go:184 insertRows	TP	5 levels of nesting over the limit of its role
+38037d044bc39d5b086c0c2f542da6d8e1bc10b16ddc817ad93a61841712b359	qlbridge	exec/order.go:59 Run	TP	6 levels of nesting over the limit of its role
+efb01dae4c00fb38195fb5c55a605d05852b6207e307baef07ee7aed6d7a1b18	qlbridge	exec/groupby.go:72 Run	TP	5 levels of nesting over the limit of its role
+3a4adc3e2f662c42f7eb5832ccfc075f5602f0f8c57403a4e08aa63f9c651607	minivm	transform/forward.go:29 Run	TP	5 levels of nesting over the limit of its role
+ca91a51e15e725e9a8b01e61cbc5110ddf2c6a193f5245abded7d217c97ac97a	qlbridge	exec/groupby.go:180 Run	TP	5 levels of nesting over the limit of its role
+135488ccd53005576630eade4a5f720893574ee049f21944a0f62c2299189861	qlbridge	exec/projection.go:113 projectionEvaluator	TP	6 levels of nesting over the limit of its role
+13465fb34fb60dfb65781f6636e58ca3b4fd977ed2af3ec9efec04264614f8dd	minivm	transform/fold.go:24 Run	TP	5 levels of nesting over the limit of its role
+500c89303b3e38630aeeacaa4885e0d8b43491929e1118ebfb2fde9d12b82437	qlbridge	plan/projection.go:148 projectionForSourcePlan	TP	5 levels of nesting over the limit of its role
+d7c2e2a8d2c5981140178b062876610f577d739e97be33271c71ba811d932ebe	minivm	internal/vigil/declarations.go:14 docs	TP	6 levels of nesting over the limit of its role
+5c7dfaa7281b4cb6e79efd2c88f50db5af81ab439bfb7eb6cee2cd5381e6858d	minivm	interp/interp.go:208 New	TP	5 levels of nesting over the limit of its role
+de83addfd82128f16bc06d81a4862185669fa159e060829402d0b9a3651c58c8	qlbridge	testutil/harness.go:98 ExecSqlSpec	TP	5 levels of nesting over the limit of its role
+ea9d11c3382af8502c4b298708900126954bace7bae9314a66389345b9506ac0	qlbridge	datasource/membtree/btree.go:167 Next	TP	5 levels of nesting over the limit of its role
+f6d6a7c2dee990a7f9321e105ed7c5f3981786205584d25ddd043b5367e4109f	cel	cel/options.go:345 Types	TP	5 levels of nesting over the limit of its role
+d812c4afee90af9e2a07a38596719aff1dd1b0d36072bf6bf7930d8685a999b6	qlbridge	lex/lexer.go:778 LexDialectForStatement	TP	5 levels of nesting over the limit of its role
+1174eda9f5151027c0e98ec31b139caf654cfdbab57d3992beeaafa12c8c758f	qlbridge	expr/builtins/filter.go:212 FilterMatchEval	TP	5 levels of nesting over the limit of its role
+719c2e52fd0c30223256560506dd187a6b3ead6068e223b297f77e8755b2ca7a	qlbridge	exec/join.go:54 Run	TP	5 levels of nesting over the limit of its role
+20a2a127b098374e5853bf18e6ff02db1fd3e2c0f7cc00af35a460b712fb69ab	qlbridge	lex/lexer.go:2876 LexJsonIdentity	TP	5 levels of nesting over the limit of its role
+a8f91ecadc277ed7cabf717e4905523ddecf0f5bd39b57c17d7a8efc7b995fd8	minivm	internal/jit/compile/compile.go:240 Lowering	TP	5 levels of nesting over the limit of its role
+a4f8771123d4156203cf6b9882abafd3f3657c681f47586c8b352bc52ba86633	qlbridge	exec/projection.go:113 projectionEvaluator	TP	200 lines over the limit of its role
+a3a2ed9927cae16956c73bc209c08f2d04a1c293a77f45e940d033e55d1bfb1f	cel	common/ast/factory.go:236 CopyExpr	TP	62 lines over the limit of its role
+56fe28fdda395e0661255de98dce2948faaa58140d2d2ee7326d974e2f864905	cel	common/types/pb/type.go:524 unwrapDynamic	TP	87 lines over the limit of its role
+2fb213e687b8db30321a5f0da2641119fa3b8d5d3b580b211838b2e9dcbbe295	qlbridge	rel/parse_sql.go:1656 parseCreateCols	TP	76 lines over the limit of its role
+4a0423dbd71c4a2b44473ab53d89c7e8d5e6866a70eb75e7fe2ce3aa1a611538	cel	interpreter/attribute_patterns.go:250 matchesUnknownPatterns	TP	91 lines over the limit of its role
+ae6dd44f0327c57b3315d0d98cc8ea22877376ad06d72878632b052386b8a98c	qlbridge	generators/elasticsearch/es2gen/esgenerator.go:189 binaryExpr	TP	84 lines over the limit of its role
+ee05ef3c7c6d07cb53ef67835f5bbb52d55323e6c5e306955a82d5059507794c	minivm	internal/codegen/call.go:462 retire	TP	63 lines over the limit of its role
+114439ff45c4988619a1b54fd5b18de1704c63f7a6860f45b2a0c31cffbf73aa	cel	cel/fieldpaths.go:67 expandFieldPaths	TP	79 lines over the limit of its role
+3263c56e85f761a736546eeebe11a7f531db1103ee0a11a3241d1e7655ea71e9	cel	interpreter/runtimecost.go:97 Observe	TP	79 lines over the limit of its role
+0ab0eca1f619be576045288d39d5f8dfdfed7ab30e955c58fd0fb2690d521200	qlbridge	value/value.go:288 Value	TP	160 lines over the limit of its role
+544f575480bd5cc00c4c38d6437b55aa4095cb9d47e311bfef3fa03d40165869	qlbridge	rel/parse_sql.go:1540 parseOrderBy	TP	65 lines over the limit of its role
+78c64ce1832db542a84f3ebd60807e879f4d394f96451c5ad3a0dcb2195441c7	qlbridge	datasource/sqlite/sqlrewrite.go:267 walkFilterBinary	TP	61 lines over the limit of its role
+da270d5e42a0577fad4abef8a31fe2381a782e6bd971e1a786f184e35b4be585	cel	interpreter/attributes.go:643 Qualifier	TP	158 lines over the limit of its role
+0fa9eb15d0beb9c9dca0bad28c2f4818a4d07a2de82e65623ea355aefba8cc18	cel	interpreter/prune.go:271 prune	TP	196 lines over the limit of its role
+d4c9ea5fef5765031248f961301abaa07a143534602eb7111cb5ffda533f2cc4	cel	cel/folding.go:577 constantCallMatcher	TP	64 lines over the limit of its role
+98aa71b41699f4519bf5ec86fdb4cddd534ac663b7377e8bff36b92839b3eb21	qlbridge	vm/vm.go:1132 operateIntVals	TP	73 lines over the limit of its role
+ec2ac03def53a0f1eb803c3f6cbe920907d54ceb94f753015150f5fc94a3feab	minivm	internal/jit/compile/compile.go:350 function	TP	79 lines over the limit of its role
+bc5a2a087b963a35669df7c768f752c2412d812d91adbd913785469f98d559bd	qlbridge	vm/vm.go:840 walkTernary	TP	76 lines over the limit of its role
+de828db063cf68a244d52e2f491f806f51424b7c6514909f7c46c7300a450c0b	cel	cel/env.go:518 Extend	TP	103 lines over the limit of its role
+dbecf389d4001ab474ef54a3c65406fe38eec43e4920f8d4ae253934de018b16	minivm	cli/repl.go:139 command	TP	62 lines over the limit of its role
+7f8e5e9f1804a11b68b7f4e33d5a2dee31933461e6a4a8135bb114b3e3e0af2d	qlbridge	expr/builtins/filter.go:212 FilterMatchEval	TP	57 statements over the limit of its role
+db49fe62ced7d49937538c2541a1f7dea4db3a301421fef1894fbf6c75b33f90	qlbridge	value/value.go:76 String	TP	43 statements over the limit of its role
+cd88a71e02a55b9fe116ba0531503a7326222ae2f576e9befdc94c03ca1be067	cel	cel/env.go:518 Extend	TP	48 statements over the limit of its role
+fdbff396baf9b66514cdfbccb5e5374407991e0425675c61451a21be2ae6cbcb	qlbridge	datasource/introspect.go:34 IntrospectTable	TP	70 statements over the limit of its role
+a7e5f962dd40e96b472816ee661f5014dfb015aa0bdb09d5d14649a2b497a858	qlbridge	expr/node.go:2150 NodeFromExpr	TP	46 statements over the limit of its role
+e5798e7f146355d0c0f8f1a123490fd7b4049fce096670ffdb458d8d1891989c	minivm	transform/bound.go:122 induction	TP	67 statements over the limit of its role
+7593685459ff45ace10d9ec52d41d93f10806b2389a6180a602394b9000eaf80	cel	cel/io.go:204 ValueAsProto	TP	48 statements over the limit of its role
+2161f9241ea3593d5b502cc1a6a893869884be1a1cebcef461abfc38ec0c58cf	cel	interpreter/attributes.go:1368 refQualify	TP	42 statements over the limit of its role
+e5e24735a435549364bf81dcecc3d0ffc4500aafbd57e27f7200c58d7166e644	minivm	internal/codegen/lower.go:323 resolve	TP	59 statements over the limit of its role
+38d5ef251b65819d0fc4813b8ef5a2c985f5be3039595a88f33588b84c9d4ed2	minivm	internal/codegen/names.go:27 normalizeLocalNames	TP	110 statements over the limit of its role
+26a5a63a561126d2fc114934a6f237202471de227d8d2694782262adbaaa0206	cel	common/env/env.go:881 AsCELType	TP	68 statements over the limit of its role
+1ccde55d12f92209bac3af551e6421b50f24d1ce2622257e65ea0edbef696727	minivm	internal/jit/compile/compile.go:350 function	TP	57 statements over the limit of its role
+267c69e84cfc12ec6cef1bfcc769c2addbdd42af45c0f1305b8fff2d42613aec	cel	internal/minivm/differential/runner/main.go:92 evaluate	TP	65 statements over the limit of its role
+c98907429e0519d72507ccb5970918879762e04a787695eea60ead4ba1280025	cel	ext/formatting.go:119 formatMap	TP	49 statements over the limit of its role
+a8bb68800480a7765c40a84ec35b6c1040298e4455bf4e65b4a65956b0f4cc0c	minivm	interp/encode.go:592 mapWriter	TP	52 statements over the limit of its role
+d49f1312b20cae513e7772a9afe5c119c94912909da65fd682bf947a1cf95a02	minivm	transform/walk.go:492 emit	TP	41 statements over the limit of its role
+20eb364ce8cd0527c97d9e85c0a0b6c34361087df3d74d2bae2a221be753dc10	minivm	benchmarks/fixtures/sieve.go:35 sieveWasm	FP	straight-line benchmark fixture that emits a byte program; not a responsibility smell
+76ae82410b8b622b9ae0b6c43101145778a4f57c6aae94d69d22ca0ac804e869	qlbridge	lex/lexer.go:1813 LexTableReferenceFirst	TP	50 statements over the limit of its role
+2429155b70fd9ba958df35aa15f1c2f56e1ccabc1a83a89422a1aadd93956fb5	cel	ext/formatting_v2.go:45 format	TP	114 statements over the limit of its role
+495339a3927c4a11c86f2dbee4a4e0614797461a35be6fffdec6a1b5dc663a79	qlbridge	vm/vm.go:299 evalBinary	TP	348 statements over the limit of its role

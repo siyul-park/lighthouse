@@ -91,7 +91,7 @@ fn exported_doc_skips_generated_and_test_files() {
     assert!(w.check(DOC, json!({})).is_empty());
 }
 
-const WRAP: &str = "design/no-single-use-wrapper";
+const WRAP: &str = "design/symbols";
 
 /// `Get` calls the wrapper `load`, which only forwards to `read`.
 fn wrapped() -> (World, Symbol, Symbol, Symbol) {
@@ -180,11 +180,20 @@ fn branches(n: usize) -> Vec<Flow> {
     vec![Flow::new(FlowKind::If, 0); n]
 }
 
-const COGNITIVE: &str = "design/cognitive-complexity";
-const STATEMENTS: &str = "design/max-statements";
-const DEPTH: &str = "design/max-depth";
-const PARAMS: &str = "design/max-params";
-const RESULTS: &str = "design/max-results";
+const COGNITIVE: &str = "design/complexity";
+const STATEMENTS: &str = "design/complexity";
+const DEPTH: &str = "design/complexity";
+const PARAMS: &str = "design/signature";
+
+/// The options that report one kind of `design/complexity` at `limit`.
+fn only(kind: &str, limit: Value) -> Value {
+    let mut limits = json!({
+        "lines": -1, "statements": -1, "cyclomatic": -1, "cognitive": -1, "nesting": -1
+    });
+    limits[kind] = limit;
+    json!({ "kinds": [kind], "limits": limits })
+}
+const RESULTS: &str = "design/signature";
 
 #[test]
 fn complexity_is_one_independent_limit() {
@@ -193,7 +202,7 @@ fn complexity_is_one_independent_limit() {
     w.summarize(&wide, 1, &branches(14));
     let narrow = w.func("m", "narrow", "m/a.ucm");
     w.summarize(&narrow, 99, &branches(13));
-    let found = w.check(COMPLEX, json!({ "max": 14 }));
+    let found = w.check(COMPLEX, only("cyclomatic", json!(14)));
     assert_eq!(w.names(&found), ["wide"]);
 }
 
@@ -204,12 +213,15 @@ fn cognitive_complexity_and_depth_have_their_own_limits() {
     let nested: Vec<Flow> = (0..5).map(|n| Flow::new(FlowKind::Loop, n)).collect();
     w.summarize(&tangled, 5, &nested);
     assert_eq!(
-        w.names(&w.check(COGNITIVE, json!({ "max": 14 }))),
+        w.names(&w.check(COGNITIVE, only("cognitive", json!(14)))),
         ["tangled"]
     );
-    assert!(w.check(COGNITIVE, json!({ "max": 15 })).is_empty());
-    assert_eq!(w.names(&w.check(DEPTH, json!({ "max": 4 }))), ["tangled"]);
-    assert!(w.check(DEPTH, json!({ "max": 5 })).is_empty());
+    assert!(w.check(COGNITIVE, only("cognitive", json!(15))).is_empty());
+    assert_eq!(
+        w.names(&w.check(DEPTH, only("nesting", json!(4)))),
+        ["tangled"]
+    );
+    assert!(w.check(DEPTH, only("nesting", json!(5))).is_empty());
 }
 
 #[test]
@@ -218,37 +230,37 @@ fn statements_are_limited_per_role() {
     let long = w.func("m", "long", "m/a.ucm");
     w.summarize(&long, 12, &[]);
     assert_eq!(
-        w.names(&w.check(STATEMENTS, json!({ "max": 10 }))),
+        w.names(&w.check(STATEMENTS, only("statements", json!(10)))),
         ["long"]
     );
-    let by_role = json!({ "max": { "default": 10, "function": 20 } });
+    let by_role = only("statements", json!({ "default": 10, "function": 20 }));
     assert!(w.check(STATEMENTS, by_role).is_empty());
-    let no_default = json!({ "max": { "default": -1, "method": 1 } });
+    let no_default = only("statements", json!({ "default": -1, "method": 1 }));
     assert!(
         w.check(STATEMENTS, no_default).is_empty(),
         "no limit for a function"
     );
     assert!(
-        w.check(STATEMENTS, json!({ "max": -1 })).is_empty(),
+        w.check(STATEMENTS, only("statements", json!(-1)))
+            .is_empty(),
         "-1 is no limit"
     );
 }
 
 #[test]
-fn an_object_limit_keeps_the_roles_of_the_default() {
+fn an_object_limit_names_the_roles_it_limits() {
     let mut w = World::default();
     let plain = w.func("m", "build", "m/a.ucm");
     params(&mut w, &plain, 9);
     let ctor = w.func("m", "NewServer", "m/a.ucm");
     params(&mut w, &ctor, 10);
-    let found = w.check(PARAMS, json!({ "max": { "constructor": 12 } }));
-    assert_eq!(w.names(&found), ["build"], "the default of 8 still applies");
-    let only_default = w.check(PARAMS, json!({ "max": { "default": 20 } }));
-    assert_eq!(
-        w.names(&only_default),
-        ["NewServer"],
-        "the constructor keeps its 9"
-    );
+    let limits = |params: Value| json!({ "kinds": ["params"], "limits": { "params": params } });
+    let found = w.check(PARAMS, limits(json!({ "default": 8, "constructor": 12 })));
+    assert_eq!(w.names(&found), ["build"]);
+    let only_default = w.check(PARAMS, limits(json!({ "default": 20 })));
+    assert!(only_default.is_empty(), "the default covers every role");
+    let no_default = w.check(PARAMS, limits(json!({ "constructor": 9 })));
+    assert_eq!(w.names(&no_default), ["NewServer"], "no default, no limit");
 }
 
 fn flag(
@@ -286,7 +298,7 @@ fn a_role_is_the_first_flag_that_fits() {
         let mut all = serde_json::Map::new();
         all.insert("default".to_owned(), json!(100));
         all.insert(role.to_owned(), json!(5));
-        json!({ "max": all })
+        only("statements", json!(all))
     };
     let flagged = |w: &World, role: &str| w.names(&w.check(STATEMENTS, limits(role)));
     assert_eq!(flagged(&w, "function"), ["plain"]);
@@ -313,8 +325,9 @@ fn complexity_skips_dispatchers_unless_asked() {
         ..Flow::new(FlowKind::Switch, 0)
     }];
     w.summarize(&table, 90, &flow);
-    assert!(w.check(COMPLEX, json!({ "max": 5 })).is_empty());
-    let counted = json!({ "max": 5, "ignoreDispatch": false });
+    assert!(w.check(COMPLEX, only("cyclomatic", json!(5))).is_empty());
+    let mut counted = only("cyclomatic", json!(5));
+    counted["ignoreDispatch"] = json!(false);
     assert_eq!(w.names(&w.check(COMPLEX, counted)), ["table"]);
 }
 
@@ -372,15 +385,28 @@ fn a_limit_refuses_what_is_not_a_limit() {
         json!({ "closure": 3 }),
         json!({ "default": -2 }),
     ] {
-        let result = std::panic::catch_unwind(|| w.check(PARAMS, json!({ "max": bad })));
+        let result =
+            std::panic::catch_unwind(|| w.check(PARAMS, json!({ "limits": { "params": bad } })));
         assert!(result.is_err(), "{bad}");
     }
 }
 
-const COUPLE: &str = "design/coupling";
+const COUPLE: &str = "design/complexity";
 
 fn hub_options() -> Value {
-    json!({ "hubFanIn": 2, "hubFanOut": 2, "hubStatements": 1 })
+    hub(json!({ "fanIn": 2, "fanOut": 2, "statements": 1 }))
+}
+
+/// The options that report only hubs, with `overrides` over the defaults.
+fn hub(overrides: Value) -> Value {
+    let mut hub = json!({
+        "fanIn": 8, "fanOut": 6, "statements": 20,
+        "coordinatorFanOut": 12, "coordinatorMaxFanIn": 1, "coordinatorStatements": 15
+    });
+    for (key, value) in overrides.as_object().unwrap() {
+        hub[key] = value.clone();
+    }
+    json!({ "kinds": ["hub"], "hub": hub })
 }
 
 fn hub_world() -> (World, Symbol) {
@@ -402,7 +428,10 @@ fn coupling_flags_an_intra_package_hub() {
     let (w, _) = hub_world();
     let found = w.check(COUPLE, hub_options());
     assert_eq!(w.names(&found), ["hub"]);
-    assert!(w.check(COUPLE, json!({})).is_empty(), "defaults are high");
+    assert!(
+        w.check(COUPLE, hub(json!({}))).is_empty(),
+        "defaults are high"
+    );
 }
 
 #[test]
@@ -430,12 +459,12 @@ fn coupling_flags_a_coordinator_with_many_callees() {
         let step = w.func("m", name, "m/a.ucm");
         w.edge(EdgeKind::Calls, &run, &step);
     }
-    let options = json!({
-        "hubFanIn": 100,
+    let options = hub(json!({
+        "fanIn": 100,
         "coordinatorFanOut": 3,
         "coordinatorMaxFanIn": 0,
         "coordinatorStatements": 1,
-    });
+    }));
     let found = w.check(COUPLE, options);
     assert_eq!(w.names(&found), ["run"]);
 }
@@ -585,14 +614,20 @@ fn no_panic_reports_each_event_at_its_place() {
     );
     let must = w.func("m", "must_run", "m/a.ucm");
     with_events(&mut w, &must, &[(EventKind::Panic, 20, "panic")]);
-    let found = w.check("design/no-panic", json!({}));
+    assert!(
+        w.check("design/errors", json!({})).is_empty(),
+        "off by default"
+    );
+    let both = json!({ "kinds": ["panic", "unwrap"] });
+    let found = w.check("design/errors", both);
     assert_eq!(
         found,
         [("m/a.ucm".to_owned(), 7), ("m/a.ucm".to_owned(), 9)]
     );
-    let found = w.check("design/no-panic", json!({ "kinds": ["todo"] }));
+    let found = w.check("design/errors", json!({ "kinds": ["panic"] }));
     assert_eq!(found, [("m/a.ucm".to_owned(), 9)]);
-    let found = w.check("design/no-panic", json!({ "allowPrefixes": [] }));
+    let all = json!({ "kinds": ["panic", "unwrap"], "allowPrefixes": [] });
+    let found = w.check("design/errors", all);
     assert_eq!(found.len(), 3, "the prefix is what exempts must_run");
 }
 
@@ -608,7 +643,8 @@ fn an_event_keeps_its_identity_when_a_different_event_comes_before_it() {
             (EventKind::Unwrap, 9, "unwrap"),
         ],
     );
-    let before = w.fingerprints("design/no-panic", json!({}));
+    let both = json!({ "kinds": ["panic", "unwrap"] });
+    let before = w.fingerprints("design/errors", both.clone());
     with_events(
         &mut w,
         &run,
@@ -618,7 +654,7 @@ fn an_event_keeps_its_identity_when_a_different_event_comes_before_it() {
             (EventKind::Unwrap, 9, "unwrap"),
         ],
     );
-    let after = w.fingerprints("design/no-panic", json!({}));
+    let after = w.fingerprints("design/errors", both);
     assert_eq!(after.len(), 3);
     assert_eq!(before.len(), 2);
     assert_eq!(

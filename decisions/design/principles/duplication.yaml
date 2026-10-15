@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/duplication
+  uid: aeab463d-9e93-4f38-9851-ab5624b963ef
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: principles
+spec:
+  title: One implementation, one owner
+  context: >-
+    Two implementations of one rule will diverge, and a concern restated in
+    two places drifts apart. Duplicated behavior drifts; a single owner keeps
+    it consistent (Martin, Clean Code ch. 3 DRY and G5 Duplication;
+    Hunt and Thomas, The Pragmatic Programmer: every piece of knowledge has a
+    single representation). Near-identical bodies often hide one concept
+    implemented twice, and parallel variants multiply what readers must
+    learn; every extra layer or knob is a permanent cost, and moving code
+    downward without generalizing only relocates the complexity.
+
+    Judged: the requirement and the examples are the question put to the
+    project. Near-clone analysis needs a meaningful body size and a semantic or
+    naming relation; syntax similarity alone is not duplication.
+  scope:
+    domain: code
+    subject: project
+  requirement: >-
+    Multiple implementations of the same behavior or rule MUST converge on one
+    owner; syntax similarity alone MUST NOT trigger abstraction. Each behavior
+    MUST have one implementation and each semantic rule MUST have one owner.
+    Near-clone analysis SHOULD require meaningful body size and a semantic or
+    naming relation. Symbols with substantially the same responsibility at the
+    same abstraction level MUST be consolidated; one general symbol SHOULD be
+    preferred over parallel variants, wrappers, aliases, or coordinators.
+    Existing symbols and composition SHOULD be preferred before adding layers,
+    extension points, policy knobs, or parallel mechanisms. Shared
+    functionality MUST be generalized when extracted; it MUST NOT be moved
+    downward merely to relocate complexity. Each concern, such as test
+    contracts and structure or general test code style, MUST have exactly one
+    owning document; other documents MUST reference it instead of restating it.
+  severity: info
+  check:
+    type: model
+  provenance:
+    wasDerivedFrom:
+    - Jiang et al., Deckard 2007; Roy and Cordy 2007
+    - Martin, Clean Code (2008), G5 Duplication
+    - Martin, Clean Code (2008), ch. 3 DRY
+    - Martin, Clean Code (2008), ch. 12 Beck's four rules

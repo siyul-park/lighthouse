@@ -10,16 +10,17 @@ Size limits that keep files reviewable.
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`core/max-lines`](#files-stay-below-a-line-limit) | Files stay below a line limit | warn · cel |  |  |
-| `core/cohesion` | Split files by cohesion | doc |  | A file MUST be split along cohesion boundaries, not by size alone. |
+| [`core/file-size`](#files-stay-small-and-cohesive) | Files stay small and cohesive | warn · cel |  |  |
 
-### Files stay below a line limit
+### Files stay small and cohesive
 
-`core/max-lines` · file · warn · cel
+`core/file-size` · file · warn · cel
 
-*Large files tend to mix responsibilities.*
+*Large files tend to mix responsibilities, and splitting by size alone creates arbitrary boundaries. The count is the file's lines (revive `file-length-limit`), reported once per file with the kind `lines`.*
 
-A file SHOULD stay at or below the configured line limit (option `max`).
+A file SHOULD stay at or below the configured line limit (option `max`). A file that is over the limit MUST be split along cohesion boundaries, not by size alone.
+
+Derived from: revive file-length-limit: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#file-length-limit; Martin, Clean Code (2008), ch. 5 Vertical size and ordering
 
 | option | default | meaning |
 | --- | --- | --- |
@@ -42,25 +43,18 @@ A finding that is right to leave in place can be allowed where it happens, in a 
 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
-| [`core/allow-annotation`](#allow-a-finding-in-source) | Allow a finding in source | doc |  |  |
-| [`core/allow-reason`](#an-allow-annotation-states-its-reason) | An allow annotation states its reason | error · builtin |  |  |
+| [`core/allow`](#allow-a-finding-in-source-with-a-reason) | Allow a finding in source, with a reason | error · builtin |  |  |
 | [`core/no-unused-allow`](#allow-annotations-suppress-something) | Allow annotations suppress something | warn · builtin | suggested |  |
 
-### Allow a finding in source
+### Allow a finding in source, with a reason
 
-`core/allow-annotation` · symbol · doc
+`core/allow` · file · error · builtin
 
-*A decision to accept a finding belongs next to the code it is about, where a reviewer sees it change. The forms are ESLint's directives, with ESLint's `--` before the description, which is required here on every form that disables, and there is no form without ids. `lighthouse-disable-next-line <id>[, <id>] -- <reason>` covers the next line and the symbol declared there, `lighthouse-disable-line <id> -- <reason>` its own line, and `lighthouse-disable <id> -- <reason>` everything from the comment to a matching `lighthouse-enable <id>` or to the end of the file (the whole file above the first line that is neither blank nor a comment; imports are code). ` -- ` separates the ids from the reason, as in ESLint, and ids are separated by commas: `lighthouse-disable a/b, c/d -- why`. A documentation comment (`///`, `//!`, `/** */`) never holds a directive.*
+*A decision to accept a finding belongs next to the code it is about, where a reviewer sees it change, and an exception without a reason cannot be reviewed or revisited. A silenced check is the smell Martin calls Overridden Safeties, so the way to silence one is narrow and explained. The forms are ESLint's directives, with ESLint's `--` before the description, which is required here on every form that disables, and there is no form without ids (ESLint `eslint-comments/require-description`, golangci `nolintlint` with `require-explanation`, clippy `allow_attributes_without_reason`). `lighthouse-disable-next-line <id>[, <id>] -- <reason>` covers the next line and the symbol declared there, `lighthouse-disable-line <id> -- <reason>` its own line, and `lighthouse-disable <id> -- <reason>` everything from the comment to a matching `lighthouse-enable <id>` or to the end of the file (the whole file above the first line that is neither blank nor a comment; imports are code). ` -- ` separates the ids from the reason, as in ESLint, and ids are separated by commas: `lighthouse-disable a/b, c/d -- why`. A documentation comment (`///`, `//!`, `/** */`) never holds a directive. The check reports a directive that gives no reason (kind `reason`); the directive is then ignored. One that suppresses nothing is `core/no-unused-allow`.*
 
-A finding that is right to leave in place MAY be allowed by a comment on the symbol, the line before it or the same line, written `lighthouse-disable-next-line <rule>[, <rule>] -- <reason>`. The comment suppresses the named rules there, whatever their severity, and the reason is required. Allowed findings are counted in the report.
+An allow annotation MUST give a reason after `--`; an annotation without one is ignored and reported. A finding that is right to leave in place MAY be allowed by a comment on the symbol, the line before it or the same line, written `lighthouse-disable-next-line <rule>[, <rule>] -- <reason>`. The comment suppresses the named rules there, whatever their severity, and the reason is required. Allowed findings are counted in the report.
 
-### An allow annotation states its reason
-
-`core/allow-reason` · file · error · builtin
-
-*An exception without a reason cannot be reviewed or revisited.*
-
-An allow annotation MUST give a reason after `--`; an annotation without one is ignored and reported.
+Derived from: ESLint eslint-comments/require-description: https://eslint-community.github.io/eslint-plugin-eslint-comments/rules/require-description.html; golangci-lint nolintlint require-explanation: https://golangci-lint.run/usage/linters/#nolintlint; clippy allow_attributes_without_reason: https://rust-lang.github.io/rust-clippy/master/index.html#allow_attributes_without_reason; Martin, Clean Code (2008), G4 Overridden Safeties
 
 ```go invalid
 package sample
@@ -85,6 +79,8 @@ Also: rust
 *An exception that no longer applies is noise that hides the next real one. A `lighthouse-disable` range that covers no finding is as stale as a single directive, and so is a `lighthouse-enable` that closes no range, or a directive that names no decision (there is no form without ids).*
 
 An allow annotation SHOULD suppress a finding; one whose rule no longer fires there, or is not enabled, SHOULD be removed.
+
+Derived from: Martin, Clean Code (2008), G4 Overridden Safeties; Martin, Clean Code (2008), G12 Clutter
 
 ```diff
 --- a/example.go
@@ -113,6 +109,8 @@ A name is read in findings, configuration and directives for as long as the deci
 *A decision is named once and read everywhere: in findings, configuration, directives and the log. Its identity is the uid, so a name costs nothing to get right later, and the convention is the one ESLint rules follow. The semantic part, which a reviewer judges, is that the name is a noun phrase naming what the decision requires, and a standard smell or refactoring name where one exists (complexity, feature-envy). The check covers what can be counted. Names are cohesive: one word where it stays unambiguous within its pack.*
 
 A decision name SHOULD be kebab-case with at most three words, not counting a `no-`, `max-` or `prefer-` prefix; SHOULD contain none of the words `is`, `are`, `be`, `should`, `must`, `when` or `not`; and SHOULD NOT repeat the name of its pack in a word. `no-<thing>` names a prohibition, `max-<thing>` a limit and `prefer-<thing>` a preference; any other name is a noun phrase naming what is required.
+
+Derived from: Martin, Clean Code (2008), N1 Choose Descriptive Names
 
 ```text invalid
 apiVersion: lighthouse/v1alpha1

@@ -34,9 +34,7 @@ fn check_kind_deterministic_is_false_only_for_a_model() {
 fn check_kind_label_names_the_operation_of_a_standard_builtin() {
     let order = bundled("design/declaration-groups").check.as_ref().unwrap();
     assert_eq!(order.kind.label(), "order");
-    let proximity = bundled("design/contiguity").check.as_ref().unwrap();
-    assert_eq!(proximity.kind.label(), "proximity");
-    let cel = bundled("core/max-lines").check.as_ref().unwrap();
+    let cel = bundled("core/file-size").check.as_ref().unwrap();
     assert_eq!(cel.kind.label(), "cel");
 }
 
@@ -127,14 +125,14 @@ fn model_check() {
 
 #[test]
 fn decision_spec_enforced_needs_an_accepted_status_and_a_check() {
-    let decision = bundled("core/max-lines");
+    let decision = bundled("core/file-size");
     assert!(decision.enforced());
     let proposed = decision.clone().map_spec(|mut s| {
         s.status = DecisionStatus::Proposed;
         s
     });
     assert!(!proposed.enforced());
-    let doc = bundled("core/allow-annotation");
+    let doc = bundled("testing/validation");
     assert!(!doc.enforced());
 }
 

@@ -163,7 +163,7 @@ def script(path, cfg, kind, probe, body_file):
 
     def option():
         with open(cfg, "a") as f:
-            f.write('[spec.rules."design/max-name-words"]\nlevel = "warn"\noptions.max = 2\n')
+            f.write('[spec.rules."design/naming"]\nlevel = "warn"\noptions.kinds = ["words"]\noptions.maxWords = 2\n')
 
     def new_caller():
         pkg = re.search(r"^package (\w+)", read(path, caller), re.M)

@@ -60,7 +60,7 @@ pub(crate) fn probe(prefix: &str, language: &str) -> String {
 
 pub(crate) fn toml(language: &str, plugin: &Path) -> String {
     lighthouse_test_support::project(&format!(
-        "plugins = [{{ id = \"{language}\", path = {:?} }}, \"core\", \"design\", \"testing\", \"local\"]\nextends = [\"core/recommended\", \"design/recommended\", \"design/strict\", \"testing/recommended\"]\n[rules]\n\"local/probe\" = \"warn\"\n\"design/coupling\" = {{ level = \"warn\", options = {{ hubFanIn = 2, hubFanOut = 0, hubStatements = 1 }} }}\n",
+        "plugins = [{{ id = \"{language}\", path = {:?} }}, \"core\", \"design\", \"testing\", \"local\"]\nextends = [\"core/recommended\", \"design/recommended\", \"design/strict\", \"testing/recommended\"]\n[rules]\n\"local/probe\" = \"warn\"\n\"design/complexity\" = {{ level = \"warn\", options = {{ hub = {{ fanIn = 2, fanOut = 0, statements = 1, coordinatorFanOut = 12, coordinatorMaxFanIn = 1, coordinatorStatements = 15 }} }} }}\n",
         plugin.to_str().unwrap()
     ))
 }
@@ -158,7 +158,7 @@ pub(crate) fn rust() -> Fixture {
                         d,
                         "lighthouse.toml",
                         "\"local/probe\" = \"warn\"",
-                        "\"local/probe\" = \"warn\", \"design/max-name-words\" = { level = \"warn\", options = { max = 1 } }",
+                        "\"local/probe\" = \"warn\", \"design/naming\" = { level = \"warn\", options = { maxWords = 1 } }",
                     )
                 },
                 mostly_warm: false,
@@ -265,7 +265,7 @@ pub(crate) fn go() -> Option<Fixture> {
                         d,
                         "lighthouse.toml",
                         "\"local/probe\" = \"warn\"",
-                        "\"local/probe\" = \"warn\", \"design/max-name-words\" = { level = \"warn\", options = { max = 1 } }",
+                        "\"local/probe\" = \"warn\", \"design/naming\" = { level = \"warn\", options = { maxWords = 1 } }",
                     )
                 },
                 mostly_warm: false,

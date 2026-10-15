@@ -101,10 +101,7 @@ fn structured_content_conforms_to_the_output_schema_of_every_reading_tool() {
         ("decision_list", json!({})),
         ("decision_list", json!({ "all": true })),
         ("decision_show", json!({ "id": "design/exported-doc" })),
-        (
-            "decision_test",
-            json!({ "decision": ["design/no-banners"] }),
-        ),
+        ("decision_test", json!({ "decision": ["design/comments"] })),
         ("review_list", json!({})),
         ("review_list", json!({ "detail": "full" })),
         ("review_show", json!({ "fingerprint": prefix })),
@@ -112,7 +109,7 @@ fn structured_content_conforms_to_the_output_schema_of_every_reading_tool() {
         ("model_list", json!({})),
         (
             "fix",
-            json!({ "decision": ["design/no-banners"], "dryRun": true }),
+            json!({ "decision": ["design/comments"], "dryRun": true }),
         ),
     ] {
         let result = called(&mut client, name, arguments);

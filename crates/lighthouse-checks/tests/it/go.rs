@@ -269,7 +269,7 @@ fn config(plugin: &Path) -> String {
 const CONFIG: &str = r#"extends = ["design/recommended"]
 
 [rules]
-"design/coupling" = { level = "warn", options = { hubFanIn = 2, hubFanOut = 2, hubStatements = 1 } }
+"design/complexity" = { level = "warn", options = { hub = { fanIn = 2, fanOut = 2, statements = 1, coordinatorFanOut = 12, coordinatorMaxFanIn = 1, coordinatorStatements = 15 } } }
 "#;
 
 fn line_of(source: &str, needle: &str) -> u32 {
@@ -305,9 +305,9 @@ fn engine_checks_a_multi_file_go_package() {
     // examples and would also speak about this deliberately small package.
     let only = [
         "design/complexity",
-        "design/coupling",
+        "design/complexity",
         "design/exported-doc",
-        "design/no-single-use-wrapper",
+        "design/symbols",
     ]
     .map(str::to_owned);
     let outcome = engine(&plugin, root, "").check(&[], &only).unwrap();
@@ -327,7 +327,7 @@ fn engine_checks_a_multi_file_go_package() {
         (
             "store/load.go",
             line_of(LOAD, "func (s *Store) load"),
-            "design/no-single-use-wrapper",
+            "design/symbols",
         ),
         (
             "store/load.go",
@@ -337,7 +337,7 @@ fn engine_checks_a_multi_file_go_package() {
         (
             "store/store.go",
             line_of(STORE, "func (s *Store) hub"),
-            "design/coupling",
+            "design/complexity",
         ),
         (
             "store/store.go",

@@ -43,11 +43,21 @@ spec:
 
     Rust: a module is a crate or one of its modules, named by the crate and
     the `mod` path (`my_crate/domain/order`); the crate root is the crate name.
+
+    Kind `contract` (the only kind): which contract an import breaks is the
+    evidence `contract`: `forbidden`, `layers` or `independence`. Where an
+    interface lives, and whether low-level code knows its callers, need the
+    meaning of the code and are judged: the requirement and the examples are the
+    question put to a model.
   scope:
     domain: code
     subject: edge
   requirement: >-
-    A module MUST NOT depend on a module of a higher layer, and modules of one
+    Interfaces MUST be used only when callers supply behavior and MUST be
+    defined where that behavior is consumed. Lower-level or reusable symbols
+    MUST express their responsibility in the most general form that fully fits
+    it and MUST NOT depend on caller-specific policy, types, lifecycle, or
+    semantics; lower-level code MUST NOT depend on its callers. A module MUST NOT depend on a module of a higher layer, and modules of one
     layer MUST stay independent of each other, as the project's layers state.
   severity: warn
   options:
@@ -139,152 +149,256 @@ spec:
       to: edge.to.module
       fromLayer: from
       toLayer: to
+      kind: "'contract'"
+      kinds: "['contract']"
       contract: contract
     identity:
       subject: "'imports:' + edge.from.module + '->' + edge.to.module"
   provenance:
     wasDerivedFrom:
-      - "import-linter, layers, independence and forbidden contracts"
-      - "ArchUnit, layeredArchitecture"
-      - "Martin, Stable Dependencies Principle"
+    - import-linter, layers, independence and forbidden contracts
+    - ArchUnit, layeredArchitecture
+    - Martin, Stable Dependencies Principle
+    - Tarjan 1972, strongly connected components
+    - Martin, Clean Code (2008), G13 Artificial Coupling
+    - Martin, Clean Code (2008), G22 Make Logical Dependencies Physical
+    - Martin, Clean Code (2008), ch. 10 Isolate from change
   examples:
-    - name: go-import-points-up
-      language: go
-      kind: invalid
-      options:
-        layers: [["infra"], ["domain"]]
-      files:
-        - path: go.mod
-          body: "module example.com/app\n\ngo 1.26\n"
-        - path: domain/domain.go
-          body: "package domain\n\nimport \"example.com/app/infra\"\n\nfunc Load() string { return infra.Read() }\n"
-        - path: infra/infra.go
-          body: "package infra\n\nfunc Read() string { return \"\" }\n"
-      expect:
-        - line: 5
-    - name: go-import-points-down
-      language: go
-      kind: valid
-      canonical: true
-      options:
-        layers: [["domain"], ["infra"]]
-      files:
-        - path: go.mod
-          body: "module example.com/app\n\ngo 1.26\n"
-        - path: domain/domain.go
-          body: "package domain\n\nimport \"example.com/app/infra\"\n\nfunc Load() string { return infra.Read() }\n"
-        - path: infra/infra.go
-          body: "package infra\n\nfunc Read() string { return \"\" }\n"
-    - name: go-peers
-      language: go
-      kind: invalid
-      options:
-        layers: [["http", "grpc"]]
-      files:
-        - path: go.mod
-          body: "module example.com/app\n\ngo 1.26\n"
-        - path: http/http.go
-          body: "package http\n\nimport \"example.com/app/grpc\"\n\nfunc Serve() string { return grpc.Serve() }\n"
-        - path: grpc/grpc.go
-          body: "package grpc\n\nfunc Serve() string { return \"\" }\n"
-      expect:
-        - line: 5
-    - name: go-peers-may-be-dependent
-      language: go
-      kind: valid
-      options:
-        layers: [["http", "grpc"]]
-        independent: false
-      files:
-        - path: go.mod
-          body: "module example.com/app\n\ngo 1.26\n"
-        - path: http/http.go
-          body: "package http\n\nimport \"example.com/app/grpc\"\n\nfunc Serve() string { return grpc.Serve() }\n"
-        - path: grpc/grpc.go
-          body: "package grpc\n\nfunc Serve() string { return \"\" }\n"
-    - name: go-submodules-of-one-glob
-      language: go
-      kind: valid
-      options:
-        layers: [["http/**"], ["domain"]]
-      files:
-        - path: go.mod
-          body: "module example.com/app\n\ngo 1.26\n"
-        - path: http/api/api.go
-          body: "package api\n\nimport \"example.com/app/http/wire\"\n\nfunc Serve() string { return wire.Encode() }\n"
-        - path: http/wire/wire.go
-          body: "package wire\n\nfunc Encode() string { return \"\" }\n"
-    - name: go-forbidden
-      language: go
-      kind: invalid
-      options:
-        forbidden: [{from: "domain", to: "infra/**"}]
-      files:
-        - path: go.mod
-          body: "module example.com/app\n\ngo 1.26\n"
-        - path: domain/domain.go
-          body: "package domain\n\nimport \"example.com/app/infra/db\"\n\nfunc Load() string { return db.Read() }\n"
-        - path: infra/db/db.go
-          body: "package db\n\nfunc Read() string { return \"\" }\n"
-      expect:
-        - line: 5
-    - name: go-ignored-with-a-reason
-      language: go
-      kind: valid
-      options:
-        layers: [["infra"], ["domain"]]
-        ignore: [{from: "domain", to: "infra", reason: "the config loader moves down in the next release"}]
-      files:
-        - path: go.mod
-          body: "module example.com/app\n\ngo 1.26\n"
-        - path: domain/domain.go
-          body: "package domain\n\nimport \"example.com/app/infra\"\n\nfunc Load() string { return infra.Read() }\n"
-        - path: infra/infra.go
-          body: "package infra\n\nfunc Read() string { return \"\" }\n"
-    - name: rust-mod-points-up
-      language: rust
-      kind: invalid
-      options:
-        layers: [["workspace/infra"], ["workspace/domain"]]
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub mod domain;
-            pub mod infra;
-        - path: src/domain.rs
-          body: |-
-            use crate::infra::read;
+  - name: go-import-points-up
+    language: go
+    kind: invalid
+    options:
+      layers:
+      - - infra
+      - - domain
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
 
-            pub fn load() -> String {
-                read()
-            }
-        - path: src/infra.rs
-          body: |-
-            pub fn read() -> String {
-                String::new()
-            }
-      expect:
-        - line: 3
-    - name: rust-mod-points-down
-      language: rust
-      kind: valid
-      canonical: true
-      options:
-        layers: [["workspace/domain"], ["workspace/infra"]]
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub mod domain;
-            pub mod infra;
-        - path: src/domain.rs
-          body: |-
-            use crate::infra::read;
+        go 1.26
+    - path: domain/domain.go
+      body: |
+        package domain
 
-            pub fn load() -> String {
-                read()
-            }
-        - path: src/infra.rs
-          body: |-
-            pub fn read() -> String {
-                String::new()
-            }
+        import "example.com/app/infra"
+
+        func Load() string { return infra.Read() }
+    - path: infra/infra.go
+      body: |
+        package infra
+
+        func Read() string { return "" }
+    expect:
+    - line: 5
+  - name: go-import-points-down
+    language: go
+    kind: valid
+    canonical: true
+    options:
+      layers:
+      - - domain
+      - - infra
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: domain/domain.go
+      body: |
+        package domain
+
+        import "example.com/app/infra"
+
+        func Load() string { return infra.Read() }
+    - path: infra/infra.go
+      body: |
+        package infra
+
+        func Read() string { return "" }
+  - name: go-peers
+    language: go
+    kind: invalid
+    options:
+      layers:
+      - - http
+        - grpc
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: http/http.go
+      body: |
+        package http
+
+        import "example.com/app/grpc"
+
+        func Serve() string { return grpc.Serve() }
+    - path: grpc/grpc.go
+      body: |
+        package grpc
+
+        func Serve() string { return "" }
+    expect:
+    - line: 5
+  - name: go-peers-may-be-dependent
+    language: go
+    kind: valid
+    options:
+      layers:
+      - - http
+        - grpc
+      independent: false
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: http/http.go
+      body: |
+        package http
+
+        import "example.com/app/grpc"
+
+        func Serve() string { return grpc.Serve() }
+    - path: grpc/grpc.go
+      body: |
+        package grpc
+
+        func Serve() string { return "" }
+  - name: go-submodules-of-one-glob
+    language: go
+    kind: valid
+    options:
+      layers:
+      - - http/**
+      - - domain
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: http/api/api.go
+      body: |
+        package api
+
+        import "example.com/app/http/wire"
+
+        func Serve() string { return wire.Encode() }
+    - path: http/wire/wire.go
+      body: |
+        package wire
+
+        func Encode() string { return "" }
+  - name: go-forbidden
+    language: go
+    kind: invalid
+    options:
+      forbidden:
+      - from: domain
+        to: infra/**
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: domain/domain.go
+      body: |
+        package domain
+
+        import "example.com/app/infra/db"
+
+        func Load() string { return db.Read() }
+    - path: infra/db/db.go
+      body: |
+        package db
+
+        func Read() string { return "" }
+    expect:
+    - line: 5
+  - name: go-ignored-with-a-reason
+    language: go
+    kind: valid
+    options:
+      layers:
+      - - infra
+      - - domain
+      ignore:
+      - from: domain
+        to: infra
+        reason: the config loader moves down in the next release
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: domain/domain.go
+      body: |
+        package domain
+
+        import "example.com/app/infra"
+
+        func Load() string { return infra.Read() }
+    - path: infra/infra.go
+      body: |
+        package infra
+
+        func Read() string { return "" }
+  - name: rust-mod-points-up
+    language: rust
+    kind: invalid
+    options:
+      layers:
+      - - workspace/infra
+      - - workspace/domain
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub mod domain;
+        pub mod infra;
+    - path: src/domain.rs
+      body: |-
+        use crate::infra::read;
+
+        pub fn load() -> String {
+            read()
+        }
+    - path: src/infra.rs
+      body: |-
+        pub fn read() -> String {
+            String::new()
+        }
+    expect:
+    - line: 3
+  - name: rust-mod-points-down
+    language: rust
+    kind: valid
+    canonical: true
+    options:
+      layers:
+      - - workspace/domain
+      - - workspace/infra
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub mod domain;
+        pub mod infra;
+    - path: src/domain.rs
+      body: |-
+        use crate::infra::read;
+
+        pub fn load() -> String {
+            read()
+        }
+    - path: src/infra.rs
+      body: |-
+        pub fn read() -> String {
+            String::new()
+        }

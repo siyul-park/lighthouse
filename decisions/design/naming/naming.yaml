@@ -1,0 +1,305 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/naming
+  uid: 20d2afee-ae3b-4690-9bb7-885cb98ded94
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: naming
+spec:
+  title: Names are short, standard and say what they mean
+  context: >-
+    Context already names the package, receiver, phase, or representation,
+    and a longer name adds words, not meaning (Martin, Clean Code ch. 2 and
+    N1-N7: descriptive, unambiguous names at the right level of abstraction,
+    standard nomenclature, long names for long scopes, no encodings, names
+    that describe side-effects; G20 Function Names Should Say What They Do).
+
+    Kinds. `qualifier`: an exported top-level symbol whose name starts or ends
+    with the name of its package or module (`parser.ParserConfig`,
+    `config_config`) repeats what callers already write. A name equal to its
+    package or module name (`provider.Provider`, `list.List`, `time.Time`) is
+    the package's primary concept; repeating it has meaning and is never
+    reported. `symbols` names the kinds of symbol that are checked; Rust,
+    where a module path is part of every use, checks none by default.
+    `words` (off by default and on in the strict preset): a name has more
+    words than `maxWords`, with the option name of ESLint's `max-lines` and
+    `max-params`. Words are the parts of a name split at `_`, at a
+    lower-to-upper change and at the end of an acronym: `parseHTTPRequest` and
+    `parse_http_request` have three.
+
+    The rest is judged: whether a name is minimal, singular or plural, a
+    predicate that states its form, an action verb that does not hide a
+    query, a one-letter name that outlives a tiny scope, a standard
+    abbreviation kept, and one term for one concept across packages need the
+    meaning of a name. A function that returns a `bool`, and a one-letter
+    name, are put to a model, with the requirement and the examples as the
+    question.
+  scope:
+    domain: code
+    subject: symbol
+  requirement: >-
+    Package, receiver, phase, or representation MUST NOT be repeated in a name
+    without meaning. A name equal to its package or module name
+    (`provider.Provider`, `list.List`, `time.Time`) is the package's primary
+    concept; repeating it has meaning and is never reported. A name SHOULD
+    have at most the configured number of words (option `maxWords`). One word
+    SHOULD be the default; a multi-word name MUST add only the minimum
+    qualifier needed to express a distinction. Capability names MUST be
+    singular; collections and stores MUST be plural. Predicates MUST name
+    their form: `HasX` for containing or registering X, `IsX` for a state
+    predicate, `MatchX` for comparison or validation against X, and a bare `X`
+    for a direct boolean value. `At` MUST be used for position or time
+    predicates. Configured action verbs, by default `Build`, `Compile`,
+    `Publish`, `Capture`, and `Use`, MUST be reserved for actions or
+    transitions. One-letter names MUST be limited to conventional receivers,
+    indexes, and tiny scopes. Standard abbreviations MUST be kept in their
+    conventional form. One term MUST represent one concept across packages,
+    and one concept one term: modules MUST NOT export types of the same name
+    unless they are the same concept.
+  severity: warn
+  options:
+    type: object
+    properties:
+      kinds:
+        type: array
+        items: { type: string, enum: [qualifier, words] }
+        default: [qualifier]
+        description: What to report.
+      symbols:
+        type: array
+        items:
+          type: string
+          enum: [function, type, interface, const, var]
+        default: [function, type, interface, const, var]
+        description: >-
+          Kinds of exported top-level symbols whose names are checked for a
+          repeated qualifier. Empty for Rust: see its tuning.
+      maxWords:
+        type: integer
+        default: 3
+        description: Most words a name may have.
+    additionalProperties: false
+  languages:
+    rust:
+      options:
+        symbols: []
+  check:
+    type: cel
+    select: symbol
+    with:
+      - name: repeated
+        expr: >-
+          'qualifier' in options.kinds
+          ? symbol.module_forms.filter(f, f.key != ''
+              && (symbol.name_key.startsWith(f.key + '_') || symbol.name_key.endsWith('_' + f.key)))
+          : []
+      - name: word_count
+        expr: "'words' in options.kinds ? size(words(symbol.name)) : 0"
+      - name: matched
+        expr: >-
+          ('qualifier' in options.kinds && symbol.owner == '' && symbol.visibility != 'private'
+            && options.symbols.exists(k, k == symbol.kind)
+            && !(symbol.kind == 'function' && symbol.name == 'main') && size(repeated) > 0
+            ? ['qualifier'] : [])
+          + ('words' in options.kinds && word_count > options.maxWords ? ['words'] : [])
+    where: size(matched) > 0
+    review: >-
+      size(matched) == 0 && !symbol.test && !symbol.generated
+      && (size(symbol.name) == 1
+          || (symbol.func != null && size(symbol.func.signature.results) == 1
+              && symbol.func.signature.results[0].text == 'bool'))
+    message: >-
+      {{ size(matched) == 0 ? ''
+         : matched[0] == 'qualifier'
+         ? symbol.kind + ' ' + symbol.name + ' repeats its module name `' + repeated[0].name + '`; callers already write it'
+         : symbol.kind + ' ' + symbol.name + ' has ' + string(word_count) + ' words, limit is ' + string(options.maxWords) }}
+    evidence:
+      kind: "size(matched) > 0 ? matched[0] : ''"
+      kinds: matched
+      name: symbol.name
+      repeated: "size(repeated) > 0 ? repeated[0].name : ''"
+      words: word_count
+      max: options.maxWords
+    identity:
+      subject: symbol.id
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), G20 Function Names Should Say What They Do
+    - Martin, Clean Code (2008), N1 Choose Descriptive Names
+    - Martin, Clean Code (2008), N2 Choose Names at the Appropriate Level of Abstraction
+    - Martin, Clean Code (2008), N3 Use Standard Nomenclature Where Possible
+    - Martin, Clean Code (2008), N4 Unambiguous Names
+  examples:
+  - name: invalid
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package provider
+
+        type ProviderOptions struct{}
+    expect:
+    - line: 3
+    options:
+      kinds:
+      - qualifier
+  - name: suffix
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package provider
+
+        type OptionsProvider struct{}
+    expect:
+    - line: 3
+    options:
+      kinds:
+      - qualifier
+  - name: valid
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package provider
+
+        type Config struct{}
+
+        type Providence struct{}
+
+        type providerState struct{}
+    options:
+      kinds:
+      - qualifier
+  - name: primary-concept
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: example.go
+      body: |-
+        package provider
+
+        type Provider struct{}
+    options:
+      kinds:
+      - qualifier
+  - name: rust-invalid
+    language: rust
+    kind: invalid
+    options:
+      kinds:
+      - qualifier
+      symbols:
+      - type
+    files:
+    - path: src/lib.rs
+      body: pub mod store;
+    - path: src/store.rs
+      body: pub struct StoreHandle;
+    expect:
+    - line: 1
+  - name: rust-valid
+    language: rust
+    kind: valid
+    canonical: true
+    options:
+      kinds:
+      - qualifier
+      symbols:
+      - type
+    files:
+    - path: src/lib.rs
+      body: pub mod store;
+    - path: src/store.rs
+      body: pub struct Handle;
+  - name: rust-primary-concept
+    language: rust
+    kind: valid
+    options:
+      kinds:
+      - qualifier
+      symbols:
+      - type
+    files:
+    - path: src/lib.rs
+      body: pub mod store;
+    - path: src/store.rs
+      body: pub struct Store;
+  - name: rust-off-by-default
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        mod store;
+        pub use store::StoreHandle;
+    - path: src/store.rs
+      body: pub struct StoreHandle;
+    options:
+      kinds:
+      - qualifier
+  - name: words-go-long-name
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        func parseHTTPRequestBodyBytes() {}
+    expect:
+    - line: 3
+    options:
+      kinds:
+      - words
+  - name: words-go-short-name
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        func parseHTTPRequest() {}
+    options:
+      kinds:
+      - words
+  - name: words-go-higher-limit
+    language: go
+    kind: valid
+    options:
+      kinds:
+      - words
+      maxWords: 5
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        func parseHTTPRequestBodyBytes() {}
+  - name: words-rust-long-name
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: fn parse_http_request_body_bytes() {}
+    expect:
+    - line: 1
+    options:
+      kinds:
+      - words
+  - name: words-rust-short-name
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: fn parse_http_request() {}
+    options:
+      kinds:
+      - words

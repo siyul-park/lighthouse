@@ -1,0 +1,54 @@
+# retained: yes (design/max-params)
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run (design/max-params)
+# retained: yes (design/max-results)
+# R3a review: 20 findings sampled at random (seed 7) from the reviewed run; fingerprints are those of that run (design/max-results)
+# retained: yes (design/no-private-types)
+# R3b review: every finding of the final run (8) (design/no-private-types)
+fingerprint	repo	location	verdict	reason
+aedcdbba20f5b83bf9f7f47931b7d325a1d5758b6dffdddf85090adcf79f2e5d	qlbridge	schema/schema.go:635 Field	TP	8 parameters over the limit of its role
+c943f243b0608a421dbf4192a8e03bfbcde027bf24c8d1ad25a84e5828b97032	strict-root	crates/lighthouse-session/src/fix.rs:88 fix	TP	8 parameters over the limit of its role (counts fields of a struct used only here, as specified)
+ab9be5404f11d77c15fa66fb9f73a3895041ee7041bf45a09430af2845dd0f7d	minivm	interp/native.go:883 settle	TP	8 parameters over the limit of its role
+df428df97da72852a280faf9f92ab2d5d90a374151c5e3b15b113ada3a82cb94	minivm	interp/native.go:554 run	TP	7 parameters over the limit of its role
+14ae53e45f629f8726475590716f8f178871439c0a364498bfe2ffb84635b803	cel	parser/helper.go:120 Comprehension	TP	8 parameters over the limit of its role
+cfb8e90ab2cc727f966615b1aa3e281f9c2fdb64e994dcdcdddcf212a5a0e42c	cel	internal/minivm/differential/runner/main.go:92 evaluate	TP	7 parameters over the limit of its role (counts fields of a struct used only here, as specified)
+b7447d80292032eab3407835b444a6f64ee6f163fb7dce752e856f142a9932b7	minivm	internal/vigil/ownership.go:58 access	TP	7 parameters over the limit of its role
+e463f4ffa41ab0a3fc03dab0ef03ae7e0ef81a6e877b0e85db1b36cd9f16e339	strict-root	crates/lighthouse-store/src/store.rs:242 record_fix	TP	8 parameters over the limit of its role (counts fields of a struct used only here, as specified)
+7c2aef716b5373a30cff522f43819f3ca30063f1db3df4fd654bdf51f17b6d38	strict-root	crates/lighthouse-cli/src/main.rs:411 check	TP	10 parameters over the limit of its role (counts fields of a struct used only here, as specified)
+e990a2ef42b223a255a8ae34e3e71e529cf141f841d74601db6fa3d856d19d67	cel	parser/parser.go:941 ReportAmbiguity	FP	the method implements antlr.ErrorListener, an interface outside the project, so its signature is not its own
+04b34fd1bbb6bf573e5be4b1abebfdbb48c0b20fc0d209e91736c9e1b03a735a	strict-root	plugins/lang-rust/src/extract.rs:197 declare	TP	9 parameters over the limit of its role (counts fields of a struct used only here, as specified)
+a8936b51de26c851495aae5832ff24e36bf8952ae10789c748229efa1233a7b0	minivm	internal/jit/code.go:62 Code	TP	10 parameters over the limit of its role
+689671e55117b7559c9eef48421899a0934a60a97e0118438596128c15a4b490	cel	parser/helper.go:132 ComprehensionTwoVar	TP	9 parameters over the limit of its role
+90edcbb756040872fce2feb3a5865b685fa670772bd495d1e3874c8709880bc0	minivm	benchmarks/fixtures/n-body.go:68 nBodyAdvance	TP	9 parameters over the limit of its role
+7cf05ba098c75ff172798032c162e276e3589120bfb21e5bf68bfe391351a31d	minivm	internal/jit/compile/compile.go:133 Lower	TP	7 parameters over the limit of its role
+6d85da33dfe58ad608ec138a20dc2c20aac2ac094f8a827a4d3a83635a3996cd	strict-root	crates/lighthouse-design/src/coupling.rs:26 check	TP	8 parameters over the limit of its role (counts fields of a struct used only here, as specified)
+9e66c6ddbe01e14b2c09938dc25074ba54099032255a49057f74f2bb6b1fc8ff	minivm	benchmarks/fixtures/n-body.go:19 nBodyEnergy	TP	8 parameters over the limit of its role
+25650a5dd74ec920d3e296d135c708c916654af237cc13e457a5d6e05c04bc2a	strict-root	plugins/lang-go/provider/unit.go:307 symbol	TP	8 parameters over the limit of its role
+f453572365f30246ac505186e9c0c889507f82f02bab19b0b0744c9bc4edc66b	cel	test/expr.go:354 ExprComprehension	TP	8 parameters over the limit of its role
+6da4a53fc0441331b8a9e45f91e462e852bcf93bb3a240f65edf611db1fab34d	strict-root	crates/lighthouse-session/src/reviewing.rs:59 record_verdict	TP	5 results over the limit of its role (counts fields of a struct used only here, as specified)
+e65e7355a1c02304cacbffdc79c95f96374b611eb1e04f291572bd1b73252bd0	strict-root	crates/lighthouse-session/src/check.rs:66 summary	TP	8 results over the limit of its role (counts fields of a struct used only here, as specified)
+1e55c7200c74103b78d1abd86e25968213d8cbc28552d54f50f6d34bd8e5119c	minivm	internal/asm/arm64/encoder.go:1137 decodeMovImm	TP	4 results over the limit of its role
+01a59728fa7e6141804ebbdd03a1cfd679474c2f2639aac66c3b96399f901183	strict-root	crates/lighthouse-session/src/migrate.rs:157 migrate_paths	TP	4 results over the limit of its role (counts fields of a struct used only here, as specified)
+5250180c6fa497a084b8adae214589553b56aa797f0da5f66925940846a70453	strict-root	crates/lighthouse-session/src/fix.rs:136 declined_row	TP	5 results over the limit of its role (counts fields of a struct used only here, as specified)
+d06554f1ef9124ec359055ba127c8707113d4ed449012d3aedef20877695b082	minivm	internal/jit/compile/compile.go:133 Lower	TP	4 results over the limit of its role
+64b7a5f3f5e78c965ec5ed25df3064adebe56e31a07940d702d53e6ca4b8615e	cel	interpreter/vm_control.go:105 vmControlRoot	TP	5 results over the limit of its role
+75e98e7963294c01cf91b23cae4bd42919cbbeefa4e7ee2babe410cb77cf8530	minivm	internal/asm/arm64/encoder.go:1057 decodeRegImm	TP	4 results over the limit of its role
+7e3160ec69bd4024fd19b658c4c09018ddef5b18145cd22c7fd8a01fcd7c7774	minivm	interp/interp.go:441 Frame	TP	4 results over the limit of its role
+c6a7f737db48408fc506cf4b78350c7fa63d2144ee686639af5a50da32734b6c	minivm	internal/asm/arm64/encoder.go:1073 decodeRegImm2	TP	5 results over the limit of its role
+8cbed374ee0208190fa198756d5f84fd7926bf645452f790d8467d4ddb4a34bd	cel	internal/minivm/differential/runner/main.go:199 canonicalValue	TP	5 results over the limit of its role (counts fields of a struct used only here, as specified)
+b427b902c9532c033f58b2f33bfdaea9b2155049d3753115743698617987cf98	minivm	internal/asm/arm64/encoder.go:1227 decodeTestBranch	TP	4 results over the limit of its role
+afbaaa6a3f177f5f89dfb1acddbabbc9c8f650dfdb58a5b007514835afdb8be1	cel	parser/unescape.go:104 unescapeChar	TP	4 results over the limit of its role
+5a29f538908b19a138c7935218d6b02e3480ec6c9034b48bf26fd4a1fc22f1d6	minivm	internal/asm/arm64/encoder.go:1182 decodeStrOp	TP	4 results over the limit of its role
+d596b1d5e16c5a332ce18a1b0d22db6f3ecb72008570666cf5c17fbc9c2615d2	strict-root	crates/lighthouse-engine/src/fix/lower.rs:219 block	TP	4 results over the limit of its role (counts fields of a struct used only here, as specified)
+10b83dc1a3a04c9ed86806e83f25cfbc9fb094f6d1db805f7690049b71de6513	strict-root	crates/lighthouse-session/src/fix.rs:125 applied_row	TP	6 results over the limit of its role (counts fields of a struct used only here, as specified)
+0f94c39d6bf0d62d2ae5b56f3ed0a03b411a5c6722f6d5a22a3e01dcefa1201a	minivm	internal/asm/arm64/encoder.go:1014 decodeReg4	TP	5 results over the limit of its role
+1586139c4d61ed911ea25dbc8ccfa57459fa563445ca8dd9a087107fd328cf16	minivm	internal/asm/arm64/encoder.go:1166 decodeMemOp	TP	4 results over the limit of its role
+04c8a98647265df5adefdab518f2fcfd2c02b3ff0edc3148b31791ae6e0ca7a8	strict-root	plugins/lang-rust/src/body.rs:871 analyze	TP	8 results over the limit of its role (counts fields of a struct used only here, as specified)
+a186a51f8b5dc78dfe5b268baef4d4148437203df0d7d9e2c4ed1a952d45ad83	strict-root	crates/lighthouse-report/src/sarif.rs:216 rule_ref	TP	7 results over the limit of its role (counts fields of a struct used only here, as specified)
+40945d9d7650174fc131b2255a6fa16d677356abe5b9679a704ebaa71d9c85b1	cel	interpreter/interpreter.go:85	TP	exported function returns an unexported type
+ed0ba019d60af34f0515c44708305a52607225d6680b9c2babcee41d59bc9667	cel	interpreter/runtimecost.go:42	TP	exported function returns an unexported type
+8c76076efb488acc3c712183730f13f9a05fdae26de9b465812575050085a045	qlbridge	generators/elasticsearch/es2gen/estypes.go:93	TP	exported function returns an unexported type
+04691a18244654de25c2a47dfe9fc83e069409d77f10749ad404fbc3d13e3d4d	qlbridge	generators/elasticsearch/es2gen/estypes.go:132	TP	exported function returns an unexported type
+b1c1401be84fc623ae73159acc23a2a78a5ba0531963ce6f161c5422d8abb9af	qlbridge	generators/elasticsearch/es2gen/estypes.go:182	TP	exported function returns an unexported type
+8f0dc91dbb8d844e4a4d1379ba2cbee02cd32b262ffb7815e71634b380d73ead	qlbridge	generators/elasticsearch/esgen/estypes.go:119	TP	exported function returns an unexported type
+559b04470f81412e47b3090294daae74412f3d20700ec51d9c9ef14dd7d9dfa1	qlbridge	generators/elasticsearch/esgen/estypes.go:161	TP	exported function returns an unexported type
+84bf8d9d8dcbfa9a73bcafb1c13d3b5fe765a2d9a61951296425ec2a1fdac050	qlbridge	generators/elasticsearch/esgen/estypes.go:207	TP	exported function returns an unexported type

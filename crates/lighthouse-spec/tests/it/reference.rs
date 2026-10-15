@@ -2,10 +2,10 @@ use lighthouse_spec::Catalog;
 
 #[test]
 fn a_decision_reference_carries_its_requirement_and_examples() {
-    let decision = Catalog::bundled().decision("design/feature-envy").unwrap();
+    let decision = Catalog::bundled().decision("design/prefer-method").unwrap();
     let told = decision.reference();
 
-    assert_eq!(told.id, "design/feature-envy");
+    assert_eq!(told.id, "design/prefer-method");
     assert_eq!(told.prompt, decision.requirement);
     assert!(!told.invalid.is_empty());
     assert!(!told.valid.is_empty());

@@ -9,9 +9,9 @@ use lighthouse_model::SymbolKind;
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 
-const CLOSE: &str = "design/contiguity";
+const CLOSE: &str = "design/layout";
 
-/// `design/contiguity` as the cel check of a function that its `separator`
+/// the cel check of a function that the `gap` kind of `design/layout`
 /// stands for.
 const CONTIGUITY_AS_CEL: &str = "func.gap.between.exists(b, b.kind != 'method' || (b.owner_key != func.owner_key && (!options.visibilityGroups || (b.visibility != 'private') == (func.visibility != 'private'))))";
 
@@ -62,7 +62,9 @@ fn flagged(
 }
 
 fn contiguity(world: &World, options: &Value) -> BTreeSet<(String, u32)> {
-    world.check(CLOSE, options.clone()).into_iter().collect()
+    let mut gap = options.clone();
+    gap["kinds"] = json!(["gap"]);
+    world.check(CLOSE, gap).into_iter().collect()
 }
 
 /// A file with the shapes the contiguity examples and tests use, one module
@@ -91,7 +93,7 @@ fn crowded() -> World {
 }
 
 #[test]
-fn gap_stands_for_the_proximity_separator_with_visibility_groups() {
+fn gap_stands_for_the_layout_separator_with_visibility_groups() {
     let w = crowded();
     let options = json!({ "visibilityGroups": true });
     let expected = contiguity(&w, &options);
@@ -103,7 +105,7 @@ fn gap_stands_for_the_proximity_separator_with_visibility_groups() {
 }
 
 #[test]
-fn gap_stands_for_the_proximity_separator_without_visibility_groups() {
+fn gap_stands_for_the_layout_separator_without_visibility_groups() {
     let w = crowded();
     let options = json!({ "visibilityGroups": false });
     let expected = contiguity(&w, &options);
@@ -119,7 +121,7 @@ fn gap_stands_for_the_proximity_separator_without_visibility_groups() {
 }
 
 #[test]
-fn gap_stands_for_the_proximity_separator_on_adjacent_methods() {
+fn gap_stands_for_the_layout_separator_on_adjacent_methods() {
     let mut w = World::default();
     let a = w.symbol("m", "A", SymbolKind::Type, "m/a.ucm");
     let b = w.symbol("m", "B", SymbolKind::Type, "m/a.ucm");

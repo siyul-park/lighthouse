@@ -60,20 +60,10 @@ impl<'de> Deserialize<'de> for Check {
                 }
                 None => &["id"],
                 Some("order") => &["op", "clauses"],
-                Some("proximity") => &[
-                    "op",
-                    "when",
-                    "group",
-                    "separator",
-                    "maxDistance",
-                    "contiguous",
-                    "message",
-                    "evidence",
-                ],
                 Some("cycle") => &["op", "edge", "level"],
                 Some(other) => {
                     return Err(D::Error::custom(format!(
-                        "builtin `op` is `{other}`, expected order, proximity or cycle"
+                        "builtin `op` is `{other}`, expected order or cycle"
                     )));
                 }
             },
@@ -169,7 +159,6 @@ impl CheckKind {
         match self {
             Self::Builtin(BuiltinCheck::Op(op)) => match op {
                 BuiltinOp::Order { .. } => "order",
-                BuiltinOp::Proximity { .. } => "proximity",
                 BuiltinOp::Cycle { .. } => "cycle",
             },
             other => other.name(),
@@ -250,37 +239,6 @@ pub enum BuiltinOp {
     /// keys a `reorder` fix sorts by. Each clause is judged on its own and the
     /// findings are concatenated.
     Order { clauses: Vec<OrderClause> },
-    /// Declarations that belong together stay together: nothing but members
-    /// of the same `group` may separate two of them.
-    Proximity {
-        /// CEL over `file`: the check runs on the files it is true for.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        when: Option<String>,
-        /// CEL over a declaration (`symbol`) that gives the key of the group
-        /// it belongs to; empty when it belongs to none.
-        group: String,
-        /// CEL over `between`, a declaration lying between two members of the
-        /// group, and `member` (the later one) and `key` (the group's key):
-        /// true for a declaration that splits the group. Default: any
-        /// declaration that is not in the group.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        separator: Option<String>,
-        /// How many separating declarations a group tolerates between two of
-        /// its members.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        max_distance: Option<u32>,
-        /// The group is contiguous: no separator at all. The default when
-        /// `maxDistance` is not given.
-        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-        contiguous: bool,
-        /// Text over `symbol` (the member separated from the group),
-        /// `previous` (the member before it), `separators` (the declarations
-        /// between, as a list), `count` and `options`.
-        message: String,
-        /// Evidence fields, each a CEL expression over the same variables.
-        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-        evidence: BTreeMap<String, String>,
-    },
     /// No dependency cycle over edges of one kind.
     Cycle {
         /// The edge kind followed: `calls`, `references`, `imports`,

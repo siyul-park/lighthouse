@@ -15,12 +15,12 @@ fn span(line: u32, col: u32, end_line: u32) -> Span {
 
 fn fixture() -> Vec<Diagnostic> {
     let mut first = Diagnostic::new(
-        "core/max-lines",
+        "core/file-size",
         Severity::Warn,
         "file has 12 lines, limit is 10",
         "src/a.txt",
         span(11, 1, 12),
-        Fingerprint::of("core/max-lines", "src/a.txt", ""),
+        Fingerprint::of("core/file-size", "src/a.txt", ""),
     );
     first.evidence = json!({ "lines": 12, "max": 10 });
     first.fix = Some("split the file".to_owned());
@@ -95,12 +95,12 @@ fn sarif_marks_the_invocation_unsuccessful_with_notifications() {
 
 fn at(severity: Severity) -> Diagnostic {
     Diagnostic::new(
-        "core/max-lines",
+        "core/file-size",
         severity,
         "m",
         "a.txt",
         span(1, 1, 1),
-        Fingerprint::of("core/max-lines", "a.txt", &format!("{severity}")),
+        Fingerprint::of("core/file-size", "a.txt", &format!("{severity}")),
     )
 }
 
@@ -134,16 +134,16 @@ fn sarif_describes_a_rule_by_the_decision_it_cites_and_links_its_docs() {
     let rules = sarif["runs"][0]["tool"]["driver"]["rules"]
         .as_array()
         .unwrap();
-    assert_eq!(rules[0]["id"], "core/max-lines");
+    assert_eq!(rules[0]["id"], "core/file-size");
     assert_eq!(
         rules[0]["shortDescription"]["text"],
-        "Files stay below a line limit"
+        "Files stay small and cohesive"
     );
     assert_eq!(rules[0]["defaultConfiguration"]["level"], "warning");
     assert_eq!(rules[0]["properties"]["status"], "accepted");
     assert_eq!(
         rules[0]["helpUri"],
-        "https://github.com/siyul-park/lighthouse/blob/main/docs/decisions/core.md#files-stay-below-a-line-limit"
+        "https://github.com/siyul-park/lighthouse/blob/main/docs/decisions/core.md#files-stay-small-and-cohesive"
     );
     assert_eq!(rules[1]["id"], "demo/boom");
     assert!(

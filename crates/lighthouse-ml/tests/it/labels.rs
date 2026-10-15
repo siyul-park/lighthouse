@@ -7,7 +7,7 @@ use lighthouse_ml::{
 use lighthouse_model::{AgentKind, Attribution, Judgment};
 use lighthouse_spec::Catalog;
 
-const RULE: &str = "core/max-lines";
+const RULE: &str = "core/file-size";
 
 fn judged(fingerprint: &str, judgment: Judgment, by: Attribution, meaning: &str) -> Judged {
     Judged {

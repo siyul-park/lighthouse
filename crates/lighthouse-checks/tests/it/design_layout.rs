@@ -7,10 +7,10 @@ use lighthouse_model::{EdgeKind, SymbolKind};
 use serde_json::json;
 
 const GROUPS: &str = "design/declaration-groups";
-const CLOSE: &str = "design/contiguity";
-const CALLERS: &str = "design/callers-before-callees";
-const BANNERS: &str = "design/no-banners";
-const QUALIFIERS: &str = "design/no-redundant-qualifiers";
+const CLOSE: &str = "design/layout";
+const CALLERS: &str = "design/layout";
+const BANNERS: &str = "design/comments";
+const QUALIFIERS: &str = "design/naming";
 
 #[test]
 fn groups_flag_the_fewest_declarations_that_break_the_order() {
@@ -330,6 +330,6 @@ fn qualifiers_skip_members_tests_and_the_listed_kinds() {
     w.symbol("store", "StoreTest", SymbolKind::Type, "store/a_test.ucm");
     w.symbol("store", "StoreLimit", SymbolKind::Const, "store/a.ucm");
     assert_eq!(w.names(&w.check(QUALIFIERS, json!({}))), ["StoreLimit"]);
-    let only_types = w.check(QUALIFIERS, json!({ "kinds": ["type"] }));
+    let only_types = w.check(QUALIFIERS, json!({ "symbols": ["type"] }));
     assert!(only_types.is_empty());
 }

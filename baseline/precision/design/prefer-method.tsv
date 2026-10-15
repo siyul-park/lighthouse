@@ -1,0 +1,68 @@
+# retained: yes (design/feature-envy)
+# R4 review after the refinements, all findings; unclear counts as not TP (design/feature-envy)
+# retained: yes (design/misplaced-symbol)
+# R4 review after the refinements, all findings; unclear counts as not TP (design/misplaced-symbol)
+fingerprint	repo	location	verdict	reason
+6bf2ab6c79ddd8b323064d2f08726ac1584446282e63c3db0dadfe3c8df4c3a1	cel	interpreter/vm_program.go:84	TP	recursive over node.children/op/constant
+58029a1b7c5b9b0f7a027f392b48b42d7830f61d140656d7e10cd831b035e29c	cel	interpreter/vm_program.go:289	TP	opcode of a node: switch over node.op
+46962ca51efcc83312f9b3d84903440eb8b2a9492e5d2028ac72d9e34c8c7b48	qlbridge	lex/lexer.go:3138	TP	scanner over l; text/template has scanNumber as a Lexer method
+48707490247cf2fc7f225ee4b7855d2a131d74286826b4c1228e77f1e394af37	qlbridge	schema/registry.go:296	TP	all work on Schema fields; a Schema method with an Applyer arg
+8cf4ad044bc864a0e14f9b563d8d8f5dfd032a47ef22462ee63322305b1aede4	minivm	internal/codegen/call.go:178	unclear	6 params; callee target is one input of a code generator
+3cb4c2a311248e7ed70f4e3fdd91eed04e60826ad9195d7f461a119f9185ef44	minivm	internal/codegen/numeric.go:129	FP	slice param: members of inputs[i]
+1fc30a6d19dae0f2d937deea779b4ced6887d5287d56e25c9152b3f87a1fea1a	minivm	internal/codegen/slot.go:435	TP	reads input.room/check/body/boxed only
+2bcfb0b884ed6d5a85e4a9888122145d0a79c540c79d2196d8217c55d33633b3	self	crates/lighthouse-report/src/agent.rs:349	unclear	Briefing is one of two inputs; counts diagnostics
+7ccee4643d22b539b27afee37c772cfee739beeb83b5789a257d1e0fdbd36b71	self	crates/lighthouse-report/src/agent.rs:595	unclear	Briefing is one of three inputs; summary line over diagnostics
+9a1c5f4338e9654223d4db4a0519e6daba4d8d4708d71f7df6d13704dda22c5e	cel	cel/folding.go:319	unclear	factory-like: builds with the optimizer factory, ctx is the real input
+bf7d6879f56206c2a8151bec3eff61ba87b7c270330085604824c86594db6a7a	cel	cel/folding.go:400	unclear	same
+ecc843117b5683c3fcbe45d3883ab4bd5f67c21073b5cff4fc79731a064dc972	cel	common/decls/decls.go:1102	unclear	conversion to a protobuf declaration; a method would couple the type to exprpb
+1ef1a8311ba42e475068664109f4ef2dffeed7dc262f3e29ace268c308d57d76	cel	common/decls/decls.go:1200	TP	formats an overload
+4693f879c418b23c2c28ca00ef6db437a339caa8f746a1a268beeaa270814f33	cel	common/env/env.go:852	TP	recursive over TypeDesc
+261cc14490df09c7aa9561286a7128228137c30f0213f84a58f3be8c8f16b7c6	cel	interpreter/vm_program.go:179	TP	recursive over vmIRNode
+0e3c0d53857040f93ec24aa80c97dcc0c611bf5eca50df8a34674ecfc525eb79	cel	interpreter/vm_program.go:194	unclear	emitter: the builder is the main input
+0989c8e46086fa4a77b8c28a1b30cb59e869cedc6099e9f4f579a4170437e967	cel	interpreter/vm_program.go:232	unclear	emitter: the builder is the main input
+855fb7f1e1a69eb28bff6e899ce292636ebfd591916f8ef2edb2913aa1a52d82	cel	interpreter/vm_program.go:676	TP	converts a vmScalarValue
+016da7b43bf164920f0cae5ecd7cecb1d23b4d3b36f0fbc6eafcc5fb5169ff5a	qlbridge	rel/sql_rewrite.go:107	FP	slice of Columns, a collection loop
+dd5330c3e0924c555f134e2c122b10dd8fb87db97e7af713c8d62940b41891c4	minivm	analysis/blocks.go:138	FP	graph builder over a slice of blocks
+d16d2a7e0e90792dcbf2665306bd9113c41dd8bbe99b0ebb62fc67717e503846	minivm	internal/codegen/call.go:243	unclear	code generator, callee is data
+6a8d7dc5a5178e51761063d48eeb36236f831befe5d4a2c6440d32ac7e00a9be	minivm	internal/ssa/format.go:108	TP	String-like rendering of a Slot
+7fba9ac37c31fc52d5166de07850538c5a1615bfa7bbc83832a738c4563d7f77	minivm	program/parse.go:103	FP	parser fills a Program
+30891fee25f6b72addc3b8bef7ab6e991cb2cfd84dc6c40ac61c033699a6070a	self	crates/lighthouse-report/src/agent.rs:267	unclear	briefing is context, diagnostics are the input
+9e792df44eb9ee1563e5fb32545f04393d18afef82faf752cafa3e35ad6d18a7	self	crates/lighthouse-report/src/agent.rs:401	FP	builds a report output
+738cd190976355470494d1c4767847acbaf336120783b4d36ffb1bc43395b99e	self	crates/lighthouse-report/src/agent.rs:536	unclear	renderer in another layer
+60aa770203a7246bef142730fb5c6c318d91bcd684a6745db49b001b819494f7	self	crates/lighthouse-report/src/group.rs:442	TP	derived only from an Entry
+81eaa385c460c761c046b2128fa0049c42b3555d6b77fd77d4a56b64a63711d6	cel	common/decls/decls.go:1158	TP	walks a types.Type tree with Type methods only
+97682a5dd8603d9133b60209042b48e53c760ef32ae8a017ebea7b4332717533	cel	ext/protos.go:142	unclear	dotted-identifier validator over ast.Expr; specific to ext/protos, a move widens common/ast
+024c0af944acea17b6c481d10b6febd79b5bde57c1be01d90fb03027afd1e553	qlbridge	expr/builtins/json.go:49	FP	a builtin written against value.Value; builtins are clients of the value interface
+cf5a106aabbc7d4de2919e093883eb348381368b407f20018b18e7b672692c31	qlbridge	expr/node.go:2022	unclear	twin of rel/sql.go tokenFromInt
+760928f1fd9490e5ef2ca06448366fd5977ebac4e0a84f9b357965bdbc64c591	qlbridge	plan/planner_select.go:12	FP	planner policy (does the plan need a final projection); rel would gain a planner concept
+4f11feff664277bd9eaac2f375963474f4805d81aa35bea5ba7e00c6921a1f8f	qlbridge	rel/parse_sql.go:1965	unclear	parser rewrite of expr nodes; belongs to the parser step, not to expr
+030df676f5a0aaed0249124fba56b11c4a3efec7a50e8f90ef600bb512a4dd64	qlbridge	rel/sql.go:1976	unclear	pb-int to lex.Token for rel's serialization; twin of expr/node.go:2022 with another field (Description vs Kw)
+b89a399ae097b8d59ccad1b7d3a1c4932b4ffbc86986272fb389bea621a717fc	minivm	cli/profile.go:116	TP	same code as cel minivm/cli/profile.go:450 (cel carries a minivm tree)
+938dda382ad5751ccb7bb29ea10a7eea897d3092f9902fd02456f92e46f5a9a7	minivm	internal/jit/compile/unit.go:78	TP	scan of ssa.Function blocks for a terminator: a Function method
+bd3015634cee42e4fcdf4addf2b0340cb076af6b1c940b0f8e4cd2ab815dce87	minivm	interp/codec.go:672	TP	scalar Value to kind and bits; types owns Boxed/Kind
+a90019e87649b741255a2bb955d8d3921563ccf283ae5878133867f8b89282e8	minivm	interp/decode.go:418	unclear	field matching policy of the decoder over StructType
+6c5f0c58790e8b1a4c1a0740acaf878e49b959acab6ccd221ba4bd7655a2a701	minivm	transform/promote.go:217	unclear	slot test plus a transform-local map parameter
+fb365fb3b4f8dd186d05899f946a641063e9c295840b8e67d450d71c2d25e1e7	minivm	transform/ssa.go:145	TP	Value to Boxed conversion with types.Box* only: types.Box
+a2755485dd2a08f41aa015c2e09ae697f944edc6fdbbdbfb7096d9e3d52f6657	self	crates/lighthouse-checks/src/fix/ops.rs:349	FP	policy of the reorder fix (what a reorder may move), not of the model
+d44cf8ad99e374cd8e1bf60987d004fddae73ab301f9edfde0115684fb5efe1b	self	crates/lighthouse-report/src/agent.rs:574	unclear	heading text of an Expected in the agent renderer; presentation stays in the renderer
+d853e077de34ceacd878d17eaa8e222dd1f0f4cba31b77b4fd5aa22bd1f35943	self	crates/lighthouse-rpc/src/convert.rs:107	unclear	validation of a wire Fragment in rpc; protocol is the lower layer and stays plain data
+090c26795c3f17cee7a6016f510c999b1a75b2058a789373cb259085d75dd5e6	self	crates/lighthouse-spec/src/render.rs:98	FP	markdown rendering of a Fix; the fix module should not know markdown
+eec30945576606b71a128361040495859cdfbc5ca9ea217e136f96936337d7fa	cel	cel/folding.go:689	unclear	AST walk of the optimizer
+6407af7c4bf76350be8b31b6f787da017eb517fb8a9ab0360f27c7fbf70f85c2	cel	cel/optimizer.go:134	unclear	policy of the optimizer
+b22389143a521fe61e1c26f88856367697ae8cfc9f72bd00abcc09ce7dd2d47d	cel	cel/optimizer.go:178	unclear	policy of the optimizer
+91ef74bebc08d284cd01ac62d874da0252a37d942a2a6445591c1836750a9527	cel	cel/validator.go:405	unclear	policy of the validator
+db432eb7172ca1a4d93b3833a4a5e2c7ba723439e11bb05afb22ecd683a1b072	cel	cel/validator.go:528	TP	predicate on the AST
+a5c2c3fdb947d721273ebda6dfa60553ff7bae2af48be3d76b5f0994db280992	cel	checker/checker.go:736	unclear	type-checker policy
+12c3a631f11f69aace3f5b74f999afde38cdcf179572baddec63756d8ec643fa	cel	checker/cost.go:1031	unclear	cost policy of the checker
+fa7e0812a1fd166d93f86b0c7451c7444fd90d4c3280a32ad00b2f7027b41948	cel	ext/costs.go:52	FP	policy of the ext estimator
+f3c4d06583d4c39cd8fff57f1427136e93752ce13a1c1b8ec0f44b121bc7f452	cel	ext/lists.go:739	unclear	cost estimate of ext
+d27fa9d6d93d98bfe668cad7bb293b78dbafd57f67b5338eae222c72bc46f76c	cel	ext/math.go:963	FP	error suffix policy of ext/math
+6bba3b62ad97a5922c7468fb997d1a1f8d9c781a17512db142e04a9cafbf6b51	cel	interpreter/prune.go:564	TP	recognizes a call shape of the AST
+a42e37d5dab699aeabd7b659cfa01e327dc373995dda35489977897ba5120ff1	cel	parser/unparser.go:503	FP	unparser concern
+57c21047cd281f654178a3de8943bbec1bcf2a9a87d20a3286851a489fa350cb	minivm	internal/codegen/lower.go:594	TP	property of an opcode
+5f5d851b26efbc9b40fa45daed4b463bf9afad91c8d43ff3c2fd13d4dd68df7f	minivm	interp/native.go:1678	TP	a Function method
+6cd795800fd03e7d500364c2fd9f04c0cfa6dbc47bae4822e14b1af4ebe610b8	self	crates/lighthouse-checks/src/builder/mod.rs:584	FP	test-touch policy of the checks
+84f2119b19868cc7507a18c1227d13ed0be11ea3b34c93873f56af69b0b227fb	self	crates/lighthouse-checks/src/builder/ownership.rs:245	unclear	owner-use test over the model
+babb306a02d3d1ba31e980094a1924f87c34f69a74ac805b68f3e55ee87700cf	self	crates/lighthouse-cli/src/hook.rs:220	FP	policy of the hook layer
+411fdaa36fd89af29fba0f95988688eea23f6a2f7e6579a167bd6e3e40c7dc94	self	crates/lighthouse-cli/src/review.rs:281	FP	renderer of the cli
+40d295825f0561496cdbdea54dd3306b6373a04b7f921d52a295e05a641fe56e	self	crates/lighthouse-spec/src/pack_docs.rs:207	FP	renderer of the docs

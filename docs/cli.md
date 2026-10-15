@@ -313,7 +313,7 @@ Usage: lighthouse decision eval [OPTIONS] <ID>
 
 Arguments:
   <ID>
-          The decision, such as `design/feature-envy`
+          The decision, such as `design/prefer-method`
 
 Options:
       --repo <NAME=DIR>
@@ -341,9 +341,9 @@ Options:
           Print help (see a summary with '-h')
 
 Examples:
-  lighthouse decision eval design/feature-envy
-  lighthouse decision eval design/feature-envy --check candidate.yaml --format json
-  lighthouse decision eval design/feature-envy --repo cel=../cel --audit 50
+  lighthouse decision eval design/prefer-method
+  lighthouse decision eval design/prefer-method --check candidate.yaml --format json
+  lighthouse decision eval design/prefer-method --repo cel=../cel --audit 50
 ```
 
 ## `lighthouse review`
@@ -602,7 +602,7 @@ Usage: lighthouse model train [OPTIONS] <ID>
 
 Arguments:
   <ID>
-          The decision whose labels the model learns, such as `design/feature-envy`
+          The decision whose labels the model learns, such as `design/prefer-method`
 
 Options:
       --model <REF>
@@ -630,9 +630,9 @@ Options:
           Print help (see a summary with '-h')
 
 Examples:
-  lighthouse model train design/feature-envy
-  lighthouse model train design/feature-envy --model local/general --repo cel=../cel
-  lighthouse model train design/feature-envy --from-model openai/gpt-5 --format json
+  lighthouse model train design/prefer-method
+  lighthouse model train design/prefer-method --model local/general --repo cel=../cel
+  lighthouse model train design/prefer-method --from-model openai/gpt-5 --format json
 ```
 
 ## `lighthouse cache`

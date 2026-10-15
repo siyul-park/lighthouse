@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: design/responsibility
+  uid: 064e4160-8da3-4079-9674-aaeab16151ee
+  labels:
+    lighthouse/pack: design
+    lighthouse/section: principles
+spec:
+  title: One responsibility per symbol, and a boundary for every split
+  context: >-
+    A symbol with one responsibility and a narrow contract is easy to name,
+    test and reuse; a split without a real difference in lifecycle or
+    invariant only adds navigation cost, and a small module that a single
+    other module uses is that user's detail (Martin, Clean Code ch. 10: a
+    class has one reason to change; Ousterhout, A Philosophy of Software
+    Design ch. 4 and 9: deep modules, better together). Reuse bought by
+    merging unrelated roles couples things that change for different reasons.
+
+    Judged: the requirement and the examples are the question put to a model,
+    for each module that is small and has a single dependent, no dependents
+    or no declarations of its own.
+  scope:
+    domain: code
+    subject: module
+  requirement: >-
+    Each symbol MUST have one coherent responsibility, a narrow contract, and
+    sufficient scope for every legitimate caller. Symbols MUST be separated
+    only when responsibility, invariant, ownership, lifecycle, or abstraction
+    level differs. Physical separation MUST represent a real responsibility,
+    ownership, or abstraction boundary: a module separated from its only user
+    MUST be that kind of boundary, or be merged into the user. Unrelated roles
+    MUST NOT be combined merely to force reuse.
+  severity: info
+  check:
+    type: model
+    # Recall-oriented: modules under 600 lines with a single dependent or
+    # nothing declared, and modules nobody imports unless they are an entry
+    # module (a Go `main` package or a Rust binary target).
+    select: >-
+      module.lines < 600
+      && (size(module.dependents) == 1 || module.declares == 0
+          || (size(module.dependents) == 0 && module.name != 'main'
+              && !module.path.contains('[bin:')))
+  provenance:
+    wasDerivedFrom:
+    - Martin, Clean Code (2008), ch. 10 Classes should be small
+    - Martin, Clean Code (2008), ch. 10 Single responsibility and cohesion
+    - Martin, Clean Code (2008), ch. 10 Organize for change
+    - Martin, Clean Code (2008), G30 Functions Should Do One Thing

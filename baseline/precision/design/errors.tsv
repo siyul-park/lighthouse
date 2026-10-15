@@ -1,0 +1,64 @@
+# retained: yes (design/error-identity)
+# R3b review: every finding of the final run (35); verdicts from the review report (design/error-identity)
+# retained: yes (design/no-panic)
+# R4: 24 of the 107 findings the R3b sample did not cover (seed 11, six per repository). TP = a real panic site in production code (design/no-panic)
+fingerprint	repo	location	verdict	reason
+f72b5c238609946c58509adc85b1b51ea4db51f60995b1c727febd333aa5c86b	cel	cel/options.go:435	TP	comparison or assertion against an error, as errorlint reports
+c365b7e5264ad4ef1bdb8037326855bc7754489e080ba5b12c7e80e781db29ad	cel	common/decls/decls.go:181	TP	comparison or assertion against an error, as errorlint reports
+f0df618112aa59db39bb5cd120d5cdec3f775a8931514c046cb3357ea313badb	cel	common/env/io.go:121	TP	comparison or assertion against an error, as errorlint reports
+76c3ffa79398c978f89cd441c8599753d3539b31e0fa13dd1e006432691597ec	cel	common/types/err.go:116	TP	comparison or assertion against an error, as errorlint reports
+a91af7a1e3b1fe966d640188b52270521f1ce1c89c6e466f0bc5353132aa6636	cel	common/types/object.go:97	TP	comparison or assertion against an error, as errorlint reports
+1dc2758e7a8cc0d9ee98ae81e5f0f6ffa1d9cc8515c9ee33dca9fe615efd0b61	cel	common/types/pb/pb.go:78	TP	comparison or assertion against an error, as errorlint reports
+c06e3773912d2d29ceb744987ecc4c9da6a2f20ea03f57255a9a986b7a57126d	cel	common/types/pb/pb.go:82	TP	comparison or assertion against an error, as errorlint reports
+752caaba42c08ab7b0b98556b70c4ebc8d65a1ae35a0e64bb0a5f0b0a9568f0a	cel	common/types/pb/type.go:541	TP	comparison or assertion against an error, as errorlint reports
+3a8b947bdfc3d556f5724c454d77aea272465aa5f29e84fba7f383a209fd5353	cel	common/types/pb/type.go:547	TP	comparison or assertion against an error, as errorlint reports
+ad79da34dc0e8cc1be511c8a7c0262b3075d13bdb8affe70f8b24e856cb26c55	cel	common/types/provider.go:815	TP	comparison or assertion against an error, as errorlint reports
+20d6beea92c0a8ddf5cf708fa2eabb43624614f21d559285483f5ad062b13da0	cel	ext/encoders.go:147	TP	comparison or assertion against an error, as errorlint reports
+45e1a97341b595f8d14c7609ead405bd317fd1707c6f08b5d0e317f18dc84db9	cel	ext/formatting.go:460	TP	comparison or assertion against an error, as errorlint reports
+4cc57a075285f245f0080341b4f8bd8ddb121f74ffd6453bd96a936d881ec794	cel	ext/network.go:508	TP	comparison or assertion against an error, as errorlint reports
+239f6ad25654b95bfe1c628d367dde3f8270eb8d840ed229ade830458245fef7	cel	ext/network.go:522	TP	comparison or assertion against an error, as errorlint reports
+b4d14fe9079daab24fa7935162bd98947bdda0d8d46bba781160d764287d8518	cel	interpreter/attributes.go:546	TP	comparison or assertion against an error, as errorlint reports
+e6ba5e4a6a714ac40f7d9e411003821e7a1bc8fc8d7c8be82a0e32cbc37ddf96	qlbridge	datasource/files/filepager.go:92	TP	comparison or assertion against an error, as errorlint reports
+c11ab113970d890d8c4124768e6cb10ff4460d3ddd1dffc05a9b889ac38e2f78	qlbridge	datasource/files/filepager.go:167	TP	comparison or assertion against an error, as errorlint reports
+39c1664017a3394afc8490254a43e0c0d7d279c9fbc25d3d17e802dc34fa4fd5	qlbridge	datasource/files/filepager.go:170	TP	comparison or assertion against an error, as errorlint reports
+ca94ab9d0686d9d5a1ff0ac8cb0f8e0b0222308f9811d8dd37f5d6a2906f55a0	qlbridge	datasource/files/filepager.go:170	TP	comparison or assertion against an error, as errorlint reports
+1dfadfbe75fa3fcbbe9f4bb9baaa0d8aeeb5ac5bd6f8ddf33bbc6334e26cddc0	qlbridge	datasource/files/filepager.go:259	TP	comparison or assertion against an error, as errorlint reports
+6539627fd032445ceb190475c33fb4bee987d7f237d09d01517bbdaa91e69b68	qlbridge	datasource/files/filesource.go:263	TP	comparison or assertion against an error, as errorlint reports
+11088f31fb600a38a3699cd310959a299d978aaad6b7d94ec23d331d100bbdb8	qlbridge	datasource/files/filesource.go:265	TP	comparison or assertion against an error, as errorlint reports
+829428482128a6a4f1c9932f7565c18696b280571984b7d3e7113b4686a6f5ac	qlbridge	datasource/files/filesource.go:265	TP	comparison or assertion against an error, as errorlint reports
+06072245d855c099a73fb730269ce4816f5d1a02eadd2b90acaecf86d6de0cdb	qlbridge	datasource/files/storesource.go:124	TP	comparison or assertion against an error, as errorlint reports
+4b457b2b7a52cd28ab5441d203aa69d2169cfbb8301f699b731f44f01763e3d7	qlbridge	expr/builtins/time.go:389	TP	comparison or assertion against an error, as errorlint reports
+251816169af01ea556f96f272accbf0af261b950068a052bde21205f2d54d7b3	qlbridge	expr/node.go:628	TP	comparison or assertion against an error, as errorlint reports
+e588d46d2ed11d153d71c30ce3156c9ee14c268d2b20402bf9792389c210da6c	qlbridge	expr/parse.go:560	TP	comparison or assertion against an error, as errorlint reports
+71188db7f0e1d22e11c393b1103f1008dfff0b8223f8608e8f0dc0311e4b1b22	qlbridge	generators/elasticsearch/es2gen/esgenerator.go:102	TP	comparison or assertion against an error, as errorlint reports
+58c68df76331a403ffc9fef4da4af9cd74d39939983930b6a66c33a503a311e5	qlbridge	generators/elasticsearch/es2gen/esgenerator.go:160	TP	comparison or assertion against an error, as errorlint reports
+db2aedef2ad6e46bba7cb08be191cabcca9edcd291c996867d4df6c96390160d	qlbridge	generators/elasticsearch/esgen/esgenerator.go:101	TP	comparison or assertion against an error, as errorlint reports
+1cb784ca684e79dc41bca6c60111d7c8255a555d182810fe2c4393664000b2b2	qlbridge	generators/elasticsearch/esgen/esgenerator.go:159	TP	comparison or assertion against an error, as errorlint reports
+05dd7bc7a766138d2d43bfa6d6a654e57bb7f1661e50409baef42c8936671b96	qlbridge	vm/vm.go:186	TP	comparison or assertion against an error, as errorlint reports
+2e3f2eaa833f5c9a723f8d21263767f591181e19388a427faba78bb47d5ddd7a	minivm	internal/cmd/vigil/main.go:181	TP	comparison or assertion against an error, as errorlint reports
+767fd463aa32e808fa9382c6f8aebcf43c219fbb819b479d7f34382071147d8d	minivm	internal/cmd/vigil/main.go:249	TP	comparison or assertion against an error, as errorlint reports
+c71d3f53bf4bb08ee34fcb408afe5707b39131f9ae8ea14c57240c5c327dd46c	minivm	interp/interp.go:1185	FP	r is a recovered any, not an error
+4e682a3ed8daf74b4d85e4f84aa337fc388181bf23db08ed0a6095f9bf8f6b05	cel	parser/parser.go:224	TP	a real panic site in production code (the R3b meaning)
+8f5bfb74665c4e32dca6e669b183fe41fa5b408e212a3f54ac582d871f445232	cel	interpreter/runtimecost.go:173	TP	a real panic site in production code (the R3b meaning)
+ea4abfe97c0c9f1b57eb76a183428c373fc0312bcc89bbe5ea14eaf352b7720a	cel	checker/decls/decls.go:251	TP	a real panic site in production code (the R3b meaning)
+db444b21d7b25c6a1fe2cc1a3fadf4684945207be7449027ac203d50c0ecff84	cel	common/debug/debug.go:308	TP	a real panic site in production code (the R3b meaning)
+85f9bb8049559da68efa071e6ad1ddd37cca5cc5bd62487b92145ae6d3fbde0a	cel	parser/input.go:32	TP	a real panic site in production code (the R3b meaning)
+ec9d25d6f1a72c482cb1921b2006c97ab9fde53389d3769ef58f21ae2217330a	cel	common/stdlib/standard.go:929	TP	a real panic site in production code (the R3b meaning)
+8f8ce7812a01e579eb87cfd9d9647815d38af7681e119ee90e53ee7fc07e7801	qlbridge	datasource/mockcsvtestdata/testdata.go:53	FP	test-data package (mockcsvtestdata), not production
+a45354f62b076ff7125a690feb9a5aae3b5d3abbf4a97c17d7efb8b2b8594244	qlbridge	exec/executor.go:306	TP	a real panic site in production code (the R3b meaning)
+9f365a3e80a8a2cc3010a6468f606ae68849d71093a312d886a13e8fb27cfc21	qlbridge	expr/parse.go:257	TP	a real panic site in production code (the R3b meaning)
+4bd35ac4a8d1fd9f9977b97ab1b97e42648628b1c77e06dcb03ecf031c0dde8e	qlbridge	vm/vm.go:1032	TP	a real panic site in production code (the R3b meaning)
+fd5652cf90b7a360da70d7b0b2b1361c791dcc94b13657bb0100b3e4d94e39cd	qlbridge	expr/parse.go:560	TP	a real panic site in production code (the R3b meaning)
+c93f8c5822188c5926294faf0a93b1ead6808fc6729450eb47a47f8b8071c92d	qlbridge	expr/parse.go:580	TP	a real panic site in production code (the R3b meaning)
+bd5156b93beacbe4f74cfe682fcd539a888b9ba604908b3c747cb9d2ac390ccb	minivm	internal/codegen/array.go:484	TP	a real panic site in production code (the R3b meaning)
+d17b914574d5f9d2bbc2f4f713dcfe1f3ae1ee4445dd1c2d2d08bb1151cee3ed	minivm	internal/codegen/lower.go:283	TP	a real panic site in production code (the R3b meaning)
+2328ec40b5ceda9a9c226ba612c87cb7e9e105b96758e45e81f805967d1b6ac6	minivm	interp/interp.go:985	TP	a real panic site in production code (the R3b meaning)
+af68c1fdc8eeb324e3d1927e73d6c989a2c8eb01db3d3c6366b8bc19b3fa97b9	minivm	internal/codegen/array.go:464	TP	a real panic site in production code (the R3b meaning)
+5ce9f7d9f9fb44d9fa89bf67966cc75021d8ff0d2cfcccef5c96919f4c55f255	minivm	internal/codegen/slot.go:587	TP	a real panic site in production code (the R3b meaning)
+c716725af858fcdd24f9b30ac4555cbf4533d4052c03cd2f3bc53916b86d1520	minivm	interp/decode.go:180	TP	a real panic site in production code (the R3b meaning)
+97116cd1e3c077109a59e3e15172c14844e194330475310e251dfb13b7bd097b	self	crates/lighthouse-spec/src/decision.rs:178	TP	a real panic site in production code (the R3b meaning)
+0aa1ec12167aacfab81781e5500b702335c1476371d3333298c8b05d1636ed78	self	crates/lighthouse-report/src/lib.rs:129	TP	a real panic site in production code (the R3b meaning)
+d6906c72344580bcb9eaa7ebb52546b18f55367e2e83eef4c90cd08ceadfae03	self	crates/lighthouse-protocol/src/serve.rs:111	TP	a real panic site in production code (the R3b meaning)
+df7469a8328ffbf9514e1e0e1ed50ecb82900cf95ef7f2db779a3dabadae94e4	self	crates/lighthouse-protocol/src/lib.rs:45	TP	a real panic site in production code (the R3b meaning)
+8780ea5b581e8a88490faa50fd70e4ea6303527f9c30162aa56851fb50ad34ff	self	crates/lighthouse-spec/src/catalog.rs:59	TP	a real panic site in production code (the R3b meaning)
+f4c6d0b7a1f21dfe56bfa3baee29ceb0aee3026698be2963fb66c92e187076c6	self	crates/lighthouse-store/src/log.rs:165	TP	a real panic site in production code (the R3b meaning)

@@ -144,7 +144,7 @@ fn max_warnings_fails_a_run_with_more_warnings_than_allowed() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(
-            "plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 2 } }\n",
+            "plugins = [\"core\"]\n[rules]\n\"core/file-size\" = { level = \"warn\", options = { max = 2 } }\n",
         ),
     );
     write(dir.path(), "a.txt", "1\n2\n3\n");
@@ -170,7 +170,7 @@ fn sarif_links_a_rule_to_its_decision_page() {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(
-            "plugins = [\"core\"]\n[rules]\n\"core/max-lines\" = { level = \"warn\", options = { max = 2 } }\n",
+            "plugins = [\"core\"]\n[rules]\n\"core/file-size\" = { level = \"warn\", options = { max = 2 } }\n",
         ),
     );
     write(dir.path(), "a.txt", "1\n2\n3\n");
@@ -184,7 +184,7 @@ fn sarif_links_a_rule_to_its_decision_page() {
         rule["helpUri"]
             .as_str()
             .unwrap()
-            .ends_with("docs/decisions/core.md#files-stay-below-a-line-limit")
+            .ends_with("docs/decisions/core.md#files-stay-small-and-cohesive")
     );
     assert_eq!(sarif["runs"][0]["results"][0]["level"], "warning");
 }

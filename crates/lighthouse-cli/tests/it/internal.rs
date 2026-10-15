@@ -10,7 +10,7 @@ use tempfile::TempDir;
 
 const DOC: &str = "design/exported-doc";
 const OWNER: &str = "testing/owner";
-const SINGLE: &str = "testing/unique-owner";
+const SINGLE: &str = "testing/owner";
 
 const PACKS: &str = "\"core\", \"design\", \"testing\"";
 const PRESETS: &str = "[\"core/recommended\", \"design/recommended\", \"testing/recommended\"]";

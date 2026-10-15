@@ -10,35 +10,96 @@ metadata:
 spec:
   title: Behavior lives with its owner
   context: >-
-    Where a function lives tells readers who owns the behavior.
+    Where a function lives tells readers who owns the behavior (Martin, Clean
+    Code G18 Inappropriate Static, G14 Feature Envy, G17 Misplaced
+    Responsibility).
 
-    Go: A private package function with at least one production caller,
-    every caller being a method of one type, never used as a value and not
-    named like a constructor, is reported. Test callers do not count. A
-    function called by any other function, or by methods of two types, is
-    not judged.
+    Kind `method`: a private free function whose only callers are methods of
+    one type, and which takes a value of that type or calls or references it
+    or one of its members, is that type's behavior wearing another name. A
+    function that does neither is a helper with no more to do with the owner
+    than with any other type. Constructors, `main` and `init` are not
+    reported.
 
-    Rust: The same for a private free function and the methods of one
-    `impl` target type.
+    The other two kinds are review routes, off by default and on in the
+    strict preset, because their precision is low: a candidate is put to a
+    model, not reported. `envy` is Fowler's Feature Envy (Refactoring, 2nd
+    ed.) with the detection strategy of Lanza and Marinescu (2006): the
+    function accesses more than a few foreign attributes (ATFD above FEW,
+    which they put at 3) of one class only. Sonar has no rule for it, and
+    PMD's design rules have a God Class but no feature-envy rule. `module` is
+    Fowler's Move Function with the foreign-data measure of the same
+    authors: a function whose every use lies in one other module is that
+    module's code, kept here by accident of history. No tool checks it: Sonar
+    and PMD judge coupling of a class, not where a function belongs.
   scope:
     domain: code
     subject: symbol
   requirement: >-
     Methods SHOULD express receiver-owned behavior; free functions SHOULD
-    express construction or behavior with no natural receiver.
+    express construction or behavior with no natural receiver. A function that
+    uses only the members of one type SHOULD be a method of that type, and a
+    function SHOULD live in the module whose symbols it uses.
   severity: warn
   options:
     type: object
     properties:
+      kinds:
+        type: array
+        items:
+          type: string
+          enum:
+          - method
+          - envy
+          - module
+        default:
+        - method
+        description: 'What to report: a private function called only by the methods
+          of one type (`method`), and, as review candidates for a model, a function
+          that uses the members of only one type (`envy`) or the symbols of only one
+          other module (`module`).'
       requireOwnerParam:
         type: boolean
         default: false
-        description: >-
-          Report only functions that take a value of the owner type as a
-          parameter, the strongest sign that the owner should be the receiver.
-          By default a function that takes one or calls or references the owner
-          or one of its members is reported; a function that does neither is a
-          helper with no more to do with the owner than with any other type.
+        description: Report only functions that take a value of the owner type as a
+          parameter, the strongest sign that the owner should be the receiver. By default
+          a function that takes one or calls or references the owner or one of its members
+          is reported; a function that does neither is a helper with no more to do with
+          the owner than with any other type.
+      envy:
+        type: object
+        properties:
+          minMembers:
+            type: integer
+          minStatements:
+            type: integer
+          includeExported:
+            type: boolean
+        default:
+          minMembers: 3
+          minStatements: 3
+          includeExported: false
+        description: 'What makes a function a candidate for `envy`. `minMembers`: Fewest
+          distinct members of the type the function must use. `minStatements`: Fewest
+          statements a function must have to be judged. `includeExported`: Also judge
+          exported functions, whose callers outside the module would have to change.'
+      module:
+        type: object
+        properties:
+          minUses:
+            type: integer
+          minStatements:
+            type: integer
+          includeExported:
+            type: boolean
+        default:
+          minUses: 3
+          minStatements: 3
+          includeExported: false
+        description: 'What makes a function a candidate for `module`. `minUses`: Fewest
+          distinct symbols of the other module the function must use. `minStatements`:
+          Fewest statements a function must have to be judged. `includeExported`: Also
+          judge exported functions, whose callers would have to change.'
     additionalProperties: false
   check:
     type: cel
@@ -46,111 +107,484 @@ spec:
     with:
       - name: affinity
         expr: func.receiver_affinity
-    where: >-
-      func.kind == 'function' && func.visibility == 'private'
-      && func.name != 'main' && func.name != 'init' && !func.constructor_named
-      && func.references == 0 && size(affinity) > 0
-      && (affinity.takes_owner_param || affinity.uses_owner)
-      && !(options.requireOwnerParam && !affinity.takes_owner_param)
+      - name: envy
+        expr: "('envy' in options.kinds || 'module' in options.kinds) ? func.envy : {}"
+      - name: free
+        expr: func.kind == 'function' && func.name != 'main' && func.name != 'init'
+      - name: method
+        expr: >-
+          'method' in options.kinds
+          && free && func.visibility == 'private' && !func.constructor_named
+          && func.references == 0 && size(affinity) > 0
+          && (affinity.takes_owner_param || affinity.uses_owner)
+          && !(options.requireOwnerParam && !affinity.takes_owner_param)
+      - name: envied
+        expr: >-
+          'envy' in options.kinds
+          && free && (func.visibility == 'private' || options.envy.includeExported)
+          && func.role != 'constructor' && func.references == 0
+          && func.statements >= options.envy.minStatements
+          && size(envy) > 0 && !envy.entry && envy.count >= options.envy.minMembers
+          && size(envy.others) == 0 && envy.same_module
+      - name: misplaced
+        expr: >-
+          'module' in options.kinds
+          && free && (func.visibility == 'private' || options.module.includeExported)
+          && func.references == 0 && func.statements >= options.module.minStatements
+          && size(envy) > 0 && !envy.entry && size(envy.module_target) > 0
+          && size(envy.module_uses) >= options.module.minUses && envy.own_uses == 0
+      - name: matched
+        expr: >-
+          (method ? ['method'] : []) + (envied ? ['envy'] : []) + (misplaced ? ['module'] : [])
+    where: method
+    review: envied || misplaced
     message: >-
-      private function {{ func.name }} is called only by methods of
-      {{ affinity.owner_name }}; consider making it a method of {{ affinity.owner_name }}
+      {{ method
+         ? 'private function ' + func.name + ' is called only by methods of ' + affinity.owner_name
+           + '; consider making it a method of ' + affinity.owner_name
+         : envied
+         ? func.name + ' depends on ' + envy.target_name + "'s members (" + envy.member_names.join(', ')
+           + ') only; consider a method of ' + envy.target_name
+         : misplaced
+         ? func.name + ' uses only ' + envy.module_target + ' (' + envy.module_use_names.join(', ')
+           + '); consider moving it to ' + envy.module_target
+         : '' }}
     evidence:
-      owner: affinity.owner
-      callers: affinity.callers
-      takes_owner_param: affinity.takes_owner_param
-      uses_owner: affinity.uses_owner
+      kind: "size(matched) > 0 ? matched[0] : ''"
+      kinds: matched
+      owner: "method ? affinity.owner : ''"
+      callers: "method ? affinity.callers : []"
+      takes_owner_param: "method ? affinity.takes_owner_param : false"
+      uses_owner: "method ? affinity.uses_owner : false"
+      target: "envied ? envy.target : ''"
+      members: "envied ? envy.member_names : []"
+      module: "misplaced ? envy.module_target : ''"
+      uses: "misplaced ? envy.module_uses : []"
     identity:
       subject: func.id
+  provenance:
+    wasDerivedFrom:
+    - Fowler, Refactoring 2nd ed., Feature Envy
+    - Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006, Feature Envy detection
+      strategy
+    - Fowler, Refactoring 2nd ed., Move Function
+    - Lanza and Marinescu, Object-Oriented Metrics in Practice, 2006
+    - Martin, Clean Code (2008), G14 Feature Envy
+    - Martin, Clean Code (2008), G17 Misplaced Responsibility
+    - Martin, Clean Code (2008), G18 Inappropriate Static
   examples:
-    - name: only-one-owner-calls
-      language: go
-      kind: invalid
-      files:
-        - path: example.go
-          body: "package sample\n\ntype Store struct{ items []int }\n\nfunc (s *Store) Total() int { return sum(s) }\n\nfunc (s *Store) Count() int { return len(s.items) + sum(s) - sum(s) }\n\nfunc sum(s *Store) int {\n\ttotal := 0\n\tfor _, i := range s.items {\n\t\ttotal += i\n\t}\n\treturn total\n}"
-      expect:
-        - line: 9
-    - name: shared-by-a-free-function
-      language: go
-      kind: valid
-      files:
-        - path: example.go
-          body: "package sample\n\ntype Store struct{ items []int }\n\nfunc (s *Store) Total() int { return sum(s) }\n\nfunc Sum(s *Store) int { return sum(s) }\n\nfunc sum(s *Store) int {\n\ttotal := 0\n\tfor _, i := range s.items {\n\t\ttotal += i\n\t}\n\treturn total\n}"
-    - name: helper-unrelated-to-the-owner
-      language: go
-      kind: valid
-      files:
-        - path: example.go
-          body: "package sample\n\ntype Store struct{ items []int }\n\nfunc (s *Store) Total() int { return sum(s.items) }\n\nfunc sum(items []int) int {\n\ttotal := 0\n\tfor _, i := range items {\n\t\ttotal += i\n\t}\n\treturn total\n}"
-    - name: constructor-called-by-method
-      language: go
-      kind: valid
-      canonical: true
-      files:
-        - path: example.go
-          body: |-
-            package sample
+  - name: only-one-owner-calls
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype Store struct{ items []int }\n\nfunc (s *Store) Total()
+        int { return sum(s) }\n\nfunc (s *Store) Count() int { return len(s.items) +
+        sum(s) - sum(s) }\n\nfunc sum(s *Store) int {\n\ttotal := 0\n\tfor _, i := range
+        s.items {\n\t\ttotal += i\n\t}\n\treturn total\n}"
+    expect:
+    - line: 9
+    options:
+      kinds:
+      - method
+  - name: shared-by-a-free-function
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype Store struct{ items []int }\n\nfunc (s *Store) Total()
+        int { return sum(s) }\n\nfunc Sum(s *Store) int { return sum(s) }\n\nfunc sum(s
+        *Store) int {\n\ttotal := 0\n\tfor _, i := range s.items {\n\t\ttotal += i\n\t}\n\treturn
+        total\n}"
+    options:
+      kinds:
+      - method
+  - name: helper-unrelated-to-the-owner
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype Store struct{ items []int }\n\nfunc (s *Store) Total()
+        int { return sum(s.items) }\n\nfunc sum(items []int) int {\n\ttotal := 0\n\tfor
+        _, i := range items {\n\t\ttotal += i\n\t}\n\treturn total\n}"
+    options:
+      kinds:
+      - method
+  - name: constructor-called-by-method
+    language: go
+    kind: valid
+    canonical: true
+    files:
+    - path: example.go
+      body: |-
+        package sample
 
-            type Store struct{ items []int }
+        type Store struct{ items []int }
 
-            func (s *Store) Reset() *Store { return newStore() }
+        func (s *Store) Reset() *Store { return newStore() }
 
-            func newStore() *Store { return &Store{items: []int{}} }
-    - name: rust-only-one-owner-calls
-      language: rust
-      kind: invalid
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub struct Store {
-                items: Vec<i32>,
+        func newStore() *Store { return &Store{items: []int{}} }
+    options:
+      kinds:
+      - method
+  - name: rust-only-one-owner-calls
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            items: Vec<i32>,
+        }
+
+        impl Store {
+            pub fn total(&self) -> i32 {
+                sum(self)
             }
 
-            impl Store {
-                pub fn total(&self) -> i32 {
-                    sum(self)
-                }
+            pub fn count(&self) -> i32 {
+                self.items.len() as i32 + sum(self)
+            }
+        }
 
-                pub fn count(&self) -> i32 {
-                    self.items.len() as i32 + sum(self)
-                }
+        fn sum(store: &Store) -> i32 {
+            let mut total = 0;
+            for i in &store.items {
+                total += i;
             }
+            total
+        }
+    expect:
+    - line: 15
+    options:
+      kinds:
+      - method
+  - name: rust-shared-by-a-free-function
+    language: rust
+    kind: valid
+    canonical: true
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            items: Vec<i32>,
+        }
 
-            fn sum(store: &Store) -> i32 {
-                let mut total = 0;
-                for i in &store.items {
-                    total += i;
-                }
-                total
+        impl Store {
+            pub fn total(&self) -> i32 {
+                sum(self)
             }
-      expect:
-        - line: 15
-    - name: rust-shared-by-a-free-function
-      language: rust
-      kind: valid
-      canonical: true
-      files:
-        - path: src/lib.rs
-          body: |-
-            pub struct Store {
-                items: Vec<i32>,
-            }
+        }
 
-            impl Store {
-                pub fn total(&self) -> i32 {
-                    sum(self)
-                }
-            }
+        pub fn total_of(store: &Store) -> i32 {
+            sum(store)
+        }
 
-            pub fn total_of(store: &Store) -> i32 {
-                sum(store)
+        fn sum(store: &Store) -> i32 {
+            let mut total = 0;
+            for i in &store.items {
+                total += i;
             }
+            total
+        }
+    options:
+      kinds:
+      - method
+  - name: envy-go-uses-three-fields-of-one-type
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype Store struct {\n\titems []int\n\ttotal int\n\textra
+        int\n}\n\nfunc (s *Store) Reset() { s.items = nil }\n\nfunc summary(s *Store)
+        int {\n\tn := len(s.items)\n\tn += s.total\n\tn += s.extra\n\treturn n\n}"
+    expect: []
+    options:
+      kinds:
+      - envy
+  - name: envy-go-uses-members-of-two-types
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype Store struct {\n\titems []int\n\ttotal int\n\textra
+        int\n}\n\ntype Cache struct{ hits int }\n\nfunc summary(s *Store, c *Cache)
+        int {\n\tn := len(s.items)\n\tn += s.total + s.extra\n\tn += c.hits\n\treturn
+        n\n}"
+    options:
+      kinds:
+      - envy
+  - name: envy-go-uses-too-few-members
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype Store struct {\n\titems []int\n\ttotal int\n}\n\nfunc
+        (s *Store) Total() int { return s.total }\n\nfunc report(s *Store) int {\n\tn
+        := s.total\n\tn += len(s.items)\n\treturn n + format(s)\n}\n\nfunc format(s
+        *Store) int { return len(s.items) }"
+    options:
+      kinds:
+      - envy
+  - name: envy-rust-uses-three-fields-of-one-type
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            items: Vec<i32>,
+            total: i32,
+            extra: i32,
+        }
 
-            fn sum(store: &Store) -> i32 {
-                let mut total = 0;
-                for i in &store.items {
-                    total += i;
-                }
-                total
+        impl Store {
+            pub fn reset(&mut self) {
+                self.items.clear();
             }
+        }
+
+        fn summary(store: &Store) -> i32 {
+            let mut n = store.items.len() as i32;
+            n += store.total;
+            n += store.extra;
+            n
+        }
+    expect: []
+    options:
+      kinds:
+      - envy
+  - name: envy-rust-matches-over-the-variants-of-an-enum
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub enum Level {
+            Error,
+            Warn,
+            Info,
+        }
+
+        impl Level {
+            pub fn name(&self) -> &'static str {
+                "level"
+            }
+        }
+
+        fn rank(text: &str) -> Option<Level> {
+            let lower = text.to_lowercase();
+            match lower.as_str() {
+                "error" => Some(Level::Error),
+                "warn" => Some(Level::Warn),
+                _ => Some(Level::Info),
+            }
+        }
+    options:
+      kinds:
+      - envy
+  - name: envy-go-names-the-type-itself
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: "package sample\n\ntype Store struct {\n\titems []int\n\ttotal int\n\textra
+        int\n}\n\nfunc (s *Store) Reset() { s.items = nil }\n\nfunc snapshot(items []int)
+        int {\n\ts := Store{items: items}\n\tn := len(s.items)\n\tn += s.total\n\tn
+        += s.extra\n\treturn n\n}"
+    options:
+      kinds:
+      - envy
+  - name: envy-rust-free-function-builds-the-type
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            items: Vec<i32>,
+            total: i32,
+            extra: i32,
+        }
+
+        impl Store {
+            pub fn reset(&mut self) {
+                self.items.clear();
+            }
+        }
+
+        fn open(items: Vec<i32>) -> Store {
+            let mut store = Store { items, total: 0, extra: 0 };
+            store.total = store.items.len() as i32;
+            store.extra = store.total;
+            store
+        }
+    options:
+      kinds:
+      - envy
+  - name: envy-rust-names-the-type-but-returns-another-value
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        pub struct Store {
+            items: Vec<i32>,
+            total: i32,
+            extra: i32,
+        }
+
+        impl Store {
+            pub fn reset(&mut self) {
+                self.items.clear();
+            }
+        }
+
+        fn measure(items: Vec<i32>) -> i32 {
+            let store = Store { items, total: 0, extra: 0 };
+            let mut n = store.items.len() as i32;
+            n += store.total;
+            n += store.extra;
+            n
+        }
+    options:
+      kinds:
+      - envy
+  - name: module-go-uses-only-another-package
+    language: go
+    kind: invalid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: app/app.go
+      body: "package app\n\nimport \"example.com/app/store\"\n\nfunc Run() int { return
+        load() }\n\nfunc load() int {\n\ta := store.Read()\n\tb := store.Count()\n\tc
+        := store.Scan()\n\treturn a + b + c\n}\n"
+    - path: store/store.go
+      body: |
+        package store
+
+        func Read() int { return 1 }
+
+        func Count() int { return 2 }
+
+        func Scan() int { return 3 }
+    expect: []
+    options:
+      kinds:
+      - module
+  - name: module-go-uses-its-own-package-too
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: app/app.go
+      body: "package app\n\nimport \"example.com/app/store\"\n\nfunc Run() int { return
+        load() }\n\nfunc load() int {\n\ta := store.Read()\n\tb := store.Count() + store.Scan()\n\treturn
+        a + b + local()\n}\n\nfunc local() int { return 0 }\n"
+    - path: store/store.go
+      body: |
+        package store
+
+        func Read() int { return 1 }
+
+        func Count() int { return 2 }
+
+        func Scan() int { return 3 }
+    options:
+      kinds:
+      - module
+  - name: module-go-wired-up-by-a-variable
+    language: go
+    kind: valid
+    files:
+    - path: go.mod
+      body: |
+        module example.com/app
+
+        go 1.26
+    - path: app/app.go
+      body: "package app\n\nimport \"example.com/app/store\"\n\nvar total = load()\n\nfunc
+        load() int {\n\ta := store.Read()\n\tb := store.Count()\n\tc := store.Scan()\n\treturn
+        a + b + c\n}\n"
+    - path: store/store.go
+      body: |
+        package store
+
+        func Read() int { return 1 }
+
+        func Count() int { return 2 }
+
+        func Scan() int { return 3 }
+    options:
+      kinds:
+      - module
+  - name: module-rust-uses-only-another-module
+    language: rust
+    kind: invalid
+    files:
+    - path: src/lib.rs
+      body: |-
+        mod store;
+
+        use crate::store::{count, read, scan};
+
+        pub fn run() -> i32 {
+            load()
+        }
+
+        fn load() -> i32 {
+            let a = read();
+            let b = count();
+            let c = scan();
+            a + b + c
+        }
+    - path: src/store.rs
+      body: |-
+        pub fn read() -> i32 {
+            1
+        }
+
+        pub fn count() -> i32 {
+            2
+        }
+
+        pub fn scan() -> i32 {
+            3
+        }
+    expect: []
+    options:
+      kinds:
+      - module
+  - name: module-rust-uses-one-symbol-of-another-module
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        mod store;
+
+        use crate::store::read;
+
+        pub fn run() -> i32 {
+            load()
+        }
+
+        fn load() -> i32 {
+            read()
+        }
+    - path: src/store.rs
+      body: |-
+        pub fn read() -> i32 {
+            1
+        }
+    options:
+      kinds:
+      - module

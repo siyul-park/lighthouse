@@ -10,13 +10,13 @@ spec:
     - name: limits
       title: Limits
       intro: Size limits that keep files reviewable.
-      decisions: [max-lines, cohesion]
+      decisions: [file-size]
     - name: annotations
       title: Source annotations
       intro: >-
         A finding that is right to leave in place can be allowed where it
         happens, in a comment that a reviewer sees in the diff.
-      decisions: [allow-annotation, allow-reason, no-unused-allow]
+      decisions: [allow, no-unused-allow]
     - name: naming
       title: Naming
       intro: >-

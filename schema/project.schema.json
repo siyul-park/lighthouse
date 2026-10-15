@@ -195,7 +195,7 @@
           "type": "object"
         },
         "name": {
-          "description": "Fully qualified name, such as `design/minimal-names`.",
+          "description": "Fully qualified name, such as `design/naming`.",
           "type": "string"
         },
         "uid": {

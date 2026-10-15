@@ -75,50 +75,36 @@ Do not memorize decision text; ask for it when a finding names a rule.
 - `lighthouse://config` is the effective configuration.
 - `review_history` shows every judgment recorded on a finding.
 
-## Active decisions (35)
+## Active decisions (21)
 
 A decision declares the severity of its findings: `error` is definitive, so it needs no review and only a directive in the code suppresses it; `warn` and `info` are review tasks, and a judgment can hide them whatever level the configuration reports them at. `fixable: safe|suggested` marks a decision with a fixer.
 
 ### core
 
-- `core/max-lines` (warn) Files stay below a line limit
-- `core/allow-reason` (error) An allow annotation states its reason
+- `core/file-size` (warn) Files stay small and cohesive
+- `core/allow` (error) Allow a finding in source, with a reason
 - `core/no-unused-allow` (warn, fixable: suggested) Allow annotations suppress something
 - `core/decision-naming` (warn) Decision names follow the ESLint convention
 
 ### design
 
 - `design/layers` (warn) Dependencies point down the layers
-- `design/misplaced-symbol` (info) A function lives with what it uses
-- `design/contiguity` (warn, fixable: suggested) Collaborators stay close
-- `design/complexity` (warn) Cyclomatic complexity is a review signal
-- `design/cognitive-complexity` (warn) Cognitive complexity is a review signal
-- `design/max-statements` (warn) Functions have a bounded number of statements
-- `design/max-lines-per-function` (warn) Functions have a bounded length
-- `design/max-depth` (warn) Control flow is nested a bounded number of levels
-- `design/max-params` (warn) Functions take a bounded number of parameters
-- `design/max-results` (warn) Functions return a bounded number of results
-- `design/coupling` (warn) Coupling is a review signal
-- `design/no-single-use-wrapper` (warn) Inline single-use wrappers
+- `design/complexity` (warn) A function is small enough to read at one level
+- `design/signature` (warn) A signature is short, public and narrow
 - `design/prefer-method` (warn) Behavior lives with its owner
-- `design/feature-envy` (info) A function that wants another type's members
-- `design/callers-before-callees` (warn, fixable: suggested) Callers before callees
-- `design/max-name-words` (warn) Names have at most a few words
-- `design/no-redundant-qualifiers` (warn) No redundant qualifiers
-- `design/no-private-types` (warn) Public APIs do not expose private types
-- `design/no-mutable-globals` (warn) No exported mutable global
-- `design/context-first` (warn) Cancellation context comes first
-- `design/no-stored-context` (warn) Request contexts are not stored
-- `design/error-identity` (warn) Preserve error identity
+- `design/symbols` (warn) Every symbol earns its existence
+- `design/naming` (warn) Names are short, standard and say what they mean
+- `design/ownership` (warn) State, generated code and platform code have one owner
+- `design/concurrency` (warn) Cancellation is explicit and tasks can be stopped
+- `design/errors` (warn) Errors keep their identity and are returned, not thrown
+- `design/layout` (warn, fixable: suggested) Declarations are laid out for reading
 - `design/declaration-groups` (error, fixable: safe) Declarations follow ownership groups
-- `design/no-banners` (warn, fixable: suggested) Comments do not label sections
 - `design/exported-doc` (warn) Exported symbols are documented
+- `design/comments` (warn, fixable: suggested) A comment states a fact the code cannot
 
 ### testing
 
-- `testing/external-package` (error) Contract tests live outside the target
-- `testing/no-hidden-target` (info) Helpers do not hide the target call
-- `testing/standard-assertions` (warn) Assertions use the standard library
-- `testing/owner` (warn) Every public symbol has an owner test
-- `testing/unique-owner` (error) One owner test per public symbol
+- `testing/owner` (warn) Every public symbol has exactly one owner test
+- `testing/cases` (warn) Cases are behaviors, written simply and asserted through the standard library
 - `testing/file-layout` (error, fixable: safe) A test file reads fixtures, tests, helpers
+- `testing/public-boundary` (error) Contract tests live outside the target
