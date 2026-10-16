@@ -18,7 +18,7 @@ spec:
     code or a concept that is reused, never relocation (Fowler, Refactoring
     2nd ed.: Inline Function, Lazy Element, Middle Man).
 
-    Kinds, off by default and on in the strict preset, one finding per module,
+    Kinds, off by default and on in the strict project, one finding per module,
     the kind being the first match, at its first type that matches.
     `members`: a type has more public methods than `maxMembers` (Sonar S1448,
     classes should not have too many methods; methods that implement an

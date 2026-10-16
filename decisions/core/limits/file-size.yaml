@@ -17,7 +17,7 @@ spec:
     `conjoined`). The count is the file's lines (revive
     `file-length-limit`), reported once per file with the kind `lines`.
 
-    Kind `width` (off by default and on in the strict preset): a line wider
+    Kind `width` (off by default and on in the strict project): a line wider
     than `maxWidth` columns, counted in characters with a tab as one (ESLint
     `max-len`, Checkstyle `LineLength`). A comment that is one URL, a single
     string literal and an import line cannot be wrapped and are not counted.

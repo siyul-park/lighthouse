@@ -28,7 +28,7 @@ spec:
     `nesting`: the deepest block nesting (4). `hub`: a dependency hub (many
     callers and many callees in a long function) or a high fan-out
     coordinator. `helpers`, an opt-in review route (off by default, on in the strict
-    preset): a function within a limit whose unit, the function together with
+    project): a function within a limit whose unit, the function together with
     the private functions only it calls, transitively (single-use helpers,
     which can be neither reused nor read apart from their caller), is over
     it, is put to a model: is the split a concept or a relocation? It is never
@@ -127,8 +127,6 @@ spec:
         expr: unit(func)
       - name: fold
         expr: "'helpers' in options.kinds"
-      - name: measured
-        expr: (func.kind == 'function' || func.kind == 'method') && m.measured
       - name: caps
         expr: >-
           {'lines': limit(func, options.limits.lines),
@@ -161,7 +159,7 @@ spec:
             'max': caps.cognitive, 'skip': options.ignoreDispatch && m.dispatcher,
             'hint': 'flatten the control flow'}]
       - name: judged
-        expr: "measured ? rows.filter(r, r.max >= 0 && !r.skip) : []"
+        expr: "m.measured ? rows.filter(r, r.max >= 0 && !r.skip) : []"
       - name: via
         expr: judged.filter(r, fold && r.own <= r.max && r.all > r.max)
       - name: found
@@ -169,10 +167,10 @@ spec:
           judged.filter(r, r.kind in options.kinds && r.own > r.max)
             .map(r, {'kind': r.kind, 'what': r.what, 'own': r.own, 'max': r.max, 'hint': r.hint,
                      'value': r.own})
-          + (measured && 'nesting' in options.kinds && caps.nesting >= 0 && m.nesting > caps.nesting
+          + (m.measured && 'nesting' in options.kinds && caps.nesting >= 0 && m.nesting > caps.nesting
             ? [{'kind': 'nesting', 'what': 'levels of nesting', 'own': m.nesting, 'max': caps.nesting,
                 'hint': 'extract nested blocks or return early', 'value': m.nesting}] : [])
-          + (measured && 'hub' in options.kinds && !m.dispatcher && hub_role != ''
+          + (m.measured && 'hub' in options.kinds && !m.dispatcher && hub_role != ''
             ? [{'kind': 'hub', 'what': hub_role, 'own': m.fan_in, 'max': options.hub.fanIn,
                 'hint': '', 'value': m.fan_in}] : [])
       - name: first
@@ -183,7 +181,7 @@ spec:
         expr: u.helpers.map(h, h.name)
       - name: near
         expr: >-
-          measured && size(found) == 0
+          m.measured && size(found) == 0
           && (rows.exists(r, r.max > 0 && r.own * 10 >= r.max * 6)
               || (caps.nesting > 0 && m.nesting * 10 >= caps.nesting * 6))
     where: size(found) > 0

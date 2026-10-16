@@ -13,7 +13,7 @@ use serde_json::Value;
 /// Plugin id.
 const ID: &str = "metrics";
 /// Analyzer id of the per-function [`Measures`] fact: a map from the functions
-/// declared in the focused file to what is measured of each.
+/// and methods declared in the focused file to what is measured of each.
 pub const MEASURES: &str = "metrics/function";
 
 /// Deepest nesting of a flat dispatch's arms.
@@ -110,7 +110,7 @@ impl Plugin for Metrics {
     }
 }
 
-/// Measures every function declared in the focused file.
+/// Measures every function and method declared in the focused file.
 impl Analyzer for Metrics {
     fn manifest(&self) -> &AnalyzerManifest {
         static MANIFEST: LazyLock<AnalyzerManifest> = LazyLock::new(|| AnalyzerManifest {
@@ -128,6 +128,7 @@ impl Analyzer for Metrics {
         let measures: BTreeMap<&SymbolId, Measures> = ctx
             .project
             .symbols_in(&file.path)
+            .filter(|symbol| matches!(symbol.kind, SymbolKind::Function | SymbolKind::Method))
             .filter_map(|symbol| {
                 let summary = ctx.project.function(&symbol.id)?;
                 Some((&symbol.id, Measures::of(ctx.project, symbol, summary)))

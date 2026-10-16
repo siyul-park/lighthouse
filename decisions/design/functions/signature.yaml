@@ -106,8 +106,6 @@ spec:
     with:
       - name: m
         expr: metrics(func)
-      - name: measured
-        expr: (func.kind == 'function' || func.kind == 'method') && m.measured
       - name: caps
         expr: >-
           {'params': limit(func, options.limits.params),
@@ -134,10 +132,10 @@ spec:
           : []
       - name: found
         expr: >-
-          (measured && 'params' in options.kinds && caps.params >= 0 && eff.params > caps.params
+          (m.measured && 'params' in options.kinds && caps.params >= 0 && eff.params > caps.params
             ? [{'kind': 'params', 'value': eff.params, 'max': caps.params, 'what': 'parameters',
                 'hint': func.role == 'constructor' ? 'split ' + func.built : 'split by responsibility'}] : [])
-          + (measured && 'results' in options.kinds && caps.results >= 0 && func.returns > caps.results
+          + (m.measured && 'results' in options.kinds && caps.results >= 0 && func.returns > caps.results
             ? [{'kind': 'results', 'value': func.returns, 'max': caps.results, 'what': 'results',
                 'hint': 'split by responsibility'}] : [])
           + ('unexported' in options.kinds && size(exposed) > 0
@@ -148,7 +146,7 @@ spec:
           : {'kind': '', 'value': 0, 'max': 0, 'what': '', 'hint': ''}
     where: size(found) > 0
     review: >-
-      measured && size(found) == 0 && func.visibility != 'private'
+      m.measured && size(found) == 0 && func.visibility != 'private'
       && (func.role == 'function' || func.role == 'method' || func.role == 'constructor')
       && func.signature.params.exists(t, t.symbol != '')
     message: >-

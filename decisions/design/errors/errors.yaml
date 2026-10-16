@@ -22,7 +22,7 @@ spec:
     without `%w`. Rust keeps identity through `?` and `From`, which the
     compiler checks, so these kinds leave it to review.
 
-    Off by default and on in the strict preset, as clippy's restriction lints
+    Off by default and on in the strict project, as clippy's restriction lints
     and forbidigo are opt-in for the same reason: `panic` and `unwrap`
     report every place production code can panic, one finding each
     (forbidigo `^panic$`; clippy `panic`, `unwrap_used`, `expect_used`,

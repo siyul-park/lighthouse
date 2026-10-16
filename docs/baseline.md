@@ -7,7 +7,7 @@ parts; the data lives in `baseline/`.
 
 ## Reference repositories
 
-All four run with the strict preset (`baseline/strict-root.toml` for the Cargo workspace,
+All four run with the strict project (`baseline/strict-root.toml` for the Cargo workspace,
 `baseline/strict-go.toml` for Go modules): `core/recommended`, `design/strict`, `testing/recommended`.
 
 | repo | language | commit | source files | source lines | findings | exit |
@@ -47,7 +47,7 @@ it on a temporary copy of each repository and fails unless every warm run prints
 as a `--no-cache` run of the same tree, after each of seven edits (a body-only edit, a rename of a called
 function, a new caller in another file, a new exported type with a homonym, a rule option, the check of a
 decision, a deleted file). Apple M4 Pro, 24 GiB, release build, Go build cache warm, `--no-store`, median of 3,
-total ms. The `lighthouse` row is this repository at the commit measured (Rust and Go, strict preset), not the
+total ms. The `lighthouse` row is this repository at the commit measured (Rust and Go, strict project), not the
 frozen `strict-root` copy.
 
 | repo | cold `--no-cache` | cold, empty cache | warm, no change | warm, one-function body edit | edit as share of cold |
@@ -148,7 +148,7 @@ whose `select` is the old condition, widened for recall; the TSVs keep the evide
 - Precision here is the share of findings that are right, not recall: what a rule misses is not measured.
 - Fingerprints are stable only while the identity of a finding is; R3b changed the identity of event findings, so
   older samples may no longer match a run.
-- The numbers are of one machine, a warm Go build cache and the strict preset; the preset the projects run with
+- The numbers are of one machine, a warm Go build cache and the strict project; the configuration the projects run with
   differs per project.
 - Symbols per repository are missing: no command reports the size of the code model. Add one when the caches
   need it.

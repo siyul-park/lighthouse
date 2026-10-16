@@ -19,7 +19,7 @@ spec:
     reported.
 
     The other two kinds are review routes, off by default and on in the
-    strict preset, because their precision is low: a candidate is put to a
+    strict project, because their precision is low: a candidate is put to a
     model, not reported. `envy` is Fowler's Feature Envy (Refactoring, 2nd
     ed.) with the detection strategy of Lanza and Marinescu (2006): the
     function accesses more than a few foreign attributes (ATFD above FEW,

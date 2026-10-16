@@ -20,13 +20,13 @@ spec:
     the package's primary concept; repeating it has meaning and is never
     reported. `symbols` names the kinds of symbol that are checked; Rust,
     where a module path is part of every use, checks none by default.
-    `words` (off by default and on in the strict preset): a name has more
+    `words` (off by default and on in the strict project): a name has more
     words than `maxWords`, with the option name of ESLint's `max-lines` and
     `max-params`. Words are the parts of a name split at `_`, at a
     lower-to-upper change and at the end of an acronym: `parseHTTPRequest` and
     `parse_http_request` have three.
 
-    `encoding` (off by default and on in the strict preset): a name that
+    `encoding` (off by default and on in the strict project): a name that
     carries its type or scope in a prefix, matched by the patterns of
     `encodings` (Hungarian notation `strName`, member prefix `m_name`, an
     `I` before the name of an interface), optionally limited to some kinds

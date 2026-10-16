@@ -36,7 +36,7 @@ spec:
     dead code to rustc's `dead_code` lint, which sees type positions and
     macro arguments the index does not, so `deadKinds` is empty there.
 
-    Kind `interface` (off by default and on in the strict preset): a private
+    Kind `interface` (off by default and on in the strict project): a private
     interface with members and exactly one implementing type, tests included:
     use the type directly until a second implementation exists. An exported
     interface with one implementation is left to agent review, since callers
