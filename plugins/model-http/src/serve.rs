@@ -1,6 +1,5 @@
 //! The plugin as the protocol sees it: the handshake, and each method handed
-//! to the function the dispatch table names for it. The handler knows no
-//! spec by name.
+//! to the API that serves it.
 
 use lighthouse_protocol::{
     Capabilities, Handler, HandlerError, IndexParams, IndexResult, InitializeParams,
@@ -8,7 +7,12 @@ use lighthouse_protocol::{
     VERSION,
 };
 
-use crate::{chat::PROMPT_VERSION, dispatch, endpoint::Endpoint, http::Client};
+use crate::{
+    chat::{self, PROMPT_VERSION},
+    endpoint::Endpoint,
+    http::Client,
+    typesafe,
+};
 
 /// The plugin's id, and the id of the one model it offers.
 pub const ID: &str = "model-http";
@@ -63,7 +67,19 @@ impl Handler for Plugin {
             return Err("the request names no model".into());
         }
         let endpoint = Endpoint::of(&params.options)?;
-        dispatch::classify(&endpoint)?(self.client.as_ref(), &endpoint, &params)
+        // The method's own API first, then Chat Completions by adaptation.
+        let client = self.client.as_ref();
+        if endpoint.speaks("typesafe") {
+            typesafe::systemone(client, &endpoint, &params)
+        } else if endpoint.speaks("openai") {
+            chat::systemone(client, &endpoint, &params)
+        } else {
+            Err(format!(
+                "no spec of {:?} serves classification (served: [\"typesafe\", \"openai\"])",
+                endpoint.specs
+            )
+            .into())
+        }
     }
 }
 
@@ -164,7 +180,7 @@ mod tests {
             "200 OK",
             r#"{"id":"c","object":"chat.completion","created":1,"model":"m","choices":[{"index":0,"message":{"role":"assistant","content":"{\"noul\": 0.97}"}}]}"#,
         );
-        let result = Plugin::new(Box::new(Http))
+        let result = Plugin::new(Box::new(Http::new()))
             .classify(params(json!("openai"), &url))
             .unwrap();
         let request = request.join().unwrap();
@@ -183,7 +199,7 @@ mod tests {
             "200 OK",
             r#"{"model":"jev-latest","answers":{"d/x":{"type":"noul","noul":0.81}},"usage":{"tokens":3}}"#,
         );
-        let result = Plugin::new(Box::new(Http))
+        let result = Plugin::new(Box::new(Http::new()))
             .classify(params(json!(["openai", "typesafe"]), &url))
             .unwrap();
         let request = request.join().unwrap();
@@ -208,7 +224,7 @@ mod tests {
             "400 Bad Request",
             r#"{"error":{"message":"response_format unsupported"}}"#,
         );
-        let error = Plugin::new(Box::new(Http))
+        let error = Plugin::new(Box::new(Http::new()))
             .classify(params(json!("openai"), &url))
             .unwrap_err();
         assert!(error.message.contains("400"), "{}", error.message);
@@ -216,5 +232,13 @@ mod tests {
             error.data.unwrap()["error"]["message"],
             "response_format unsupported"
         );
+    }
+
+    #[test]
+    fn a_provider_declaring_no_served_spec_is_refused() {
+        let error = Plugin::new(Box::new(Http::new()))
+            .classify(params(json!("anthropic"), "http://x"))
+            .unwrap_err();
+        assert!(error.message.contains("serves classification"));
     }
 }

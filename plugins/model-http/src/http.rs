@@ -25,23 +25,27 @@ pub trait Client: Sync {
     fn post(&self, url: &str, key: Option<&str>, body: &Value) -> Result<Value, HandlerError>;
 }
 
-/// The client over the network.
-pub struct Http;
+/// The client over the network: one agent, so connections are reused.
+pub struct Http {
+    agent: ureq::Agent,
+}
 
-/// A request that failed: refused with an error status, or not answered.
-struct Refused {
-    /// The status the service answered with; none when it was not reached.
-    status: Option<u16>,
-    /// The seconds the service asked to wait.
-    retry_after: Option<u64>,
-    error: HandlerError,
+impl Http {
+    pub fn new() -> Self {
+        let agent = ureq::Agent::config_builder()
+            .timeout_global(Some(TIMEOUT))
+            .http_status_as_error(false)
+            .build()
+            .into();
+        Self { agent }
+    }
 }
 
 impl Client for Http {
     fn post(&self, url: &str, key: Option<&str>, body: &Value) -> Result<Value, HandlerError> {
         let mut pause = Duration::from_secs(1);
         for _ in 0..RETRIES {
-            match post_once(url, key, body) {
+            match post(&self.agent, url, key, body) {
                 Err(refused) if matches!(refused.status, Some(429 | 503 | 529)) => {
                     let wait = refused
                         .retry_after
@@ -53,8 +57,17 @@ impl Client for Http {
                 other => return other.map_err(|refused| refused.error),
             }
         }
-        post_once(url, key, body).map_err(|refused| refused.error)
+        post(&self.agent, url, key, body).map_err(|refused| refused.error)
     }
+}
+
+/// A request that failed: refused with an error status, or not answered.
+struct Refused {
+    /// The status the service answered with; none when it was not reached.
+    status: Option<u16>,
+    /// The seconds the service asked to wait.
+    retry_after: Option<u64>,
+    error: HandlerError,
 }
 
 fn unreached(e: ureq::Error) -> Refused {
@@ -65,12 +78,7 @@ fn unreached(e: ureq::Error) -> Refused {
     }
 }
 
-fn post_once(url: &str, key: Option<&str>, body: &Value) -> Result<Value, Refused> {
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_global(Some(TIMEOUT))
-        .http_status_as_error(false)
-        .build()
-        .into();
+fn post(agent: &ureq::Agent, url: &str, key: Option<&str>, body: &Value) -> Result<Value, Refused> {
     let mut call = agent.post(url);
     if let Some(key) = key {
         call = call.header("Authorization", &format!("Bearer {key}"));

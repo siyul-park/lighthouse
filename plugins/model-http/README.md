@@ -7,9 +7,8 @@ The model provider over the standard HTTP APIs: TypeSafe System One and the Open
 ## Entry points
 - `openai`, `typesafe`: one module per published API, one free function per operation used.
 - `chat`: adapts a System One request to Chat Completions (a prompt asking for the probability of yes, `json_schema` response format).
-- `dispatch`: the table of which function serves which protocol method.
 - `endpoint`: the provider `options`: `spec`, `baseUrl`, `keyEnv`.
-- `http`: the one I/O seam, `Client`; `serve`: the handshake and handler.
+- `http`: the one I/O seam, `Client`, over one shared agent; `serve`: the handshake and handler, which picks the API a provider declares for `classify` (`typesafe` before `openai`).
 
 ## Invariants
 - Request and response bodies are the published ones (protocol's `SystemOneRequest`/`SystemOneResponse`, `async-openai` types), used verbatim; there is no home-made API.

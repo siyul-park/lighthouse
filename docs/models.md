@@ -45,8 +45,7 @@ functions, one per operation used, named by the API's operation in snake_case, w
 
 `http.rs` holds the one I/O seam, `trait Client { fn post(url, key, body) }`, and `Http` (bearer
 key, retries on 429, 503 and 529 honouring `Retry-After`, the error body as the JSON-RPC `data`).
-Tests swap the client, never a module. `dispatch.rs` is the table from protocol method to
-functions, the method's own API first: `lighthouse/classify` goes to `typesafe::systemone`, then
+Tests swap the client, never a module. `lighthouse/classify` goes to `typesafe::systemone`, then
 `chat::systemone` for `openai`; the first whose `spec` the provider declares serves the call.
 
 An official SDK in another language needs no code: a `command` provider with `stdin = "request"`
