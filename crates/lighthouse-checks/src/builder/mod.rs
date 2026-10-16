@@ -7,10 +7,10 @@
 use std::{
     cell::OnceCell,
     collections::{BTreeMap, BTreeSet},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
-use crate::metrics::{MEASURES, Measures};
+use crate::metrics::{MEASURES, Measures, propagation::System};
 use lighthouse_model::{
     Comment, FunctionSummary, Project, Symbol, SymbolId, SymbolKind, Visibility,
 };
@@ -38,7 +38,19 @@ mod stability;
 mod unit;
 mod widths;
 
-use forward::{cyclic, forwarded};
+use forward::{forwarded, reaches};
+
+/// The indexes over the whole project that facts read, each built by the first
+/// check of a run that asks and shared by the others.
+#[derive(Default)]
+pub(crate) struct Indexes {
+    single: OnceLock<effective::Index>,
+    imports: OnceLock<BTreeMap<String, Vec<String>>>,
+    types: OnceLock<BTreeMap<String, Vec<Value>>>,
+    parents: OnceLock<parent::Uses>,
+    modules: OnceLock<System>,
+    symbols: OnceLock<System>,
+}
 
 /// Builds the values of one run of a check over one file (or the project).
 pub(crate) struct Builder<'a> {
@@ -51,11 +63,7 @@ pub(crate) struct Builder<'a> {
     keys: Vec<(String, &'a dyn OrderKey)>,
     measures: Option<BTreeMap<SymbolId, Measures>>,
     table: Arc<Table>,
-    single: Arc<effective::Single>,
-    imports: Arc<imports::Imports>,
-    types: Arc<cohesion::Types>,
-    parents: Arc<parent::Parents>,
-    stabilities: Arc<stability::Stabilities>,
+    indexes: Arc<Indexes>,
     allow_suffixes: Vec<String>,
     first_test: OnceCell<Option<Value>>,
 }
@@ -90,11 +98,7 @@ impl<'a> Builder<'a> {
             keys,
             measures,
             table: ctx.memo.slot(),
-            single: ctx.memo.slot(),
-            imports: ctx.memo.slot(),
-            types: ctx.memo.slot(),
-            parents: ctx.memo.slot(),
-            stabilities: ctx.memo.slot(),
+            indexes: ctx.memo.slot(),
             allow_suffixes: strings(options.get("allowSuffixes")),
             first_test: OnceCell::new(),
         })
@@ -482,7 +486,11 @@ impl<'a> Builder<'a> {
         if callers.is_empty()
             || callers.iter().any(|s| s.kind == SymbolKind::Var)
             || !callers.iter().all(|s| s.file == callee.file)
-            || cyclic(project, callee, &callers)
+            || reaches(
+                project,
+                &callee.id,
+                &callers.iter().map(|s| &s.id).collect::<Vec<_>>(),
+            )
         {
             return json!([]);
         }

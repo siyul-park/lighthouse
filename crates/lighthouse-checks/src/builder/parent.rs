@@ -1,23 +1,16 @@
 //! The `parent` of a module: how it is tied to the module that holds it, from
 //! what its symbols use of each other.
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::OnceLock,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use lighthouse_model::{Module, Project, SymbolId, SymbolKind, Visibility};
 use serde_json::{Value, json};
 
 use super::Builder;
 
-/// What the production symbols of the project use across the modules, built by
-/// the first check that asks and shared by the others.
+/// What the production symbols of the project use across the modules.
 #[derive(Default)]
-pub(crate) struct Parents(OnceLock<Uses>);
-
-#[derive(Default)]
-struct Uses {
+pub(super) struct Uses {
     /// The modules that declare a production symbol.
     production: BTreeSet<String>,
     /// The production modules that use a symbol of each module, itself left
@@ -37,7 +30,7 @@ impl Builder<'_> {
     ///   uses, as nodes sorted by id;
     /// - `called`: the parent uses it.
     pub(super) fn module_parent(&self, module: &Module) -> Value {
-        let uses = self.parents.0.get_or_init(|| uses(self.project));
+        let uses = self.indexes.parents.get_or_init(|| uses(self.project));
         let path = module.path.as_str();
         let parent = parent_of(path).filter(|p| self.project.module(p).is_some());
         let Some(parent) = parent.filter(|_| uses.production.contains(path)) else {

@@ -2,30 +2,23 @@
 //! API and the cohesion of their methods (LCOM4: the connected components of
 //! the methods, joined by a field they share or a call between them).
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::OnceLock,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use lighthouse_model::{EdgeKind, Node, Project, Symbol, SymbolId, SymbolKind, Target, Visibility};
 use serde_json::{Value, json};
 
 use super::Builder;
 
-/// The types of every module, built by the first check that asks and shared
-/// by the others.
-#[derive(Default)]
-pub(crate) struct Types(OnceLock<BTreeMap<String, Vec<Value>>>);
-
 impl Builder<'_> {
     /// The non-test, non-generated types and interfaces of a module.
     pub(super) fn module_types(&self, module: &str) -> Value {
-        let types = self.types.0.get_or_init(|| index(self.project));
+        let types = self.indexes.types.get_or_init(|| index(self.project));
         json!(types.get(module).map_or(&[][..], Vec::as_slice))
     }
 }
 
-fn index(project: &Project) -> BTreeMap<String, Vec<Value>> {
+/// The types of every module.
+pub(super) fn index(project: &Project) -> BTreeMap<String, Vec<Value>> {
     let mut found: BTreeMap<String, Vec<Value>> = BTreeMap::new();
     let types = project
         .symbols

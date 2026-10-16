@@ -6,20 +6,16 @@
 //! is a parameter list in disguise. Counting the struct as one parameter would
 //! let a long list pass by being wrapped.
 
-use std::{collections::BTreeMap, sync::OnceLock};
+use std::collections::BTreeMap;
 
 use lighthouse_model::{FunctionSummary, Project, Symbol, SymbolId, SymbolKind};
 use serde_json::{Value, json};
 
 use super::Builder;
 
-/// The run's index of who takes and touches which type, built by the first
-/// check that asks and shared by the others.
+/// Who takes and touches which type.
 #[derive(Default)]
-pub(crate) struct Single(OnceLock<Index>);
-
-#[derive(Default)]
-struct Index {
+pub(super) struct Index {
     /// Functions that name a type in their parameters, by the type's
     /// kind-less id.
     takers: BTreeMap<String, Vec<SymbolId>>,
@@ -41,7 +37,7 @@ impl Builder<'_> {
         let Some(summary) = summary else {
             return json!({ "params": 0, "hidden": [] });
         };
-        let index = self.single.0.get_or_init(|| index(self.project));
+        let index = self.indexes.single.get_or_init(|| index(self.project));
         let hidden: Vec<Hidden> = named_params(summary)
             .filter_map(|ty| self.hidden(index, function, ty))
             .collect();

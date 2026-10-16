@@ -1,21 +1,11 @@
 //! The `stability` of a module and the `reach` of a symbol: how many others
 //! use it directly and through what they use, in the graphs of the project.
 
-use std::sync::OnceLock;
-
 use lighthouse_model::{Module, Symbol};
 use serde_json::{Value, json};
 
 use super::Builder;
 use crate::metrics::propagation::{self, Stability, System};
-
-/// The graphs of the project, each built by the first check that asks and
-/// shared by the others.
-#[derive(Default)]
-pub(crate) struct Stabilities {
-    modules: OnceLock<System>,
-    symbols: OnceLock<System>,
-}
 
 impl Builder<'_> {
     /// `{ ca, ce, instability, vfi, vfo, vfi_share, vfo_share, cyclic,
@@ -23,7 +13,7 @@ impl Builder<'_> {
     /// is no node: test code or generated.
     pub(super) fn module_stability(&self, module: &Module) -> Value {
         let system = self
-            .stabilities
+            .indexes
             .modules
             .get_or_init(|| propagation::modules(self.project));
         let Some(s) = system.of(&module.path) else {
@@ -46,7 +36,7 @@ impl Builder<'_> {
     /// that is no node.
     pub(super) fn reach(&self, symbol: &Symbol) -> Value {
         let system = self
-            .stabilities
+            .indexes
             .symbols
             .get_or_init(|| propagation::symbols(self.project));
         let Some(s) = system.of(symbol.id.as_str()) else {

@@ -65,7 +65,6 @@ pub(crate) fn symbol(project: &Project, s: &Symbol) -> Value {
     let lang = project
         .file(&s.file)
         .map_or_else(String::new, |f| f.lang.clone());
-    let mut value = node(project, s);
     let module = project.module(s.id.module());
     let last = module.map_or_else(
         || {
@@ -80,7 +79,9 @@ pub(crate) fn symbol(project: &Project, s: &Symbol) -> Value {
     let spelled = module
         .and_then(|m| m.name.clone())
         .unwrap_or_else(|| last.clone());
-    let extra = json!({
+    extended(
+        node(project, s),
+        json!({
         "lang": lang,
         "doc": s.doc.clone().unwrap_or_default(),
         "name_key": text::key(&s.name),
@@ -96,19 +97,17 @@ pub(crate) fn symbol(project: &Project, s: &Symbol) -> Value {
         "callees": project.callees(&s.id).len(),
         "references": project.references(&s.id).len(),
         "members": project.members(&s.id).len(),
-    });
-    if let (Some(into), Some(extra)) = (value.as_object_mut(), extra.as_object()) {
-        into.extend(extra.clone());
-    }
-    value
+        }),
+    )
 }
 
 /// A symbol with its function summary; the metrics are zero for a symbol
 /// that has no body.
 pub(crate) fn function(project: &Project, s: &Symbol) -> Option<Value> {
     let summary = project.function(&s.id)?;
-    let mut value = symbol(project, s);
-    let extra = json!({
+    Some(extended(
+        symbol(project, s),
+        json!({
         "statements": summary.statements,
         "top_level": summary.top_level,
         "params": summary.params,
@@ -117,13 +116,11 @@ pub(crate) fn function(project: &Project, s: &Symbol) -> Option<Value> {
         "tokens": summary.tokens,
         "branches": summary.flow.len(),
         "manual_assertions": summary.manual_assertions,
-    });
-    value.as_object_mut()?.extend(extra.as_object()?.clone());
-    Some(value)
+        }),
+    ))
 }
 
 pub(crate) fn test(project: &Project, s: &Symbol, case: &TestCase) -> Value {
-    let mut value = symbol(project, s);
     let targets: Vec<String> = case
         .targets
         .iter()
@@ -132,7 +129,9 @@ pub(crate) fn test(project: &Project, s: &Symbol, case: &TestCase) -> Value {
             Target::Resolved(Node::Module(m)) | Target::Path(m) => m.clone(),
         })
         .collect();
-    let extra = json!({
+    extended(
+        symbol(project, s),
+        json!({
         "nesting": case.nesting,
         "style": match case.style {
             lighthouse_model::TestStyle::Table => "table",
@@ -140,11 +139,8 @@ pub(crate) fn test(project: &Project, s: &Symbol, case: &TestCase) -> Value {
         },
         "target_count": targets.len(),
         "targets": targets,
-    });
-    if let (Some(into), Some(extra)) = (value.as_object_mut(), extra.as_object()) {
-        into.extend(extra.clone());
-    }
-    value
+        }),
+    )
 }
 
 pub(crate) fn edge(project: &Project, e: &Edge) -> Value {
@@ -203,6 +199,14 @@ pub(crate) fn file(project: &Project, f: &lighthouse_model::File, text: &str) ->
         "symbols": symbols,
         "functions": functions,
     })
+}
+
+/// `value` with the fields of the object `extra` added.
+fn extended(mut value: Value, extra: Value) -> Value {
+    if let (Some(into), Value::Object(extra)) = (value.as_object_mut(), extra) {
+        into.extend(extra);
+    }
+    value
 }
 
 fn role(role: SymbolRole) -> &'static str {
