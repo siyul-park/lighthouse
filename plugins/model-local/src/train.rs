@@ -4,8 +4,7 @@
 
 use std::{fs, path::Path};
 
-use lighthouse_protocol::hash::sha256;
-use lighthouse_protocol::{CreateFineTuningJobRequest, dataset_path};
+use lighthouse_protocol::{CreateFineTuningJobRequest, dataset_path, hash::sha256};
 use serde_json::Value;
 
 use crate::{

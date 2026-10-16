@@ -21,9 +21,9 @@ use std::{
 use lighthouse_protocol::{
     Answer, Capabilities, CreateFineTuningJobRequest, ErrorObject, FineTuningJob,
     FineTuningJobStatus, Handler, InitializeParams, InitializeResult, Model, NOUL,
-    SystemOneRequest, SystemOneResponse, artifact_path, dataset_path, serve,
+    SystemOneRequest, SystemOneResponse, artifact_path, canonical, dataset_path, hash::sha256,
+    serve,
 };
-use lighthouse_protocol::{canonical, hash::sha256};
 use serde_json::{Value, json};
 
 const ID: &str = "fake-model";
@@ -41,7 +41,7 @@ impl Handler for Fake {
     }
 
     fn classify(&mut self, params: SystemOneRequest) -> Result<SystemOneResponse, ErrorObject> {
-        let noul = noul_of(&params.state.text);
+        let noul = noul_by_text(&params.state.text);
         Ok(SystemOneResponse {
             model: params.model,
             answers: answers(params.questions.keys(), noul),
@@ -134,7 +134,7 @@ fn command() -> ExitCode {
     if mark().is_err() {
         return ExitCode::FAILURE;
     }
-    let noul = noul_of(request["state"]["text"].as_str().unwrap_or_default());
+    let noul = noul_by_text(request["state"]["text"].as_str().unwrap_or_default());
     let questions = request["questions"]
         .as_object()
         .cloned()
@@ -169,7 +169,7 @@ fn weak() -> ExitCode {
 }
 
 /// P(violation) of a subject by its text.
-fn noul_of(text: &str) -> f64 {
+fn noul_by_text(text: &str) -> f64 {
     if text.contains("maybe_bad") {
         0.95
     } else if text.contains("maybe_good") {

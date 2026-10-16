@@ -5,9 +5,8 @@
 use std::{fs, path::Path};
 
 use base64::{Engine, engine::general_purpose::STANDARD};
-use lighthouse_protocol::artifact_path;
 use lighthouse_protocol::{
-    canonical,
+    artifact_path, canonical,
     hash::{digest, sha256},
     stats::FOLDS,
 };
@@ -295,7 +294,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let document = document(json!({"decision": "d/x"}), "Fake@2", &rate(0.3), &none());
         let hex = write(dir.path(), &document).unwrap();
-        let path = dir.path().join("sha256").join(format!("{hex}.json"));
+        let path = artifact_path(dir.path(), &hex);
         let tampered = fs::read_to_string(&path).unwrap().replace("0.3", "0.9");
         fs::write(&path, tampered).unwrap();
 

@@ -3,11 +3,10 @@
 
 use std::{fs, path::Path};
 
-use lighthouse_protocol::hash::sha256;
 use lighthouse_protocol::{
     ClientInfo, CreateFineTuningJobRequest, Criteria, Criterion, FineTuneMethod,
     FineTuningJobStatus, Handler, InitializeParams, Instructions, MODELS_DIR, Question, State,
-    SystemOneRequest, VERSION,
+    SystemOneRequest, VERSION, artifact_path, hash::sha256,
 };
 use serde_json::{Value, json};
 
@@ -201,7 +200,7 @@ fn training_twice_gives_the_same_digest_and_the_same_file() {
     let model = reference(one.path());
     assert_eq!(model, reference(two.path()));
     let hex = model.strip_prefix("learned@sha256:").unwrap();
-    let path = |root: &Path| root.join(MODELS_DIR).join(format!("sha256/{hex}.json"));
+    let path = |root: &Path| artifact_path(&root.join(MODELS_DIR), hex);
     assert_eq!(
         fs::read(path(one.path())).unwrap(),
         fs::read(path(two.path())).unwrap()
@@ -233,10 +232,7 @@ fn an_artifact_that_is_missing_or_altered_names_its_path_and_digest() {
     let (mut plugin, hex) = project(root.path(), fake, &dataset(12, 12));
     let model = trained(&mut plugin, root.path(), &hex);
     let digest = model.strip_prefix("learned@sha256:").unwrap().to_owned();
-    let path = root
-        .path()
-        .join(MODELS_DIR)
-        .join(format!("sha256/{digest}.json"));
+    let path = artifact_path(&root.path().join(MODELS_DIR), &digest);
 
     let (mut fresh, _) = project(root.path(), fake, &dataset(12, 12));
     fs::write(
