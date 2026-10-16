@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_checks::Declarative;
+use lighthouse_checks::Checks;
 use lighthouse_plugin::Registry;
 use lighthouse_resource::Format;
 use lighthouse_rpc::Registered;
@@ -142,7 +142,7 @@ impl Session {
     pub fn in_process_registry(&self) -> Result<Registry> {
         let mut registry = lighthouse_checks::registry();
         if let Some(local) = &self.local {
-            let plugin = Declarative::from_catalog("local", local)?;
+            let plugin = Checks::new("local", local)?;
             if !plugin.is_empty() {
                 registry.register(&plugin)?;
             }

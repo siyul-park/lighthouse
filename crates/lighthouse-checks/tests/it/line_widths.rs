@@ -1,7 +1,7 @@
 //! The `line_widths` fact of a file: widths in characters, and the lines a
 //! formatter cannot wrap.
 
-use lighthouse_checks::Declarative;
+use lighthouse_checks::Checks;
 use lighthouse_engine::RuleTester;
 use lighthouse_plugin::Registry;
 use lighthouse_spec::Catalog;
@@ -64,7 +64,7 @@ fn catalog() -> Catalog {
 fn registry() -> Registry {
     let mut registry = lighthouse_checks::registry();
     registry
-        .register(&Declarative::from_catalog("demo", &catalog()).unwrap())
+        .register(&Checks::new("demo", &catalog()).unwrap())
         .unwrap();
     registry
 }

@@ -1,4 +1,4 @@
-//! The rule a decision's `check` compiles into: a CEL expression over the code
+//! The check a decision's `check` block compiles into: a CEL expression over the code
 //! model, a standard operation (`order`, `cycle`), a program, or
 //! the name of an annotation rule the engine serves.
 //! The decision supplies id, severity, scope, options and the examples that
@@ -29,7 +29,7 @@ const ANNOTATION_RULES: [&str; 2] = [ANNOTATION_REASON, UNUSED_ALLOW];
 
 /// A rule built from a decision and its check.
 #[derive(Clone)]
-pub(crate) struct DeclarativeRule {
+pub(crate) struct Check {
     meta: RuleManifest,
     decision: Decision,
     kind: Arc<Kind>,
@@ -50,7 +50,7 @@ enum Kind {
     Annotation,
 }
 
-impl DeclarativeRule {
+impl Check {
     /// Compiles the check of `decision`; `None` for a decision whose check no
     /// program runs here (a named rule, `judged`, `rpc`) or that has none.
     pub(crate) fn new(decision: &Decision) -> Result<Option<Self>, Error> {
@@ -151,7 +151,7 @@ impl DeclarativeRule {
     }
 }
 
-impl Rule for DeclarativeRule {
+impl Rule for Check {
     /// The metadata of the decision the rule was built from.
     fn manifest(&self) -> &RuleManifest {
         &self.meta

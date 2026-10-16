@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 use crate::support::{Subject, World};
-use lighthouse_checks::Declarative;
+use lighthouse_checks::Checks;
 use lighthouse_model::{EdgeKind, Symbol, SymbolKind, Visibility};
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
@@ -43,7 +43,7 @@ fn candidates(world: &World, kind: &str, overrides: Value) -> Vec<(String, u32)>
         "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/review\nspec: {spec}\n"
     );
     let catalog = Catalog::from_local(BTreeMap::from([("review.yaml".to_owned(), text)])).unwrap();
-    let plugin = Declarative::from_catalog("local", &catalog).unwrap();
+    let plugin = Checks::new("local", &catalog).unwrap();
     let options = json!({ "kinds": [kind], kind: limits(kind, overrides) });
     world
         .diagnose_with(

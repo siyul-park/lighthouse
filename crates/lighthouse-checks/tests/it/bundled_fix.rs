@@ -1,7 +1,7 @@
 //! The fix of a bundled-style pack that fixes by command: examples run it only
 //! when the configuration allows commands of other catalogs.
 
-use lighthouse_checks::Declarative;
+use lighthouse_checks::Checks;
 use lighthouse_engine::RuleTester;
 use lighthouse_plugin::Registry;
 use lighthouse_spec::Catalog;
@@ -59,7 +59,7 @@ fn catalog() -> Catalog {
 fn registry() -> Registry {
     let mut registry = lighthouse_checks::registry();
     registry
-        .register(&Declarative::from_catalog("demo", &catalog()).unwrap())
+        .register(&Checks::new("demo", &catalog()).unwrap())
         .unwrap();
     registry
 }

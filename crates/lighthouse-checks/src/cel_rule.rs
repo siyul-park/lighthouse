@@ -15,11 +15,12 @@ use serde_json::{Map, Value};
 use crate::{
     Error,
     builder::Builder,
+    caching,
     eval::{Fact, Frame, Template, cel_fact, compile, compile_all},
     facts,
     library::{self, Needs},
     metrics::MEASURES,
-    modules, reach,
+    modules,
     review::{Candidate, Review},
 };
 
@@ -50,7 +51,7 @@ struct Identity {
 
 /// Where a finding goes, and what it is about.
 #[derive(Clone)]
-struct Place {
+struct Anchor {
     file: std::path::PathBuf,
     span: Span,
     symbol: Option<SymbolId>,
@@ -144,7 +145,7 @@ impl CelRule {
         if scope == lighthouse_model::RunScope::Project || elsewhere {
             return (Reach::Global, false);
         }
-        reach::of(&self.needs)
+        caching::reach(&self.needs)
     }
 
     pub(crate) fn check(
@@ -155,7 +156,7 @@ impl CelRule {
     ) -> Result<Vec<Diagnostic>, PluginError> {
         let builder = Builder::new(ctx, &self.needs, options, &meta.id)?;
         let reviewing = self.reviews() && ctx.models.asks(&meta.id);
-        let run = Run {
+        let run = Evaluation {
             rule: self,
             reviewing,
             meta,
@@ -174,7 +175,7 @@ impl CelRule {
     }
 }
 
-struct Run<'a> {
+struct Evaluation<'a> {
     rule: &'a CelRule,
     /// Whether the `review` route is evaluated: the run asks the models of this rule.
     reviewing: bool,
@@ -185,7 +186,7 @@ struct Run<'a> {
     candidates: RefCell<Vec<Candidate>>,
 }
 
-impl Run<'_> {
+impl Evaluation<'_> {
     fn check_file(&self, ctx: &Context) -> Result<Vec<Diagnostic>, PluginError> {
         let Some((file, text)) = ctx.file else {
             return Ok(Vec::new());
@@ -193,7 +194,7 @@ impl Run<'_> {
         match self.rule.select {
             Select::File if ctx.applies.admits_file(file) => {
                 let value = cel_fact(&self.builder.file(file, text));
-                let anchor = Place {
+                let anchor = Anchor {
                     file: file.path.clone(),
                     span: top_of_file(),
                     symbol: None,
@@ -239,7 +240,7 @@ impl Run<'_> {
     fn judge_events(&self, function: &Symbol) -> Result<Vec<Diagnostic>, PluginError> {
         let mut found = Vec::new();
         for event in self.builder.event_facts(function) {
-            let place = Place {
+            let place = Anchor {
                 file: function.file.clone(),
                 span: event.span,
                 symbol: Some(function.id.clone()),
@@ -263,7 +264,7 @@ impl Run<'_> {
                 continue;
             }
             let value = cel_fact(&self.builder.comment(comment, text));
-            let place = Place {
+            let place = Anchor {
                 file: file.path.clone(),
                 span: comment.span,
                 symbol: None,
@@ -296,7 +297,7 @@ impl Run<'_> {
                         *count,
                         stats.get(module.path.as_str()).unwrap_or(&none),
                     ));
-                    let place = Place {
+                    let place = Anchor {
                         file: anchor.file.clone(),
                         span: top_of_file(),
                         symbol: None,
@@ -324,7 +325,7 @@ impl Run<'_> {
                     }
                     let value = cel_fact(&facts::edge(project, edge));
                     let key = format!("{:?}->{:?}", edge.from, edge.to);
-                    let place = Place {
+                    let place = Anchor {
                         file: anchor.file.clone(),
                         span: anchor.span,
                         symbol: None,
@@ -343,7 +344,7 @@ impl Run<'_> {
         let mut found = Vec::new();
         for document in project.documents().iter().filter(|d| d.kind == "Decision") {
             let value = cel_fact(&facts::document(document));
-            let place = Place {
+            let place = Anchor {
                 file: document.file.clone(),
                 span: Span {
                     start: document.at,
@@ -363,7 +364,7 @@ impl Run<'_> {
         symbol: &Symbol,
         value: Fact,
     ) -> Result<Option<Diagnostic>, PluginError> {
-        let place = Place {
+        let place = Anchor {
             file: symbol.file.clone(),
             span: symbol.span,
             symbol: Some(symbol.id.clone()),
@@ -376,7 +377,7 @@ impl Run<'_> {
     fn judge(
         &self,
         value: Fact,
-        place: Place,
+        place: Anchor,
         key: &str,
     ) -> Result<Option<Diagnostic>, PluginError> {
         let rule = self.rule;
@@ -444,7 +445,7 @@ impl Run<'_> {
         Ok(Some(diagnostic))
     }
 
-    fn place(&self, frame: &Frame, default: Place) -> Result<Place, PluginError> {
+    fn place(&self, frame: &Frame, default: Anchor) -> Result<Anchor, PluginError> {
         let Some(at) = &self.rule.at else {
             return Ok(default);
         };
@@ -457,7 +458,7 @@ impl Run<'_> {
                         "`at.symbol` is `{text}`, not a symbol of the project"
                     ))
                 })?;
-            return Ok(Place {
+            return Ok(Anchor {
                 file: symbol.file.clone(),
                 span: symbol.span,
                 symbol: Some(symbol.id.clone()),
@@ -487,7 +488,7 @@ impl Run<'_> {
                 end: position(e),
             },
         };
-        Ok(Place { span, ..default })
+        Ok(Anchor { span, ..default })
     }
 }
 

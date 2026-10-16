@@ -15,10 +15,11 @@ use serde_json::{Map, Value, json};
 use crate::{
     Error,
     builder::Builder,
+    caching,
     eval::{Frame, Template, compile, compile_all},
     layout::declarations,
     library::{self, Needs},
-    order, reach,
+    order,
 };
 
 /// `order`: declarations follow the order of registered order keys.
@@ -82,7 +83,7 @@ impl OrderRule {
     pub(crate) fn reach(&self) -> (Reach, bool) {
         let core = |id: &String| order::CORE_KEYS.contains(&id.as_str());
         if self.clauses.iter().all(|c| c.by.iter().all(core)) {
-            reach::of(&self.needs)
+            caching::reach(&self.needs)
         } else {
             (Reach::Global, false)
         }

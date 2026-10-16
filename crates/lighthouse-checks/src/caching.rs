@@ -113,7 +113,7 @@ pub(crate) fn fact_declared(word: &str) -> bool {
 /// The reach of the expressions, and whether they read the place of
 /// neighbors: the greatest reach of the facts they mention and the functions
 /// they call.
-pub(crate) fn of(needs: &Needs) -> (Reach, bool) {
+pub(crate) fn reach(needs: &Needs) -> (Reach, bool) {
     let facts = FACTS.iter().filter(|(word, _)| needs.mentions(word));
     let functions = FUNCTIONS.iter().filter(|(name, _)| needs.calls(name));
     let reach = facts

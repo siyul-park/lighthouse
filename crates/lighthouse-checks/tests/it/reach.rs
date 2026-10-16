@@ -4,7 +4,7 @@
 
 use std::{collections::BTreeSet, fs, path::Path};
 
-use lighthouse_checks::reach::{FACTS, FUNCTIONS};
+use lighthouse_checks::caching::{FACTS, FUNCTIONS};
 use lighthouse_model::Reach;
 
 fn source(relative: &str) -> String {

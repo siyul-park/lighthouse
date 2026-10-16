@@ -39,7 +39,7 @@ pub(super) struct Reading<'a> {
 }
 
 /// Where a result lies.
-enum Place {
+enum Location {
     /// Nowhere: it is about the project.
     Project,
     /// In a file the project does not have.
@@ -96,10 +96,10 @@ impl Reading<'_> {
 
     /// The finding for one result; `None` for a result outside the project.
     fn diagnostic(&self, run: &Run, result: &SarifResult, tally: &mut Tally) -> Option<Diagnostic> {
-        let (path, span) = match self.place(run, result, tally) {
-            Place::Outside => return None,
-            Place::Project => (PathBuf::from("."), at(Position { line: 1, col: 1 })),
-            Place::File(path, span) => (path, span),
+        let (path, span) = match self.locate(run, result, tally) {
+            Location::Outside => return None,
+            Location::Project => (PathBuf::from("."), at(Position { line: 1, col: 1 })),
+            Location::File(path, span) => (path, span),
         };
         let id = rule_id(run, result);
         let rule = run.rule(result);
@@ -119,21 +119,21 @@ impl Reading<'_> {
         Some(diagnostic)
     }
 
-    fn place(&self, run: &Run, result: &SarifResult, tally: &mut Tally) -> Place {
+    fn locate(&self, run: &Run, result: &SarifResult, tally: &mut Tally) -> Location {
         let physical = result
             .locations
             .first()
             .and_then(|l| l.physical_location.as_ref());
         let Some(location) = physical.and_then(|p| p.artifact_location.as_ref()) else {
-            return Place::Project;
+            return Location::Project;
         };
         let Some(path) = place::path_of(location, &run.original_uri_base_ids) else {
-            return Place::Project;
+            return Location::Project;
         };
         let path = place::relative(&path, &self.ctx.workspace.root);
         if self.ctx.project.file(&path).is_none() {
             tally.left_out(&path);
-            return Place::Outside;
+            return Location::Outside;
         }
         let region = physical.and_then(|p| p.region.as_ref());
         let start = Position {
@@ -157,7 +157,7 @@ impl Reading<'_> {
             start: bytes(start),
             end: bytes(end),
         };
-        Place::File(path, span)
+        Location::File(path, span)
     }
 
     /// The unit columns are counted in: the decision's, else the log's, else

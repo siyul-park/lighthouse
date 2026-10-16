@@ -9,7 +9,7 @@ mod ops;
 use std::sync::Arc;
 
 use lighthouse_model::{FixOutcome, Safety};
-use lighthouse_plugin::{Error as PluginError, FixRequest, Fixer, FixerManifest};
+use lighthouse_plugin::{Error as PluginError, FixRequest, FixerManifest};
 use lighthouse_spec::{CommandSpec, Decision, FixKind};
 
 use crate::Error;
@@ -21,14 +21,14 @@ enum Compiled {
 
 /// A fixer built from a decision's `fix:` block.
 #[derive(Clone)]
-pub(crate) struct SpecFixer {
+pub(crate) struct Fixer {
     meta: FixerManifest,
     description: String,
     safety: Safety,
     compiled: Arc<Compiled>,
 }
 
-impl SpecFixer {
+impl Fixer {
     /// `None` when the decision has no fix, or one of a kind that is not yet
     /// supported; an error when it cannot compile.
     pub(crate) fn new(decision: &Decision) -> Result<Option<Self>, Error> {
@@ -55,7 +55,7 @@ impl SpecFixer {
     }
 }
 
-impl Fixer for SpecFixer {
+impl lighthouse_plugin::Fixer for Fixer {
     fn manifest(&self) -> &FixerManifest {
         &self.meta
     }

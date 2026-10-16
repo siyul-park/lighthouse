@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use lighthouse_checks::Declarative;
+use lighthouse_checks::Checks;
 use lighthouse_engine::RuleTester;
 use lighthouse_plugin::Registry;
 use lighthouse_spec::{Catalog, Config};
@@ -155,7 +155,7 @@ fn registry() -> Registry {
     let config = Config::parse_inline(&format!("plugins = [{}]", plugins.join(", "))).unwrap();
     lighthouse_rpc::register(&mut registry, &config, Path::new("."), &[]).unwrap();
     registry
-        .register(&Declarative::from_catalog("demo", &catalog()).unwrap())
+        .register(&Checks::new("demo", &catalog()).unwrap())
         .unwrap();
     registry
 }

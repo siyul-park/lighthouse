@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::support::{Subject, World};
-use lighthouse_checks::Declarative;
+use lighthouse_checks::Checks;
 use lighthouse_model::SymbolKind;
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
@@ -58,7 +58,7 @@ pub(crate) fn flagged_in(
         },
     );
     let catalog = Catalog::from_local(BTreeMap::from([("facts.yaml".to_owned(), text)])).unwrap();
-    let plugin = Declarative::from_catalog("local", &catalog).unwrap();
+    let plugin = Checks::new("local", &catalog).unwrap();
     world
         .diagnose_with(
             &catalog,

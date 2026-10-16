@@ -71,7 +71,7 @@ impl Needs {
     /// builder asks, so that a fact without a declared reach is caught.
     pub(crate) fn fact(&self, word: &'static str) -> bool {
         debug_assert!(
-            crate::reach::fact_declared(word),
+            crate::caching::fact_declared(word),
             "fact `{word}` has no declared reach"
         );
         self.mentions(word)

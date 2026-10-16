@@ -1,10 +1,10 @@
-//! Declarative rules over synthetic projects: every selector, the message and
+//! Checks rules over synthetic projects: every selector, the message and
 //! evidence expressions, and the ways a rule file can be wrong.
 
 use std::collections::BTreeMap;
 
 use crate::support::{Subject, World};
-use lighthouse_checks::Declarative;
+use lighthouse_checks::Checks;
 use lighthouse_model::{EdgeKind, SymbolKind};
 use lighthouse_plugin::Plugin;
 use lighthouse_spec::Catalog;
@@ -12,22 +12,22 @@ use serde_json::json;
 
 /// A local decision `local/probe` over `scope` with the CEL check `check`: the
 /// lines of its `select`, `where`, `message` and `evidence`.
-fn local(scope: &str, check: &str) -> Result<Declarative, String> {
+fn local(scope: &str, check: &str) -> Result<Checks, String> {
     scoped(&format!("{{ subject: {scope}, tests: include }}"), check)
 }
 
 /// Like [`local`], with the whole `scope` written out.
-fn scoped(scope: &str, check: &str) -> Result<Declarative, String> {
+fn scoped(scope: &str, check: &str) -> Result<Checks, String> {
     let indented: String = check.lines().map(|l| format!("    {l}\n")).collect();
     let text = format!(
         "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {scope}\n  requirement: A probe MUST hold.\n  severity: error\n  check:\n    type: cel\n{indented}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
     );
     let layer = Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)]))
         .map_err(|e| e.to_string())?;
-    Declarative::from_catalog("local", &layer).map_err(|e| e.to_string())
+    Checks::new("local", &layer).map_err(|e| e.to_string())
 }
 
-fn found(plugin: &Declarative, w: &World) -> Vec<(String, u32)> {
+fn found(plugin: &Checks, w: &World) -> Vec<(String, u32)> {
     w.check_in(
         &Subject {
             plugin,
@@ -220,17 +220,13 @@ fn local_files_need_the_local_prefix_and_a_cel_check_and_inline_examples() {
 fn declarative_is_empty() {
     let probe = local("symbol", "select: symbol\nwhere: 'true'\nmessage: x").unwrap();
     assert!(!probe.is_empty());
-    let elsewhere = Declarative::from_catalog("elsewhere", Catalog::bundled()).unwrap();
+    let elsewhere = Checks::new("elsewhere", Catalog::bundled()).unwrap();
     assert!(elsewhere.is_empty());
 }
 
 #[test]
 fn declarative_bundled_rules() {
-    let rules = |pack: &str| {
-        Declarative::from_catalog(pack, Catalog::bundled())
-            .unwrap()
-            .rules()
-    };
+    let rules = |pack: &str| Checks::new(pack, Catalog::bundled()).unwrap().rules();
     assert!(!rules("design").is_empty());
     assert!(rules("elsewhere").is_empty());
 }

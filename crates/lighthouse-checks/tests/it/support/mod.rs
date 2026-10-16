@@ -4,7 +4,7 @@
 
 use std::{collections::BTreeMap, fs};
 
-use lighthouse_checks::{Pack, metrics::Metrics};
+use lighthouse_checks::{Checks, metrics::Metrics};
 use lighthouse_engine::Engine;
 use lighthouse_model::{
     Comment, Edge, EdgeKind, File, Flow, Fragment, FunctionSummary, Module, Node, Position,
@@ -215,7 +215,7 @@ impl World {
     }
 
     pub fn check(&self, rule: &str, options: Value) -> Vec<(String, u32)> {
-        let design = Pack::of("design", Catalog::bundled());
+        let design = Checks::new("design", Catalog::bundled()).unwrap();
         self.check_in(
             &Subject {
                 plugin: &design,
@@ -235,7 +235,7 @@ impl World {
 
     /// The messages of what `rule` reports, in report order.
     pub fn messages(&self, rule: &str, options: Value) -> Vec<String> {
-        let design = Pack::of("design", Catalog::bundled());
+        let design = Checks::new("design", Catalog::bundled()).unwrap();
         let subject = Subject {
             plugin: &design,
             id: "design",
@@ -248,7 +248,7 @@ impl World {
 
     /// The fingerprints of what `rule` reports, in report order.
     pub fn fingerprints(&self, rule: &str, options: Value) -> Vec<String> {
-        let design = Pack::of("design", Catalog::bundled());
+        let design = Checks::new("design", Catalog::bundled()).unwrap();
         let subject = Subject {
             plugin: &design,
             id: "design",

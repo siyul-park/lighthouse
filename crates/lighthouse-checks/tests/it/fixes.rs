@@ -3,7 +3,7 @@
 
 use std::{collections::BTreeMap, path::PathBuf};
 
-use lighthouse_checks::Declarative;
+use lighthouse_checks::Checks;
 use lighthouse_model::{
     Anchor, Diagnostic, EditOp, File, Fingerprint, FixOutcome, Fragment, Node, Options, Owner,
     Position, Project, Severity, Span, Symbol, SymbolId, SymbolKind, Visibility,
@@ -104,7 +104,7 @@ fn local_layer(fix: &str) -> Result<Catalog, lighthouse_spec::Error> {
 
 fn fixer(fix: &str, pack: &str) -> Box<dyn Fixer> {
     let layer = local_layer(fix).unwrap();
-    let plugin = Declarative::from_catalog(pack, &layer).unwrap();
+    let plugin = Checks::new(pack, &layer).unwrap();
     plugin.fixers().remove(0)
 }
 
@@ -125,10 +125,7 @@ fn bundled(fix: &str) -> Box<dyn Fixer> {
     .map(|(k, v)| (k.to_owned(), v.to_owned()))
     .collect();
     let catalog = Catalog::from_files(files).unwrap();
-    Declarative::from_catalog("demo", &catalog)
-        .unwrap()
-        .fixers()
-        .remove(0)
+    Checks::new("demo", &catalog).unwrap().fixers().remove(0)
 }
 
 fn finding(symbol: Option<&str>, evidence: Value) -> Diagnostic {
@@ -725,7 +722,7 @@ fn the_fixer_carries_the_capabilities_the_fix_requires() {
 
 #[test]
 fn only_decisions_with_a_fix_have_fixers() {
-    let plugin = Declarative::from_catalog("design", Catalog::bundled()).unwrap();
+    let plugin = Checks::new("design", Catalog::bundled()).unwrap();
 
     let ids: Vec<String> = plugin
         .fixers()
@@ -739,7 +736,7 @@ fn only_decisions_with_a_fix_have_fixers() {
 
 #[test]
 fn the_bundled_fixers_of_a_pack_are_those_of_its_decisions_with_a_fix() {
-    let ids: Vec<String> = Declarative::from_catalog("testing", Catalog::bundled())
+    let ids: Vec<String> = Checks::new("testing", Catalog::bundled())
         .unwrap()
         .fixers()
         .iter()

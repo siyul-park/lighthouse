@@ -53,7 +53,7 @@ impl CommandRule {
                 self.spec.argv.join(" ")
             )));
         }
-        let run = Run {
+        let run = Invocation {
             rule: self,
             meta,
             ctx,
@@ -102,14 +102,14 @@ impl Ran {
     }
 }
 
-struct Run<'a> {
+struct Invocation<'a> {
     rule: &'a CommandRule,
     meta: &'a RuleManifest,
     ctx: &'a Context<'a>,
     options: &'a Map<String, Value>,
 }
 
-impl Run<'_> {
+impl Invocation<'_> {
     /// One invocation for one file.
     fn one(&self, file: &Path, text: Option<&str>) -> Result<Vec<Diagnostic>, PluginError> {
         let argv = self.arguments(std::slice::from_ref(&file.to_path_buf()))?;

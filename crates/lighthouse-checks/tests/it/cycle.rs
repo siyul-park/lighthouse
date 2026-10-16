@@ -3,20 +3,20 @@
 use std::collections::BTreeMap;
 
 use crate::support::{Subject, World};
-use lighthouse_checks::Declarative;
+use lighthouse_checks::Checks;
 use lighthouse_model::EdgeKind;
 use lighthouse_spec::Catalog;
 use serde_json::json;
 
-fn plugin(level: &str) -> Declarative {
+fn plugin(level: &str) -> Checks {
     let text = format!(
         "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/acyclic\nspec:\n  title: No cycles\n  context: Dependencies point one way.\n  scope: {{ subject: project }}\n  requirement: Modules MUST NOT depend on each other in a circle.\n  severity: error\n  check:\n    type: builtin\n    op: cycle\n    edge: imports\n    level: {level}\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: y }}]\n"
     );
     let layer = Catalog::from_local(BTreeMap::from([("acyclic.yaml".to_owned(), text)])).unwrap();
-    Declarative::from_catalog("local", &layer).unwrap()
+    Checks::new("local", &layer).unwrap()
 }
 
-fn found(plugin: &Declarative, w: &World) -> Vec<(String, u32)> {
+fn found(plugin: &Checks, w: &World) -> Vec<(String, u32)> {
     w.check_in(
         &Subject {
             plugin,

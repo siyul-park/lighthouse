@@ -41,6 +41,6 @@ impl LanguageProvider for Text {
 }
 
 /// The language providers of the pack: the fallback text one.
-pub(super) fn languages() -> Vec<Box<dyn LanguageProvider>> {
+pub(crate) fn languages() -> Vec<Box<dyn LanguageProvider>> {
     vec![Box::new(Text::new())]
 }

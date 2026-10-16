@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 
 use crate::support::{Subject, World};
-use lighthouse_checks::Declarative;
+use lighthouse_checks::Checks;
 use lighthouse_model::{EdgeKind, SymbolKind};
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
@@ -62,7 +62,7 @@ fn selected(world: &World, id: &str, subject: &str) -> Vec<String> {
         selecting(&spec, id, subject)
     };
     let catalog = Catalog::from_local(BTreeMap::from([("select.yaml".to_owned(), text)])).unwrap();
-    let plugin = Declarative::from_catalog("local", &catalog).unwrap();
+    let plugin = Checks::new("local", &catalog).unwrap();
     let mut found: Vec<String> = world
         .diagnose_with(
             &catalog,

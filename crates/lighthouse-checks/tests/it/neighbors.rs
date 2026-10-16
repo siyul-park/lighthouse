@@ -310,7 +310,7 @@ fn cases() -> Vec<Case> {
 
 #[test]
 fn a_fact_of_the_neighbors_that_changes_with_an_edit_elsewhere_changes_the_neighbors_digest() {
-    let declared: Vec<_> = lighthouse_checks::reach::FACTS
+    let declared: Vec<_> = lighthouse_checks::caching::FACTS
         .iter()
         .filter(|(_, reach)| *reach == lighthouse_model::Reach::Neighbors)
         .map(|(fact, _)| *fact)

@@ -1,7 +1,7 @@
 //! The test-contract rules over synthetic projects.
 
 use crate::support::{Subject, World};
-use lighthouse_checks::Pack;
+use lighthouse_checks::Checks;
 use lighthouse_model::{EdgeKind, Resolution, Symbol, SymbolKind, Visibility};
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
@@ -10,7 +10,7 @@ const EXTERNAL: &str = "testing/public-boundary";
 const OWNER: &str = "testing/owner";
 
 fn check(w: &World, rule: &str, options: Value) -> Vec<(String, u32)> {
-    let testing = Pack::of("testing", Catalog::bundled());
+    let testing = Checks::new("testing", Catalog::bundled()).unwrap();
     w.check_in(
         &Subject {
             plugin: &testing,
