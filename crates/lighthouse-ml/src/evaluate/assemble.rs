@@ -29,6 +29,8 @@ pub struct Part {
     pub(super) audit: Vec<String>,
     pub(super) check: String,
     pub(super) candidate_check: Option<String>,
+    /// The examples that should pass and the candidate newly fails.
+    pub(super) regressions: Vec<String>,
     /// The layer each side was graded with, when it had one.
     pub(super) layer: Option<LayerInfo>,
     pub(super) candidate_layer: Option<LayerInfo>,
@@ -140,6 +142,17 @@ impl Gathered {
             current: current_side,
             candidate: candidate_side,
             meets_policy,
+            decided: pairs
+                .iter()
+                .filter(|(was, now)| {
+                    *was == Outcome::Review && matches!(now, Outcome::Fail | Outcome::Pass)
+                })
+                .count(),
+            regressions: self
+                .parts
+                .iter()
+                .flat_map(|p| p.regressions.clone())
+                .collect(),
             caveat: CAVEAT,
             audit,
             proposal,
@@ -150,7 +163,7 @@ impl Gathered {
 /// How a check misses the policy by the point estimates of its precision and,
 /// when the policy sets a target, of its recall; none when it meets it (or
 /// has no precision to judge).
-fn shortfall(metrics: &Metrics, policy: Evaluation) -> Option<String> {
+pub(crate) fn shortfall(metrics: &Metrics, policy: Evaluation) -> Option<String> {
     let precision = metrics.precision?;
     if precision.value < policy.precision {
         return Some(format!(

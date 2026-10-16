@@ -1,0 +1,89 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false
+  },
+  "description": "Make a model the first layer of a decision, by a revision.\n\nGrades the model as `decision eval --model` does and appends a `Revision` to the decision log only when it meets the evaluation policy, loses no recall, newly fails none of the decision's examples that should pass, and decides a labelled subject the check leaves for review. Otherwise it exits 1 with the reasons and writes nothing; there is no way to force it. The next `check` asks the model first.\n\nExamples:\n  lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e\n  lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e --repo cel=../cel\n  lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e --attributed-to agent:claude --format json",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`model attach`.",
+    "properties": {
+      "attributedTo": {
+        "default": null,
+        "description": "Who approves the revision: `person` or `agent`, with an id after a\ncolon (`agent:claude`). Default: the person from `git config\nuser.name` on the command line, the client's name through MCP.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "baseline": {
+        "default": null,
+        "description": "A table of reviewed findings. Default: `baseline/precision/<id>.tsv`\nwhen it exists.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "id": {
+        "description": "The decision the model judges, such as `design/prefer-method`.",
+        "type": "string"
+      },
+      "model": {
+        "description": "The model to attach, `<provider>/<model>@sha256:<hex>` for a learned\none: graded as the first layer of the decision before anything is\nwritten.",
+        "type": "string"
+      },
+      "repo": {
+        "default": [],
+        "description": "A repository the labels are about, `name=dir`, where `name` is the\nbaseline's `repo` column. Repeatable; default: this project.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "id",
+      "model"
+    ],
+    "type": "object"
+  },
+  "name": "model_attach",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/attach-report.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "decision": {
+        "type": "string"
+      },
+      "evaluation": {
+        "type": "object"
+      },
+      "model": {
+        "type": "string"
+      },
+      "refused": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "revision": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "decision",
+      "model",
+      "evaluation"
+    ],
+    "title": "AttachReport",
+    "type": "object"
+  },
+  "title": "Make a model the first layer of a decision, by a revision"
+}

@@ -27,7 +27,7 @@ pub use record::{
     Ruling, Run, RunSummary, Stamp, Standing, State, StatusFilter, Subject, SuppressionEvent,
     Unchecked, evidence_digest,
 };
-pub use records::{Records, append_revision};
+pub use records::{Records, append_revision, now};
 pub use store::Store;
 
 /// The JSON Schema of every record kind the decision log holds.

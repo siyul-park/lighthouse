@@ -15,7 +15,7 @@ Commands:
   check        Check the project and print findings
   decision     Inspect, author, test and evaluate decisions
   review       Review the findings `check` remembers and record judgments on them
-  model        List and train the models that judge decisions
+  model        List, train, attach and detach the models that judge decisions
   cache        Manage the result cache in `.lighthouse/cache`
   spec         Validate spec documents
   schema       Print the JSON Schema of a kind of document or output
@@ -551,14 +551,16 @@ Options:
 ## `lighthouse model`
 
 ```text
-List and train the models that judge decisions
+List, train, attach and detach the models that judge decisions
 
 Usage: lighthouse model <COMMAND>
 
 Commands:
-  list   List the models bound to decisions
-  train  Fit a model on the labels of a decision
-  help   Print this message or the help of the given subcommand(s)
+  list    List the models bound to decisions
+  train   Fit a model on the labels of a decision
+  attach  Make a model the first layer of a decision, by a revision
+  detach  Remove the model a revision attached to a decision
+  help    Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help
@@ -636,6 +638,84 @@ Examples:
   lighthouse model train design/prefer-method
   lighthouse model train design/prefer-method --model local/learned --repo cel=../cel
   lighthouse model train design/prefer-method --from-model openai/gpt-5 --format json
+```
+
+## `lighthouse model attach`
+
+```text
+Make a model the first layer of a decision, by a revision.
+
+Grades the model as `decision eval --model` does and appends a `Revision` to the decision log only when it meets the evaluation policy, loses no recall, newly fails none of the decision's examples that should pass, and decides a labelled subject the check leaves for review. Otherwise it exits 1 with the reasons and writes nothing; there is no way to force it. The next `check` asks the model first.
+
+Usage: lighthouse model attach [OPTIONS] --model <REF> <ID>
+
+Arguments:
+  <ID>
+          The decision the model judges, such as `design/prefer-method`
+
+Options:
+      --model <REF>
+          The model to attach, `<provider>/<model>@sha256:<hex>` for a learned one: graded as the first layer of the decision before anything is written
+
+      --baseline <FILE>
+          A table of reviewed findings. Default: `baseline/precision/<id>.tsv` when it exists
+
+      --repo <NAME=DIR>
+          A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project
+
+      --attributed-to <WHO>
+          Who approves the revision: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
+          
+          [env: LIGHTHOUSE_ATTRIBUTED_TO=]
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e
+  lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e --repo cel=../cel
+  lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e --attributed-to agent:claude --format json
+```
+
+## `lighthouse model detach`
+
+```text
+Remove the model a revision attached to a decision.
+
+Appends a `Revision` that binds no model; exits 2 when none is attached. The model and the labels it learned from stay where they are.
+
+Usage: lighthouse model detach [OPTIONS] <ID>
+
+Arguments:
+  <ID>
+          The decision whose attached model is detached, such as `design/prefer-method`
+
+Options:
+      --attributed-to <WHO>
+          Who approves the revision: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
+          
+          [env: LIGHTHOUSE_ATTRIBUTED_TO=]
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
 ```
 
 ## `lighthouse cache`

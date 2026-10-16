@@ -6,6 +6,7 @@
 //! a `Reply` (stdout, JSON value, notes for stderr, exit code) and never print.
 
 pub mod args;
+mod attach;
 mod check;
 pub mod cli;
 mod decision;

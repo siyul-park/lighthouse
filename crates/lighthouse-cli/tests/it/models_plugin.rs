@@ -30,7 +30,7 @@ fn with_plugin(dir: &Path) {
     fs::write(dir.join("lighthouse.toml"), text).unwrap();
 }
 
-fn lighthouse(dir: &Path, args: &[&str]) -> std::process::Output {
+pub(crate) fn lighthouse(dir: &Path, args: &[&str]) -> std::process::Output {
     Command::cargo_bin("lighthouse")
         .unwrap()
         .current_dir(dir)
@@ -41,7 +41,7 @@ fn lighthouse(dir: &Path, args: &[&str]) -> std::process::Output {
 }
 
 /// Fingerprints of the subjects of the decision, by function name.
-fn fingerprints(dir: &Path) -> BTreeMap<String, String> {
+pub(crate) fn fingerprints(dir: &Path) -> BTreeMap<String, String> {
     let out = lighthouse(
         dir,
         &[
@@ -69,7 +69,7 @@ fn fingerprints(dir: &Path) -> BTreeMap<String, String> {
 }
 
 /// A table that calls the two flagged functions right and the unsure one wrong.
-fn baseline(dir: &Path) {
+pub(crate) fn baseline(dir: &Path) {
     let fp = fingerprints(dir);
     assert_eq!(fp.len(), 4, "{fp:?}");
     write(
@@ -82,7 +82,7 @@ fn baseline(dir: &Path) {
     );
 }
 
-fn json(out: &std::process::Output) -> Value {
+pub(crate) fn json(out: &std::process::Output) -> Value {
     serde_json::from_slice(&out.stdout)
         .unwrap_or_else(|_| panic!("{}", String::from_utf8_lossy(&out.stderr)))
 }
@@ -264,7 +264,7 @@ fn model_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
 
 /// The command provider declared but bound to nothing: models are asked only
 /// when a revision attaches one, or `--model` names one.
-fn declared() -> String {
+pub(crate) fn declared() -> String {
     provider("command").replace("classification = \"fake/any\"\n", "")
 }
 

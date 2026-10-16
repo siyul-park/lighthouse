@@ -49,6 +49,18 @@ pub fn run(ctx: &Context, args: &DecisionEvalArgs, output: Output) -> Result<Rep
     Reply::data(output, &report, || text(&report))
 }
 
+pub(crate) fn rate_text(rate: Option<Rate>) -> String {
+    rate.map_or_else(
+        || "-".to_owned(),
+        |r| {
+            format!(
+                "{:.3} [{:.3}, {:.3}] ({}/{})",
+                r.value, r.low, r.high, r.hits, r.of
+            )
+        },
+    )
+}
+
 fn text(report: &EvalReport) -> String {
     let mut out = String::new();
     let _ = writeln!(
@@ -144,16 +156,4 @@ fn side(out: &mut String, label: &str, side: &Side) {
     for notice in &side.notices {
         let _ = writeln!(out, "  note: {notice}");
     }
-}
-
-fn rate_text(rate: Option<Rate>) -> String {
-    rate.map_or_else(
-        || "-".to_owned(),
-        |r| {
-            format!(
-                "{:.3} [{:.3}, {:.3}] ({}/{})",
-                r.value, r.low, r.high, r.hits, r.of
-            )
-        },
-    )
 }

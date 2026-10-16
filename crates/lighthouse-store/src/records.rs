@@ -3,7 +3,9 @@
 
 use std::{collections::BTreeMap, path::Path};
 
-use crate::{Error, JudgmentEvent, RevisionEvent, RevisionSpec, Store, log};
+use rusqlite::Connection;
+
+use crate::{Error, JudgmentEvent, RevisionEvent, RevisionSpec, Store, log, store};
 
 /// What the decision log of a project holds.
 #[derive(Debug, Default)]
@@ -23,6 +25,14 @@ impl Records {
             revisions: read.revisions,
             notices: read.notices,
         })
+    }
+
+    /// The latest revision of `decision` (its uid, else its name), in log order.
+    pub fn latest(&self, decision: &str) -> Option<&RevisionEvent> {
+        self.revisions
+            .iter()
+            .rev()
+            .find(|revision| revision.spec.decision == decision)
     }
 
     /// The model each decision is bound to by its latest revision, by the
@@ -47,4 +57,9 @@ pub fn append_revision(root: &Path, spec: RevisionSpec) -> Result<String, Error>
     let line = log::line(&id, spec)?;
     log::append(&Store::log_path_in(root), &[line])?;
     Ok(id)
+}
+
+/// The current UTC time as RFC 3339, in the form the log's records carry.
+pub fn now() -> Result<String, Error> {
+    store::timestamp(&Connection::open_in_memory()?)
 }

@@ -907,6 +907,10 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         ],
         "type": "object"
       },
+      "decided": {
+        "minimum": 0,
+        "type": "integer"
+      },
       "decision": {
         "type": "string"
       },
@@ -955,6 +959,12 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
           "reason"
         ],
         "type": "object"
+      },
+      "regressions": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
       }
     },
     "required": [
@@ -962,6 +972,8 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "labelled",
       "policy",
       "current",
+      "decided",
+      "regressions",
       "caveat"
     ],
     "title": "EvalReport",

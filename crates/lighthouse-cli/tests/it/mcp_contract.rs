@@ -4,7 +4,14 @@
 use jsonschema::Validator;
 use serde_json::{Value, json};
 
-use crate::mcp::{Client, rust_project, text_project};
+use lighthouse_store::Records;
+
+use crate::{
+    attach::{DECISION, MODEL, mislabelled},
+    mcp::{Client, rust_project, text_project},
+    models::project,
+    models_plugin::{baseline, declared},
+};
 
 /// The `tools/list` result.
 fn listed(client: &mut Client) -> Vec<Value> {
@@ -47,7 +54,7 @@ fn the_tool_list_is_golden() {
     let mut client = Client::start(dir.path());
     let mut tools = listed(&mut client);
     tools.sort_by_key(|t| t["name"].as_str().unwrap().to_owned());
-    assert_eq!(tools.len(), 14);
+    assert_eq!(tools.len(), 16);
     for tool in tools {
         let name = format!("tool-{}", tool["name"].as_str().unwrap());
         insta::assert_snapshot!(name, serde_json::to_string_pretty(&tool).unwrap());
@@ -178,4 +185,37 @@ fn an_unknown_tool_is_a_protocol_error_and_a_failed_one_an_error_result() {
             .unwrap()
             .contains("nope/nope")
     );
+}
+
+#[test]
+fn a_refused_attach_is_a_result_and_a_detach_is_attributed_to_the_agent() {
+    let dir = project(&declared());
+    mislabelled(dir.path());
+    let mut client = Client::trusting(dir.path());
+    let tools = listed(&mut client);
+    let arguments = json!({ "id": DECISION, "model": MODEL, "baseline": "labels.tsv" });
+
+    let refused = called(&mut client, "model_attach", arguments.clone());
+    conforms(&tools, "model_attach", &refused);
+    assert_eq!(refused["isError"], json!(false), "{refused}");
+    let reasons = refused["structuredContent"]["refused"].to_string();
+    assert!(reasons.contains("misses the policy"), "{reasons}");
+    assert!(Records::read(dir.path()).unwrap().revisions.is_empty());
+
+    baseline(dir.path());
+    let attached = called(&mut client, "model_attach", arguments);
+    conforms(&tools, "model_attach", &attached);
+    assert!(attached["structuredContent"]["revision"].is_string());
+
+    let detached = called(&mut client, "model_detach", json!({ "id": DECISION }));
+    conforms(&tools, "model_detach", &detached);
+    let records = Records::read(dir.path()).unwrap();
+    assert_eq!(records.revisions.len(), 2);
+    for revision in &records.revisions {
+        assert_eq!(revision.spec.approval.id.as_deref(), Some("test-agent"));
+    }
+    assert!(records.attached().is_empty());
+
+    let nothing = called(&mut client, "model_detach", json!({ "id": DECISION }));
+    assert_eq!(nothing["isError"], json!(true), "{nothing}");
 }

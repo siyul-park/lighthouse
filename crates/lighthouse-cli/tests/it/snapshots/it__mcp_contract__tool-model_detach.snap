@@ -1,0 +1,59 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": false
+  },
+  "description": "Remove the model a revision attached to a decision.\n\nAppends a `Revision` that binds no model; exits 2 when none is attached. The model and the labels it learned from stay where they are.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`model detach`.",
+    "properties": {
+      "attributedTo": {
+        "default": null,
+        "description": "Who approves the revision: `person` or `agent`, with an id after a\ncolon (`agent:claude`). Default: the person from `git config\nuser.name` on the command line, the client's name through MCP.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "id": {
+        "description": "The decision whose attached model is detached, such as\n`design/prefer-method`.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "name": "model_detach",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/detach-report.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "decision": {
+        "type": "string"
+      },
+      "model": {
+        "type": "string"
+      },
+      "revision": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "revision",
+      "decision",
+      "model"
+    ],
+    "title": "DetachReport",
+    "type": "object"
+  },
+  "title": "Remove the model a revision attached to a decision"
+}

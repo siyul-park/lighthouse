@@ -4,6 +4,7 @@
 //! the agent skill. The CLI, the MCP server and
 //! the agent hooks only parse their own input and print the results of these.
 
+mod attach;
 mod authoring;
 mod cache;
 mod check;
@@ -28,6 +29,7 @@ mod validate;
 
 use std::error::Error;
 
+pub use attach::{Attachment, Detachment, attach, detach};
 pub use authoring::{Authored, create_decision, replace_decision};
 pub use cache::{cache_dir, clean_cache};
 pub(crate) use check::attached_models;

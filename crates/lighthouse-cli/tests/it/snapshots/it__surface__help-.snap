@@ -10,7 +10,7 @@ Commands:
   check        Check the project and print findings
   decision     Inspect, author, test and evaluate decisions
   review       Review the findings `check` remembers and record judgments on them
-  model        List and train the models that judge decisions
+  model        List, train, attach and detach the models that judge decisions
   cache        Manage the result cache in `.lighthouse/cache`
   spec         Validate spec documents
   schema       Print the JSON Schema of a kind of document or output

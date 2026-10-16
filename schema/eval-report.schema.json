@@ -838,6 +838,10 @@
       ],
       "type": "object"
     },
+    "decided": {
+      "minimum": 0,
+      "type": "integer"
+    },
     "decision": {
       "type": "string"
     },
@@ -886,6 +890,12 @@
         "reason"
       ],
       "type": "object"
+    },
+    "regressions": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
     }
   },
   "required": [
@@ -893,6 +903,8 @@
     "labelled",
     "policy",
     "current",
+    "decided",
+    "regressions",
     "caveat"
   ],
   "title": "EvalReport",

@@ -1,0 +1,22 @@
+{
+  "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/detach-report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "decision": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "revision": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "revision",
+    "decision",
+    "model"
+  ],
+  "title": "DetachReport",
+  "type": "object"
+}

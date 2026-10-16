@@ -1,6 +1,7 @@
 //! The command line against real projects and language plugins, one binary.
 
 mod agent;
+mod attach;
 mod cache;
 mod cache_fixtures;
 mod checks;

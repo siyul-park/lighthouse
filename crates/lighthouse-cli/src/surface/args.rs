@@ -378,6 +378,52 @@ pub struct ModelTrainArgs {
     pub repo: Vec<String>,
 }
 
+/// `model attach`.
+#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ModelAttachArgs {
+    /// The decision the model judges, such as `design/prefer-method`.
+    #[arg(value_name = "ID")]
+    pub id: String,
+    /// The model to attach, `<provider>/<model>@sha256:<hex>` for a learned
+    /// one: graded as the first layer of the decision before anything is
+    /// written.
+    #[arg(long, value_name = "REF")]
+    pub model: String,
+    /// A table of reviewed findings. Default: `baseline/precision/<id>.tsv`
+    /// when it exists.
+    #[arg(long, value_name = "FILE")]
+    #[serde(default)]
+    pub baseline: Option<PathBuf>,
+    /// A repository the labels are about, `name=dir`, where `name` is the
+    /// baseline's `repo` column. Repeatable; default: this project.
+    #[arg(long, value_name = "NAME=DIR")]
+    #[serde(default)]
+    pub repo: Vec<String>,
+    /// Who approves the revision: `person` or `agent`, with an id after a
+    /// colon (`agent:claude`). Default: the person from `git config
+    /// user.name` on the command line, the client's name through MCP.
+    #[arg(long, value_name = "WHO", env = "LIGHTHOUSE_ATTRIBUTED_TO")]
+    #[serde(default)]
+    pub attributed_to: Option<String>,
+}
+
+/// `model detach`.
+#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ModelDetachArgs {
+    /// The decision whose attached model is detached, such as
+    /// `design/prefer-method`.
+    #[arg(value_name = "ID")]
+    pub id: String,
+    /// Who approves the revision: `person` or `agent`, with an id after a
+    /// colon (`agent:claude`). Default: the person from `git config
+    /// user.name` on the command line, the client's name through MCP.
+    #[arg(long, value_name = "WHO", env = "LIGHTHOUSE_ATTRIBUTED_TO")]
+    #[serde(default)]
+    pub attributed_to: Option<String>,
+}
+
 /// The text of a document given as text, or an object given as JSON.
 fn text_or_object<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
     match Value::deserialize(deserializer)? {

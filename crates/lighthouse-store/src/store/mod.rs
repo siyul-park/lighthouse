@@ -403,6 +403,11 @@ enum Seen {
     Open,
 }
 
+/// The current UTC time, in the form the log and the cache record.
+pub(crate) fn timestamp(conn: &Connection) -> Result<String, Error> {
+    Ok(conn.query_row(&format!("SELECT {NOW}"), [], |row| row.get(0))?)
+}
+
 fn retry_busy<T>(mut attempt: impl FnMut() -> Result<T, Error>) -> Result<T, Error> {
     let mut tries = 0;
     loop {
@@ -437,10 +442,6 @@ fn diagnose(error: Error, path: &Path) -> Error {
         }
         _ => error,
     }
-}
-
-fn timestamp(conn: &Connection) -> Result<String, Error> {
-    Ok(conn.query_row(&format!("SELECT {NOW}"), [], |row| row.get(0))?)
 }
 
 fn upsert(tx: &Transaction, observed: &Observed, run: &Run, now: &str) -> Result<Seen, Error> {

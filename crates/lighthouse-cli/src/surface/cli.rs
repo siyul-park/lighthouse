@@ -8,10 +8,10 @@ use crate::surface::{
     Result,
     args::{
         CheckArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs, DecisionTestArgs,
-        DocumentArgs, FingerprintArgs, FixOptions, ModelListArgs, ModelTrainArgs, ReviewListArgs,
-        ReviewResolveArgs,
+        DocumentArgs, FingerprintArgs, FixOptions, ModelAttachArgs, ModelDetachArgs, ModelListArgs,
+        ModelTrainArgs, ReviewListArgs, ReviewResolveArgs,
     },
-    check, decision, eval, model,
+    attach, check, decision, eval, model,
     reply::{CheckFormat, Context, OutputArg, Reply},
     review,
 };
@@ -40,6 +40,12 @@ Examples:
   lighthouse model train design/prefer-method
   lighthouse model train design/prefer-method --model local/learned --repo cel=../cel
   lighthouse model train design/prefer-method --from-model openai/gpt-5 --format json";
+
+const ATTACH_EXAMPLES: &str = "\
+Examples:
+  lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e
+  lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e --repo cel=../cel
+  lighthouse model attach design/prefer-method --model local/learned@sha256:3f2a9c1e --attributed-to agent:claude --format json";
 
 /// A command of the agent loop, with its arguments.
 #[derive(Debug, Subcommand)]
@@ -78,7 +84,7 @@ pub enum Action {
         #[command(subcommand)]
         command: ReviewCommand,
     },
-    /// List and train the models that judge decisions.
+    /// List, train, attach and detach the models that judge decisions.
     Model {
         #[command(subcommand)]
         command: ModelCommand,
@@ -268,6 +274,31 @@ pub enum ModelCommand {
         #[command(flatten)]
         output: OutputArg,
     },
+    /// Make a model the first layer of a decision, by a revision.
+    ///
+    /// Grades the model as `decision eval --model` does and appends a
+    /// `Revision` to the decision log only when it meets the evaluation
+    /// policy, loses no recall, newly fails none of the decision's examples
+    /// that should pass, and decides a labelled subject the check leaves for
+    /// review. Otherwise it exits 1 with the reasons and writes nothing; there
+    /// is no way to force it. The next `check` asks the model first.
+    #[command(after_long_help = ATTACH_EXAMPLES)]
+    Attach {
+        #[command(flatten)]
+        args: ModelAttachArgs,
+        #[command(flatten)]
+        output: OutputArg,
+    },
+    /// Remove the model a revision attached to a decision.
+    ///
+    /// Appends a `Revision` that binds no model; exits 2 when none is
+    /// attached. The model and the labels it learned from stay where they are.
+    Detach {
+        #[command(flatten)]
+        args: ModelDetachArgs,
+        #[command(flatten)]
+        output: OutputArg,
+    },
 }
 
 #[derive(Debug, clap::Parser)]
@@ -294,6 +325,8 @@ pub fn run(ctx: &Context, action: &Action) -> Result<Reply> {
         Action::Model { command } => match command {
             ModelCommand::List { args, output } => model::list(ctx, args, output.format),
             ModelCommand::Train { args, output } => model::train_model(ctx, args, output.format),
+            ModelCommand::Attach { args, output } => attach::attach(ctx, args, output.format),
+            ModelCommand::Detach { args, output } => attach::detach(ctx, args, output.format),
         },
     }
 }

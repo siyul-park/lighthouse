@@ -23,6 +23,8 @@ pub fn kinds() -> BTreeMap<&'static str, Value> {
         ("JudgmentHistory", judgment_history()),
         ("ModelList", model_list()),
         ("TrainReport", train_report()),
+        ("AttachReport", attach_report()),
+        ("DetachReport", detach_report()),
     ]
     .into_iter()
     .map(|(kind, schema)| (kind, document(kind, schema)))
@@ -219,12 +221,21 @@ fn eval_report() -> Value {
             "policy": object(json!({ "precision": { "type": "number" } }), &["precision"]),
             "current": side(), "candidate": nullable(side()), "agreement": rate(),
             "meets_policy": nullable(json!({ "type": "boolean" })),
+            "decided": integer(), "regressions": strings(),
             "caveat": string(), "audit": nullable(string()),
             "proposal": object(json!({
                 "action": { "enum": ["detach"] }, "model": string(), "reason": string()
             }), &["action", "model", "reason"])
         }),
-        &["decision", "labelled", "policy", "current", "caveat"],
+        &[
+            "decision",
+            "labelled",
+            "policy",
+            "current",
+            "decided",
+            "regressions",
+            "caveat",
+        ],
     )
 }
 
@@ -324,5 +335,24 @@ fn train_report() -> Value {
             "dataset",
             "training_file",
         ],
+    )
+}
+
+fn attach_report() -> Value {
+    object(
+        json!({
+            "decision": string(), "model": string(),
+            "revision": string(),
+            "refused": strings(),
+            "evaluation": { "type": "object" }
+        }),
+        &["decision", "model", "evaluation"],
+    )
+}
+
+fn detach_report() -> Value {
+    object(
+        json!({ "revision": string(), "decision": string(), "model": string() }),
+        &["revision", "decision", "model"],
     )
 }

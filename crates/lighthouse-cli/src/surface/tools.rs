@@ -12,10 +12,10 @@ use crate::surface::{
     Result,
     args::{
         CheckArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs, DecisionTestArgs,
-        DocumentArgs, FingerprintArgs, FixArgs, ModelListArgs, ModelTrainArgs, ReviewListArgs,
-        ReviewResolveArgs,
+        DocumentArgs, FingerprintArgs, FixArgs, ModelAttachArgs, ModelDetachArgs, ModelListArgs,
+        ModelTrainArgs, ReviewListArgs, ReviewResolveArgs,
     },
-    check, cli, decision, eval, fix, model,
+    attach, check, cli, decision, eval, fix, model,
     reply::{CheckFormat, Context, Output, Reply},
     review,
 };
@@ -33,7 +33,7 @@ const READ: Hints = Hints {
 };
 
 /// The tools, in the order they are listed.
-pub const TOOLS: [Tool; 14] = [
+pub const TOOLS: [Tool; 16] = [
     Tool::new(
         "check",
         &["check"],
@@ -164,6 +164,30 @@ pub const TOOLS: [Tool; 14] = [
             open_world: true,
         },
         schema::<ModelTrainArgs>,
+    ),
+    Tool::new(
+        "model_attach",
+        &["model", "attach"],
+        "AttachReport",
+        Hints {
+            read_only: false,
+            destructive: false,
+            idempotent: true,
+            open_world: true,
+        },
+        schema::<ModelAttachArgs>,
+    ),
+    Tool::new(
+        "model_detach",
+        &["model", "detach"],
+        "DetachReport",
+        Hints {
+            read_only: false,
+            destructive: false,
+            idempotent: true,
+            open_world: false,
+        },
+        schema::<ModelDetachArgs>,
     ),
 ];
 
@@ -309,6 +333,8 @@ fn dispatch(ctx: &Context, tool: &Tool, arguments: Value) -> Result<Reply> {
         "review_history" => review::history(&parse(arguments)?, json),
         "model_list" => model::list(ctx, &parse(arguments)?, json),
         "model_train" => model::train_model(ctx, &parse(arguments)?, json),
+        "model_attach" => attach::attach(ctx, &parse(arguments)?, json),
+        "model_detach" => attach::detach(ctx, &parse(arguments)?, json),
         other => Err(format!("unknown tool `{other}`").into()),
     }
 }

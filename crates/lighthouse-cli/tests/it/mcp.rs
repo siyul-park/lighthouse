@@ -23,15 +23,28 @@ pub(crate) struct Client {
 
 impl Client {
     pub(crate) fn start(dir: &Path) -> Self {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_lighthouse"))
+        Self::open(dir, false)
+    }
+
+    /// A server for a project the person trusts, so that the commands it
+    /// names (a model among them) are run.
+    pub(crate) fn trusting(dir: &Path) -> Self {
+        Self::open(dir, true)
+    }
+
+    fn open(dir: &Path, trusted: bool) -> Self {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_lighthouse"));
+        command
             .arg("mcp")
             .current_dir(dir)
             .env_remove("LIGHTHOUSE_ATTRIBUTED_TO")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .unwrap();
+            .stderr(Stdio::null());
+        if trusted {
+            command.env("LIGHTHOUSE_TRUST", "1");
+        }
+        let mut child = command.spawn().unwrap();
         let input = child.stdin.take().unwrap();
         let output = BufReader::new(child.stdout.take().unwrap());
         let mut client = Self {
@@ -200,6 +213,8 @@ fn the_server_lists_its_tools_and_resources() {
             "decision_test",
             "decision_update",
             "fix",
+            "model_attach",
+            "model_detach",
             "model_list",
             "model_train",
             "review_history",

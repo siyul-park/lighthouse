@@ -1,0 +1,43 @@
+---
+source: crates/lighthouse-cli/tests/it/surface.rs
+expression: "printed(dir.path(), &args)"
+---
+Remove the model a revision attached to a decision.
+
+Appends a `Revision` that binds no model; exits 2 when none is attached. The model and the labels it learned from stay where they are.
+
+Usage: lighthouse model detach [OPTIONS] <ID>
+
+Arguments:
+  <ID>
+          The decision whose attached model is detached, such as `design/prefer-method`
+
+Options:
+      --attributed-to <WHO>
+          Who approves the revision: `person` or `agent`, with an id after a colon (`agent:claude`). Default: the person from `git config user.name` on the command line, the client's name through MCP
+          
+          [env: LIGHTHOUSE_ATTRIBUTED_TO=]
+
+      --config <FILE>
+          The project file; the project root is then the current directory
+          
+          [env: LIGHTHOUSE_CONFIG=]
+
+      --color <COLOR>
+          Color of help and messages. `auto` honours NO_COLOR and CLICOLOR_FORCE
+          
+          [env: LIGHTHOUSE_COLOR=]
+          [default: auto]
+          [possible values: auto, always, never]
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')

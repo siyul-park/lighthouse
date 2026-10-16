@@ -26,7 +26,9 @@ use crate::{
 mod assemble;
 mod layer;
 
+pub(crate) use assemble::shortfall;
 pub use assemble::{Gathered, Part};
+pub(crate) use layer::trained_on;
 pub use layer::{Layer, LayerInfo, Layered, overlay, shown};
 
 const CAVEAT: &str = "labelled positives come mostly from flagged findings, so recall is an upper bound; sample unflagged subjects for a person to label";
@@ -108,6 +110,11 @@ pub struct EvalReport {
     /// evaluation policy by the point estimates of its precision and, when the
     /// policy sets a target, of its recall; the intervals are shown beside.
     pub meets_policy: Option<bool>,
+    /// Labelled subjects the candidate decides that the current check leaves
+    /// for review.
+    pub decided: usize,
+    /// The examples that should pass and the candidate newly fails.
+    pub regressions: Vec<String>,
     pub caveat: &'static str,
     /// The table of unflagged subjects written for a person to label.
     pub audit: Option<PathBuf>,
@@ -331,6 +338,7 @@ pub fn grade(
         audit: Vec::new(),
         check: request.decision.clone(),
         candidate_check: None,
+        regressions: Vec::new(),
         layer: current.layer.clone(),
         candidate_layer: None,
     };
@@ -358,6 +366,13 @@ pub fn grade(
                 .copied()
                 .unwrap_or(Outcome::Unselected)
         };
+        if label.observed.is_some()
+            && label.truth == Truth::Pass
+            && now == Outcome::Fail
+            && was != Outcome::Fail
+        {
+            part.regressions.push(label.key.clone());
+        }
         part.candidate.push((label.truth, now));
         part.candidate_scored
             .extend(candidate.found.scored(current, label, repo));

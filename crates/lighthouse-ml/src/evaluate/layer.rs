@@ -72,33 +72,16 @@ impl CrossFit {
     /// The dataset `layer`'s model learned from, when it is a learned one
     /// whose card names a dataset.
     fn of(layer: &Layer) -> Result<Option<Self>> {
-        let Some((trainer, digest)) = layer.model.split_once('@') else {
+        let Some(file) = trained_on(layer.root, layer.model)? else {
             return Ok(None);
         };
-        let Some(hex) = digest.strip_prefix("sha256:") else {
-            return Ok(None);
-        };
-        let path = layer
-            .root
-            .join(MODELS_DIR)
-            .join("sha256")
-            .join(format!("{hex}.json"));
-        let Ok(text) = fs::read_to_string(path) else {
-            return Ok(None);
-        };
-        let artifact: Value = serde_json::from_str(&text)?;
-        let Some(file) = artifact
-            .pointer("/card/trainingFile")
-            .and_then(Value::as_str)
-        else {
-            return Ok(None);
-        };
-        let lines = dataset::read(layer.root, file)?.ok_or_else(|| {
+        let lines = dataset::read(layer.root, &file)?.ok_or_else(|| {
             format!(
                 "the labels `{}` learned from (dataset {file}) are not in {DIR}; train it again",
                 layer.model
             )
         })?;
+        let trainer = layer.model.split('@').next().unwrap_or(layer.model);
         let groups: Vec<&str> = lines.iter().map(|line| line.group.as_str()).collect();
         let folds = assign(&groups);
         Ok(Some(Self {
@@ -324,6 +307,29 @@ pub fn overlay(layer: &Layer, base: &Found, labels: &[Label]) -> Result<Layered>
     drop(refits.made);
     drop(scratch);
     Ok(Layered { found, labels })
+}
+
+/// The dataset (`sha256:<hex>`) the card of a learned model's artifact names
+/// as the file it was trained on; none for a model without an artifact here.
+pub(crate) fn trained_on(root: &Path, model: &str) -> Result<Option<String>> {
+    let Some((_, digest)) = model.split_once('@') else {
+        return Ok(None);
+    };
+    let Some(hex) = digest.strip_prefix("sha256:") else {
+        return Ok(None);
+    };
+    let path = root
+        .join(MODELS_DIR)
+        .join("sha256")
+        .join(format!("{hex}.json"));
+    let Ok(text) = fs::read_to_string(path) else {
+        return Ok(None);
+    };
+    let artifact: Value = serde_json::from_str(&text)?;
+    Ok(artifact
+        .pointer("/card/trainingFile")
+        .and_then(Value::as_str)
+        .map(str::to_owned))
 }
 
 /// P(fail) the model gave the subject, the model as evidence names it, and
