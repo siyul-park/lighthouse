@@ -1,6 +1,5 @@
 //! The standard functions of CEL expressions over the code model:
-//! `metrics(n)`, `callers(n)`, `callees(n)`, `edges(n, kind)`, `owner(n)`,
-//! `tests(n)`, `annotations(n)`, `rank(n, key)`, `exposed(n, internal)`,
+//! `metrics(n)`, `callers(n)`, `owner(n)`, `tests(n)`, `rank(n, key)`, `exposed(n, internal)`,
 //! `unit(func)`, `reach(n)`, `limit(n, max)` and `counted(n, count, what)`,
 //! the module path helpers `globMatch(path, glob)` and
 //! `layerOf(module, layers)`, and the text helpers `join`, `lines`, `trim`,
@@ -29,14 +28,11 @@ use cel::{
 
 /// The functions the library defines and the hidden field of a node each one
 /// reads.
-pub(crate) const FUNCTIONS: [(&str, &str); 10] = [
+pub(crate) const FUNCTIONS: [(&str, &str); 7] = [
     ("metrics", "__metrics"),
     ("callers", "__callers"),
-    ("callees", "__callees"),
     ("owner", "__owner"),
     ("tests", "__tests"),
-    ("annotations", "__annotations"),
-    ("edges", "__edges"),
     ("rank", "__ranks"),
     ("unit", "__unit"),
     ("reach", "__reach"),
@@ -126,13 +122,11 @@ pub(super) type Builtin = Box<dyn Fn(&mut FunctionContext) -> ResolveResult + Se
 pub(crate) fn context() -> Context<'static> {
     let mut context = Context::default();
     for (name, field) in FUNCTIONS {
-        if name == "edges" || name == "rank" {
-            continue;
+        if name != "rank" {
+            context.add_function(name, field_reader(name, field));
         }
-        context.add_function(name, field_reader(name, field));
     }
-    context.add_function("edges", keyed_reader("edges", "__edges", empty_list));
-    context.add_function("rank", keyed_reader("rank", "__ranks", unranked));
+    context.add_function("rank", rank());
     context.add_function("exposed", exposed());
     limits::install(&mut context);
     context.add_function("globMatch", |path: Arc<String>, glob: Arc<String>| {
@@ -210,21 +204,22 @@ fn field_reader(name: &'static str, field: &'static str) -> Builtin {
     })
 }
 
-/// `name(node, key)`: the entry `key` of the hidden map `field` of the node,
-/// or what `absent` makes when the node has none.
-fn keyed_reader(name: &'static str, field: &'static str, absent: fn() -> Value) -> Builtin {
-    Box::new(move |ftx| {
+/// `rank(node, key)`: the rank the order key `key` gives the node, `-1` when
+/// the node has none.
+fn rank() -> Builtin {
+    Box::new(|ftx| {
         let [node, key] = arguments(ftx)?;
         let key = text(&Value::try_from(key)?);
-        let Some(map) = member(node, field, name)?.and_then(|v| v.downcast_ref::<CelMap>()) else {
-            return Ok(absent());
+        let Some(map) = member(node, "__ranks", "rank")?.and_then(|v| v.downcast_ref::<CelMap>())
+        else {
+            return Ok(Value::Int(-1));
         };
         match map
             .inner()
             .get(&CelMapKey::String(CelString::from(key.as_str())))
         {
             Some(value) => Value::try_from(value.as_ref()),
-            None => Ok(absent()),
+            None => Ok(Value::Int(-1)),
         }
     })
 }
@@ -336,14 +331,6 @@ fn text_helpers(context: &mut Context<'static>) {
             .skip(usize::try_from(n).unwrap_or(0))
             .collect::<String>()
     });
-}
-
-fn empty_list() -> Value {
-    Value::List(Vec::new().into())
-}
-
-fn unranked() -> Value {
-    Value::Int(-1)
 }
 
 fn empty() -> Value {

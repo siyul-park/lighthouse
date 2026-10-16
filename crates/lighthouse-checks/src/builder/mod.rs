@@ -12,8 +12,7 @@ use std::{
 
 use crate::metrics::{COGNITIVE, CYCLOMATIC, FAN, NESTING, SIZE, is_dispatcher, is_flat_dispatch};
 use lighthouse_model::{
-    Comment, Edge, FunctionSummary, Node, Project, Symbol, SymbolId, SymbolKind, Target,
-    Visibility, annotation,
+    Comment, FunctionSummary, Project, Symbol, SymbolId, SymbolKind, Visibility,
 };
 use lighthouse_plugin::{Context, Error, KeyContext, OrderKey, Workspace};
 use serde_json::{Map, Value, json};
@@ -31,8 +30,6 @@ mod cohesion;
 mod effective;
 mod forward;
 mod gap;
-mod hidden;
-mod homonyms;
 mod imports;
 mod measures;
 mod ownership;
@@ -59,7 +56,6 @@ pub(crate) struct Builder<'a> {
     keys: Vec<(String, &'a dyn OrderKey)>,
     measures: Option<Measures>,
     table: Arc<Table>,
-    names: Arc<homonyms::Names>,
     single: Arc<effective::Single>,
     imports: Arc<imports::Imports>,
     types: Arc<cohesion::Types>,
@@ -99,7 +95,6 @@ impl<'a> Builder<'a> {
             keys,
             measures,
             table: ctx.memo.slot(),
-            names: ctx.memo.slot(),
             single: ctx.memo.slot(),
             imports: ctx.memo.slot(),
             types: ctx.memo.slot(),
@@ -259,12 +254,6 @@ impl<'a> Builder<'a> {
                 self.nodes(project.callers(&symbol.id)),
             );
         }
-        if needs.function("callees") {
-            map.insert(
-                "__callees".to_owned(),
-                self.nodes(project.callees(&symbol.id)),
-            );
-        }
         if needs.function("unit") {
             map.insert("__unit".to_owned(), self.unit(symbol, summary));
         }
@@ -273,12 +262,6 @@ impl<'a> Builder<'a> {
         }
         if needs.function("owner") {
             map.insert("__owner".to_owned(), self.owner(symbol));
-        }
-        if needs.function("edges") {
-            map.insert("__edges".to_owned(), self.edges(symbol));
-        }
-        if needs.function("annotations") {
-            map.insert("__annotations".to_owned(), self.annotations(symbol));
         }
         if needs.function("tests") {
             map.insert("__tests".to_owned(), self.tests(symbol));
@@ -377,14 +360,8 @@ impl<'a> Builder<'a> {
         if needs.fact("owner_home") {
             map.insert("owner_home".to_owned(), self.owner_home(symbol));
         }
-        if needs.fact("homonyms") {
-            map.insert("homonyms".to_owned(), self.homonyms(symbol));
-        }
         if needs.fact("module_imports") {
             map.insert("module_imports".to_owned(), self.module_imports(symbol));
-        }
-        if needs.fact("hidden_target") {
-            map.insert("hidden_target".to_owned(), self.hidden_target(symbol));
         }
     }
 
@@ -403,58 +380,6 @@ impl<'a> Builder<'a> {
             .as_ref()
             .and_then(|o| self.project.symbol(o))
             .map_or_else(|| json!({ "visibility": "", "kind": "" }), |o| self.node(o))
-    }
-
-    fn edges(&self, symbol: &Symbol) -> Value {
-        let mut by_kind: BTreeMap<&str, Vec<Value>> = BTreeMap::new();
-        for edge in self.project.edges_from(&symbol.id) {
-            by_kind
-                .entry(edge.kind.as_str())
-                .or_default()
-                .push(self.edge_target(edge));
-        }
-        json!(by_kind)
-    }
-
-    fn edge_target(&self, edge: &Edge) -> Value {
-        let resolution = serde_json::to_value(edge.resolution).unwrap_or(Value::Null);
-        match &edge.to {
-            Target::Resolved(Node::Symbol(id)) => match self.project.symbol(id) {
-                Some(s) => {
-                    let mut node = self.node(s);
-                    node["resolution"] = resolution;
-                    node
-                }
-                None => json!({ "id": id.as_str(), "resolution": resolution }),
-            },
-            Target::Resolved(Node::Module(m)) | Target::Path(m) => {
-                json!({ "id": m, "module": m, "name": m, "kind": "module", "resolution": resolution })
-            }
-        }
-    }
-
-    fn annotations(&self, symbol: &Symbol) -> Value {
-        Value::Array(
-            self.project
-                .comments_in(&symbol.file)
-                .iter()
-                .filter(|c| c.attached_to.as_ref() == Some(&symbol.id))
-                .flat_map(|c| {
-                    annotation::directives(&c.text)
-                        .into_iter()
-                        .filter(|(_, d)| d.form.needs_reason())
-                        .map(|(_, d)| {
-                            json!({
-                                "form": d.form.as_str(),
-                                "rules": d.rules,
-                                "reason": d.reason.unwrap_or_default(),
-                                "line": c.span.start.line,
-                            })
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .collect(),
-        )
     }
 
     fn tests(&self, symbol: &Symbol) -> Value {

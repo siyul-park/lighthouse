@@ -52,13 +52,11 @@ pub const FACTS: &[(&str, Reach)] = &[
     // across modules, or an index over every symbol of the project.
     ("forwards_only", Reach::Global),
     ("forward_target", Reach::Global),
-    ("hidden_target", Reach::Global),
     ("touched_by_tests", Reach::Global),
     ("module_tested", Reach::Global),
     ("local_callers", Reach::Global),
     ("effective", Reach::Global),
     ("module_imports", Reach::Global),
-    ("homonyms", Reach::Global),
     // The types of a module, with the cohesion of their methods; the types
     // that implement an interface, tests included.
     ("types", Reach::Global),
@@ -75,15 +73,12 @@ pub const FACTS: &[(&str, Reach)] = &[
 pub const FUNCTIONS: &[(&str, Reach)] = &[
     ("metrics", Reach::Local),
     ("callers", Reach::Neighbors),
-    ("callees", Reach::Neighbors),
     ("owner", Reach::Neighbors),
-    ("edges", Reach::Neighbors),
     ("tests", Reach::Global),
     // A function with the single-use helpers it calls, transitively.
     ("unit", Reach::Global),
     // How far a symbol reaches the others through what the symbols use.
     ("reach", Reach::Global),
-    ("annotations", Reach::Local),
     // The order keys of this crate rank a declaration by its own file and
     // owner.
     ("rank", Reach::Local),

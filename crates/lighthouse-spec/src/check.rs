@@ -453,8 +453,7 @@ impl Select {
 /// value (`symbol`, `func`, `edge`, `module`, `file`, `test`, `comment` or
 /// `event`),
 /// the decision's resolved `options`, and the standard function library over
-/// the code model: `metrics(n)`, `callers(n)`, `callees(n)`, `edges(n, kind)`,
-/// `owner(n)`, `tests(n)`, `annotations(n)`.
+/// the code model: `metrics(n)`, `callers(n)`, `owner(n)`, `tests(n)`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct CelCheck {
