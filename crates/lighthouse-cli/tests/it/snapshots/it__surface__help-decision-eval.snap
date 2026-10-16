@@ -34,6 +34,9 @@ Options:
       --check <FILE>
           A decision file whose check is evaluated beside the current one
 
+      --model <REF>
+          A model to grade as the first layer of the decision, beside the current check: `<provider>/<model>@sha256:<hex>`. One fitted on labels is graded on those by refits that leave each fold out
+
       --audit <N>
           Write this many selected subjects the check did not flag to a table for a person to label (`TP` or `FP`), to measure recall
 

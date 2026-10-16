@@ -3,6 +3,7 @@ mod canonical;
 mod diagnostic;
 mod document;
 mod fix;
+mod fold;
 pub mod hash;
 mod merge;
 mod relations;
@@ -18,6 +19,7 @@ pub use document::Document;
 pub use fix::{
     Anchor, EditOp, FixOutcome, Owner, Preview, PreviewEdit, PreviewFile, Safety, UnknownSafety,
 };
+pub use fold::{FOLDS, assign, fold};
 pub use review::{
     AgentKind, Attribution, Judgment, Label, Role, Suppressed, Suppression, SuppressionKind,
     SuppressionStatus, UnknownTerm,

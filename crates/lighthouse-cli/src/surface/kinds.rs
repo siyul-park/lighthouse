@@ -194,7 +194,10 @@ fn side() -> Value {
                 "violates": { "type": "boolean" }, "probability": { "type": "number" },
                 "model": string()
             }), &["fingerprint", "violates", "probability", "model"])),
-            "notices": list_of(string())
+            "notices": list_of(string()),
+            "layer": object(json!({
+                "model": string(), "cross_fitted": integer(), "refits": strings()
+            }), &["model", "cross_fitted", "refits"])
         }),
         &[
             "check",
@@ -216,7 +219,10 @@ fn eval_report() -> Value {
             "policy": object(json!({ "precision": { "type": "number" } }), &["precision"]),
             "current": side(), "candidate": nullable(side()), "agreement": rate(),
             "meets_policy": nullable(json!({ "type": "boolean" })),
-            "caveat": string(), "audit": nullable(string())
+            "caveat": string(), "audit": nullable(string()),
+            "proposal": object(json!({
+                "action": { "enum": ["detach"] }, "model": string(), "reason": string()
+            }), &["action", "model", "reason"])
         }),
         &["decision", "labelled", "policy", "current", "caveat"],
     )

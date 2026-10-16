@@ -42,6 +42,7 @@ pub fn run(ctx: &Context, args: &DecisionEvalArgs, output: Output) -> Result<Rep
         repos: repos_of(ctx, &args.repo)?,
         baseline: args.baseline.clone().or_else(|| default_baseline(&args.id)),
         candidate: args.check.clone(),
+        model: args.model.clone(),
         config: ctx.config.clone(),
         audit: args.audit,
     })?;
@@ -80,6 +81,13 @@ fn text(report: &EvalReport) -> String {
             report.policy.precision
         );
     }
+    if let Some(proposal) = &report.proposal {
+        let _ = writeln!(
+            out,
+            "proposal: {} {}: {}; run lighthouse model {} {}",
+            proposal.action, proposal.model, proposal.reason, proposal.action, report.decision
+        );
+    }
     if let Some(path) = &report.audit {
         let _ = writeln!(
             out,
@@ -94,6 +102,19 @@ fn text(report: &EvalReport) -> String {
 fn side(out: &mut String, label: &str, side: &Side) {
     let m = &side.metrics;
     let _ = writeln!(out, "{label} ({}):", side.check);
+    if let Some(layer) = &side.layer {
+        let _ = writeln!(
+            out,
+            "  layer 1: {} ({} cross-fitted{})",
+            layer.model,
+            layer.cross_fitted,
+            if layer.refits.is_empty() {
+                String::new()
+            } else {
+                format!(", refits {}", layer.refits.join(", "))
+            }
+        );
+    }
     for (name, rate) in [
         ("precision", m.precision),
         ("FPR", m.fpr),

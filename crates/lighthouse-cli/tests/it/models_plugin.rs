@@ -261,3 +261,56 @@ fn model_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
     let shown = String::from_utf8_lossy(&out.stdout);
     assert!(shown.contains("chosen fake (brier 0.2500)"), "{shown}");
 }
+
+/// The command provider declared but bound to nothing: models are asked only
+/// when a revision attaches one, or `--model` names one.
+fn declared() -> String {
+    provider("command").replace("classification = \"fake/any\"\n", "")
+}
+
+#[test]
+fn eval_grades_a_model_beside_the_check_as_its_first_layer() {
+    let dir = project(&declared());
+    baseline(dir.path());
+    let out = lighthouse(
+        dir.path(),
+        &[
+            "decision",
+            "eval",
+            "local/naming-ban",
+            "--baseline",
+            "labels.tsv",
+            "--model",
+            "fake/learned@sha256:abc",
+            "--format",
+            "json",
+        ],
+    );
+    let report = json(&out);
+    // Nothing is bound: the check leaves the two `maybe` subjects for review.
+    // Its violations are `bad_one` and the subject the invalid example shows.
+    assert!(report["current"].get("layer").is_none());
+    assert_eq!(report["current"]["metrics"]["recall"]["hits"], 2);
+    let candidate = &report["candidate"];
+    assert_eq!(candidate["layer"]["model"], "fake/learned@sha256:abc");
+    assert_eq!(candidate["layer"]["cross_fitted"], 0);
+    // The model fails `maybe_bad`, which a person called a violation.
+    assert_eq!(candidate["metrics"]["recall"]["hits"], 3);
+    assert_eq!(candidate["metrics"]["precision"]["of"], 3);
+    assert_eq!(report["agreement"]["of"], 4);
+    assert!(report.get("proposal").is_none());
+
+    let both = lighthouse(
+        dir.path(),
+        &[
+            "decision",
+            "eval",
+            "local/naming-ban",
+            "--model",
+            "fake/learned@sha256:abc",
+            "--check",
+            "ban.yaml",
+        ],
+    );
+    assert_eq!(both.status.code(), Some(2));
+}

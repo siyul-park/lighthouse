@@ -56,6 +56,9 @@ pub struct ModelFlags {
     pub record: bool,
     /// Keep the subjects models were put, for training and evaluation.
     pub collect: bool,
+    /// Leave out the models revisions attached: the run is the check without
+    /// that layer, as grading it needs.
+    pub detached: bool,
 }
 
 /// How a run ended. `Incomplete` wins over everything: "not checked" is never
@@ -232,6 +235,7 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
         subjects: request.models.subjects.clone(),
         collect: request.models.collect,
         attached,
+        detached: request.models.detached,
     });
     let engine = if request.cache {
         engine.with_cache(cache_dir(&root), cache_limit())

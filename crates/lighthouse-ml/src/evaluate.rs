@@ -13,6 +13,7 @@ use std::{
 };
 
 use lighthouse_engine::Outcome as Run;
+use lighthouse_plugin::Subject;
 use lighthouse_spec::{Catalog, Evaluation, local_files};
 use serde::Serialize;
 
@@ -23,8 +24,10 @@ use crate::{
 };
 
 mod assemble;
+mod layer;
 
 pub use assemble::{Gathered, Part};
+pub use layer::{Layer, LayerInfo, Layered, overlay, shown};
 
 const CAVEAT: &str = "labelled positives come mostly from flagged findings, so recall is an upper bound; sample unflagged subjects for a person to label";
 
@@ -44,6 +47,9 @@ pub struct EvalRequest {
     pub baseline: Option<PathBuf>,
     /// A decision file whose check is evaluated beside the current one.
     pub candidate: Option<PathBuf>,
+    /// A model (`<provider>/<model>@sha256:<hex>`) to grade as the first
+    /// layer of the decision, beside the current check.
+    pub model: Option<String>,
     pub config: Option<PathBuf>,
     /// Write this many selected subjects the check did not flag to a table
     /// a person labels, to measure recall.
@@ -69,6 +75,9 @@ pub struct Side {
     /// What went wrong with the models, or was worth saying: the notices of
     /// the run, so that a failing model is not silent.
     pub notices: Vec<String>,
+    /// The model attached by revision this side is graded with, and how.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub layer: Option<LayerInfo>,
 }
 
 /// What a model gave a labelled subject.
@@ -102,10 +111,22 @@ pub struct EvalReport {
     pub caveat: &'static str,
     /// The table of unflagged subjects written for a person to label.
     pub audit: Option<PathBuf>,
+    /// What to do about an attached model that misses the policy.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proposal: Option<Proposal>,
+}
+
+/// A change the monitor proposes; nothing is written until it is made.
+#[derive(Debug, Serialize)]
+pub struct Proposal {
+    /// `detach`.
+    pub action: &'static str,
+    pub model: String,
+    pub reason: String,
 }
 
 /// What one run of a check found, by subject.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Found {
     by_fingerprint: BTreeMap<String, Outcome>,
     /// The subject a fingerprint is about: its file and symbol.
@@ -122,6 +143,11 @@ pub struct Found {
     /// Selected subjects the check did not flag, for an audit, with the
     /// place each is at.
     unflagged: Vec<(String, String)>,
+    /// With subjects collected, what models are asked about each, by
+    /// fingerprint.
+    subjects: BTreeMap<String, Subject>,
+    /// The layer of an attached model laid over the run, when one was.
+    layer: Option<LayerInfo>,
 }
 
 impl Found {
@@ -156,6 +182,7 @@ impl Found {
             .filter_map(|(fp, answer)| Some((found.place.get(fp)?.clone(), answer.clone())))
             .collect();
         found.notices = run.notices.iter().cloned().collect();
+        found.subjects.clone_from(&run.subjects);
         found.calls = run.model_calls;
         found.cost = run.model_cost;
         let flagged: BTreeSet<&String> = found.by_fingerprint.keys().collect();
@@ -171,6 +198,17 @@ impl Found {
             })
             .collect();
         found
+    }
+
+    /// With subjects collected, what models are asked about each, by
+    /// fingerprint.
+    pub fn subjects(&self) -> &BTreeMap<String, Subject> {
+        &self.subjects
+    }
+
+    /// The layer laid over the run, when there is one.
+    pub fn layer(&self) -> Option<&LayerInfo> {
+        self.layer.as_ref()
     }
 
     /// The probability of failing a model gave the subject of a label this
@@ -192,7 +230,9 @@ impl Found {
         })
     }
 
-    fn outcome_of(&self, label: &Label) -> Outcome {
+    /// How the run came out on a label's subject: the outcome an example
+    /// carries, else the one the run gave its fingerprint.
+    pub fn outcome_of(&self, label: &Label) -> Outcome {
         label.observed.unwrap_or_else(|| {
             self.by_fingerprint
                 .get(&label.key)
@@ -291,6 +331,8 @@ pub fn grade(
         audit: Vec::new(),
         check: request.decision.clone(),
         candidate_check: None,
+        layer: current.layer.clone(),
+        candidate_layer: None,
     };
     let Some(candidate) = candidate else {
         part.audit = audit_rows(request, repo, current);
@@ -325,6 +367,7 @@ pub fn grade(
     part.candidate_notices.clone_from(&candidate.found.notices);
     part.audit = audit_rows(request, repo, candidate.found);
     part.candidate_check = Some(candidate.id);
+    part.candidate_layer.clone_from(&candidate.found.layer);
     part
 }
 

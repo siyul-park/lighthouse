@@ -24,6 +24,9 @@ use super::{batch::Pending, instance::Host};
 /// Failures of a model, in one run, after which it is no longer asked.
 pub(super) const ALLOWED_FAILS: usize = 3;
 
+/// What a run without attached models is given as the attached ones.
+static NONE: BTreeMap<String, String> = BTreeMap::new();
+
 /// A layer of the cascade: the models one binding names, tried in turn.
 pub(super) struct Route<'a> {
     /// The references of the models, joined with `,`.
@@ -135,7 +138,11 @@ impl<'a> RunModels<'a> {
         Self {
             host,
             binding,
-            attached: &options.attached,
+            attached: if options.detached {
+                &NONE
+            } else {
+                &options.attached
+            },
             scopes: (!options.all && options.subjects.is_none()).then_some(scopes),
             subjects: options.subjects.as_ref(),
             budget: AtomicUsize::new(binding.budget),

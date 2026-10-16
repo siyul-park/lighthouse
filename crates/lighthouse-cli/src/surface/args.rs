@@ -253,9 +253,15 @@ pub struct DecisionEvalArgs {
     #[serde(default)]
     pub baseline: Option<PathBuf>,
     /// A decision file whose check is evaluated beside the current one.
-    #[arg(long, value_name = "FILE")]
+    #[arg(long, value_name = "FILE", conflicts_with = "model")]
     #[serde(default)]
     pub check: Option<PathBuf>,
+    /// A model to grade as the first layer of the decision, beside the
+    /// current check: `<provider>/<model>@sha256:<hex>`. One fitted on labels
+    /// is graded on those by refits that leave each fold out.
+    #[arg(long, value_name = "REF")]
+    #[serde(default)]
+    pub model: Option<String>,
     /// Write this many selected subjects the check did not flag to a table
     /// for a person to label (`TP` or `FP`), to measure recall.
     #[arg(long, value_name = "N")]

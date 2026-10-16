@@ -30,7 +30,7 @@ pub use models::{
     FineTuneSupervisedMethod, FineTuningJob, FineTuningJobStatus, Judged, LineKeys,
     ListModelResponse, MODELS_DIR, Model, Models, Neighbor, NoModels, Open, Question, ResultKind,
     Settle, State, Subject, SubjectContext, Supports, SystemOneRequest, SystemOneResponse,
-    TrainingLine, UPPER, decide,
+    TrainingLine, UPPER, decide, request_of,
 };
 pub use notices::Notices;
 pub use registry::{Registry, plugin_of};

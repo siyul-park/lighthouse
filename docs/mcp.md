@@ -150,6 +150,7 @@ Result: [EvalReport](../schema/eval-report.schema.json).
 | `baseline` | string \| null | `null` | A table of reviewed findings. Default: `baseline/precision/<id>.tsv` when it exists. |
 | `check` | string \| null | `null` | A decision file whose check is evaluated beside the current one. |
 | `id` (required) | string |  | The decision, such as `design/prefer-method`. |
+| `model` | string \| null | `null` | A model to grade as the first layer of the decision, beside the current check: `<provider>/<model>@sha256:<hex>`. One fitted on labels is graded on those by refits that leave each fold out. |
 | `repo` | string[] | `[]` | A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project. |
 
 ## review_list

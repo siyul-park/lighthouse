@@ -62,6 +62,29 @@
             "cost": {
               "type": "number"
             },
+            "layer": {
+              "properties": {
+                "cross_fitted": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "refits": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "model",
+                "cross_fitted",
+                "refits"
+              ],
+              "type": "object"
+            },
             "metrics": {
               "properties": {
                 "abstention": {
@@ -436,6 +459,29 @@
         },
         "cost": {
           "type": "number"
+        },
+        "layer": {
+          "properties": {
+            "cross_fitted": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "model": {
+              "type": "string"
+            },
+            "refits": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "model",
+            "cross_fitted",
+            "refits"
+          ],
+          "type": "object"
         },
         "metrics": {
           "properties": {
@@ -817,6 +863,27 @@
       },
       "required": [
         "precision"
+      ],
+      "type": "object"
+    },
+    "proposal": {
+      "properties": {
+        "action": {
+          "enum": [
+            "detach"
+          ]
+        },
+        "model": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "model",
+        "reason"
       ],
       "type": "object"
     }

@@ -44,6 +44,14 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "description": "The decision, such as `design/prefer-method`.",
         "type": "string"
       },
+      "model": {
+        "default": null,
+        "description": "A model to grade as the first layer of the decision, beside the\ncurrent check: `<provider>/<model>@sha256:<hex>`. One fitted on labels\nis graded on those by refits that leave each fold out.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
       "repo": {
         "default": [],
         "description": "A repository the labels are about, `name=dir`, where `name` is the\nbaseline's `repo` column. Repeatable; default: this project.",
@@ -122,6 +130,29 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
               },
               "cost": {
                 "type": "number"
+              },
+              "layer": {
+                "properties": {
+                  "cross_fitted": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "refits": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "model",
+                  "cross_fitted",
+                  "refits"
+                ],
+                "type": "object"
               },
               "metrics": {
                 "properties": {
@@ -497,6 +528,29 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
           },
           "cost": {
             "type": "number"
+          },
+          "layer": {
+            "properties": {
+              "cross_fitted": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "model": {
+                "type": "string"
+              },
+              "refits": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "model",
+              "cross_fitted",
+              "refits"
+            ],
+            "type": "object"
           },
           "metrics": {
             "properties": {
@@ -878,6 +932,27 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         },
         "required": [
           "precision"
+        ],
+        "type": "object"
+      },
+      "proposal": {
+        "properties": {
+          "action": {
+            "enum": [
+              "detach"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "model",
+          "reason"
         ],
         "type": "object"
       }

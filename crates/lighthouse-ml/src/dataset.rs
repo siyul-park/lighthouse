@@ -37,12 +37,20 @@ pub struct Dataset {
     pub lines: usize,
 }
 
+/// A line of a stored dataset: what the cross-fit needs to place it, and its
+/// text, which is canonical already.
+pub(crate) struct Line {
+    pub(crate) key: String,
+    pub(crate) group: String,
+    pub(crate) text: String,
+}
+
 /// Writes the lines of `rows` for `decision`, ordered by key, and gives the
 /// dataset.
 pub(crate) fn write(root: &Path, decision: &DecisionRef, mut rows: Vec<Row>) -> Result<Dataset> {
     rows.sort_by(|a, b| a.key.cmp(&b.key));
     let question = Question::of(decision);
-    let mut text = String::new();
+    let mut lines = Vec::new();
     for row in &rows {
         let group = if row.subject.file.is_empty() {
             row.key.as_str()
@@ -61,9 +69,15 @@ pub(crate) fn write(root: &Path, decision: &DecisionRef, mut rows: Vec<Row>) -> 
                 attribution: row.attribution.clone(),
             },
         );
-        text.push_str(&canonical(&serde_json::to_value(&line)?));
-        text.push('\n');
+        lines.push(canonical(&serde_json::to_value(&line)?));
     }
+    write_lines(root, &lines)
+}
+
+/// Writes canonical `lines` as a dataset: the one place a training file is
+/// made, so that equal lines are one file.
+pub(crate) fn write_lines(root: &Path, lines: &[String]) -> Result<Dataset> {
+    let text: String = lines.iter().map(|line| format!("{line}\n")).collect();
     let hex = sha256(&text);
     let dir = root.join(DIR).join("sha256");
     fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
@@ -72,6 +86,33 @@ pub(crate) fn write(root: &Path, decision: &DecisionRef, mut rows: Vec<Row>) -> 
     Ok(Dataset {
         digest: format!("sha256:{hex}"),
         path,
-        lines: rows.len(),
+        lines: lines.len(),
     })
+}
+
+/// The path of the dataset `digest` (`sha256:<hex>`) names.
+pub(crate) fn path_of(root: &Path, digest: &str) -> PathBuf {
+    let hex = digest.strip_prefix("sha256:").unwrap_or(digest);
+    root.join(DIR).join("sha256").join(format!("{hex}.jsonl"))
+}
+
+/// The lines of the dataset `digest` names, or `None` when the store does not
+/// hold it.
+pub(crate) fn read(root: &Path, digest: &str) -> Result<Option<Vec<Line>>> {
+    let path = path_of(root, digest);
+    let Ok(text) = fs::read_to_string(&path) else {
+        return Ok(None);
+    };
+    let mut lines = Vec::new();
+    for text in text.lines() {
+        let line: Value =
+            serde_json::from_str(text).map_err(|e| format!("{}: {e}", path.display()))?;
+        let field = |name: &str| line.get(name).and_then(Value::as_str).unwrap_or_default();
+        lines.push(Line {
+            key: field("key").to_owned(),
+            group: field("group").to_owned(),
+            text: text.to_owned(),
+        });
+    }
+    Ok(Some(lines))
 }

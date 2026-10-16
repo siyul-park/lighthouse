@@ -130,6 +130,24 @@ pub struct NoModels;
 
 impl Models for NoModels {}
 
+/// The request that puts a subject, as `state`, to a model: one question per
+/// decision, the one shape every asker of a model builds (a run's batch, a
+/// teacher, the grading of a layer-1 model).
+pub fn request_of<'a>(
+    state: State,
+    decisions: impl IntoIterator<Item = &'a DecisionRef>,
+) -> SystemOneRequest {
+    SystemOneRequest {
+        state,
+        model: String::new(),
+        questions: decisions
+            .into_iter()
+            .map(|decision| (decision.id.clone(), Question::of(decision)))
+            .collect(),
+        options: serde_json::Map::new(),
+    }
+}
+
 /// A probability of failing, made a verdict by the band: `Some(confidence)`
 /// when the model fails the subject (P at or above `upper`), `None` when it
 /// abstains. M1 has no calibration, so no lower bound clears a subject.

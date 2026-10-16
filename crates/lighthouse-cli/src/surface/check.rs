@@ -97,6 +97,7 @@ pub fn analyze(ctx: &Context, args: &CheckArgs) -> Result<Checked> {
             subjects: None,
             record: args.record_model_labels,
             collect: false,
+            detached: false,
         },
     };
     lighthouse_session::check(session, &request)

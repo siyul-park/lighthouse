@@ -4,6 +4,7 @@ mod annotation;
 mod canonical;
 mod fingerprint;
 mod fix;
+mod fold;
 mod hash;
 mod project;
 mod review;

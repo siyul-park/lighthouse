@@ -3,12 +3,7 @@
 //! fitted on and the part it is judged on), and how a probability on them is
 //! judged.
 
-use std::collections::BTreeSet;
-
-use lighthouse_model::hash::short;
-
-/// The number of folds, when there are groups enough.
-pub const FOLDS: usize = 5;
+use lighthouse_model::assign;
 
 /// One labelled subject, embedded.
 #[derive(Debug, Clone, PartialEq)]
@@ -66,35 +61,23 @@ pub fn out_of_fold<T>(rows: &[&Row], score: impl Fn(&[&Row], &[&Row]) -> Vec<T>)
     scored.into_iter().flatten().collect()
 }
 
-/// The indices of each fold: by the hash of the group (stable, whatever else
-/// is in the data) and, when there are fewer groups than [`FOLDS`], one group
-/// a fold. Empty folds are dropped.
+/// The indices of each fold, by the rule the host grades with
+/// (`lighthouse_model::assign`). Empty folds are dropped.
 fn folds(rows: &[&Row]) -> Vec<Vec<usize>> {
-    let groups: BTreeSet<&str> = rows.iter().map(|r| r.group.as_str()).collect();
-    let by_group = groups.len() < FOLDS;
-    let fold_of = |group: &str| {
-        if by_group {
-            groups.iter().position(|g| *g == group).unwrap_or(0)
-        } else {
-            hashed(group)
-        }
-    };
-    let mut folds = vec![Vec::new(); if by_group { groups.len() } else { FOLDS }];
-    for (i, row) in rows.iter().enumerate() {
-        folds[fold_of(&row.group)].push(i);
+    let groups: Vec<&str> = rows.iter().map(|r| r.group.as_str()).collect();
+    let assigned = assign(&groups);
+    let mut folds = vec![Vec::new(); assigned.iter().max().map_or(0, |m| m + 1)];
+    for (i, fold) in assigned.into_iter().enumerate() {
+        folds[fold].push(i);
     }
     folds.retain(|fold| !fold.is_empty());
     folds
 }
 
-/// The fold of a group: the first 8 hex digits of its SHA-256, modulo the
-/// number of folds.
-fn hashed(group: &str) -> usize {
-    u32::from_str_radix(&short(group, 4), 16).unwrap_or(0) as usize % FOLDS
-}
-
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
 
     fn row(group: &str, label: f64) -> Row {
@@ -127,14 +110,6 @@ mod tests {
         let rows = [row("a", 0.0), row("a", 1.0), row("b", 0.0), row("c", 1.0)];
         let refs: Vec<&Row> = rows.iter().collect();
         assert_eq!(folds(&refs), [vec![0, 1], vec![2], vec![3]]);
-    }
-
-    #[test]
-    fn the_fold_of_a_group_is_its_hash_modulo_the_folds() {
-        // sha256("a") starts with ca978112, which is 3398926610.
-        assert_eq!(hashed("a"), 0);
-        // sha256("b") starts with 3e23e816, which is 1042540566.
-        assert_eq!(hashed("b"), 1);
     }
 
     #[test]

@@ -8,7 +8,7 @@ use std::{collections::BTreeMap, sync::Arc, sync::PoisonError, sync::atomic::Ord
 
 use lighthouse_model::Diagnostic;
 use lighthouse_plugin::{
-    Ask, Classifier, Decided, Judged, Model, Open, Question, Settle, SystemOneRequest, decide,
+    Ask, Classifier, Decided, Judged, Model, Open, Settle, decide, request_of,
 };
 use rayon::prelude::*;
 
@@ -161,18 +161,10 @@ impl<'a> RunModels<'a> {
         if manifest.cost > 0.0 && !self.spend() {
             return Err(Miss::Budget);
         }
-        let params = SystemOneRequest {
-            state: pending[chunk[0].0].ask.subjects[chunk[0].1].state(),
-            model: String::new(),
-            questions: chunk
-                .iter()
-                .map(|&(p, _)| {
-                    let decision = &pending[p].ask.decision;
-                    (decision.id.clone(), Question::of(decision))
-                })
-                .collect(),
-            options: serde_json::Map::new(),
-        };
+        let params = request_of(
+            pending[chunk[0].0].ask.subjects[chunk[0].1].state(),
+            chunk.iter().map(|&(p, _)| &pending[p].ask.decision),
+        );
         self.calls.fetch_add(1, Ordering::SeqCst);
         *self.cost.lock().unwrap_or_else(PoisonError::into_inner) += manifest.cost;
         let result = model

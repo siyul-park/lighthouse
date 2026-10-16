@@ -18,6 +18,7 @@ fn request(audit: Option<usize>) -> EvalRequest {
         repos: Vec::new(),
         baseline: None,
         candidate: None,
+        model: None,
         config: None,
         audit,
     }

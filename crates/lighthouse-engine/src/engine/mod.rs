@@ -292,6 +292,9 @@ pub struct ModelOptions {
     pub collect: bool,
     /// The model a revision attached to a decision, by decision id.
     pub attached: BTreeMap<String, String>,
+    /// Ignore `attached`: the run is the check without the layer a revision
+    /// adds, which is what grading that layer starts from.
+    pub detached: bool,
 }
 
 impl Engine {

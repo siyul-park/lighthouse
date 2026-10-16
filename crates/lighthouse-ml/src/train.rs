@@ -11,7 +11,7 @@ use std::{
 
 use lighthouse_plugin::{
     Classifier, CreateFineTuningJobRequest, DecisionRef, FineTuneMethod, FineTuneSupervisedMethod,
-    FineTuningJob, MODELS_DIR, Question, ResultKind, Subject, SystemOneRequest, UPPER, decide,
+    FineTuningJob, MODELS_DIR, ResultKind, Subject, UPPER, decide, request_of,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -154,6 +154,41 @@ pub fn train(request: &TrainRequest, parts: Vec<Rows>, target: &Target) -> Resul
     })
 }
 
+/// OpenAI's fine-tuning job creation for the dataset: the same dataset for the
+/// same base model is the same job (its seed comes from the digest).
+pub(crate) fn job(
+    reference: &str,
+    training_file: &str,
+    root: &Path,
+    decision: &str,
+) -> CreateFineTuningJobRequest {
+    let model = reference.split_once('/').map_or(reference, |(_, m)| m);
+    let seed = u32::from_str_radix(&training_file["sha256:".len()..][..8], 16).unwrap_or(0);
+    CreateFineTuningJobRequest {
+        model: model.to_owned(),
+        training_file: training_file.to_owned(),
+        validation_file: None,
+        method: FineTuneMethod {
+            kind: "supervised".to_owned(),
+            supervised: FineTuneSupervisedMethod::default(),
+        },
+        seed,
+        suffix: None,
+        metadata: BTreeMap::from([
+            ("decision".to_owned(), decision.to_owned()),
+            (
+                "datasets".to_owned(),
+                root.join(DIR).to_string_lossy().into_owned(),
+            ),
+            (
+                "dir".to_owned(),
+                root.join(MODELS_DIR).to_string_lossy().into_owned(),
+            ),
+        ]),
+        options: serde_json::Map::new(),
+    }
+}
+
 /// Whether a label is a row to learn from. A `notApplicable` label teaches
 /// nothing to a classifier, and a catalog example is not drawn from the
 /// distribution of the labels (every invalid one is a positive): examples
@@ -201,16 +236,10 @@ fn taught(
     decision: &DecisionRef,
     unlabelled: Vec<(String, Subject)>,
 ) -> Result<Vec<Sourced>> {
-    let question = Question::of(decision);
     let attribution = json!({"type": "SoftwareAgent", "hadRole": "model"});
     let mut labelled = Vec::new();
     for (key, subject) in unlabelled {
-        let answered = teacher.classify(&SystemOneRequest {
-            state: subject.state(),
-            model: String::new(),
-            questions: BTreeMap::from([(decision.id.clone(), question.clone())]),
-            options: serde_json::Map::new(),
-        })?;
+        let answered = teacher.classify(&request_of(subject.state(), [decision]))?;
         let Some(noul) = answered.answers.get(&decision.id).map(|a| a.noul) else {
             continue;
         };
@@ -233,41 +262,6 @@ fn taught(
         });
     }
     Ok(labelled)
-}
-
-/// OpenAI's fine-tuning job creation for the dataset: the same dataset for the
-/// same base model is the same job (its seed comes from the digest).
-fn job(
-    reference: &str,
-    training_file: &str,
-    root: &Path,
-    decision: &str,
-) -> CreateFineTuningJobRequest {
-    let model = reference.split_once('/').map_or(reference, |(_, m)| m);
-    let seed = u32::from_str_radix(&training_file["sha256:".len()..][..8], 16).unwrap_or(0);
-    CreateFineTuningJobRequest {
-        model: model.to_owned(),
-        training_file: training_file.to_owned(),
-        validation_file: None,
-        method: FineTuneMethod {
-            kind: "supervised".to_owned(),
-            supervised: FineTuneSupervisedMethod::default(),
-        },
-        seed,
-        suffix: None,
-        metadata: BTreeMap::from([
-            ("decision".to_owned(), decision.to_owned()),
-            (
-                "datasets".to_owned(),
-                root.join(DIR).to_string_lossy().into_owned(),
-            ),
-            (
-                "dir".to_owned(),
-                root.join(MODELS_DIR).to_string_lossy().into_owned(),
-            ),
-        ]),
-        options: serde_json::Map::new(),
-    }
 }
 
 /// The card of the artifact the job's first result file names, when that is
