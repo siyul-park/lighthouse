@@ -15,6 +15,28 @@ enum Skipped {
     Incomplete(Incomplete),
 }
 
+/// Runs `op` on the worker threads the independent steps of a run share. A
+/// worker gets the stack the main thread has, as the expressions of a check
+/// recurse deeply. If such workers cannot start, workers with the default
+/// stack do, and failing that `op` runs on the global pool.
+pub(super) fn in_pool<R: Send>(op: impl FnOnce() -> R + Send) -> R {
+    const STACK: usize = 8 << 20;
+    static POOL: OnceLock<Option<ThreadPool>> = OnceLock::new();
+    let pool = POOL.get_or_init(|| {
+        let named =
+            || rayon::ThreadPoolBuilder::new().thread_name(|n| format!("lighthouse-worker-{n}"));
+        named()
+            .stack_size(STACK)
+            .build()
+            .or_else(|_| named().build())
+            .ok()
+    });
+    match pool {
+        Some(pool) => pool.install(op),
+        None => op(),
+    }
+}
+
 impl Engine {
     /// Reads every file under the root that a listed language claims, side by
     /// side.
@@ -468,27 +490,5 @@ fn unfinished(
             Ok(Vec::new())
         }
         other => Ok(other?),
-    }
-}
-
-/// Runs `op` on the worker threads the independent steps of a run share. A
-/// worker gets the stack the main thread has, as the expressions of a check
-/// recurse deeply. If such workers cannot start, workers with the default
-/// stack do, and failing that `op` runs on the global pool.
-pub(super) fn in_pool<R: Send>(op: impl FnOnce() -> R + Send) -> R {
-    const STACK: usize = 8 << 20;
-    static POOL: OnceLock<Option<ThreadPool>> = OnceLock::new();
-    let pool = POOL.get_or_init(|| {
-        let named =
-            || rayon::ThreadPoolBuilder::new().thread_name(|n| format!("lighthouse-worker-{n}"));
-        named()
-            .stack_size(STACK)
-            .build()
-            .or_else(|_| named().build())
-            .ok()
-    });
-    match pool {
-        Some(pool) => pool.install(op),
-        None => op(),
     }
 }
