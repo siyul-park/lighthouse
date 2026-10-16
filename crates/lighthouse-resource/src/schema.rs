@@ -16,7 +16,7 @@ pub struct Descriptor {
 
 impl Descriptor {
     /// The descriptor of the kind whose spec is `S`.
-    pub fn of<S: Spec + JsonSchema>() -> Self {
+    pub fn new<S: Spec + JsonSchema>() -> Self {
         Self {
             kind: S::KIND,
             schema: schema::<S>(),

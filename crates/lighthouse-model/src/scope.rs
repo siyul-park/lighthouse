@@ -63,17 +63,13 @@ pub struct Applicability {
 }
 
 impl Applicability {
-    /// Whether every subject of `file` is out: it is generated code the
-    /// decision skips, or test code it leaves to other decisions.
-    fn excludes_file(&self, file: &File) -> bool {
-        (!self.generated && file.generated) || (self.tests == TestScope::Exclude && file.test)
-    }
-
     /// Whether no subject of `file` can be a subject of the decision, the
-    /// project's symbols considered: besides `excludes_file`, a production
-    /// file without test code is out of a decision that is only about tests.
+    /// project's symbols considered: it is generated code the decision skips,
+    /// test code it leaves to other decisions, or a production file without
+    /// test code in a decision that is only about tests.
     pub fn excludes(&self, project: &Project, file: &File) -> bool {
-        self.excludes_file(file)
+        (!self.generated && file.generated)
+            || (self.tests == TestScope::Exclude && file.test)
             || (self.tests == TestScope::Only
                 && !file.test
                 && !project

@@ -149,7 +149,7 @@ vocabulary!(Label, "label" {
 
 impl Label {
     /// The label of a judgment, whether an external suppression went with it.
-    pub fn of(judgment: Judgment, suppressed: bool) -> Self {
+    pub fn new(judgment: Judgment, suppressed: bool) -> Self {
         match (judgment, suppressed) {
             (Judgment::Fail, false) => Self::Positive,
             (Judgment::Fail, true) => Self::Separate,

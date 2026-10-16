@@ -160,7 +160,7 @@ pub fn request_of<'a>(
         model: String::new(),
         questions: decisions
             .into_iter()
-            .map(|decision| (decision.id.clone(), Question::of(decision)))
+            .map(|decision| (decision.id.clone(), Question::new(decision)))
             .collect(),
         options: serde_json::Map::new(),
     }

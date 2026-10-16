@@ -250,7 +250,7 @@ fn rule_manifest_fingerprints_are_seeded_by_the_uid_so_a_rename_moves_none() {
     let by_name = meta.fingerprint("pkg::f#function", "snippet");
     assert_eq!(
         by_name,
-        lighthouse_model::Fingerprint::of("design/new", "pkg::f#function", "snippet"),
+        lighthouse_model::Fingerprint::new("design/new", "pkg::f#function", "snippet"),
         "a rule without a uid is seeded by its id"
     );
 

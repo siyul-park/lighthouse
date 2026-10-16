@@ -37,7 +37,7 @@ fn state() -> State {
 
 #[test]
 fn a_question_puts_invalid_examples_under_true_and_valid_ones_under_false() {
-    let question = Question::of(&decision());
+    let question = Question::new(&decision());
     let wire = serde_json::to_value(&question).unwrap();
 
     assert_eq!(wire["type"], "noul");
@@ -54,7 +54,7 @@ fn a_question_puts_invalid_examples_under_true_and_valid_ones_under_false() {
 
 #[test]
 fn the_system_text_carries_the_instructions_the_decision_and_its_examples() {
-    let text = prompt::system("design/x", &Question::of(&decision()));
+    let text = prompt::system("design/x", &Question::new(&decision()));
     assert!(text.contains("Is it small?") && text.contains("design/x"));
     assert!(text.contains("Criterion true") && text.contains("func big() {}"));
     assert!(text.contains("noul"));
@@ -62,7 +62,7 @@ fn the_system_text_carries_the_instructions_the_decision_and_its_examples() {
 
 #[test]
 fn the_label_system_text_asks_for_a_word_instead_of_a_probability() {
-    let question = Question::of(&decision());
+    let question = Question::new(&decision());
     let text = prompt::system_label("design/x", &question);
     assert!(text.contains("Answer with one word") && text.contains("func big() {}"));
     assert!(!text.contains("noul") && !text.contains("JSON"));
@@ -85,7 +85,7 @@ fn a_prompt_holds_both_and_the_schema_asks_for_a_probability() {
     let request = SystemOneRequest {
         state: state(),
         model: "m".to_owned(),
-        questions: BTreeMap::from([("design/x".to_owned(), Question::of(&decision()))]),
+        questions: BTreeMap::from([("design/x".to_owned(), Question::new(&decision()))]),
         options: Default::default(),
     };
     let text = prompt::render(&request);
@@ -98,7 +98,7 @@ fn system_one_options_are_the_only_optional_top_level_request_key() {
     let mut request = SystemOneRequest {
         state: state(),
         model: "m".to_owned(),
-        questions: BTreeMap::from([("design/x".to_owned(), Question::of(&decision()))]),
+        questions: BTreeMap::from([("design/x".to_owned(), Question::new(&decision()))]),
         options: Default::default(),
     };
     let keys = |value: &serde_json::Value| {
@@ -178,7 +178,7 @@ fn a_training_line_is_openais_supervised_format_with_lighthouses_keys() {
         facts: json!({}),
         neighbors: Vec::new(),
     };
-    let question = Question::of(&decision());
+    let question = Question::new(&decision());
     let line = |fail| {
         let keys = LineKeys {
             weight: 0.5,

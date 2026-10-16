@@ -124,7 +124,7 @@ impl Rule for Fake {
                 (ctx.project.files[0].path.clone(), format!("{count} files"))
             }
         };
-        let fp = Fingerprint::of(&self.meta.id, &file.to_string_lossy(), "");
+        let fp = Fingerprint::new(&self.meta.id, &file.to_string_lossy(), "");
         let d = Diagnostic::new(&self.meta.id, Severity::Info, message, file, at, fp);
         Ok(vec![d.clone(), d])
     }

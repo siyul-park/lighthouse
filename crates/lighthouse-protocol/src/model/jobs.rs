@@ -255,12 +255,6 @@ pub struct ListModelResponse {
     pub data: Vec<Model>,
 }
 
-impl Default for ListModelResponse {
-    fn default() -> Self {
-        Self::new(Vec::new())
-    }
-}
-
 impl ListModelResponse {
     /// The list of `data`.
     pub fn new(data: Vec<Model>) -> Self {
@@ -273,5 +267,11 @@ impl ListModelResponse {
     /// Whether the list has no model.
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
+    }
+}
+
+impl Default for ListModelResponse {
+    fn default() -> Self {
+        Self::new(Vec::new())
     }
 }

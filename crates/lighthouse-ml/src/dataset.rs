@@ -49,7 +49,7 @@ pub(crate) struct Line {
 /// dataset.
 pub(crate) fn write(root: &Path, decision: &DecisionRef, mut rows: Vec<Row>) -> Result<Dataset> {
     rows.sort_by(|a, b| a.key.cmp(&b.key));
-    let question = Question::of(decision);
+    let question = Question::new(decision);
     let mut lines = Vec::new();
     for row in &rows {
         let group = if row.subject.state.file.is_empty() {

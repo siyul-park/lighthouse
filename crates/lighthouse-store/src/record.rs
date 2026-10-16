@@ -380,7 +380,7 @@ pub struct JudgmentEvent {
 impl JudgmentEvent {
     /// What the judgment teaches a model about its decision.
     pub fn label(&self) -> Label {
-        Label::of(
+        Label::new(
             self.judgment,
             self.suppressions
                 .iter()

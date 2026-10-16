@@ -69,7 +69,7 @@ impl Rule for Counting {
             ),
         };
         let at = Position { line: 1, col: 1 };
-        let fingerprint = Fingerprint::of(&self.meta.id, &file.to_string_lossy(), "");
+        let fingerprint = Fingerprint::new(&self.meta.id, &file.to_string_lossy(), "");
         Ok(vec![Diagnostic::new(
             &self.meta.id,
             Severity::Warn,

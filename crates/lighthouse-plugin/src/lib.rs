@@ -273,7 +273,7 @@ impl RuleManifest {
     /// `snippet`, seeded by the decision's uid; a rule without a uid is
     /// seeded by its id.
     pub fn fingerprint(&self, symbol_path: &str, snippet: &str) -> Fingerprint {
-        Fingerprint::of(
+        Fingerprint::new(
             self.uid.as_deref().unwrap_or(&self.id),
             symbol_path,
             snippet,

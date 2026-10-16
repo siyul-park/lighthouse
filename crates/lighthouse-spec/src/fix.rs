@@ -214,25 +214,6 @@ pub struct CommandSpec {
     pub scope: CommandScope,
 }
 
-impl CommandSpec {
-    /// Why the command cannot run as written.
-    fn valid(&self) -> Result<(), String> {
-        if let Some(arg) = self.argv.iter().find(|a| bad_placeholder(a)) {
-            return Err(format!(
-                "`{arg}` is not a placeholder of its own: `{{file}}`, `{{line}}`, `{{symbol}}` and `{{rule}}` fill a whole argument"
-            ));
-        }
-        if self
-            .argv
-            .first()
-            .is_none_or(|program| program.trim().is_empty())
-        {
-            return Err("`argv` needs a program".to_owned());
-        }
-        Ok(())
-    }
-}
-
 /// The checks of a catalog on a decision's `fix:`.
 pub(crate) fn validate(id: &str, fix: &Fix, mechanical: bool, checked: bool) -> Result<(), Error> {
     let fail = |reason: String| Error::invalid(id, format!("fix: {reason}"));
@@ -259,7 +240,7 @@ pub(crate) fn validate(id: &str, fix: &Fix, mechanical: bool, checked: bool) -> 
             }
             ops.iter().try_for_each(|op| op_valid(op).map_err(fail))
         }
-        FixKind::Command(command) => command.valid().map_err(fail),
+        FixKind::Command(command) => command_valid(command).map_err(fail),
         // Kept, and declined when a fix is asked for; see `FixPlan`.
         FixKind::Rpc { .. } => Ok(()),
     }
@@ -267,6 +248,23 @@ pub(crate) fn validate(id: &str, fix: &Fix, mechanical: bool, checked: bool) -> 
 
 fn default_timeout() -> Duration {
     Duration::from_secs(30)
+}
+
+/// Why the command cannot run as written.
+fn command_valid(command: &CommandSpec) -> Result<(), String> {
+    if let Some(arg) = command.argv.iter().find(|a| bad_placeholder(a)) {
+        return Err(format!(
+            "`{arg}` is not a placeholder of its own: `{{file}}`, `{{line}}`, `{{symbol}}` and `{{rule}}` fill a whole argument"
+        ));
+    }
+    if command
+        .argv
+        .first()
+        .is_none_or(|program| program.trim().is_empty())
+    {
+        return Err("`argv` needs a program".to_owned());
+    }
+    Ok(())
 }
 
 /// An argument that uses a placeholder without being exactly that placeholder

@@ -26,7 +26,7 @@ fn unknown_rule() -> Diagnostic {
         "custom finding",
         "a.txt",
         span(1),
-        Fingerprint::of("acme/custom", "a.txt", ""),
+        Fingerprint::new("acme/custom", "a.txt", ""),
     )
 }
 

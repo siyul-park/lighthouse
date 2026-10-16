@@ -28,7 +28,7 @@ pub fn file(rows: &[Labelled]) -> String {
         valid: vec![example("good")],
         invalid: vec![example("bad"), example("worse")],
     };
-    let question = Question::of(&decision);
+    let question = Question::new(&decision);
     rows.iter()
         .map(|(text, fail, group, attribution)| {
             let state = State {

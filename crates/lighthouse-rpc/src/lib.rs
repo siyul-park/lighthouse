@@ -81,7 +81,7 @@ impl Plugin for Unavailable {
 
 /// The JSON Schema of the kinds this crate defines.
 pub fn descriptors() -> Vec<lighthouse_resource::Descriptor> {
-    vec![lighthouse_resource::Descriptor::of::<PluginSpec>()]
+    vec![lighthouse_resource::Descriptor::new::<PluginSpec>()]
 }
 
 /// Where plugin manifests are searched: `<root>/.lighthouse/plugins`,

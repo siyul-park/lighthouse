@@ -28,12 +28,6 @@ impl Duration {
     }
 }
 
-impl From<Duration> for time::Duration {
-    fn from(duration: Duration) -> Self {
-        duration.0
-    }
-}
-
 impl FromStr for Duration {
     type Err = InvalidDuration;
 
@@ -96,5 +90,11 @@ impl JsonSchema for Duration {
 
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
         String::json_schema(generator)
+    }
+}
+
+impl From<Duration> for time::Duration {
+    fn from(duration: Duration) -> Self {
+        duration.0
     }
 }

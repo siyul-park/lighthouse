@@ -369,7 +369,7 @@ impl<'a> RunModels<'a> {
             .part(&ask.revision)
             .part(format!("{model}@{version}"))
             .part(digest_of(&subject.state))
-            .part(digest_of(&Question::of(&ask.decision)));
+            .part(digest_of(&Question::new(&ask.decision)));
         key.finish()
     }
 

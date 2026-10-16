@@ -91,10 +91,10 @@ fn agent_kind_reads_the_prov_classes_and_the_old_words() {
 
 #[test]
 fn label_follows_the_documented_semantics() {
-    assert_eq!(Label::of(Judgment::Fail, false), Label::Positive);
-    assert_eq!(Label::of(Judgment::Fail, true), Label::Separate);
-    assert_eq!(Label::of(Judgment::Pass, false), Label::Negative);
-    assert_eq!(Label::of(Judgment::NotApplicable, false), Label::Negative);
+    assert_eq!(Label::new(Judgment::Fail, false), Label::Positive);
+    assert_eq!(Label::new(Judgment::Fail, true), Label::Separate);
+    assert_eq!(Label::new(Judgment::Pass, false), Label::Negative);
+    assert_eq!(Label::new(Judgment::NotApplicable, false), Label::Negative);
 }
 
 #[test]
@@ -109,6 +109,11 @@ fn only_a_non_error_finding_nobody_judged_needs_review() {
 fn an_unknown_term_names_the_text_and_what_was_expected() {
     let error: lighthouse_model::UnknownTerm = "maybe".parse::<Judgment>().unwrap_err();
     let message = error.to_string();
+    let built = lighthouse_model::UnknownTerm::new("judgment", "maybe", "pass".to_owned());
+    assert_eq!(
+        built.to_string(),
+        "unknown judgment `maybe` (expected pass)"
+    );
     assert!(
         message.contains("`maybe`") && message.contains("expected"),
         "{message}"

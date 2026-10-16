@@ -20,7 +20,7 @@ fn fixture() -> Vec<Diagnostic> {
         "file has 12 lines, limit is 10",
         "src/a.txt",
         span(11, 1, 12),
-        Fingerprint::of("core/file-size", "src/a.txt", ""),
+        Fingerprint::new("core/file-size", "src/a.txt", ""),
     );
     first.evidence = json!({ "lines": 12, "max": 10 });
     first.fix = Some("split the file".to_owned());
@@ -30,7 +30,7 @@ fn fixture() -> Vec<Diagnostic> {
         "boom",
         "src/b c/é#1.txt",
         span(2, 5, 2),
-        Fingerprint::of("demo/boom", "b", "boom"),
+        Fingerprint::new("demo/boom", "b", "boom"),
     );
     vec![first, second]
 }
@@ -100,7 +100,7 @@ fn at(severity: Severity) -> Diagnostic {
         "m",
         "a.txt",
         span(1, 1, 1),
-        Fingerprint::of("core/file-size", "a.txt", &format!("{severity}")),
+        Fingerprint::new("core/file-size", "a.txt", &format!("{severity}")),
     )
 }
 

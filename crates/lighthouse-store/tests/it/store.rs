@@ -604,7 +604,7 @@ fn observed_records_a_diagnostic_and_digests_its_evidence() {
         "too big",
         "src/a.go",
         span,
-        Fingerprint::of("design/a", "m::f#function", ""),
+        Fingerprint::new("design/a", "m::f#function", ""),
     );
     diagnostic.symbol = Some("m::f#function".to_owned());
     diagnostic.evidence = json!({ "n": 1, "name": "a   b" });

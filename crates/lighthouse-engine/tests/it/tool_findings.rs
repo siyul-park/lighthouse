@@ -38,7 +38,7 @@ impl Rule for Wrapped {
                 message,
                 &file.path,
                 Span { start: at, end: at },
-                Fingerprint::of(&self.0.id, "f", message).occurrence(n),
+                Fingerprint::new(&self.0.id, "f", message).occurrence(n),
             )
         };
         let mut waived = finding("waived by the tool", 0);

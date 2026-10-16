@@ -82,7 +82,7 @@ fn written_yaml_reads_back() {
 
 #[test]
 fn schema_describes_the_envelope_and_names_its_file() {
-    let schema = Descriptor::of::<Toy>().schema;
+    let schema = Descriptor::new::<Toy>().schema;
     assert_eq!(
         schema["$schema"],
         "https://json-schema.org/draft/2020-12/schema"
@@ -110,6 +110,7 @@ fn durations_need_a_unit_and_a_span() {
     assert_eq!(parse("s"), None);
     assert_eq!(parse("3d"), None);
     assert_eq!(parse("0s"), None);
+    assert_eq!(Duration::from_secs(90).get(), time::Duration::from_secs(90));
 }
 
 #[test]
@@ -146,7 +147,7 @@ fn the_format_follows_the_extension() {
 fn the_schema_of_a_spec_is_the_schema_of_its_document() {
     let described = schema::<Toy>();
 
-    assert_eq!(described, Descriptor::of::<Toy>().schema);
+    assert_eq!(described, Descriptor::new::<Toy>().schema);
     assert_eq!(described["title"], "ToyKind");
     assert!(
         described["$id"]

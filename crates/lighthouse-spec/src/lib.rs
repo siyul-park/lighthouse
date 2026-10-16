@@ -46,7 +46,7 @@ pub(crate) use sources::SourceMapSpec;
 
 /// The JSON Schema of every kind this crate defines.
 pub fn descriptors() -> Vec<Descriptor> {
-    let mut decision = Descriptor::of::<DecisionSpec>();
+    let mut decision = Descriptor::new::<DecisionSpec>();
     // The named shapes a `$ref` of an option may point to.
     if let Some(defs) = decision
         .schema
@@ -62,8 +62,8 @@ pub fn descriptors() -> Vec<Descriptor> {
     }
     vec![
         decision,
-        Descriptor::of::<PackSpec>(),
-        Descriptor::of::<ProjectSpec>(),
-        Descriptor::of::<SourceMapSpec>(),
+        Descriptor::new::<PackSpec>(),
+        Descriptor::new::<ProjectSpec>(),
+        Descriptor::new::<SourceMapSpec>(),
     ]
 }

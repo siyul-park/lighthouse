@@ -121,7 +121,7 @@ fn a_reference_names_a_provider_and_the_model_it_is_asked_for() {
             model: String::new(),
             questions: std::collections::BTreeMap::from([(
                 "d/x".to_owned(),
-                lighthouse_plugin::Question::of(&decision()),
+                lighthouse_plugin::Question::new(&decision()),
             )]),
             options: serde_json::Map::new(),
         })

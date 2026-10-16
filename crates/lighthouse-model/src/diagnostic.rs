@@ -52,7 +52,7 @@ pub struct Fingerprint(String);
 impl Fingerprint {
     /// Hashes the rule, the symbol path (separators normalized to `/`) and the
     /// whitespace-normalized snippet.
-    pub fn of(rule_id: &str, symbol_path: &str, snippet: &str) -> Self {
+    pub fn new(rule_id: &str, symbol_path: &str, snippet: &str) -> Self {
         let symbol_path = symbol_path.replace('\\', "/");
         let mut hash = Hasher::new();
         for part in [rule_id, symbol_path.as_str()] {
@@ -210,24 +210,6 @@ impl Diagnostic {
     }
 }
 
-/// A hash of evidence with whitespace in its strings collapsed, so
-/// reformatting does not change what the evidence says.
-pub fn evidence_digest(evidence: &Value) -> String {
-    fn squashed(value: &Value) -> Value {
-        match value {
-            Value::String(s) => Value::String(squash(s)),
-            Value::Array(items) => Value::Array(items.iter().map(squashed).collect()),
-            Value::Object(map) => Value::Object(
-                map.iter()
-                    .map(|(key, value)| (key.clone(), squashed(value)))
-                    .collect(),
-            ),
-            other => other.clone(),
-        }
-    }
-    short_digest(&squashed(evidence), 8)
-}
-
 /// Part of the analysis scope that could not be analyzed: a file, or the
 /// whole run of a provider when `path` is `None`. Never silent: "not checked"
 /// is not "passed".
@@ -326,4 +308,22 @@ impl Suppression {
 pub struct Suppressed {
     pub diagnostic: Diagnostic,
     pub suppression: Suppression,
+}
+
+/// A hash of evidence with whitespace in its strings collapsed, so
+/// reformatting does not change what the evidence says.
+pub fn evidence_digest(evidence: &Value) -> String {
+    fn squashed(value: &Value) -> Value {
+        match value {
+            Value::String(s) => Value::String(squash(s)),
+            Value::Array(items) => Value::Array(items.iter().map(squashed).collect()),
+            Value::Object(map) => Value::Object(
+                map.iter()
+                    .map(|(key, value)| (key.clone(), squashed(value)))
+                    .collect(),
+            ),
+            other => other.clone(),
+        }
+    }
+    short_digest(&squashed(evidence), 8)
 }

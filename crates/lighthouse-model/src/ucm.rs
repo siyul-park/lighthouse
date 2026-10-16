@@ -588,11 +588,6 @@ impl Project {
     }
 }
 
-/// The entries of `map` under `id`, none when it has none.
-fn slice<'a, T>(map: &'a BTreeMap<SymbolId, Vec<T>>, id: &SymbolId) -> &'a [T] {
-    map.get(id).map_or(&[], Vec::as_slice)
-}
-
 impl Index {
     fn new(all: &Fragment) -> Self {
         let mut index = Self::default();
@@ -669,4 +664,9 @@ impl Index {
                 .push(from.clone());
         }
     }
+}
+
+/// The entries of `map` under `id`, none when it has none.
+fn slice<'a, T>(map: &'a BTreeMap<SymbolId, Vec<T>>, id: &SymbolId) -> &'a [T] {
+    map.get(id).map_or(&[], Vec::as_slice)
 }

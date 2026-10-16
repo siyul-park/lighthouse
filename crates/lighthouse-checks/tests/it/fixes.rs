@@ -138,7 +138,7 @@ fn finding(symbol: Option<&str>, evidence: Value) -> Diagnostic {
         "m",
         FILE,
         span((2, 3), (2, 8)),
-        Fingerprint::of("local/probe", FILE, ""),
+        Fingerprint::new("local/probe", FILE, ""),
     );
     d.symbol = symbol.map(|n| id(n).as_str().to_owned());
     d.evidence = evidence;

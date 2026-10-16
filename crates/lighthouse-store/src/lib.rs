@@ -33,8 +33,8 @@ pub use store::Store;
 /// The JSON Schema of every record kind the decision log holds.
 pub fn descriptors() -> Vec<Descriptor> {
     vec![
-        Descriptor::of::<JudgmentSpec>(),
-        Descriptor::of::<SuppressionSpec>(),
-        Descriptor::of::<RevisionSpec>(),
+        Descriptor::new::<JudgmentSpec>(),
+        Descriptor::new::<SuppressionSpec>(),
+        Descriptor::new::<RevisionSpec>(),
     ]
 }

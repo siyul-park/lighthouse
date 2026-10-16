@@ -22,7 +22,7 @@ fn coupling() -> Diagnostic {
         "function coordinates 14 collaborators in its package",
         "internal/jit/compile.go",
         span(350),
-        Fingerprint::of("design/complexity", "jit::compile#function", ""),
+        Fingerprint::new("design/complexity", "jit::compile#function", ""),
     );
     d.symbol = Some("jit::compile#function".to_owned());
     d.evidence = json!({ "fan_in": 2, "fan_out": 14, "callees": ["a", "b c"] });
@@ -36,7 +36,7 @@ fn helper() -> Diagnostic {
         "private helper has one caller",
         "src/lib.rs",
         span(7),
-        Fingerprint::of("design/errors", "m::helper#function", ""),
+        Fingerprint::new("design/errors", "m::helper#function", ""),
     );
     d.symbol = Some("m::helper#function".to_owned());
     d
@@ -49,7 +49,7 @@ fn unknown_rule() -> Diagnostic {
         "custom finding",
         "a.txt",
         span(1),
-        Fingerprint::of("acme/custom", "a.txt", ""),
+        Fingerprint::new("acme/custom", "a.txt", ""),
     )
 }
 
@@ -72,7 +72,7 @@ fn exported(index: usize, file: &str) -> Diagnostic {
         format!("exported function Func{index} must have a doc comment"),
         file,
         span(index as u32 * 3 + 1),
-        Fingerprint::of("design/exported-doc", &symbol, ""),
+        Fingerprint::new("design/exported-doc", &symbol, ""),
     );
     d.evidence = json!({ "symbol": symbol });
     d.symbol = Some(symbol);
@@ -100,7 +100,7 @@ fn mixed(count: usize) -> Vec<Diagnostic> {
                     "private helper has one caller",
                     format!("internal/store/file{}.go", i % 7),
                     span(i as u32 * 5 + 2),
-                    Fingerprint::of("design/errors", &symbol, ""),
+                    Fingerprint::new("design/errors", &symbol, ""),
                 );
                 d.evidence =
                     json!({ "caller": "store::run#function", "callers": 1, "statements": 3 });
@@ -115,7 +115,7 @@ fn mixed(count: usize) -> Vec<Diagnostic> {
                     "function coordinates 14 collaborators in its package",
                     format!("internal/store/hub{}.go", i % 3),
                     span(i as u32 * 7 + 3),
-                    Fingerprint::of("design/complexity", &symbol, ""),
+                    Fingerprint::new("design/complexity", &symbol, ""),
                 );
                 d.evidence = json!({ "fan_in": 2, "fan_out": 14 + i % 3 });
                 d.symbol = Some(symbol);
@@ -618,7 +618,7 @@ fn needs_review_follows_the_authored_severity_of_the_decision_and_the_judgments_
         "needs a reason",
         "src/lib.rs",
         span(1),
-        Fingerprint::of("core/allow", "m", ""),
+        Fingerprint::new("core/allow", "m", ""),
     );
     assert!(
         !briefing.needs_review(&mechanical),

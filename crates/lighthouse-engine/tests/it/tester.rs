@@ -71,7 +71,7 @@ impl Rule for Marker {
                     format!("found {word}"),
                     &file.path,
                     Span { start: at, end: at },
-                    Fingerprint::of("fake/marker", &file.path.to_string_lossy(), ""),
+                    Fingerprint::new("fake/marker", &file.path.to_string_lossy(), ""),
                 )
             })
             .collect())

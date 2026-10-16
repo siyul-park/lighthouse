@@ -327,7 +327,7 @@ fn finding(
     let path = comment.file.to_string_lossy();
     let fingerprint = match gate.manifests.get(rule) {
         Some(meta) => meta.fingerprint(&path, &snippet),
-        None => Fingerprint::of(rule, &path, &snippet),
+        None => Fingerprint::new(rule, &path, &snippet),
     };
     let mut d = Diagnostic::new(
         rule,

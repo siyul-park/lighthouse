@@ -139,7 +139,7 @@ impl Rule for Word {
                     format!("{} found", self.word),
                     &file.path,
                     span,
-                    Fingerprint::of(&self.manifest.id, &file.path.to_string_lossy(), "")
+                    Fingerprint::new(&self.manifest.id, &file.path.to_string_lossy(), "")
                         .occurrence(n),
                 )
             })

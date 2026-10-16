@@ -31,7 +31,7 @@ fn request() -> SystemOneRequest {
             neighbors: Vec::new(),
         },
         model: String::new(),
-        questions: BTreeMap::from([("d/x".to_owned(), Question::of(&decision))]),
+        questions: BTreeMap::from([("d/x".to_owned(), Question::new(&decision))]),
         options: serde_json::Map::new(),
     }
 }

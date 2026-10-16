@@ -11,6 +11,10 @@ use serde_json::Value;
 
 use crate::{Call, CreateFineTuningJobRequest, FineTuningJob};
 
+/// The `type` of a question and of its answer: System One's `noul`, the
+/// probability of yes.
+pub const NOUL: &str = "noul";
+
 /// The model methods with their params and result. Exists to anchor the schema.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ModelMethods {
@@ -103,10 +107,6 @@ pub struct Instructions {
     pub prompt: String,
 }
 
-/// The `type` of a question and of its answer: System One's `noul`, the
-/// probability of yes.
-pub const NOUL: &str = "noul";
-
 /// One yes/no question: System One's `noul`, the probability of yes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Question {
@@ -155,7 +155,7 @@ pub struct SystemOneResponse {
 impl Question {
     /// The question a decision asks: it fails when `true`, its invalid
     /// examples show what that looks like, its valid examples the other side.
-    pub fn of(decision: &DecisionRef) -> Self {
+    pub fn new(decision: &DecisionRef) -> Self {
         Self {
             kind: NOUL.to_owned(),
             instructions: Instructions {
