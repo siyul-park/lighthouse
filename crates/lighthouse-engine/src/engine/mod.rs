@@ -39,6 +39,7 @@ use cached::RunCache;
 pub use classifier::CommandModels;
 pub use config::active;
 use config::{constructors, io_error, load_languages, validate_config};
+use models::RunModels;
 pub(crate) use scopes::Scopes;
 
 /// Name of the file, in `.gitignore` syntax, that keeps files out of the

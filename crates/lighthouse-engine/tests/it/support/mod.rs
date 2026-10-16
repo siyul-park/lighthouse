@@ -295,6 +295,7 @@ pub fn plan(fixer: &str, cap: Safety, mechanical: bool) -> FixPlan {
                 requirement: String::new(),
                 context: String::new(),
             },
+            runs_command: false,
             unsupported: None,
         },
     );

@@ -115,21 +115,24 @@ impl super::Engine {
             commands: self.commands.as_ref(),
         }
     }
+}
 
-    /// The models of a run that reports `scopes`, keeping answers in `cache`.
-    pub(super) fn run_models<'a>(
-        &'a self,
+impl<'a> RunModels<'a> {
+    /// The models of a run of `engine` that reports `scopes`, keeping answers
+    /// in `cache`.
+    pub(super) fn new(
+        engine: &'a super::Engine,
         scopes: &'a Scopes,
         cache: Option<&'a Cache>,
-    ) -> RunModels<'a> {
-        let options = &self.models;
-        RunModels {
-            classifiers: self.classifiers(),
-            binding: &self.binding,
+    ) -> Self {
+        let options = &engine.models;
+        Self {
+            classifiers: engine.classifiers(),
+            binding: &engine.binding,
             attached: &options.attached,
             scopes: (!options.all && options.fingerprints.is_none()).then_some(scopes),
             fingerprints: options.fingerprints.as_ref(),
-            budget: AtomicUsize::new(self.binding.budget),
+            budget: AtomicUsize::new(engine.binding.budget),
             answers: cache,
             off: options.off,
             collect: options.collect,
@@ -143,9 +146,7 @@ impl super::Engine {
             usage: Mutex::default(),
         }
     }
-}
 
-impl<'a> RunModels<'a> {
     /// The subjects the rules put to the models this run, by fingerprint.
     pub(super) fn subjects(&self) -> BTreeMap<String, Subject> {
         self.seen
@@ -518,7 +519,7 @@ mod tests {
                     .unwrap()
                     .with_models(super::super::ModelOptions::default());
             let scopes = Scopes::default();
-            let models = engine.run_models(&scopes, None);
+            let models = RunModels::new(&engine, &scopes, None);
 
             assert_eq!(models.model("work/echo").is_some(), supported);
             if !supported {

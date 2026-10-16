@@ -24,7 +24,7 @@ use super::*;
 pub(super) struct RunCache<'c> {
     cache: &'c Cache,
     digests: Digests,
-    documents: Digest,
+    documents_digest: Digest,
     prefixes: HashMap<String, Prefix>,
 }
 
@@ -50,8 +50,7 @@ struct Row {
 #[derive(Serialize, Deserialize)]
 struct Entry<'a> {
     file: Cow<'a, Path>,
-    // Not `Cow<str>`: serde borrows that from the input, and a row is owned.
-    tag: Cow<'a, String>,
+    tag: String,
     found: Stored<'a>,
 }
 
@@ -96,7 +95,7 @@ impl Engine {
             Ok((digests, documents)) => Some(RunCache {
                 cache,
                 digests,
-                documents,
+                documents_digest: documents,
                 prefixes: self.prefixes(selected, models),
             }),
             Err(e) => {
@@ -233,7 +232,7 @@ impl RunCache<'_> {
     ) -> Result<Vec<Diagnostic>, lighthouse_plugin::Error> {
         let tag = tag(ctx.applies, options);
         let row = self.row(prefix);
-        let loaded = row.loaded.get(&file.path).filter(|entry| *entry.tag == tag);
+        let loaded = row.loaded.get(&file.path).filter(|entry| entry.tag == tag);
         self.cache.count(loaded.is_some());
         if let Some(entry) = loaded {
             let found = &entry.found;
@@ -247,7 +246,7 @@ impl RunCache<'_> {
         let notices = ctx.notices.take();
         let entry = Entry {
             file: Cow::Borrowed(&file.path),
-            tag: Cow::Borrowed(&tag),
+            tag: tag.clone(),
             found: Stored {
                 diagnostics: Cow::Borrowed(&found),
                 notices: Cow::Borrowed(&notices),
@@ -282,7 +281,7 @@ impl RunCache<'_> {
                 }
             }
             _ => {
-                key.part(self.digests.project()).part(self.documents);
+                key.part(self.digests.project()).part(self.documents_digest);
             }
         }
         Some(key.finish())
@@ -292,7 +291,7 @@ impl RunCache<'_> {
     fn row<'a>(&self, prefix: &'a Prefix) -> &'a Row {
         prefix.row.get_or_init(|| {
             let mut key = prefix.key.clone();
-            key.part(self.digests.project()).part(self.documents);
+            key.part(self.digests.project()).part(self.documents_digest);
             let key = key.finish();
             let loaded = self
                 .cache

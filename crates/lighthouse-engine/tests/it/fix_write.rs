@@ -95,6 +95,7 @@ fn pair(dir: &tempfile::TempDir, formatter: &str) -> (Engine, FixPlan) {
                 requirement: String::new(),
                 context: String::new(),
             },
+            runs_command: false,
             unsupported: None,
         },
     );
@@ -243,6 +244,7 @@ fn a_write_that_fails_midway_puts_the_written_files_back() {
                 requirement: String::new(),
                 context: String::new(),
             },
+            runs_command: false,
             unsupported: None,
         },
     );
@@ -314,6 +316,7 @@ fn a_file_whose_provider_does_not_analyze_overlays_is_not_fixed() {
                 requirement: String::new(),
                 context: String::new(),
             },
+            runs_command: false,
             unsupported: None,
         },
     );

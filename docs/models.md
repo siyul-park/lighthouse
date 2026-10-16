@@ -27,8 +27,8 @@ and the report scope to models that cost, keeps every answer in the result cache
 under the model's reference and version, and returns for each subject a decision or the reason it
 stays open. The host owns the band: `noul` at or above `FAIL_AT` (0.9) fails the subject with
 confidence `max(p, 1 - p)`; anything else is left to review. Open subjects come back as
-diagnostics marked `review`; the engine reports them apart from findings (`Outcome::reviews`), and
-they never change the exit code. `Outcome::subjects` keeps what was put to the models when a
+diagnostics marked `review`; the engine reports them apart from findings (`Run::reviews`), and
+they never change the exit code. `Run::questions` keeps what was put to the models when a
 command (`decision eval`, `model train`) asks for it.
 
 ## `model-http`

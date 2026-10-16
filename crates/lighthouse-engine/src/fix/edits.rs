@@ -2,7 +2,12 @@
 //! one file's original text; overlapping proposals are dropped before any is
 //! applied, and the rest are applied in one pass.
 
-use std::{ops::Range, path::PathBuf};
+use std::{
+    ops::Range,
+    path::{Path, PathBuf},
+};
+
+use similar::TextDiff;
 
 /// Replaces `range` of `file`'s text with `text`; an empty range inserts.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,6 +33,19 @@ impl TextEdit {
             text,
         }
     }
+}
+
+/// The unified diff from `before` to `after` of one file; empty when equal.
+pub fn unified_diff(path: &Path, before: &str, after: &str) -> String {
+    if before == after {
+        return String::new();
+    }
+    let name = path.to_string_lossy().replace('\\', "/");
+    TextDiff::from_lines(before, after)
+        .unified_diff()
+        .context_radius(3)
+        .header(&format!("a/{name}"), &format!("b/{name}"))
+        .to_string()
 }
 
 /// Whether two edits of one file collide. Two inserts at one point do not; an

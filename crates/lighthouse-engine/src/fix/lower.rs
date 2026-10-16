@@ -392,12 +392,24 @@ impl<'a> Lowerer<'a> {
             range: start..start + symbol.name.len(),
             text: name.to_owned(),
         });
-        for site in self.project.sites(id) {
-            if site.kind == EdgeKind::Contains {
-                continue;
-            }
-            let text = self.sources.text(&site.file)?;
-            let range = LineIndex::new(&text)
+        // Where the lines start in each file with a site, found once.
+        let sites: Vec<_> = self
+            .project
+            .sites(id)
+            .iter()
+            .filter(|site| site.kind != EdgeKind::Contains)
+            .collect();
+        let texts = sites
+            .iter()
+            .map(|site| Ok((site.file.as_path(), self.sources.text(&site.file)?)))
+            .collect::<Result<BTreeMap<_, _>, String>>()?;
+        let indexes: BTreeMap<&Path, LineIndex> = texts
+            .iter()
+            .map(|(&file, text)| (file, LineIndex::new(text)))
+            .collect();
+        for site in sites {
+            let text = &texts[site.file.as_path()];
+            let range = indexes[site.file.as_path()]
                 .range(site.span)
                 .filter(|r| text[r.clone()] == symbol.name)
                 .ok_or_else(|| {

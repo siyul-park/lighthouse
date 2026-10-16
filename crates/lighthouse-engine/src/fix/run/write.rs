@@ -13,14 +13,15 @@ use lighthouse_resource::{write_atomic, write_atomic_guarded};
 use super::{
     super::edits::{TextEdit, apply},
     super::lower::Sources,
+    super::propose::Proposal,
     super::{AppliedFix, DeclinedFix, FileChange, FixReport},
-    Orchestrator, Proposal,
+    Orchestrator,
 };
 use crate::{Error, Run};
 
 /// What a round did to the files its proposals touch.
 #[derive(Default)]
-pub(super) struct Candidates {
+pub(super) struct Round {
     /// The new text of every file whose text changed.
     pub(super) texts: BTreeMap<PathBuf, String>,
     /// Their text before the round.
@@ -41,7 +42,7 @@ impl Orchestrator<'_> {
     /// and the hash are checked again right before the rename); if a write
     /// fails, the files already written are put back and nothing counts as
     /// applied. A dry run writes nothing.
-    pub(super) fn finish(mut self, outcome: Result<Run, Error>) -> Result<FixReport, Error> {
+    pub(super) fn write(mut self, outcome: Result<Run, Error>) -> Result<FixReport, Error> {
         let outcome = outcome?;
         let changed: Vec<PathBuf> = self
             .texts
@@ -54,10 +55,10 @@ impl Orchestrator<'_> {
             .map(|(path, _)| path.clone())
             .collect();
         let mut skipped: BTreeMap<PathBuf, String> = BTreeMap::new();
-        if !self.run.dry_run {
+        if !self.proposer.run.dry_run {
             for path in &changed {
                 let (_, hash) = &self.original[path];
-                match fs::read_to_string(self.engine.ws.root.join(path)) {
+                match fs::read_to_string(self.proposer.engine.ws.root.join(path)) {
                     Ok(now) if hash::sha256(&now) == *hash => {}
                     Ok(_) => {
                         skipped.insert(path.clone(), "changed concurrently".to_owned());
@@ -155,12 +156,12 @@ impl Orchestrator<'_> {
         skipped: &BTreeMap<PathBuf, String>,
         outcome: &Run,
     ) -> Option<(String, String)> {
-        let root = &self.engine.ws.root;
+        let root = &self.proposer.engine.ws.root;
         let sources = Sources::new(root, &outcome.project, &self.texts);
         let mut done: Vec<&PathBuf> = Vec::new();
         for path in changed.iter().filter(|p| !skipped.contains_key(*p)) {
             let target = root.join(path);
-            let (before, hash) = &self.original[path];
+            let (_, hash) = &self.original[path];
             let guard = || {
                 sources.contain(path)?;
                 match fs::read_to_string(&target) {
@@ -172,7 +173,6 @@ impl Orchestrator<'_> {
                 for written in done {
                     let _ = write_atomic(&root.join(written), &self.original[written].0);
                 }
-                let _ = before;
                 return Some((path.display().to_string(), e.to_string()));
             }
             done.push(path);
@@ -182,13 +182,13 @@ impl Orchestrator<'_> {
 
     /// The new text of every file the kept proposals edit, formatted. Files
     /// whose edits cannot be applied, or whose formatter fails, are `failed`.
-    pub(super) fn candidates(&self, kept: &[Proposal], before: &Run) -> Candidates {
-        let sources = Sources::new(&self.engine.ws.root, &before.project, &self.texts);
+    pub(super) fn round(&self, kept: &[Proposal], before: &Run) -> Round {
+        let sources = Sources::new(&self.proposer.engine.ws.root, &before.project, &self.texts);
         let mut by_file: BTreeMap<PathBuf, Vec<&TextEdit>> = BTreeMap::new();
         for edit in kept.iter().flat_map(|p| &p.edits) {
             by_file.entry(edit.file.clone()).or_default().push(edit);
         }
-        let mut out = Candidates::default();
+        let mut out = Round::default();
         let mut unformatted = false;
         for (file, edits) in &by_file {
             let base = match sources.text(file) {
@@ -245,11 +245,11 @@ impl Orchestrator<'_> {
         skipped: &mut bool,
         notes: &mut Vec<String>,
     ) -> Result<String, String> {
-        let Some(formatter) = self.engine.config.formatter(language) else {
+        let Some(formatter) = self.proposer.engine.config.formatter(language) else {
             return Ok(text);
         };
         let shown = formatter.argv.join(" ");
-        if !self.engine.trusted {
+        if !self.proposer.engine.trusted {
             if !*skipped {
                 *skipped = true;
                 notes.push(format!(
@@ -258,6 +258,6 @@ impl Orchestrator<'_> {
             }
             return Ok(text);
         }
-        formatter.format(&self.engine.ws.root, file, &text)
+        formatter.format(&self.proposer.engine.ws.root, file, &text)
     }
 }

@@ -4,10 +4,10 @@
 //! overlapping ones, applies the rest, formats, re-indexes and re-checks, rolls
 //! back every file that got worse and repeats until nothing is left to do.
 
-mod diff;
 mod edits;
 mod lower;
 mod preview;
+mod propose;
 mod run;
 mod scan;
 
@@ -21,7 +21,7 @@ use lighthouse_model::{Fingerprint, Safety};
 use lighthouse_plugin::FixDecision;
 use lighthouse_spec::{Catalog, FixKind};
 
-pub use diff::unified_diff;
+pub use edits::unified_diff;
 
 use crate::Run;
 
@@ -37,6 +37,8 @@ pub struct FixBinding {
     pub cap: Safety,
     /// The rule is mechanical: its safe fixes apply without asking.
     pub mechanical: bool,
+    /// The fixer runs a program, which needs the project's trust.
+    pub runs_command: bool,
     pub decision: FixDecision,
     /// Why the fix cannot run at all, such as a kind this version does not
     /// support; the rule's findings are then declined with this text.
@@ -48,8 +50,6 @@ pub struct FixBinding {
 #[derive(Debug, Clone, Default)]
 pub struct FixPlan {
     bindings: BTreeMap<String, FixBinding>,
-    /// The rules whose fixer runs a program, which needs the project's trust.
-    commands: BTreeSet<String>,
 }
 
 impl FixPlan {
@@ -60,15 +60,13 @@ impl FixPlan {
         let mut plan = Self::default();
         for decision in catalog.decisions() {
             let Some(fix) = &decision.fix else { continue };
-            if matches!(fix.kind, FixKind::Command(_)) {
-                plan.commands.insert(decision.id().to_owned());
-            }
             plan.insert(
                 decision.id(),
                 FixBinding {
                     fixer: decision.id().to_owned(),
                     cap: fix.safety,
                     mechanical: decision.severity == Some(Severity::Error),
+                    runs_command: matches!(fix.kind, FixKind::Command(_)),
                     decision: FixDecision {
                         id: decision.id().to_owned(),
                         requirement: decision.requirement.clone(),
@@ -87,11 +85,6 @@ impl FixPlan {
     /// Names `binding` as the fix of `rule`.
     pub fn insert(&mut self, rule: impl Into<String>, binding: FixBinding) {
         self.bindings.insert(rule.into(), binding);
-    }
-
-    /// Whether the fixer of `rule` runs a program.
-    pub fn runs_command(&self, rule: &str) -> bool {
-        self.commands.contains(rule)
     }
 
     /// How the findings of `rule` are fixed, if they are.

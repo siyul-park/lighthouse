@@ -62,6 +62,7 @@ fn engine_preview_fixes_skips_what_cannot_be_proposed() {
 #[test]
 fn fix_plan_runs_command_only_for_fixers_that_run_a_program() {
     let plan = FixPlan::from_catalog(Catalog::bundled());
-    assert!(!plan.runs_command("design/declaration-groups"));
-    assert!(!plan.runs_command("nope/nope"));
+    let runs = |rule: &str| plan.get(rule).map(|binding| binding.runs_command);
+    assert_eq!(runs("design/declaration-groups"), Some(false));
+    assert_eq!(runs("nope/nope"), None);
 }

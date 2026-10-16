@@ -19,6 +19,8 @@ struct Frame {
     open: usize,
     close: usize,
     group: bool,
+    /// The pair around this one, by place in `frames`.
+    parent: Option<usize>,
 }
 
 /// The bracket structure of one text.
@@ -44,9 +46,7 @@ impl Containers {
                 b'/' if bytes.get(at + 1) == Some(&b'*') => block_end(bytes, at, rust),
                 b'"' => quoted_end(bytes, at, b'"'),
                 b'`' if !rust => quoted_end(bytes, at, b'`'),
-                b'r' if rust && raw_string(bytes, at).is_some() => {
-                    raw_string(bytes, at).unwrap_or(at + 1)
-                }
+                b'r' if rust => raw_string(bytes, at).unwrap_or(at + 1),
                 b'\'' if rust || language == "go" => char_end(bytes, at),
                 b'{' | b'(' | b'[' => {
                     stack.push((at, byte));
@@ -60,6 +60,7 @@ impl Containers {
                             open,
                             close: at,
                             group: kind == b'(',
+                            parent: None,
                         });
                     }
                     at + 1
@@ -67,16 +68,35 @@ impl Containers {
                 _ => at + 1,
             };
         }
+        // In the order they open, a pair's parent is the nearest earlier pair
+        // that is still open.
+        frames.sort_by_key(|f| f.open);
+        let mut around: Vec<usize> = Vec::new();
+        for n in 0..frames.len() {
+            while around
+                .last()
+                .is_some_and(|&p| frames[p].close < frames[n].open)
+            {
+                around.pop();
+            }
+            frames[n].parent = around.last().copied();
+            around.push(n);
+        }
         Self { frames }
     }
 
     /// The innermost pair that has `offset` strictly between its brackets.
     pub(crate) fn at(&self, offset: usize) -> Container {
-        let inner = self
+        // The last pair opened before the offset is inside the innermost pair
+        // around it, or is it.
+        let mut at = self
             .frames
-            .iter()
-            .filter(|f| f.open < offset && offset <= f.close)
-            .max_by_key(|f| f.open);
+            .partition_point(|f| f.open < offset)
+            .checked_sub(1);
+        while let Some(n) = at.filter(|&n| self.frames[n].close < offset) {
+            at = self.frames[n].parent;
+        }
+        let inner = at.map(|n| &self.frames[n]);
         Container {
             open: inner.map(|f| f.open),
             group: inner.is_some_and(|f| f.group),

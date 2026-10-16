@@ -358,6 +358,7 @@ fn fixes_stop_after_a_bounded_number_of_rounds() {
                 requirement: String::new(),
                 context: String::new(),
             },
+            runs_command: false,
             unsupported: None,
         },
     );

@@ -141,6 +141,7 @@ fn a_file_that_changed_since_it_was_read_is_skipped_and_its_fix_is_declined() {
                 requirement: String::new(),
                 context: String::new(),
             },
+            runs_command: false,
             unsupported: None,
         },
     );
@@ -276,6 +277,7 @@ fn eligibility_is_decided_before_a_fixer_is_asked() {
                 requirement: String::new(),
                 context: String::new(),
             },
+            runs_command: false,
             unsupported: None,
         },
     );
@@ -303,6 +305,7 @@ fn an_unsupported_fix_declines_its_findings_with_its_reason() {
     unsupported.insert(
         "fake/todo",
         FixBinding {
+            runs_command: false,
             unsupported: Some(
                 "the fix of this rule is of kind `rpc`, which is not yet supported".to_owned(),
             ),
@@ -380,6 +383,7 @@ fn a_proposal_whose_edits_overlap_each_other_is_declined() {
                 requirement: String::new(),
                 context: String::new(),
             },
+            runs_command: false,
             unsupported: None,
         },
     );
@@ -477,6 +481,7 @@ fn fixes_that_undo_each_other_stop_the_run_and_name_their_rules() {
                 requirement: String::new(),
                 context: String::new(),
             },
+            runs_command: false,
             unsupported: None,
         },
     );
@@ -542,6 +547,7 @@ fn a_fix_that_adds_a_warning_is_rolled_back_like_one_that_adds_an_error() {
                 requirement: String::new(),
                 context: String::new(),
             },
+            runs_command: false,
             unsupported: None,
         },
     );
@@ -658,6 +664,7 @@ fn a_fix_cannot_reach_outside_the_project_or_into_a_symlink() {
                     requirement: String::new(),
                     context: String::new(),
                 },
+                runs_command: false,
                 unsupported: None,
             },
         );

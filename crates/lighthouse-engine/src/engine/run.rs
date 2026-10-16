@@ -28,7 +28,7 @@ impl Engine {
                 })
                 .ok()
         });
-        let models = self.run_models(&scopes, cache.as_ref());
+        let models = RunModels::new(self, &scopes, cache.as_ref());
         let (inputs, project) = self.load(&selected, overlays, &mut run);
         let started = Instant::now();
         let run_cache = cache.as_ref().and_then(|cache| {

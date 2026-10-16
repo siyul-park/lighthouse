@@ -3,15 +3,16 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use lighthouse_model::{Fingerprint, Severity, hash};
 
 use super::{
     super::edits::overlap,
+    super::propose::Proposal,
     super::{AppliedFix, DeclinedFix},
-    Orchestrator, Proposal,
+    Orchestrator,
 };
 use crate::{Error, Run};
 
@@ -29,33 +30,44 @@ impl Orchestrator<'_> {
         // shut out by a suggestion.
         proposals.sort_by_key(|p| p.safety);
         let (kept, merged) = kept_proposals(proposals);
-        let mut candidates = self.candidates(&kept, &before);
+        let mut candidates = self.round(&kept, &before);
         let mut failed = std::mem::take(&mut candidates.failed);
         self.notes.append(&mut candidates.notes);
-        let mut trial = self.texts.clone();
-        trial.extend(candidates.texts.clone());
-        let after = if failed.len() == kept.len() && candidates.texts.is_empty() {
+        let changed: Vec<PathBuf> = candidates.texts.keys().cloned().collect();
+        // The candidates stand in for the disk while they are checked; the
+        // texts they replace are kept to put back what is rolled back.
+        let mut prior: BTreeMap<PathBuf, Option<String>> = BTreeMap::new();
+        for (file, text) in std::mem::take(&mut candidates.texts) {
+            prior.insert(file.clone(), self.texts.insert(file, text));
+        }
+        let after = if failed.len() == kept.len() && changed.is_empty() {
             None
         } else {
-            Some(self.engine.check_overlaid(&[], &[], &trial)?)
+            Some(self.proposer.engine.check_overlaid(&[], &[], &self.texts)?)
         };
-        let changed: Vec<PathBuf> = candidates.texts.keys().cloned().collect();
         if let Some(after) = &after {
             failed.extend(worse(&before, after, &changed));
         }
         let rolled = close_over(&kept, failed);
         for (file, reason) in &rolled {
-            candidates.texts.remove(file);
+            match prior.remove(file) {
+                Some(Some(text)) => {
+                    self.texts.insert(file.clone(), text);
+                }
+                Some(None) => {
+                    self.texts.remove(file);
+                }
+                None => {}
+            }
             self.notes
                 .push(format!("rolled back {}: {reason}", file.display()));
         }
-        for (file, text) in &candidates.texts {
+        for file in changed.iter().filter(|f| !rolled.contains_key(*f)) {
             self.original.entry(file.clone()).or_insert_with(|| {
-                let base = candidates.bases[file].clone();
+                let base = candidates.bases.remove(file).unwrap_or_default();
                 let hash = hash::sha256(&base);
                 (base, hash)
             });
-            self.texts.insert(file.clone(), text.clone());
         }
         if self.account(&kept, &merged, &rolled, &candidates.unchanged, round) {
             self.rounds = round;
@@ -75,7 +87,7 @@ impl Orchestrator<'_> {
     ) -> bool {
         let mut any = false;
         for proposal in kept {
-            let files = proposal.files();
+            let files = &proposal.files;
             let reason = match files.iter().find(|f| rolled.contains_key(*f)) {
                 Some(file) => Some(format!("rolled back: {}", rolled[file])),
                 None if files.iter().all(|f| unchanged.contains(f)) => {
@@ -99,7 +111,7 @@ impl Orchestrator<'_> {
                     fixer: p.fixer.clone(),
                     description: p.description.clone(),
                     safety: p.safety,
-                    files: files.iter().cloned().collect(),
+                    files: files.clone(),
                     round,
                 });
             }
@@ -125,27 +137,41 @@ impl Orchestrator<'_> {
 /// proposal with exactly the edits of a kept one is covered by it, and
 /// returned with the fingerprint it merged into.
 fn kept_proposals(proposals: Vec<Proposal>) -> (Vec<Proposal>, Vec<(Proposal, Fingerprint)>) {
-    let mut kept: Vec<Proposal> = Vec::new();
+    // The order of the edits of each proposal by file and place, found once:
+    // two proposals are the same when their edits are, in that order.
+    let placed = |p: &Proposal| {
+        let mut order: Vec<usize> = (0..p.edits.len()).collect();
+        order.sort_by_key(|&n| {
+            let e = &p.edits[n];
+            (&e.file, e.range.start, e.range.end)
+        });
+        order
+    };
+    let mut kept: Vec<(Proposal, Vec<usize>)> = Vec::new();
     let mut merged = Vec::new();
     for proposal in proposals {
-        let same = kept.iter().find(|k| {
-            let (a, b) = (k.sorted_edits(), proposal.sorted_edits());
-            a.len() == b.len() && a.iter().zip(&b).all(|(x, y)| x == y)
+        let order = placed(&proposal);
+        let same = kept.iter().find(|(k, kept_order)| {
+            kept_order.len() == order.len()
+                && kept_order
+                    .iter()
+                    .zip(&order)
+                    .all(|(&a, &b)| k.edits[a] == proposal.edits[b])
         });
-        if let Some(same) = same {
+        if let Some((same, _)) = same {
             merged.push((proposal, same.fingerprint.clone()));
             continue;
         }
         let collides = proposal.edits.iter().any(|e| {
             kept.iter()
-                .flat_map(|k| &k.edits)
+                .flat_map(|(k, _)| &k.edits)
                 .any(|k| k.file == e.file && overlap(&k.range, &e.range))
         });
         if !collides {
-            kept.push(proposal);
+            kept.push((proposal, order));
         }
     }
-    (kept, merged)
+    (kept.into_iter().map(|(p, _)| p).collect(), merged)
 }
 
 /// The changed files whose check got worse: more findings of error or warn
@@ -154,21 +180,21 @@ fn kept_proposals(proposals: Vec<Proposal>) -> (Vec<Proposal>, Vec<(Proposal, Fi
 /// gap in the analysis. A change that cannot be pinned on one file (a gap with
 /// no path, a finding in an untouched file) condemns them all.
 fn worse(before: &Run, after: &Run, changed: &[PathBuf]) -> BTreeMap<PathBuf, String> {
-    type Key = (PathBuf, String, String);
-    let count = |o: &Run| -> BTreeMap<Key, usize> {
+    type Key<'a> = (&'a Path, &'a str, &'a str);
+    fn count(run: &Run) -> BTreeMap<Key<'_>, usize> {
         let mut counts = BTreeMap::new();
-        let loud = o
+        let loud = run
             .diagnostics
             .iter()
             .filter(|d| matches!(d.severity, Severity::Error | Severity::Warn));
         for d in loud {
-            let owner = d.symbol.clone().unwrap_or_default();
+            let owner = d.symbol.as_deref().unwrap_or_default();
             *counts
-                .entry((d.file.clone(), d.rule_id.clone(), owner))
+                .entry((d.file.as_path(), d.rule_id.as_str(), owner))
                 .or_insert(0) += 1;
         }
         counts
-    };
+    }
     let known = count(before);
     let gaps: BTreeSet<_> = before.incomplete.iter().collect();
     let mut bad: BTreeMap<PathBuf, String> = BTreeMap::new();
@@ -179,8 +205,8 @@ fn worse(before: &Run, after: &Run, changed: &[PathBuf]) -> BTreeMap<PathBuf, St
         }
         let (file, rule, _) = key;
         let reason = format!("it introduced a finding of {rule}");
-        if changed.contains(file) {
-            bad.entry(file.clone()).or_insert(reason);
+        if changed.iter().any(|c| c.as_path() == *file) {
+            bad.entry(file.to_path_buf()).or_insert(reason);
         } else {
             everyone.get_or_insert_with(|| format!("{reason} in {}", file.display()));
         }
@@ -216,12 +242,13 @@ fn close_over(
     loop {
         let mut grew = false;
         for proposal in kept {
-            let files = proposal.files();
+            let files = &proposal.files;
             let Some(reason) = files.iter().find_map(|f| failed.get(f)).cloned() else {
                 continue;
             };
             for file in files {
-                if let std::collections::btree_map::Entry::Vacant(slot) = failed.entry(file) {
+                if let std::collections::btree_map::Entry::Vacant(slot) = failed.entry(file.clone())
+                {
                     slot.insert(reason.clone());
                     grew = true;
                 }

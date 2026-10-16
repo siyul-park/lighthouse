@@ -180,7 +180,7 @@ defaults in the decision realize a rule per language; the context says what each
 
 ## Incomplete analysis
 
-`Outcome.incomplete` is first-class: "not checked" never equals "passed".
+`Run.incomplete` is first-class: "not checked" never equals "passed".
 
 - **Incomplete**: something inside the analysis scope or the requested scope was
   not analyzed. Unreadable files; files a language provider could not parse, load

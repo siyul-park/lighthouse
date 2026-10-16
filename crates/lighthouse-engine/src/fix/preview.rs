@@ -3,8 +3,6 @@
 //! text on disk, nothing more: it is not formatted, not re-checked and not
 //! written. Applying a fix goes through the verified path of a fix run.
 
-use std::path::PathBuf;
-
 use lighthouse_model::{
     Capability, Diagnostic, LineIndex, Position, Preview, PreviewEdit, PreviewFile, Safety,
     utf16_position,
@@ -15,7 +13,7 @@ use super::{
     FixPlan, FixRun,
     edits::apply,
     lower::{Lowerer, Sources},
-    run::Orchestrator,
+    propose::Proposer,
 };
 use crate::{Engine, Overlays, Run};
 
@@ -31,7 +29,7 @@ impl Engine {
         findings: &[&Diagnostic],
     ) -> Vec<Preview> {
         let run = FixRun::default();
-        let orchestrator = Orchestrator::new(self, plan, &run);
+        let proposer = Proposer::new(self, plan, &run);
         let overlays = Overlays::new();
         let sources = Sources::new(&self.ws.root, &outcome.project, &overlays);
         let complete = |language: &str| self.provides(language, Capability::CompleteReferences);
@@ -40,20 +38,16 @@ impl Engine {
             .iter()
             .filter_map(|finding| {
                 let binding = plan.get(&finding.rule_id)?;
-                if binding.unsupported.is_some() || plan.runs_command(&finding.rule_id) {
+                if binding.unsupported.is_some() || binding.runs_command {
                     return None;
                 }
-                let proposal = orchestrator
+                let proposal = proposer
                     .propose_one(outcome, finding, binding, &lowerer, &sources)
                     .ok()?;
-                let mut files: Vec<PathBuf> =
-                    proposal.edits.iter().map(|e| e.file.clone()).collect();
-                files.sort();
-                files.dedup();
                 let mut changed = Vec::new();
-                for file in files {
-                    let base = sources.text(&file).ok()?;
-                    let mine: Vec<_> = proposal.edits.iter().filter(|e| e.file == file).collect();
+                for file in &proposal.files {
+                    let base = sources.text(file).ok()?;
+                    let mine: Vec<_> = proposal.edits.iter().filter(|e| e.file == *file).collect();
                     let after = apply(&base, &mine).ok()?;
                     if after == *base {
                         continue;
@@ -76,8 +70,8 @@ impl Engine {
                 if changed.is_empty() {
                     return None;
                 }
-                let needs_unsafe = proposal.safety == Safety::Suggested
-                    || orchestrator.ineligible(binding).is_some();
+                let needs_unsafe =
+                    proposal.safety == Safety::Suggested || proposer.ineligible(binding).is_some();
                 Some(Preview {
                     fingerprint: finding.fingerprint.clone(),
                     description: proposal.description,
