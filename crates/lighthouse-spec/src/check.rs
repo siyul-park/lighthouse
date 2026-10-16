@@ -2,10 +2,7 @@
 //! provider kind is selected by `type`; each compiles into the single `Rule`
 //! interface. Further kinds join the same union.
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    time,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use lighthouse_model::{Capability, EdgeKind, RunScope};
 use lighthouse_resource::Duration;
@@ -19,8 +16,8 @@ use crate::{
     union::{refuse_strays, stray_field},
 };
 
-/// How long a provider may run when the check names no `timeout`.
-pub const DEFAULT_TIMEOUT: time::Duration = time::Duration::from_secs(30);
+/// How long a command may run when its check or fix names no `timeout`.
+pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 /// The id of the builtin check that compares a file with its formatter's output.
 pub const FORMATTED: &str = "core/formatted";
 

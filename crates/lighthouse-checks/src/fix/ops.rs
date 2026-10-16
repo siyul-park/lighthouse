@@ -12,9 +12,9 @@ use serde_json::{Value, json};
 
 use crate::{
     Error,
-    eval::Template,
+    eval::{Template, render, to_json},
     facts,
-    rule::{render, to_json},
+    glob::slashed,
 };
 
 /// The result of evaluating: edit operations, or the reason none apply.
@@ -160,7 +160,7 @@ impl<'a> Env<'a> {
         let value = json!({
             "rule": finding.rule_id,
             "message": finding.message,
-            "file": finding.file.to_string_lossy().replace('\\', "/"),
+            "file": slashed(&finding.file),
             "span": finding.span,
             "symbol": finding.symbol.clone().unwrap_or_default(),
             "evidence": evidence,

@@ -48,7 +48,7 @@ impl Default for ExitCodes {
 /// or the project), anything else (`>= 2`, a signal, a timeout) is an error
 /// that leaves the analysis incomplete, never clean. stderr is for people.
 /// It runs without a shell in the project root, read-only by contract, with an
-/// environment cleared to `PATH`, `LANG`, `TMPDIR`, the declared
+/// environment cleared to `PATH`, `HOME`, `LANG`, `TMPDIR`, the declared
 /// `env` and `LIGHTHOUSE_*`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]

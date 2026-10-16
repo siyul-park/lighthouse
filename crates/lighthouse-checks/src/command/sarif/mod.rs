@@ -14,6 +14,8 @@ use std::path::{Path, PathBuf};
 use lighthouse_model::{ColumnUnit, Diagnostic, Position, Span, Suppression, byte_position};
 use lighthouse_plugin::{Context, RuleManifest};
 use lighthouse_spec::{SarifColumns, SarifSelect};
+
+use crate::glob::slashed;
 use serde_json::{Map, Value, json};
 
 use self::{
@@ -182,7 +184,7 @@ impl Reading<'_> {
                 extent.start <= start && start <= extent.end
             })
             .max_by_key(|s| s.extent.unwrap_or(s.span).start)
-            .map_or_else(|| super::slashed(path), |s| s.id.as_str().to_owned())
+            .map_or_else(|| slashed(path), |s| s.id.as_str().to_owned())
     }
 }
 

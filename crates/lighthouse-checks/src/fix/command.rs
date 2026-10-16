@@ -4,7 +4,7 @@
 //! verified like any other fix.
 
 use std::{
-    env, fs,
+    fs,
     path::{Component, Path},
 };
 
@@ -15,11 +15,7 @@ use lighthouse_spec::CommandSpec;
 use serde_json::json;
 
 use super::ops::Evaluated;
-
-/// The version of the contract between Lighthouse and its commands.
-const API_VERSION: &str = "1";
-/// What a command inherits from its caller, besides what it declares.
-const INHERITED: [&str; 4] = ["PATH", "HOME", "LANG", "TMPDIR"];
+use crate::command::contract;
 
 pub(crate) fn run(
     id: &str,
@@ -45,7 +41,13 @@ pub(crate) fn run(
         fs::create_dir_all(dir).map_err(|e| fail(e.to_string()))?;
     }
     fs::write(&target, request.text).map_err(|e| fail(e.to_string()))?;
-    let argv = match arguments(spec, request, &target) {
+    let argv = match contract::expand(&spec.argv, &request.workspace.root, |arg| match arg {
+        "{file}" => Some(vec![target.to_string_lossy().into_owned()]),
+        "{line}" => Some(vec![finding.span.start.line.to_string()]),
+        "{symbol}" => Some(vec![finding.symbol.clone().unwrap_or_default()]),
+        "{rule}" => Some(vec![finding.rule_id.clone()]),
+        _ => None,
+    }) {
         Ok(argv) => argv,
         Err(reason) => return Ok(Err(reason)),
     };
@@ -53,7 +55,16 @@ pub(crate) fn run(
         Stdin::None => Vec::new(),
         Stdin::File => request.text.as_bytes().to_vec(),
     };
-    let environment = environment(spec, request);
+    let decision = json!({
+        "rule": finding.rule_id,
+        "message": finding.message,
+        "file": finding.file,
+        "line": finding.span.start.line,
+        "symbol": finding.symbol,
+        "fingerprint": finding.fingerprint.as_str(),
+        "evidence": finding.evidence,
+    });
+    let environment = contract::environment(&spec.env, &decision, request.options);
     let output = lighthouse_process::run(&Invocation {
         argv: &argv,
         dir: scratch.path(),
@@ -115,75 +126,6 @@ fn interpret(
         ));
     }
     Ok(replacement(&finding.file, request.text, &changed))
-}
-
-/// The environment a command gets and nothing else: the inherited allowlist,
-/// the declared variables and the context Lighthouse passes.
-fn environment(spec: &CommandSpec, request: &FixRequest) -> Vec<(String, String)> {
-    let finding = request.finding;
-    let mut vars: Vec<(String, String)> = INHERITED
-        .iter()
-        .filter_map(|k| env::var(k).ok().map(|v| ((*k).to_owned(), v)))
-        .collect();
-    vars.extend(spec.env.iter().map(|(k, v)| (k.clone(), v.clone())));
-    let decision = json!({
-        "rule": finding.rule_id,
-        "message": finding.message,
-        "file": finding.file,
-        "line": finding.span.start.line,
-        "symbol": finding.symbol,
-        "fingerprint": finding.fingerprint.as_str(),
-        "evidence": finding.evidence,
-    });
-    vars.push(("LIGHTHOUSE_DECISION".to_owned(), decision.to_string()));
-    vars.push((
-        "LIGHTHOUSE_OPTIONS".to_owned(),
-        serde_json::Value::Object(request.options.clone()).to_string(),
-    ));
-    vars.push(("LIGHTHOUSE_API_VERSION".to_owned(), API_VERSION.to_owned()));
-    vars
-}
-
-/// The command line: each placeholder argument (`{file}`, `{line}`, `{symbol}`,
-/// `{rule}`) is replaced as a whole argument, so no value can grow into an
-/// option; a value that starts with `-` is refused.
-fn arguments(
-    spec: &CommandSpec,
-    request: &FixRequest,
-    target: &Path,
-) -> Result<Vec<String>, String> {
-    let finding = request.finding;
-    let mut argv = Vec::new();
-    for (at, arg) in spec.argv.iter().enumerate() {
-        // A program named by a relative path is the project's own, found from
-        // the project root, though the command runs in the scratch directory;
-        // trust is judged on that same file.
-        if at == 0 && arg.contains('/') && !Path::new(arg).is_absolute() {
-            argv.push(
-                request
-                    .workspace
-                    .root
-                    .join(arg)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            continue;
-        }
-        let value = match arg.as_str() {
-            "{file}" => target.to_string_lossy().into_owned(),
-            "{line}" => finding.span.start.line.to_string(),
-            "{symbol}" => finding.symbol.clone().unwrap_or_default(),
-            "{rule}" => finding.rule_id.clone(),
-            other => other.to_owned(),
-        };
-        if value != *arg && value.starts_with('-') {
-            return Err(format!(
-                "the value of `{arg}` starts with `-`, so it is refused"
-            ));
-        }
-        argv.push(value);
-    }
-    Ok(argv)
 }
 
 /// The smallest whole-line replacement that turns `old` into `new`; declined

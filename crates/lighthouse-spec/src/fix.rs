@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::{
-    DecisionSpec, OrderScope,
+    DEFAULT_TIMEOUT, DecisionSpec, OrderScope,
     command::mixed_placeholder,
     expression::{compile_problem, template_problem},
     union::{refuse_strays, stray_field},
@@ -286,5 +286,5 @@ impl CommandSpec {
 }
 
 fn default_timeout() -> Duration {
-    Duration::from_secs(30)
+    DEFAULT_TIMEOUT
 }

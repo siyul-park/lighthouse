@@ -7,6 +7,8 @@ use lighthouse_model::{Diagnostic, Position, Span};
 use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
 use serde_json::json;
 
+use crate::glob::slashed;
+
 /// Checks the focused file against its language's formatter; a file of a
 /// language with no formatter is not judged.
 pub(crate) fn check(meta: &RuleManifest, ctx: &Context) -> Result<Vec<Diagnostic>, PluginError> {
@@ -30,7 +32,7 @@ pub(crate) fn check(meta: &RuleManifest, ctx: &Context) -> Result<Vec<Diagnostic
         return Ok(Vec::new());
     }
     let line = first_difference(text, &formatted);
-    let path = file.path.to_string_lossy().replace('\\', "/");
+    let path = slashed(&file.path);
     let at = Position { line, col: 1 };
     let mut found = Diagnostic::new(
         &meta.id,

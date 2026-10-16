@@ -6,24 +6,21 @@
 //! never clean. stderr is for people and only ever explains an error. With
 //! `output: sarif` stdout is a SARIF log instead of lines (see [`sarif`]).
 
+pub(crate) mod contract;
 pub mod sarif;
 
 use std::{
-    env,
     path::{Path, PathBuf},
     time::Duration,
 };
 
 use lighthouse_model::{Diagnostic, Position, Project, RunScope, Span, squash};
 use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
-use lighthouse_process::{GRACE, Invocation, Stdin};
-use lighthouse_spec::{Batch, Check, CheckOutput, CommandCheck};
+use lighthouse_process::{GRACE, Stdin};
+use lighthouse_spec::{Batch, Check, CheckOutput, CommandCheck, DEFAULT_TIMEOUT};
 use serde_json::{Map, Value, json};
 
-/// The version of the contract between Lighthouse and its commands.
-const API_VERSION: &str = "1";
-/// What a command inherits from its caller, besides what it declares.
-const INHERITED: [&str; 3] = ["PATH", "LANG", "TMPDIR"];
+use crate::glob::slashed;
 /// The most bytes of arguments one run is given; more files go to more runs.
 const ARGUMENT_BUDGET: usize = 96 * 1024;
 /// How much of stderr an error carries.
@@ -39,9 +36,7 @@ impl CommandRule {
     pub(crate) fn new(check: &Check, spec: &CommandCheck) -> Self {
         Self {
             spec: spec.clone(),
-            timeout: check
-                .timeout
-                .map_or(lighthouse_spec::DEFAULT_TIMEOUT, |t| t.get()),
+            timeout: check.timeout.unwrap_or(DEFAULT_TIMEOUT).get(),
         }
     }
 
@@ -169,31 +164,18 @@ impl Run<'_> {
         Ok(found)
     }
 
-    /// The command line: `{file}`, `{files}` and `{rule}` fill whole arguments,
-    /// and a value that starts with `-` is refused so none can grow into an
-    /// option. A program named by a relative path is the project's own.
+    /// The command line: `{file}`, `{files}` and `{rule}` fill whole arguments.
     fn arguments(&self, files: &[PathBuf]) -> Result<Vec<String>, PluginError> {
-        let root = &self.ctx.workspace.root;
-        let mut argv = Vec::new();
-        for (at, arg) in self.rule.spec.argv.iter().enumerate() {
-            if at == 0 && arg.contains('/') && !Path::new(arg).is_absolute() {
-                argv.push(root.join(arg).to_string_lossy().into_owned());
-                continue;
-            }
-            let values: Vec<String> = match arg.as_str() {
-                "{file}" | "{files}" => files.iter().map(|f| slashed(f)).collect(),
-                "{rule}" => vec![self.meta.id.clone()],
-                other => vec![other.to_owned()],
-            };
-            if let Some(bad) = values.iter().find(|v| *v != arg && v.starts_with('-')) {
-                return Err(PluginError::Incomplete(format!(
-                    "{}: the value `{bad}` of `{arg}` starts with `-`, so it is refused",
-                    self.meta.id
-                )));
-            }
-            argv.extend(values);
-        }
-        Ok(argv)
+        contract::expand(
+            &self.rule.spec.argv,
+            &self.ctx.workspace.root,
+            |arg| match arg {
+                "{file}" | "{files}" => Some(files.iter().map(|f| slashed(f)).collect()),
+                "{rule}" => Some(vec![self.meta.id.clone()]),
+                _ => None,
+            },
+        )
+        .map_err(|reason| PluginError::Incomplete(format!("{}: {reason}", self.meta.id)))
     }
 
     /// Runs the command; what it printed when it found something (or, for a
@@ -201,11 +183,15 @@ impl Run<'_> {
     fn invoke(&self, argv: &[String], stdin: &[u8]) -> Result<Ran, PluginError> {
         let shown = argv.join(" ");
         let incomplete = |what: String| PluginError::Incomplete(format!("`{shown}` {what}"));
-        let output = lighthouse_process::run(&Invocation {
+        let output = lighthouse_process::run(&lighthouse_process::Invocation {
             argv,
             dir: &self.ctx.workspace.root,
             stdin,
-            env: Some(&self.environment()),
+            env: Some(&contract::environment(
+                &self.rule.spec.env,
+                &json!({ "id": self.meta.id }),
+                self.options,
+            )),
             limit: self.rule.timeout,
             grace: GRACE,
             max_output: lighthouse_process::MAX_OUTPUT,
@@ -243,32 +229,6 @@ impl Run<'_> {
             )));
         }
         Ok(ran)
-    }
-
-    /// The environment a command gets and nothing else: the inherited
-    /// allowlist, the declared variables and the context Lighthouse passes.
-    fn environment(&self) -> Vec<(String, String)> {
-        let mut vars: Vec<(String, String)> = INHERITED
-            .iter()
-            .filter_map(|k| env::var(k).ok().map(|v| ((*k).to_owned(), v)))
-            .collect();
-        vars.extend(
-            self.rule
-                .spec
-                .env
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone())),
-        );
-        vars.push((
-            "LIGHTHOUSE_DECISION".to_owned(),
-            json!({ "id": self.meta.id }).to_string(),
-        ));
-        vars.push((
-            "LIGHTHOUSE_OPTIONS".to_owned(),
-            Value::Object(self.options.clone()).to_string(),
-        ));
-        vars.push(("LIGHTHOUSE_API_VERSION".to_owned(), API_VERSION.to_owned()));
-        vars
     }
 
     /// One finding per line: a leading `path:line[:col]: ` of a file of the
@@ -337,10 +297,6 @@ impl Run<'_> {
 
 fn known(project: &Project, path: &Path) -> bool {
     project.file(path).is_some()
-}
-
-fn slashed(path: &Path) -> String {
-    path.to_string_lossy().replace('\\', "/")
 }
 
 /// Splits `files` into runs whose arguments fit the budget.

@@ -15,7 +15,6 @@ use lighthouse_plugin::{Caching, Context, Error as PluginError, Rule, RuleManife
 use lighthouse_spec::{BuiltinCheck, BuiltinOp, CheckKind, Decision, FORMATTED, Select};
 use serde_json::{Map, Value};
 
-pub(crate) use crate::eval::{render, to_json};
 use crate::{
     Error,
     cel_rule::CelRule,

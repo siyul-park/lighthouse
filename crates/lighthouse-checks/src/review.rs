@@ -14,6 +14,7 @@ use serde_json::{Value, json};
 use crate::{
     Error,
     eval::{Frame, compile, render, to_json},
+    glob::slashed,
 };
 
 /// The most characters of a subject's source put to a model.
@@ -163,7 +164,7 @@ impl Review {
                     .file(&diagnostic.file)
                     .map(|f| f.lang.clone())
                     .unwrap_or_default(),
-                file: diagnostic.file.to_string_lossy().replace('\\', "/"),
+                file: slashed(&diagnostic.file),
                 text,
                 facts: candidate.fact.clone(),
                 neighbors: symbol.map_or_else(Vec::new, |s| neighbors(ctx, source, s)),
