@@ -208,11 +208,11 @@ fn a_command_needs_a_program_and_a_usable_timeout() {
     rejected(fixable(&command("argv: []")), "needs a program");
     rejected(
         fixable(&command("argv: [gofmt]\n    timeout: soon")),
-        "`timeout` is `soon`",
+        "`soon` is not a duration",
     );
     rejected(
         fixable(&command("argv: [gofmt]\n    timeout: '30'")),
-        "expected a duration",
+        "`30` is not a duration",
     );
     rejected(
         fixable(&command("argv: [gofmt]\n    output: inPlace")),
@@ -225,10 +225,7 @@ fn a_command_needs_a_program_and_a_usable_timeout() {
         panic!("command expected");
     };
     assert_eq!(command.argv.len(), 3);
-    assert_eq!(
-        command.timeout_duration(),
-        Some(std::time::Duration::from_secs(120))
-    );
+    assert_eq!(command.timeout.get(), std::time::Duration::from_secs(120));
 }
 
 #[test]

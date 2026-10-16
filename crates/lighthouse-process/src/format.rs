@@ -7,7 +7,7 @@ use std::{collections::BTreeMap, fs, path::Path, time::Duration};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{MAX_OUTPUT, Spec, run};
+use crate::{GRACE, Invocation, MAX_OUTPUT, Output, Stdin, run};
 
 /// Settings files of formatters that look for them upward from the file.
 const SETTINGS: [&str; 4] = [
@@ -19,30 +19,6 @@ const SETTINGS: [&str; 4] = [
 
 /// How long a formatter may run on one file.
 const LIMIT: Duration = Duration::from_secs(60);
-/// How long a formatter that was told to stop may take to do so.
-const GRACE: Duration = Duration::from_secs(2);
-
-/// What a formatter is given on stdin.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum FormatterStdin {
-    #[default]
-    None,
-    /// The text of the file.
-    File,
-}
-
-/// Where a formatter leaves the formatted text.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum FormatterOutput {
-    /// In the scratch copy of the file, which is appended to `argv` (or fills
-    /// an `{file}` argument).
-    #[default]
-    InPlace,
-    /// On stdout, which carries only the text.
-    Text,
-}
 
 /// The command that formats a file of a language, by the command contract of
 /// fixes: exit `0` succeeds, stdout carries only the result, stderr is for
@@ -52,9 +28,9 @@ pub enum FormatterOutput {
 pub struct Formatter {
     pub argv: Vec<String>,
     #[serde(default)]
-    pub stdin: FormatterStdin,
+    pub stdin: Stdin,
     #[serde(default)]
-    pub output: FormatterOutput,
+    pub output: Output,
     /// Extra environment variables; the rest is cleared to an allowlist.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<String, String>,
@@ -89,20 +65,20 @@ impl Formatter {
             })
             .collect();
         let named = self.argv.iter().any(|a| a == "{file}");
-        if self.stdin == FormatterStdin::None && !named {
+        if self.stdin == Stdin::None && !named {
             command.push(path);
         }
         let stdin = match self.stdin {
-            FormatterStdin::None => Vec::new(),
-            FormatterStdin::File => text.as_bytes().to_vec(),
+            Stdin::None => Vec::new(),
+            Stdin::File => text.as_bytes().to_vec(),
         };
         let mut env: Vec<(String, String)> = ["PATH", "HOME", "LANG", "TMPDIR"]
             .iter()
             .filter_map(|k| std::env::var(k).ok().map(|v| ((*k).to_owned(), v)))
             .collect();
         env.extend(self.env.iter().map(|(k, v)| (k.clone(), v.clone())));
-        let name = &self.argv[0];
-        let output = run(&Spec {
+        let name = self.argv.first().ok_or("the formatter has no program")?;
+        let output = run(&Invocation {
             argv: &command,
             dir: root,
             stdin: &stdin,
@@ -123,10 +99,10 @@ impl Formatter {
             return Err(format!("formatter `{name}` printed more than it may"));
         }
         match self.output {
-            FormatterOutput::InPlace => {
+            Output::InPlace => {
                 fs::read_to_string(&copy).map_err(|e| format!("formatter output: {e}"))
             }
-            FormatterOutput::Text => match String::from_utf8(output.stdout) {
+            Output::Text => match String::from_utf8(output.stdout) {
                 Ok(out) if out.is_empty() => Err("the formatter printed no text".to_owned()),
                 Ok(out) => Ok(out),
                 Err(_) => Err("the formatter printed text that is not UTF-8".to_owned()),

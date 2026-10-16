@@ -90,11 +90,11 @@
           "type": "object"
         },
         "output": {
-          "$ref": "#/$defs/FormatterOutput",
+          "$ref": "#/$defs/Output",
           "default": "in-place"
         },
         "stdin": {
-          "$ref": "#/$defs/FormatterStdin",
+          "$ref": "#/$defs/Stdin",
           "default": "none"
         }
       },
@@ -102,21 +102,6 @@
         "argv"
       ],
       "type": "object"
-    },
-    "FormatterOutput": {
-      "description": "Where a formatter leaves the formatted text.",
-      "oneOf": [
-        {
-          "const": "in-place",
-          "description": "In the scratch copy of the file, which is appended to `argv` (or fills\nan `{file}` argument).",
-          "type": "string"
-        },
-        {
-          "const": "text",
-          "description": "On stdout, which carries only the text.",
-          "type": "string"
-        }
-      ]
     },
     "FormatterSpec": {
       "anyOf": [
@@ -131,22 +116,6 @@
         }
       ],
       "description": "How a formatter is written: `[gofmt, -w]` is the short form (scratch copy,\npath appended)."
-    },
-    "FormatterStdin": {
-      "description": "What a formatter is given on stdin.",
-      "oneOf": [
-        {
-          "enum": [
-            "none"
-          ],
-          "type": "string"
-        },
-        {
-          "const": "file",
-          "description": "The text of the file.",
-          "type": "string"
-        }
-      ]
     },
     "GeneratedCheck": {
       "description": "Whether decisions check generated code.",
@@ -426,6 +395,21 @@
       ],
       "description": "One name or several, in the order written: the standard APIs a provider\nspeaks (each operation uses the one that covers it: classification\n`typesafe`, else `openai`), or the models of a route."
     },
+    "Output": {
+      "description": "Where a command that fixes or formats a file leaves the new text.",
+      "oneOf": [
+        {
+          "const": "in-place",
+          "description": "In the scratch copy of the file, which is appended to `argv` (or fills\nan `{file}` argument).",
+          "type": "string"
+        },
+        {
+          "const": "text",
+          "description": "On stdout, which carries only the text.",
+          "type": "string"
+        }
+      ]
+    },
     "OverrideSpec": {
       "additionalProperties": false,
       "description": "Rules for the files and languages that match.",
@@ -650,6 +634,22 @@
         }
       ],
       "description": "How a rule is written in a spec: `warn`, `off`, or\n`{ level: warn, options: { max: 10 } }`."
+    },
+    "Stdin": {
+      "description": "What a command that checks, fixes or formats a file is given on stdin.",
+      "oneOf": [
+        {
+          "enum": [
+            "none"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "file",
+          "description": "The text of the file.",
+          "type": "string"
+        }
+      ]
     }
   },
   "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/project.schema.json",

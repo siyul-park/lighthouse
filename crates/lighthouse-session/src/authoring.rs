@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_resource::{API_VERSION, new_uid};
+use lighthouse_resource::{API_VERSION, STATE_DIR, new_uid};
 use lighthouse_spec::{Catalog, local_dir, local_files};
 use serde_json::Value;
 
@@ -19,7 +19,7 @@ use crate::{DecisionTest, Result, Session, test_decisions};
 const LOCAL_PACK: &str = "local";
 /// Held while a decision is authored. Its name matches the `.lighthouse/*.db*`
 /// ignore that `init` writes, so it stays out of version control.
-const LOCK_FILE: &str = ".lighthouse/authoring.db-lock";
+const LOCK_FILE: &str = "authoring.db-lock";
 
 /// A decision change that passed its gate and was written.
 pub struct Authored {
@@ -123,7 +123,7 @@ fn checked_name(name: &str) -> Result<()> {
 
 /// Serializes authoring in a project, across threads and processes.
 fn lock(root: &Path) -> Result<File> {
-    let path = root.join(LOCK_FILE);
+    let path = root.join(STATE_DIR).join(LOCK_FILE);
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }

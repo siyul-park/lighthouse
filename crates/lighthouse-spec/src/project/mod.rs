@@ -13,16 +13,16 @@ use std::{
     collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
-    time::Duration,
+    time,
 };
 
 pub use formatter::FormatterSpec;
 pub use globset::GlobSet;
 use globset::{GlobBuilder, GlobSetBuilder};
 use lighthouse_model::Options;
-pub use lighthouse_process::{Formatter, FormatterOutput, FormatterStdin};
+pub use lighthouse_process::Formatter;
+use lighthouse_resource::{Duration, documents, resource};
 pub use lighthouse_resource::{Format, Metadata, Resource};
-use lighthouse_resource::{documents, parse_duration, resource};
 pub use models::{
     ApiProvider, Evaluation, ModelBinding, ModelInput, ModelOutput, ModelProvider, ModelsSpec,
     Names, ProviderSpec, RESERVED, Routing,
@@ -74,8 +74,6 @@ pub enum ProjectError {
     Formatter { language: String },
     #[error("invalid configuration: `models.explore` is {0}, not a share from 0 to 1")]
     Explore(f64),
-    #[error("invalid configuration: `{text}` is not a duration such as `30s` (plugin `{plugin}`)")]
-    Duration { plugin: String, text: String },
 }
 
 /// A listed plugin. `path` (relative to the config directory) names the
@@ -106,29 +104,18 @@ impl PluginRef {
     }
 
     /// The per-request limit, if one was configured.
-    pub fn timeout(&self) -> Option<Duration> {
-        self.timeout
+    pub fn timeout(&self) -> Option<time::Duration> {
+        self.timeout.map(Duration::get)
     }
 
-    fn of(entry: PluginEntry) -> Result<Self, ProjectError> {
+    fn of(entry: PluginEntry) -> Self {
         match entry {
-            PluginEntry::Id(id) => Ok(Self::new(id)),
-            PluginEntry::Detailed(detail) => {
-                let timeout = detail
-                    .timeout
-                    .map(|text| {
-                        parse_duration(&text).ok_or_else(|| ProjectError::Duration {
-                            plugin: detail.id.clone(),
-                            text,
-                        })
-                    })
-                    .transpose()?;
-                Ok(Self {
-                    id: detail.id,
-                    path: detail.path,
-                    timeout,
-                })
-            }
+            PluginEntry::Id(id) => Self::new(id),
+            PluginEntry::Detailed(detail) => Self {
+                id: detail.id,
+                path: detail.path,
+                timeout: detail.timeout,
+            },
         }
     }
 }
@@ -372,11 +359,7 @@ impl Config {
         }
         Ok(Self {
             name: metadata.name,
-            plugins: spec
-                .plugins
-                .into_iter()
-                .map(PluginRef::of)
-                .collect::<Result<_, _>>()?,
+            plugins: spec.plugins.into_iter().map(PluginRef::of).collect(),
             languages,
             constructors,
             formatters,

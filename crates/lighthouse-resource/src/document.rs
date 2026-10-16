@@ -55,18 +55,13 @@ pub fn resource<S: Spec + DeserializeOwned>(
     path: &str,
     document: &Value,
 ) -> Result<Resource<S>, Error> {
-    let Some(version) = document.get("apiVersion").and_then(Value::as_str) else {
-        return Err(Error::Unversioned {
-            path: path.to_owned(),
-            api_version: API_VERSION.to_owned(),
-        });
-    };
+    let version = document.get("apiVersion").and_then(Value::as_str);
     let found = kind_of(document).unwrap_or("(none)");
-    if version != API_VERSION || found != S::KIND {
+    if version != Some(API_VERSION) || found != S::KIND {
         return Err(Error::Mismatch {
             path: path.to_owned(),
             expected: format!("{API_VERSION} {}", S::KIND),
-            found: format!("{version} {found}"),
+            found: version.map_or_else(|| "(none)".to_owned(), |v| format!("{v} {found}")),
         });
     }
     serde_json::from_value(document.clone()).map_err(|e| Error::Invalid {

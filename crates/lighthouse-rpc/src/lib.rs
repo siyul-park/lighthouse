@@ -13,6 +13,7 @@ use std::{
 
 use lighthouse_model::Incomplete;
 use lighthouse_plugin::{Plugin, Registry};
+use lighthouse_resource::STATE_DIR;
 use lighthouse_spec::{Config, PluginRef};
 use thiserror::Error;
 
@@ -88,7 +89,7 @@ pub fn descriptors() -> Vec<lighthouse_resource::Descriptor> {
 /// and `plugins` next to the executable. A
 /// development checkout is reached only through an explicit `path`.
 pub fn search_dirs(root: &Path) -> Vec<PathBuf> {
-    let mut dirs = vec![root.join(".lighthouse/plugins")];
+    let mut dirs = vec![root.join(STATE_DIR).join("plugins")];
     dirs.extend(lighthouse_resource::xdg_plugins());
     if let Some(dir) = env::current_exe()
         .ok()

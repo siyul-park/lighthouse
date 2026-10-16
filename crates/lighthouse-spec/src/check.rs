@@ -2,19 +2,19 @@
 //! provider kind is selected by `type`; each compiles into the single `Rule`
 //! interface. Further kinds (`command`, `rpc`, ...) join the same union.
 
-use std::{collections::BTreeMap, time::Duration};
+use std::{collections::BTreeMap, time};
 
 use cel::Program;
 use lighthouse_model::{Capability, RunScope};
 
 use crate::{CommandCheck, ModelCheck, Subject};
-use lighthouse_resource::parse_duration;
+use lighthouse_resource::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 /// How long a provider may run when the check names no `timeout`.
-pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+pub const DEFAULT_TIMEOUT: time::Duration = time::Duration::from_secs(30);
 /// The id of the builtin check that compares a file with its formatter's output.
 pub const FORMATTED: &str = "core/formatted";
 
@@ -30,7 +30,7 @@ pub struct Check {
     pub requires: Vec<Capability>,
     /// How long one run of the provider may take, such as `30s` or `2m`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub timeout: Option<String>,
+    pub timeout: Option<Duration>,
     #[serde(flatten)]
     pub kind: CheckKind,
 }
@@ -42,7 +42,7 @@ struct Shape {
     #[serde(default)]
     requires: Vec<Capability>,
     #[serde(default)]
-    timeout: Option<String>,
+    timeout: Option<Duration>,
     #[serde(flatten)]
     kind: CheckKind,
 }
@@ -130,20 +130,10 @@ impl Check {
         }
     }
 
-    /// How long a run may take: the `timeout`, else the default.
     /// Whether a program decides the findings of this check, as opposed to
     /// agent review.
     pub fn is_automated(&self) -> bool {
         self.kind.deterministic()
-    }
-
-    /// How long a run may take: the `timeout`, else the default; `None` for a
-    /// text that is not a duration.
-    pub fn timeout_duration(&self) -> Option<Duration> {
-        match &self.timeout {
-            None => Some(DEFAULT_TIMEOUT),
-            Some(text) => parse_duration(text),
-        }
     }
 }
 

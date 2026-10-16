@@ -363,15 +363,6 @@ fn check(decision: &Decision, automated: bool) -> Result<(), Error> {
     let Some(check) = &decision.check else {
         return Ok(());
     };
-    if check.timeout_duration().is_none_or(|t| t.is_zero()) {
-        return Err(Error::invalid(
-            id,
-            format!(
-                "check `timeout` is `{}`, expected a duration such as `30s` or `2m`",
-                check.timeout.as_deref().unwrap_or_default()
-            ),
-        ));
-    }
     kind_problem(decision, &check.kind).map_or(Ok(()), |reason| Err(Error::invalid(id, reason)))?;
     let has = |kind| decision.examples.iter().any(|e| e.kind == kind);
     if automated && !(has(ExampleKind::Valid) && has(ExampleKind::Invalid)) {

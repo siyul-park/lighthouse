@@ -8,6 +8,7 @@ use std::{
 };
 
 use lighthouse_model::{Judgment, hash};
+use lighthouse_resource::STATE_DIR;
 use rusqlite::{
     Connection, ErrorCode, OptionalExtension, Transaction, TransactionBehavior, named_params,
     params,
@@ -25,8 +26,6 @@ mod rows;
 use rows::*;
 
 const FILE: &str = "lighthouse.db";
-/// Directory of a project that holds its Lighthouse state.
-const DIR: &str = ".lighthouse";
 /// How long a writer waits for another process holding the database.
 const BUSY: Duration = Duration::from_secs(5);
 /// Attempts to switch a database that another process is switching, and the
@@ -47,12 +46,12 @@ const MAX_CANDIDATES: usize = 5;
 impl Store {
     /// Where a project's cache lives: `<root>/.lighthouse/lighthouse.db`.
     pub fn path_in(root: &Path) -> PathBuf {
-        root.join(DIR).join(FILE)
+        root.join(STATE_DIR).join(FILE)
     }
 
     /// Where a project's decision log lives: `<root>/.lighthouse/decisions.jsonl`.
     pub fn log_path_in(root: &Path) -> PathBuf {
-        root.join(DIR).join(log::FILE)
+        root.join(STATE_DIR).join(log::FILE)
     }
 
     /// Opens the store of the project at `root`, creating the cache and its

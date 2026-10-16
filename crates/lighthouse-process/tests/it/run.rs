@@ -3,10 +3,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lighthouse_process::{Spec, run};
+use lighthouse_process::{Invocation, run};
 
-fn spec<'a>(argv: &'a [String], limit: Duration) -> Spec<'a> {
-    Spec {
+fn spec<'a>(argv: &'a [String], limit: Duration) -> Invocation<'a> {
+    Invocation {
         argv,
         dir: Path::new("."),
         stdin: b"",

@@ -8,13 +8,10 @@ use std::{
 };
 
 use lighthouse_cli::surface::kinds;
-use lighthouse_session::{Session, config_file, schema_file, schemas, validate_paths};
+use lighthouse_session::{Session, config_file, local_dir, schema_file, schemas, validate_paths};
 use serde_json::Value;
 
 use crate::cli::Result;
-
-/// Where a project keeps its own decisions, for the default of validation.
-const LOCAL_DECISIONS: &str = ".lighthouse/decisions";
 
 /// Validates the documents under `paths`; the project's configuration and
 /// local decisions when there are none. Returns 1 when anything is wrong.
@@ -26,7 +23,9 @@ pub fn validate(config: Option<&Path>, paths: &[PathBuf], examples: bool) -> Res
         Err(_) => Session::bare(root.clone())?,
     };
     let paths = if paths.is_empty() {
-        defaults(&root, &[LOCAL_DECISIONS])
+        let mut paths: Vec<PathBuf> = config_file(&root).into_iter().collect();
+        paths.extend(Some(local_dir(&root)).filter(|d| d.is_dir()));
+        paths
     } else {
         paths.to_vec()
     };
@@ -88,12 +87,4 @@ pub fn all_schemas() -> BTreeMap<String, Value> {
         .into_iter()
         .map(|(kind, schema)| (kind.to_owned(), schema));
     documents.chain(outputs).collect()
-}
-
-/// The project's configuration file and the given directories, as far as they
-/// exist.
-fn defaults(root: &Path, dirs: &[&str]) -> Vec<PathBuf> {
-    let mut paths: Vec<PathBuf> = config_file(root).into_iter().collect();
-    paths.extend(dirs.iter().map(|d| root.join(d)).filter(|d| d.is_dir()));
-    paths
 }

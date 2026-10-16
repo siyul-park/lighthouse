@@ -16,7 +16,7 @@ pub fn to_yaml<T: Serialize>(value: &T) -> String {
     let value = serde_norway::to_value(value).expect("a document serializes to YAML");
     let mut out = String::new();
     match &value {
-        Value::Mapping(map) if !map.is_empty() => block_map(&mut out, map, 0),
+        Value::Mapping(map) if !map.is_empty() => block_map(&mut out, map, 0, false),
         Value::Sequence(items) if !items.is_empty() => block_list(&mut out, items, 0),
         other => {
             out.push_str(&scalar_or_empty(other));
@@ -26,30 +26,32 @@ pub fn to_yaml<T: Serialize>(value: &T) -> String {
     out
 }
 
-fn block_map(out: &mut String, map: &Mapping, indent: usize) {
-    for (key, value) in map {
-        let _ = write!(out, "{}{}:", " ".repeat(indent), key_text(key));
+/// The entries of `map`, each at `indent`; the first starts where the line
+/// already is when `inline_first`, as after a list item's dash.
+fn block_map(out: &mut String, map: &Mapping, indent: usize, inline_first: bool) {
+    for (at, (key, value)) in map.into_iter().enumerate() {
+        if !(inline_first && at == 0) {
+            let _ = write!(out, "{:indent$}", "");
+        }
+        let _ = write!(out, "{}:", key_text(key));
         entry(out, value, indent);
     }
 }
 
 fn block_list(out: &mut String, items: &[Value], indent: usize) {
     for item in items {
-        let pad = " ".repeat(indent);
+        let _ = write!(out, "{:indent$}", "");
         match item {
             Value::Mapping(map) if !map.is_empty() => {
-                let mut inner = String::new();
-                block_map(&mut inner, map, indent + INDENT);
-                // The first key shares the dash line.
-                let rest = &inner[indent + INDENT..];
-                let _ = write!(out, "{pad}- {rest}");
+                out.push_str("- ");
+                block_map(out, map, indent + INDENT, true);
             }
             Value::Sequence(nested) if !nested.is_empty() && !flow_fits(nested, indent + 2) => {
-                let _ = writeln!(out, "{pad}-");
+                out.push_str("-\n");
                 block_list(out, nested, indent + INDENT);
             }
             other => {
-                let _ = write!(out, "{pad}- ");
+                out.push_str("- ");
                 inline_value(out, other, indent + INDENT);
             }
         }
@@ -61,7 +63,7 @@ fn entry(out: &mut String, value: &Value, indent: usize) {
     match value {
         Value::Mapping(map) if !map.is_empty() => {
             out.push('\n');
-            block_map(out, map, indent + INDENT);
+            block_map(out, map, indent + INDENT, false);
         }
         Value::Sequence(items) if !items.is_empty() => {
             if flow_fits(items, indent + 2) {
@@ -126,13 +128,12 @@ fn literal(text: &str, indent: usize) -> Option<String> {
         Some(_) => return None,
         None => (text, "|-"),
     };
-    let pad = " ".repeat(indent);
     let mut out = format!("{header}\n");
     for line in body.split('\n') {
         if line.is_empty() {
             out.push('\n');
         } else {
-            let _ = writeln!(out, "{pad}{line}");
+            let _ = writeln!(out, "{:indent$}{line}", "");
         }
     }
     Some(out)
@@ -146,13 +147,12 @@ fn folded(text: &str, indent: usize) -> Option<String> {
     if !plain {
         return None;
     }
-    let pad = " ".repeat(indent);
     let width = WIDTH.saturating_sub(indent).max(20);
     let mut out = String::from(">-\n");
     let mut line = String::new();
     for word in text.split(' ') {
         if !line.is_empty() && line.chars().count() + 1 + word.chars().count() > width {
-            let _ = writeln!(out, "{pad}{line}");
+            let _ = writeln!(out, "{:indent$}{line}", "");
             line.clear();
         }
         if !line.is_empty() {
@@ -160,7 +160,7 @@ fn folded(text: &str, indent: usize) -> Option<String> {
         }
         line.push_str(word);
     }
-    let _ = writeln!(out, "{pad}{line}");
+    let _ = writeln!(out, "{:indent$}{line}", "");
     Some(out)
 }
 

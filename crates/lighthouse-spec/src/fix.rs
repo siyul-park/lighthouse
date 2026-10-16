@@ -4,11 +4,11 @@
 //! every type compiles into a provider of the one `Fixer` interface.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::time::Duration;
 
 use cel::Program;
 use lighthouse_model::{Capability, Safety};
-use lighthouse_resource::parse_duration;
+use lighthouse_process::{Output, Stdin};
+use lighthouse_resource::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -178,27 +178,6 @@ impl OpSpec {
     }
 }
 
-/// What the orchestrator takes from a command that succeeded.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum CommandOutput {
-    /// The command edits the scratch copy of the file.
-    #[default]
-    InPlace,
-    /// The command prints the new text of the file on stdout, and nothing else.
-    Text,
-}
-
-/// What the command is given on stdin.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum CommandStdin {
-    #[default]
-    None,
-    /// The content of the target file.
-    File,
-}
-
 /// Where a command's edits may land.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -222,15 +201,15 @@ pub struct CommandSpec {
     /// whole arguments.
     pub argv: Vec<String>,
     #[serde(default)]
-    pub output: CommandOutput,
+    pub output: Output,
     #[serde(default)]
-    pub stdin: CommandStdin,
+    pub stdin: Stdin,
     /// Extra environment variables.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<String, String>,
     /// How long it may run, such as `30s` or `2m`.
     #[serde(default = "default_timeout")]
-    pub timeout: String,
+    pub timeout: Duration,
     #[serde(default)]
     pub scope: CommandScope,
 }
@@ -250,19 +229,7 @@ impl CommandSpec {
         {
             return Err("`argv` needs a program".to_owned());
         }
-        if self.timeout_duration().is_none_or(|t| t.is_zero()) {
-            return Err(format!(
-                "`timeout` is `{}`, expected a duration such as `30s` or `2m`",
-                self.timeout
-            ));
-        }
         Ok(())
-    }
-
-    /// How long the command may run; `None` for a text that is not a
-    /// duration such as `30s`.
-    pub fn timeout_duration(&self) -> Option<Duration> {
-        parse_duration(&self.timeout)
     }
 }
 
@@ -298,8 +265,8 @@ pub(crate) fn validate(id: &str, fix: &Fix, mechanical: bool, checked: bool) -> 
     }
 }
 
-fn default_timeout() -> String {
-    "30s".to_owned()
+fn default_timeout() -> Duration {
+    Duration::from_secs(30)
 }
 
 /// An argument that uses a placeholder without being exactly that placeholder

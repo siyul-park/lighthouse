@@ -11,22 +11,22 @@ mod schema;
 mod xdg;
 mod yaml;
 
-use std::{
-    borrow::Cow,
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-};
+use std::{borrow::Cow, collections::BTreeMap};
 
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub use document::{Format, documents, kind_of, resource};
-pub use duration::parse_duration;
+pub use duration::{Duration, InvalidDuration};
 pub use error::Error;
-pub use fs::{write_atomic, write_atomic_guarded};
+pub use fs::{file_in, read_optional, write_atomic, write_atomic_guarded};
 pub use schema::{Descriptor, SCHEMA_URL_BASE, header, schema, schema_file};
 pub use xdg::{Base, dir as xdg_dir, dir_in as xdg_dir_in, plugins as xdg_plugins};
 pub use yaml::to_yaml;
+
+/// The directory below a project's root that holds what Lighthouse keeps for
+/// it: the cache, the store, its own decisions, models and datasets.
+pub const STATE_DIR: &str = ".lighthouse";
 
 /// The version every document of this model declares.
 pub const API_VERSION: &str = "lighthouse/v1alpha1";
@@ -155,18 +155,6 @@ struct In<S> {
     kind: String,
     metadata: Metadata,
     spec: S,
-}
-
-/// The first of `names` that is a file in `dir`: how a project's config and a
-/// plugin's manifest are found, in the order the names are tried.
-pub fn file_in(dir: &Path, names: &[&str]) -> Option<PathBuf> {
-    names.iter().map(|n| dir.join(n)).find(|p| p.is_file())
-}
-
-/// A document in YAML, with the comment that makes editors validate it
-/// against its schema; `schema_base` is the directory or URL holding them.
-pub fn to_document<S: Spec + Serialize>(resource: &Resource<S>, schema_base: &str) -> String {
-    format!("{}{}", header(S::KIND, schema_base), to_yaml(resource))
 }
 
 /// A fresh uid: a random UUID v4 in its canonical lowercase form.

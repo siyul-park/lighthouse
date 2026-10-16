@@ -4,8 +4,10 @@
 
 mod format;
 
-pub use format::{Formatter, FormatterOutput, FormatterStdin};
+pub use format::Formatter;
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::{
     io::{Read, Write},
     path::Path,
@@ -25,10 +27,35 @@ const DRAIN: Duration = Duration::from_millis(500);
 
 /// What a fixer or formatter may print on each of stdout and stderr.
 pub const MAX_OUTPUT: usize = 1 << 20;
+/// How long a program that was asked to stop may take to do so before it is
+/// killed, unless the caller says otherwise.
+pub const GRACE: Duration = Duration::from_secs(2);
+
+/// What a command that checks, fixes or formats a file is given on stdin.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Stdin {
+    #[default]
+    None,
+    /// The text of the file.
+    File,
+}
+
+/// Where a command that fixes or formats a file leaves the new text.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Output {
+    /// In the scratch copy of the file, which is appended to `argv` (or fills
+    /// an `{file}` argument).
+    #[default]
+    InPlace,
+    /// On stdout, which carries only the text.
+    Text,
+}
 
 /// What a finished program left behind.
 #[derive(Debug)]
-pub struct Output {
+pub struct Ran {
     pub success: bool,
     /// The exit code; `None` when a signal ended the program.
     pub code: Option<i32>,
@@ -41,7 +68,7 @@ pub struct Output {
 
 /// What to run and how: no shell, `dir` as the working directory, `stdin` on
 /// its input, and the limits it lives under.
-pub struct Spec<'a> {
+pub struct Invocation<'a> {
     pub argv: &'a [String],
     pub dir: &'a Path,
     pub stdin: &'a [u8],
@@ -80,18 +107,18 @@ impl Captured {
     }
 }
 
-/// Runs the program of `spec`. When it outlives `limit` its process group gets
-/// SIGTERM, then SIGKILL after `grace`; that is an error.
-pub fn run(spec: &Spec) -> Result<Output, String> {
-    let (program, args) = spec.argv.split_first().ok_or("no program")?;
+/// Runs the program of `invocation`. When it outlives `limit` its process group
+/// gets SIGTERM, then SIGKILL after `grace`; that is an error.
+pub fn run(invocation: &Invocation) -> Result<Ran, String> {
+    let (program, args) = invocation.argv.split_first().ok_or("no program")?;
     let mut command = Command::new(program);
     command
         .args(args)
-        .current_dir(spec.dir)
+        .current_dir(invocation.dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    if let Some(env) = spec.env {
+    if let Some(env) = invocation.env {
         command.env_clear().envs(env.iter().map(|(k, v)| (k, v)));
     }
     #[cfg(unix)]
@@ -100,12 +127,12 @@ pub fn run(spec: &Spec) -> Result<Output, String> {
         .spawn()
         .map_err(|e| format!("cannot start `{program}`: {e}"))?;
     let mut input = child.stdin.take().ok_or("no stdin")?;
-    let payload = spec.stdin.to_vec();
+    let payload = invocation.stdin.to_vec();
     let writer = thread::spawn(move || {
         let _ = input.write_all(&payload);
     });
-    let stdout = capture(child.stdout.take(), spec.max_output);
-    let stderr = capture(child.stderr.take(), spec.max_output);
+    let stdout = capture(child.stdout.take(), invocation.max_output);
+    let stderr = capture(child.stderr.take(), invocation.max_output);
     let started = Instant::now();
     let status = loop {
         match exited(&mut child) {
@@ -114,15 +141,15 @@ pub fn run(spec: &Spec) -> Result<Output, String> {
                 // id is still ours: take down whatever it left running before
                 // collecting it, so a daemon holding the pipes cannot hang the
                 // run.
-                kill_group(&child);
+                signal_group(&child, true);
                 match child.wait() {
                     Ok(status) => break status,
                     Err(e) => return Err(e.to_string()),
                 }
             }
-            Ok(None) if started.elapsed() >= spec.limit => {
-                stop(&mut child, spec.grace);
-                return Err(format!("timed out after {}s", spec.limit.as_secs()));
+            Ok(None) if started.elapsed() >= invocation.limit => {
+                stop(&mut child, invocation.grace);
+                return Err(format!("timed out after {}s", invocation.limit.as_secs()));
             }
             Ok(None) => thread::sleep(POLL),
             Err(e) => {
@@ -134,7 +161,7 @@ pub fn run(spec: &Spec) -> Result<Output, String> {
     let _ = writer.join();
     let (stdout, cut_out) = stdout.finish();
     let (stderr, cut_err) = stderr.finish();
-    Ok(Output {
+    Ok(Ran {
         success: status.success(),
         code: status.code(),
         stdout,
@@ -151,13 +178,7 @@ pub fn reap(child: &mut Child) {
         let _ = child.wait();
         return;
     }
-    #[cfg(unix)]
-    if let Ok(pid) = i32::try_from(child.id()) {
-        // SAFETY: killpg only signals the group made at spawn.
-        unsafe {
-            libc::killpg(pid, libc::SIGKILL);
-        }
-    }
+    signal_group(child, true);
     let _ = child.kill();
     let _ = child.wait();
 }
@@ -165,27 +186,30 @@ pub fn reap(child: &mut Child) {
 /// Asks the program's process group to stop, then kills the whole group after
 /// `grace` whether or not the leader obeyed, and collects the leader.
 fn stop(child: &mut Child, grace: Duration) {
+    signal_group(child, false);
+    let asked = Instant::now();
+    while asked.elapsed() < grace {
+        if matches!(child.try_wait(), Ok(Some(_))) {
+            break;
+        }
+        thread::sleep(POLL);
+    }
+    reap(child);
+}
+
+/// Signals the process group the program led: SIGKILL when `kill`, else
+/// SIGTERM.
+fn signal_group(child: &Child, kill: bool) {
     #[cfg(unix)]
     if let Ok(pid) = i32::try_from(child.id()) {
+        let signal = if kill { libc::SIGKILL } else { libc::SIGTERM };
         // SAFETY: killpg only signals the group made at spawn.
         unsafe {
-            libc::killpg(pid, libc::SIGTERM);
-        }
-        let asked = Instant::now();
-        while asked.elapsed() < grace {
-            if matches!(child.try_wait(), Ok(Some(_))) {
-                break;
-            }
-            thread::sleep(POLL);
-        }
-        // SAFETY: as above.
-        unsafe {
-            libc::killpg(pid, libc::SIGKILL);
+            libc::killpg(pid, signal);
         }
     }
     #[cfg(not(unix))]
-    let _ = grace;
-    reap(child);
+    let _ = (child, kill);
 }
 
 /// Whether the program has exited, without collecting it: its process group
@@ -217,19 +241,6 @@ fn exited(child: &mut Child) -> std::io::Result<Option<()>> {
     {
         child.try_wait().map(|s| s.map(drop))
     }
-}
-
-/// Kills the process group the program led.
-fn kill_group(child: &Child) {
-    #[cfg(unix)]
-    if let Ok(pid) = i32::try_from(child.id()) {
-        // SAFETY: killpg only signals the group made at spawn.
-        unsafe {
-            libc::killpg(pid, libc::SIGKILL);
-        }
-    }
-    #[cfg(not(unix))]
-    let _ = child;
 }
 
 fn capture<R: Read + Send + 'static>(pipe: Option<R>, max: usize) -> Captured {

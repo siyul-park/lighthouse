@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use lighthouse_process::{Formatter, FormatterOutput, FormatterStdin};
+use lighthouse_process::{Formatter, Output, Stdin};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -18,8 +18,8 @@ impl From<FormatterSpec> for Formatter {
         match spec {
             FormatterSpec::Argv(argv) => Self {
                 argv,
-                stdin: FormatterStdin::None,
-                output: FormatterOutput::InPlace,
+                stdin: Stdin::None,
+                output: Output::InPlace,
                 env: BTreeMap::new(),
             },
             FormatterSpec::Detailed(formatter) => formatter,

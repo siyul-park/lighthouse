@@ -5,15 +5,12 @@ use std::{
 };
 
 use include_dir::{Dir, DirEntry, include_dir};
-use lighthouse_resource::{Format, Resource, Spec, documents, kind_of, resource};
+use lighthouse_resource::{Format, Resource, STATE_DIR, Spec, documents, kind_of, resource};
 
 use crate::{
     Catalog, Decision, DecisionSpec, Error, PackSpec, ProjectSpec,
     sources::{SourceLine, SourceMapSpec},
 };
-
-/// Where a project keeps its own decisions, relative to the project root.
-const LOCAL_DIR: &str = ".lighthouse/decisions";
 
 static BUNDLED: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../decisions");
 
@@ -43,7 +40,7 @@ pub(super) fn read_dir(root: &Path) -> Result<Files, Error> {
 
 /// Where a project keeps its own decisions: `<root>/.lighthouse/decisions`.
 pub fn local_dir(root: &Path) -> PathBuf {
-    root.join(LOCAL_DIR)
+    root.join(STATE_DIR).join("decisions")
 }
 
 /// The catalog layer of `<root>/.lighthouse/decisions/*.yaml`; `None` when the

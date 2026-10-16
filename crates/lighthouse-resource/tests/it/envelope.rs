@@ -1,8 +1,8 @@
-use std::path::Path;
+use std::{path::Path, time};
 
 use lighthouse_resource::{
-    API_VERSION, Descriptor, Error, Format, Metadata, Resource, Spec, documents, header, kind_of,
-    resource, schema, schema_file, to_document, to_yaml,
+    API_VERSION, Descriptor, Duration, Error, Format, Metadata, Resource, Spec, documents, header,
+    kind_of, resource, schema, schema_file, to_yaml,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -55,8 +55,8 @@ fn yaml_may_hold_several_documents_and_skips_empty_ones() {
 fn a_document_without_api_version_is_refused() {
     let docs = documents(Format::Yaml, "old.yaml", "id: core/x\n").unwrap();
     let err = resource::<Toy>("old.yaml", &docs[0]).unwrap_err();
-    assert!(matches!(err, Error::Unversioned { .. }));
-    assert!(err.to_string().contains("no `apiVersion`"));
+    assert!(matches!(err, Error::Mismatch { .. }));
+    assert!(err.to_string().contains("found (none)"), "{err}");
 }
 
 #[test]
@@ -100,16 +100,33 @@ fn schema_describes_the_envelope_and_names_its_file() {
 }
 
 #[test]
-fn durations_need_a_unit() {
-    use lighthouse_resource::parse_duration;
-    use std::time::Duration;
-    assert_eq!(parse_duration("30s"), Some(Duration::from_secs(30)));
-    assert_eq!(parse_duration("2m"), Some(Duration::from_secs(120)));
-    assert_eq!(parse_duration("500ms"), Some(Duration::from_millis(500)));
-    assert_eq!(parse_duration("1h"), Some(Duration::from_secs(3600)));
-    assert_eq!(parse_duration("30"), None);
-    assert_eq!(parse_duration("s"), None);
-    assert_eq!(parse_duration("3d"), None);
+fn durations_need_a_unit_and_a_span() {
+    let parse = |text: &str| text.parse::<Duration>().ok().map(Duration::get);
+    assert_eq!(parse("30s"), Some(time::Duration::from_secs(30)));
+    assert_eq!(parse("2m"), Some(time::Duration::from_secs(120)));
+    assert_eq!(parse("500ms"), Some(time::Duration::from_millis(500)));
+    assert_eq!(parse("1h"), Some(time::Duration::from_secs(3600)));
+    assert_eq!(parse("30"), None);
+    assert_eq!(parse("s"), None);
+    assert_eq!(parse("3d"), None);
+    assert_eq!(parse("0s"), None);
+}
+
+#[test]
+fn a_duration_is_written_in_the_largest_exact_unit_and_read_back() {
+    for (text, written) in [
+        ("90s", "90s"),
+        ("60s", "1m"),
+        ("7200s", "2h"),
+        ("1500ms", "1500ms"),
+    ] {
+        let duration: Duration = text.parse().unwrap();
+        let json = serde_json::to_value(duration).unwrap();
+        assert_eq!(json, written);
+        assert_eq!(serde_json::from_value::<Duration>(json).unwrap(), duration);
+    }
+    let error = serde_json::from_value::<Duration>("soon".into()).unwrap_err();
+    assert!(error.to_string().contains("not a duration"), "{error}");
 }
 
 #[test]
@@ -123,16 +140,6 @@ fn the_format_follows_the_extension() {
     assert_eq!(Format::of_path(Path::new("x.json")), Some(Format::Json));
     assert_eq!(Format::of_path(Path::new("x.md")), None);
     assert_eq!(Format::of_path(Path::new("Makefile")), None);
-}
-
-#[test]
-fn a_document_is_yaml_under_the_comment_that_names_its_schema() {
-    let text = to_document(&toy(), "../schema");
-
-    assert_eq!(
-        text,
-        format!("# yaml-language-server: $schema=../schema/toy-kind.schema.json\n{YAML}")
-    );
 }
 
 #[test]

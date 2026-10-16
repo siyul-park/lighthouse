@@ -2,9 +2,9 @@
 //! hooks and the skill in the project. Existing content is merged, never
 //! overwritten, and a second run changes nothing.
 
-use std::{fs, io, path::Path};
+use std::path::Path;
 
-use lighthouse_resource::write_atomic;
+use lighthouse_resource::{read_optional, write_atomic};
 use lighthouse_session::{SKILL_MARKER, Session, skill_for};
 use serde_json::{Value, json};
 
@@ -127,48 +127,39 @@ fn ours(group: &Value) -> bool {
 fn skill(root: &Path) -> Result<()> {
     let path = root.join(SKILL_FILE);
     let text = skill_for(&Session::load_or_default(None)?)?;
-    match fs::read_to_string(&path) {
-        Ok(current) if current == text => println!("{}: unchanged", path.display()),
-        Ok(current) if !current.contains(SKILL_MARKER) => println!(
+    match read_optional(&path)? {
+        Some(current) if current == text => println!("{}: unchanged", path.display()),
+        Some(current) if !current.contains(SKILL_MARKER) => println!(
             "{}: kept your skill file (it is not generated)",
             path.display()
         ),
-        Ok(_) => {
+        Some(_) => {
             write_atomic(&path, &text)?;
             println!("{}: refreshed", path.display());
         }
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            if let Some(dir) = path.parent() {
-                fs::create_dir_all(dir)?;
-            }
+        None => {
             write_atomic(&path, &text)?;
             println!("{}: wrote the Lighthouse skill", path.display());
         }
-        Err(e) => return Err(format!("cannot read {}: {e}", path.display()).into()),
     }
     Ok(())
 }
 
 /// The JSON object in `path`, an empty one when the file does not exist.
 fn read_json(path: &Path) -> Result<Value> {
-    match fs::read_to_string(path) {
-        Ok(text) if text.trim().is_empty() => Ok(json!({})),
-        Ok(text) => serde_json::from_str(&text).map_err(|e| {
+    match read_optional(path)? {
+        Some(text) if !text.trim().is_empty() => serde_json::from_str(&text).map_err(|e| {
             format!(
                 "{} is not valid JSON ({e}); fix it or merge by hand",
                 path.display()
             )
             .into()
         }),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(json!({})),
-        Err(e) => Err(format!("cannot read {}: {e}", path.display()).into()),
+        _ => Ok(json!({})),
     }
 }
 
 fn write_json(path: &Path, doc: &Value) -> Result<()> {
-    if let Some(dir) = path.parent() {
-        fs::create_dir_all(dir)?;
-    }
     write_atomic(path, &format!("{}\n", serde_json::to_string_pretty(doc)?))?;
     Ok(())
 }

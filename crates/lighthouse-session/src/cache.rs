@@ -3,6 +3,8 @@
 
 use std::path::{Path, PathBuf};
 
+use lighthouse_resource::STATE_DIR;
+
 use crate::Result;
 
 /// The environment variable that sets the size limit of the cache, in MB.
@@ -10,7 +12,7 @@ pub const LIMIT_VAR: &str = "LIGHTHOUSE_CACHE_LIMIT_MB";
 
 /// Where the cache of the project at `root` lives: `<root>/.lighthouse/cache`.
 pub fn cache_dir(root: &Path) -> PathBuf {
-    root.join(".lighthouse").join(lighthouse_engine::cache::DIR)
+    root.join(STATE_DIR).join(lighthouse_engine::cache::DIR)
 }
 
 /// The size limit of the cache in bytes: `LIGHTHOUSE_CACHE_LIMIT_MB`, else

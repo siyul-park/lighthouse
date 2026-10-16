@@ -2,10 +2,11 @@ use std::path::Path;
 use std::time::Duration;
 
 use lighthouse_model::Severity;
+use lighthouse_process::{Output, Stdin};
 use lighthouse_resource::{Format, Metadata, Resource};
 use lighthouse_spec::{
-    Config, FormatterOutput, FormatterStdin, PluginRef, ProjectError as Error, ProjectSpec,
-    Projects, RuleConfig, RuleSetting, Rules, glob_set,
+    Config, PluginRef, ProjectError as Error, ProjectSpec, Projects, RuleConfig, RuleSetting,
+    Rules, glob_set,
 };
 
 fn rule(level: Option<Severity>, options: &[(&str, i64)]) -> RuleConfig {
@@ -258,12 +259,9 @@ fn plugin_ref_timeout_is_a_duration_string() {
         Some(Duration::from_secs(120))
     );
     let error = Config::parse_inline("plugins = [{ id = \"b\", timeout = 30 }]").unwrap_err();
-    assert!(
-        matches!(error, Error::Parse(_) | Error::Duration { .. })
-            || error.to_string().contains("timeout")
-    );
+    assert!(error.to_string().contains("timeout"), "{error}");
     let error = Config::parse_inline("plugins = [{ id = \"b\", timeout = \"30\" }]").unwrap_err();
-    assert!(matches!(error, Error::Duration { .. }), "{error}");
+    assert!(error.to_string().contains("timeout"), "{error}");
 }
 
 #[test]
@@ -293,8 +291,8 @@ fn a_language_formatter_is_the_hosts_and_never_reaches_the_provider() {
 
     let go = config.formatter("go").unwrap();
     assert_eq!(go.argv, ["gofmt", "-w"]);
-    assert_eq!(go.stdin, FormatterStdin::None);
-    assert_eq!(go.output, FormatterOutput::InPlace);
+    assert_eq!(go.stdin, Stdin::None);
+    assert_eq!(go.output, Output::InPlace);
     assert_eq!(config.formatter("rust"), None);
     assert!(!config.languages()["go"].contains_key("formatter"));
     assert!(config.languages()["go"].contains_key("tags"));
@@ -333,13 +331,10 @@ fn formatter() {
     let rust = config.formatter("rust").unwrap();
 
     assert_eq!(rust.argv, ["rustfmt", "--emit", "stdout"]);
-    assert_eq!(rust.stdin, FormatterStdin::File);
-    assert_eq!(rust.output, FormatterOutput::Text);
+    assert_eq!(rust.stdin, Stdin::File);
+    assert_eq!(rust.output, Output::Text);
     assert_eq!(rust.env["A"], "b");
-    assert_eq!(
-        config.formatter("go").unwrap().output,
-        FormatterOutput::InPlace
-    );
+    assert_eq!(config.formatter("go").unwrap().output, Output::InPlace);
 }
 
 #[test]

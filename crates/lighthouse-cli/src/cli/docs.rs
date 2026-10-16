@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lighthouse_resource::{read_optional, write_atomic};
 use lighthouse_session::{DOCS_DIR, Session, bundled_docs, skill_for};
 
 use crate::cli::{Result, reference};
@@ -16,16 +17,10 @@ pub fn generate(config: Option<&Path>, out: &Path, skill: &Path) -> Result<u8> {
     }
     for (path, text) in &docs {
         let target = out.join(path);
-        if let Some(dir) = target.parent() {
-            fs::create_dir_all(dir)?;
-        }
-        fs::write(&target, text)?;
+        write_atomic(&target, text)?;
         println!("wrote {}", target.display());
     }
-    if let Some(dir) = skill.parent() {
-        fs::create_dir_all(dir)?;
-    }
-    fs::write(skill, skill_text(config)?)?;
+    write_atomic(skill, &skill_text(config)?)?;
     println!("wrote {}", skill.display());
     Ok(0)
 }
@@ -49,25 +44,19 @@ pub fn check(config: Option<&Path>, out: &Path, skill: &Path) -> Result<u8> {
     let mut problems = Vec::new();
     for (path, text) in &docs {
         let target = out.join(path);
-        match fs::read_to_string(&target) {
-            Ok(current) if current == *text => {}
-            Ok(_) => problems.push(format!("{} is stale", target.display())),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => {
-                problems.push(format!("{} is missing", target.display()));
-            }
-            Err(e) => return Err(format!("cannot read {}: {e}", target.display()).into()),
+        match read_optional(&target)? {
+            Some(current) if current == *text => {}
+            Some(_) => problems.push(format!("{} is stale", target.display())),
+            None => problems.push(format!("{} is missing", target.display())),
         }
     }
     for orphan in orphans(out, &docs)? {
         problems.push(format!("{} is not generated", orphan.display()));
     }
-    match fs::read_to_string(skill) {
-        Ok(current) if current == skill_text(config)? => {}
-        Ok(_) => problems.push(format!("{} is stale", skill.display())),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            problems.push(format!("{} is missing", skill.display()));
-        }
-        Err(e) => return Err(format!("cannot read {}: {e}", skill.display()).into()),
+    match read_optional(skill)? {
+        Some(current) if current == skill_text(config)? => {}
+        Some(_) => problems.push(format!("{} is stale", skill.display())),
+        None => problems.push(format!("{} is missing", skill.display())),
     }
     for problem in &problems {
         eprintln!("lighthouse: {problem}");

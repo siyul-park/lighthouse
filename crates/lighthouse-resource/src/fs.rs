@@ -1,15 +1,34 @@
 use std::{
     fs,
-    io::Write,
-    path::Path,
+    io::{ErrorKind, Write},
+    path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
 };
 
 use crate::Error;
 
+/// The first of `names` that is a file in `dir`: how a project's config and a
+/// plugin's manifest are found, in the order the names are tried.
+pub fn file_in(dir: &Path, names: &[&str]) -> Option<PathBuf> {
+    names.iter().map(|n| dir.join(n)).find(|p| p.is_file())
+}
+
+/// The text of the file at `path`; `None` when there is no such file.
+pub fn read_optional(path: &Path) -> Result<Option<String>, Error> {
+    match fs::read_to_string(path) {
+        Ok(text) => Ok(Some(text)),
+        Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(Error::Io {
+            path: path.display().to_string(),
+            message: e.to_string(),
+        }),
+    }
+}
+
 /// Writes `text` beside `path`, flushes it to disk, then renames it over
-/// `path`. Readers see either complete version; a failed write leaves no
-/// partial file. Refuses a symlink rather than following or replacing it.
+/// `path`, creating the directories above it. Readers see either complete
+/// version; a failed write leaves no partial file. Refuses a symlink rather
+/// than following or replacing it.
 pub fn write_atomic(path: &Path, text: &str) -> Result<(), Error> {
     write_atomic_guarded(path, text, &|| Ok(()))
 }
@@ -27,7 +46,7 @@ pub fn write_atomic_guarded(
         message: error.to_string(),
     };
     if fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
-        return Err(Error::Invalid {
+        return Err(Error::Io {
             path: path.display().to_string(),
             message: "is a symlink; edit its target by hand".to_owned(),
         });
@@ -39,6 +58,9 @@ pub fn write_atomic_guarded(
         COUNTER.fetch_add(1, Ordering::Relaxed)
     ));
     let written = (|| {
+        if let Some(dir) = path.parent() {
+            fs::create_dir_all(dir)?;
+        }
         let mut file = fs::OpenOptions::new()
             .write(true)
             .create_new(true)

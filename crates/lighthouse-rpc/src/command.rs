@@ -13,17 +13,14 @@ use lighthouse_plugin::{
     Answer, Capabilities, Classifier, CreateFineTuningJobRequest, Error, FineTuningJob, Model,
     Supports, SystemOneRequest, SystemOneResponse,
 };
-use lighthouse_process::{MAX_OUTPUT, Spec};
+use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT};
 use lighthouse_protocol::{json_in, noul_of};
-use lighthouse_resource::parse_duration;
+use lighthouse_resource::Duration as Limit;
 use lighthouse_spec::{ModelInput, ModelProvider};
 use serde_json::Value;
 
 /// How long a command model may take when the instance says nothing.
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(120);
-/// How long a command that was told to stop may take before it is killed.
-const GRACE: Duration = Duration::from_secs(2);
-
 /// A program run as a model.
 pub struct Command {
     manifest: Model,
@@ -88,10 +85,7 @@ impl Command {
             pointer: pointer.clone(),
             dir: dir.to_owned(),
             env: command_env(env, key_env.as_deref()),
-            timeout: timeout
-                .as_deref()
-                .and_then(parse_duration)
-                .unwrap_or(DEFAULT_TIMEOUT),
+            timeout: timeout.map_or(DEFAULT_TIMEOUT, Limit::get),
         })
     }
 }
@@ -111,7 +105,7 @@ impl Classifier for Command {
             ModelInput::Request => serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?,
             ModelInput::Prompt => lighthouse_protocol::prompt(&asked).into_bytes(),
         };
-        let output = lighthouse_process::run(&Spec {
+        let output = lighthouse_process::run(&Invocation {
             argv: &self.argv,
             dir: &self.dir,
             stdin: &input,

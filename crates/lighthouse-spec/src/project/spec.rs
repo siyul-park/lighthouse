@@ -4,7 +4,7 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use lighthouse_model::Options;
-use lighthouse_resource::Spec;
+use lighthouse_resource::{Duration, Spec};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -96,7 +96,7 @@ pub struct PluginRefSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub timeout: Option<String>,
+    pub timeout: Option<Duration>,
 }
 
 /// The options of one language.

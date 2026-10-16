@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, path::Path};
 
-use lighthouse_process::{Formatter, FormatterOutput, FormatterStdin};
+use lighthouse_process::{Formatter, Output, Stdin};
 
-fn formatter(argv: &[&str], stdin: FormatterStdin, output: FormatterOutput) -> Formatter {
+fn formatter(argv: &[&str], stdin: Stdin, output: Output) -> Formatter {
     Formatter {
         argv: argv.iter().map(|a| (*a).to_owned()).collect(),
         stdin,
@@ -12,11 +12,7 @@ fn formatter(argv: &[&str], stdin: FormatterStdin, output: FormatterOutput) -> F
 }
 
 fn upper() -> Formatter {
-    formatter(
-        &["tr", "a-z", "A-Z"],
-        FormatterStdin::File,
-        FormatterOutput::Text,
-    )
+    formatter(&["tr", "a-z", "A-Z"], Stdin::File, Output::Text)
 }
 
 #[test]
@@ -37,8 +33,8 @@ fn a_formatter_that_works_in_place_gets_a_scratch_copy_of_the_file() {
             "-c",
             "tr a-z A-Z < \"$0\" > \"$0.new\" && mv \"$0.new\" \"$0\"",
         ],
-        FormatterStdin::None,
-        FormatterOutput::InPlace,
+        Stdin::None,
+        Output::InPlace,
     );
 
     let text = in_place.format(root.path(), Path::new("src/a.txt"), "ab\n");
@@ -53,7 +49,7 @@ fn a_formatter_that_works_in_place_gets_a_scratch_copy_of_the_file() {
 #[test]
 fn a_formatter_that_fails_is_an_error_naming_it() {
     let root = tempfile::tempdir().unwrap();
-    let failing = formatter(&["false"], FormatterStdin::File, FormatterOutput::Text);
+    let failing = formatter(&["false"], Stdin::File, Output::Text);
 
     let text = failing.format(root.path(), Path::new("a.txt"), "ab\n");
 
@@ -63,7 +59,7 @@ fn a_formatter_that_fails_is_an_error_naming_it() {
 #[test]
 fn a_formatter_that_prints_nothing_is_an_error() {
     let root = tempfile::tempdir().unwrap();
-    let silent = formatter(&["true"], FormatterStdin::File, FormatterOutput::Text);
+    let silent = formatter(&["true"], Stdin::File, Output::Text);
 
     let text = silent.format(root.path(), Path::new("a.txt"), "ab\n");
 
@@ -75,8 +71,8 @@ fn a_formatter_that_prints_more_than_it_may_is_an_error() {
     let root = tempfile::tempdir().unwrap();
     let flood = formatter(
         &["sh", "-c", "yes | head -c 2000000"],
-        FormatterStdin::File,
-        FormatterOutput::Text,
+        Stdin::File,
+        Output::Text,
     );
 
     let text = flood.format(root.path(), Path::new("a.txt"), "ab\n");

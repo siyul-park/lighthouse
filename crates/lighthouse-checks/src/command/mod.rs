@@ -16,12 +16,10 @@ use std::{
 
 use lighthouse_model::{Diagnostic, Position, Project, RunScope, Span, squash};
 use lighthouse_plugin::{Ctx, Error as PluginError, RuleManifest};
-use lighthouse_process::Spec;
-use lighthouse_spec::{Batch, Check, CheckOutput, CheckStdin, CommandCheck};
+use lighthouse_process::{GRACE, Invocation, Stdin};
+use lighthouse_spec::{Batch, Check, CheckOutput, CommandCheck};
 use serde_json::{Map, Value, json};
 
-/// How long a command that was told to stop may take before it is killed.
-const GRACE: Duration = Duration::from_secs(2);
 /// The version of the contract between Lighthouse and its commands.
 const API_VERSION: &str = "1";
 /// What a command inherits from its caller, besides what it declares.
@@ -42,8 +40,8 @@ impl CommandRule {
         Self {
             spec: spec.clone(),
             timeout: check
-                .timeout_duration()
-                .unwrap_or(lighthouse_spec::DEFAULT_TIMEOUT),
+                .timeout
+                .map_or(lighthouse_spec::DEFAULT_TIMEOUT, |t| t.get()),
         }
     }
 
@@ -76,7 +74,7 @@ impl CommandRule {
             (RunScope::Project, Batch::File) => {
                 let mut found = Vec::new();
                 for file in &ctx.project.files {
-                    let text = self.spec.stdin == CheckStdin::File;
+                    let text = self.spec.stdin == Stdin::File;
                     let content = text.then(|| ctx.ws.read(&file.path)).transpose()?;
                     found.extend(run.one(&file.path, content.as_deref())?);
                 }
@@ -121,8 +119,8 @@ impl Run<'_> {
     fn one(&self, file: &Path, text: Option<&str>) -> Result<Vec<Diagnostic>, PluginError> {
         let argv = self.arguments(std::slice::from_ref(&file.to_path_buf()))?;
         let stdin = match self.rule.spec.stdin {
-            CheckStdin::None => Vec::new(),
-            CheckStdin::File => text.unwrap_or_default().as_bytes().to_vec(),
+            Stdin::None => Vec::new(),
+            Stdin::File => text.unwrap_or_default().as_bytes().to_vec(),
         };
         let ran = self.invoke(&argv, &stdin)?;
         self.collect(&ran, &argv, Some(file))
@@ -203,7 +201,7 @@ impl Run<'_> {
     fn invoke(&self, argv: &[String], stdin: &[u8]) -> Result<Ran, PluginError> {
         let shown = argv.join(" ");
         let incomplete = |what: String| PluginError::Incomplete(format!("`{shown}` {what}"));
-        let output = lighthouse_process::run(&Spec {
+        let output = lighthouse_process::run(&Invocation {
             argv,
             dir: &self.ctx.ws.root,
             stdin,

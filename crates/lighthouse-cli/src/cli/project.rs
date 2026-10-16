@@ -6,17 +6,10 @@ use std::{
     path::Path,
 };
 
+use lighthouse_resource::{STATE_DIR, read_optional, write_atomic};
 use lighthouse_session::{DEFAULT_CONFIG, FILE_NAME, Session};
 
 use crate::cli::{Result, command::Agent, setup};
-
-/// What `init` keeps out of version control: the store is a local cache of
-/// one machine's checks and reviews.
-const STORE_IGNORE: &str = ".lighthouse/*.db*";
-
-/// The decision log is committed; branches that both appended merge by
-/// keeping the lines of both.
-const LOG_ATTRIBUTES: &str = ".lighthouse/decisions.jsonl merge=union";
 
 pub fn cache_clean() -> Result<u8> {
     let root = lighthouse_session::project_root()?;
@@ -95,10 +88,15 @@ pub fn init(agent: Option<Agent>) -> Result<u8> {
     } else {
         fs::write(&path, DEFAULT_CONFIG)?;
         println!("wrote {}", path.display());
-        if ensure_line(&path.with_file_name(".gitignore"), STORE_IGNORE)? {
-            println!("added {STORE_IGNORE} to .gitignore");
+        // The store is a local cache of one machine's checks and reviews.
+        let ignore = format!("{STATE_DIR}/*.db*");
+        if ensure_line(&path.with_file_name(".gitignore"), &ignore)? {
+            println!("added {ignore} to .gitignore");
         }
-        if ensure_line(&path.with_file_name(".gitattributes"), LOG_ATTRIBUTES)? {
+        // The decision log is committed; branches that both appended merge by
+        // keeping the lines of both.
+        let attributes = format!("{STATE_DIR}/decisions.jsonl merge=union");
+        if ensure_line(&path.with_file_name(".gitattributes"), &attributes)? {
             println!("added the decision log to .gitattributes (merge=union)");
         }
     }
@@ -111,7 +109,7 @@ pub fn init(agent: Option<Agent>) -> Result<u8> {
 /// Adds `line` to the file, creating it if needed; false when the file
 /// already has it.
 fn ensure_line(path: &Path, line: &str) -> Result<bool> {
-    let mut text = fs::read_to_string(path).unwrap_or_default();
+    let mut text = read_optional(path)?.unwrap_or_default();
     if text.lines().any(|existing| existing.trim() == line) {
         return Ok(false);
     }
@@ -120,6 +118,6 @@ fn ensure_line(path: &Path, line: &str) -> Result<bool> {
     }
     text.push_str(line);
     text.push('\n');
-    fs::write(path, text)?;
+    write_atomic(path, &text)?;
     Ok(true)
 }

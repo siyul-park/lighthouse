@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 
+use lighthouse_process::Stdin;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -19,16 +20,6 @@ pub enum Batch {
     /// Runs over many files at once, as many per run as the argument list
     /// allows; `{files}` expands to several arguments.
     All,
-}
-
-/// What a `command` check gives the program on stdin.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum CheckStdin {
-    #[default]
-    None,
-    /// The content of the file (only with `batch: file`).
-    File,
 }
 
 /// Which exit codes mean what; every other code, a signal or a timeout is an
@@ -68,7 +59,7 @@ pub struct CommandCheck {
     #[serde(default)]
     pub batch: Batch,
     #[serde(default)]
-    pub stdin: CheckStdin,
+    pub stdin: Stdin,
     /// Extra environment variables.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<String, String>,
@@ -164,7 +155,7 @@ impl CommandCheck {
                 "check: `{file}` needs `batch: file`; use `{files}` with `batch: all`".to_owned(),
             );
         }
-        if self.stdin == CheckStdin::File && self.batch == Batch::All {
+        if self.stdin == Stdin::File && self.batch == Batch::All {
             return Some("check: `stdin: file` needs `batch: file`".to_owned());
         }
         if self.select.is_some() && self.output != CheckOutput::Sarif {

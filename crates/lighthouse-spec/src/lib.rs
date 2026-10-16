@@ -21,14 +21,10 @@ pub use check::{
     FORMATTED, Identity, NamedRule, OrderClause, OrderReport, OrderScope, RpcCheck, Select,
     TemplatePart, parse_template,
 };
-pub use command::{
-    Batch, CheckOutput, CheckStdin, CommandCheck, ExitCodes, SarifColumns, SarifSelect,
-};
+pub use command::{Batch, CheckOutput, CommandCheck, ExitCodes, SarifColumns, SarifSelect};
 pub use decision::{Decision, DecisionSpec, LanguageSpec, PACK_LABEL, Provenance, SECTION_LABEL};
 pub use error::Error;
-pub use fix::{
-    CommandOutput, CommandScope, CommandSpec, CommandStdin, Fix, FixKind, OpSpec, ReorderScope,
-};
+pub use fix::{CommandScope, CommandSpec, Fix, FixKind, OpSpec, ReorderScope};
 pub use model::{
     Content, DecisionStatus, Domain, Example, ExampleFile, ExampleKind, Expect, Scope, Subject,
     authored_severity,
@@ -40,12 +36,11 @@ pub use options::{
 pub use pack::{Pack, Section};
 pub(crate) use pack::{PackSpec, SectionSpec};
 pub use project::{
-    ApiProvider, Config, Evaluation, FILE_NAME, FILE_NAMES, Formatter, FormatterOutput,
-    FormatterSpec, FormatterStdin, GeneratedCheck, GeneratedSpec, GlobSet, Layer, Level,
-    ModelBinding, ModelInput, ModelOutput, ModelProvider, ModelsSpec, Names, OverrideSpec,
-    PluginEntry, PluginRef, PluginRefSpec, ProjectError, ProjectLanguage, ProjectSpec, Projects,
-    ProviderSpec, RESERVED as RESERVED_PROVIDERS, Routing, RuleConfig, RuleDetail, RuleSetting,
-    Rules, glob_set,
+    ApiProvider, Config, Evaluation, FILE_NAME, FILE_NAMES, Formatter, FormatterSpec,
+    GeneratedCheck, GeneratedSpec, GlobSet, Layer, Level, ModelBinding, ModelInput, ModelOutput,
+    ModelProvider, ModelsSpec, Names, OverrideSpec, PluginEntry, PluginRef, PluginRefSpec,
+    ProjectError, ProjectLanguage, ProjectSpec, Projects, ProviderSpec,
+    RESERVED as RESERVED_PROVIDERS, Routing, RuleConfig, RuleDetail, RuleSetting, Rules, glob_set,
 };
 pub(crate) use sources::SourceMapSpec;
 

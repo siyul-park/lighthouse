@@ -28,6 +28,7 @@ use std::{
 
 use clap::ValueEnum;
 use lighthouse_report::{Briefing, Detail, Format, render_with};
+use lighthouse_resource::STATE_DIR;
 use lighthouse_session::{CheckRequest, Checked, RunStatus, SKIPPED_DIRS, Session};
 use serde_json::{Value, json};
 
@@ -38,8 +39,6 @@ const EDIT_LIMIT: usize = 5;
 const STOP_LIMIT: usize = 10;
 /// Bytes read to tell text from binary.
 const SNIFF: usize = 8192;
-/// The directory of Lighthouse's own state; its files are never analyzed.
-const STATE_DIR: &str = ".lighthouse";
 const EDIT_TOOLS: [&str; 3] = ["Edit", "Write", "MultiEdit"];
 /// Said with a report that had no baseline to be measured against.
 const NO_BASELINE: &str = "Lighthouse: no pre-edit baseline, so every finding in the file is shown, including ones that were there before this session; `lighthouse init --agent claude-code` adds the PreToolUse hook that records it.";

@@ -7,7 +7,7 @@ use std::{
 
 use lighthouse_model::hash;
 use lighthouse_resource::{
-    Format, Resource, SCHEMA_URL_BASE, Spec, documents, resource, to_document, write_atomic,
+    Format, Resource, SCHEMA_URL_BASE, Spec, documents, header, resource, to_yaml, write_atomic,
 };
 use serde::Serialize;
 
@@ -333,7 +333,11 @@ fn decision_document(decision: &Decision) -> Result<String, Error> {
 }
 
 fn document<S: Spec + Serialize>(resource: &Resource<S>) -> Result<String, Error> {
-    Ok(to_document(resource, SCHEMA_URL_BASE))
+    Ok(format!(
+        "{}{}",
+        header(S::KIND, SCHEMA_URL_BASE),
+        to_yaml(resource)
+    ))
 }
 
 fn read(path: &Path) -> Result<String, Error> {

@@ -9,10 +9,8 @@ pub enum Error {
     /// The text is not valid YAML, TOML or JSON.
     #[error("{path}: {message}")]
     Parse { path: String, message: String },
-    /// The document has no `apiVersion`.
-    #[error("{path}: not a `{api_version}` resource (no `apiVersion`)")]
-    Unversioned { path: String, api_version: String },
-    /// The document is a resource of another version or kind than asked for.
+    /// The document is a resource of another version or kind than asked for,
+    /// or declares none (`(none)`).
     #[error("{path}: expected {expected}, found {found}")]
     Mismatch {
         path: String,

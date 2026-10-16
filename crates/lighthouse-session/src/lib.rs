@@ -51,7 +51,7 @@ pub use lighthouse_ml::{
 pub use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};
 pub use lighthouse_report::docs::DOCS_DIR;
 pub use lighthouse_resource::schema_file;
-pub use lighthouse_spec::FILE_NAME;
+pub use lighthouse_spec::{FILE_NAME, local_dir};
 pub use lighthouse_store::{
     FindingRecord, JudgmentEvent, NewJudgment, Standing, StatusFilter, SuppressionEvent,
 };

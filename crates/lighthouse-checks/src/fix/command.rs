@@ -6,19 +6,16 @@
 use std::{
     env, fs,
     path::{Component, Path},
-    time::Duration,
 };
 
 use lighthouse_model::{EditOp, LineIndex, Span};
 use lighthouse_plugin::{Error as PluginError, FixRequest};
-use lighthouse_process::Spec;
-use lighthouse_spec::{CommandOutput, CommandSpec, CommandStdin};
+use lighthouse_process::{GRACE, Invocation, Output, Stdin};
+use lighthouse_spec::CommandSpec;
 use serde_json::json;
 
 use super::ops::Evaluated;
 
-/// How long a command that was told to stop may take before it is killed.
-const GRACE: Duration = Duration::from_secs(2);
 /// The version of the contract between Lighthouse and its commands.
 const API_VERSION: &str = "1";
 /// What a command inherits from its caller, besides what it declares.
@@ -53,16 +50,16 @@ pub(crate) fn run(
         Err(reason) => return Ok(Err(reason)),
     };
     let stdin = match spec.stdin {
-        CommandStdin::None => Vec::new(),
-        CommandStdin::File => request.text.as_bytes().to_vec(),
+        Stdin::None => Vec::new(),
+        Stdin::File => request.text.as_bytes().to_vec(),
     };
     let environment = environment(spec, request);
-    let output = lighthouse_process::run(&Spec {
+    let output = lighthouse_process::run(&Invocation {
         argv: &argv,
         dir: scratch.path(),
         stdin: &stdin,
         env: Some(&environment),
-        limit: spec.timeout_duration().unwrap_or(Duration::from_secs(30)),
+        limit: spec.timeout.get(),
         grace: GRACE,
         max_output: lighthouse_process::MAX_OUTPUT,
     })
@@ -78,7 +75,7 @@ fn interpret(
     request: &FixRequest,
     argv: &[String],
     target: &Path,
-    output: lighthouse_process::Output,
+    output: lighthouse_process::Ran,
 ) -> Result<Evaluated, PluginError> {
     let fail = |message: String| PluginError::Failed(format!("{id}: fix command: {message}"));
     let finding = request.finding;
@@ -101,7 +98,7 @@ fn interpret(
         }
     }
     let changed = match spec.output {
-        CommandOutput::InPlace => {
+        Output::InPlace => {
             if fs::symlink_metadata(target).is_ok_and(|m| !m.is_file()) {
                 return Ok(Err(
                     "the command left something other than a file".to_owned()
@@ -109,10 +106,10 @@ fn interpret(
             }
             fs::read_to_string(target).map_err(|e| fail(format!("cannot read the result: {e}")))?
         }
-        CommandOutput::Text => String::from_utf8(output.stdout)
+        Output::Text => String::from_utf8(output.stdout)
             .map_err(|_| fail("stdout is not valid UTF-8".to_owned()))?,
     };
-    if spec.output == CommandOutput::Text && changed.is_empty() {
+    if spec.output == Output::Text && changed.is_empty() {
         return Ok(Err(
             "the command printed no text, so it changed nothing".to_owned()
         ));

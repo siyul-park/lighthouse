@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 
+use lighthouse_resource::Duration;
 use serde_json::{Map, Value};
 
 use schemars::JsonSchema;
@@ -96,7 +97,7 @@ pub enum ModelProvider {
         cost: f64,
         /// How long one run may take, such as `90s`. Default: 120s.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        timeout: Option<String>,
+        timeout: Option<Duration>,
         /// Variables the program is given besides the allowlist.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         env: BTreeMap<String, String>,
