@@ -34,6 +34,8 @@ pub(super) struct Route<'a> {
     models: Vec<Arc<dyn Classifier + 'a>>,
     /// Requests that went through the route this run, to rotate its models.
     turn: Arc<AtomicUsize>,
+    /// The route is the model a revision attached, the first layer.
+    pub(super) attached: bool,
 }
 
 impl<'a> Route<'a> {
@@ -262,7 +264,10 @@ impl<'a> RunModels<'a> {
             Some(self.binding.classification.clone()),
         ];
         let mut found: Vec<Route<'a>> = Vec::new();
-        for references in layers.into_iter().flatten() {
+        for (at, references) in layers.into_iter().enumerate() {
+            let Some(references) = references else {
+                continue;
+            };
             let models: Vec<_> = references.iter().filter_map(|r| self.model(r)).collect();
             if models.is_empty() {
                 continue;
@@ -271,7 +276,13 @@ impl<'a> RunModels<'a> {
             let id = ids.join(",");
             if found.iter().all(|route| route.id != id) {
                 let turn = self.turn(&id);
-                found.push(Route { id, models, turn });
+                let attached = at == 0;
+                found.push(Route {
+                    id,
+                    models,
+                    turn,
+                    attached,
+                });
             }
         }
         found

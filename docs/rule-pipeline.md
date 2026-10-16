@@ -134,6 +134,7 @@ A model is named `<provider>/<model>`, split at the first `/`. The standard API 
 classification = "openrouter/qwen/qwen3-coder:free"  # or a route: ["nvidia/nvidia/nemotron-3-super-120b-a12b", "openrouter/nvidia/nemotron-3-super-120b-a12b:free"]
 routing = "ordered"               # or "round-robin" for a route of several
 budget = 200                      # subjects per run put to models that cost; the rest stay `review`
+explore = 0.05                   # share of an attached model's fails sent on to the next layer, to keep labels coming; 0 to 1
 
 [models.providers.openrouter]     # a recipe: any OpenAI-compatible service; free models first
 spec = "openai"                   # or a list: ["openai", "typesafe"]
@@ -208,6 +209,7 @@ evaluation = { precision = 0.9 }          # recall = 0.8 optional
 - A cheap model that abstains in front of an expensive one is just layer 1 or 2 over layer 3. It is not a separate mechanism.
 - If a layer-1 artifact is missing on a machine (a fresh clone, say), the model is skipped with a notice that names `lighthouse model rebuild`, and the case falls through; `check` never trains.
 - `lighthouse model rebuild [<decision>...]` makes the missing artifacts of attached models again. It trains the model on the dataset its attaching revision names (`evaluation.trainingFile`), or on the dataset today's labels make when that file is gone and the digest is the same; a trainer that is not deterministic or does not learn is `not-rebuildable`, other labels are `labels-changed` and nothing is trained, a file or a training run with another digest is `differs` (nothing is deleted), and a model without a digest is `not-local`. It exits 1 unless every model is `present`, `rebuilt` or `not-local`.
+- **Exploring.** A model that is surest of a fail would otherwise never be checked. A share `[models] explore` (default 0.05, a number from 0 to 1; anything else is a configuration error) of the subjects the attached model fails is treated as an abstention, so the layers below judge them and a person or agent can label them. A subject is in the share when the first 8 hex digits of sha256(`rule`, NUL, subject key), as a number out of 2^32, are below `explore`: the same subjects every run. Only the attached model, layer 1, is explored, and nothing changes where none is attached. A subject nothing below decides stays open with the reason `explored: <model> said fail at <confidence>`; one a lower layer fails carries `explored: {model, confidence}` in its evidence.
 - `embedding` is bound only per project. Classifiers trained on embeddings record the embedding model in their version tuple, and changing the embedding model invalidates them.
 - The order is about **cost and confidence**, not quality. A trained classifier approximates a boundary that has no faithful predicate; it is not a weaker deterministic rule.
 - A deterministic check decides every subject it selects unless it abstains (`review`); abstained subjects fall through to the model bindings, like a model's abstention. Providers are never stacked.

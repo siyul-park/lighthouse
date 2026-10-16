@@ -26,7 +26,7 @@ pub use fix::{
 pub use memo::Memo;
 pub use models::{
     Answer, Ask, Capabilities, Classifier, CreateFineTuningJobRequest, Decided, DecisionRef,
-    Example, FineTuneJobError, FineTuneMethod, FineTuneSupervisedHyperparameters,
+    Example, Explored, FineTuneJobError, FineTuneMethod, FineTuneSupervisedHyperparameters,
     FineTuneSupervisedMethod, FineTuningJob, FineTuningJobStatus, Judged, LineKeys,
     ListModelResponse, MODELS_DIR, Model, Models, Neighbor, NoModels, Open, Question, ResultKind,
     Settle, State, Subject, SubjectContext, Supports, SystemOneRequest, SystemOneResponse,

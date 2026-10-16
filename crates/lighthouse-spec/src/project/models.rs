@@ -14,6 +14,9 @@ use super::{RuleSetting, spec::ProjectSpec};
 pub const DEFAULT_BUDGET: usize = 200;
 /// The precision a check must reach unless the project says.
 pub const DEFAULT_PRECISION: f64 = 0.9;
+/// The share of the answers of an attached model that are sent on, unless the
+/// project says.
+pub const DEFAULT_EXPLORE: f64 = 0.05;
 
 /// The specs a provider may name, and what each needs by default.
 const SPECS: [(&str, &str, &str); 2] = [
@@ -248,6 +251,12 @@ pub struct ModelsSpec {
     /// of the rest are left to review. Default: 200.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub budget: Option<usize>,
+    /// The share, from 0 to 1, of the subjects an attached model fails that are
+    /// sent on to the next layer as if it had abstained, so that labels keep
+    /// coming from where the model is surest. The same subjects every run.
+    /// Default: 0.05.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub explore: Option<f64>,
     /// The providers the project defines, by name; a name that is built in
     /// overrides it.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -300,6 +309,8 @@ pub struct ModelBinding {
     /// The evaluation policy a rule sets, by decision id.
     pub evaluation: BTreeMap<String, Evaluation>,
     pub budget: usize,
+    /// The share of an attached model's fails that are sent on.
+    pub explore: f64,
 }
 
 impl ModelBinding {
@@ -339,6 +350,7 @@ impl ModelBinding {
             invalid,
             evaluation,
             budget: models.budget.unwrap_or(DEFAULT_BUDGET),
+            explore: models.explore.unwrap_or(DEFAULT_EXPLORE),
         }
     }
 

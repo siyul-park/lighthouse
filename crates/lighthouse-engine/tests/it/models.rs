@@ -3,7 +3,7 @@
 
 use lighthouse_engine::{Engine, ModelOptions};
 use lighthouse_plugin::{
-    Answer, Capabilities, Classifier, CreateFineTuningJobRequest, DecisionRef, Error,
+    Answer, Capabilities, Classifier, CreateFineTuningJobRequest, DecisionRef, Error, Explored,
     FineTuningJob, Model, Open, Plugin, PluginManifest, Registry, State, SystemOneRequest,
     SystemOneResponse,
 };
@@ -139,6 +139,14 @@ fn a_subject_nothing_decided_says_why() {
     assert_eq!(Open::Unbound.to_string(), "no model is bound");
     assert_eq!(Open::OverBudget.to_string(), "the model budget was spent");
     assert!(Open::Failed("x".to_owned()).to_string().contains('x'));
+    let explored = Open::Explored(Explored {
+        model: "local/m@1".to_owned(),
+        confidence: 0.951,
+    });
+    assert_eq!(
+        explored.to_string(),
+        "explored: local/m@1 said fail at 0.95"
+    );
 }
 
 #[test]

@@ -6,9 +6,9 @@
 
 use std::{collections::BTreeMap, sync::Arc, sync::PoisonError, sync::atomic::Ordering};
 
-use lighthouse_model::Diagnostic;
+use lighthouse_model::{Diagnostic, hash::sha256};
 use lighthouse_plugin::{
-    Ask, Classifier, Decided, Judged, Model, Open, Settle, decide, request_of,
+    Ask, Classifier, Decided, Explored, Judged, Model, Open, Settle, decide, request_of,
 };
 use rayon::prelude::*;
 
@@ -16,6 +16,10 @@ use super::models::{Route, RunModels, digest_of};
 
 /// The most questions put to a model in one request.
 pub(super) const MAX_QUESTIONS: usize = 32;
+
+/// The values the first eight hex digits of a digest take, which makes a
+/// subject's place in the sample a share between 0 and 1.
+const SAMPLE_SPAN: f64 = 4_294_967_296.0;
 
 /// What a rule asked and has not had answered: its routes, most specific
 /// first, and what to make of the judgments.
@@ -59,7 +63,7 @@ impl<'a> RunModels<'a> {
                 if let Ok((noul, model)) = &answer {
                     self.record(&pending[p].ask.subjects[i], *noul, model);
                 }
-                judged[p][i] = verdict(&pending[p], answer);
+                judged[p][i] = self.verdict(&pending[p], (layer, i), &judged[p][i], answer);
             }
         }
         pending
@@ -189,17 +193,58 @@ impl<'a> RunModels<'a> {
             })
             .collect())
     }
+
+    /// What a model's answer makes of the subject at `(layer, i)`: failed when
+    /// P(fail) reaches the band, otherwise open for the next layer. The fail of
+    /// the attached model on a sampled subject is an abstention instead, with
+    /// what it said kept (`prior` is what the layers above made of it).
+    fn verdict(
+        &self,
+        item: &Pending<'a>,
+        (layer, i): At,
+        prior: &Judged,
+        answer: Answer,
+    ) -> Judged {
+        let kept = explored(prior);
+        let (noul, model) = match answer {
+            Ok(given) => given,
+            Err(Open::Undecided) if kept.is_some() => return prior.clone(),
+            Err(open) => return Judged::Open(open),
+        };
+        let Some(confidence) = decide(noul, item.ask.upper) else {
+            return if kept.is_some() {
+                prior.clone()
+            } else {
+                Judged::Open(Open::Undecided)
+            };
+        };
+        let subject = &item.ask.subjects[i].key;
+        let sample =
+            item.routes[layer].attached && sampled(&item.ask.rule, subject, self.binding.explore);
+        if sample {
+            return Judged::Open(Open::Explored(Explored { model, confidence }));
+        }
+        Judged::Decided(Decided {
+            confidence,
+            model,
+            explored: kept.cloned(),
+        })
+    }
 }
 
-/// What a model's answer makes of a subject: failed when P(fail) reaches the
-/// band, otherwise open for the next layer.
-fn verdict(item: &Pending<'_>, answer: Answer) -> Judged {
-    match answer {
-        Ok((noul, model)) => match decide(noul, item.ask.upper) {
-            Some(confidence) => Judged::Decided(Decided { confidence, model }),
-            None => Judged::Open(Open::Undecided),
-        },
-        Err(open) => Judged::Open(open),
+/// Whether exploring takes the subject: the same subjects every run, a share
+/// `explore` of them over many.
+fn sampled(rule: &str, subject: &str, explore: f64) -> bool {
+    let digest = sha256(format!("{rule}\0{subject}"));
+    u32::from_str_radix(&digest[..8], 16).is_ok_and(|at| f64::from(at) / SAMPLE_SPAN < explore)
+}
+
+/// What an exploration of the subject said so far, kept when the layers below
+/// have nothing to add.
+fn explored(prior: &Judged) -> Option<&Explored> {
+    match prior {
+        Judged::Open(Open::Explored(explored)) => Some(explored),
+        _ => None,
     }
 }
 

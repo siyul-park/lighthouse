@@ -51,10 +51,23 @@ pub struct Decided {
     pub confidence: f64,
     /// The model that decided, `<provider>/<model>@<version>`.
     pub model: String,
+    /// The attached model that failed it too and was set aside for the sake of
+    /// exploring.
+    pub explored: Option<Explored>,
+}
+
+/// A fail of an attached model that was treated as an abstention, to find out
+/// what the layers below would say.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Explored {
+    /// The model, `<provider>/<model>@<version>`.
+    pub model: String,
+    /// max(p, 1 - p) of the probability it gave.
+    pub confidence: f64,
 }
 
 /// Why a subject was left undecided: it is a candidate for agent review.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Open {
     /// Every model of the cascade abstained or was unsure.
     Undecided,
@@ -64,6 +77,8 @@ pub enum Open {
     OverBudget,
     /// A model failed; the reason.
     Failed(String),
+    /// The attached model failed it and no layer below decided otherwise.
+    Explored(Explored),
 }
 
 impl std::fmt::Display for Open {
@@ -73,6 +88,9 @@ impl std::fmt::Display for Open {
             Self::Unbound => f.write_str("no model is bound"),
             Self::OverBudget => f.write_str("the model budget was spent"),
             Self::Failed(reason) => write!(f, "a model failed: {reason}"),
+            Self::Explored(Explored { model, confidence }) => {
+                write!(f, "explored: {model} said fail at {confidence:.2}")
+            }
         }
     }
 }

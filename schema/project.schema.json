@@ -383,6 +383,14 @@
           ],
           "description": "The model (`<provider>/<model>`), or the route of several, that judges\na decision no rule binds and no trained model is attached to. A request\nmoves to the next model of a route when one fails. When the route\nabstains, the subject is left to agent review."
         },
+        "explore": {
+          "description": "The share, from 0 to 1, of the subjects an attached model fails that are\nsent on to the next layer as if it had abstained, so that labels keep\ncoming from where the model is surest. The same subjects every run.\nDefault: 0.05.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "providers": {
           "additionalProperties": {
             "$ref": "#/$defs/ProviderSpec"

@@ -195,3 +195,24 @@ fn model_provider_remote() {
         "a program that is given no key stays on the machine"
     );
 }
+
+#[test]
+fn exploring_sends_a_twentieth_of_the_fails_on_unless_the_project_says() {
+    assert_eq!(binding().explore, 0.05);
+    let said = Config::parse_inline("plugins = []\n[models]\nexplore = 0.25\n").unwrap();
+    assert_eq!(said.models().explore, 0.25);
+    for share in ["0.0", "1.0"] {
+        let text = format!("plugins = []\n[models]\nexplore = {share}\n");
+        assert!(Config::parse_inline(&text).is_ok(), "{share}");
+    }
+}
+
+#[test]
+fn a_share_to_explore_outside_zero_and_one_is_a_configuration_error() {
+    for share in ["1.5", "-0.1"] {
+        let text = format!("plugins = []\n[models]\nexplore = {share}\n");
+        let error = Config::parse_inline(&text).unwrap_err().to_string();
+        assert!(error.contains("`models.explore` is"), "{error}");
+        assert!(error.contains("not a share from 0 to 1"), "{error}");
+    }
+}

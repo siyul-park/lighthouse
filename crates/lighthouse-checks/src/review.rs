@@ -189,6 +189,12 @@ fn outcome(judged: Judged, candidate: Candidate, decision: &DecisionRef) -> Diag
                 "model": decided.model,
                 "confidence": decided.confidence,
             });
+            if let Some(explored) = decided.explored {
+                diagnostic.evidence["explored"] = json!({
+                    "model": explored.model,
+                    "confidence": explored.confidence,
+                });
+            }
         }
         Judged::Open(open) => diagnostic.review = Some(open.to_string()),
     }

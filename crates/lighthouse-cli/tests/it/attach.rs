@@ -16,7 +16,7 @@ use crate::{
 pub(crate) const DECISION: &str = "local/naming-ban";
 pub(crate) const MODEL: &str = "fake/learned@sha256:abc";
 
-fn attach(dir: &Path, extra: &[&str]) -> std::process::Output {
+pub(crate) fn attach(dir: &Path, extra: &[&str]) -> std::process::Output {
     let mut args = vec![
         "model",
         "attach",
@@ -39,7 +39,7 @@ fn detach(dir: &Path) -> std::process::Output {
 }
 
 /// How many of the decision's results a check reports as failures.
-fn failures(dir: &Path) -> usize {
+pub(crate) fn failures(dir: &Path) -> usize {
     let out = lighthouse(
         dir,
         &["check", "--no-store", "--no-cache", "--format", "sarif"],

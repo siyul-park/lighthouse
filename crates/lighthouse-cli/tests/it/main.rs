@@ -8,6 +8,7 @@ mod checks;
 mod cli;
 mod command_sarif;
 mod environment;
+mod explore;
 mod fix;
 mod fix_trust;
 mod help;

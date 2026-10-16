@@ -72,6 +72,8 @@ pub enum ProjectError {
     DuplicateProject(String),
     #[error("invalid configuration: `languages.{language}.formatter` must have a non-empty `argv`")]
     Formatter { language: String },
+    #[error("invalid configuration: `models.explore` is {0}, not a share from 0 to 1")]
+    Explore(f64),
     #[error("invalid configuration: `{text}` is not a duration such as `30s` (plugin `{plugin}`)")]
     Duration { plugin: String, text: String },
 }
@@ -344,6 +346,11 @@ impl Config {
     pub fn from_resource(project: Resource<ProjectSpec>) -> Result<Self, ProjectError> {
         let Resource { metadata, spec } = project;
         let layer = Layer::of(&spec)?;
+        if let Some(share) = spec.models.explore
+            && !(0.0..=1.0).contains(&share)
+        {
+            return Err(ProjectError::Explore(share));
+        }
         let models = ModelBinding::of(&spec);
         let generated = globs(&spec.generated.files)?;
         let generated_check = spec.generated.check;
