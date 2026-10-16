@@ -115,7 +115,7 @@ pub fn detach(config: Option<&Path>, decision: &str, approval: Attribution) -> R
 }
 
 /// How the log names a decision: its uid, else its id.
-fn key_of(decision: &Decision) -> &str {
+pub(crate) fn key_of(decision: &Decision) -> &str {
     decision.uid().unwrap_or_else(|| decision.id())
 }
 

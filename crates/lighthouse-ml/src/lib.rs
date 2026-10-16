@@ -7,6 +7,7 @@ pub mod attach;
 pub mod evaluate;
 pub mod labels;
 pub mod metrics;
+pub mod rebuild;
 pub mod train;
 
 mod dataset;

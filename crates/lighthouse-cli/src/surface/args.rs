@@ -408,6 +408,23 @@ pub struct ModelAttachArgs {
     pub attributed_to: Option<String>,
 }
 
+/// `model rebuild`.
+#[derive(Debug, Default, Clone, Args)]
+pub struct ModelRebuildArgs {
+    /// Decisions or globs such as `design/*`; default: every decision with an
+    /// attached model.
+    #[arg(value_name = "ID")]
+    pub ids: Vec<String>,
+    /// A table of reviewed findings, for the labels when the dataset the model
+    /// was attached with is gone.
+    #[arg(long, value_name = "FILE")]
+    pub baseline: Option<PathBuf>,
+    /// A repository the labels are about, `name=dir`, where `name` is the
+    /// baseline's `repo` column. Repeatable; default: this project.
+    #[arg(long, value_name = "NAME=DIR")]
+    pub repo: Vec<String>,
+}
+
 /// `model detach`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

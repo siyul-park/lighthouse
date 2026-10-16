@@ -110,8 +110,12 @@ pub fn load(dir: &Path, hex: &str) -> Result<Loaded, String> {
         return Err(format!("`sha256:{hex}` is not a SHA-256 digest"));
     }
     let path = dir.join("sha256").join(format!("{hex}.json"));
-    let text = fs::read_to_string(&path)
-        .map_err(|e| format!("{}: {e} (expected sha256:{hex})", path.display()))?;
+    let text = fs::read_to_string(&path).map_err(|e| {
+        format!(
+            "{}: {e} (expected sha256:{hex}); run `lighthouse model rebuild`",
+            path.display()
+        )
+    })?;
     let document: Value =
         serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     let actual = sha256(canonical(&document));

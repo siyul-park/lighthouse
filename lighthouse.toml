@@ -50,7 +50,7 @@ files = ["crates/lighthouse-rpc/tests/conformance/**"]
 rules = { "core/file-size" = "off", "design/complexity" = { level = "warn", options = { kinds = ["lines", "statements", "cognitive", "nesting"] } }, "design/exported-doc" = "off", "design/symbols" = "off", "design/declaration-groups" = "off", "design/layout" = "off", "design/comments" = "off", "design/naming" = "off", "design/ownership" = "off", "testing/public-boundary" = "off", "testing/owner" = "off" }
 
 [[spec.overrides]]
-files = ["docs/decisions/**", "schema/**", "protocol/schema/**"]
+files = ["docs/cli.md", "docs/decisions/**", "schema/**", "protocol/schema/**"]
 rules = { "core/file-size" = "off" }
 
 [[spec.overrides]]

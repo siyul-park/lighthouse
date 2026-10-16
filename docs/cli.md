@@ -556,11 +556,12 @@ List, train, attach and detach the models that judge decisions
 Usage: lighthouse model <COMMAND>
 
 Commands:
-  list    List the models bound to decisions
-  train   Fit a model on the labels of a decision
-  attach  Make a model the first layer of a decision, by a revision
-  detach  Remove the model a revision attached to a decision
-  help    Print this message or the help of the given subcommand(s)
+  list     List the models bound to decisions
+  train    Fit a model on the labels of a decision
+  attach   Make a model the first layer of a decision, by a revision
+  detach   Remove the model a revision attached to a decision
+  rebuild  Make the missing artifacts of attached models again, from their labels
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help
@@ -716,6 +717,44 @@ Options:
 
   -h, --help
           Print help (see a summary with '-h')
+```
+
+## `lighthouse model rebuild`
+
+```text
+Make the missing artifacts of attached models again, from their labels.
+
+A learned model is a file named by its digest and kept out of git; a fresh clone has the revision that attached it and not the file. Per attached model the status is `present` (the file is what its name says), `rebuilt` (training made it again, bit for bit), `differs` (a file or a training run gives another digest; nothing is deleted), `labels-changed` (the labels are no longer those it was attached with; nothing is trained), `not-rebuildable` (its trainer is not deterministic or does not learn) or `not-local` (a service, not a file). Exits 1 unless every model is `present`, `rebuilt` or `not-local`.
+
+Usage: lighthouse model rebuild [OPTIONS] [ID]...
+
+Arguments:
+  [ID]...
+          Decisions or globs such as `design/*`; default: every decision with an attached model
+
+Options:
+      --baseline <FILE>
+          A table of reviewed findings, for the labels when the dataset the model was attached with is gone
+
+      --repo <NAME=DIR>
+          A repository the labels are about, `name=dir`, where `name` is the baseline's `repo` column. Repeatable; default: this project
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  lighthouse model rebuild
+  lighthouse model rebuild 'design/*' --repo cel=../cel
+  lighthouse model rebuild design/prefer-method --format json
 ```
 
 ## `lighthouse cache`

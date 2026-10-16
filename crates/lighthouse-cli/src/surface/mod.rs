@@ -15,6 +15,7 @@ mod fix;
 pub mod kinds;
 mod list;
 mod model;
+mod rebuild;
 pub mod reply;
 mod review;
 mod timings;

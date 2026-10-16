@@ -17,6 +17,7 @@ mod git;
 mod judged;
 mod models;
 mod project;
+mod rebuild;
 mod reviewing;
 mod samples;
 mod schema;
@@ -59,6 +60,7 @@ pub use lighthouse_store::{
 };
 pub use models::{Binding, BoundModel, bound_models, remote_bound};
 pub use project::{DEFAULT_CONFIG, Session, catalog_at, config_file, project_root};
+pub use rebuild::{RebuildRequest, Rebuilt, rebuild};
 pub use reviewing::{
     Recorded, TaskQuery, Tasks, attribute_to, person, record_judgment, review_finding,
     review_history, review_prune, review_tasks,

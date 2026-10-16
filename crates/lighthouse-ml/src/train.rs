@@ -154,6 +154,13 @@ pub fn train(request: &TrainRequest, parts: Vec<Rows>, target: &Target) -> Resul
     })
 }
 
+/// Writes the dataset of the rows of every repository and nothing else; gives
+/// its digest (`sha256:<hex>`).
+pub fn write_dataset(parts: Vec<Rows>, root: &Path, decision: &DecisionRef) -> Result<String> {
+    let rows = parts.into_iter().flat_map(|p| p.rows).map(|r| r.row);
+    Ok(dataset::write(root, decision, rows.collect())?.digest)
+}
+
 /// OpenAI's fine-tuning job creation for the dataset: the same dataset for the
 /// same base model is the same job (its seed comes from the digest).
 pub(crate) fn job(

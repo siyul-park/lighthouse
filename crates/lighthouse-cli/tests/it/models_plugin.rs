@@ -13,11 +13,11 @@ use crate::{
     models::{bound, count, project, provider, results},
 };
 
-const RPC: &str = "[models]\nclassification = \"fake/m1\"\n[models.providers.fake]\ntype = \"rpc\"\nplugin = \"fake-model\"\noptions = { tag = 1 }\n";
+pub(crate) const RPC: &str = "[models]\nclassification = \"fake/m1\"\n[models.providers.fake]\ntype = \"rpc\"\nplugin = \"fake-model\"\noptions = { tag = 1 }\n";
 
 /// Binds the `fake-model` plugin, which speaks `lighthouse/classify` and
 /// `lighthouse/train`.
-fn with_plugin(dir: &Path) {
+pub(crate) fn with_plugin(dir: &Path) {
     let plugin = lighthouse_test_support::fake_model();
     let text = fs::read_to_string(dir.join("lighthouse.toml")).unwrap();
     let text = text.replace(
@@ -212,7 +212,11 @@ fn model_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
     let digest = trained["training_file"].as_str().unwrap();
     assert!(digest.starts_with("sha256:"), "{digest}");
     assert_eq!(trained["result"]["status"], "succeeded");
-    assert_eq!(trained["result"]["fine_tuned_model"], "learned@sha256:abc");
+    let made = trained["result"]["result_files"][0].as_str().unwrap();
+    assert_eq!(
+        trained["result"]["fine_tuned_model"],
+        format!("learned@{made}")
+    );
     assert_eq!(trained["unresolved"], 0);
     // The three reviewed rows; the example is no row to learn from.
     assert_eq!(trained["subjects"], 3);
@@ -237,10 +241,10 @@ fn model_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
 
     // The model was handed the same lines, and keeps them in the store of
     // models; the result shows its card.
-    let kept = fs::read_to_string(
-        dir.path()
-            .join(format!(".lighthouse/models/sha256/{hex}.json")),
-    )
+    let kept = fs::read_to_string(dir.path().join(format!(
+        ".lighthouse/models/sha256/{}.json",
+        made.strip_prefix("sha256:").unwrap()
+    )))
     .unwrap();
     let artifact: Value = serde_json::from_str(&kept).unwrap();
     let subjects = artifact["subjects"].as_array().unwrap();

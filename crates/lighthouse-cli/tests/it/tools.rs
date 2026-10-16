@@ -27,7 +27,7 @@ const CLI_ONLY: [&str; 10] = [
 ];
 
 /// Housekeeping commands: CLI only, as the design lists them.
-const CLI_ONLY_COMMANDS: [&str; 1] = ["review_prune"];
+const CLI_ONLY_COMMANDS: [&str; 2] = ["review_prune", "model_rebuild"];
 
 /// The leaf commands of the tree, as paths.
 fn leaves(command: &Command, path: &mut Vec<String>, found: &mut Vec<Vec<String>>) {

@@ -19,6 +19,7 @@ mod mcp_contract;
 mod models;
 mod models_plugin;
 mod preview;
+mod rebuild;
 mod reply;
 mod review;
 mod review_agent;

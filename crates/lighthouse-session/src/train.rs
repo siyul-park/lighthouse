@@ -18,16 +18,42 @@ use lighthouse_plugin::DecisionRef;
 use crate::{CheckRequest, Checked, ModelFlags, Result, Session, check, judged::judged, samples};
 
 /// What one repository gave to a training run.
-struct Gathered {
-    root: PathBuf,
-    reference: Option<String>,
-    decision_ref: DecisionRef,
+pub(crate) struct Gathered {
+    pub(crate) root: PathBuf,
+    pub(crate) reference: Option<String>,
+    pub(crate) decision_ref: DecisionRef,
     /// The run, which holds the models.
-    checked: Checked,
+    pub(crate) checked: Checked,
+}
+
+/// What every repository gave to a training run: the rows of each, and the
+/// first one's run.
+pub(crate) struct Collected {
+    pub(crate) rows: Vec<Rows>,
+    pub(crate) first: Gathered,
 }
 
 /// Trains the model on the labels of the decision.
 pub fn train(request: &TrainRequest) -> Result<Trained> {
+    let collected = collect(request)?;
+    let first = &collected.first;
+    let model = first
+        .reference
+        .as_deref()
+        .map(|r| first.checked.model(r))
+        .transpose()?;
+    let target = Target {
+        root: &first.root,
+        reference: first.reference.as_deref(),
+        decision: &first.decision_ref,
+        model: model.as_deref(),
+    };
+    lighthouse_ml::train::train(request, collected.rows, &target)
+}
+
+/// The labelled subjects of the decision in each repository the labels are
+/// about.
+pub(crate) fn collect(request: &TrainRequest) -> Result<Collected> {
     let start = env::current_dir()?;
     let config = request.config.as_ref().map(|c| start.join(c));
     let baseline = request.baseline.as_ref().map(|b| start.join(b));
@@ -50,23 +76,8 @@ pub fn train(request: &TrainRequest) -> Result<Trained> {
     })();
     env::set_current_dir(&start)?;
     outcome?;
-    let first = gathered.first().ok_or("nothing to train on")?;
-    let (root, reference, decision_ref) = (
-        first.root.clone(),
-        first.reference.clone(),
-        first.decision_ref.clone(),
-    );
-    let model = reference
-        .as_deref()
-        .map(|r| first.checked.model(r))
-        .transpose()?;
-    let target = Target {
-        root: &root,
-        reference: reference.as_deref(),
-        decision: &decision_ref,
-        model: model.as_deref(),
-    };
-    lighthouse_ml::train::train(request, parts, &target)
+    let first = gathered.into_iter().next().ok_or("nothing to train on")?;
+    Ok(Collected { rows: parts, first })
 }
 
 /// The labelled subjects of the repository the process is in.

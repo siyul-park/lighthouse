@@ -9,9 +9,9 @@ use crate::surface::{
     args::{
         CheckArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs, DecisionTestArgs,
         DocumentArgs, FingerprintArgs, FixOptions, ModelAttachArgs, ModelDetachArgs, ModelListArgs,
-        ModelTrainArgs, ReviewListArgs, ReviewResolveArgs,
+        ModelRebuildArgs, ModelTrainArgs, ReviewListArgs, ReviewResolveArgs,
     },
-    attach, check, decision, eval, model,
+    attach, check, decision, eval, model, rebuild,
     reply::{CheckFormat, Context, OutputArg, Reply},
     review,
 };
@@ -40,6 +40,12 @@ Examples:
   lighthouse model train design/prefer-method
   lighthouse model train design/prefer-method --model local/learned --repo cel=../cel
   lighthouse model train design/prefer-method --from-model openai/gpt-5 --format json";
+
+const REBUILD_EXAMPLES: &str = "\
+Examples:
+  lighthouse model rebuild
+  lighthouse model rebuild 'design/*' --repo cel=../cel
+  lighthouse model rebuild design/prefer-method --format json";
 
 const ATTACH_EXAMPLES: &str = "\
 Examples:
@@ -299,6 +305,24 @@ pub enum ModelCommand {
         #[command(flatten)]
         output: OutputArg,
     },
+    /// Make the missing artifacts of attached models again, from their labels.
+    ///
+    /// A learned model is a file named by its digest and kept out of git; a
+    /// fresh clone has the revision that attached it and not the file. Per
+    /// attached model the status is `present` (the file is what its name says),
+    /// `rebuilt` (training made it again, bit for bit), `differs` (a file or a
+    /// training run gives another digest; nothing is deleted), `labels-changed`
+    /// (the labels are no longer those it was attached with; nothing is
+    /// trained), `not-rebuildable` (its trainer is not deterministic or does
+    /// not learn) or `not-local` (a service, not a file). Exits 1 unless every
+    /// model is `present`, `rebuilt` or `not-local`.
+    #[command(after_long_help = REBUILD_EXAMPLES)]
+    Rebuild {
+        #[command(flatten)]
+        args: ModelRebuildArgs,
+        #[command(flatten)]
+        output: OutputArg,
+    },
 }
 
 #[derive(Debug, clap::Parser)]
@@ -327,6 +351,7 @@ pub fn run(ctx: &Context, action: &Action) -> Result<Reply> {
             ModelCommand::Train { args, output } => model::train_model(ctx, args, output.format),
             ModelCommand::Attach { args, output } => attach::attach(ctx, args, output.format),
             ModelCommand::Detach { args, output } => attach::detach(ctx, args, output.format),
+            ModelCommand::Rebuild { args, output } => rebuild::run(ctx, args, output.format),
         },
     }
 }

@@ -17,6 +17,7 @@ use std::{
     process::ExitCode,
 };
 
+use lighthouse_model::{canonical, hash::sha256};
 use lighthouse_protocol::{
     Answer, Capabilities, CreateFineTuningJobRequest, FineTuningJob, FineTuningJobStatus, Handler,
     HandlerError, IndexParams, IndexResult, InitializeParams, InitializeResult, ListModelResponse,
@@ -94,15 +95,16 @@ impl Handler for Fake {
             .map(serde_json::from_str)
             .collect::<Result<_, _>>()
             .map_err(|e| format!("a training line: {e}"))?;
-        // An artifact of the store, named by the digest of the dataset.
+        // An artifact of the store, named by the digest of its canonical form:
+        // the same dataset makes the same file.
         let store = format!("{dir}/sha256");
         fs::create_dir_all(&store).map_err(|e| e.to_string())?;
-        let artifact = json!({
-            "card": {"rows": lines.len(), "chosen": "fake", "metrics": {"brier": 0.25}, "band": {"upper": null, "lower": null}},
+        let artifact = canonical(&json!({
+            "card": {"rows": lines.len(), "chosen": "fake", "metrics": {"brier": 0.25}, "band": {"upper": null, "lower": null}, "trainingFile": request.training_file},
             "subjects": lines,
-        });
-        fs::write(format!("{store}/{hex}.json"), artifact.to_string())
-            .map_err(|e| e.to_string())?;
+        }));
+        let digest = sha256(&artifact);
+        fs::write(format!("{store}/{digest}.json"), artifact).map_err(|e| e.to_string())?;
         Ok(FineTuningJob {
             id: "ftjob-1".to_owned(),
             created_at: 0,
@@ -120,8 +122,8 @@ impl Handler for Fake {
             estimated_finish: None,
             method: Some(request.method),
             metadata: Some(request.metadata),
-            fine_tuned_model: Some("learned@sha256:abc".to_owned()),
-            result_files: vec![format!("sha256:{hex}")],
+            fine_tuned_model: Some(format!("learned@sha256:{digest}")),
+            result_files: vec![format!("sha256:{digest}")],
             error: None,
         })
     }

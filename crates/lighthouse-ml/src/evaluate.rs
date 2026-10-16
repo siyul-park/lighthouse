@@ -34,6 +34,7 @@ pub use layer::{Layer, LayerInfo, Layered, overlay, shown};
 const CAVEAT: &str = "labelled positives come mostly from flagged findings, so recall is an upper bound; sample unflagged subjects for a person to label";
 
 /// A repository whose findings the labels are about.
+#[derive(Clone)]
 pub struct Repo {
     /// The name its baseline rows use (the `repo` column).
     pub name: Option<String>,

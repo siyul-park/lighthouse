@@ -7,11 +7,12 @@ List, train, attach and detach the models that judge decisions
 Usage: lighthouse model [OPTIONS] <COMMAND>
 
 Commands:
-  list    List the models bound to decisions
-  train   Fit a model on the labels of a decision
-  attach  Make a model the first layer of a decision, by a revision
-  detach  Remove the model a revision attached to a decision
-  help    Print this message or the help of the given subcommand(s)
+  list     List the models bound to decisions
+  train    Fit a model on the labels of a decision
+  attach   Make a model the first layer of a decision, by a revision
+  detach   Remove the model a revision attached to a decision
+  rebuild  Make the missing artifacts of attached models again, from their labels
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
       --config <FILE>  The project file; the project root is then the current directory [env: LIGHTHOUSE_CONFIG=]

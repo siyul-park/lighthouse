@@ -7,4 +7,5 @@ mod labels;
 mod layer;
 mod layer_support;
 mod metrics;
+mod rebuild;
 mod train;
