@@ -81,7 +81,6 @@ kind: Decision
 metadata:
   name: core/file-size        # the id, `<namespace>/<kebab-name>`
   uid: 8a4f0a2c-6b57-4a8e-9a42-0d2f3b9f5c11   # identity, a UUID v4 assigned once
-  labels: { lighthouse/pack: core, lighthouse/section: limits }
   annotations: {}
 spec: { ... }
 ```
@@ -91,7 +90,7 @@ spec: { ... }
 | `Decision` | a decision: `title context scope requirement status supersedes consequences severity options languages check fix provenance examples` | `decisions/<pack>/<section>/<name>.yaml`, `.lighthouse/decisions/` |
 | `Pack` | title, intro and the ordered sections, each listing its decisions | `decisions/<pack>/pack.yaml` |
 | `SourceMap` | which decision covers each normative line of the documents a catalog came from | `decisions/sources.yaml` |
-| `Project` | `lighthouse.toml`: `plugins extends languages rules overrides generated`; also a shareable configuration, which `extends` names like an ESLint shareable config. `<pack>/recommended` and `<pack>/strict` are Projects derived from the decisions (a decision joins `strict` by the label `lighthouse/preset: strict`); a catalog layer may hold more | project root, `.lighthouse/decisions/` |
+| `Project` | `lighthouse.toml`: `plugins extends languages rules overrides generated`; also a shareable configuration, which `extends` names like an ESLint shareable config. `<pack>/recommended` and `<pack>/strict` are Projects derived from the decisions (`strict` also switches on every kind of a decision whose `kinds` option enables only some by default); a catalog layer may hold more | project root, `.lighthouse/decisions/` |
 | `Plugin` | `lighthouse-plugin.toml`: `runtime {command, args}` and `provides` | plugin directory |
 | `Judgment`, `Suppression` | records of the decision log | `.lighthouse/decisions.jsonl` |
 
@@ -102,13 +101,13 @@ seeded by the uid. `decision_create` assigns one, and `spec validate` asks for o
 refuses two decisions with the same.
 
 Conventions: keys are lowerCamelCase, option names included (`maxWords`), durations are strings (`30s`), enums are lowercase kebab,
-paths are relative with `/`. A decision belongs to a pack and section by its
-labels; the `Pack` document only orders them, so where the file lies carries no
-meaning. `scope` is `{domain, subject, generated, tests}` (`domain` is `code`; `generated: true` makes generated code a subject, default false; `tests: exclude|include|only`, default `exclude`, set explicitly where a decision is about tests or covers them). The host tells generated code apart once (the provider's marker such as Go's `// Code generated ... DO NOT EDIT.`, `.gitattributes` `linguist-generated`, the project's `[generated] files`) and the engine leaves out the subjects the scope excludes before any check runs, so no expression guards against `generated` or `test`. A project overrides it with `[generated] check = "skip"|"include"` for all decisions, or `rules."<id>".generated = true|false` for one. A `cel` check's `select` defaults to the scope's subject. `options` is a JSON
+paths are relative with `/`. A decision belongs to the pack its id names and to
+the section of that pack's file that lists it, so where the file lies carries no
+meaning. `scope` is `{subject, generated, tests}` (`generated: true` makes generated code a subject, default false; `tests: exclude|include|only`, default `exclude`, set explicitly where a decision is about tests or covers them). The host tells generated code apart once (the provider's marker such as Go's `// Code generated ... DO NOT EDIT.`, `.gitattributes` `linguist-generated`, the project's `[generated] files`) and the engine leaves out the subjects the scope excludes before any check runs, so no expression guards against `generated` or `test`. A project overrides it with `[generated] check = "skip"|"include"` for all decisions, or `rules."<id>".generated = true|false` for one. A `cel` check's `select` defaults to the scope's subject. `options` is a JSON
 Schema object (`type`, `default`, `description` per property, closed with
 `additionalProperties: false`); `languages.<id>` holds the option values and the
 wording of one language. `check` and `fix` choose a provider by `type`: `check` is
-`builtin`, `cel`, `command`, `rpc` or `model`; `fix` is `ops`, `command` or `rpc`, with the fields of its type
+`builtin`, `cel`, `command` or `model`; `fix` is `ops`, `command` or `rpc`, with the fields of its type
 next to `safety` and `requires`, and no others.
 
 The JSON Schema (2020-12) of each kind is generated from the Rust types into
@@ -140,14 +139,13 @@ judgment that can take effect.
 ## Rules
 
 Every implemented rule belongs to a catalog decision whose `check` is
-one provider of the union `builtin | cel | command | rpc | model`, with the common fields `requires` and `timeout`:
+one provider of the union `builtin | cel | command | model`, with the common fields `requires` and `timeout`:
 
 - `builtin` is a standard, decision-agnostic operation (`order`, `cycle`) or, for the two rules the engine reports itself (`core/allow`, `core/no-unused-allow`), a rule named by `id`.
 - `cel` is an expression over the code model, written in the decision, with the standard function library `metrics callers callees edges owner tests annotations rank exposed limit counted`, the module path helpers `globMatch layerOf` and the text helpers `lines trim join trimPrefixes trimSuffixes trimLeft trimRight leadingRun drop`.
   - A function node has a `role`, computed once for every rule, the first that fits: `test`, `implementation` (it satisfies an interface or trait), `constructor` (named by the language's `constructorPrefixes`, or a Rust associated function returning its owner), `entrypoint` (Go `main`/`init`, Rust `main` of a binary), then `method` or `function`. The test sub-role of a test-file declaration is `test_role`.
   - A limit option is declared `$ref: '#/$defs/limit'`: an integer for every role, or an object with `default` and one entry per role (`function method constructor implementation entrypoint test`), each an integer or null for no limit. `limit(node, max)` gives the value for the node's role, and `counted(node, n, what)` says it (`NewServer needs 9 parameters`, `parse has 9 parameters`).
 - `command` runs a program under the process contract: argv without a shell, `{file}`/`{files}`/`{rule}` filling whole arguments, `batch: file|all`, exit `0` clean, `1` findings (stdout lines, an optional `path:line[:col]: ` prefix), anything else an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script. A command is not sandboxed: it runs with the user's privileges, in the project root, with an environment cleared to `PATH`, `LANG`, `TMPDIR` and the declared `env` (no `HOME`) plus `LIGHTHOUSE_*`. Trust is the only protection; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean. `output: sarif` reads stdout as a SARIF log instead, which is how common linters are wrapped: see [wrapping linters](wrapping-linters.md).
-- `rpc` is reserved until plugin protocol 0.2 and refused at load.
 - `model` hands the decision to agent review (`select` and `prompt` optional); it is not deterministic and caps the severity at `warn`.
 
 A decision with no `check` is documentation. How a decision is checked is not part of what it means: the *meaning version* hashes requirement, severity, scope (with its applicability) and options, and the `check_revision` records the check on findings and judgments without ever expiring one.
@@ -221,7 +219,7 @@ gathered in a fixed order (files in path order, rules in id order), so findings,
 fingerprints and exit codes are the same on every run whatever the schedule;
 identity and fingerprint assignment run after the findings are collected and
 ordered. What several rules would compute alike is computed once per run and
-shared through `Ctx::memo`: the base facts of a symbol that CEL checks read, and
+shared through `Context::memo`: the base facts of a symbol that CEL checks read, and
 the versions of a decision that the store records with each finding. Set
 `RAYON_NUM_THREADS=1` to run on one worker.
 

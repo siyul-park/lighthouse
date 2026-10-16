@@ -461,7 +461,7 @@ fn decision_with(examples: &str) -> Catalog {
     let indented: String = examples.lines().map(|l| format!("  {l}\n")).collect();
     let empty = if examples.is_empty() { " []" } else { "" };
     let decision = format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: p/a\n  labels:\n    lighthouse/pack: p\n    lighthouse/section: s\nspec:\n  title: A\n  context: i\n  scope: {{ subject: symbol }}\n  requirement: A MUST b.\n  severity: info\n  check:\n    type: model\n  examples:{empty}\n{indented}"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: p/a\nspec:\n  title: A\n  context: i\n  scope: {{ subject: symbol }}\n  requirement: A MUST b.\n  severity: info\n  check:\n    type: model\n  examples:{empty}\n{indented}"
     );
     let files = std::collections::BTreeMap::from([
         (

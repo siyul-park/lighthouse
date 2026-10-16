@@ -29,15 +29,11 @@ fn skill_for_lists_every_rule_the_engines_registry_enables() {
             .iter()
             .any(|l| l.provider.manifest().id == "rust")
     );
-    let enabled = active_rules(
-        &session.config,
-        &session.catalog().unwrap().projects().unwrap(),
-    )
-    .unwrap();
+    let catalog = session.catalog().unwrap();
+    let enabled = active_rules(&session.config, catalog.projects()).unwrap();
     assert!(!enabled.is_empty());
 
     let skill = skill_for(&session).unwrap();
-    let catalog = session.catalog().unwrap();
     for id in &enabled {
         assert!(catalog.decision(id).is_some(), "{id} has no decision");
         assert!(

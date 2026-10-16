@@ -59,23 +59,20 @@ pub fn local_files(root: &Path) -> Result<Option<BTreeMap<String, String>>, Erro
     if !dir.is_dir() {
         return Ok(None);
     }
-    let io = |path: &Path, source: std::io::Error| Error::Io {
-        path: path.display().to_string(),
-        source,
-    };
     let mut files = BTreeMap::new();
-    for entry in fs::read_dir(&dir).map_err(|e| io(&dir, e))? {
-        let path = entry.map_err(|e| io(&dir, e))?.path();
+    for entry in fs::read_dir(&dir).map_err(Error::io(&dir))? {
+        let path = entry.map_err(Error::io(&dir))?.path();
         if Format::of_path(&path).is_some() {
             let name = path
                 .file_name()
                 .unwrap_or_default()
                 .to_string_lossy()
                 .into_owned();
-            let text = fs::read_to_string(&path).map_err(|e| io(&path, e))?;
+            let text = fs::read_to_string(&path).map_err(Error::io(&path))?;
             files.insert(name, text);
         }
     }
+
     Ok(Some(files))
 }
 
@@ -141,17 +138,14 @@ fn collect_embedded(dir: &Dir, files: &mut Files) {
 }
 
 fn collect_dir(root: &Path, dir: &Path, files: &mut Files) -> Result<(), Error> {
-    let io = |path: &Path| {
-        let path = path.display().to_string();
-        move |source| Error::Io { path, source }
-    };
-    for entry in fs::read_dir(dir).map_err(io(dir))? {
-        let path = entry.map_err(io(dir))?.path();
+    for entry in fs::read_dir(dir).map_err(Error::io(dir))? {
+        let path = entry.map_err(Error::io(dir))?.path();
         if path.is_dir() {
             collect_dir(root, &path, files)?;
             continue;
         }
-        let text = fs::read_to_string(&path).map_err(io(&path))?;
+        let text = fs::read_to_string(&path).map_err(Error::io(&path))?;
+
         let key = path.strip_prefix(root).unwrap_or(&path);
         files.insert(key.to_string_lossy().replace('\\', "/"), text);
     }

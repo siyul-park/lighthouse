@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: design/responsibility
   uid: 064e4160-8da3-4079-9674-aaeab16151ee
-  labels:
-    lighthouse/pack: design
-    lighthouse/section: principles
 spec:
   title: One responsibility per symbol, and a boundary for every split
   context: >-
@@ -40,7 +37,6 @@ spec:
     dependents or no declarations of its own, whether it is a real boundary or
     its user's detail; the requirement and the examples are the question.
   scope:
-    domain: code
     subject: module
   requirement: >-
     Each symbol MUST have one coherent responsibility, a narrow contract, and
@@ -54,7 +50,6 @@ spec:
     merely to force reuse.
   severity: info
   options:
-    type: object
     properties:
       kinds:
         type: array

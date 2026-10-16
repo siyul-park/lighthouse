@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: design/ownership
   uid: 61a20af8-1053-4e04-bfbe-8512d7595901
-  labels:
-    lighthouse/pack: design
-    lighthouse/section: types-and-apis
 spec:
   title: State, generated code and platform code have one owner
   context: >-
@@ -26,7 +23,6 @@ spec:
     mutable state is put to a model, with the requirement and the examples as
     the question.
   scope:
-    domain: code
     subject: symbol
   requirement: >-
     An exported package-level variable MUST NOT hold mutable state: state

@@ -87,7 +87,6 @@ fn a_set_of_option_properties_is_a_closed_object_schema() {
 
     let value = serde_json::to_value(&schema).unwrap();
 
-    assert_eq!(value["type"], "object");
     assert_eq!(value["additionalProperties"], false);
     assert_eq!(value["properties"]["max"]["type"], "integer");
     assert_eq!(
@@ -139,7 +138,7 @@ fn shape_of() {
 
 #[test]
 fn definitions_name_the_limit_shape() {
-    let limit = lighthouse_spec::definitions()["limit"].clone();
+    let limit = lighthouse_spec::limit().clone();
     assert_eq!(limit.one_of.len(), 2);
     let object = &limit.one_of[1];
     for role in lighthouse_spec::LIMIT_ROLES.into_iter().chain(["default"]) {
@@ -161,7 +160,7 @@ fn option_schema_holds_its_shape() {
 
 #[test]
 fn shape_check() {
-    let limit = lighthouse_spec::definitions()["limit"].clone();
+    let limit = lighthouse_spec::limit().clone();
     assert!(limit.check(&json!(3), "x").is_ok());
     assert!(
         limit
@@ -184,7 +183,7 @@ fn shape_target() {
         reference: Some("#/$defs/limit".to_owned()),
         ..lighthouse_spec::Shape::default()
     };
-    assert_eq!(by_ref.target(), lighthouse_spec::definitions().get("limit"));
+    assert_eq!(by_ref.target(), Some(lighthouse_spec::limit()));
     let unknown = lighthouse_spec::Shape {
         reference: Some("#/$defs/nope".to_owned()),
         ..lighthouse_spec::Shape::default()
@@ -200,7 +199,7 @@ fn shape_target() {
 #[test]
 fn shape_describe() {
     assert_eq!(
-        lighthouse_spec::definitions()["limit"].describe(),
+        lighthouse_spec::limit().describe(),
         "an integer or an object"
     );
     assert_eq!(

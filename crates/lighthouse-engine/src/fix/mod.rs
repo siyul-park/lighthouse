@@ -68,7 +68,7 @@ impl FixPlan {
                 FixBinding {
                     fixer: decision.id().to_owned(),
                     cap: fix.safety,
-                    mechanical: decision.severity() == Some(Severity::Error),
+                    mechanical: decision.severity == Some(Severity::Error),
                     decision: FixDecision {
                         id: decision.id().to_owned(),
                         requirement: decision.requirement.clone(),

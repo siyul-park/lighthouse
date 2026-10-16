@@ -1,17 +1,23 @@
 //! The `check:` block of a decision: how a violation is detected. One
 //! provider kind is selected by `type`; each compiles into the single `Rule`
-//! interface. Further kinds (`command`, `rpc`, ...) join the same union.
+//! interface. Further kinds join the same union.
 
-use std::{collections::BTreeMap, time};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    time,
+};
 
-use cel::Program;
-use lighthouse_model::{Capability, RunScope};
-
-use crate::{CommandCheck, ModelCheck, Subject};
+use lighthouse_model::{Capability, EdgeKind, RunScope};
 use lighthouse_resource::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::Value;
+
+use crate::{
+    Batch, CommandCheck, ModelCheck, Subject,
+    expression::{compile_problem, template_problem},
+    union::{refuse_strays, stray_field},
+};
 
 /// How long a provider may run when the check names no `timeout`.
 pub const DEFAULT_TIMEOUT: time::Duration = time::Duration::from_secs(30);
@@ -38,13 +44,24 @@ pub struct Check {
 /// The fields of a check as it is read, before its `type` has had its say
 /// about which of them may be there.
 #[derive(Deserialize)]
-struct Shape {
+struct Written {
     #[serde(default)]
     requires: Vec<Capability>,
     #[serde(default)]
     timeout: Option<Duration>,
     #[serde(flatten)]
     kind: CheckKind,
+}
+
+impl Check {
+    /// A check of this kind with no common fields set.
+    pub fn new(kind: CheckKind) -> Self {
+        Self {
+            requires: Vec::new(),
+            timeout: None,
+            kind,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for Check {
@@ -83,31 +100,22 @@ impl<'de> Deserialize<'de> for Check {
                 "columns",
                 "select",
             ],
-            Some("rpc") => &["params"],
             Some("model") => &["over", "with", "select", "prompt", "identity"],
             other => {
                 return Err(D::Error::custom(match other {
-                    None => {
-                        "a check needs a `type`: builtin, cel, command, rpc or model".to_owned()
-                    }
+                    None => "a check needs a `type`: builtin, cel, command or model".to_owned(),
                     Some(found) => {
                         format!(
-                            "check `type` is `{found}`, expected builtin, cel, command, rpc or model"
+                            "check `type` is `{found}`, expected builtin, cel, command or model"
                         )
                     }
                 }));
             }
         };
-        if let Some(stray) = table
-            .keys()
-            .find(|key| !COMMON.contains(&key.as_str()) && !own.contains(&key.as_str()))
-        {
-            return Err(D::Error::custom(format!(
-                "unknown field `{stray}` for a check of type `{}`",
-                table["type"].as_str().unwrap_or_default()
-            )));
+        if let Some(problem) = stray_field(table, "check", &COMMON, own) {
+            return Err(D::Error::custom(problem));
         }
-        let Shape {
+        let Written {
             requires,
             timeout,
             kind,
@@ -117,23 +125,6 @@ impl<'de> Deserialize<'de> for Check {
             timeout,
             kind,
         })
-    }
-}
-
-impl Check {
-    /// A check of this kind with no common fields set.
-    pub fn of(kind: CheckKind) -> Self {
-        Self {
-            requires: Vec::new(),
-            timeout: None,
-            kind,
-        }
-    }
-
-    /// Whether a program decides the findings of this check, as opposed to
-    /// agent review.
-    pub fn is_automated(&self) -> bool {
-        self.kind.deterministic()
     }
 }
 
@@ -163,8 +154,47 @@ impl CheckKind {
             Self::Builtin(_) => "builtin",
             Self::Cel(_) => "cel",
             Self::Command(_) => "command",
-            Self::Rpc(_) => "rpc",
             Self::Model(_) => "model",
+        }
+    }
+
+    /// What is wrong with the provider this names, for a decision about `subject`.
+    pub(crate) fn problem(&self, subject: Subject) -> Option<String> {
+        match self {
+            Self::Builtin(BuiltinCheck::Named(named)) if named.id.is_empty() => {
+                Some("a builtin check needs a rule id".to_owned())
+            }
+            Self::Builtin(BuiltinCheck::Named(_)) => None,
+            Self::Builtin(BuiltinCheck::Op(op)) => op.problem(subject),
+            Self::Cel(cel) => cel.problem().or_else(|| {
+                let Some(select) = cel.selects(subject) else {
+                    return Some(format!("a `{subject}` decision needs a `select`"));
+                };
+                if select.scope() != subject.run_scope() {
+                    return Some(format!(
+                        "selects `{}`, which a `{subject}` decision cannot run over",
+                        select.name()
+                    ));
+                }
+                // A model cannot be asked about a subject outside a file; a
+                // module is left to agent review, which lists its subjects.
+                (cel.review.is_some()
+                    && select.scope() != RunScope::File
+                    && select != Select::Module)
+                    .then(|| {
+                        format!(
+                            "a model cannot judge `{}`: it needs the source of a subject in a file",
+                            select.name()
+                        )
+                    })
+            }),
+            Self::Command(command) => command.problem().or_else(|| {
+                (command.batch == Batch::All && subject.run_scope() == RunScope::File).then(|| {
+                    "check `batch: all` needs a module or project decision: a file-scope decision is checked one file at a time"
+                        .to_owned()
+                })
+            }),
+            Self::Model(model) => model.problem(subject),
         }
     }
 }
@@ -179,8 +209,6 @@ pub enum CheckKind {
     Cel(CelCheck),
     /// An external program under the process contract.
     Command(CommandCheck),
-    /// A language plugin's check method. Reserved until protocol 0.2.
-    Rpc(RpcCheck),
     /// Agent review: a model is asked about the candidates. Not
     /// deterministic; today's agent review tasks serve it.
     Model(ModelCheck),
@@ -213,11 +241,11 @@ impl BuiltinCheck {
     }
 }
 
-/// What an `order` check judges.
+/// What an `order` check judges, and what a `reorder` fix permutes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum OrderScope {
-    /// Every declaration of a file, each module on its own.
+    /// Every declaration of a file, each container on its own.
     File,
     /// Only the members of one owner.
     Owner,
@@ -238,6 +266,33 @@ pub enum BuiltinOp {
         edge: String,
         level: CycleLevel,
     },
+}
+
+impl BuiltinOp {
+    /// What is wrong with the operation for a decision about `subject`: a
+    /// standard operation judges the shape of one file or of the whole project.
+    fn problem(&self, subject: Subject) -> Option<String> {
+        let own = match self {
+            Self::Order { clauses } if clauses.is_empty() => {
+                Some("check: `order` needs at least one clause".to_owned())
+            }
+            Self::Order { clauses } => clauses.iter().find_map(OrderClause::problem),
+            Self::Cycle { edge, .. } => edge
+                .parse::<EdgeKind>()
+                .is_err()
+                .then(|| format!("check: `{edge}` is not an edge kind")),
+        };
+        let per_file = subject.run_scope() == RunScope::File;
+        own.or_else(|| match self {
+            Self::Order { .. } if !per_file => Some(format!(
+                "an `order` check judges one file at a time, which a `{subject}` decision does not"
+            )),
+            Self::Cycle { .. } if per_file => Some(format!(
+                "a `cycle` check judges the whole project, which a `{subject}` decision does not"
+            )),
+            _ => None,
+        })
+    }
 }
 
 /// How an `order` clause picks the declarations to report.
@@ -277,6 +332,33 @@ pub struct OrderClause {
     pub evidence: BTreeMap<String, String>,
 }
 
+impl OrderClause {
+    fn problem(&self) -> Option<String> {
+        let mut seen = BTreeSet::new();
+        if self.by.is_empty() {
+            return Some("check: an `order` clause needs at least one key in `by`".to_owned());
+        }
+        if let Some(key) = self
+            .by
+            .iter()
+            .find(|key| !key.contains('/') || !seen.insert(*key))
+        {
+            return Some(format!(
+                "check: order key `{key}` must be a qualified `plugin/name` and listed once"
+            ));
+        }
+        self.when
+            .as_deref()
+            .and_then(|source| compile_problem("check when", source))
+            .or_else(|| {
+                self.evidence.iter().find_map(|(name, source)| {
+                    compile_problem(&format!("check evidence `{name}`"), source)
+                })
+            })
+            .or_else(|| template_problem("check message", &self.message))
+    }
+}
+
 /// At what level a `cycle` check looks for strongly connected components.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -307,6 +389,18 @@ pub enum Select {
 }
 
 impl Select {
+    const ALL: [Self; 9] = [
+        Self::Symbol,
+        Self::Function,
+        Self::Edge,
+        Self::Module,
+        Self::File,
+        Self::Test,
+        Self::Comment,
+        Self::Event,
+        Self::Decision,
+    ];
+
     /// What a check looks at when it does not say: the subject of the
     /// decision. A `project` decision has no such default.
     pub fn of(subject: Subject) -> Option<Self> {
@@ -446,48 +540,37 @@ impl CelCheck {
 
     /// The first expression that does not compile, described.
     pub(crate) fn problem(&self) -> Option<String> {
-        let compile = |what: &str, source: &str| {
-            Program::compile(source)
-                .err()
-                .map(|e| format!("check {what}: {e}"))
-        };
         for binding in &self.bindings {
-            let reserved = [
-                "options", "symbol", "func", "edge", "module", "file", "test", "comment", "event",
-                "decision",
-            ];
-            let valid = !binding.name.is_empty()
-                && binding
-                    .name
+            let name = binding.name.as_str();
+            let valid = !name.is_empty()
+                && name
                     .chars()
                     .all(|c| c.is_ascii_lowercase() || c == '_' || c.is_ascii_digit())
-                && !reserved.contains(&binding.name.as_str());
+                && name != "options"
+                && !Select::ALL.iter().any(|s| s.variable() == name);
             if !valid {
-                return Some(format!(
-                    "check with: `{}` is not a usable name",
-                    binding.name
-                ));
+                return Some(format!("check with: `{name}` is not a usable name"));
             }
-            if let Some(problem) = compile(&format!("with `{}`", binding.name), &binding.expr) {
+            if let Some(problem) = compile_problem(&format!("check with `{name}`"), &binding.expr) {
                 return Some(problem);
             }
         }
-        if let Some(problem) = compile("where", &self.condition) {
+        if let Some(problem) = compile_problem("check where", &self.condition) {
             return Some(problem);
         }
-        if let Some(problem) = self.review_problem(&compile) {
+        if let Some(problem) = self.review_problem() {
             return Some(problem);
         }
         for (name, source) in &self.evidence {
-            if let Some(problem) = compile(&format!("evidence `{name}`"), source) {
+            if let Some(problem) = compile_problem(&format!("check evidence `{name}`"), source) {
                 return Some(problem);
             }
         }
         let positions = self.at.iter().flat_map(|at| {
             [
-                ("at.symbol", &at.symbol),
-                ("at.line", &at.line),
-                ("at.endLine", &at.end_line),
+                ("at.symbol", at.symbol.as_ref()),
+                ("at.line", at.line.as_ref()),
+                ("at.endLine", at.end_line.as_ref()),
             ]
         });
         let identity = self.identity.iter().flat_map(|identity| {
@@ -496,118 +579,24 @@ impl CelCheck {
                 ("identity.snippet", identity.snippet.as_ref()),
             ]
         });
-        for (what, source) in positions
-            .map(|(what, source)| (what, source.as_ref()))
-            .chain(identity)
-        {
-            if let Some(problem) = source.and_then(|source| compile(what, source)) {
+        for (what, source) in positions.chain(identity) {
+            if let Some(problem) =
+                source.and_then(|source| compile_problem(&format!("check {what}"), source))
+            {
                 return Some(problem);
             }
         }
-        template_problem(&self.message).map(|p| format!("check message: {p}"))
+        template_problem("check message", &self.message)
     }
 
     /// What is wrong with `review` or `prompt`.
-    fn review_problem(&self, compile: &dyn Fn(&str, &str) -> Option<String>) -> Option<String> {
+    fn review_problem(&self) -> Option<String> {
         if self.review.is_none() && self.prompt.is_some() {
             return Some("check: `prompt` needs a `review`".to_owned());
         }
         if self.prompt.as_deref().is_some_and(|p| p.trim().is_empty()) {
             return Some("check: `prompt` is empty".to_owned());
         }
-        compile("review", self.review.as_deref()?)
-    }
-}
-
-/// A language plugin's check method. Reserved until protocol 0.2.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct RpcCheck {
-    #[serde(default, skip_serializing_if = "Map::is_empty")]
-    pub params: Map<String, Value>,
-}
-
-/// One part of a `{{ cel }}` template: literal text, or the source of a hole.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TemplatePart {
-    Text(String),
-    Hole(String),
-}
-
-/// Splits a template into its text and its `{{ cel }}` holes; the one parser
-/// every template of a decision (check messages, fix names and texts) goes
-/// through. It does not compile the holes.
-pub fn parse_template(text: &str) -> Result<Vec<TemplatePart>, String> {
-    let mut parts = Vec::new();
-    let mut rest = text;
-    while let Some(open) = rest.find("{{") {
-        let (before, after) = rest.split_at(open);
-        if !before.is_empty() {
-            parts.push(TemplatePart::Text(before.to_owned()));
-        }
-        let Some(close) = after.find("}}") else {
-            return Err("`{{` is never closed".to_owned());
-        };
-        parts.push(TemplatePart::Hole(after[2..close].trim().to_owned()));
-        rest = &after[close + 2..];
-    }
-    if !rest.is_empty() {
-        parts.push(TemplatePart::Text(rest.to_owned()));
-    }
-    Ok(parts)
-}
-
-/// Why a `{{ cel }}` template is not well formed.
-pub(crate) fn template_problem(text: &str) -> Option<String> {
-    let parts = match parse_template(text) {
-        Ok(parts) => parts,
-        Err(problem) => return Some(problem),
-    };
-    parts.iter().find_map(|part| match part {
-        TemplatePart::Hole(source) => Program::compile(source)
-            .err()
-            .map(|e| format!("`{source}`: {e}")),
-        TemplatePart::Text(_) => None,
-    })
-}
-
-/// The loader refuses a field its `type` does not have; so does the schema:
-/// each branch carries the common fields too and allows no other.
-fn refuse_strays(schema: &mut schemars::Schema) {
-    let Some(root) = schema.as_object_mut() else {
-        return;
-    };
-    let common = match root.get("properties") {
-        Some(Value::Object(properties)) => properties.clone(),
-        _ => Map::new(),
-    };
-    let required = root
-        .get("required")
-        .cloned()
-        .unwrap_or(Value::Array(Vec::new()));
-    let Some(Value::Array(branches)) = root.get_mut("oneOf") else {
-        return;
-    };
-    for branch in branches.iter_mut().filter_map(Value::as_object_mut) {
-        if let Value::Object(properties) = branch
-            .entry("properties")
-            .or_insert_with(|| Value::Object(Map::new()))
-        {
-            properties.extend(common.clone());
-        }
-        if let (Some(Value::Array(own)), Value::Array(shared)) =
-            (branch.get_mut("required"), &required)
-        {
-            own.extend(shared.iter().cloned());
-        }
-        // A branch that refers to another schema for its own fields (the
-        // builtin operations) cannot close itself with `additionalProperties`,
-        // which only sees the properties written beside it.
-        let closing = if branch.contains_key("$ref") {
-            "unevaluatedProperties"
-        } else {
-            "additionalProperties"
-        };
-        branch.insert(closing.to_owned(), Value::Bool(false));
+        compile_problem("check review", self.review.as_deref()?)
     }
 }

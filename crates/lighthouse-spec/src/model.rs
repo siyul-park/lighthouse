@@ -1,23 +1,12 @@
 use std::fmt;
 
-use lighthouse_model::{Applicability, RunScope, Severity, TestScope};
+use lighthouse_model::{Applicability, RunScope, TestScope};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-/// What kind of thing a decision is about: source code, or Lighthouse's own
-/// documents (the decisions of a catalog).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum Domain {
-    #[default]
-    Code,
-    /// The documents of a project that configure Lighthouse.
-    Spec,
-}
-
-/// What a decision talks about inside its domain. Mapping to the run scope
-/// of a rule is `Subject::run_scope`.
+/// What a decision talks about. Mapping to the run scope of a rule is
+/// `Subject::run_scope`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Subject {
@@ -28,7 +17,7 @@ pub enum Subject {
     Edge,
     Project,
     Test,
-    /// A decision document, in the `spec` domain.
+    /// A decision document of the project.
     Decision,
 }
 
@@ -41,26 +30,16 @@ impl Subject {
             Self::Module | Self::Edge | Self::Project | Self::Decision => RunScope::Project,
         }
     }
-
-    /// The domain this subject belongs to.
-    pub fn domain(self) -> Domain {
-        match self {
-            Self::Decision => Domain::Spec,
-            _ => Domain::Code,
-        }
-    }
 }
 
-/// Where a decision applies: its domain, what it is about, and which code its
-/// subjects may be in. Generated and test code are told apart by the host
-/// (the provider's marker, `.gitattributes`, the project's `generated`
-/// globs), and the engine leaves the subjects out that the scope excludes
-/// before any check runs.
+/// Where a decision applies: what it is about, and which code its subjects
+/// may be in. Generated and test code are told apart by the host (the
+/// provider's marker, `.gitattributes`, the project's `generated` globs), and
+/// the engine leaves the subjects out that the scope excludes before any
+/// check runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Scope {
-    #[serde(default)]
-    pub domain: Domain,
     pub subject: Subject,
     /// Generated code is a subject too. Default: it is not.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -72,10 +51,9 @@ pub struct Scope {
 }
 
 impl Scope {
-    /// A scope in the code domain.
-    pub fn code(subject: Subject) -> Self {
+    /// A scope over `subject` that leaves out generated and test code.
+    pub fn new(subject: Subject) -> Self {
         Self {
-            domain: Domain::Code,
             subject,
             generated: false,
             tests: TestScope::Exclude,
@@ -135,14 +113,6 @@ pub enum ExampleKind {
     Invalid,
 }
 
-/// Where a fixture file's text comes from.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Content {
-    Inline(String),
-    /// Path relative to the directory of the decision's file.
-    File(String),
-}
-
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct RawFile {
@@ -161,8 +131,8 @@ struct RawFile {
 #[schemars(with = "RawFile")]
 pub struct ExampleFile {
     pub path: String,
-    pub content: Content,
-    loaded: Option<String>,
+    text: String,
+    source: Option<String>,
 }
 
 impl ExampleFile {
@@ -170,24 +140,24 @@ impl ExampleFile {
     pub fn inline(path: &str, body: &str) -> Self {
         Self {
             path: path.to_owned(),
-            content: Content::Inline(body.to_owned()),
-            loaded: None,
+            text: body.to_owned(),
+            source: None,
         }
     }
 
-    /// The file's text, with `Content::File` already loaded by the catalog.
+    /// The file's text; a `source` file's is loaded by the catalog.
     pub fn text(&self) -> &str {
-        match &self.content {
-            Content::Inline(body) => body,
-            Content::File(_) => self.loaded.as_deref().unwrap_or_default(),
-        }
+        &self.text
     }
 
-    pub(crate) fn with_loaded(self, text: String) -> Self {
-        Self {
-            loaded: Some(text),
-            ..self
-        }
+    /// The file that holds the text, relative to the directory of the
+    /// decision's file; `None` for a text written inline.
+    pub fn source(&self) -> Option<&str> {
+        self.source.as_deref()
+    }
+
+    pub(crate) fn with_text(self, text: String) -> Self {
+        Self { text, ..self }
     }
 }
 
@@ -195,34 +165,31 @@ impl TryFrom<RawFile> for ExampleFile {
     type Error = String;
 
     fn try_from(raw: RawFile) -> Result<Self, String> {
-        let content = match (raw.body, raw.source) {
-            (Some(body), None) => Content::Inline(body),
-            (None, Some(source)) => Content::File(source),
-            _ => {
-                return Err(format!(
-                    "`{}` needs exactly one of `body` or `source`",
-                    raw.path
-                ));
-            }
-        };
-        Ok(Self {
-            path: raw.path,
-            content,
-            loaded: None,
-        })
+        match (raw.body, raw.source) {
+            (Some(text), None) => Ok(Self {
+                path: raw.path,
+                text,
+                source: None,
+            }),
+            (None, Some(source)) => Ok(Self {
+                path: raw.path,
+                text: String::new(),
+                source: Some(source),
+            }),
+            _ => Err(format!(
+                "`{}` needs exactly one of `body` or `source`",
+                raw.path
+            )),
+        }
     }
 }
 
 impl From<ExampleFile> for RawFile {
     fn from(file: ExampleFile) -> Self {
-        let (body, source) = match file.content {
-            Content::Inline(body) => (Some(body), None),
-            Content::File(source) => (None, Some(source)),
-        };
         Self {
             path: file.path,
-            body,
-            source,
+            body: file.source.is_none().then_some(file.text),
+            source: file.source,
         }
     }
 }
@@ -247,7 +214,7 @@ pub struct Example {
     pub files: Vec<ExampleFile>,
     /// The example that best shows the decision in its language; at most one
     /// per language and kind. Agent output prefers it.
-    #[serde(default, skip_serializing_if = "is_false")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub canonical: bool,
     /// Diagnostics an invalid example must produce.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -262,12 +229,6 @@ pub struct Example {
     pub fixed: Vec<ExampleFile>,
 }
 
-/// The severity a finding's decision authored, else the severity the finding
-/// has: what decides whether a judgment may hide it and a fix may be safe.
-pub fn authored_severity(severity: Severity, decision: Option<&crate::Decision>) -> Severity {
-    decision.and_then(|d| d.severity()).unwrap_or(severity)
-}
-
 macro_rules! display {
     ($ty:ty { $($variant:ident => $text:literal),+ $(,)? }) => {
         impl fmt::Display for $ty {
@@ -279,10 +240,5 @@ macro_rules! display {
 }
 
 display!(Subject { Symbol => "symbol", File => "file", Module => "module", Edge => "edge", Project => "project", Test => "test", Decision => "decision" });
-display!(Domain { Code => "code", Spec => "spec" });
 display!(DecisionStatus { Proposed => "proposed", Accepted => "accepted", Rejected => "rejected", Superseded => "superseded", Deprecated => "deprecated" });
 display!(ExampleKind { Valid => "valid", Invalid => "invalid" });
-
-fn is_false(value: &bool) -> bool {
-    !value
-}

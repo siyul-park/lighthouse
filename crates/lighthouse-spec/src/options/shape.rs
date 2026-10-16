@@ -1,6 +1,6 @@
-//! The shape of a value inside an option, and the named shapes the spec
-//! defines once. One registry of named shapes serves both the JSON Schema
-//! (`$defs`) and the checking of a value (`$ref`).
+//! The shape of a value inside an option, and the named shape the spec
+//! defines once. It serves both the JSON Schema (`$defs`) and the checking of
+//! a value (`$ref`).
 
 use std::{collections::BTreeMap, sync::OnceLock};
 
@@ -23,7 +23,8 @@ pub const LIMIT_ROLES: [&str; 6] = [
 /// What a limit of `-1` says: there is none.
 pub const NO_LIMIT: i64 = -1;
 
-const DEFS: &str = "#/$defs/";
+/// The `$ref` of the `limit` shape.
+const LIMIT_REF: &str = "#/$defs/limit";
 
 /// The shape of a value inside an option: its type and, for a list, the shape
 /// of its items, for an object, its properties and which of them are required.
@@ -68,8 +69,7 @@ impl Shape {
 
     /// The shape the `$ref` names, if this is a reference to a known one.
     pub fn target(&self) -> Option<&'static Shape> {
-        let name = self.reference.as_deref()?.strip_prefix(DEFS)?;
-        definitions().get(name)
+        (self.reference.as_deref()? == LIMIT_REF).then(limit)
     }
 
     /// Whether `value` has this shape; otherwise what is wrong, naming `at`.
@@ -157,12 +157,6 @@ impl Shape {
     }
 }
 
-/// The named shapes of the spec, by name.
-pub fn definitions() -> &'static BTreeMap<String, Shape> {
-    static DEFS_BY_NAME: OnceLock<BTreeMap<String, Shape>> = OnceLock::new();
-    DEFS_BY_NAME.get_or_init(|| BTreeMap::from([("limit".to_owned(), limit())]))
-}
-
 /// `over` laid on `base`: two objects merge per key, anything else is `over`.
 /// An object-valued option (a limit per role) is thus refined, not replaced,
 /// by each layer that sets it.
@@ -177,26 +171,29 @@ pub fn merge(base: &Value, over: &Value) -> Value {
     Value::Object(merged)
 }
 
-/// The `limit` shape every limit option shares: an integer for every role of
-/// a function, or an object that gives `default` and one per role. `-1` is no
-/// limit; a role left out takes `default`, and a `default` left out is no
-/// limit.
-fn limit() -> Shape {
-    let bound = Shape {
-        minimum: Some(NO_LIMIT),
-        ..Shape::of(OptionType::Integer)
-    };
-    let roles = std::iter::once("default")
-        .chain(LIMIT_ROLES)
-        .map(|role| (role.to_owned(), bound.clone()));
-    Shape {
-        one_of: vec![
-            bound.clone(),
-            Shape {
-                properties: roles.collect(),
-                ..Shape::of(OptionType::Object)
-            },
-        ],
-        ..Shape::default()
-    }
+/// The `limit` shape every limit option shares, defined once under `$defs`:
+/// an integer for every role of a function, or an object that gives `default`
+/// and one per role. `-1` is no limit; a role left out takes `default`, and a
+/// `default` left out is no limit.
+pub fn limit() -> &'static Shape {
+    static LIMIT: OnceLock<Shape> = OnceLock::new();
+    LIMIT.get_or_init(|| {
+        let bound = Shape {
+            minimum: Some(NO_LIMIT),
+            ..Shape::of(OptionType::Integer)
+        };
+        let roles = std::iter::once("default")
+            .chain(LIMIT_ROLES)
+            .map(|role| (role.to_owned(), bound.clone()));
+        Shape {
+            one_of: vec![
+                bound.clone(),
+                Shape {
+                    properties: roles.collect(),
+                    ..Shape::of(OptionType::Object)
+                },
+            ],
+            ..Shape::default()
+        }
+    })
 }

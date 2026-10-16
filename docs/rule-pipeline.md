@@ -370,7 +370,7 @@ judgment, meaning version and check revision.
 | Part | State |
 | --- | --- |
 | Decisions, packs, judgments, suppressions (reviewer-declared and in the code), `decisions.jsonl`, SQLite memory | done |
-| `check` providers (`builtin`, `cel` with `review`, `command`, `model`; `rpc` reserved), meaning version and check revision | done |
+| `check` providers (`builtin`, `cel` with `review`, `command`, `model`), meaning version and check revision | done |
 | `classification` with layered bindings (Revision, rule, project, agent), `provider/model` references, `model-http` (`openai` spec) and `command` providers, answer cache, budget, SARIF `review` results, `decision eval`, the label collector, `model train` plumbing | done |
 | Judgments and suppressions replace verdicts; naming alignment (`intent` → `context`, provenance fields) | done |
 | Judgments on subjects, sampling, evaluation, `Revision` records, log compaction, snapshot budgets | Phase 3 |

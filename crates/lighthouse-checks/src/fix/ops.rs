@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use cel::{Context, Program};
 use lighthouse_model::{Anchor, EditOp, Node, Owner, Project, Span, Symbol, SymbolId, SymbolKind};
 use lighthouse_plugin::{Error as PluginError, FixRequest, KeyContext};
-use lighthouse_spec::{OpSpec, ReorderScope};
+use lighthouse_spec::{OpSpec, OrderScope};
 use serde_json::{Value, json};
 
 use crate::{
@@ -27,7 +27,7 @@ enum Step {
         before: bool,
     },
     Reorder {
-        scope: ReorderScope,
+        scope: OrderScope,
         by: Vec<String>,
     },
     DeleteNode(Program),
@@ -266,7 +266,7 @@ impl<'a> Env<'a> {
     /// permutes each container on its own.
     fn reorder(
         &self,
-        scope: ReorderScope,
+        scope: OrderScope,
         by: &[String],
         request: &FixRequest,
     ) -> Result<Evaluated, PluginError> {
@@ -300,7 +300,7 @@ impl<'a> Env<'a> {
         let mut members: Vec<&Symbol> = project
             .symbols_in(&anchor.file)
             .filter(|s| orderable(project, s))
-            .filter(|s| scope == ReorderScope::File || s.owner == anchor.owner)
+            .filter(|s| scope == OrderScope::File || s.owner == anchor.owner)
             .collect();
         members.sort_by_key(|s| (s.extent.map(|e| e.start), s.id.clone()));
         let mut ranked: Vec<(Vec<u64>, usize)> = Vec::new();
@@ -331,7 +331,7 @@ impl<'a> Env<'a> {
             ));
         }
         let owner = match (scope, &anchor.owner) {
-            (ReorderScope::Owner, Some(owner)) => Owner::Symbol(owner.clone()),
+            (OrderScope::Owner, Some(owner)) => Owner::Symbol(owner.clone()),
             _ => Owner::File(anchor.file.clone()),
         };
         Ok(Ok(vec![EditOp::Reorder {

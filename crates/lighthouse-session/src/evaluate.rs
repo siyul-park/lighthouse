@@ -70,7 +70,10 @@ fn one(request: &EvalRequest, repo: &Repo, inputs: &Inputs) -> Result<Part> {
         .decision(&request.decision)
         .ok_or_else(|| format!("unknown decision `{}`", request.decision))?
         .clone();
-    let policy = session.config.models().policy(&request.decision);
+    let policy = session
+        .config
+        .models(catalog.projects())?
+        .policy(&request.decision);
     let table = inputs.baseline.map(|file| Baseline {
         file,
         repo: repo.name.as_deref(),

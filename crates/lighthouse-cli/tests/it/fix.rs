@@ -281,7 +281,6 @@ spec:
   title: Functions do not end in Old
   context: Names do not carry their history.
   scope:
-    domain: code
     subject: symbol
   requirement: A function MUST NOT have a name that ends in Old.
   severity: error
@@ -351,7 +350,6 @@ spec:
   title: Notes are upper case
   context: Notes are read from far away.
   scope:
-    domain: code
     subject: file
   requirement: A note MUST be written in upper case.
   severity: error
@@ -446,7 +444,6 @@ spec:
   title: Notes are not lowercase
   context: Notes are read from far away.
   scope:
-    domain: code
     subject: file
   requirement: A note MUST NOT be written in lower case.
   severity: error
@@ -518,7 +515,6 @@ spec:
   title: Public functions have a doc line
   context: A reader should not have to guess what an exported function is for.
   scope:
-    domain: code
     subject: symbol
   requirement: A public function MUST have a doc comment.
   severity: error

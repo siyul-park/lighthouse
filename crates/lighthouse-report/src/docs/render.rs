@@ -12,7 +12,7 @@ pub const DOCS_DIR: &str = "decisions";
 /// Markdown for every pack, keyed by path relative to the docs root.
 pub fn pages(catalog: &Catalog) -> BTreeMap<String, String> {
     catalog
-        .packs
+        .packs()
         .iter()
         .map(|pack| {
             (
@@ -40,17 +40,12 @@ pub fn decision_markdown(decision: &Decision, level: usize) -> String {
     let mut out = String::new();
     let _ = writeln!(out, "{} {}\n", "#".repeat(level), decision.title);
     let severity = decision
-        .severity()
+        .severity
         .map_or_else(|| "none".to_owned(), |s| s.to_string());
     let provider = decision
         .check
         .as_ref()
         .map_or("none", |check| check.kind.label());
-    let preset = if decision.strict() {
-        " · preset `strict`"
-    } else {
-        ""
-    };
     let mut lifecycle = String::new();
     if !decision.status.is_default() {
         let _ = write!(lifecycle, " · status `{}`", decision.status);
@@ -64,7 +59,7 @@ pub fn decision_markdown(decision: &Decision, level: usize) -> String {
     }
     let _ = writeln!(
         out,
-        "`{}` · scope `{}` · severity `{severity}` · check `{provider}`{lifecycle}{preset}\n",
+        "`{}` · scope `{}` · severity `{severity}` · check `{provider}`{lifecycle}\n",
         decision.id(),
         decision.scope.subject,
     );

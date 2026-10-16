@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: design/naming
   uid: 20d2afee-ae3b-4690-9bb7-885cb98ded94
-  labels:
-    lighthouse/pack: design
-    lighthouse/section: naming
 spec:
   title: Names are short, standard and say what they mean
   context: >-
@@ -43,7 +40,6 @@ spec:
     name, are put to a model, with the requirement and the examples as the
     question.
   scope:
-    domain: code
     subject: symbol
   requirement: >-
     Package, receiver, phase, or representation MUST NOT be repeated in a name
@@ -66,7 +62,6 @@ spec:
     unless they are the same concept.
   severity: warn
   options:
-    type: object
     properties:
       kinds:
         type: array

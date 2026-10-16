@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: design/signature
   uid: a8c094cf-597d-4bfa-bc8d-a1fc1b9f03f9
-  labels:
-    lighthouse/pack: design
-    lighthouse/section: functions
 spec:
   title: A signature is short, public and narrow
   context: >-
@@ -40,7 +37,6 @@ spec:
     Narrow inputs are judged: a public function that takes a project type is
     put to a model, with the requirement and the examples as the question.
   scope:
-    domain: code
     subject: symbol
   requirement: >-
     A function SHOULD NOT take more parameters, or return more results, than
@@ -52,7 +48,6 @@ spec:
     the most concrete public type unless polymorphism is itself the contract.
   severity: warn
   options:
-    type: object
     properties:
       kinds:
         type: array

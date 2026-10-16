@@ -210,16 +210,6 @@
         }
       ]
     },
-    "ModelOutput": {
-      "description": "How a `command` model prints its answer.",
-      "oneOf": [
-        {
-          "const": "json",
-          "description": "stdout is one JSON value.",
-          "type": "string"
-        }
-      ]
-    },
     "ModelProvider": {
       "description": "A provider of models, named under `[models.providers.<name>]`: a provider,\nas a check or a fix is. A model is named `<provider>/<model>`.",
       "oneOf": [
@@ -283,12 +273,8 @@
                 "null"
               ]
             },
-            "output": {
-              "$ref": "#/$defs/ModelOutput",
-              "default": "json"
-            },
             "pointer": {
-              "description": "RFC 6901 JSON Pointer to the answer inside the printed JSON, when\nthe program wraps it in an envelope.",
+              "description": "RFC 6901 JSON Pointer to the answer inside the printed JSON (stdout\nis one JSON value), when the program wraps it in an envelope.",
               "type": [
                 "string",
                 "null"

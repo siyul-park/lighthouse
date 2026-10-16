@@ -18,7 +18,7 @@ use lighthouse_model::{Diagnostic, ModelRef, hash};
 use lighthouse_plugin::{
     Abstained, Answered, Ask, Classifier, Model, Models, Question, Settle, Subject,
 };
-use lighthouse_spec::{ModelBinding, Routing};
+use lighthouse_spec::{Models as BoundModels, Routing};
 use serde::{Deserialize, Serialize};
 
 use super::{batch::Pending, instance::Host};
@@ -61,7 +61,7 @@ impl<'a> Route<'a> {
 /// where answers are kept.
 pub(super) struct RunModels<'a> {
     host: Host<'a>,
-    pub(super) binding: &'a ModelBinding,
+    pub(super) binding: &'a BoundModels,
     /// The model attached to a decision by a revision, by decision id.
     attached: &'a BTreeMap<String, String>,
     /// The paths whose findings the run reports; the whole project when it
@@ -103,7 +103,7 @@ impl super::Engine {
     /// The model `reference` (`<provider>/<model>`) as a classifier, for the
     /// commands that train and evaluate it.
     pub fn model(&self, reference: &str) -> Result<Box<dyn Classifier + '_>, super::Error> {
-        let binding = self.config.models();
+        let binding = &self.binding;
         let unknown = || super::Error::UnknownModel(reference.to_owned());
         let model = ModelRef::parse(reference).ok_or_else(unknown)?;
         let provider = binding.provider(model.provider).ok_or_else(unknown)?;
@@ -120,7 +120,7 @@ impl super::Engine {
 
     /// The models of a run that reports `scopes`.
     pub(super) fn run_models<'a>(&'a self, scopes: &'a [PathBuf]) -> RunModels<'a> {
-        let binding = self.config.models();
+        let binding = &self.binding;
         RunModels::new(
             self.host(),
             binding,
@@ -134,7 +134,7 @@ impl super::Engine {
 impl<'a> RunModels<'a> {
     pub(super) fn new(
         host: Host<'a>,
-        binding: &'a ModelBinding,
+        binding: &'a BoundModels,
         options: &'a super::ModelOptions,
         scopes: &'a [PathBuf],
         cache_dir: Option<&std::path::Path>,
@@ -262,7 +262,7 @@ impl<'a> RunModels<'a> {
         let attached = self.attached.get(rule).map(|model| vec![model.clone()]);
         let layers = [
             attached,
-            self.binding.rules.get(rule).cloned(),
+            self.binding.route(rule).map(<[String]>::to_vec),
             Some(self.binding.classification.clone()),
         ];
         let mut found: Vec<Route<'a>> = Vec::new();
@@ -362,19 +362,6 @@ impl<'a> RunModels<'a> {
             .is_ok()
     }
 
-    fn key(&self, model: &str, version: &str, ask: &Ask, subject: &Subject) -> crate::cache::Key {
-        // The check's revision, the model at its version, what the model reads
-        // of the subject and what it is asked. The band is not part of it: the
-        // cache holds the raw probability.
-        let mut key = KeyBuilder::new();
-        key.part("model-answer")
-            .part(&ask.revision)
-            .part(format!("{model}@{version}"))
-            .part(digest_of(&subject.state))
-            .part(digest_of(&Question::new(&ask.decision)));
-        key.finish()
-    }
-
     pub(super) fn recall(&self, manifest: &Model, ask: &Ask, subject: &Subject) -> Option<f64> {
         let kept: Kept =
             self.answers
@@ -387,6 +374,19 @@ impl<'a> RunModels<'a> {
         let Some(answers) = &self.answers else { return };
         let key = self.key(&manifest.id, &manifest.version, ask, subject);
         answers.put(key, &Kept { noul });
+    }
+
+    fn key(&self, model: &str, version: &str, ask: &Ask, subject: &Subject) -> crate::cache::Key {
+        // The check's revision, the model at its version, what the model reads
+        // of the subject and what it is asked. The band is not part of it: the
+        // cache holds the raw probability.
+        let mut key = KeyBuilder::new();
+        key.part("model-answer")
+            .part(&ask.revision)
+            .part(format!("{model}@{version}"))
+            .part(digest_of(&subject.state))
+            .part(digest_of(&Question::new(&ask.decision)));
+        key.finish()
     }
 }
 

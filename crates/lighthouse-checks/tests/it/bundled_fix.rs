@@ -10,9 +10,6 @@ const DECISION: &str = r#"apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: demo/shout
-  labels:
-    lighthouse/pack: demo
-    lighthouse/section: s
 spec:
   title: Scratch notes are emptied
   context: A scratch note holds nothing.

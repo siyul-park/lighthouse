@@ -13,7 +13,8 @@ use serde_json::{Value, json};
 
 const EXAMPLES_JSON: &str = r#"[{"name":"bad","language":"text","kind":"invalid","files":[{"path":"a.txt","body":"x"}],"expect":[{"line":1}]},{"name":"good","language":"text","kind":"valid","files":[{"path":"a.txt","body":"x"}]}]"#;
 
-const LOCAL_HEAD: &str = "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/select\n  labels:\n    lighthouse/pack: local\n    lighthouse/section: rules\nspec: ";
+const LOCAL_HEAD: &str =
+    "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/select\nspec: ";
 
 /// The decision `spec` whose `where` is the `review` route of its cel check:
 /// what the check puts to a model.

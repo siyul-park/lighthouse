@@ -60,7 +60,7 @@ pub fn attach(request: &EvalRequest, approval: Attribution) -> Result<Attachment
     let report = eval(request)?;
     let evaluation = evidence(&report, &model, &session.root)?;
     let mut reasons = attachable(&report);
-    if records.attached().get(key_of(decision)) == Some(&model) {
+    if records.attached().get(decision.key()) == Some(&model) {
         reasons.push(format!("`{model}` is already attached"));
     }
     let revision = if reasons.is_empty() {
@@ -95,7 +95,7 @@ pub fn detach(config: Option<&Path>, decision: &str, approval: Attribution) -> R
     let records = Records::read(&session.root)?;
     let model = records
         .attached()
-        .remove(key_of(found))
+        .remove(found.key())
         .ok_or_else(|| format!("no model is attached to `{decision}`"))?;
     let revision = append(
         &session.root,
@@ -114,15 +114,10 @@ pub fn detach(config: Option<&Path>, decision: &str, approval: Attribution) -> R
     })
 }
 
-/// How the log names a decision: its uid, else its id.
-pub(crate) fn key_of(decision: &Decision) -> &str {
-    decision.uid().unwrap_or_else(|| decision.id())
-}
-
 /// Appends `revision` to the log and gives its id.
 fn append(root: &Path, revision: Revision) -> Result<String> {
     let decision = revision.decision;
-    let key = key_of(decision);
+    let key = decision.key();
     Ok(append_revision(
         root,
         RevisionSpec {

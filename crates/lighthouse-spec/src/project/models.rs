@@ -1,23 +1,23 @@
 //! What a project says about the models that judge its decisions, and about
 //! how a decision's check is evaluated.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
-use lighthouse_resource::Duration;
 use serde_json::{Map, Value};
 
+use lighthouse_resource::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{RuleSetting, spec::ProjectSpec};
+use super::Rules;
 
 /// Requests a run may send to models that cost, unless the project says.
-pub const DEFAULT_BUDGET: usize = 200;
+const DEFAULT_BUDGET: usize = 200;
 /// The precision a check must reach unless the project says.
-pub const DEFAULT_PRECISION: f64 = 0.9;
+const DEFAULT_PRECISION: f64 = 0.9;
 /// The share of the answers of an attached model that are sent on, unless the
 /// project says.
-pub const DEFAULT_EXPLORE: f64 = 0.05;
+const DEFAULT_EXPLORE: f64 = 0.05;
 
 /// The specs a provider may name, and what each needs by default.
 const SPECS: [(&str, &str, &str); 2] = [
@@ -26,14 +26,14 @@ const SPECS: [(&str, &str, &str); 2] = [
 ];
 
 /// The plugin that speaks the standard APIs.
-pub const API_PLUGIN: &str = "model-http";
+const API_PLUGIN: &str = "model-http";
 
 /// The plugin that learns from a decision's labels, on this machine.
-pub const LOCAL_PLUGIN: &str = "model-local";
+const LOCAL_PLUGIN: &str = "model-local";
 
 /// Names a project may not give a provider: they belong to the providers
 /// Lighthouse will predefine.
-pub const RESERVED: [&str; 2] = ["local", "anthropic"];
+pub const RESERVED_PROVIDERS: [&str; 2] = ["local", "anthropic"];
 
 /// What a `command` model is given on stdin.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -44,15 +44,6 @@ pub enum ModelInput {
     Request,
     /// The request as text for a language model, with the answer's shape.
     Prompt,
-}
-
-/// How a `command` model prints its answer.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum ModelOutput {
-    /// stdout is one JSON value.
-    #[default]
-    Json,
 }
 
 /// A provider of models, named under `[models.providers.<name>]`: a provider,
@@ -83,10 +74,9 @@ pub enum ModelProvider {
         argv: Vec<String>,
         #[serde(default)]
         stdin: ModelInput,
-        #[serde(default)]
-        output: ModelOutput,
-        /// RFC 6901 JSON Pointer to the answer inside the printed JSON, when
-        /// the program wraps it in an envelope.
+        /// RFC 6901 JSON Pointer to the answer inside the printed JSON (stdout
+        /// is one JSON value), when the program wraps it in an envelope.
+
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pointer: Option<String>,
         /// Default: `classification`.
@@ -109,6 +99,30 @@ pub enum ModelProvider {
 }
 
 impl ModelProvider {
+    /// The providers Lighthouse predefines: the standard APIs, at their own
+    /// service, and `local`, which costs nothing. Declare a provider of the
+    /// same name to override an API; `local` is reserved.
+    pub fn predefined(name: &str) -> Option<Self> {
+        if name == "local" {
+            return Some(Self::Rpc {
+                plugin: LOCAL_PLUGIN.to_owned(),
+                options: Map::new(),
+                cost: Some(0.0),
+            });
+        }
+        SPECS.iter().find(|(spec, ..)| *spec == name)?;
+        ProviderSpec::Api(ApiProvider {
+            spec: Names::One(name.to_owned()),
+            base_url: None,
+            key_env: None,
+            cost: None,
+            logprobs: None,
+            extra_body: None,
+        })
+        .resolve()
+        .ok()
+    }
+
     /// Whether asking this provider reaches a service outside the machine: a
     /// standard API, or a program that is given an API key.
     pub fn remote(&self) -> bool {
@@ -160,15 +174,12 @@ pub enum Names {
 
 impl Names {
     /// The names, in the order written.
-    pub fn names(&self) -> Vec<&str> {
-        match self {
-            Self::One(name) => vec![name.as_str()],
-            Self::Many(names) => names.iter().map(String::as_str).collect(),
-        }
-    }
-
-    fn owned(&self) -> Vec<String> {
-        self.names().into_iter().map(str::to_owned).collect()
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        let names = match self {
+            Self::One(name) => std::slice::from_ref(name),
+            Self::Many(names) => names.as_slice(),
+        };
+        names.iter().map(String::as_str)
     }
 }
 
@@ -189,16 +200,17 @@ pub enum Routing {
 #[serde(untagged)]
 pub enum ProviderSpec {
     Api(ApiProvider),
-    Provider(ModelProvider),
+    Plugin(ModelProvider),
 }
 
 impl ProviderSpec {
     /// The provider this is, or why it cannot be.
     pub fn resolve(&self) -> Result<ModelProvider, String> {
         match self {
-            Self::Provider(provider) => Ok(provider.clone()),
+            Self::Plugin(provider) => Ok(provider.clone()),
             Self::Api(api) => {
-                let names = api.spec.names();
+                let names: Vec<&str> = api.spec.iter().collect();
+
                 let (_, base, key) = SPECS
                     .iter()
                     .find(|(spec, ..)| names.contains(spec))
@@ -294,44 +306,28 @@ impl Default for Evaluation {
 }
 
 /// The models of a project and the evaluation policies, resolved from its
-/// `models` table and its rules.
+/// `models` table and the rules it and the projects it extends set.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct ModelBinding {
+pub struct Models {
     /// The project's route for decisions no rule binds.
     pub classification: Vec<String>,
-    /// The route a rule names for its decision, by decision id.
-    pub rules: BTreeMap<String, Vec<String>>,
     /// Which model of a route a request starts at.
     pub routing: Routing,
     /// The providers the project defines, by name.
     pub providers: BTreeMap<String, ModelProvider>,
     /// Providers that cannot work, by name, and why.
     pub invalid: BTreeMap<String, String>,
-    /// The evaluation policy a rule sets, by decision id.
-    pub evaluation: BTreeMap<String, Evaluation>,
     pub budget: usize,
     /// The share of an attached model's fails that are sent on.
     pub explore: f64,
+    /// The rules, from which each decision's route and evaluation policy come.
+    rules: Arc<Rules>,
 }
 
-impl ModelBinding {
-    pub(super) fn of(spec: &ProjectSpec) -> Self {
-        let details = spec.rules.iter().filter_map(|(id, setting)| match setting {
-            RuleSetting::Detailed(detail) => Some((id, detail)),
-            RuleSetting::Level(_) => None,
-        });
-        let mut rules = BTreeMap::new();
-        let mut evaluation = BTreeMap::new();
-        for (id, detail) in details {
-            if let Some(model) = &detail.model {
-                rules.insert(id.clone(), model.owned());
-            }
-            if let Some(policy) = detail.evaluation {
-                evaluation.insert(id.clone(), policy);
-            }
-        }
-        let models = &spec.models;
+impl Models {
+    pub(super) fn new(models: &ModelsSpec) -> Self {
         let mut providers = BTreeMap::new();
+
         let mut invalid = BTreeMap::new();
         for (name, provider) in &models.providers {
             match provider.resolve() {
@@ -343,59 +339,65 @@ impl ModelBinding {
             classification: models
                 .classification
                 .as_ref()
-                .map(Names::owned)
+                .map(|names| names.iter().map(str::to_owned).collect())
                 .unwrap_or_default(),
-            rules,
             routing: models.routing.unwrap_or_default(),
             providers,
             invalid,
-            evaluation,
             budget: models.budget.unwrap_or(DEFAULT_BUDGET),
             explore: models.explore.unwrap_or(DEFAULT_EXPLORE),
+            rules: Arc::default(),
         }
     }
 
-    /// The provider of that name: the project's own, else a preset.
+    /// These models with the routes and policies of `rules`.
+    pub(super) fn with_rules(&self, rules: Arc<Rules>) -> Self {
+        Self {
+            rules,
+            ..self.clone()
+        }
+    }
+
+    /// The provider of that name: the project's own, else a predefined one.
     pub fn provider(&self, name: &str) -> Option<ModelProvider> {
-        self.providers.get(name).cloned().or_else(|| builtin(name))
+        self.providers
+            .get(name)
+            .cloned()
+            .or_else(|| ModelProvider::predefined(name))
+    }
+
+    /// The route a rule names for its decision.
+    pub fn route(&self, rule: &str) -> Option<&[String]> {
+        self.rules.get(rule)?.model.as_deref()
+    }
+
+    /// The routes rules name, by decision id.
+    pub fn routes(&self) -> impl Iterator<Item = (&str, &[String])> {
+        self.rules
+            .iter()
+            .filter_map(|(id, rule)| Some((id.as_str(), rule.model.as_deref()?)))
     }
 
     /// Every model reference the project binds.
     pub fn ids(&self) -> impl Iterator<Item = &str> {
         self.classification
             .iter()
-            .chain(self.rules.values().flatten())
+            .chain(
+                self.rules
+                    .values()
+                    .filter_map(|r| r.model.as_ref())
+                    .flatten(),
+            )
             .map(String::as_str)
     }
 
     /// The evaluation policy of a rule: what the project sets, else the default.
     pub fn policy(&self, rule: &str) -> Evaluation {
-        self.evaluation.get(rule).copied().unwrap_or_default()
+        self.rules
+            .get(rule)
+            .and_then(|r| r.evaluation)
+            .unwrap_or_default()
     }
-}
-
-/// The providers Lighthouse predefines: the standard APIs, at their own
-/// service, and `local`, which costs nothing. Declare a provider of the same
-/// name to override an API; `local` is reserved.
-pub fn builtin(name: &str) -> Option<ModelProvider> {
-    if name == "local" {
-        return Some(ModelProvider::Rpc {
-            plugin: LOCAL_PLUGIN.to_owned(),
-            options: Map::new(),
-            cost: Some(0.0),
-        });
-    }
-    SPECS.iter().find(|(spec, ..)| *spec == name)?;
-    ProviderSpec::Api(ApiProvider {
-        spec: Names::One(name.to_owned()),
-        base_url: None,
-        key_env: None,
-        cost: None,
-        logprobs: None,
-        extra_body: None,
-    })
-    .resolve()
-    .ok()
 }
 
 fn default_tasks() -> Vec<String> {

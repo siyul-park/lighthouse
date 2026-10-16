@@ -99,7 +99,7 @@ impl Sets {
         let mut layered: Vec<(Catalog, Vec<String>)> = Vec::new();
         let known: BTreeSet<String> = session
             .catalog()?
-            .projects()?
+            .projects()
             .names()
             .map(str::to_owned)
             .chain(self.projects.iter().map(|(_, p)| p.metadata.name.clone()))

@@ -592,7 +592,7 @@ fn construction_validates_plugins_presets_rules_and_options() {
     ));
     assert!(matches!(
         err("plugins = [\"fake\"]\nextends = [\"fake/zzz\"]"),
-        Error::Project(_)
+        Error::Spec(_)
     ));
     assert!(matches!(
         err("plugins = [\"fake\"]\n[rules]\n\"fake/zzz\" = \"warn\""),
@@ -712,25 +712,23 @@ fn active_rules() {
     let config = |toml: &str| Config::parse_inline(toml).unwrap();
     let team =
         Catalog::from_local(BTreeMap::from([("team.yaml".to_owned(), TEAM.to_owned())])).unwrap();
-    let projects = Catalog::overlay(Catalog::bundled(), &team)
-        .unwrap()
-        .projects()
-        .unwrap();
+    let overlaid = Catalog::overlay(Catalog::bundled(), &team).unwrap();
+    let projects = overlaid.projects();
     let from_project = lighthouse_engine::active_rules(
         &config("plugins = [\"fake\"]\nextends = [\"fake/p\"]\n"),
-        &projects,
+        projects,
     )
     .unwrap();
     assert_eq!(from_project.into_iter().collect::<Vec<_>>(), ["fake/each"]);
 
     let set_by_entry = lighthouse_engine::active_rules(
         &config("plugins = [\"fake\"]\n[rules]\n\"fake/all\" = \"warn\"\n"),
-        &projects,
+        projects,
     )
     .unwrap();
     assert_eq!(set_by_entry.into_iter().collect::<Vec<_>>(), ["fake/all"]);
 
-    let unknown = lighthouse_engine::active_rules(&config("extends = [\"nope/p\"]\n"), &projects);
+    let unknown = lighthouse_engine::active_rules(&config("extends = [\"nope/p\"]\n"), projects);
     assert!(unknown.is_err());
 }
 

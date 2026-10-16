@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: core/file-size
   uid: e6ca5b54-89c2-4528-b9a1-8db7d6de564b
-  labels:
-    lighthouse/pack: core
-    lighthouse/section: limits
 spec:
   title: Files stay small and cohesive
   context: >-
@@ -27,7 +24,6 @@ spec:
     Only files of a language provider are counted: prose and data have no
     syntax to wrap at. A file reports once, with the kind that matched first.
   scope:
-    domain: code
     subject: file
     generated: true
     tests: include
@@ -39,7 +35,6 @@ spec:
     configured number of columns (option `maxWidth`).
   severity: warn
   options:
-    type: object
     properties:
       kinds:
         type: array

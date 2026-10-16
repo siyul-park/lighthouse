@@ -100,9 +100,7 @@ impl DeclarativeRule {
                 let analyzers = rule.analyzers();
                 (Kind::Cel(Box::new(rule)), analyzers)
             }
-            CheckKind::Builtin(BuiltinCheck::Named(_)) | CheckKind::Rpc(_) => {
-                return Ok(None);
-            }
+            CheckKind::Builtin(BuiltinCheck::Named(_)) => return Ok(None),
         };
         let mut meta = rule_manifest(decision)
             .ok_or_else(|| Error::invalid(id, "the decision has no severity or check"))?;
@@ -112,7 +110,7 @@ impl DeclarativeRule {
             decision.uid(),
             &decision.check,
             &decision.scope,
-            decision.severity(),
+            decision.severity,
             &decision.options,
             &decision.languages,
         ))

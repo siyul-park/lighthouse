@@ -11,7 +11,11 @@ fn provider(argv: &str) -> lighthouse_spec::ModelProvider {
         "plugins = []\n[models.providers.p]\ntype = \"command\"\nargv = {argv}\n"
     ))
     .unwrap();
-    config.models().provider("p").unwrap()
+    config
+        .models(&lighthouse_spec::Projects::default())
+        .unwrap()
+        .provider("p")
+        .unwrap()
 }
 
 fn request() -> SystemOneRequest {
@@ -65,7 +69,11 @@ fn command_new_is_none_for_a_provider_that_is_not_a_command() {
         "plugins = []\n[models.providers.p]\ntype = \"rpc\"\nplugin = \"x\"\n",
     )
     .unwrap();
-    let provider = config.models().provider("p").unwrap();
+    let provider = config
+        .models(&lighthouse_spec::Projects::default())
+        .unwrap()
+        .provider("p")
+        .unwrap();
 
     assert!(Command::new(dir.path(), "p/m", "m", &provider).is_none());
 }

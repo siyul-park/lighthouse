@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: testing/public-boundary
   uid: 88a25428-d3d8-43c5-adf4-a2d99a45ffa6
-  labels:
-    lighthouse/pack: testing
-    lighthouse/section: public-boundary
 spec:
   title: Contract tests live outside the target
   context: >-
@@ -26,7 +23,6 @@ spec:
 
     TypeScript: Contract tests import only the package's public exports.
   scope:
-    domain: code
     subject: test
     tests: only
   requirement: >-

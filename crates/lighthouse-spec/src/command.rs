@@ -137,15 +137,12 @@ impl CommandCheck {
         if KNOWN.contains(&self.argv[0].as_str()) {
             return Some("check: the program cannot be a placeholder".to_owned());
         }
-        if let Some(arg) = self
-            .argv
-            .iter()
-            .find(|a| !KNOWN.contains(&a.as_str()) && (a.contains('{') && a.contains('}')))
-        {
-            return Some(format!(
-                "check: `{arg}` is not a placeholder of its own: `{{file}}`, `{{files}}` and `{{rule}}` fill a whole argument"
-            ));
+        if let Some(problem) = mixed_placeholder(&self.argv, &KNOWN, |arg| {
+            arg.contains('{') && arg.contains('}')
+        }) {
+            return Some(format!("check: {problem}"));
         }
+
         let uses = |p: &str| self.argv.iter().any(|a| a == p);
         if uses("{files}") && self.batch == Batch::File {
             return Some("check: `{files}` needs `batch: all`".to_owned());
@@ -187,6 +184,25 @@ impl CommandCheck {
         }
         None
     }
+}
+
+/// Why an argument of `argv` is neither one of the `known` placeholders nor
+/// free of them: a placeholder fills a whole argument, and `mixes` says which
+/// arguments are not text of their own.
+pub(crate) fn mixed_placeholder(
+    argv: &[String],
+    known: &[&str],
+    mixes: impl Fn(&str) -> bool,
+) -> Option<String> {
+    let arg = argv
+        .iter()
+        .find(|arg| !known.contains(&arg.as_str()) && mixes(arg))?;
+    let (last, init) = known.split_last()?;
+    let init: Vec<String> = init.iter().map(|k| format!("`{k}`")).collect();
+    Some(format!(
+        "`{arg}` is not a placeholder of its own: {} and `{last}` fill a whole argument",
+        init.join(", ")
+    ))
 }
 
 fn default_clean() -> Vec<i32> {

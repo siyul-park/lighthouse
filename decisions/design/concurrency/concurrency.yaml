@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: design/concurrency
   uid: bec19263-cf17-4684-9885-cb5eabdb378a
-  labels:
-    lighthouse/pack: design
-    lighthouse/section: concurrency
 spec:
   title: Cancellation is explicit and tasks can be stopped
   context: >-
@@ -25,7 +22,6 @@ spec:
     a goroutine, which no fact carries, so the requirement and the examples
     are the question put to a model.
   scope:
-    domain: code
     subject: symbol
   requirement: >-
     Blocking, I/O, and process-boundary operations MUST take the cancellation
@@ -34,7 +30,6 @@ spec:
     shutdown path.
   severity: warn
   options:
-    type: object
     properties:
       kinds:
         type: array

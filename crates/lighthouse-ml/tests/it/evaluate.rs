@@ -281,15 +281,9 @@ fn gathered_add_and_finish_pool_the_repositories_into_one_report() {
 #[test]
 fn setup_read_adds_the_candidate_file_to_the_decisions_of_the_project() {
     let dir = tempfile::tempdir().unwrap();
-    let text = Catalog::decision_text(Catalog::bundled().decision(RULE).unwrap()).unwrap();
+    let text = Catalog::decision_text(Catalog::bundled().decision(RULE).unwrap());
     let file = dir.path().join("candidate.yaml");
-    fs::write(
-        &file,
-        text.replace(RULE, "local/probe")
-            .replace("lighthouse/pack: core", "lighthouse/pack: local")
-            .replace("lighthouse/section: limits", "lighthouse/section: rules"),
-    )
-    .unwrap();
+    fs::write(&file, text.replace(RULE, "local/probe")).unwrap();
 
     let (id, setup) = Setup::read(dir.path(), &file).unwrap();
     assert_eq!(id, "local/probe");

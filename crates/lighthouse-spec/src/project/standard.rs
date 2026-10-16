@@ -1,9 +1,8 @@
 //! The projects every pack has: `<pack>/recommended` holds each enforced
-//! decision that is not `strict` at its authored severity, and
-//! `<pack>/strict` holds every enforced one, with every kind of a decision
-//! whose `kinds` option switches only some on by default. `strict` is present
-//! only when some decision of the pack asks for it. They derive from the
-//! decisions, so a catalog never lists them.
+//! decision at its authored severity, and `<pack>/strict` the same with every
+//! kind of a decision whose `kinds` option switches only some on by default.
+//! `strict` is present only when some decision of the pack has such an option.
+//! They derive from the decisions, so a catalog never lists them.
 
 use lighthouse_model::{
     Options,
@@ -11,13 +10,13 @@ use lighthouse_model::{
 };
 use serde_json::Value;
 
-use super::{Level, Metadata, ProjectSpec, Resource, RuleDetail, RuleSetting};
+use super::{Level, Metadata, ProjectSpec, Resource, RuleSetting, rules::RuleDetail};
 use crate::{BuiltinCheck, Catalog, CheckKind, Decision, FORMATTED, Pack, options::KINDS};
 
 /// The standard projects of every pack of `catalog`, pack by pack.
 pub(crate) fn standard(catalog: &Catalog) -> Vec<Resource<ProjectSpec>> {
     let mut projects = Vec::new();
-    for pack in &catalog.packs {
+    for pack in catalog.packs() {
         let rules: Vec<&Decision> = pack
             .sections
             .iter()
@@ -25,7 +24,7 @@ pub(crate) fn standard(catalog: &Catalog) -> Vec<Resource<ProjectSpec>> {
             .filter(|d| runs_as_rule(d) && d.enforced())
             .collect();
         projects.push(project(pack, &rules, false));
-        if rules.iter().any(|d| d.strict() || every_kind(d).is_some()) {
+        if rules.iter().any(|d| every_kind(d).is_some()) {
             projects.push(project(pack, &rules, true));
         }
     }
@@ -35,9 +34,8 @@ pub(crate) fn standard(catalog: &Catalog) -> Vec<Resource<ProjectSpec>> {
 fn project(pack: &Pack, rules: &[&Decision], strict: bool) -> Resource<ProjectSpec> {
     let rules = rules
         .iter()
-        .filter(|d| strict || !d.strict())
         .filter_map(|d| {
-            let level = Level::from(Some(d.severity()?));
+            let level = Level::from(Some(d.severity?));
             let setting = match every_kind(d).filter(|_| strict) {
                 Some(kinds) => RuleSetting::Detailed(RuleDetail {
                     level,
@@ -51,6 +49,7 @@ fn project(pack: &Pack, rules: &[&Decision], strict: bool) -> Resource<ProjectSp
             Some((d.id().to_owned(), setting))
         })
         .collect();
+
     let name = if strict { "strict" } else { "recommended" };
     Resource::new(
         Metadata::named(format!("{}/{name}", pack.id)),
@@ -83,6 +82,6 @@ fn runs_as_rule(decision: &Decision) -> bool {
         CheckKind::Builtin(BuiltinCheck::Named(named)) => {
             [ANNOTATION_REASON, UNUSED_ALLOW, FORMATTED].contains(&named.id.as_str())
         }
-        CheckKind::Rpc(_) | CheckKind::Model(_) => false,
+        CheckKind::Model(_) => false,
     }
 }

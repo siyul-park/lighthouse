@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: design/layers
   uid: be0e8004-85e1-4b34-abb9-30dc46192e5c
-  labels:
-    lighthouse/pack: design
-    lighthouse/section: dependency-direction
 spec:
   title: Dependencies point down the layers
   context: >-
@@ -50,7 +47,6 @@ spec:
     meaning of the code and are judged: the requirement and the examples are the
     question put to a model.
   scope:
-    domain: code
     subject: edge
   requirement: >-
     Interfaces MUST be used only when callers supply behavior and MUST be
@@ -61,7 +57,6 @@ spec:
     layer MUST stay independent of each other, as the project's layers state.
   severity: warn
   options:
-    type: object
     properties:
       layers:
         type: array

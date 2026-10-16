@@ -37,8 +37,8 @@ pub struct BoundModel {
 /// The models of the project bound to decisions matching `decisions` (ids and
 /// globs; all when empty), in a stable order.
 pub fn bound_models(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> {
-    let bound = session.config.models();
     let catalog = session.catalog()?;
+    let bound = session.config.models(catalog.projects())?;
     let known: Vec<&str> = catalog.decisions().map(|d| d.id()).collect();
     let selector = Selector::new(decisions)?;
     selector.expand(known.iter().copied())?;
@@ -48,10 +48,10 @@ pub fn bound_models(session: &Session, decisions: &[String]) -> Result<Vec<Bound
             .is_some_and(|provider| provider.remote())
     };
     let mut found = Vec::new();
-    let mut bind = |model: &String, decision: Option<&String>, binding| {
+    let mut bind = |model: &String, decision: Option<&str>, binding| {
         found.push(BoundModel {
             model: model.clone(),
-            decision: decision.cloned(),
+            decision: decision.map(str::to_owned),
             binding,
             remote: remote(model),
         });
@@ -62,7 +62,7 @@ pub fn bound_models(session: &Session, decisions: &[String]) -> Result<Vec<Bound
         }
     }
     let attached: BTreeMap<String, String> = attached_models(&session.root, &catalog);
-    for (decision, models) in &bound.rules {
+    for (decision, models) in bound.routes() {
         if selector.matches(decision) {
             for model in models {
                 bind(model, Some(decision), Binding::Rule);
@@ -71,7 +71,7 @@ pub fn bound_models(session: &Session, decisions: &[String]) -> Result<Vec<Bound
     }
     for (decision, model) in &attached {
         if selector.matches(decision) {
-            bind(model, Some(decision), Binding::Attached);
+            bind(model, Some(decision.as_str()), Binding::Attached);
         }
     }
     Ok(found)

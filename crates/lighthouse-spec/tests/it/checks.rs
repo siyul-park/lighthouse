@@ -1,7 +1,7 @@
 //! The providers a `check:` block can name, and what the types around them say.
 
 use lighthouse_spec::{
-    Batch, BuiltinCheck, Catalog, Check, CheckKind, CheckOutput, CommandCheck, Decision,
+    Batch, BuiltinCheck, BuiltinOp, Catalog, Check, CheckKind, CheckOutput, CommandCheck, Decision,
     DecisionStatus, ExitCodes, ModelCheck, NamedRule,
 };
 use lighthouse_test_support::catalog::*;
@@ -16,11 +16,22 @@ fn bundled(id: &str) -> &'static Decision {
 }
 
 #[test]
-fn check_is_automated_unless_a_model_answers_it() {
+fn builtin_op() {
+    let check = bundled("design/declaration-groups").check.as_ref().unwrap();
+
+    let CheckKind::Builtin(BuiltinCheck::Op(op)) = &check.kind else {
+        panic!("a standard operation expected");
+    };
+
+    assert!(matches!(op, BuiltinOp::Order { clauses, .. } if !clauses.is_empty()));
+}
+
+#[test]
+fn check_is_deterministic_unless_a_model_answers_it() {
     let cel = check(json!({"type":"cel","select":"file","where":"true","message":"m"})).unwrap();
-    assert!(cel.is_automated());
-    let model = Check::of(CheckKind::Model(ModelCheck::default()));
-    assert!(!model.is_automated());
+    assert!(cel.kind.deterministic());
+    let model = Check::new(CheckKind::Model(ModelCheck::default()));
+    assert!(!model.kind.deterministic());
 }
 
 #[test]
@@ -161,8 +172,8 @@ fn a_supersession_names_decisions_that_exist_and_are_marked_superseded() {
         let old = format!("{SPEC}  status: {old_status}\n");
         let new = format!("{SPEC}  supersedes: [{supersedes}]\n");
         let mut files = base();
-        files.insert("p/s/old.yaml".into(), decision("p/old", "s", &old));
-        files.insert("p/s/new.yaml".into(), decision("p/new", "s", &new));
+        files.insert("p/s/old.yaml".into(), decision("p/old", &old));
+        files.insert("p/s/new.yaml".into(), decision("p/new", &new));
         files.insert(
             "p/pack.yaml".into(),
             pack("p", &[("s", &["a", "old", "new"])]),
@@ -216,7 +227,6 @@ fn a_standard_operation_needs_the_scope_it_judges() {
     let load = |scope: &str, check: &str| {
         let text = decision(
             "p/a",
-            "s",
             &format!(
                 "  title: A\n  context: i\n  scope: {{ subject: {scope} }}\n  requirement: A MUST b.\n{check}{examples}"
             ),
@@ -247,7 +257,7 @@ fn supersession_that_goes_round_in_a_circle_is_an_error_of_any_length() {
         for (from, to) in links {
             let name = from.rsplit('/').next().unwrap();
             let spec = format!("{SPEC}  status: superseded\n  supersedes: [{to}]\n");
-            files.insert(format!("p/s/{name}.yaml"), decision(from, "s", &spec));
+            files.insert(format!("p/s/{name}.yaml"), decision(from, &spec));
         }
         let names: Vec<&str> = ids.iter().map(|i| i.rsplit('/').next().unwrap()).collect();
         let mut all = vec!["a"];

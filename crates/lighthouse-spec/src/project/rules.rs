@@ -5,6 +5,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, de};
 use serde_json::Value;
 
+use super::models::{Evaluation, Names};
+
 /// Rule id to its configured level and options.
 pub type Rules = BTreeMap<String, RuleConfig>;
 
@@ -17,6 +19,41 @@ pub struct RuleConfig {
     /// Whether generated code is checked by this rule; `None` leaves it to
     /// the project's `generated.check` and the decision's scope.
     pub generated: Option<bool>,
+    /// The models that judge this decision, before the project's
+    /// `models.classification`.
+    pub model: Option<Vec<String>>,
+    /// How `lighthouse eval` judges this rule's check.
+    pub evaluation: Option<Evaluation>,
+}
+
+impl RuleConfig {
+    /// A rule at `level`, with nothing else said.
+    pub fn new(level: Option<Severity>) -> Self {
+        Self {
+            level,
+            options: Options::new(),
+            generated: None,
+            model: None,
+            evaluation: None,
+        }
+    }
+}
+
+impl From<RuleSetting> for RuleConfig {
+    fn from(setting: RuleSetting) -> Self {
+        match setting {
+            RuleSetting::Level(level) => Self::new(level.into()),
+            RuleSetting::Detailed(detail) => Self {
+                options: detail.options,
+                generated: detail.generated,
+                model: detail
+                    .model
+                    .map(|names| names.iter().map(str::to_owned).collect()),
+                evaluation: detail.evaluation,
+                ..Self::new(detail.level.into())
+            },
+        }
+    }
 }
 
 /// A level a project can set: a severity, or `off`, which only
@@ -53,30 +90,6 @@ impl<'de> Deserialize<'de> for RuleSetting {
     }
 }
 
-impl RuleSetting {
-    /// A rule at `severity`, with its options left to the decision's defaults.
-    pub fn level(severity: Severity) -> Self {
-        Self::Level(Level::from(Some(severity)))
-    }
-}
-
-impl From<&RuleConfig> for RuleSetting {
-    fn from(config: &RuleConfig) -> Self {
-        let level = Level::from(config.level);
-        if config.options.is_empty() && config.generated.is_none() {
-            RuleSetting::Level(level)
-        } else {
-            RuleSetting::Detailed(RuleDetail {
-                level,
-                options: config.options.clone(),
-                generated: config.generated,
-                model: None,
-                evaluation: None,
-            })
-        }
-    }
-}
-
 /// A level with options.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -94,10 +107,10 @@ pub struct RuleDetail {
     /// the project's `models.classification`. When it abstains, the subject is
     /// left to agent review.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<super::models::Names>,
+    pub model: Option<Names>,
     /// How `lighthouse eval` judges this rule's check.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub evaluation: Option<super::models::Evaluation>,
+    pub evaluation: Option<Evaluation>,
 }
 
 impl From<Level> for Option<Severity> {
@@ -122,25 +135,9 @@ impl From<Option<Severity>> for Level {
     }
 }
 
-impl From<RuleSetting> for RuleConfig {
-    fn from(setting: RuleSetting) -> Self {
-        match setting {
-            RuleSetting::Level(level) => Self {
-                level: level.into(),
-                options: Options::new(),
-                generated: None,
-            },
-            RuleSetting::Detailed(detail) => Self {
-                level: detail.level.into(),
-                options: detail.options,
-                generated: detail.generated,
-            },
-        }
-    }
-}
-
 /// Later level replaces the earlier one; options merge per key, later wins,
-/// and an object-valued option (a limit per role) merges per key too.
+/// and an object-valued option (a limit per role) merges per key too; a
+/// model route and an evaluation policy the later sets replace the earlier.
 pub(crate) fn merge(into: &mut Rules, from: &Rules) {
     for (id, next) in from {
         match into.get_mut(id) {
@@ -154,6 +151,10 @@ pub(crate) fn merge(into: &mut Rules, from: &Rules) {
                     prev.options.insert(key.clone(), merged);
                 }
                 prev.generated = next.generated.or(prev.generated);
+                prev.evaluation = next.evaluation.or(prev.evaluation);
+                if next.model.is_some() {
+                    prev.model.clone_from(&next.model);
+                }
             }
             None => {
                 into.insert(id.clone(), next.clone());

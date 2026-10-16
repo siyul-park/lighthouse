@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: core/decision-naming
   uid: 76c3ebca-9320-478b-90ab-31b0c0056b09
-  labels:
-    lighthouse/pack: core
-    lighthouse/section: naming
 spec:
   title: Decision names follow the ESLint convention
   context: >-
@@ -21,7 +18,6 @@ spec:
     covers what can be counted. Names are cohesive: one word where it stays
     unambiguous within its pack.
   scope:
-    domain: spec
     subject: decision
   requirement: >-
     A decision name SHOULD be kebab-case with at most three words, not counting
@@ -75,8 +71,6 @@ spec:
             kind: Decision
             metadata:
               name: design/prefer-method
-              labels:
-                lighthouse/pack: design
     - name: noun-phrase-and-limit
       language: text
       kind: valid
@@ -152,8 +146,6 @@ spec:
             kind: Decision
             metadata:
               name: testing/unique-owner-test
-              labels:
-                lighthouse/pack: testing
       expect:
         - line: 4
           message: repeats its pack in `test`

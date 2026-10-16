@@ -17,9 +17,7 @@ use lighthouse_store::Records;
 use serde::Serialize;
 
 use crate::{
-    Result, Selector, Session,
-    attach::key_of,
-    attached_models,
+    Result, Selector, Session, attached_models,
     train::{Collected, collect},
 };
 
@@ -135,7 +133,7 @@ fn train_again(
 
 /// The dataset the revision that attached `model` to `decision` names.
 fn trained_on(records: &Records, decision: &Decision, model: &str) -> Option<String> {
-    let key = key_of(decision);
+    let key = decision.key();
     let attaching = records
         .revisions
         .iter()

@@ -294,7 +294,7 @@ pub fn attached_models(root: &Path, catalog: &Catalog) -> BTreeMap<String, Strin
     let named = |key: &str| {
         catalog
             .decisions()
-            .find(|d| d.uid() == Some(key) || d.id() == key)
+            .find(|d| d.is_key(key))
             .map(|d| d.id().to_owned())
     };
     records

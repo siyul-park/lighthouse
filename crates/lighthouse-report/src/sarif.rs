@@ -306,9 +306,7 @@ fn rule_ref<'a>(id: &'a str, decision: Option<&'a Decision>) -> RuleRef<'a> {
             text: &decision.requirement,
         }),
         help_uri: Some(format!("{DOCS_URL_BASE}/{}", help_path(decision))),
-        default_configuration: decision
-            .severity()
-            .map(|s| Configuration { level: level(s) }),
+        default_configuration: decision.severity.map(|s| Configuration { level: level(s) }),
         properties: Some(RuleProperties {
             status: decision.status.to_string(),
             tags: vec![decision.pack()],

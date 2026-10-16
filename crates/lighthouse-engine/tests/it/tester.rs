@@ -177,9 +177,6 @@ fn catalog_with(fix: &str, examples: &str) -> Catalog {
 kind: Decision
 metadata:
   name: fake/marker
-  labels:
-    lighthouse/pack: fake
-    lighthouse/section: s
 spec:
   title: Marker
   context: Words are flagged.
@@ -187,7 +184,6 @@ spec:
   requirement: A file MUST NOT contain the marker word.
   severity: warn
   options:
-    type: object
     properties:
       word:
         type: string

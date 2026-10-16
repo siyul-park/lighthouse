@@ -16,7 +16,8 @@ use lighthouse_plugin::{
     Workspace,
 };
 use lighthouse_spec::{
-    Catalog, Config, Domain, GeneratedCheck, GlobSet, ProjectError, Projects, RuleConfig, Rules,
+    Catalog, Config, Error as SpecError, GeneratedCheck, GlobSet, Models as BoundModels, Projects,
+    RuleConfig, Rules, Subject as DecisionSubject,
 };
 use rayon::prelude::*;
 use serde_json::Value;
@@ -55,7 +56,7 @@ pub const EXIT_INCOMPLETE: u8 = 3;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
-    Project(#[from] ProjectError),
+    Spec(#[from] SpecError),
     #[error(transparent)]
     Plugin(#[from] lighthouse_plugin::Error),
     #[error("{}: {source}", path.display())]
@@ -246,6 +247,8 @@ pub struct Engine {
     pub(crate) config: Config,
     /// The projects `extends` can name.
     projects: Projects,
+    /// The models the configuration binds to its decisions.
+    binding: BoundModels,
     /// Rules whose decision is not in force (proposed, rejected, deprecated
     /// or superseded): they run only when a run selects them by id, such as
     /// `decision test`; configuration and projects never enable them.
@@ -306,16 +309,20 @@ impl Engine {
         catalog: &Catalog,
         root: &Path,
     ) -> Result<Self, Error> {
-        let projects = catalog.projects()?;
+        let projects = catalog.projects().clone();
+        let binding = config.models(&projects)?;
         let mut notices = Vec::new();
-        validate_config(&registry, &config, &projects)?;
+        validate_config(&registry, &config, &binding, &projects)?;
         let (providers, languages) = load_languages(&registry, &config)?;
         let root = root.canonicalize().map_err(io_error(root))?;
         let (attributes, found) = Attributes::of(&root);
         notices.extend(found);
         let ws = Workspace {
             root,
-            languages: config.languages().clone(),
+            languages: config
+                .languages()
+                .map(|(id, options)| (id.to_owned(), options.clone()))
+                .collect(),
             constructors: constructors(&registry, &config),
             formatters: config
                 .formatters()
@@ -328,6 +335,7 @@ impl Engine {
             registry,
             config,
             projects,
+            binding,
             unenforced: catalog
                 .decisions()
                 .filter(|d| !d.enforced())
@@ -335,7 +343,7 @@ impl Engine {
                 .collect(),
             documented: catalog
                 .decisions()
-                .filter(|d| d.scope.domain == Domain::Spec)
+                .filter(|d| d.scope.subject == DecisionSubject::Decision)
                 .map(|d| d.id().to_owned())
                 .collect(),
             attributes,

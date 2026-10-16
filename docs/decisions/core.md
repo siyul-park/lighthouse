@@ -160,6 +160,4 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/prefer-method
-  labels:
-    lighthouse/pack: design
 ```

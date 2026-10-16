@@ -90,7 +90,7 @@ impl Session {
         let files = local_files(&root)?;
         let local = files.clone().map(Catalog::from_local).transpose()?;
         let catalog = layered(local.as_ref())?;
-        let commands = commands(&config, &catalog);
+        let commands = commands(&config, &catalog)?;
         let basis = Basis::of(&root, text, &files.unwrap_or_default(), &commands);
         Ok(Self {
             config,
@@ -179,7 +179,7 @@ pub fn catalog_at(root: &Path) -> Result<Catalog> {
 
 /// Every command the project would run: the formatters of its configuration
 /// and the command fixers and command checks of its catalog.
-fn commands(config: &Config, catalog: &Catalog) -> Vec<Command> {
+fn commands(config: &Config, catalog: &Catalog) -> Result<Vec<Command>> {
     let mut found: Vec<Command> = config
         .formatters()
         .map(|(language, f)| Command {
@@ -187,7 +187,7 @@ fn commands(config: &Config, catalog: &Catalog) -> Vec<Command> {
             argv: f.argv.clone(),
         })
         .collect();
-    for (name, provider) in &config.models().providers {
+    for (name, provider) in &config.models(catalog.projects())?.providers {
         if let lighthouse_spec::ModelProvider::Command { argv, .. } = provider {
             found.push(Command {
                 what: format!("model provider {name}: {}", argv.join(" ")),
@@ -213,7 +213,7 @@ fn commands(config: &Config, catalog: &Catalog) -> Vec<Command> {
             });
         }
     }
-    found
+    Ok(found)
 }
 
 fn layered(local: Option<&Catalog>) -> Result<Catalog> {

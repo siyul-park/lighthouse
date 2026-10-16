@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: design/symbols
   uid: 6fd6c0ba-61a7-4bc8-80b2-671c6fe78fe6
-  labels:
-    lighthouse/pack: design
-    lighthouse/section: functions
 spec:
   title: Every symbol earns its existence
   context: >-
@@ -49,7 +46,6 @@ spec:
     with exactly one production caller is put to a model, with the
     requirement and the examples as the question.
   scope:
-    domain: code
     subject: symbol
   requirement: >-
     A simple single-use wrapper SHOULD be inlined unless its name expresses a
@@ -66,7 +62,6 @@ spec:
     exposed without a distinct contract.
   severity: warn
   options:
-    type: object
     properties:
       kinds:
         type: array

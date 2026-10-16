@@ -57,11 +57,10 @@ apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: design/symbols
-  labels: { lighthouse/pack: design, lighthouse/section: functions }
 spec:
   title: Inline single-use wrappers
   context: A forwarding wrapper adds a name without adding meaning.
-  scope: { domain: code, subject: symbol }
+  scope: { subject: symbol }
   requirement: >-
     A simple single-use wrapper SHOULD be inlined unless its name expresses a
     real policy or mechanic.

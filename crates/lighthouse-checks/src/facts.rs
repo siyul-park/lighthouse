@@ -14,7 +14,6 @@ use crate::{
     modules::Stats,
     text,
 };
-use lighthouse_spec::{PACK_LABEL, SECTION_LABEL};
 use serde_json::{Value, json};
 
 const POS_LINE: u64 = 1 << 20;
@@ -161,21 +160,14 @@ pub(crate) fn edge(project: &Project, e: &Edge) -> Value {
     })
 }
 
-/// A document of the project, such as a decision: its name, the pack and
-/// section its labels (else its name) put it in, and where it is written.
+/// A document of the project, such as a decision: its name, the pack its name
+/// puts it in, and where it is written.
 pub(crate) fn document(d: &Document) -> Value {
-    let label = |key: &str| d.labels.get(key).cloned();
-    let pack = label(PACK_LABEL).unwrap_or_else(|| {
-        d.name
-            .split_once('/')
-            .map_or(d.name.as_str(), |(p, _)| p)
-            .to_owned()
-    });
+    let pack = d.name.split_once('/').map_or(d.name.as_str(), |(p, _)| p);
     json!({
         "name": d.name,
         "kind": d.kind,
         "pack": pack,
-        "section": label(SECTION_LABEL).unwrap_or_default(),
         "labels": d.labels,
         "uid": d.uid.clone().unwrap_or_default(),
         "file": path(&d.file),

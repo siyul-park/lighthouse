@@ -1,59 +1,43 @@
+//! The rules a catalog holds its decisions to, beyond what each kind says of
+//! itself: ids, uids, supersession, options, examples, sources.
+
 use std::collections::{BTreeMap, BTreeSet};
 
-use lighthouse_model::{EdgeKind, RunScope, Severity};
-use serde_json::Value;
-
 use crate::{
-    Catalog, CheckKind, Decision, DecisionStatus, Error, Example, ExampleKind, OptionType,
-    check::{BuiltinCheck, BuiltinOp},
+    Catalog, Decision, DecisionStatus, Error, Example, ExampleKind, OptionType,
     options::KINDS,
     sources::{SourceLine, has_keyword},
 };
 
 /// Everything a single layer must satisfy on its own.
 pub(crate) fn layer(catalog: &Catalog) -> Result<(), Error> {
-    decisions(catalog)?;
-    sources(catalog)?;
-    catalog.projects()?;
-    Ok(())
-}
-
-/// Decision-level rules; also run on a merged overlay.
-pub(crate) fn decisions(catalog: &Catalog) -> Result<(), Error> {
-    for pack in &catalog.packs {
+    for pack in catalog.packs() {
         kebab(&pack.id)?;
         for section in &pack.sections {
             kebab(&section.id)?;
         }
     }
-    let mut ids = BTreeSet::new();
-    let mut uids = BTreeMap::new();
-    for decision in catalog.decisions() {
-        if !ids.insert(decision.id()) {
-            return Err(Error::invalid(decision.id(), "defined twice"));
-        }
-        self::decision(decision)?;
-        if let Some(uid) = decision.uid()
-            && let Some(other) = uids.insert(uid, decision.id())
-        {
-            return Err(Error::invalid(
-                decision.id(),
-                format!(
-                    "uid `{uid}` is also the uid of `{other}`; a uid is assigned once and never copied"
-                ),
-            ));
-        }
-    }
-    lifecycle(catalog)
+    unique(catalog)?;
+    catalog.decisions().try_for_each(decision)?;
+    lifecycle(catalog, catalog.decisions())?;
+    sources(catalog)
 }
 
-/// The projects of a catalog: names are unique, every project they extend
-/// exists, and none extends itself, however far round.
+/// What the layers of `merged` must satisfy together, each having satisfied
+/// the rest on its own: ids and uids unique across them, and the
+/// supersession the decisions of `local` declare.
+pub(crate) fn overlay(merged: &Catalog, local: &Catalog) -> Result<(), Error> {
+    unique(merged)?;
+    lifecycle(merged, local.decisions())
+}
+
+/// The projects of a catalog: every project they extend exists, and none
+/// extends itself, however far round.
 pub(crate) fn projects(catalog: &Catalog) -> Result<(), Error> {
-    let all = catalog.projects()?;
+    let all = catalog.projects();
     for name in all.names() {
-        if let Some(layer) = all.get(name) {
-            layer.entries(&all)?;
+        if let Some(config) = all.get(name) {
+            config.entries(all)?;
         }
     }
     Ok(())
@@ -66,17 +50,6 @@ pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {
         .ok_or_else(|| Error::invalid(id, "an id is `<pack>/<name>`"))?;
     kebab(pack)?;
     kebab(name)?;
-    if decision.scope.subject.domain() != decision.scope.domain {
-        return Err(Error::invalid(
-            id,
-            format!(
-                "a `{}` decision is in the `{}` domain, not `{}`",
-                decision.scope.subject,
-                decision.scope.subject.domain(),
-                decision.scope.domain
-            ),
-        ));
-    }
     if let Some(uid) = decision.uid()
         && !lighthouse_resource::is_uid(uid)
     {
@@ -109,14 +82,8 @@ pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {
         }
         _ => {}
     }
-    let automated = decision
-        .check
-        .as_ref()
-        .is_some_and(crate::Check::is_automated);
-    for reference in decision.supersedes.iter() {
-        if reference.trim().is_empty() {
-            return Err(Error::invalid(id, "`supersedes` entries are not empty"));
-        }
+    if decision.supersedes.iter().any(|r| r.trim().is_empty()) {
+        return Err(Error::invalid(id, "`supersedes` entries are not empty"));
     }
     options(decision)?;
     decision
@@ -124,7 +91,7 @@ pub(crate) fn decision(decision: &Decision) -> Result<(), Error> {
         .iter()
         .try_for_each(|e| example(decision, e))?;
     canonical(decision)?;
-    check(decision, automated)?;
+    check(decision)?;
     fix(decision)
 }
 
@@ -132,10 +99,35 @@ pub(crate) fn relative(path: &str) -> bool {
     !path.is_empty() && !path.starts_with('/') && path.split('/').all(|part| part != "..")
 }
 
+/// No two decisions share an id or a uid.
+fn unique(catalog: &Catalog) -> Result<(), Error> {
+    let mut ids = BTreeSet::new();
+    let mut uids = BTreeMap::new();
+    for decision in catalog.decisions() {
+        if !ids.insert(decision.id()) {
+            return Err(Error::invalid(decision.id(), "defined twice"));
+        }
+        if let Some(uid) = decision.uid()
+            && let Some(other) = uids.insert(uid, decision.id())
+        {
+            return Err(Error::invalid(
+                decision.id(),
+                format!(
+                    "uid `{uid}` is also the uid of `{other}`; a uid is assigned once and never copied"
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// A decision that supersedes another names one that exists, is not itself,
 /// and has been marked superseded; no two supersede each other.
-fn lifecycle(catalog: &Catalog) -> Result<(), Error> {
-    for decision in catalog.decisions() {
+fn lifecycle<'c>(
+    catalog: &Catalog,
+    decisions: impl Iterator<Item = &'c Decision>,
+) -> Result<(), Error> {
+    for decision in decisions.filter(|d| !d.supersedes.is_empty()) {
         let id = decision.id();
         for old in &decision.supersedes {
             let fail = |reason: String| Error::invalid(id, format!("supersedes `{old}`: {reason}"));
@@ -192,15 +184,9 @@ fn supersession_cycle<'c>(catalog: &'c Catalog, start: &'c str) -> Option<Vec<&'
 fn fix(decision: &Decision) -> Result<(), Error> {
     let id = decision.id();
     if let Some(fix) = &decision.fix {
-        crate::fix::validate(
-            id,
-            fix,
-            decision.severity == Some(Severity::Error),
-            decision
-                .check
-                .as_ref()
-                .is_some_and(crate::Check::is_automated),
-        )?;
+        if let Some(reason) = fix.problem(decision) {
+            return Err(Error::invalid(id, format!("fix: {reason}")));
+        }
         let fixed = decision
             .examples
             .iter()
@@ -306,7 +292,7 @@ fn kinds_shape(id: &str, kinds: &crate::OptionSchema) -> Result<(), Error> {
     let declared: BTreeSet<&str> = items
         .values
         .iter()
-        .filter_map(Value::as_str)
+        .filter_map(serde_json::Value::as_str)
         .filter(|kind| !kind.is_empty())
         .collect();
     if declared.is_empty() || declared.len() != items.values.len() {
@@ -358,139 +344,22 @@ fn canonical(decision: &Decision) -> Result<(), Error> {
     Ok(())
 }
 
-fn check(decision: &Decision, automated: bool) -> Result<(), Error> {
+fn check(decision: &Decision) -> Result<(), Error> {
     let id = decision.id();
     let Some(check) = &decision.check else {
         return Ok(());
     };
-    kind_problem(decision, &check.kind).map_or(Ok(()), |reason| Err(Error::invalid(id, reason)))?;
+    if let Some(reason) = check.kind.problem(decision.scope.subject) {
+        return Err(Error::invalid(id, reason));
+    }
     let has = |kind| decision.examples.iter().any(|e| e.kind == kind);
-    if automated && !(has(ExampleKind::Valid) && has(ExampleKind::Invalid)) {
+    if decision.automated() && !(has(ExampleKind::Valid) && has(ExampleKind::Invalid)) {
         return Err(Error::invalid(
             id,
             "a checked decision needs a valid and an invalid example",
         ));
     }
     Ok(())
-}
-
-/// What is wrong with the provider a check names, for this decision.
-fn kind_problem(decision: &Decision, kind: &CheckKind) -> Option<String> {
-    let subject = decision.scope.subject;
-    match kind {
-        CheckKind::Builtin(BuiltinCheck::Named(named)) if named.id.is_empty() => {
-            Some("a builtin check needs a rule id".to_owned())
-        }
-        CheckKind::Builtin(BuiltinCheck::Named(_)) => None,
-        CheckKind::Builtin(BuiltinCheck::Op(op)) => op_problem(op).or_else(|| scope_problem(op, subject)),
-        CheckKind::Cel(cel) => cel.problem().or_else(|| match cel.selects(subject) {
-            None => Some(format!("a `{subject}` decision needs a `select`")),
-            Some(select) => (select.scope() != subject.run_scope())
-                .then(|| {
-                    format!(
-                        "selects `{}`, which a `{subject}` decision cannot run over",
-                        select.name()
-                    )
-                })
-                .or_else(|| review_problem(cel.review.is_some(), select)),
-        }),
-        CheckKind::Command(command) => command.problem().or_else(|| {
-            let per_file = subject.run_scope() == RunScope::File;
-            (command.batch == crate::Batch::All && per_file).then(|| {
-                "check `batch: all` needs a module or project decision: a file-scope decision is checked one file at a time"
-                    .to_owned()
-            })
-        }),
-        CheckKind::Model(model) => model.problem(subject),
-        CheckKind::Rpc(_) => Some("an `rpc` check is not supported until plugin protocol 0.2".to_owned()),
-    }
-}
-
-/// What a model cannot be asked: a subject outside a file. A module is left
-/// to agent review, which lists its subjects by `review`.
-fn review_problem(reviewed: bool, select: crate::Select) -> Option<String> {
-    if !reviewed {
-        return None;
-    }
-    if select.scope() != RunScope::File && select != crate::Select::Module {
-        return Some(format!(
-            "a model cannot judge `{}`: it needs the source of a subject in a file",
-            select.name()
-        ));
-    }
-    None
-}
-
-/// A standard operation judges the shape of one file or of the whole project.
-fn scope_problem(op: &BuiltinOp, subject: crate::Subject) -> Option<String> {
-    let per_file = subject.run_scope() == RunScope::File;
-    match (op, per_file) {
-        (BuiltinOp::Order { .. }, false) => Some(format!(
-            "an `order` check judges one file at a time, which a `{subject}` decision does not"
-        )),
-        (BuiltinOp::Cycle { .. }, true) => Some(format!(
-            "a `cycle` check judges the whole project, which a `{subject}` decision does not"
-        )),
-        _ => None,
-    }
-}
-
-fn op_problem(op: &BuiltinOp) -> Option<String> {
-    match op {
-        BuiltinOp::Order { clauses } => {
-            if clauses.is_empty() {
-                return Some("check: `order` needs at least one clause".to_owned());
-            }
-            for clause in clauses {
-                let mut seen = BTreeSet::new();
-                if clause.by.is_empty() {
-                    return Some(
-                        "check: an `order` clause needs at least one key in `by`".to_owned(),
-                    );
-                }
-                let stray = clause
-                    .by
-                    .iter()
-                    .find(|key| !key.contains('/') || !seen.insert(*key));
-                if let Some(key) = stray {
-                    return Some(format!(
-                        "check: order key `{key}` must be a qualified `plugin/name` and listed once"
-                    ));
-                }
-                if let Some(problem) =
-                    expressions(clause.when.as_ref(), &clause.message, &clause.evidence)
-                {
-                    return Some(problem);
-                }
-            }
-            None
-        }
-        BuiltinOp::Cycle { edge, .. } => edge
-            .parse::<EdgeKind>()
-            .is_err()
-            .then(|| format!("check: `{edge}` is not an edge kind")),
-    }
-}
-
-/// The first of a `when` guard, a message template and evidence expressions
-/// that does not compile.
-fn expressions(
-    when: Option<&String>,
-    message: &str,
-    evidence: &std::collections::BTreeMap<String, String>,
-) -> Option<String> {
-    let compile = |what: &str, source: &str| {
-        cel::Program::compile(source)
-            .err()
-            .map(|e| format!("check {what}: {e}"))
-    };
-    when.and_then(|source| compile("when", source))
-        .or_else(|| {
-            evidence
-                .iter()
-                .find_map(|(name, source)| compile(&format!("evidence `{name}`"), source))
-        })
-        .or_else(|| crate::check::template_problem(message).map(|p| format!("check message: {p}")))
 }
 
 fn kebab(name: &str) -> Result<(), Error> {

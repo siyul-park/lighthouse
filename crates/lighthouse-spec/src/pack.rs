@@ -5,8 +5,9 @@ use serde::{Deserialize, Serialize};
 use crate::Decision;
 
 /// The spec of the `Pack` kind: an ordered set of sections, each an ordered
-/// list of decisions. A decision belongs to a pack and section by its labels
-/// (`lighthouse/pack`, `lighthouse/section`); this list only orders them.
+/// list of decisions. A decision belongs to the pack its id names (its
+/// `<pack>/` prefix) and to the section of this list that names it.
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PackSpec {
@@ -23,8 +24,9 @@ impl Spec for PackSpec {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SectionSpec {
-    /// Kebab-case name; the value of the decisions' section label.
+    /// Kebab-case name of the section inside the pack.
     pub name: String,
+
     pub title: String,
     pub intro: String,
     /// Names of the decisions, without the pack prefix, in reading order.

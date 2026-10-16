@@ -264,7 +264,7 @@ impl Engine {
         rule: &str,
         file: &Path,
         lang: &str,
-    ) -> Result<Option<Severity>, ProjectError> {
+    ) -> Result<Option<Severity>, lighthouse_spec::Error> {
         let rules = self.config.resolve(file, lang, &self.projects)?;
         Ok(rules.get(rule).and_then(|config| config.level))
     }
@@ -276,7 +276,6 @@ impl Engine {
         found: &[Diagnostic],
         project: &Project,
     ) -> Result<BTreeMap<Fingerprint, Options>, Error> {
-        let mut resolved: BTreeMap<(PathBuf, String), Rules> = BTreeMap::new();
         let mut options = BTreeMap::new();
         for d in found {
             let project_scope = self
@@ -287,14 +286,7 @@ impl Engine {
                 Some(file) if !project_scope => (file.path.clone(), file.lang.clone()),
                 _ => (PathBuf::new(), String::new()),
             };
-            let rules = match resolved.entry((path, lang)) {
-                std::collections::btree_map::Entry::Occupied(e) => e.into_mut(),
-                std::collections::btree_map::Entry::Vacant(e) => {
-                    let (path, lang) = e.key().clone();
-                    let rules = self.config.resolve(&path, &lang, &self.projects)?;
-                    e.insert(rules)
-                }
-            };
+            let rules = self.config.resolve(&path, &lang, &self.projects)?;
             let found = rules.get(&d.rule_id).map(|c| c.options.clone());
             options.insert(d.fingerprint.clone(), found.unwrap_or_default());
         }

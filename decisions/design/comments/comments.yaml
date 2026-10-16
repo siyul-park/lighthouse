@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: design/comments
   uid: 38a41dfc-93d7-4634-ab1c-ccf00b3c242d
-  labels:
-    lighthouse/pack: design
-    lighthouse/section: comments
 spec:
   title: A comment states a fact the code cannot
   context: >-
@@ -37,7 +34,6 @@ spec:
     documentation, a directive or generated code is put to a model, with the
     requirement and the examples as the question.
   scope:
-    domain: code
     subject: file
     tests: include
   requirement: >-
@@ -53,7 +49,6 @@ spec:
     fact, constraint, invariant, or consequence.
   severity: warn
   options:
-    type: object
     properties:
       kinds:
         type: array

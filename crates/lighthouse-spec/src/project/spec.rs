@@ -6,7 +6,8 @@ use std::{collections::BTreeMap, path::PathBuf};
 use lighthouse_model::Options;
 use lighthouse_resource::{Duration, Spec};
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
+use serde_json::Value;
 
 use super::{formatter::FormatterSpec, models::ModelsSpec, rules::RuleSetting};
 
@@ -79,11 +80,26 @@ impl Spec for ProjectSpec {
 }
 
 /// A plugin in `plugins`: a bare id, or an id with where to find it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum PluginEntry {
     Id(String),
     Detailed(PluginRefSpec),
+}
+
+impl<'de> Deserialize<'de> for PluginEntry {
+    /// Names what was expected, which an untagged enum's own error does not.
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        match Value::deserialize(deserializer)? {
+            Value::String(id) => Ok(Self::Id(id)),
+            table @ Value::Object(_) => PluginRefSpec::deserialize(table)
+                .map(Self::Detailed)
+                .map_err(D::Error::custom),
+            other => Err(D::Error::custom(format!(
+                "a plugin is an id or a table with an `id`, not {other}"
+            ))),
+        }
+    }
 }
 
 /// A listed plugin. `path` (relative to the config directory) names the

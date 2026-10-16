@@ -8,7 +8,11 @@ use std::collections::BTreeMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{Binding, CelCheck, Identity, Select, Subject};
+use crate::{
+    CelCheck, Select, Subject,
+    check::{Binding, Identity},
+    expression::compile_problem,
+};
 
 /// A check a model answers. The subjects `select` picks are put to the models
 /// the decision is bound to, with the decision's examples as their few shots.
@@ -58,10 +62,7 @@ impl ModelCheck {
         // A decision about a project has nothing to range over by default and
         // stays with agent review; its `select` must still compile.
         let Some(cel) = self.as_cel(subject) else {
-            let source = self.select.as_deref()?;
-            return cel::Program::compile(source)
-                .err()
-                .map(|e| format!("check select: {e}"));
+            return compile_problem("check select", self.select.as_deref()?);
         };
         cel.problem()
             .map(|p| p.replacen("check review", "check select", 1))

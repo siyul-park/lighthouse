@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: testing/cases
   uid: 4428ab36-fed5-40eb-8ed3-6dcf7c1a1a15
-  labels:
-    lighthouse/pack: testing
-    lighthouse/section: organization
 spec:
   title: Cases are behaviors, written simply and asserted through the standard library
   context: >-
@@ -37,7 +34,6 @@ spec:
     instead of helpers that compare and `panic!`. Not enforced for Rust,
     whose provider does not count hand-written checks.
   scope:
-    domain: code
     subject: test
     tests: only
   requirement: >-
@@ -63,7 +59,6 @@ spec:
     only when the specified behavior remains visible.
   severity: warn
   options:
-    type: object
     properties:
       kinds:
         type: array

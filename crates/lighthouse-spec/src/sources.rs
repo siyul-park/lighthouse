@@ -44,6 +44,14 @@ pub(crate) struct Bullet {
     pub text: String,
 }
 
+/// A normative line being read: under which heading, its text so far, and
+/// whether indented lines after it continue it.
+struct Item {
+    heading: String,
+    text: String,
+    wraps: bool,
+}
+
 struct Out<'a> {
     doc: &'a str,
     seen: BTreeMap<String, usize>,
@@ -59,11 +67,12 @@ impl<'a> Out<'a> {
         }
     }
 
-    fn finish(&mut self, item: Option<(String, String, bool)>) {
-        let Some((heading, text, _)) = item else {
+    fn finish(&mut self, item: Option<Item>) {
+        let Some(Item { heading, text, .. }) = item else {
             return;
         };
         let heading = if heading.is_empty() { "doc" } else { &heading };
+
         let base = format!("{}#{heading}-{}", self.doc, hash::short(&text, 4));
         let n = self.seen.entry(base.clone()).or_default();
         *n += 1;
@@ -81,7 +90,8 @@ pub(crate) fn extract(doc: &str, markdown: &str) -> Vec<Bullet> {
     let mut out = Out::new(doc);
     let mut heading = String::new();
     let mut fence: Option<char> = None;
-    let mut open: Option<(String, String, bool)> = None;
+    let mut open: Option<Item> = None;
+
     for (i, raw) in lines.iter().enumerate() {
         let line = raw.trim();
         if let Some(marker) = fence_marker(line) {
@@ -97,7 +107,9 @@ pub(crate) fn extract(doc: &str, markdown: &str) -> Vec<Bullet> {
             out.finish(open.take());
             continue;
         }
-        if let Some((_, text, true)) = open.as_mut()
+        if let Some(Item {
+            text, wraps: true, ..
+        }) = open.as_mut()
             && raw.starts_with(char::is_whitespace)
             && list_item(line).is_none()
             && !line.starts_with(['|', '#'])
@@ -106,13 +118,18 @@ pub(crate) fn extract(doc: &str, markdown: &str) -> Vec<Bullet> {
             text.push_str(line);
             continue;
         }
+
         out.finish(open.take());
         if line.starts_with('#') {
             heading = slug(line.trim_start_matches('#'));
             continue;
         }
         let next = lines.get(i + 1).map(|l| l.trim());
-        open = normative(line, next).map(|(text, wraps)| (heading.clone(), text, wraps));
+        open = normative(line, next).map(|(text, wraps)| Item {
+            heading: heading.clone(),
+            text,
+            wraps,
+        });
     }
     out.finish(open.take());
     out.bullets

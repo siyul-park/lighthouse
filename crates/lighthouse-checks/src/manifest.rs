@@ -14,11 +14,11 @@ pub(crate) fn rule_manifest(decision: &Decision) -> Option<RuleManifest> {
     decision
         .check
         .as_ref()
-        .filter(|c| c.is_automated() || matches!(c.kind, CheckKind::Model(_)))?;
+        .filter(|c| c.kind.deterministic() || matches!(c.kind, CheckKind::Model(_)))?;
     Some(RuleManifest {
         id: decision.id().to_owned(),
         uid: decision.uid().map(str::to_owned),
-        severity: decision.severity()?,
+        severity: decision.severity?,
         scope: decision.scope.subject.run_scope(),
         description: decision.title.clone(),
         docs: decision.requirement.clone(),

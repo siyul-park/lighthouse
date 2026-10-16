@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use lighthouse_model::RunScope;
 use lighthouse_model::{File, Fragment, Options, Project, Severity};
@@ -12,10 +12,10 @@ fn options(max: u64) -> Options {
 
 /// The rules of the standard project `name`, as a configuration that extends
 /// it resolves them.
-fn preset(name: &str) -> Rules {
+fn preset(name: &str) -> Arc<Rules> {
     Config::parse_inline(&format!("extends = [\"{name}\"]"))
         .unwrap()
-        .resolve(Path::new(""), "", &Catalog::bundled().projects().unwrap())
+        .resolve(Path::new(""), "", Catalog::bundled().projects())
         .unwrap()
 }
 
@@ -96,8 +96,8 @@ fn recommended_preset_derives_levels_from_rule_meta() {
 fn the_standard_projects_hold_exactly_the_rules_the_registry_has() {
     let registry = lighthouse_checks::registry();
     let catalog = Catalog::bundled();
-    let projects = catalog.projects().unwrap();
-    for pack in &catalog.packs {
+    let projects = catalog.projects();
+    for pack in catalog.packs() {
         let ours: Vec<String> = registry
             .rules()
             .filter(|r| lighthouse_plugin::plugin_of(&r.manifest().id) == pack.id)

@@ -364,38 +364,6 @@
         },
         {
           "additionalProperties": false,
-          "description": "A language plugin's check method. Reserved until protocol 0.2.",
-          "properties": {
-            "params": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "requires": {
-              "description": "Capabilities the language provider must offer; without them the check\nis not run for that language.",
-              "items": {
-                "$ref": "#/$defs/Capability"
-              },
-              "type": "array"
-            },
-            "timeout": {
-              "description": "How long one run of the provider may take, such as `30s` or `2m`.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "type": {
-              "const": "rpc",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
           "description": "Agent review: a model is asked about the candidates. Not\ndeterministic; today's agent review tasks serve it.",
           "properties": {
             "identity": {
@@ -495,16 +463,6 @@
         {
           "const": "sarif",
           "description": "A SARIF 2.1.0 log: one finding per result.",
-          "type": "string"
-        }
-      ]
-    },
-    "CommandScope": {
-      "description": "Where a command's edits may land.",
-      "oneOf": [
-        {
-          "const": "file",
-          "description": "Only the finding's file.",
           "type": "string"
         }
       ]
@@ -649,22 +607,6 @@
         {
           "const": "deprecated",
           "description": "No longer wanted, and nothing replaces it.",
-          "type": "string"
-        }
-      ]
-    },
-    "Domain": {
-      "description": "What kind of thing a decision is about: source code, or Lighthouse's own\ndocuments (the decisions of a catalog).",
-      "oneOf": [
-        {
-          "enum": [
-            "code"
-          ],
-          "type": "string"
-        },
-        {
-          "const": "spec",
-          "description": "The documents of a project that configure Lighthouse.",
           "type": "string"
         }
       ]
@@ -870,10 +812,6 @@
               "$ref": "#/$defs/Safety",
               "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
             },
-            "scope": {
-              "$ref": "#/$defs/CommandScope",
-              "default": "file"
-            },
             "stdin": {
               "$ref": "#/$defs/Stdin",
               "default": "none"
@@ -1023,13 +961,6 @@
       ],
       "type": "object"
     },
-    "ObjectType": {
-      "description": "The only `type` of the options object.",
-      "enum": [
-        "object"
-      ],
-      "type": "string"
-    },
     "OpSpec": {
       "description": "One operation of an `ops` fix. Every parameter but `scope` and `by` is a\nCEL expression over the finding (`finding`, `symbol`, `options`) or, for\n`text` and `name`, a template with `{{ cel }}` holes. A `when` expression\nthat is false skips the operation.",
       "oneOf": [
@@ -1082,7 +1013,7 @@
               "type": "string"
             },
             "scope": {
-              "$ref": "#/$defs/ReorderScope"
+              "$ref": "#/$defs/OrderScope"
             },
             "when": {
               "type": [
@@ -1214,10 +1145,6 @@
           },
           "default": {},
           "type": "object"
-        },
-        "type": {
-          "$ref": "#/$defs/ObjectType",
-          "default": "object"
         }
       },
       "type": "object"
@@ -1283,11 +1210,11 @@
       ]
     },
     "OrderScope": {
-      "description": "What an `order` check judges.",
+      "description": "What an `order` check judges, and what a `reorder` fix permutes.",
       "oneOf": [
         {
           "const": "file",
-          "description": "Every declaration of a file, each module on its own.",
+          "description": "Every declaration of a file, each container on its own.",
           "type": "string"
         },
         {
@@ -1325,21 +1252,6 @@
         }
       },
       "type": "object"
-    },
-    "ReorderScope": {
-      "description": "The declarations a `reorder` permutes.",
-      "oneOf": [
-        {
-          "const": "file",
-          "description": "Every declaration of the finding's file, each container sorted on its own.",
-          "type": "string"
-        },
-        {
-          "const": "owner",
-          "description": "Only the members of the finding symbol's owner.",
-          "type": "string"
-        }
-      ]
     },
     "Safety": {
       "description": "How much a proposed fix may be trusted to keep the program's meaning.",
@@ -1399,12 +1311,8 @@
     },
     "Scope": {
       "additionalProperties": false,
-      "description": "Where a decision applies: its domain, what it is about, and which code its\nsubjects may be in. Generated and test code are told apart by the host\n(the provider's marker, `.gitattributes`, the project's `generated`\nglobs), and the engine leaves the subjects out that the scope excludes\nbefore any check runs.",
+      "description": "Where a decision applies: what it is about, and which code its subjects\nmay be in. Generated and test code are told apart by the host (the\nprovider's marker, `.gitattributes`, the project's `generated` globs), and\nthe engine leaves the subjects out that the scope excludes before any\ncheck runs.",
       "properties": {
-        "domain": {
-          "$ref": "#/$defs/Domain",
-          "default": "code"
-        },
         "generated": {
           "description": "Generated code is a subject too. Default: it is not.",
           "type": "boolean"
@@ -1490,7 +1398,7 @@
       ]
     },
     "Subject": {
-      "description": "What a decision talks about inside its domain. Mapping to the run scope\nof a rule is `Subject::run_scope`.",
+      "description": "What a decision talks about. Mapping to the run scope of a rule is\n`Subject::run_scope`.",
       "oneOf": [
         {
           "enum": [
@@ -1509,7 +1417,7 @@
         },
         {
           "const": "decision",
-          "description": "A decision document, in the `spec` domain.",
+          "description": "A decision document of the project.",
           "type": "string"
         }
       ]

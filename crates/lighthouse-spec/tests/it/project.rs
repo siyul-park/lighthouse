@@ -1,23 +1,42 @@
-use std::path::Path;
-use std::time::Duration;
+use std::{path::Path, sync::Arc, time::Duration};
 
 use lighthouse_model::Severity;
 use lighthouse_process::{Output, Stdin};
 use lighthouse_resource::{Format, Metadata, Resource};
 use lighthouse_spec::{
-    Config, PluginRef, ProjectError as Error, ProjectSpec, Projects, RuleConfig, RuleSetting,
-    Rules, glob_set,
+    Config, Error, Level, PluginRef, ProjectSpec, Projects, RuleConfig, RuleSetting, Rules,
+    glob_set,
 };
+use serde_json::json;
 
 fn rule(level: Option<Severity>, options: &[(&str, i64)]) -> RuleConfig {
     RuleConfig {
-        level,
         options: options
             .iter()
             .map(|(k, v)| ((*k).to_owned(), (*v).into()))
             .collect(),
-        generated: None,
+        ..RuleConfig::new(level)
     }
+}
+
+/// The way a project's document writes `config`.
+fn setting(config: &RuleConfig) -> RuleSetting {
+    let level = config.level.map_or("off".to_owned(), |l| l.to_string());
+    serde_json::from_value(json!({
+        "level": level,
+        "options": config.options,
+        "generated": config.generated,
+    }))
+    .unwrap()
+}
+
+/// The options `languages.<id>` hands to its provider.
+fn options<'a>(config: &'a Config, id: &str) -> &'a serde_json::Map<String, serde_json::Value> {
+    config
+        .languages()
+        .find(|(language, _)| *language == id)
+        .map(|(_, options)| options)
+        .unwrap()
 }
 
 fn shared(name: &str, extends: &[&str], rules: Rules) -> Resource<ProjectSpec> {
@@ -27,7 +46,7 @@ fn shared(name: &str, extends: &[&str], rules: Rules) -> Resource<ProjectSpec> {
             extends: extends.iter().map(|e| (*e).to_owned()).collect(),
             rules: rules
                 .iter()
-                .map(|(id, config)| (id.clone(), RuleSetting::from(config)))
+                .map(|(id, config)| (id.clone(), setting(config)))
                 .collect(),
             ..ProjectSpec::default()
         },
@@ -49,7 +68,7 @@ fn projects() -> Projects {
     .unwrap()
 }
 
-fn resolve(text: &str, path: &str, lang: &str) -> Rules {
+fn resolve(text: &str, path: &str, lang: &str) -> Arc<Rules> {
     Config::parse_inline(text)
         .unwrap()
         .resolve(Path::new(path), lang, &projects())
@@ -161,8 +180,10 @@ fn config_parse() {
     assert!(msg("[rules]\n\"a/b\" = 3").contains("level string or a table"));
     assert!(msg("bogus = 1").contains("unknown field `bogus`"));
     assert!(msg("[[overrides]]\nfiles = [\"[\"]").contains("invalid glob `[`"));
-    assert!(Config::parse_inline("plugins = [{ path = \"x\" }]").is_err());
-    assert!(Config::parse_inline("plugins = [{ id = \"x\", other = 1 }]").is_err());
+    assert!(msg("plugins = [3]").contains("a plugin is an id or a table with an `id`"));
+    assert!(msg("plugins = [{ path = \"x\" }]").contains("missing field `id`"));
+    assert!(msg("plugins = [{ id = \"x\", other = 1 }]").contains("unknown field `other`"));
+    assert!(msg("plugins = [{ id = \"x\", timeout = \"soon\" }]").contains("not a duration"));
 }
 
 #[test]
@@ -202,7 +223,7 @@ fn config_load() {
     let path = dir.path().join("lighthouse.toml");
     assert!(matches!(Config::load(&path), Err(Error::Io { .. })));
     std::fs::write(&path, "[spec]\nextends = [\"core/recommended\"]").unwrap();
-    assert!(matches!(Config::load(&path), Err(Error::Parse(_))));
+    assert!(matches!(Config::load(&path), Err(Error::Document(_))));
     std::fs::write(
         &path,
         ENVELOPE.replace("plugins = [\"core\"]", "extends = [\"core/recommended\"]"),
@@ -273,7 +294,7 @@ fn config_lists() {
 #[test]
 fn config_languages() {
     let config = Config::parse_inline("[languages.go]\ntags = [\"integration\"]\n").unwrap();
-    assert_eq!(config.languages()["go"]["tags"][0], "integration");
+    assert_eq!(options(&config, "go")["tags"][0], "integration");
 }
 
 #[test]
@@ -294,8 +315,8 @@ fn a_language_formatter_is_the_hosts_and_never_reaches_the_provider() {
     assert_eq!(go.stdin, Stdin::None);
     assert_eq!(go.output, Output::InPlace);
     assert_eq!(config.formatter("rust"), None);
-    assert!(!config.languages()["go"].contains_key("formatter"));
-    assert!(config.languages()["go"].contains_key("tags"));
+    assert!(!options(&config, "go").contains_key("formatter"));
+    assert!(options(&config, "go").contains_key("tags"));
 }
 
 #[test]
@@ -385,10 +406,9 @@ fn a_parsed_project_builds_a_config() {
 
 #[test]
 fn rule_settings_and_levels_convert_both_ways() {
-    use lighthouse_spec::{Level, RuleSetting};
-
-    let plain = RuleSetting::from(&rule(Some(Severity::Warn), &[]));
-    let detailed = RuleSetting::from(&rule(Some(Severity::Error), &[("max", 3)]));
+    let plain: RuleSetting = serde_json::from_value(json!("warn")).unwrap();
+    let detailed: RuleSetting =
+        serde_json::from_value(json!({ "level": "error", "options": { "max": 3 } })).unwrap();
 
     assert_eq!(plain, RuleSetting::Level(Level::Warn));
     assert!(
@@ -439,7 +459,7 @@ fn an_extended_project_keeps_its_overrides() {
     let mut base = shared("p/base", &[], Rules::new());
     base.spec.overrides = vec![lighthouse_spec::OverrideSpec {
         files: vec!["gen/**".to_owned()],
-        rules: [("p/a".to_owned(), RuleSetting::level(Severity::Info))].into(),
+        rules: [("p/a".to_owned(), RuleSetting::Level(Level::Info))].into(),
         ..lighthouse_spec::OverrideSpec::default()
     }];
     let projects = Projects::new([base]).unwrap();
@@ -490,7 +510,7 @@ fn the_entries_of_a_project_are_those_of_what_it_extends_and_its_own() {
             .unwrap();
 
     let known = projects();
-    let entries = config.layer().entries(&known).unwrap();
+    let entries = config.entries(&known).unwrap();
 
     let ids: Vec<&str> = entries.iter().map(|(id, _)| *id).collect();
     assert_eq!(ids, ["core/a", "core/b", "core/c"]);
@@ -541,18 +561,16 @@ fn config_constructor_prefixes() {
         "[languages.go]\nconstructorPrefixes = [\"Make\"]\n[languages.rust]\ntags = 1\n",
     )
     .unwrap();
-    assert_eq!(config.constructor_prefixes()["go"], ["Make"]);
-    assert!(!config.constructor_prefixes().contains_key("rust"));
-    assert!(!config.languages()["go"].contains_key("constructorPrefixes"));
+    let prefixes: Vec<_> = config.constructor_prefixes().collect();
+    assert_eq!(prefixes, [("go", &["Make".to_owned()][..])]);
+    assert!(!options(&config, "go").contains_key("constructorPrefixes"));
 }
 
 #[test]
 fn object_options_merge_per_key_across_layers_in_toml() {
     let limits = RuleConfig {
-        level: Some(Severity::Warn),
-        options: serde_json::from_value(serde_json::json!({ "max": { "default": 5, "test": -1 } }))
-            .unwrap(),
-        generated: None,
+        options: serde_json::from_value(json!({ "max": { "default": 5, "test": -1 } })).unwrap(),
+        ..RuleConfig::new(Some(Severity::Warn))
     };
     let layers = Projects::new([shared(
         "base/limits",

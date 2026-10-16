@@ -9,7 +9,7 @@ use std::{
 
 use lighthouse_model::ModelRef;
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Config, ModelProvider, Projects, glob_set};
+use lighthouse_spec::{Config, ModelProvider, Models, Projects, glob_set};
 
 use super::{Error, Language};
 
@@ -18,8 +18,8 @@ use super::{Error, Language};
 pub fn active_rules(config: &Config, projects: &Projects) -> Result<BTreeSet<String>, Error> {
     let mut active: BTreeSet<String> = config
         .resolve(Path::new(""), "", projects)?
-        .into_iter()
-        .filter_map(|(id, c)| c.level.map(|_| id))
+        .iter()
+        .filter_map(|(id, c)| c.level.map(|_| id.clone()))
         .collect();
     let overridden = config.configured().filter(|(_, c)| c.level.is_some());
     active.extend(overridden.map(|(id, _)| id.to_owned()));
@@ -31,6 +31,7 @@ pub fn active_rules(config: &Config, projects: &Projects) -> Result<BTreeSet<Str
 pub(super) fn validate_config(
     registry: &Registry,
     config: &Config,
+    binding: &Models,
     projects: &Projects,
 ) -> Result<(), Error> {
     for plugin in config.plugins() {
@@ -39,9 +40,9 @@ pub(super) fn validate_config(
         }
     }
     registry.validate()?;
-    validate_models(registry, config)?;
+    validate_models(registry, config, binding)?;
     let listed = |id: &str| config.lists(lighthouse_plugin::plugin_of(id));
-    let entries = config.layer().entries(projects)?;
+    let entries = config.entries(projects)?;
     for (id, config) in entries {
         let rule = registry
             .rule(id)
@@ -69,7 +70,7 @@ pub(super) fn constructors(registry: &Registry, config: &Config) -> BTreeMap<Str
         })
         .collect();
     for (id, prefixes) in config.constructor_prefixes() {
-        found.insert(id.clone(), prefixes.clone());
+        found.insert(id.to_owned(), prefixes.to_vec());
     }
     found
 }
@@ -102,8 +103,7 @@ pub(super) fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error {
 
 /// Rejects a binding to a model whose provider is unknown, and a provider that
 /// cannot work.
-fn validate_models(registry: &Registry, config: &Config) -> Result<(), Error> {
-    let binding = config.models();
+fn validate_models(registry: &Registry, config: &Config, binding: &Models) -> Result<(), Error> {
     if let Some((name, reason)) = binding.invalid.iter().next() {
         return Err(Error::Model {
             name: name.clone(),

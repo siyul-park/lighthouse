@@ -3,17 +3,21 @@
 //! made (generic operations over the code model, an external command) and
 //! every type compiles into a provider of the one `Fixer` interface.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::{collections::BTreeMap, collections::BTreeSet};
 
-use cel::Program;
-use lighthouse_model::{Capability, Safety};
+use lighthouse_model::{Capability, Safety, Severity};
 use lighthouse_process::{Output, Stdin};
 use lighthouse_resource::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-use crate::Error;
+use crate::{
+    DecisionSpec, OrderScope,
+    command::mixed_placeholder,
+    expression::{compile_problem, template_problem},
+    union::{refuse_strays, stray_field},
+};
 
 /// How a decision's findings are fixed and how far the fix may be trusted.
 /// Which fields a fix may have depends on its `type`; any other is refused.
@@ -33,7 +37,7 @@ pub struct Fix {
 /// The fields of a fix as it is read, before its `type` has had its say about
 /// which of them may be there.
 #[derive(Deserialize)]
-struct Shape {
+struct Written {
     safety: Safety,
     #[serde(default)]
     requires: Vec<Capability>,
@@ -51,7 +55,7 @@ impl<'de> Deserialize<'de> for Fix {
             .ok_or_else(|| D::Error::custom("a fix is a table"))?;
         let own: &[&str] = match table.get("type").and_then(Value::as_str) {
             Some("ops") => &["ops"],
-            Some("command") => &["argv", "output", "stdin", "env", "timeout", "scope"],
+            Some("command") => &["argv", "output", "stdin", "env", "timeout"],
             Some("rpc") => &["params"],
             other => {
                 return Err(D::Error::custom(match other {
@@ -60,16 +64,10 @@ impl<'de> Deserialize<'de> for Fix {
                 }));
             }
         };
-        if let Some(stray) = table
-            .keys()
-            .find(|key| !COMMON.contains(&key.as_str()) && !own.contains(&key.as_str()))
-        {
-            return Err(D::Error::custom(format!(
-                "unknown field `{stray}` for a fix of type `{}`",
-                table["type"].as_str().unwrap_or_default()
-            )));
+        if let Some(problem) = stray_field(table, "fix", &COMMON, own) {
+            return Err(D::Error::custom(problem));
         }
-        let Shape {
+        let Written {
             safety,
             requires,
             kind,
@@ -79,6 +77,33 @@ impl<'de> Deserialize<'de> for Fix {
             requires,
             kind,
         })
+    }
+}
+
+impl Fix {
+    /// What is wrong with the fix of `decision`, for the catalog to refuse.
+    pub(crate) fn problem(&self, decision: &DecisionSpec) -> Option<String> {
+        if decision.check.is_none() {
+            return Some("a decision without a check has no findings to fix".to_owned());
+        }
+        if self.safety == Safety::Safe && decision.severity != Some(Severity::Error) {
+            return Some(
+                "`safe` is reserved for decisions that author `error`; use `suggested`".to_owned(),
+            );
+        }
+        match &self.kind {
+            FixKind::Ops { ops } if ops.is_empty() => Some("`ops` is empty".to_owned()),
+            FixKind::Ops { ops } => {
+                let renames = ops.iter().any(|op| matches!(op, OpSpec::Rename { .. }));
+                if renames && !self.requires.contains(&Capability::CompleteReferences) {
+                    return Some("`rename` needs `complete-references` in `requires`".to_owned());
+                }
+                ops.iter().find_map(OpSpec::problem)
+            }
+            FixKind::Command(command) => command.problem(),
+            // Kept, and declined when a fix is asked for; see `FixPlan`.
+            FixKind::Rpc { .. } => None,
+        }
     }
 }
 
@@ -95,16 +120,6 @@ pub enum FixKind {
         #[serde(default, skip_serializing_if = "Map::is_empty")]
         params: Map<String, Value>,
     },
-}
-
-/// The declarations a `reorder` permutes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum ReorderScope {
-    /// Every declaration of the finding's file, each container sorted on its own.
-    File,
-    /// Only the members of the finding symbol's owner.
-    Owner,
 }
 
 /// One operation of an `ops` fix. Every parameter but `scope` and `by` is a
@@ -124,7 +139,7 @@ pub enum OpSpec {
         when: Option<String>,
     },
     Reorder {
-        scope: ReorderScope,
+        scope: OrderScope,
         by: Vec<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         when: Option<String>,
@@ -176,24 +191,66 @@ impl OpSpec {
             | Self::Replace { when, .. } => when.as_deref(),
         }
     }
-}
 
-/// Where a command's edits may land.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum CommandScope {
-    /// Only the finding's file.
-    #[default]
-    File,
+    /// Why the operation cannot run as written.
+    fn problem(&self) -> Option<String> {
+        let at = |what: &str| format!("{} `{what}`", self.name());
+        let cel = |what: &str, source: &str| compile_problem(&at(what), source);
+        let template = |what: &str, text: &str| template_problem(&at(what), text);
+        if let Some(problem) = self.when().and_then(|when| cel("when", when)) {
+            return Some(problem);
+        }
+        match self {
+            Self::Move {
+                node,
+                before,
+                after,
+                ..
+            } => cel("node", node).or_else(|| match (before, after) {
+                (Some(target), None) => cel("before", target),
+                (None, Some(target)) => cel("after", target),
+                _ => Some("move needs exactly one of `before` or `after`".to_owned()),
+            }),
+            Self::Reorder { by, .. } => {
+                let mut seen = BTreeSet::new();
+                if by.is_empty() {
+                    return Some("reorder needs at least one key in `by`".to_owned());
+                }
+                by.iter()
+                    .find(|key| !key.contains('/') || !seen.insert(*key))
+                    .map(|key| {
+                        format!(
+                            "reorder key `{key}` must be a qualified `plugin/name` and listed once"
+                        )
+                    })
+            }
+            Self::Delete {
+                node, file, span, ..
+            } => match (node, file, span) {
+                (Some(node), None, None) => cel("node", node),
+                (None, Some(file), Some(span)) => cel("file", file).or_else(|| cel("span", span)),
+                _ => Some("delete needs `node`, or `file` and `span`".to_owned()),
+            },
+            Self::Rename { symbol, name, .. } => {
+                cel("symbol", symbol).or_else(|| template("name", name))
+            }
+            Self::Replace {
+                file, span, text, ..
+            } => cel("file", file)
+                .or_else(|| cel("span", span))
+                .or_else(|| template("text", text)),
+        }
+    }
 }
 
 /// An external program that fixes a finding, by the process contract: exit `0`
 /// is success and the result is per `output` (an empty result changes nothing),
 /// `1` declines with the reason on stderr, anything else (`>= 2`, a signal, a
 /// timeout) is an error that applies nothing. stdout carries only the result;
-/// stderr is for people. It runs without a shell, in a scratch directory, with
-/// an environment cleared to `PATH`, `HOME`, `LANG`, `TMPDIR`, the declared
-/// `env` and `LIGHTHOUSE_DECISION`, `LIGHTHOUSE_OPTIONS`, `LIGHTHOUSE_API_VERSION`.
+/// stderr is for people. It runs without a shell, in a scratch directory over
+/// the finding's file, with an environment cleared to `PATH`, `HOME`, `LANG`,
+/// `TMPDIR`, the declared `env` and `LIGHTHOUSE_DECISION`, `LIGHTHOUSE_OPTIONS`,
+/// `LIGHTHOUSE_API_VERSION`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CommandSpec {
@@ -210,193 +267,24 @@ pub struct CommandSpec {
     /// How long it may run, such as `30s` or `2m`.
     #[serde(default = "default_timeout")]
     pub timeout: Duration,
-    #[serde(default)]
-    pub scope: CommandScope,
 }
 
-/// The checks of a catalog on a decision's `fix:`.
-pub(crate) fn validate(id: &str, fix: &Fix, mechanical: bool, checked: bool) -> Result<(), Error> {
-    let fail = |reason: String| Error::invalid(id, format!("fix: {reason}"));
-    if !checked {
-        return Err(fail(
-            "a decision without a check has no findings to fix".to_owned(),
-        ));
-    }
-    if fix.safety == Safety::Safe && !mechanical {
-        return Err(fail(
-            "`safe` is reserved for decisions that author `error`; use `suggested`".to_owned(),
-        ));
-    }
-    match &fix.kind {
-        FixKind::Ops { ops } => {
-            if ops.is_empty() {
-                return Err(fail("`ops` is empty".to_owned()));
-            }
-            let renames = ops.iter().any(|op| matches!(op, OpSpec::Rename { .. }));
-            if renames && !fix.requires.contains(&Capability::CompleteReferences) {
-                return Err(fail(
-                    "`rename` needs `complete-references` in `requires`".to_owned(),
-                ));
-            }
-            ops.iter().try_for_each(|op| op_valid(op).map_err(fail))
+impl CommandSpec {
+    /// Why the command cannot run as written.
+    fn problem(&self) -> Option<String> {
+        const KNOWN: [&str; 4] = ["{file}", "{line}", "{symbol}", "{rule}"];
+        if let Some(problem) = mixed_placeholder(&self.argv, &KNOWN, |arg| {
+            arg.contains("{root}") || KNOWN.iter().any(|p| arg.contains(p))
+        }) {
+            return Some(problem);
         }
-        FixKind::Command(command) => command_valid(command).map_err(fail),
-        // Kept, and declined when a fix is asked for; see `FixPlan`.
-        FixKind::Rpc { .. } => Ok(()),
+        self.argv
+            .first()
+            .is_none_or(|program| program.trim().is_empty())
+            .then(|| "`argv` needs a program".to_owned())
     }
 }
 
 fn default_timeout() -> Duration {
     Duration::from_secs(30)
-}
-
-/// Why the command cannot run as written.
-fn command_valid(command: &CommandSpec) -> Result<(), String> {
-    if let Some(arg) = command.argv.iter().find(|a| bad_placeholder(a)) {
-        return Err(format!(
-            "`{arg}` is not a placeholder of its own: `{{file}}`, `{{line}}`, `{{symbol}}` and `{{rule}}` fill a whole argument"
-        ));
-    }
-    if command
-        .argv
-        .first()
-        .is_none_or(|program| program.trim().is_empty())
-    {
-        return Err("`argv` needs a program".to_owned());
-    }
-    Ok(())
-}
-
-/// An argument that uses a placeholder without being exactly that placeholder
-/// (`--out={file}`), or names one that does not exist (`{root}`).
-fn bad_placeholder(arg: &str) -> bool {
-    const KNOWN: [&str; 4] = ["{file}", "{line}", "{symbol}", "{rule}"];
-    if KNOWN.contains(&arg) {
-        return false;
-    }
-    KNOWN.iter().any(|p| arg.contains(p)) || arg.contains("{root}")
-}
-
-fn op_valid(op: &OpSpec) -> Result<(), String> {
-    let at = |what: &str| format!("{} `{what}`", op.name());
-    if let Some(when) = op.when() {
-        cel(&at("when"), when)?;
-    }
-    match op {
-        OpSpec::Move {
-            node,
-            before,
-            after,
-            ..
-        } => move_valid(&at, node, before.as_deref(), after.as_deref()),
-        OpSpec::Reorder { by, .. } => reorder_valid(by),
-        OpSpec::Delete {
-            node, file, span, ..
-        } => delete_valid(&at, node.as_deref(), file.as_deref(), span.as_deref()),
-        OpSpec::Rename { symbol, name, .. } => {
-            cel(&at("symbol"), symbol)?;
-            template(&at("name"), name)
-        }
-        OpSpec::Replace {
-            file, span, text, ..
-        } => {
-            cel(&at("file"), file)?;
-            cel(&at("span"), span)?;
-            template(&at("text"), text)
-        }
-    }
-}
-
-fn move_valid(
-    at: &dyn Fn(&str) -> String,
-    node: &str,
-    before: Option<&str>,
-    after: Option<&str>,
-) -> Result<(), String> {
-    cel(&at("node"), node)?;
-    match (before, after) {
-        (Some(target), None) => cel(&at("before"), target),
-        (None, Some(target)) => cel(&at("after"), target),
-        _ => Err("move needs exactly one of `before` or `after`".to_owned()),
-    }
-}
-
-fn reorder_valid(by: &[String]) -> Result<(), String> {
-    if by.is_empty() {
-        return Err("reorder needs at least one key in `by`".to_owned());
-    }
-    let mut seen = BTreeSet::new();
-    for key in by {
-        if !key.contains('/') || !seen.insert(key) {
-            return Err(format!(
-                "reorder key `{key}` must be a qualified `plugin/name` and listed once"
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn delete_valid(
-    at: &dyn Fn(&str) -> String,
-    node: Option<&str>,
-    file: Option<&str>,
-    span: Option<&str>,
-) -> Result<(), String> {
-    match (node, file, span) {
-        (Some(node), None, None) => cel(&at("node"), node),
-        (None, Some(file), Some(span)) => {
-            cel(&at("file"), file)?;
-            cel(&at("span"), span)
-        }
-        _ => Err("delete needs `node`, or `file` and `span`".to_owned()),
-    }
-}
-
-fn cel(what: &str, source: &str) -> Result<(), String> {
-    Program::compile(source)
-        .map(drop)
-        .map_err(|e| format!("{what}: {e}"))
-}
-
-/// Every `{{ cel }}` hole of a template compiles and is closed.
-fn template(what: &str, text: &str) -> Result<(), String> {
-    for part in crate::check::parse_template(text).map_err(|e| format!("{what}: {e}"))? {
-        if let crate::check::TemplatePart::Hole(source) = part {
-            cel(what, &source)?;
-        }
-    }
-    Ok(())
-}
-
-/// The loader refuses a field its `type` does not have; so does the schema:
-/// each branch carries the common fields too and allows no other.
-fn refuse_strays(schema: &mut schemars::Schema) {
-    let Some(root) = schema.as_object_mut() else {
-        return;
-    };
-    let common = match root.get("properties") {
-        Some(Value::Object(properties)) => properties.clone(),
-        _ => Map::new(),
-    };
-    let required = root
-        .get("required")
-        .cloned()
-        .unwrap_or(Value::Array(Vec::new()));
-    let Some(Value::Array(branches)) = root.get_mut("oneOf") else {
-        return;
-    };
-    for branch in branches.iter_mut().filter_map(Value::as_object_mut) {
-        if let Value::Object(properties) = branch
-            .entry("properties")
-            .or_insert_with(|| Value::Object(Map::new()))
-        {
-            properties.extend(common.clone());
-        }
-        if let (Some(Value::Array(own)), Value::Array(shared)) =
-            (branch.get_mut("required"), &required)
-        {
-            own.extend(shared.iter().cloned());
-        }
-        branch.insert("additionalProperties".to_owned(), Value::Bool(false));
-    }
 }

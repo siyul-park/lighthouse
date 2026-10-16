@@ -14,7 +14,7 @@ mod shape;
 /// are one of the declared kinds, of which the default switches some on.
 pub(crate) const KINDS: &str = "kinds";
 
-pub use shape::{LIMIT_ROLES, NO_LIMIT, Shape, definitions, merge};
+pub use shape::{LIMIT_ROLES, Shape, limit, merge};
 
 /// The JSON type the values of an option must have; `number` accepts any
 /// number.
@@ -42,20 +42,6 @@ impl OptionType {
     }
 }
 
-impl OptionType {
-    /// The JSON type name, as the schema spells it.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Integer => "integer",
-            Self::Number => "number",
-            Self::Boolean => "boolean",
-            Self::String => "string",
-            Self::Array => "array",
-            Self::Object => "object",
-        }
-    }
-}
-
 impl fmt::Display for OptionType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
@@ -67,14 +53,6 @@ impl fmt::Display for OptionType {
             Self::Object => "an object",
         })
     }
-}
-
-/// The only `type` of the options object.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum ObjectType {
-    #[default]
-    Object,
 }
 
 /// One tunable value: its shape, default and description. The shape's keys
@@ -132,8 +110,6 @@ impl Deref for OptionSchema {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct OptionsSchema {
-    #[serde(rename = "type", default)]
-    pub kind: ObjectType,
     #[serde(default)]
     pub properties: BTreeMap<String, OptionSchema>,
     #[serde(default)]
@@ -144,8 +120,8 @@ impl OptionsSchema {
     /// A schema over `properties` that refuses any other key.
     pub fn new(properties: BTreeMap<String, OptionSchema>) -> Self {
         Self {
-            kind: ObjectType::Object,
             properties,
+
             additional_properties: false,
         }
     }

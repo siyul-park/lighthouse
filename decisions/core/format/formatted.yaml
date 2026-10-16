@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: core/formatted
   uid: 826aab0e-2462-44af-b11d-94def41ae66b
-  labels:
-    lighthouse/pack: core
-    lighthouse/section: format
 spec:
   title: A file is as its formatter writes it
   context: >-
@@ -21,7 +18,6 @@ spec:
     than it may leaves the analysis incomplete, never clean, and runs only in
     a trusted project.
   scope:
-    domain: code
     subject: file
     generated: false
     tests: include

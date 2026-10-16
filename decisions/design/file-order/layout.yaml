@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: design/layout
   uid: 836f3261-1d9b-4fff-b121-b191bc8dbf36
-  labels:
-    lighthouse/pack: design
-    lighthouse/section: file-order
 spec:
   title: Declarations are laid out for reading
   context: >-
@@ -35,7 +32,6 @@ spec:
     and a function that lives in another file than its owner, are put to a
     model, with the requirement and the examples as the question.
   scope:
-    domain: code
     subject: file
   requirement: >-
     Declarations MUST be ordered for reading: callers before callees, related
@@ -52,7 +48,6 @@ spec:
     splits, wrappers, or duplicated helpers.
   severity: warn
   options:
-    type: object
     properties:
       kinds:
         type: array

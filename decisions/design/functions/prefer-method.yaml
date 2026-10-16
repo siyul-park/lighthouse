@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: design/prefer-method
   uid: de49963a-a976-4135-8cf0-a9ec748353bc
-  labels:
-    lighthouse/pack: design
-    lighthouse/section: functions
 spec:
   title: Behavior lives with its owner
   context: >-
@@ -33,7 +30,6 @@ spec:
     module's code, kept here by accident of history. No tool checks it: Sonar
     and PMD judge coupling of a class, not where a function belongs.
   scope:
-    domain: code
     subject: symbol
   requirement: >-
     Methods SHOULD express receiver-owned behavior; free functions SHOULD
@@ -42,7 +38,6 @@ spec:
     function SHOULD live in the module whose symbols it uses.
   severity: warn
   options:
-    type: object
     properties:
       kinds:
         type: array

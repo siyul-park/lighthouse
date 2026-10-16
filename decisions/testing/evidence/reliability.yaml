@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: testing/reliability
   uid: cc6c495d-7112-4b74-918f-3ae0237ca7d4
-  labels:
-    lighthouse/pack: testing
-    lighthouse/section: evidence
 spec:
   title: Tests are reliable evidence
   context: >-
@@ -16,7 +13,6 @@ spec:
     Judged: the requirement and the examples are the question put to a model
     for every test.
   scope:
-    domain: code
     subject: test
     tests: only
   requirement: >-

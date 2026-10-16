@@ -218,7 +218,7 @@ impl ExampleRun<'_> {
 
 fn config(registry: &Registry, decision: &Decision, example: &Example) -> Result<Config, String> {
     let level = decision
-        .severity()
+        .severity
         .ok_or_else(|| "a decision without severity has no rule".to_owned())?;
     let mut rule = toml::Table::new();
     rule.insert("level".to_owned(), level.to_string().into());

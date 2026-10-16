@@ -3,7 +3,7 @@
 
 use lighthouse_model::Severity;
 use lighthouse_spec::{
-    Config, Evaluation, ModelBinding, ModelCheck, ModelProvider, Routing, Select, Subject,
+    Config, Evaluation, ModelCheck, ModelProvider, Models, Projects, Routing, Select, Subject,
 };
 
 const PROJECT: &str = r#"
@@ -29,15 +29,21 @@ model = "script/sonnet"
 evaluation = { precision = 0.95, recall = 0.8 }
 "#;
 
-fn binding() -> ModelBinding {
-    Config::parse_inline(PROJECT).unwrap().models().clone()
+fn binding() -> Models {
+    Config::parse_inline(PROJECT)
+        .unwrap()
+        .models(&Projects::default())
+        .unwrap()
 }
 
 #[test]
 fn the_project_binds_models_by_reference_and_limits_what_they_cost() {
     let binding = binding();
     assert_eq!(binding.classification, ["openrouter/qwen/qwen3-coder:free"]);
-    assert_eq!(binding.rules["design/prefer-method"], ["script/sonnet"]);
+    assert_eq!(
+        binding.route("design/prefer-method").unwrap(),
+        ["script/sonnet"]
+    );
     assert_eq!(binding.routing, Routing::Ordered);
     assert_eq!(binding.budget, 50);
     let ids: Vec<_> = binding.ids().collect();
@@ -56,10 +62,16 @@ model = ["c/three", "a/one"]
 
 #[test]
 fn a_binding_is_one_model_or_a_route_of_several_in_the_order_written() {
-    let binding = Config::parse_inline(ROUTE).unwrap().models().clone();
+    let binding = Config::parse_inline(ROUTE)
+        .unwrap()
+        .models(&Projects::default())
+        .unwrap();
 
     assert_eq!(binding.classification, ["a/one", "b/two"]);
-    assert_eq!(binding.rules["design/naming"], ["c/three", "a/one"]);
+    assert_eq!(
+        binding.route("design/naming").unwrap(),
+        ["c/three", "a/one"]
+    );
     assert_eq!(binding.routing, Routing::RoundRobin);
     let ids: Vec<_> = binding.ids().collect();
     assert_eq!(ids, ["a/one", "b/two", "c/three", "a/one"]);
@@ -112,13 +124,32 @@ fn local_is_built_in_and_costs_nothing_and_cannot_be_declared() {
 }
 
 #[test]
+fn a_predefined_provider_needs_no_declaration_and_routes_list_the_rules_that_bind_models() {
+    assert!(ModelProvider::predefined("openai").is_some());
+    assert!(ModelProvider::predefined("nope").is_none());
+
+    let binding = binding();
+    let routes: Vec<_> = binding.routes().collect();
+
+    assert_eq!(
+        routes,
+        [("design/prefer-method", &["script/sonnet".to_owned()][..])]
+    );
+}
+
+#[test]
 fn logprobs_and_extra_body_travel_in_the_options_and_unknown_fields_are_rejected() {
     let config = Config::parse_inline(
         "[models.providers.lp]\nspec = \"openai\"\nlogprobs = true\n\
          extraBody = { provider = { require_parameters = true }, max_tokens = 1024 }\n",
     )
     .unwrap();
-    let ModelProvider::Rpc { options, .. } = config.models().provider("lp").unwrap() else {
+    let ModelProvider::Rpc { options, .. } = config
+        .models(&Projects::default())
+        .unwrap()
+        .provider("lp")
+        .unwrap()
+    else {
         panic!("a spec provider is a model-http provider");
     };
     assert_eq!(options["logprobs"], true);
@@ -137,7 +168,12 @@ fn logprobs_and_extra_body_travel_in_the_options_and_unknown_fields_are_rejected
 #[test]
 fn a_provider_naming_an_unknown_spec_is_invalid() {
     let bad = Config::parse_inline("[models.providers.x]\nspec = \"nope\"\n").unwrap();
-    assert!(bad.models().invalid.contains_key("x"));
+    assert!(
+        bad.models(&Projects::default())
+            .unwrap()
+            .invalid
+            .contains_key("x")
+    );
 }
 
 #[test]
@@ -190,7 +226,7 @@ fn model_provider_remote() {
 fn exploring_sends_a_twentieth_of_the_fails_on_unless_the_project_says() {
     assert_eq!(binding().explore, 0.05);
     let said = Config::parse_inline("plugins = []\n[models]\nexplore = 0.25\n").unwrap();
-    assert_eq!(said.models().explore, 0.25);
+    assert_eq!(said.models(&Projects::default()).unwrap().explore, 0.25);
     for share in ["0.0", "1.0"] {
         let text = format!("plugins = []\n[models]\nexplore = {share}\n");
         assert!(Config::parse_inline(&text).is_ok(), "{share}");

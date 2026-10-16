@@ -196,7 +196,7 @@ fn canonical(local: &Catalog, id: &str) -> Result<String> {
     let decision = local
         .decision(id)
         .ok_or_else(|| format!("`{id}` is not in the candidate layer"))?;
-    Ok(Catalog::decision_text(decision)?)
+    Ok(Catalog::decision_text(decision))
 }
 
 fn file_name(name: &str) -> String {

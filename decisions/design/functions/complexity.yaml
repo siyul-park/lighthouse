@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: design/complexity
   uid: 374c95b6-7892-4e6b-a8db-d25efe157aab
-  labels:
-    lighthouse/pack: design
-    lighthouse/section: functions
 spec:
   title: A function is small enough to read at one level
   context: >-
@@ -55,7 +52,6 @@ spec:
     model for the abstraction level (`review`); a finding on a function is
     never asked again.
   scope:
-    domain: code
     subject: symbol
   requirement: >-
     A function SHOULD NOT exceed the limit of its role in lines, statements,
@@ -71,7 +67,6 @@ spec:
     use deliberately high thresholds.
   severity: warn
   options:
-    type: object
     properties:
       kinds:
         type: array

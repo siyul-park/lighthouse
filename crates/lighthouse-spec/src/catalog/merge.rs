@@ -3,16 +3,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use lighthouse_resource::Resource;
 
 use crate::{
-    CheckKind, Content, Decision, Error, Example, ExampleFile, Pack, PackSpec, Section,
-    SectionSpec,
-    decision::{PACK_LABEL, SECTION_LABEL},
+    CheckKind, Decision, Error, Example, ExampleFile, Pack, PackSpec, Section, SectionSpec,
     validate,
 };
 
-use super::{LOCAL_PACK, LOCAL_SECTION, load::Files};
+use super::load::Files;
 
 /// Packs with their decisions, in the order the packs list them. Every
-/// decision is listed once, in the pack and section its labels name.
+/// decision is listed once, in the section of the pack its id names.
 pub(super) fn assemble(
     files: &Files,
     packs: Vec<(String, Resource<PackSpec>)>,
@@ -59,7 +57,6 @@ pub(super) fn assemble(
                         format!("`{short}` is listed in section `{name}` but is not defined, or is listed twice"),
                     )
                 })?;
-                labels_match(&decision, &id, &name)?;
                 members.push(resolve_examples(files, &dir, decision)?);
             }
             sections.push(Section {
@@ -77,26 +74,19 @@ pub(super) fn assemble(
         });
     }
     if let Some((id, (dir, decision))) = waiting.into_iter().next() {
-        let place = if decision.section().is_empty() {
-            "no section".to_owned()
-        } else {
-            format!(
-                "section `{}` of pack `{}`",
-                decision.section(),
-                decision.pack()
-            )
-        };
         return Err(Error::layout(
             &dir,
-            format!("`{id}` names {place} but its pack does not list it"),
+            format!(
+                "`{id}` is not listed in a section of its pack `{}`",
+                decision.pack()
+            ),
         ));
     }
     Ok(built)
 }
 
-/// A decision of the local layer, with the pack and section labels a project
-/// does not have to write.
-pub(super) fn local_decision(file: &str, mut decision: Decision) -> Result<Decision, Error> {
+/// A decision of the local layer is `local/<name>` and names no bundled rule.
+pub(super) fn check_local(file: &str, decision: &Decision) -> Result<(), Error> {
     if !decision.id().starts_with("local/") {
         return Err(Error::layout(
             file,
@@ -106,20 +96,6 @@ pub(super) fn local_decision(file: &str, mut decision: Decision) -> Result<Decis
             ),
         ));
     }
-    for (key, value) in [(PACK_LABEL, LOCAL_PACK), (SECTION_LABEL, LOCAL_SECTION)] {
-        let labels = &mut decision.metadata_mut().labels;
-        match labels.get(key) {
-            Some(found) if found != value => {
-                return Err(Error::layout(
-                    file,
-                    format!("label `{key}` is `{found}`, a local decision's is `{value}`"),
-                ));
-            }
-            _ => {
-                labels.insert(key.to_owned(), value.to_owned());
-            }
-        }
-    }
     if let Some(CheckKind::Builtin(builtin)) = decision.check.as_ref().map(|c| &c.kind)
         && builtin.named().is_some()
     {
@@ -128,7 +104,7 @@ pub(super) fn local_decision(file: &str, mut decision: Decision) -> Result<Decis
             "a local decision may not name a bundled rule with `builtin: {id}`; use a standard operation, `cel` or `command`",
         ));
     }
-    Ok(decision)
+    Ok(())
 }
 
 pub(super) fn merge_sections(into: &mut Pack, from: &Pack) {
@@ -157,33 +133,6 @@ pub(super) fn resolve_examples(
     resolved.map(|()| decision)
 }
 
-/// A decision's labels name the pack and section that list it.
-fn labels_match(decision: &Decision, pack: &str, section: &str) -> Result<(), Error> {
-    let id = decision.id();
-    let labels = &decision.metadata().labels;
-    for (key, want) in [(PACK_LABEL, pack), (SECTION_LABEL, section)] {
-        match labels.get(key) {
-            Some(found) if found == want => {}
-            Some(found) => {
-                return Err(Error::invalid(
-                    id,
-                    format!(
-                        "label `{key}` is `{found}` but the {} lists it",
-                        if key == PACK_LABEL { "pack" } else { "section" }
-                    ),
-                ));
-            }
-            None => {
-                return Err(Error::invalid(
-                    id,
-                    format!("needs the label `{key}: {want}`"),
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
 fn resolve_all(
     files: &Files,
     dir: &str,
@@ -209,7 +158,7 @@ fn resolve_files(
 ) -> Result<Vec<ExampleFile>, Error> {
     let mut resolved = Vec::new();
     for file in list {
-        let Content::File(source) = &file.content else {
+        let Some(source) = file.source() else {
             resolved.push(file);
             continue;
         };
@@ -220,7 +169,7 @@ fn resolve_files(
             ));
         }
         let key = if dir.is_empty() {
-            source.clone()
+            source.to_owned()
         } else {
             format!("{dir}/{source}")
         };
@@ -228,7 +177,7 @@ fn resolve_files(
             .get(&key)
             .ok_or_else(|| Error::invalid(id, format!("example source `{source}` does not exist")))?
             .clone();
-        resolved.push(file.with_loaded(text));
+        resolved.push(file.with_text(text));
     }
     Ok(resolved)
 }

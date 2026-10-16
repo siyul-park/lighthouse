@@ -1,31 +1,25 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fs,
-    path::{Path, PathBuf},
+    path::Path,
     sync::OnceLock,
 };
 
 use lighthouse_model::hash;
-use lighthouse_resource::{
-    Format, Resource, SCHEMA_URL_BASE, Spec, documents, header, resource, to_yaml, write_atomic,
-};
-use serde::Serialize;
+use lighthouse_resource::{Resource, SCHEMA_URL_BASE, Spec, header, to_yaml, write_atomic};
 
 use crate::{
-    Decision, Error, Pack, PackSpec, ProjectError, ProjectSpec, Projects, Section,
-    decision::SECTION_LABEL,
-    project,
+    Decision, DecisionSpec, Error, Pack, ProjectSpec, Projects, Section, project,
     sources::{SourceLine, extract},
     validate,
 };
 
 use load::{Files, read_documents};
-use merge::{assemble, local_decision, merge_sections, resolve_examples};
+use merge::{assemble, check_local, merge_sections, resolve_examples};
 
 pub(crate) mod load;
 mod merge;
 
-const PACK_FILE: &str = "pack.yaml";
 const SOURCES_FILE: &str = "sources.yaml";
 /// The pack and section the decisions of a project's own layer belong to.
 const LOCAL_PACK: &str = "local";
@@ -33,13 +27,20 @@ const LOCAL_SECTION: &str = "rules";
 
 /// A set of packs with the sources they came from. A catalog is a layer:
 /// `overlay` stacks the project-local layer on the bundled one.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Catalog {
-    pub packs: Vec<Pack>,
+    packs: Vec<Pack>,
     pub(crate) sources: Vec<SourceLine>,
     /// The `Project` documents of the layer; the standard projects of the
     /// packs derive from the decisions and are not listed here.
     projects: Vec<Resource<ProjectSpec>>,
+    /// Where each decision lies, by id: its pack, section and place in it.
+    index: HashMap<String, [usize; 3]>,
+    /// Identifies this set of decisions; see [`Catalog::version`].
+    version: String,
+    /// The projects `extends` can name: the standard ones of every pack, then
+    /// the `Project` documents of the layer.
+    shareable: Projects,
 }
 
 impl Catalog {
@@ -58,8 +59,8 @@ impl Catalog {
     /// Builds a validated layer from files keyed by `/`-separated paths
     /// relative to the catalog root. Every YAML, TOML or JSON file outside a
     /// `testdata` directory holds documents of the kinds `Pack`, `Decision`,
-    /// `Project` and `SourceMap`; a decision belongs to the pack and section
-    /// its labels name, and the pack lists it.
+    /// `Project` and `SourceMap`; a decision belongs to the pack its id
+    /// names, and the pack lists it in a section.
     pub fn from_files(files: Files) -> Result<Self, Error> {
         let mut catalog = Self::default();
         let mut packs = Vec::new();
@@ -78,16 +79,14 @@ impl Catalog {
         }
         packs.sort_by(|a, b| a.1.metadata.name.cmp(&b.1.metadata.name));
         catalog.packs = assemble(&files, packs, decisions)?;
-        validate::layer(&catalog)?;
-        Ok(catalog)
+        catalog.sealed(validate::layer)
     }
 
     /// Builds the project-local layer from the files of
     /// `.lighthouse/decisions`, keyed by file name. A `Decision` there has an
-    /// id `local/<name>` and a CEL check (or none); the loader adds the
-    /// `local` pack and `rules` section labels it leaves out. A `Project` is a
-    /// shareable configuration that `extends` can name. Examples must be
-    /// inline.
+    /// id `local/<name>` and a CEL check (or none); the loader lists it in the
+    /// `local` pack. A `Project` is a shareable configuration that `extends`
+    /// can name. Examples must be inline.
     pub fn from_local(files: Files) -> Result<Self, Error> {
         let mut catalog = Self::default();
         let mut decisions = Vec::new();
@@ -101,7 +100,8 @@ impl Catalog {
             }
             catalog.projects.extend(loaded.projects);
             for decision in loaded.decisions {
-                decisions.push(local_decision(name, decision)?);
+                check_local(name, &decision)?;
+                decisions.push(decision);
             }
         }
         if !decisions.is_empty() {
@@ -120,14 +120,15 @@ impl Catalog {
                 }],
             });
         }
-        validate::layer(&catalog)?;
-        Ok(catalog)
+        catalog.sealed(validate::layer)
     }
 
     /// `base` with `local` on top. Local packs, sections and decisions are
     /// added; into an existing pack or section only new sections or decisions
     /// are merged, and the base title and intro win. The projects of both are
-    /// kept. Sources are validated per layer, not across layers.
+    /// kept. Each layer was validated as it was built, so only what crosses
+    /// them is: unique ids and uids, supersession, and the projects `extends`
+    /// names. Sources are validated per layer, not across layers.
     pub fn overlay(base: &Self, local: &Self) -> Result<Self, Error> {
         let mut merged = base.clone();
         for pack in &local.packs {
@@ -138,85 +139,65 @@ impl Catalog {
         }
         merged.sources.extend(local.sources.iter().cloned());
         merged.projects.extend(local.projects.iter().cloned());
-        validate::decisions(&merged)?;
+        let merged = merged.sealed(|merged| validate::overlay(merged, local))?;
         validate::projects(&merged)?;
         Ok(merged)
     }
 
-    /// The projects `extends` can name: the standard ones of every pack, then
-    /// the `Project` documents of the layer.
-    pub fn projects(&self) -> Result<Projects, ProjectError> {
-        Projects::new(
-            project::standard(self)
+    /// Indexes the decisions, has `validate` judge the layer, and settles what
+    /// derives from the decisions, once: the version and the shareable projects.
+    fn sealed(mut self, validate: impl FnOnce(&Self) -> Result<(), Error>) -> Result<Self, Error> {
+        self.index = self
+            .packs
+            .iter()
+            .enumerate()
+            .flat_map(|(p, pack)| {
+                pack.sections
+                    .iter()
+                    .enumerate()
+                    .flat_map(move |(s, section)| {
+                        section
+                            .decisions
+                            .iter()
+                            .enumerate()
+                            .map(move |(d, decision)| (decision.id().to_owned(), [p, s, d]))
+                    })
+            })
+            .collect();
+        validate(&self)?;
+        let listing: String = self
+            .decisions()
+            .map(|d| format!("{}:{}\n", d.id(), d.version()))
+            .collect();
+        self.version = hash::short(&listing, 8);
+        self.shareable = Projects::new(
+            project::standard(&self)
                 .into_iter()
                 .chain(self.projects.iter().cloned()),
-        )
+        )?;
+        Ok(self)
     }
 
-    /// Writes `decision` into `<root>/<pack>/<section>/` and lists it in that
-    /// section of the pack file. Both files are written to temporary names
-    /// first, so a failure leaves no half-written file; the decision is
-    /// renamed before the pack. `source` example files must already exist.
-    pub fn write_decision(root: &Path, decision: &Decision) -> Result<(), Error> {
-        validate::decision(decision)?;
-        let id = decision.id();
-        let (pack, name) = id
-            .split_once('/')
-            .ok_or_else(|| Error::invalid(id, "an id is `<pack>/<name>`"))?;
-        let section = decision.section();
-        if section.is_empty() {
-            return Err(Error::invalid(
-                id,
-                format!("needs a `{SECTION_LABEL}` label"),
-            ));
-        }
-        let dir = root.join(pack).join(section);
-        let pack_path = root.join(pack).join(PACK_FILE);
-        let text = read(&pack_path)?;
-        let label = pack_path.display().to_string();
-        let mut docs = documents(Format::Yaml, &label, &text).map_err(Error::from)?;
-        let doc = docs
-            .pop()
-            .ok_or_else(|| Error::layout(&label, "is empty"))?;
-        let mut file = resource::<PackSpec>(&label, &doc).map_err(Error::from)?;
-        let listed = file
-            .spec
-            .sections
-            .iter_mut()
-            .find(|s| s.name == section)
-            .ok_or_else(|| Error::layout(&label, format!("has no section `{section}`")))?;
-        if !listed.decisions.iter().any(|d| d == name) {
-            listed.decisions.push(name.to_owned());
-        }
-        let decision_path = dir.join(format!("{name}.yaml"));
-        let staged = [
-            (decision_path.clone(), decision_document(decision)?),
-            (pack_path, document(&file)?),
-        ];
-        let temps: Vec<(PathBuf, PathBuf)> = staged
-            .iter()
-            .map(|(path, _)| (path.with_extension("yaml.tmp"), path.clone()))
-            .collect();
-        fs::create_dir_all(&dir).map_err(|source| Error::Io {
-            path: dir.display().to_string(),
-            source,
-        })?;
-        for ((tmp, _), (_, text)) in temps.iter().zip(&staged) {
-            write(tmp, text)?;
-        }
-        for (tmp, path) in &temps {
-            fs::rename(tmp, path).map_err(|source| Error::Io {
-                path: path.display().to_string(),
-                source,
-            })?;
-        }
-        Ok(())
+    /// The packs, in id order.
+    pub fn packs(&self) -> &[Pack] {
+        &self.packs
+    }
+
+    /// The projects `extends` can name: the standard ones of every pack, then
+    /// the `Project` documents of the layer.
+    pub fn projects(&self) -> &Projects {
+        &self.shareable
     }
 
     /// The text of a decision file: a `Decision` document in YAML that starts
     /// with the schema comment editors use.
-    pub fn decision_text(decision: &Decision) -> Result<String, Error> {
-        decision_document(decision)
+    pub fn decision_text(decision: &Decision) -> String {
+        let resource = decision.clone().into_resource();
+        format!(
+            "{}{}",
+            header(<DecisionSpec as Spec>::KIND, SCHEMA_URL_BASE),
+            to_yaml(&resource)
+        )
     }
 
     /// Whether `name` can be the file name of a local layer file: it starts
@@ -244,18 +225,14 @@ impl Catalog {
                 "a local decision file name is lowercase letters, digits, `.`, `_` and `-`, without `..`",
             ));
         }
-        let io = |path: &Path, source| Error::Io {
-            path: path.display().to_string(),
-            source,
-        };
-        fs::create_dir_all(dir).map_err(|e| io(dir, e))?;
+        fs::create_dir_all(dir).map_err(Error::io(dir))?;
         let path = dir.join(format!("{name}.yaml"));
         let inside = path
             .parent()
             .map(Path::canonicalize)
             .transpose()
-            .map_err(|e| io(dir, e))?
-            == Some(dir.canonicalize().map_err(|e| io(dir, e))?);
+            .map_err(Error::io(dir))?
+            == Some(dir.canonicalize().map_err(Error::io(dir))?);
         if !inside {
             return Err(Error::invalid(
                 name,
@@ -275,20 +252,20 @@ impl Catalog {
                 want.insert(bullet.reference, bullet.text);
             }
         }
-        let have: BTreeMap<_, _> = self
+        let have: BTreeMap<&str, &str> = self
             .sources
             .iter()
-            .map(|s| (s.reference.clone(), s.text.clone()))
+            .map(|s| (s.reference.as_str(), s.text.as_str()))
             .collect();
         let missing: Vec<_> = want
             .iter()
-            .filter(|(r, _)| !have.contains_key(*r))
+            .filter(|(r, _)| !have.contains_key(r.as_str()))
             .map(|(r, t)| format!("{r}: {t}"))
             .collect();
         let stale: Vec<_> = have
             .keys()
-            .filter(|r| !want.contains_key(*r))
-            .cloned()
+            .filter(|r| !want.contains_key(**r))
+            .copied()
             .collect();
         if missing.is_empty() && stale.is_empty() {
             return Ok(());
@@ -313,43 +290,13 @@ impl Catalog {
 
     /// The decision with this `<pack>/<name>` id.
     pub fn decision(&self, id: &str) -> Option<&Decision> {
-        self.decisions().find(|d| d.id() == id)
+        let [pack, section, decision] = *self.index.get(id)?;
+        Some(&self.packs[pack].sections[section].decisions[decision])
     }
 
     /// Identifies this set of decisions: the hash of every decision's id and
     /// version, in catalog order.
-    pub fn version(&self) -> String {
-        let listing: String = self
-            .decisions()
-            .map(|d| format!("{}:{}\n", d.id(), d.version()))
-            .collect();
-        hash::short(&listing, 8)
+    pub fn version(&self) -> &str {
+        &self.version
     }
-}
-
-fn decision_document(decision: &Decision) -> Result<String, Error> {
-    let resource = decision.clone().into_resource();
-    document(&resource)
-}
-
-fn document<S: Spec + Serialize>(resource: &Resource<S>) -> Result<String, Error> {
-    Ok(format!(
-        "{}{}",
-        header(S::KIND, SCHEMA_URL_BASE),
-        to_yaml(resource)
-    ))
-}
-
-fn read(path: &Path) -> Result<String, Error> {
-    fs::read_to_string(path).map_err(|source| Error::Io {
-        path: path.display().to_string(),
-        source,
-    })
-}
-
-fn write(path: &Path, text: &str) -> Result<(), Error> {
-    fs::write(path, text).map_err(|source| Error::Io {
-        path: path.display().to_string(),
-        source,
-    })
 }

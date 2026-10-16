@@ -10,9 +10,6 @@ const DECISION: &str = r#"apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: demo/wide
-  labels:
-    lighthouse/pack: demo
-    lighthouse/section: s
 spec:
   title: Lines are narrow
   context: A line is at most five characters wide.

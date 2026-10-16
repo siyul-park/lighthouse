@@ -37,7 +37,7 @@
     },
     "PackSpec": {
       "additionalProperties": false,
-      "description": "The spec of the `Pack` kind: an ordered set of sections, each an ordered\nlist of decisions. A decision belongs to a pack and section by its labels\n(`lighthouse/pack`, `lighthouse/section`); this list only orders them.",
+      "description": "The spec of the `Pack` kind: an ordered set of sections, each an ordered\nlist of decisions. A decision belongs to the pack its id names (its\n`<pack>/` prefix) and to the section of this list that names it.",
       "properties": {
         "intro": {
           "type": "string"
@@ -74,7 +74,7 @@
           "type": "string"
         },
         "name": {
-          "description": "Kebab-case name; the value of the decisions' section label.",
+          "description": "Kebab-case name of the section inside the pack.",
           "type": "string"
         },
         "title": {

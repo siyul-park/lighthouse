@@ -1,5 +1,5 @@
 use lighthouse_model::{RunScope, Severity};
-use lighthouse_spec::{Catalog, Content, Decision, ExampleFile, Subject, authored_severity};
+use lighthouse_spec::{Catalog, Decision, ExampleFile, Subject, authored_severity};
 use lighthouse_test_support::catalog::*;
 use serde_json::{Map, json};
 
@@ -11,8 +11,21 @@ fn bundled(id: &str) -> &'static Decision {
 
 #[test]
 fn bundled_catalog_has_core_design_and_testing_packs() {
-    let ids: Vec<_> = Catalog::bundled().packs.iter().map(|p| &*p.id).collect();
+    let ids: Vec<_> = Catalog::bundled().packs().iter().map(|p| &*p.id).collect();
     assert_eq!(ids, ["core", "design", "testing"]);
+}
+
+#[test]
+fn a_decision_is_keyed_by_its_uid_else_by_its_id() {
+    let named = bundled("core/file-size");
+    let uid = named.uid().unwrap();
+
+    assert_eq!(named.key(), uid);
+    assert!(named.is_key(uid) && named.is_key("core/file-size"));
+    assert!(!named.is_key("core/other"));
+    assert_eq!(named.metadata().name, named.id());
+    let plain = Catalog::from_files(base()).unwrap();
+    assert_eq!(plain.decision("p/a").unwrap().key(), "p/a");
 }
 
 #[test]
@@ -32,33 +45,6 @@ fn a_finding_asks_for_review_unless_its_decision_authored_an_error_or_a_judgment
 }
 
 #[test]
-fn decision_severity() {
-    let mut decision = bundled("design/errors").clone();
-    assert_eq!(decision.severity(), Some(Severity::Warn));
-    decision = decision.map_spec(|spec| lighthouse_spec::DecisionSpec {
-        severity: Some(Severity::Error),
-        ..spec
-    });
-    assert_eq!(decision.severity(), Some(Severity::Error));
-}
-
-#[test]
-fn subject_domain_follows_the_subject_and_decisions_are_judged_over_the_project() {
-    use lighthouse_spec::Domain;
-
-    assert_eq!(Subject::Decision.domain(), Domain::Spec);
-    assert_eq!(Subject::Decision.run_scope(), RunScope::Project);
-    for subject in [
-        Subject::Symbol,
-        Subject::File,
-        Subject::Module,
-        Subject::Test,
-    ] {
-        assert_eq!(subject.domain(), Domain::Code, "{subject}");
-    }
-}
-
-#[test]
 fn subject_run_scope() {
     let cases = [
         (Subject::Symbol, RunScope::File),
@@ -67,6 +53,7 @@ fn subject_run_scope() {
         (Subject::Module, RunScope::Project),
         (Subject::Edge, RunScope::Project),
         (Subject::Project, RunScope::Project),
+        (Subject::Decision, RunScope::Project),
     ];
     for (subject, want) in cases {
         assert_eq!(subject.run_scope(), want, "{subject}");
@@ -149,10 +136,10 @@ fn shape() {
 #[test]
 fn example_file_text() {
     let files = &bundled("design/errors").examples[0].files;
-    assert!(matches!(files[0].content, Content::File(_)));
+    assert!(files[0].source().is_some());
     assert!(files[0].text().contains("fmt.Errorf"));
     let inline = &bundled("design/symbols").examples[0].files[0];
-    assert!(matches!(inline.content, Content::Inline(_)));
+    assert!(inline.source().is_none());
     assert_eq!(ExampleFile::inline("a.go", "package a").text(), "package a");
 }
 
@@ -193,7 +180,7 @@ fn a_cel_check_lives_in_its_decision() {
       files: [{ path: a.txt, body: x }]
 ";
     drop(rule);
-    let files = files(&[("probe.yaml", decision("local/probe", "rules", probe))]);
+    let files = files(&[("probe.yaml", decision("local/probe", probe))]);
     let catalog = Catalog::from_local(files).unwrap();
     let decision = catalog.decision("local/probe").unwrap();
     assert!(matches!(
@@ -204,7 +191,6 @@ fn a_cel_check_lives_in_its_decision() {
         })
     ));
     assert_eq!(decision.pack(), "local");
-    assert_eq!(decision.section(), "rules");
 }
 
 #[test]
@@ -222,11 +208,11 @@ fn every_bundled_decision_has_its_own_uid() {
 mod overlay {
     use super::*;
 
-    const OPTION: &str = "  options:\n    type: object\n    properties:\n      max:\n        type: integer\n        default: 1\n        description: d\n    additionalProperties: false\n";
+    const OPTION: &str = "  options:\n    properties:\n      max:\n        type: integer\n        default: 1\n        description: d\n    additionalProperties: false\n";
 
     fn base_catalog() -> Catalog {
         let judged = format!("{SPEC}  severity: info\n  check:\n    type: model\n{OPTION}");
-        Catalog::from_files(with("p/s/a.yaml", &decision("p/a", "s", &judged))).unwrap()
+        Catalog::from_files(with("p/s/a.yaml", &decision("p/a", &judged))).unwrap()
     }
 
     fn local(entries: &[(&str, String)]) -> Catalog {
@@ -240,22 +226,22 @@ mod overlay {
                 "p/pack.yaml",
                 pack("p", &[("s", &["b"]), ("t", &[])]).replace("title: P", "title: Ignored"),
             ),
-            ("p/s/b.yaml", decision("p/b", "s", SPEC)),
+            ("p/s/b.yaml", decision("p/b", SPEC)),
             ("q/pack.yaml", pack("q", &[])),
         ]);
         let merged = Catalog::overlay(&base_catalog(), &extra).unwrap();
         let ids: Vec<_> = merged.decisions().map(|d| d.id()).collect();
         assert_eq!(ids, ["p/a", "p/b"]);
-        assert_eq!(merged.packs[0].title, "P");
-        assert_eq!(merged.packs[0].sections.len(), 2);
-        assert_eq!(merged.packs.len(), 2);
+        assert_eq!(merged.packs()[0].title, "P");
+        assert_eq!(merged.packs()[0].sections.len(), 2);
+        assert_eq!(merged.packs().len(), 2);
     }
 
     #[test]
     fn colliding_ids_are_rejected() {
         let clash = local(&[
             ("p/pack.yaml", pack("p", &[("s", &["a"])])),
-            ("p/s/a.yaml", decision("p/a", "s", SPEC)),
+            ("p/s/a.yaml", decision("p/a", SPEC)),
         ]);
         let err = Catalog::overlay(&base_catalog(), &clash).unwrap_err();
         assert!(err.to_string().contains("defined twice"));
@@ -276,7 +262,7 @@ mod overlay {
         .unwrap();
         let merged = Catalog::overlay(&base_catalog(), &layer).unwrap();
 
-        let projects = merged.projects().unwrap();
+        let projects = merged.projects();
 
         let names: Vec<&str> = projects.names().collect();
         assert!(names.contains(&"team/base"), "{names:?}");
@@ -317,12 +303,11 @@ mod overlay {
 
     #[test]
     fn a_local_decision_needs_the_local_prefix_and_a_cel_check() {
-        let probe = decision("p/x", "rules", SPEC);
+        let probe = decision("p/x", SPEC);
         let error = Catalog::from_local(files(&[("x.yaml", probe)])).unwrap_err();
         assert!(error.to_string().contains("local/<name>"), "{error}");
         let builtin = decision(
             "local/x",
-            "rules",
             &format!("{SPEC}{CHECKED_SPEC}  check:\n    type: builtin\n    id: local/x\n"),
         );
         let error = Catalog::from_local(files(&[("x.yaml", builtin)])).unwrap_err();
@@ -365,13 +350,10 @@ fn checked_decisions_mark_one_canonical_example_per_language() {
 #[test]
 fn decision_text_and_write_local_round_trip_through_the_local_layer() {
     let spec = "  title: Probe\n  context: A probe.\n  scope: { subject: file }\n  requirement: A probe MUST hold.\n  severity: error\n  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{ path: a.txt, body: x }]\n      expect: [{ line: 1 }]\n    - name: good\n      language: text\n      kind: valid\n      files: [{ path: a.txt, body: x }]\n";
-    let layer = Catalog::from_local(files(&[(
-        "probe.yaml",
-        decision("local/probe", "rules", spec),
-    )]))
-    .unwrap();
+    let layer =
+        Catalog::from_local(files(&[("probe.yaml", decision("local/probe", spec))])).unwrap();
     let probe = layer.decision("local/probe").unwrap();
-    let text = Catalog::decision_text(probe).unwrap();
+    let text = Catalog::decision_text(probe);
     assert!(text.contains("kind: Decision"), "{text}");
     assert!(text.contains("type: cel"), "{text}");
 
@@ -411,17 +393,6 @@ fn write_local_refuses_names_and_targets_that_leave_the_directory() {
     std::os::unix::fs::symlink(&outside, rules.join("linked.yaml")).unwrap();
     assert!(Catalog::write_local(&rules, "linked", "overwritten").is_err());
     assert_eq!(std::fs::read_to_string(&outside).unwrap(), "keep");
-}
-
-#[test]
-fn decision_strict() {
-    let labelled = decision("local/x", "rules", SPEC).replace(
-        "    lighthouse/section: rules\n",
-        "    lighthouse/section: rules\n    lighthouse/preset: strict\n",
-    );
-    let catalog = Catalog::from_local(files(&[("x.yaml", labelled)])).unwrap();
-    assert!(catalog.decision("local/x").unwrap().strict());
-    assert!(!bundled("design/exported-doc").strict());
 }
 
 #[test]

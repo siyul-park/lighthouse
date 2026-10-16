@@ -9,7 +9,7 @@ use lighthouse_model::{
     squash,
 };
 use lighthouse_plugin::RuleManifest;
-use lighthouse_spec::ProjectError;
+use lighthouse_spec::Error as ProjectError;
 use serde_json::json;
 
 /// The level the configuration gives a rule at a file of a language.

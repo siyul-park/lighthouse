@@ -18,7 +18,7 @@ const HEAD: &str = include_str!("skill-head.md");
 /// The skill of the project: its catalog layers and its configuration.
 pub fn skill_for(session: &Session) -> Result<String> {
     let catalog = session.catalog()?;
-    let active = active_rules(&session.config, &catalog.projects()?)?;
+    let active = active_rules(&session.config, catalog.projects())?;
     Ok(skill(&catalog, &active))
 }
 
@@ -29,14 +29,14 @@ pub fn skill_for(session: &Session) -> Result<String> {
 pub fn skill(catalog: &Catalog, active: &BTreeSet<String>) -> String {
     let mut out = String::from(HEAD);
     let mut by_pack: Vec<(&str, Vec<String>)> = Vec::new();
-    for pack in &catalog.packs {
+    for pack in catalog.packs() {
         let lines: Vec<String> = pack
             .sections
             .iter()
             .flat_map(|s| &s.decisions)
             .filter(|d| active.contains(d.id()))
             .map(|d| {
-                let level = d.severity().map_or_else(
+                let level = d.severity.map_or_else(
                     || "doc".to_owned(),
                     |s| authored_severity(s, Some(d)).to_string(),
                 );

@@ -239,7 +239,7 @@ fn run_of(root: &Path, catalog: &Catalog, outcome: &Outcome) -> Run {
         unchecked: unchecked(&outcome.incomplete),
         commit: git::head(root),
         dirty: git::dirty(root),
-        catalog_version: Some(catalog.version()),
+        catalog_version: Some(catalog.version().to_owned()),
         lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
     }
 }

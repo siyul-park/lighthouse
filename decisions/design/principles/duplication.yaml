@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: design/duplication
   uid: aeab463d-9e93-4f38-9851-ab5624b963ef
-  labels:
-    lighthouse/pack: design
-    lighthouse/section: principles
 spec:
   title: One implementation, one owner
   context: >-
@@ -23,7 +20,6 @@ spec:
     project. Near-clone analysis needs a meaningful body size and a semantic or
     naming relation; syntax similarity alone is not duplication.
   scope:
-    domain: code
     subject: project
   requirement: >-
     Multiple implementations of the same behavior or rule MUST converge on one

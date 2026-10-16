@@ -426,7 +426,7 @@ fn apply_line(decision: &Decision, tool_form: bool) -> Option<String> {
         return None;
     }
     let unsafe_fixes =
-        fix.safety == Safety::Suggested || decision.severity() != Some(Severity::Error);
+        fix.safety == Safety::Suggested || decision.severity != Some(Severity::Error);
     let rule = decision.id();
     Some(match (tool_form, unsafe_fixes) {
         (false, false) => format!("lighthouse check --fix --decision {rule}"),

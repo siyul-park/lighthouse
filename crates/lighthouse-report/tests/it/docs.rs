@@ -15,7 +15,6 @@ const ALPHA: &str = "  title: Alpha holds
     type: builtin
     id: demo/alpha
   options:
-    type: object
     properties:
       limit:
         type: integer
@@ -63,8 +62,8 @@ fn fixture() -> Catalog {
         );
     Catalog::from_files(files(&[
         ("demo/pack.yaml", demo),
-        ("demo/one/alpha.yaml", decision("demo/alpha", "one", ALPHA)),
-        ("demo/one/beta.yaml", decision("demo/beta", "one", BETA)),
+        ("demo/one/alpha.yaml", decision("demo/alpha", ALPHA)),
+        ("demo/one/beta.yaml", decision("demo/beta", BETA)),
     ]))
     .unwrap()
 }
@@ -147,7 +146,7 @@ fn fixed_fixture() -> Catalog {
 ";
     Catalog::from_files(files(&[
         ("demo/pack.yaml", pack("demo", &[("one", &["gamma"])])),
-        ("demo/one/gamma.yaml", decision("demo/gamma", "one", gamma)),
+        ("demo/one/gamma.yaml", decision("demo/gamma", gamma)),
         ("demo/one/testdata/bad.go", "first()\nsecond()\n".to_owned()),
         ("demo/one/testdata/bad.rs", "first();\n".to_owned()),
     ]))

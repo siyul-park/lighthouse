@@ -85,7 +85,7 @@ impl Plugin for Pack {
 pub fn registry() -> Registry {
     let catalog = Catalog::bundled();
     let mut registry = Registry::default();
-    for pack in &catalog.packs {
+    for pack in catalog.packs() {
         register(&mut registry, &Pack::of(&pack.id, catalog));
         if pack.id == CORE {
             register(&mut registry, &Metrics);

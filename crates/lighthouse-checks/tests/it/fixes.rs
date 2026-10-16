@@ -86,11 +86,11 @@ const EXAMPLES: &str = "  examples:
       files: [{ path: a.txt, body: x }]
 ";
 
-/// A decision `id` (labels for `pack`) with `fix` and `check`, as a document.
-fn document(id: &str, pack: &str, section: &str, fix: &str, check: &str) -> String {
+/// A decision `id` with `fix` and `check`, as a document.
+fn document(id: &str, fix: &str, check: &str) -> String {
     let indented: String = fix.lines().map(|l| format!("    {l}\n")).collect();
     format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: {id}\n  labels:\n    lighthouse/pack: {pack}\n    lighthouse/section: {section}\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: file }}\n  requirement: A probe MUST hold.\n  severity: error\n{check}  fix:\n{indented}{EXAMPLES}"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: {id}\nspec:\n  title: Probe\n  context: A probe.\n  scope: {{ subject: file }}\n  requirement: A probe MUST hold.\n  severity: error\n{check}  fix:\n{indented}{EXAMPLES}"
     )
 }
 
@@ -98,7 +98,7 @@ const CEL: &str = "  check:\n    type: cel\n    select: file\n    where: 'true'\
 
 /// A decision `local/probe` whose fix is `fix`.
 fn local_layer(fix: &str) -> Result<Catalog, lighthouse_spec::Error> {
-    let text = document("local/probe", "local", "rules", fix, CEL);
+    let text = document("local/probe", fix, CEL);
     Catalog::from_local(BTreeMap::from([("probe.yaml".to_owned(), text)]))
 }
 
@@ -115,7 +115,7 @@ fn local(fix: &str) -> Box<dyn Fixer> {
 /// The same fix as the decision of a bundled-style pack `demo`.
 fn bundled(fix: &str) -> Box<dyn Fixer> {
     let builtin = "  check:\n    type: builtin\n    id: demo/probe\n";
-    let decision = document("demo/probe", "demo", "s", fix, builtin);
+    let decision = document("demo/probe", fix, builtin);
     let pack = "apiVersion: lighthouse/v1alpha1\nkind: Pack\nmetadata:\n  name: demo\nspec:\n  title: Demo\n  intro: x\n  sections:\n    - name: s\n      title: S\n      intro: x\n      decisions: [probe]\n";
     let files = [
         ("demo/pack.yaml", pack),

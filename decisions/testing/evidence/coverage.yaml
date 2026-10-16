@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: testing/coverage
   uid: 73b63cd4-d32a-4e62-9b41-9c5b72867db7
-  labels:
-    lighthouse/pack: testing
-    lighthouse/section: evidence
 spec:
   title: Every contract dimension has evidence from the right layer
   context: >-
@@ -16,7 +13,6 @@ spec:
     quality or completeness. Judged: the requirement and the examples are the
     question put to a model for every test.
   scope:
-    domain: code
     subject: test
     tests: only
   requirement: >-

@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: testing/owner
   uid: b503cb4a-f138-4e9f-8c4a-6a645b6e408f
-  labels:
-    lighthouse/pack: testing
-    lighthouse/section: organization
 spec:
   title: Every public symbol has exactly one owner test
   context: >-
@@ -40,7 +37,6 @@ spec:
     name are not owners; two tests with exactly the name of one item (in
     different test crates, or inline and in `tests/`) are.
   scope:
-    domain: code
     subject: test
   requirement: >-
     Each public symbol SHOULD have one top-level test function, and exported
@@ -48,7 +44,6 @@ spec:
     semantic owner test functions.
   severity: warn
   options:
-    type: object
     properties:
       kinds:
         type: array

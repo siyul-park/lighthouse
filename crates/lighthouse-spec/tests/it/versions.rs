@@ -13,12 +13,10 @@ fn bundled(id: &str) -> &'static Decision {
 }
 
 mod write {
-    use std::fs;
-
     use lighthouse_resource::Metadata;
     use lighthouse_spec::{
         BuiltinCheck, Check, CheckKind, DecisionSpec, Example, ExampleKind, Expect, LanguageSpec,
-        NamedRule, ObjectType, OptionSchema, OptionType, OptionsSchema, Scope,
+        NamedRule, OptionSchema, OptionType, OptionsSchema, Scope,
     };
 
     use super::*;
@@ -27,31 +25,25 @@ mod write {
         let metadata = Metadata {
             name: "p/rich".to_owned(),
             uid: None,
-            labels: [
-                ("lighthouse/pack".to_owned(), "p".to_owned()),
-                ("lighthouse/section".to_owned(), "s".to_owned()),
-            ]
-            .into(),
+            labels: Default::default(),
             annotations: Default::default(),
         };
         let spec = DecisionSpec {
             title: "Rich".into(),
             context: "To be written.".into(),
-            scope: Scope::code(Subject::File),
+            scope: Scope::new(Subject::File),
             requirement: "A rich decision MUST round-trip.".into(),
             status: DecisionStatus::Accepted,
             supersedes: Vec::new(),
             consequences: Some("More tests.".into()),
             severity: Some(Severity::Warn),
-            options: Some(OptionsSchema {
-                kind: ObjectType::Object,
-                properties: [(
+            options: Some(OptionsSchema::new(
+                [(
                     "max".to_owned(),
                     OptionSchema::new(OptionType::Integer, json!(3), "Limit."),
                 )]
                 .into(),
-                additional_properties: false,
-            }),
+            )),
             languages: [(
                 "go".to_owned(),
                 LanguageSpec {
@@ -59,7 +51,7 @@ mod write {
                 },
             )]
             .into(),
-            check: Some(Check::of(CheckKind::Builtin(BuiltinCheck::Named(
+            check: Some(Check::new(CheckKind::Builtin(BuiltinCheck::Named(
                 NamedRule {
                     id: "p/rich".into(),
                 },
@@ -97,33 +89,38 @@ mod write {
         Decision::new(metadata, spec)
     }
 
-    fn write_base(root: &std::path::Path) {
+    #[test]
+    fn a_catalog_loads_from_its_directory() {
+        let dir = tempfile::tempdir().unwrap();
         for (path, text) in base() {
-            let target = root.join(path);
-            fs::create_dir_all(target.parent().unwrap()).unwrap();
-            fs::write(target, text).unwrap();
+            let target = dir.path().join(path);
+            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+            std::fs::write(target, text).unwrap();
         }
+
+        let catalog = Catalog::load(dir.path()).unwrap();
+
+        assert_eq!(catalog.decisions().count(), 1);
     }
 
     #[test]
-    fn written_decisions_load_back_unchanged_and_join_the_section_order() {
-        let dir = tempfile::tempdir().unwrap();
-        write_base(dir.path());
+    fn a_decision_text_loads_back_unchanged_and_joins_the_section_order() {
         let decision = rich();
-        Catalog::write_decision(dir.path(), &decision).unwrap();
-        Catalog::write_decision(dir.path(), &decision).unwrap();
+        let mut files = base();
+        files.insert(
+            "p/pack.yaml".to_owned(),
+            pack("p", &[("s", &["a", "rich"])]),
+        );
+        files.insert(
+            "p/s/rich.yaml".to_owned(),
+            Catalog::decision_text(&decision),
+        );
 
-        let catalog = Catalog::load(dir.path()).unwrap();
+        let catalog = Catalog::from_files(files).unwrap();
         assert_eq!(catalog.decision("p/rich"), Some(&decision));
         let ids: Vec<_> = catalog.decisions().map(|d| d.id()).collect();
         assert_eq!(ids, ["p/a", "p/rich"]);
-        let leftovers: Vec<_> = fs::read_dir(dir.path().join("p/s"))
-            .unwrap()
-            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
-            .filter(|n| n.ends_with(".tmp"))
-            .collect();
-        assert!(leftovers.is_empty());
-        let text = fs::read_to_string(dir.path().join("p/s/rich.yaml")).unwrap();
+        let text = Catalog::decision_text(&decision);
         assert!(
             text.starts_with("# yaml-language-server: $schema="),
             "{text}"
@@ -132,28 +129,6 @@ mod write {
             text.contains("apiVersion: lighthouse/v1alpha1\nkind: Decision\n"),
             "{text}"
         );
-    }
-
-    #[test]
-    fn invalid_decisions_and_unknown_sections_write_nothing() {
-        let dir = tempfile::tempdir().unwrap();
-        write_base(dir.path());
-        let bad = rich().map_spec(|mut spec| {
-            spec.context = String::new();
-            spec
-        });
-        assert!(Catalog::write_decision(dir.path(), &bad).is_err());
-        let elsewhere = {
-            let original = rich();
-            let mut metadata = original.metadata().clone();
-            metadata
-                .labels
-                .insert("lighthouse/section".to_owned(), "nope".to_owned());
-            Decision::new(metadata, original.spec().clone())
-        };
-        assert!(Catalog::write_decision(dir.path(), &elsewhere).is_err());
-        assert!(!dir.path().join("p/s/rich.yaml").exists());
-        assert_eq!(Catalog::load(dir.path()).unwrap().decisions().count(), 1);
     }
 }
 
@@ -243,7 +218,7 @@ fn how_a_decision_is_checked_changes_its_check_revision_and_never_its_meaning() 
         spec
     });
     let judged = decision.clone().map_spec(|mut spec| {
-        spec.check = Some(Check::of(CheckKind::Model(ModelCheck::default())));
+        spec.check = Some(Check::new(CheckKind::Model(ModelCheck::default())));
         spec
     });
     assert_eq!(unchecked.meaning_version(), decision.meaning_version());

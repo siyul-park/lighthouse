@@ -19,13 +19,10 @@ pub const CHECKED_SPEC: &str = "  severity: error
 /// Catalog files keyed by `/`-separated path.
 pub type Files = BTreeMap<String, String>;
 
-/// A `Decision` document for `id` listed in `section`, with `spec` under
-/// `spec:` (already indented by two spaces).
-pub fn decision(id: &str, section: &str, spec: &str) -> String {
-    let pack = id.split_once('/').map_or(id, |(pack, _)| pack);
-    format!(
-        "apiVersion: {API_VERSION}\nkind: Decision\nmetadata:\n  name: {id}\n  labels:\n    lighthouse/pack: {pack}\n    lighthouse/section: {section}\nspec:\n{spec}"
-    )
+/// A `Decision` document for `id`, with `spec` under `spec:` (already
+/// indented by two spaces).
+pub fn decision(id: &str, spec: &str) -> String {
+    format!("apiVersion: {API_VERSION}\nkind: Decision\nmetadata:\n  name: {id}\nspec:\n{spec}")
 }
 
 /// A `Pack` document: each section with the decisions it lists.
@@ -57,7 +54,7 @@ pub fn files(entries: &[(&str, String)]) -> Files {
 pub fn base() -> Files {
     files(&[
         ("p/pack.yaml", pack("p", &[("s", &["a"])])),
-        ("p/s/a.yaml", decision("p/a", "s", SPEC)),
+        ("p/s/a.yaml", decision("p/a", SPEC)),
     ])
 }
 
@@ -76,8 +73,5 @@ pub fn decision_with(extra: &str) -> Files {
     } else {
         SPEC.to_owned()
     };
-    with(
-        "p/s/a.yaml",
-        &decision("p/a", "s", &format!("{head}{extra}")),
-    )
+    with("p/s/a.yaml", &decision("p/a", &format!("{head}{extra}")))
 }

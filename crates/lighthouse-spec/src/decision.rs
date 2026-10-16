@@ -12,16 +12,6 @@ use crate::{
 use lighthouse_model::hash;
 use lighthouse_protocol::DecisionRef;
 
-/// Label that says which pack a decision belongs to.
-pub const PACK_LABEL: &str = "lighthouse/pack";
-/// Label that says which section of its pack a decision is listed in.
-pub const SECTION_LABEL: &str = "lighthouse/section";
-/// Label that says which preset a decision joins beyond `recommended`; the
-/// only value is `strict`.
-pub const PRESET_LABEL: &str = "lighthouse/preset";
-/// The value of [`PRESET_LABEL`] of a decision only the `strict` preset enables.
-pub const STRICT: &str = "strict";
-
 /// What one language changes about a decision: the values of its options.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -103,7 +93,7 @@ impl Spec for DecisionSpec {
 }
 
 /// One catalog entry: a `Decision` document. `metadata.name` is its
-/// `<pack>/<name>` id; the labels say where the catalog lists it.
+/// `<pack>/<name>` id; the pack file lists it in a section.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Decision(Resource<DecisionSpec>);
@@ -147,12 +137,6 @@ impl Decision {
         }
     }
 
-    /// Whether only the `strict` preset enables the decision: review-level
-    /// advice that is too noisy for `recommended`.
-    pub fn strict(&self) -> bool {
-        self.label(PRESET_LABEL) == Some(STRICT)
-    }
-
     /// The `<pack>/<name>` id.
     pub fn id(&self) -> &str {
         &self.0.metadata.name
@@ -162,6 +146,16 @@ impl Decision {
     /// a decision that was written without one.
     pub fn uid(&self) -> Option<&str> {
         self.0.metadata.uid.as_deref()
+    }
+
+    /// How the decision log names the decision: its uid, else its id.
+    pub fn key(&self) -> &str {
+        self.uid().unwrap_or_else(|| self.id())
+    }
+
+    /// Whether `key` names the decision: its uid or its id.
+    pub fn is_key(&self, key: &str) -> bool {
+        self.uid() == Some(key) || self.id() == key
     }
 
     /// The same decision with this uid.
@@ -180,15 +174,9 @@ impl Decision {
         &self.0.spec
     }
 
-    /// The pack the labels name, else the prefix of the id.
+    /// The pack the decision belongs to: the prefix of its id.
     pub fn pack(&self) -> &str {
-        self.label(PACK_LABEL)
-            .unwrap_or_else(|| self.id().split_once('/').map_or("", |(pack, _)| pack))
-    }
-
-    /// The section the labels name; empty when they name none.
-    pub fn section(&self) -> &str {
-        self.label(SECTION_LABEL).unwrap_or_default()
+        self.id().split_once('/').map_or("", |(pack, _)| pack)
     }
 
     /// The name inside the pack: the id without its pack.
@@ -196,10 +184,6 @@ impl Decision {
         self.id()
             .split_once('/')
             .map_or(self.id(), |(_, name)| name)
-    }
-
-    fn label(&self, key: &str) -> Option<&str> {
-        self.0.metadata.labels.get(key).map(String::as_str)
     }
 
     /// The same decision changed by `change`.
@@ -253,10 +237,6 @@ impl Decision {
         Ok(resolved)
     }
 
-    pub(crate) fn metadata_mut(&mut self) -> &mut Metadata {
-        &mut self.0.metadata
-    }
-
     pub(crate) fn into_resource(self) -> Resource<DecisionSpec> {
         self.0
     }
@@ -271,15 +251,10 @@ impl Deref for Decision {
 }
 
 impl DecisionSpec {
-    /// The authored severity; `None` for a decision without a check.
-    pub fn severity(&self) -> Option<Severity> {
-        self.severity
-    }
-
     /// Whether a program decides the decision's findings, as opposed to agent
     /// review (`judged`) or nothing (documentation).
     pub fn automated(&self) -> bool {
-        self.check.as_ref().is_some_and(Check::is_automated)
+        self.check.as_ref().is_some_and(|c| c.kind.deterministic())
     }
 
     /// Whether the decision is enforced: accepted, and it has a check.
@@ -309,35 +284,33 @@ impl DecisionSpec {
             "requirement": squash(&self.requirement),
             "severity": self.severity,
             "scope": self.scope,
-            "options": self.options_content(&str::to_owned),
+            "options": self.options_content(),
         })
     }
 
-    /// The options, by the names `name` gives them: their own, or the names
-    /// they had before they were camelCase.
-    pub(crate) fn options_content(&self, name: &dyn Fn(&str) -> String) -> Value {
+    /// The option types and defaults, and the values each language sets.
+    fn options_content(&self) -> Value {
         let empty = OptionsSchema::default();
         let schema = self.options.as_ref().unwrap_or(&empty);
         let properties: Map<String, Value> = schema
             .properties
             .iter()
-            .map(|(n, p)| (name(n), option_content(p)))
+            .map(|(name, p)| (name.clone(), option_content(p)))
             .collect();
         let languages: Map<String, Value> = self
             .languages
             .iter()
             .filter(|(_, l)| !l.options.is_empty())
-            .map(|(id, l)| {
-                let renamed: Map<String, Value> = l
-                    .options
-                    .iter()
-                    .map(|(k, v)| (name(k), v.clone()))
-                    .collect();
-                (id.clone(), Value::Object(renamed))
-            })
+            .map(|(id, l)| (id.clone(), Value::Object(l.options.clone())))
             .collect();
         json!({ "properties": properties, "languages": languages })
     }
+}
+
+/// The severity a finding's decision authored, else the severity the finding
+/// has: what decides whether a judgment may hide it and a fix may be safe.
+pub fn authored_severity(severity: Severity, decision: Option<&Decision>) -> Severity {
+    decision.and_then(|d| d.severity).unwrap_or(severity)
 }
 
 /// What an option contributes to the meaning: its type and default, and the

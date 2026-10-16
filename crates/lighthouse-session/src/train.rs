@@ -91,7 +91,7 @@ fn gather(
     let labelling = Session::load(config)?;
     let session = Session::load(config)?;
     let root = session.root.clone();
-    let binding = session.config.models().clone();
+    let binding = session.config.models(session.catalog()?.projects())?;
     let checked = check(
         session,
         &CheckRequest {
@@ -115,7 +115,7 @@ fn gather(
         .model
         .clone()
         .or_else(|| {
-            let route = binding.rules.get(&request.decision);
+            let route = binding.route(&request.decision);
             route.and_then(|models| models.first()).cloned()
         })
         .or_else(|| binding.classification.first().cloned());

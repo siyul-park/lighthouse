@@ -5,28 +5,9 @@ use lighthouse_test_support::catalog::*;
 use serde_json::{Map, json};
 
 #[test]
-fn a_decision_about_decisions_is_in_the_spec_domain() {
-    let in_domain = |domain: &str| {
-        decision(
-            "p/a",
-            "s",
-            &SPEC.replace(
-                "scope: { subject: file }",
-                &format!("scope: {{ domain: {domain}, subject: decision }}"),
-            ),
-        )
-    };
-    rejected(
-        with("p/s/a.yaml", &in_domain("code")),
-        "`decision` decision is in the `spec` domain, not `code`",
-    );
-    assert!(Catalog::from_files(with("p/s/a.yaml", &in_domain("spec"))).is_ok());
-}
-
-#[test]
 fn a_uid_is_a_uuid_v4_and_belongs_to_one_decision() {
     let with_uid = |id: &str, uid: &str| {
-        decision(id, "s", SPEC).replace(
+        decision(id, SPEC).replace(
             &format!("  name: {id}\n"),
             &format!("  name: {id}\n  uid: {uid}\n"),
         )
@@ -76,32 +57,13 @@ fn rejected(files: Files, needle: &str) {
 }
 
 fn swap(from: &str, to: &str) -> Files {
-    with("p/s/a.yaml", &decision("p/a", "s", &SPEC.replace(from, to)))
+    with("p/s/a.yaml", &decision("p/a", &SPEC.replace(from, to)))
 }
 
 #[test]
 fn minimal_catalog_loads() {
     let catalog = Catalog::from_files(base()).unwrap();
-    assert_eq!(catalog.decision("p/a").unwrap().severity(), None);
-}
-
-#[test]
-fn a_decision_belongs_where_its_labels_and_its_pack_say() {
-    let wrong_pack = decision("p/a", "s", SPEC).replace("lighthouse/pack: p", "lighthouse/pack: q");
-    rejected(
-        with("p/s/a.yaml", &wrong_pack),
-        "label `lighthouse/pack` is `q`",
-    );
-    let wrong_section = decision("p/a", "t", SPEC);
-    rejected(
-        with("p/s/a.yaml", &wrong_section),
-        "label `lighthouse/section` is `t`",
-    );
-    let unlabeled = decision("p/a", "s", SPEC).replace(
-        "  labels:\n    lighthouse/pack: p\n    lighthouse/section: s\n",
-        "",
-    );
-    rejected(with("p/s/a.yaml", &unlabeled), "needs the label");
+    assert_eq!(catalog.decision("p/a").unwrap().severity, None);
 }
 
 #[test]
@@ -116,7 +78,7 @@ fn identity_comes_from_metadata_not_from_where_the_file_lies() {
 #[test]
 fn ids_must_be_unique() {
     let mut files = base();
-    files.insert("p/s/copy.yaml".to_owned(), decision("p/a", "s", SPEC));
+    files.insert("p/s/copy.yaml".to_owned(), decision("p/a", SPEC));
     rejected(files, "defined twice");
 }
 
@@ -124,12 +86,12 @@ fn ids_must_be_unique() {
 fn decision_rules_are_enforced() {
     let severity_without_check = format!("{SPEC}{CHECKED_SPEC}");
     rejected(
-        with("p/s/a.yaml", &decision("p/a", "s", &severity_without_check)),
+        with("p/s/a.yaml", &decision("p/a", &severity_without_check)),
         "no `severity`",
     );
     let check_without_severity = format!("{SPEC}  check:\n    type: builtin\n    id: p/a\n");
     rejected(
-        with("p/s/a.yaml", &decision("p/a", "s", &check_without_severity)),
+        with("p/s/a.yaml", &decision("p/a", &check_without_severity)),
         "needs a `severity`",
     );
     rejected(swap("MUST", "must"), "MUST, SHOULD or MAY");
@@ -138,7 +100,7 @@ fn decision_rules_are_enforced() {
     rejected(
         with(
             "p/s/a.yaml",
-            &decision("p/a", "s", &format!("{SPEC}{no_examples}")),
+            &decision("p/a", &format!("{SPEC}{no_examples}")),
         ),
         "valid and an invalid example",
     );
@@ -156,7 +118,7 @@ fn checked_decisions_need_a_valid_and_an_invalid_example() {
     let judged = "  severity: info\n  check:\n    type: model\n";
     Catalog::from_files(with(
         "p/s/a.yaml",
-        &decision("p/a", "s", &format!("{SPEC}{judged}")),
+        &decision("p/a", &format!("{SPEC}{judged}")),
     ))
     .unwrap();
     rejected(
@@ -183,7 +145,7 @@ fn a_cel_check_must_compile_and_select_what_the_scope_runs_over() {
     );
     rejected(
         decision_with("  check:\n    type: python\n    code: x\n"),
-        "expected builtin, cel, command, rpc or model",
+        "expected builtin, cel, command or model",
     );
 }
 
@@ -267,7 +229,7 @@ fn example_sources_resolve_next_to_the_decision_file() {
 
 fn options(kind: &str, default: &str, per_language: &str) -> String {
     format!(
-        "  options:\n    type: object\n    properties:\n      max:\n        type: {kind}\n        default: {default}\n        description: d\n    additionalProperties: false\n{per_language}"
+        "  options:\n    properties:\n      max:\n        type: {kind}\n        default: {default}\n        description: d\n    additionalProperties: false\n{per_language}"
     )
 }
 
@@ -305,7 +267,7 @@ fn option_values_match_their_type() {
     );
 }
 
-const LIMIT_OPTION: &str = "  options:\n    type: object\n    properties:\n      max:\n        $ref: '#/$defs/limit'\n        default: 3\n        description: d\n    additionalProperties: false\n";
+const LIMIT_OPTION: &str = "  options:\n    properties:\n      max:\n        $ref: '#/$defs/limit'\n        default: 3\n        description: d\n    additionalProperties: false\n";
 
 fn limit_decision() -> Decision {
     Catalog::from_files(decision_with(LIMIT_OPTION))
@@ -354,7 +316,7 @@ fn a_limit_is_an_integer_or_an_object_of_integers() {
 
 #[test]
 fn one_of_accepts_exactly_one_matching_shape() {
-    let both = "  options:\n    type: object\n    properties:\n      v:\n        oneOf:\n          - { type: number }\n          - { type: integer }\n        default: 1.5\n        description: d\n    additionalProperties: false\n";
+    let both = "  options:\n    properties:\n      v:\n        oneOf:\n          - { type: number }\n          - { type: integer }\n        default: 1.5\n        description: d\n    additionalProperties: false\n";
     let decision = Catalog::from_files(decision_with(both))
         .unwrap()
         .decision("p/a")
@@ -370,13 +332,10 @@ fn one_of_accepts_exactly_one_matching_shape() {
 }
 
 #[test]
-fn every_decision_is_listed_once_in_the_pack_its_labels_name() {
+fn every_decision_is_listed_once_in_the_pack_its_id_names() {
     let mut files = base();
-    files.insert("p/s/b.yaml".into(), decision("p/b", "s", SPEC));
-    rejected(
-        files,
-        "`p/b` names section `s` of pack `p` but its pack does not list it",
-    );
+    files.insert("p/s/b.yaml".into(), decision("p/b", SPEC));
+    rejected(files, "`p/b` is not listed in a section of its pack `p`");
     rejected(
         with("p/pack.yaml", &pack("p", &[("s", &["a", "a"])])),
         "listed twice",
@@ -390,8 +349,8 @@ fn every_decision_is_listed_once_in_the_pack_its_labels_name() {
         "section `s` is listed twice",
     );
     let mut orphan = base();
-    orphan.insert("q/s/x.yaml".into(), decision("q/x", "s", SPEC));
-    rejected(orphan, "does not list it");
+    orphan.insert("q/s/x.yaml".into(), decision("q/x", SPEC));
+    rejected(orphan, "is not listed in a section of its pack `q`");
 }
 
 #[test]
@@ -408,7 +367,7 @@ fn files_that_are_not_documents_are_ignored() {
 #[test]
 fn the_same_catalog_reads_from_json_and_toml() {
     let json = r#"{"apiVersion":"lighthouse/v1alpha1","kind":"Pack","metadata":{"name":"p"},"spec":{"title":"P","intro":"x","sections":[{"name":"s","title":"S","intro":"x","decisions":["a"]}]}}"#;
-    let toml = "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Decision\"\n[metadata]\nname = \"p/a\"\n[metadata.labels]\n\"lighthouse/pack\" = \"p\"\n\"lighthouse/section\" = \"s\"\n[spec]\ntitle = \"A\"\ncontext = \"i\"\nrequirement = \"A MUST b.\"\n[spec.scope]\nsubject = \"file\"\n";
+    let toml = "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Decision\"\n[metadata]\nname = \"p/a\"\n[spec]\ntitle = \"A\"\ncontext = \"i\"\nrequirement = \"A MUST b.\"\n[spec.scope]\nsubject = \"file\"\n";
     let mut files = Files::new();
     files.insert("p/pack.json".into(), json.into());
     files.insert("p/s/a.toml".into(), toml.into());
@@ -424,7 +383,7 @@ fn several_documents_may_share_one_yaml_file() {
         format!(
             "{}---\n{}",
             pack("p", &[("s", &["a"])]),
-            decision("p/a", "s", SPEC)
+            decision("p/a", SPEC)
         ),
     );
     assert_eq!(Catalog::from_files(files).unwrap().decisions().count(), 1);

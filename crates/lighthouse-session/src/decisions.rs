@@ -41,7 +41,7 @@ pub fn decision_rows(catalog: &Catalog, registry: &Registry, all: bool) -> Vec<D
                 id: decision.id().to_owned(),
                 status: status(decision, registry),
                 severity: decision
-                    .severity()
+                    .severity
                     .map_or_else(|| "-".to_owned(), |s| s.to_string()),
                 title: decision.title.clone(),
             });
@@ -65,8 +65,11 @@ pub fn decision_rows(catalog: &Catalog, registry: &Registry, all: bool) -> Vec<D
 /// The rules the project's configuration enables for at least one file: the
 /// projects it extends and the entries it sets, resolved over the catalog.
 pub fn active_decisions(session: &Session) -> Result<BTreeSet<String>> {
-    let projects = session.catalog()?.projects()?;
-    Ok(lighthouse_engine::active_rules(&session.config, &projects)?)
+    let catalog = session.catalog()?;
+    Ok(lighthouse_engine::active_rules(
+        &session.config,
+        catalog.projects(),
+    )?)
 }
 
 /// The index of the project's catalog, one decision per line: id, authored
@@ -74,7 +77,7 @@ pub fn active_decisions(session: &Session) -> Result<BTreeSet<String>> {
 pub fn catalog_index(session: &Session) -> Result<String> {
     let mut out = String::new();
     for decision in session.catalog()?.decisions() {
-        let tier = decision.severity().map_or_else(
+        let tier = decision.severity.map_or_else(
             || "doc".to_owned(),
             |s| authored_severity(s, Some(decision)).to_string(),
         );

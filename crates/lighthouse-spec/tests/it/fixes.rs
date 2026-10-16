@@ -1,7 +1,7 @@
 //! The `fix:` block of a decision: what a catalog accepts and what it refuses.
 
 use lighthouse_model::{Capability, Safety};
-use lighthouse_spec::{Catalog, Fix, FixKind, OpSpec, ReorderScope};
+use lighthouse_spec::{Catalog, CommandSpec, Fix, FixKind, OpSpec, OrderScope};
 use lighthouse_test_support::catalog::*;
 
 fn rejected(files: Files, needle: &str) {
@@ -71,7 +71,7 @@ fn a_fix_of_every_operation_loads_and_is_readable() {
     assert_eq!(names, ["move", "reorder", "delete", "rename", "replace"]);
     assert!(matches!(
         &ops[1],
-        OpSpec::Reorder { scope: ReorderScope::Owner, by, .. } if by == &["design/group"]
+        OpSpec::Reorder { scope: OrderScope::Owner, by, .. } if by == &["design/group"]
     ));
 }
 
@@ -224,6 +224,7 @@ fn a_command_needs_a_program_and_a_usable_timeout() {
     let FixKind::Command(command) = &fix.kind else {
         panic!("command expected");
     };
+    let command: &CommandSpec = command;
     assert_eq!(command.argv.len(), 3);
     assert_eq!(command.timeout.get(), std::time::Duration::from_secs(120));
 }

@@ -12,9 +12,6 @@ const TYPES: &str = r#"apiVersion: lighthouse/v1alpha1
 kind: Decision
 metadata:
   name: demo/types
-  labels:
-    lighthouse/pack: demo
-    lighthouse/section: s
 spec:
   title: A type has the expected shape
   context: The facts of the types of a module equal the options.
@@ -22,7 +19,6 @@ spec:
   requirement: A type MUST have the expected shape.
   severity: warn
   options:
-    type: object
     properties:
       name: { type: string, default: Store, description: The type. }
       methods: { type: integer, default: 0, description: Its methods. }

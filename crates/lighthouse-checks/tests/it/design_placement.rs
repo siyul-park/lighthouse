@@ -40,7 +40,7 @@ fn candidates(world: &World, kind: &str, overrides: Value) -> Vec<(String, u32)>
           "files": [{ "path": "a.txt", "body": "x" }] },
     ]);
     let text = format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/review\n  labels:\n    lighthouse/pack: local\n    lighthouse/section: rules\nspec: {spec}\n"
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/review\nspec: {spec}\n"
     );
     let catalog = Catalog::from_local(BTreeMap::from([("review.yaml".to_owned(), text)])).unwrap();
     let plugin = Declarative::from_catalog("local", &catalog).unwrap();

@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: testing/validation
   uid: 03849464-a542-4bd3-941e-f292e9b84e3d
-  labels:
-    lighthouse/pack: testing
-    lighthouse/section: evidence
 spec:
   title: Smallest failing contract first, validated up to the contract
   context: >-
@@ -15,7 +12,6 @@ spec:
     affected contract requires. Generated output and documentation freshness
     are repository gates, not test-completeness rules.
   scope:
-    domain: code
     subject: test
     tests: only
   requirement: >-

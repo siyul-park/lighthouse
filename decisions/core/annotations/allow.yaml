@@ -4,9 +4,6 @@ kind: Decision
 metadata:
   name: core/allow
   uid: cd28a077-d029-4c54-b691-6ede8c9c6c9c
-  labels:
-    lighthouse/pack: core
-    lighthouse/section: annotations
 spec:
   title: Allow a finding in source, with a reason
   context: >-
@@ -35,7 +32,6 @@ spec:
     directive is then ignored. One that suppresses nothing is
     `core/no-unused-allow`.
   scope:
-    domain: code
     subject: file
     generated: true
     tests: include

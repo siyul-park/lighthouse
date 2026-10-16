@@ -168,7 +168,7 @@ fn stamp(catalog: Option<&Catalog>, finding: &FindingRecord) -> Stamp {
         meaning_version: decision.map(|d| d.meaning_version()),
         check_revision: decision.map(|d| d.check_revision()),
         decision_hash: decision.map(Decision::version),
-        catalog_version: Some(catalog.version()),
+        catalog_version: Some(catalog.version().to_owned()),
         scope: decision.map(|d| d.scope.subject.to_string()),
     }
 }
