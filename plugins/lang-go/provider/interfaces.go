@@ -19,6 +19,29 @@ type wider struct {
 	exported sync.Map
 }
 
+// methodIndex lists interfaces by the names of their methods, each once.
+type methodIndex struct {
+	byName map[string][]*types.Interface
+	seen   map[*types.Interface]bool
+}
+
+func newMethodIndex() *methodIndex {
+	return &methodIndex{byName: map[string][]*types.Interface{}, seen: map[*types.Interface]bool{}}
+}
+
+func (m *methodIndex) add(list ...*types.Interface) {
+	for _, iface := range list {
+		if m.seen[iface] {
+			continue
+		}
+		m.seen[iface] = true
+		for i := range iface.NumMethods() {
+			name := iface.Method(i).Name()
+			m.byName[name] = append(m.byName[name], iface)
+		}
+	}
+}
+
 // widerInterfaces returns the interfaces a package may satisfy without naming
 // them, by method name.
 func (r *resolver) widerInterfaces(pkg *packages.Package) map[string][]*types.Interface {
@@ -27,29 +50,16 @@ func (r *resolver) widerInterfaces(pkg *packages.Package) map[string][]*types.In
 			r.wider.project = append(r.wider.project, interfacesIn(p.Types, false)...)
 		}
 	})
-	found := map[string][]*types.Interface{}
-	seen := map[*types.Interface]bool{}
-	add := func(list []*types.Interface) {
-		for _, iface := range list {
-			if seen[iface] {
-				continue
-			}
-			seen[iface] = true
-			for i := range iface.NumMethods() {
-				name := iface.Method(i).Name()
-				found[name] = append(found[name], iface)
-			}
-		}
-	}
-	add(r.wider.project)
+	found := newMethodIndex()
+	found.add(r.wider.project...)
 	packages.Visit([]*packages.Package{pkg}, nil, func(p *packages.Package) {
 		cached, ok := r.wider.exported.Load(p.PkgPath)
 		if !ok {
 			cached, _ = r.wider.exported.LoadOrStore(p.PkgPath, interfacesIn(p.Types, true))
 		}
-		add(cached.([]*types.Interface))
+		found.add(cached.([]*types.Interface)...)
 	})
-	return found
+	return found.byName
 }
 
 // interfacesIn lists the interfaces declared at the top level of a package:
@@ -65,13 +75,19 @@ func interfacesIn(pkg *types.Package, exportedOnly bool) []*types.Interface {
 		if !ok || (exportedOnly && !tn.Exported()) || tn.IsAlias() {
 			continue
 		}
-		if named, ok := tn.Type().(*types.Named); ok && named.TypeParams().Len() > 0 {
-			continue
-		}
-		iface, ok := tn.Type().Underlying().(*types.Interface)
-		if ok && iface.NumMethods() > 0 && iface.IsMethodSet() {
+		if iface, ok := candidate(tn.Type()); ok {
 			list = append(list, iface)
 		}
 	}
 	return list
+}
+
+// candidate returns the interface a type is, when it is one worth matching:
+// not generic, with methods, a method set rather than a constraint.
+func candidate(t types.Type) (*types.Interface, bool) {
+	if named, ok := types.Unalias(t).(*types.Named); ok && named.TypeParams().Len() > 0 {
+		return nil, false
+	}
+	iface, ok := t.Underlying().(*types.Interface)
+	return iface, ok && iface.NumMethods() > 0 && iface.IsMethodSet()
 }

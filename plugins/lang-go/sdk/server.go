@@ -14,6 +14,14 @@ type Handler interface {
 	Index(IndexParams) (IndexResult, error)
 }
 
+// Method names of the plugin protocol (crates/lighthouse-protocol).
+const (
+	MethodInitialize = "initialize"
+	MethodIndex      = "index"
+	MethodShutdown   = "shutdown"
+	MethodExit       = "exit"
+)
+
 const (
 	codeParse    = -32700
 	codeMethod   = -32601
@@ -36,7 +44,7 @@ func Serve(r io.Reader, w io.Writer, h Handler) error {
 			_ = WriteMessage(w, &Message{Error: &ResponseError{Code: codeParse, Message: err.Error()}})
 			return err
 		}
-		if m.Method == "exit" {
+		if m.Method == MethodExit {
 			if shutdown {
 				return nil
 			}
@@ -68,19 +76,19 @@ func dispatch(h Handler, m *Message, shutdown *bool) (result json.RawMessage, re
 		}
 	}()
 	switch m.Method {
-	case "initialize":
+	case MethodInitialize:
 		var p InitializeParams
 		if err := json.Unmarshal(m.Params, &p); err != nil {
 			return nil, &ResponseError{Code: codeParams, Message: err.Error()}
 		}
 		return marshal(h.Initialize(p))
-	case "index":
+	case MethodIndex:
 		var p IndexParams
 		if err := json.Unmarshal(m.Params, &p); err != nil {
 			return nil, &ResponseError{Code: codeParams, Message: err.Error()}
 		}
 		return marshal(h.Index(p))
-	case "shutdown":
+	case MethodShutdown:
 		*shutdown = true
 		return json.RawMessage("null"), nil
 	default:

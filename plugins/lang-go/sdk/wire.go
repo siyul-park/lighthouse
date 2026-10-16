@@ -55,7 +55,7 @@ type FileRef struct {
 	Hash string `json:"hash"`
 }
 
-// Overlay is reserved; hosts do not send overlays in protocol 0.2.
+// Overlay is the text of a file the host holds unsaved, analyzed instead of the disk.
 type Overlay struct {
 	Path string `json:"path"`
 	Text string `json:"text"`

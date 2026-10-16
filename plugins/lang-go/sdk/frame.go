@@ -23,8 +23,9 @@ type Message struct {
 
 // ResponseError is the error object of a JSON-RPC response.
 type ResponseError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+	Code    int             `json:"code"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data,omitempty"`
 }
 
 const maxBody = 256 << 20

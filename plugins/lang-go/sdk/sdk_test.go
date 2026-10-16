@@ -132,14 +132,14 @@ func TestReadMessage(t *testing.T) {
 func TestServe(t *testing.T) {
 	t.Run("answers requests and stops after shutdown and exit", func(t *testing.T) {
 		var in strings.Builder
-		in.WriteString(request(t, 1, "initialize", sdk.InitializeParams{Root: "/r", ProtocolVersion: "0.2"}))
-		in.WriteString(request(t, 2, "index", sdk.IndexParams{Project: sdk.ProjectRef{Root: "/r"}, Language: "go"}))
+		in.WriteString(request(t, 1, sdk.MethodInitialize, sdk.InitializeParams{Root: "/r", ProtocolVersion: "0.2"}))
+		in.WriteString(request(t, 2, sdk.MethodIndex, sdk.IndexParams{Project: sdk.ProjectRef{Root: "/r"}, Language: "go"}))
 		in.WriteString(request(t, 3, "nope", struct{}{}))
-		in.WriteString(request(t, 4, "index", sdk.IndexParams{Language: "panic"}))
-		in.WriteString(request(t, 5, "index", sdk.IndexParams{Language: "fail"}))
-		in.WriteString(request(t, 6, "index", "not an object"))
-		in.WriteString(request(t, 7, "shutdown", nil))
-		in.WriteString(frame(t, sdk.Message{Method: "exit"}))
+		in.WriteString(request(t, 4, sdk.MethodIndex, sdk.IndexParams{Language: "panic"}))
+		in.WriteString(request(t, 5, sdk.MethodIndex, sdk.IndexParams{Language: "fail"}))
+		in.WriteString(request(t, 6, sdk.MethodIndex, "not an object"))
+		in.WriteString(request(t, 7, sdk.MethodShutdown, nil))
+		in.WriteString(frame(t, sdk.Message{Method: sdk.MethodExit}))
 		var out bytes.Buffer
 
 		err := sdk.Serve(strings.NewReader(in.String()), &out, newHandler())
@@ -163,7 +163,7 @@ func TestServe(t *testing.T) {
 		var out bytes.Buffer
 
 		endErr := sdk.Serve(strings.NewReader(""), &out, newHandler())
-		exitErr := sdk.Serve(strings.NewReader(frame(t, sdk.Message{Method: "exit"})), &out, newHandler())
+		exitErr := sdk.Serve(strings.NewReader(frame(t, sdk.Message{Method: sdk.MethodExit})), &out, newHandler())
 
 		require.Error(t, endErr, "EOF before exit must be an error")
 		require.Error(t, exitErr, "exit without shutdown must be an error")

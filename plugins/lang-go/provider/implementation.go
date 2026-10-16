@@ -113,20 +113,10 @@ func (r *resolver) interfacesOf(pkg *packages.Package) *interfaceSet {
 }
 
 func collectInterfaces(pkg *packages.Package) map[string][]*types.Interface {
-	found := map[string][]*types.Interface{}
-	seen := map[*types.Interface]bool{}
+	found := newMethodIndex()
 	add := func(t types.Type) {
-		if named, ok := types.Unalias(t).(*types.Named); ok && named.TypeParams().Len() > 0 {
-			return
-		}
-		iface, ok := t.Underlying().(*types.Interface)
-		if !ok || seen[iface] || iface.NumMethods() == 0 || !iface.IsMethodSet() {
-			return
-		}
-		seen[iface] = true
-		for i := range iface.NumMethods() {
-			name := iface.Method(i).Name()
-			found[name] = append(found[name], iface)
+		if iface, ok := candidate(t); ok {
+			found.add(iface)
 		}
 	}
 	for _, objects := range []map[*ast.Ident]types.Object{pkg.TypesInfo.Uses, pkg.TypesInfo.Defs} {
@@ -149,7 +139,7 @@ func collectInterfaces(pkg *packages.Package) map[string][]*types.Interface {
 			return true
 		})
 	}
-	return found
+	return found.byName
 }
 
 // collectEmbedders maps each type embedded in a struct type of the package
