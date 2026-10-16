@@ -470,7 +470,7 @@ fn project_edges_from_lists_the_edges_that_start_at_a_symbol() {
 }
 
 #[test]
-fn project_implements_follows_the_interfaces_of_a_type() {
+fn project_implementers_follow_the_interfaces_of_a_type() {
     let store = typed("m", "Store", SymbolKind::Type, None);
     let reader = typed("m", "Reader", SymbolKind::Interface, None);
     let read = typed("m", "Read", SymbolKind::Method, Some(&reader));
@@ -481,11 +481,6 @@ fn project_implements_follows_the_interfaces_of_a_type() {
         ..Fragment::default()
     }]);
 
-    assert_eq!(
-        project.implements(&store.id),
-        std::slice::from_ref(&reader.id)
-    );
-    assert!(project.implements(&reader.id).is_empty());
     assert_eq!(
         project.implementers(&reader.id),
         std::slice::from_ref(&store.id)

@@ -59,19 +59,20 @@ fn applicability() {
 }
 
 #[test]
-fn applicability_excludes_file() {
+fn applicability_excludes_files_without_subjects() {
     let production = file("a.go", false, false);
     let generated = file("g.go", true, false);
     let test = file("a_test.go", false, true);
 
+    let none = Project::default();
     let standard = Applicability::default();
-    assert!(!standard.excludes_file(&production));
-    assert!(standard.excludes_file(&generated));
-    assert!(standard.excludes_file(&test));
+    assert!(!standard.excludes(&none, &production));
+    assert!(standard.excludes(&none, &generated));
+    assert!(standard.excludes(&none, &test));
 
-    // `only` cannot drop a production file: its inline test modules may count.
-    assert!(!by(true, TestScope::Only).excludes_file(&production));
-    assert!(!by(true, TestScope::Include).excludes_file(&generated));
+    assert!(!by(true, TestScope::Include).excludes(&none, &generated));
+    // `only` drops a production file that holds no test code.
+    assert!(by(true, TestScope::Only).excludes(&none, &production));
 }
 
 #[test]

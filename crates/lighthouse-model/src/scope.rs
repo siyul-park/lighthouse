@@ -26,16 +26,11 @@ pub enum Reach {
     Global,
 }
 
-impl Reach {
-    /// The name of the reach, as keys and tables spell it.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Local => "local",
-            Self::Neighbors => "neighbors",
-            Self::Global => "global",
-        }
-    }
-}
+vocabulary!(Reach, "reach" {
+    Local => "local",
+    Neighbors => "neighbors",
+    Global => "global",
+});
 
 /// Which test code a decision applies to.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -70,7 +65,7 @@ pub struct Applicability {
 impl Applicability {
     /// Whether every subject of `file` is out: it is generated code the
     /// decision skips, or test code it leaves to other decisions.
-    pub fn excludes_file(&self, file: &File) -> bool {
+    fn excludes_file(&self, file: &File) -> bool {
         (!self.generated && file.generated) || (self.tests == TestScope::Exclude && file.test)
     }
 

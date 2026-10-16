@@ -145,7 +145,3 @@ pub(crate) fn truncate(text: &str, limit: usize) -> String {
         None => text.to_owned(),
     }
 }
-
-pub(crate) fn one_line(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
-}

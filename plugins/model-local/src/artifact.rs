@@ -5,7 +5,11 @@
 use std::{fs, path::Path};
 
 use base64::{Engine, engine::general_purpose::STANDARD};
-use lighthouse_model::{FOLDS, canonical, hash::sha256};
+use lighthouse_model::{
+    canonical,
+    hash::{digest, sha256},
+    stats::FOLDS,
+};
 use serde_json::{Map, Value, json};
 
 use crate::{
@@ -118,7 +122,7 @@ pub fn load(dir: &Path, hex: &str) -> Result<Loaded, String> {
     })?;
     let document: Value =
         serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
-    let actual = sha256(canonical(&document));
+    let actual = digest(&document);
     if actual != hex {
         return Err(format!(
             "{}: its digest is sha256:{actual}, not the expected sha256:{hex}",
@@ -255,7 +259,7 @@ mod tests {
         );
         let hex = write(dir.path(), &document).unwrap();
 
-        assert_eq!(hex, sha256(canonical(&document)));
+        assert_eq!(hex, digest(&document));
         let loaded = load(dir.path(), &hex).unwrap();
         assert_eq!(loaded.decision, "d/x");
         assert_eq!(loaded.embedder, "Fake@2");

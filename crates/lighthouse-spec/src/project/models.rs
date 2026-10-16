@@ -354,14 +354,6 @@ impl ModelBinding {
         }
     }
 
-    /// The provider and the model of a reference `<provider>/<model>`, split
-    /// at the first `/`.
-    pub fn split(reference: &str) -> Option<(&str, &str)> {
-        reference
-            .split_once('/')
-            .filter(|(provider, model)| !provider.is_empty() && !model.is_empty())
-    }
-
     /// The provider of that name: the project's own, else a preset.
     pub fn provider(&self, name: &str) -> Option<ModelProvider> {
         self.providers.get(name).cloned().or_else(|| builtin(name))

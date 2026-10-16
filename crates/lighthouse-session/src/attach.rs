@@ -5,9 +5,9 @@
 use std::path::Path;
 
 use lighthouse_ml::attach::{attachable, evidence};
-use lighthouse_model::Attribution;
+use lighthouse_model::{Attribution, now};
 use lighthouse_spec::Decision;
-use lighthouse_store::{Change, Records, RevisionSpec, append_revision, now};
+use lighthouse_store::{Change, Records, RevisionSpec, append_revision};
 use serde_json::{Value, json};
 
 use crate::{EvalReport, EvalRequest, Result, Session, eval};
@@ -134,7 +134,7 @@ fn append(root: &Path, revision: Revision) -> Result<String> {
             evaluation: revision.evaluation,
             approval: revision.approval,
             model: revision.model.map(str::to_owned),
-            generated_at_time: now()?,
+            generated_at_time: now(),
         },
     )?)
 }

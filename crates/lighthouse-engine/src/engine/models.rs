@@ -14,7 +14,7 @@ use std::{
 };
 
 use crate::cache::{Cache, DEFAULT_LIMIT, KeyBuilder};
-use lighthouse_model::{Diagnostic, hash};
+use lighthouse_model::{Diagnostic, ModelRef, hash};
 use lighthouse_plugin::{Ask, Classifier, Judged, Model, Models, Open, Question, Settle, Subject};
 use lighthouse_spec::{ModelBinding, Routing};
 use serde::{Deserialize, Serialize};
@@ -103,9 +103,9 @@ impl super::Engine {
     pub fn model(&self, reference: &str) -> Result<Box<dyn Classifier + '_>, super::Error> {
         let binding = self.config.models();
         let unknown = || super::Error::UnknownModel(reference.to_owned());
-        let (provider, model) = ModelBinding::split(reference).ok_or_else(unknown)?;
-        let provider = binding.provider(provider).ok_or_else(unknown)?;
-        Ok(self.host().build(reference, model, &provider))
+        let model = ModelRef::parse(reference).ok_or_else(unknown)?;
+        let provider = binding.provider(model.provider).ok_or_else(unknown)?;
+        Ok(self.host().build(reference, model.model, &provider))
     }
 
     fn host(&self) -> Host<'_> {
@@ -306,8 +306,8 @@ impl<'a> RunModels<'a> {
     }
 
     fn resolve(&self, reference: &str) -> Option<Arc<dyn Classifier + 'a>> {
-        let provider = ModelBinding::split(reference)
-            .and_then(|(provider, model)| Some((self.binding.provider(provider)?, model)));
+        let provider = ModelRef::parse(reference)
+            .and_then(|model| Some((self.binding.provider(model.provider)?, model.model)));
         let Some((provider, model)) = provider else {
             self.note(format!(
                 "model `{reference}` does not resolve to a declared provider; that binding is skipped"
@@ -437,7 +437,7 @@ impl Models for RunModels<'_> {
 /// The digest of a value as canonical JSON.
 pub(super) fn digest_of<T: Serialize>(value: &T) -> String {
     let value = serde_json::to_value(value).unwrap_or_default();
-    hash::sha256(lighthouse_model::canonical(&value))
+    hash::digest(&value)
 }
 
 #[cfg(test)]

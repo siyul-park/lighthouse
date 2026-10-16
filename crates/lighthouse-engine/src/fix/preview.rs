@@ -5,7 +5,11 @@
 
 use std::path::PathBuf;
 
-use lighthouse_model::{Capability, Diagnostic, LineIndex, Preview, PreviewFile, Safety};
+use lighthouse_model::{
+    Capability, Diagnostic, LineIndex, Position, Preview, PreviewEdit, PreviewFile, Safety,
+    utf16_position,
+};
+use similar::{ChangeTag, TextDiff};
 
 use super::{
     FixPlan, FixRun,
@@ -62,7 +66,7 @@ impl Engine {
                             e.text.clone(),
                         )
                     });
-                    changed.push(PreviewFile::new(
+                    changed.push(preview_file(
                         file.to_string_lossy().replace('\\', "/"),
                         &base,
                         &after,
@@ -86,5 +90,43 @@ impl Engine {
                 })
             })
             .collect()
+    }
+}
+
+/// Lines of unchanged text around a change in the hunks of a preview.
+const CONTEXT: usize = 1;
+
+/// The change of one file from `before` to `after`, with `edits` as
+/// (start, end, text) in byte columns of `before`.
+fn preview_file(
+    path: String,
+    before: &str,
+    after: &str,
+    edits: impl IntoIterator<Item = (Position, Position, String)>,
+) -> PreviewFile {
+    let diff = TextDiff::from_lines(before, after);
+    let hunks = diff
+        .unified_diff()
+        .context_radius(CONTEXT)
+        .to_string()
+        .trim_end_matches('\n')
+        .to_owned();
+    let changed = diff
+        .iter_all_changes()
+        .filter(|c| c.tag() != ChangeTag::Equal)
+        .count();
+    let edits = edits
+        .into_iter()
+        .map(|(start, end, text)| PreviewEdit {
+            start: utf16_position(before, start),
+            end: utf16_position(before, end),
+            text,
+        })
+        .collect();
+    PreviewFile {
+        path,
+        hunks,
+        changed,
+        edits,
     }
 }

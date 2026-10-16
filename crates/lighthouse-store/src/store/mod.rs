@@ -33,8 +33,6 @@ const BUSY: Duration = Duration::from_secs(5);
 /// pause between them.
 const OPEN_ATTEMPTS: u32 = 100;
 const OPEN_PAUSE: Duration = Duration::from_millis(20);
-/// SQL for the current UTC time, millisecond resolution.
-const NOW: &str = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 /// Format version of the feature snapshot of a judgment.
 const SNAPSHOT_VERSION: u32 = 2;
 
@@ -123,7 +121,7 @@ impl Store {
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let now = timestamp(&tx)?;
+        let now = lighthouse_model::now();
         let mut summary = RunSummary::default();
         for observed in &run.observed {
             match upsert(&tx, observed, run, &now)? {
@@ -213,7 +211,7 @@ impl Store {
                 actual: finding.last_seen,
             });
         }
-        let event = event_of(review, &finding, stamp(&finding), timestamp(&tx)?)?;
+        let event = event_of(review, &finding, stamp(&finding), lighthouse_model::now())?;
         let suppression = review
             .suppress
             .as_ref()
@@ -242,7 +240,7 @@ impl Store {
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let timestamp = timestamp(&tx)?;
+        let timestamp = lighthouse_model::now();
         let files = serde_json::to_string(&fix.files)?;
         static NONCE: AtomicU64 = AtomicU64::new(0);
         let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
@@ -401,11 +399,6 @@ enum Seen {
     New,
     Reopened,
     Open,
-}
-
-/// The current UTC time, in the form the log and the cache record.
-pub(crate) fn timestamp(conn: &Connection) -> Result<String, Error> {
-    Ok(conn.query_row(&format!("SELECT {NOW}"), [], |row| row.get(0))?)
 }
 
 fn retry_busy<T>(mut attempt: impl FnMut() -> Result<T, Error>) -> Result<T, Error> {

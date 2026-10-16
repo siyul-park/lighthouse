@@ -3,7 +3,9 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_model::{Diagnostic, Fingerprint, Position, Preview, PreviewFile, Severity, Span};
+use lighthouse_model::{
+    Diagnostic, Fingerprint, Position, Preview, PreviewEdit, PreviewFile, Severity, Span,
+};
 use lighthouse_report::{Briefing, Entry, Format, GroupOptions, Grouped, render_with};
 use serde_json::{Value, json};
 
@@ -216,12 +218,16 @@ fn sarif_columns_count_utf16_code_units_and_not_bytes() {
         fingerprint: d.fingerprint.clone(),
         safety: lighthouse_model::Safety::Safe,
         description: "rename".to_owned(),
-        files: vec![PreviewFile::new(
-            "a.go".to_owned(),
-            &before,
-            "é😀y := 1\n",
-            [(at(1, 7), at(1, 8), "y".to_owned())],
-        )],
+        files: vec![PreviewFile {
+            path: "a.go".to_owned(),
+            hunks: "@@ -1 +1 @@\n-é😀x := 1\n+é😀y := 1".to_owned(),
+            changed: 2,
+            edits: vec![PreviewEdit {
+                start: at(1, 4),
+                end: at(1, 5),
+                text: "y".to_owned(),
+            }],
+        }],
     };
     let fixes = BTreeMap::from([(d.fingerprint.as_str().to_owned(), fix)]);
     let sources = BTreeMap::from([("a.go".to_owned(), before)]);
@@ -250,13 +256,15 @@ fn sarif_columns_count_utf16_code_units_and_not_bytes() {
 
 #[test]
 fn a_fix_diff_names_the_files_when_it_edits_one_besides_the_findings() {
-    let file = |path: &str| {
-        PreviewFile::new(
-            path.to_owned(),
-            "a\nb\n",
-            "a\nc\n",
-            [(at(2, 1), at(2, 2), "c".to_owned())],
-        )
+    let file = |path: &str| PreviewFile {
+        path: path.to_owned(),
+        hunks: "@@ -1,2 +1,2 @@\n a\n-b\n+c".to_owned(),
+        changed: 2,
+        edits: vec![PreviewEdit {
+            start: at(2, 1),
+            end: at(2, 2),
+            text: "c".to_owned(),
+        }],
     };
     let fix = |files| Preview {
         fingerprint: unknown_rule().fingerprint,

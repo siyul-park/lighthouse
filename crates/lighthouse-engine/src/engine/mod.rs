@@ -25,7 +25,6 @@ use thiserror::Error;
 use crate::{
     annotations, documents,
     generated::Attributes,
-    identity,
     subject::Subjects,
     timings::{Timings, in_pool},
 };

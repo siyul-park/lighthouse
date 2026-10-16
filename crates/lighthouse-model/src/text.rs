@@ -41,7 +41,7 @@ impl<'a> LineIndex<'a> {
 
     /// The position of a byte offset.
     pub fn position(&self, offset: usize) -> Position {
-        let line = self.starts.partition_point(|&start| start <= offset);
+        let line = self.line_of(offset);
         let start = self.starts[line.saturating_sub(1)];
         Position {
             line: u32::try_from(line.max(1)).unwrap_or(u32::MAX),
@@ -51,15 +51,21 @@ impl<'a> LineIndex<'a> {
 
     /// The offset where the line holding `offset` starts.
     pub fn line_start(&self, offset: usize) -> usize {
-        let line = self.starts.partition_point(|&start| start <= offset);
-        self.starts[line.saturating_sub(1)]
+        self.starts[self.line_of(offset).saturating_sub(1)]
     }
 
     /// The offset just past the newline that ends the line holding `offset`,
     /// or the end of the text.
     pub fn line_end(&self, offset: usize) -> usize {
-        let line = self.starts.partition_point(|&start| start <= offset);
-        self.starts.get(line).copied().unwrap_or(self.text.len())
+        self.starts
+            .get(self.line_of(offset))
+            .copied()
+            .unwrap_or(self.text.len())
+    }
+
+    /// The 1-based number of the line holding `offset`.
+    fn line_of(&self, offset: usize) -> usize {
+        self.starts.partition_point(|&start| start <= offset)
     }
 }
 
@@ -113,4 +119,10 @@ pub fn byte_position(text: &str, at: Position, unit: ColumnUnit) -> Position {
         col: u32::try_from(bytes).map_or(at.col, |n| n + 1),
         ..at
     }
+}
+
+/// `text` with every run of whitespace turned into one space and the ends
+/// trimmed: what the text says, whatever its layout.
+pub fn squash(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }

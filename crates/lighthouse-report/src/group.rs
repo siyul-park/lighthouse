@@ -5,13 +5,13 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Judgment, Preview, Safety, Severity};
+use lighthouse_model::{Judgment, Preview, Safety, Severity, squash};
 use lighthouse_spec::{Catalog, Decision, FixKind};
 use serde_json::{Map, Value, json};
 
 use crate::{
     evidence::{bounded, evidence, pairs},
-    expected::{Subject, expected, one_line},
+    expected::{Subject, expected},
     fix::Shown,
 };
 
@@ -258,7 +258,7 @@ impl Group {
             severity: first.severity,
             authored: (first.authored != first.severity).then_some(first.authored),
             review,
-            requirement: decision.map(|d| one_line(&d.requirement)),
+            requirement: decision.map(|d| squash(&d.requirement)),
             expected: expecteds,
             apply: decision.and_then(|d| apply_line(d, options.tool_form)),
             evidence: shared,

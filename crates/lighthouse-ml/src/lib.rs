@@ -12,7 +12,4 @@ pub mod train;
 
 mod dataset;
 
-use std::error::Error;
-
-/// Errors cross threads (the MCP server runs operations on a blocking pool).
-pub type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
+pub use lighthouse_model::Result;

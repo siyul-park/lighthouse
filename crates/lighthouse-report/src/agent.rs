@@ -3,14 +3,16 @@ use std::{
     fmt::Write,
 };
 
-use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Preview, Severity, Suppressed};
+use lighthouse_model::{
+    Diagnostic, Fingerprint, Incomplete, Preview, Severity, Suppressed, squash,
+};
 use lighthouse_spec::{Catalog, authored_severity};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::{
     evidence::{evidence, evidence_line},
-    expected::{Expected, Subject, expected, one_line},
+    expected::{Expected, Subject, expected},
     fix::Shown,
     group::{Entry, GroupOptions, Grouped, judgments, judgments_line},
 };
@@ -425,8 +427,8 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
         },
         symbol: diagnostic.symbol.as_deref(),
         message: &diagnostic.message,
-        requirement: decision.map(|d| one_line(&d.requirement)),
-        context: decision.map(|d| one_line(&d.context)),
+        requirement: decision.map(|d| squash(&d.requirement)),
+        context: decision.map(|d| squash(&d.context)),
         evidence: evidence(&diagnostic.evidence, diagnostic.symbol.as_deref()),
         expected: decision.and_then(|d| expected(d, &subject, &diagnostic.file)),
         note: diagnostic.review.clone().or_else(|| {

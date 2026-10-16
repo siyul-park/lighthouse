@@ -78,12 +78,12 @@ impl Basis {
                 field(&mut hash, "binary", &{
                     let mut file = Hasher::new();
                     file.update(content.unwrap_or_default());
-                    file.finish_bytes()
+                    file.finish()
                 });
             }
         }
         Self {
-            digest: hash.finish(),
+            digest: hash.hex(),
             commands: commands.iter().map(|c| c.what.clone()).collect(),
         }
     }

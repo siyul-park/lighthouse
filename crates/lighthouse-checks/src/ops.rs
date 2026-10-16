@@ -230,7 +230,7 @@ impl CycleRule {
         Ok(Self {
             edge: edge
                 .parse()
-                .map_err(|()| Error::invalid(id, format!("`{edge}` is not an edge kind")))?,
+                .map_err(|_| Error::invalid(id, format!("`{edge}` is not an edge kind")))?,
             level: *level,
         })
     }

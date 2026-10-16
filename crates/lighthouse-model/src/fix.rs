@@ -1,14 +1,9 @@
-use std::{fmt, path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use similar::{ChangeTag, TextDiff};
-
-use crate::{Fingerprint, Node, Position, Span, SymbolId, utf16_position};
-
-/// Lines of unchanged text around a change in the hunks of a preview.
-const CONTEXT: usize = 1;
+use crate::{Fingerprint, Node, Position, Span, SymbolId};
 
 /// How much a proposed fix may be trusted to keep the program's meaning.
 #[derive(
@@ -22,38 +17,10 @@ pub enum Safety {
     Suggested,
 }
 
-/// The text given to [`Safety::from_str`] names no safety.
-#[derive(Debug, thiserror::Error)]
-#[error("unknown safety `{0}` (expected safe or suggested)")]
-pub struct UnknownSafety(pub String);
-
-impl Safety {
-    /// The weaker of two claims: what a decision's cap makes of a fixer's claim.
-    pub fn capped(self, cap: Self) -> Self {
-        self.max(cap)
-    }
-}
-
-impl fmt::Display for Safety {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Safe => "safe",
-            Self::Suggested => "suggested",
-        })
-    }
-}
-
-impl FromStr for Safety {
-    type Err = UnknownSafety;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "safe" => Ok(Self::Safe),
-            "suggested" => Ok(Self::Suggested),
-            _ => Err(UnknownSafety(s.to_owned())),
-        }
-    }
-}
+vocabulary!(Safety, "safety" {
+    Safe => "safe",
+    Suggested => "suggested",
+});
 
 /// Where a moved declaration lands, relative to another one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -155,41 +122,4 @@ pub struct PreviewEdit {
     pub start: Position,
     pub end: Position,
     pub text: String,
-}
-
-impl PreviewFile {
-    /// The change of one file from `before` to `after`, with `edits` as
-    /// (start, end, text) in byte columns of `before`.
-    pub fn new(
-        path: String,
-        before: &str,
-        after: &str,
-        edits: impl IntoIterator<Item = (Position, Position, String)>,
-    ) -> Self {
-        let diff = TextDiff::from_lines(before, after);
-        let hunks = diff
-            .unified_diff()
-            .context_radius(CONTEXT)
-            .to_string()
-            .trim_end_matches('\n')
-            .to_owned();
-        let changed = diff
-            .iter_all_changes()
-            .filter(|c| c.tag() != ChangeTag::Equal)
-            .count();
-        let edits = edits
-            .into_iter()
-            .map(|(start, end, text)| PreviewEdit {
-                start: utf16_position(before, start),
-                end: utf16_position(before, end),
-                text,
-            })
-            .collect();
-        Self {
-            path,
-            hunks,
-            changed,
-            edits,
-        }
-    }
 }

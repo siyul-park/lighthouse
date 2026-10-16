@@ -1,5 +1,5 @@
-use lighthouse_model::{AgentKind, Attribution};
-use lighthouse_store::{Change, Records, RevisionSpec, Store, append_revision, now};
+use lighthouse_model::{AgentKind, Attribution, now};
+use lighthouse_store::{Change, Records, RevisionSpec, Store, append_revision};
 use serde_json::json;
 
 fn revision(decision: &str, model: Option<&str>) -> RevisionSpec {
@@ -69,7 +69,7 @@ fn the_latest_revision_of_a_decision_is_the_last_one_logged_for_it() {
 
 #[test]
 fn now_is_rfc_3339_in_utc() {
-    let stamp = now().unwrap();
+    let stamp = now();
     assert!(stamp.ends_with('Z') && stamp.contains('T'), "{stamp}");
     assert_eq!(stamp.len(), "2026-10-11T00:00:00.000Z".len());
 }

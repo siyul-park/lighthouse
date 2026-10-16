@@ -6,6 +6,7 @@ use std::{
 use lighthouse_model::{
     Comment, Diagnostic, Fingerprint, Position, Project, Severity, Span, Suppressed, Suppression,
     annotation::{self, ANNOTATION_REASON, Directive, Form, UNUSED_ALLOW},
+    squash,
 };
 use lighthouse_plugin::RuleManifest;
 use lighthouse_spec::ProjectError;
@@ -319,8 +320,7 @@ fn finding(
     let Some(severity) = (gate.level)(rule, &comment.file, lang)? else {
         return Ok(None);
     };
-    let words = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
-    let mut snippet = words(&comment.text);
+    let mut snippet = squash(&comment.text);
     if at.index > 0 {
         snippet.push_str(&format!(" #{}", at.index));
     }

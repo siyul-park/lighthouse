@@ -1,4 +1,4 @@
-use lighthouse_model::{Fingerprint, Severity};
+use lighthouse_model::{Diagnostic, Fingerprint, Position, Project, Severity, Span};
 
 #[test]
 fn fingerprint_is_deterministic() {
@@ -70,4 +70,33 @@ fn discriminate_separates_findings_by_a_stable_marker() {
     assert_eq!(one, base.discriminate("m::f#function"));
     assert_ne!(one, base.discriminate("m::g#function"));
     assert_ne!(one.occurrence(1), one);
+}
+
+#[test]
+fn findings_that_share_an_identity_are_told_apart_by_ordinal_and_reported() {
+    let at = Position { line: 1, col: 1 };
+    let span = Span { start: at, end: at };
+    let found = |rule: &str, line: u32| {
+        let mut d = Diagnostic::new(
+            rule,
+            Severity::Warn,
+            "m",
+            "a.go",
+            span,
+            Fingerprint::of(rule, "a.go", "x"),
+        );
+        d.span.start.line = line;
+        d
+    };
+    let mut all = [found("r", 1), found("r", 2), found("other", 3)];
+    let alone = all[2].fingerprint.clone();
+    let first = all[0].fingerprint.clone();
+
+    let ordinal = Diagnostic::disambiguate(&mut all, &Project::default());
+
+    assert_eq!(all[2].fingerprint, alone);
+    assert_eq!(all[0].fingerprint, first);
+    assert_eq!(all[1].fingerprint, first.occurrence(1));
+    assert_eq!(ordinal.len(), 2);
+    assert!(ordinal.contains(&first) && ordinal.contains(&first.occurrence(1)));
 }

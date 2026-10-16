@@ -84,9 +84,9 @@ impl<'p> Ties<'p> {
         parts.ties.iter().for_each(|tie| near.update(tie.plain));
         parts.ties.iter().for_each(|tie| near_at.update(tie.at));
         Ok(FileDigest {
-            slice: slice.finish_bytes(),
-            neighbors: near.finish_bytes(),
-            neighbors_at: near_at.finish_bytes(),
+            slice: slice.finish(),
+            neighbors: near.finish(),
+            neighbors_at: near_at.finish(),
         })
     }
 
@@ -293,14 +293,14 @@ fn describe(project: &Project, symbol: &Symbol) -> Described {
     part(file.map_or("", |f| f.lang.as_str()).as_bytes());
     part(&flags.map(u8::from));
     counts.iter().for_each(|n| part(&(*n as u64).to_le_bytes()));
-    let plain = hasher.clone().finish_bytes();
+    let plain = hasher.clone().finish();
     let span = symbol.span;
     for n in [span.start.line, span.start.col, span.end.line, span.end.col] {
         hasher.update(n.to_le_bytes());
     }
     Described {
         plain,
-        at: hasher.finish_bytes(),
+        at: hasher.finish(),
     }
 }
 
@@ -313,7 +313,7 @@ fn tie(direction: &[u8], at: &SymbolId, kind: [u8; 2], (plain, placed): (Digest,
             hasher.update((part.len() as u64).to_le_bytes());
             hasher.update(part);
         }
-        hasher.finish_bytes()
+        hasher.finish()
     };
     Tie {
         plain: make(plain),

@@ -7,8 +7,9 @@ use std::{
     path::Path,
 };
 
+use lighthouse_model::ModelRef;
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Config, ModelBinding, ModelProvider, Projects, glob_set};
+use lighthouse_spec::{Config, ModelProvider, Projects, glob_set};
 
 use super::{Error, Language};
 
@@ -109,16 +110,16 @@ fn validate_models(registry: &Registry, config: &Config) -> Result<(), Error> {
         });
     }
     for reference in binding.ids() {
-        let known = ModelBinding::split(reference)
-            .is_some_and(|(provider, _)| binding.provider(provider).is_some());
+        let known = ModelRef::parse(reference)
+            .is_some_and(|model| binding.provider(model.provider).is_some());
         if !known {
             return Err(Error::UnknownModel(reference.to_owned()));
         }
     }
     let used = binding
         .ids()
-        .filter_map(ModelBinding::split)
-        .map(|(provider, _)| provider);
+        .filter_map(ModelRef::parse)
+        .map(|model| model.provider);
     let providers: BTreeMap<&str, ModelProvider> = used
         .filter_map(|name| Some((name, binding.provider(name)?)))
         .chain(

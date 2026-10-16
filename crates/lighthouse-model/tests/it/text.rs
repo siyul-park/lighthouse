@@ -1,4 +1,6 @@
-use lighthouse_model::{ColumnUnit, LineIndex, Position, Span, byte_position, utf16_position};
+use lighthouse_model::{
+    ColumnUnit, LineIndex, Position, Span, byte_position, squash, utf16_position,
+};
 
 fn at(line: u32, col: u32) -> Position {
     Position { line, col }
@@ -92,4 +94,10 @@ fn line_start_and_end_bound_the_line_holding_an_offset() {
     assert_eq!(index.line_end(4), 7);
     assert_eq!(index.line_start(8), 8);
     assert_eq!(index.line_end(8), TEXT.len());
+}
+
+#[test]
+fn squash_turns_runs_of_whitespace_into_one_space() {
+    assert_eq!(squash("  a \n\t b  c "), "a b c");
+    assert_eq!(squash(" \n"), "");
 }

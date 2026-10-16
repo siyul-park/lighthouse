@@ -3,9 +3,7 @@
 
 use std::{collections::BTreeMap, path::Path};
 
-use rusqlite::Connection;
-
-use crate::{Error, JudgmentEvent, RevisionEvent, RevisionSpec, Store, log, store};
+use crate::{Error, JudgmentEvent, RevisionEvent, RevisionSpec, Store, log};
 
 /// What the decision log of a project holds.
 #[derive(Debug, Default)]
@@ -57,9 +55,4 @@ pub fn append_revision(root: &Path, spec: RevisionSpec) -> Result<String, Error>
     let line = log::line(&id, spec)?;
     log::append(&Store::log_path_in(root), &[line])?;
     Ok(id)
-}
-
-/// The current UTC time as RFC 3339, in the form the log's records carry.
-pub fn now() -> Result<String, Error> {
-    store::timestamp(&Connection::open_in_memory()?)
 }

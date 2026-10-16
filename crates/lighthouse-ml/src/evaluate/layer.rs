@@ -16,7 +16,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::assign;
+use lighthouse_model::stats::assign;
 use lighthouse_plugin::{
     Classifier, DecisionRef, FineTuningJobStatus, MODELS_DIR, Subject, UPPER, decide, request_of,
 };

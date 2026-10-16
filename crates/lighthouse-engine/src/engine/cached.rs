@@ -177,7 +177,7 @@ impl Engine {
                 .unwrap_or_default()
                 .as_bytes(),
         );
-        hasher.finish_bytes()
+        hasher.finish()
     }
 
     /// Writes what the run stored and used, and says how it went.

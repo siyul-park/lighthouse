@@ -193,7 +193,7 @@ impl Orchestrator<'_> {
             hash.update(text.as_bytes());
             hash.update([0xff]);
         }
-        hash.finish()
+        hash.hex()
     }
 
     /// The proposals this round can try, with the findings that cannot be
@@ -397,7 +397,7 @@ impl Orchestrator<'_> {
                     line: finding.span.start.line,
                     fixer: binding.fixer.clone(),
                     description,
-                    safety: safety.capped(binding.cap),
+                    safety: safety.max(binding.cap),
                     edits,
                 })
             }

@@ -6,13 +6,6 @@ fn at(line: u32, col: u32) -> Position {
 }
 
 #[test]
-fn a_claim_is_capped_by_the_weaker_of_the_two() {
-    assert_eq!(Safety::Safe.capped(Safety::Safe), Safety::Safe);
-    assert_eq!(Safety::Safe.capped(Safety::Suggested), Safety::Suggested);
-    assert_eq!(Safety::Suggested.capped(Safety::Safe), Safety::Suggested);
-}
-
-#[test]
 fn safety_is_read_and_written_as_its_lowercase_name() {
     assert_eq!("safe".parse::<Safety>().unwrap(), Safety::Safe);
     assert_eq!("suggested".parse::<Safety>().unwrap(), Safety::Suggested);

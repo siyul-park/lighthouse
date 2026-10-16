@@ -1,11 +1,17 @@
-use std::{fmt, path::PathBuf, str::FromStr};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::PathBuf,
+};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use thiserror::Error;
 
-use crate::{Span, Suppression, hash::Hasher};
+use crate::{
+    Project, Span,
+    hash::{Hasher, short_digest},
+    squash,
+};
 
 /// How hard a finding fails a run; serialized and parsed as the lowercase
 /// variant name. Whether a finding also asks for review is not a level: it
@@ -23,33 +29,11 @@ pub enum Severity {
     Info,
 }
 
-/// The text given to [`Severity::from_str`] names no severity.
-#[derive(Debug, Error)]
-#[error("unknown severity `{0}` (expected error, warn or info)")]
-pub struct UnknownSeverity(pub String);
-
-impl FromStr for Severity {
-    type Err = UnknownSeverity;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "error" => Ok(Self::Error),
-            "warn" => Ok(Self::Warn),
-            "info" => Ok(Self::Info),
-            _ => Err(UnknownSeverity(s.to_owned())),
-        }
-    }
-}
-
-impl fmt::Display for Severity {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Error => "error",
-            Self::Warn => "warn",
-            Self::Info => "info",
-        })
-    }
-}
+vocabulary!(Severity, "severity" {
+    Error => "error",
+    Warn => "warn",
+    Info => "info",
+});
 
 impl Severity {
     /// Whether a finding of a decision that authored this severity asks for
@@ -75,8 +59,8 @@ impl Fingerprint {
             hash.update(part);
             hash.update([0]);
         }
-        hash.update(snippet.split_whitespace().collect::<Vec<_>>().join(" "));
-        Self(hash.finish())
+        hash.update(squash(snippet));
+        Self(hash.hex())
     }
 
     /// Adopts a fingerprint computed elsewhere, such as by a plugin.
@@ -92,7 +76,7 @@ impl Fingerprint {
         let mut hash = Hasher::new();
         hash.update(&self.0);
         hash.update(n.to_le_bytes());
-        Self(hash.finish())
+        Self(hash.hex())
     }
 
     /// Tells apart findings that share a fingerprint by something stable about
@@ -102,7 +86,7 @@ impl Fingerprint {
         hash.update(&self.0);
         hash.update([0xff]);
         hash.update(discriminator);
-        Self(hash.finish())
+        Self(hash.hex())
     }
 
     /// The opaque hex string; equal fingerprints identify the same finding.
@@ -164,6 +148,84 @@ impl Diagnostic {
             suppression: None,
         }
     }
+
+    /// Makes the fingerprints of one run unique. Findings that share a rule,
+    /// file and fingerprint are told apart by a stable discriminator (the
+    /// finding's symbol, else the symbol that encloses or precedes it) and only
+    /// findings that still collide get an ordinal. Returns the fingerprints
+    /// that rest on an ordinal, which moves when an earlier identical finding
+    /// appears or goes.
+    pub fn disambiguate(found: &mut [Self], project: &Project) -> BTreeSet<Fingerprint> {
+        let mut groups: BTreeMap<(&str, &PathBuf, &Fingerprint), Vec<usize>> = BTreeMap::new();
+        for (at, d) in found.iter().enumerate() {
+            groups
+                .entry((&d.rule_id, &d.file, &d.fingerprint))
+                .or_default()
+                .push(at);
+        }
+        let groups: Vec<Vec<usize>> = groups.into_values().filter(|g| g.len() > 1).collect();
+        let mut ordinal = BTreeSet::new();
+        for members in groups {
+            let mut by_discriminator: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+            for at in members {
+                let discriminator = found[at].discriminator(project);
+                by_discriminator.entry(discriminator).or_default().push(at);
+            }
+            for (discriminator, same) in by_discriminator {
+                for (n, &at) in same.iter().enumerate() {
+                    let base = &found[at].fingerprint;
+                    found[at].fingerprint = if discriminator.is_empty() {
+                        base.occurrence(n)
+                    } else {
+                        base.discriminate(&discriminator).occurrence(n)
+                    };
+                    if same.len() > 1 {
+                        ordinal.insert(found[at].fingerprint.clone());
+                    }
+                }
+            }
+        }
+        ordinal
+    }
+
+    /// The symbol the finding is about, else the one that encloses or precedes
+    /// it; empty when there is none.
+    fn discriminator(&self, project: &Project) -> String {
+        if let Some(symbol) = &self.symbol {
+            return symbol.clone();
+        }
+        let symbols: Vec<_> = project.symbols_in(&self.file).collect();
+        let at = self.span.start;
+        let innermost = symbols
+            .iter()
+            .filter(|s| s.span.start <= at && at <= s.span.end)
+            .max_by_key(|s| s.span.start);
+        let preceding = symbols
+            .iter()
+            .filter(|s| s.span.end < at)
+            .max_by_key(|s| s.span.end);
+        innermost
+            .or(preceding)
+            .map_or_else(String::new, |s| s.id.as_str().to_owned())
+    }
+}
+
+/// A hash of evidence with whitespace in its strings collapsed, so
+/// reformatting does not change what the evidence says.
+pub fn evidence_digest(evidence: &Value) -> String {
+    fn squashed(value: &Value) -> Value {
+        match value {
+            Value::String(s) => Value::String(squash(s)),
+            Value::Array(items) => Value::Array(items.iter().map(squashed).collect()),
+            Value::Object(map) => Value::Object(
+                map.iter()
+                    .map(|(key, value)| (key.clone(), squashed(value)))
+                    .collect(),
+            ),
+            other => other.clone(),
+        }
+    }
+    short_digest(&squashed(evidence), 8)
 }
 
 /// Part of the analysis scope that could not be analyzed: a file, or the
@@ -174,4 +236,94 @@ pub struct Incomplete {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<PathBuf>,
     pub reason: String,
+}
+
+/// How a suppression was declared, in the words of SARIF.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum SuppressionKind {
+    /// By a directive in the code.
+    #[serde(rename = "inSource")]
+    InSource,
+    /// Outside the code: a recorded decision to leave the finding in place.
+    #[serde(rename = "external")]
+    External,
+}
+
+vocabulary!(SuppressionKind, "suppression kind" {
+    InSource => "inSource",
+    External => "external",
+});
+
+/// Whether a suppression is in force, in the words of SARIF.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum SuppressionStatus {
+    /// In force.
+    #[default]
+    #[serde(rename = "accepted")]
+    Accepted,
+    /// Proposed, not yet in force.
+    #[serde(rename = "underReview")]
+    UnderReview,
+    /// Refused.
+    #[serde(rename = "rejected")]
+    Rejected,
+}
+
+vocabulary!(SuppressionStatus, "suppression status" {
+    Accepted => "accepted",
+    UnderReview => "underReview",
+    Rejected => "rejected",
+});
+
+impl SuppressionStatus {
+    fn is_default(&self) -> bool {
+        *self == Self::Accepted
+    }
+}
+
+/// A finding that is right but is left in place on purpose: SARIF's
+/// `suppression`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Suppression {
+    pub kind: SuppressionKind,
+    /// `accepted` unless said otherwise.
+    #[serde(default, skip_serializing_if = "SuppressionStatus::is_default")]
+    pub status: SuppressionStatus,
+    /// Why the finding stays.
+    pub justification: String,
+}
+
+impl Suppression {
+    /// An accepted suppression a directive in the code declares.
+    pub fn in_source(justification: impl Into<String>) -> Self {
+        Self::new(SuppressionKind::InSource, justification)
+    }
+
+    /// An accepted suppression recorded outside the code.
+    pub fn external(justification: impl Into<String>) -> Self {
+        Self::new(SuppressionKind::External, justification)
+    }
+
+    /// An accepted suppression of the given kind.
+    fn new(kind: SuppressionKind, justification: impl Into<String>) -> Self {
+        Self {
+            kind,
+            status: SuppressionStatus::Accepted,
+            justification: justification.into(),
+        }
+    }
+
+    /// Whether the suppression is in force.
+    pub fn in_force(&self) -> bool {
+        self.status == SuppressionStatus::Accepted
+    }
+}
+
+/// A finding a suppression keeps out of the report. A run states how many
+/// there were, and SARIF keeps them with their suppression.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Suppressed {
+    pub diagnostic: Diagnostic,
+    pub suppression: Suppression,
 }

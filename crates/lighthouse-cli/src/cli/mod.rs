@@ -23,7 +23,7 @@ mod reference;
 mod setup;
 mod spec;
 
-type Result<T> = lighthouse_session::Result<T>;
+use lighthouse_model::Result;
 
 /// Parses the command line and runs it; the exit code of the process.
 pub fn main() -> ExitCode {

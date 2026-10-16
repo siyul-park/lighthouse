@@ -122,5 +122,4 @@ fn a_person_outweighs_a_coding_agent_and_that_outweighs_a_model() {
     let model = Attribution::model("openai/gpt@1");
     assert!(person.strength() > agent.strength());
     assert!(agent.strength() > model.strength());
-    assert!(model.is_model() && !agent.is_model() && !person.is_model());
 }

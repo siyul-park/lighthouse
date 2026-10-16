@@ -25,9 +25,9 @@ pub use log::{Change, JudgmentSpec, RevisionEvent, RevisionSpec};
 pub use record::{
     Filter, FindingRecord, FixEvent, JudgmentEvent, NewFix, NewJudgment, Observed, Resolved,
     Ruling, Run, RunSummary, Stamp, Standing, State, StatusFilter, Subject, SuppressionEvent,
-    Unchecked, evidence_digest,
+    Unchecked,
 };
-pub use records::{Records, append_revision, now};
+pub use records::{Records, append_revision};
 pub use store::Store;
 
 /// The JSON Schema of every record kind the decision log holds.

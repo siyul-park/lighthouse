@@ -1,6 +1,5 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt,
     ops::Deref,
     path::{Path, PathBuf},
 };
@@ -14,8 +13,7 @@ pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, Type
 
 use crate::{
     Document,
-    merge::{resolve_all, sites_of, sorted_union},
-    relations::{edges_from, implementers, implements},
+    merge::{dedup_edges, resolve_all, sites_of, sorted_union},
 };
 
 /// 1-based line and column.
@@ -51,17 +49,13 @@ pub enum Capability {
     Overlays,
 }
 
-impl fmt::Display for Capability {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::SemanticEdges => f.write_str("semantic-edges"),
-            Self::Extent => f.write_str("extent"),
-            Self::ReferenceSites => f.write_str("reference-sites"),
-            Self::CompleteReferences => f.write_str("complete-references"),
-            Self::Overlays => f.write_str("overlays"),
-        }
-    }
-}
+vocabulary!(Capability, "capability" {
+    SemanticEdges => "semantic-edges",
+    Extent => "extent",
+    ReferenceSites => "reference-sites",
+    CompleteReferences => "complete-references",
+    Overlays => "overlays",
+});
 
 /// A project file; `path` is its project-relative identity and `hash` its content hash.
 /// `generated` and `test` are the provider's classification, never inferred here.
@@ -141,34 +135,17 @@ pub enum SymbolKind {
     Test,
 }
 
-impl SymbolKind {
-    const ALL: [Self; 9] = [
-        Self::Function,
-        Self::Method,
-        Self::Type,
-        Self::Field,
-        Self::Variant,
-        Self::Const,
-        Self::Var,
-        Self::Interface,
-        Self::Test,
-    ];
-
-    /// The kind's id suffix, such as `function`; inverse of the ids built by [`SymbolId::new`].
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Function => "function",
-            Self::Method => "method",
-            Self::Type => "type",
-            Self::Field => "field",
-            Self::Variant => "variant",
-            Self::Const => "const",
-            Self::Var => "var",
-            Self::Interface => "interface",
-            Self::Test => "test",
-        }
-    }
-}
+vocabulary!(SymbolKind, "symbol kind" {
+    Function => "function",
+    Method => "method",
+    Type => "type",
+    Field => "field",
+    Variant => "variant",
+    Const => "const",
+    Var => "var",
+    Interface => "interface",
+    Test => "test",
+});
 
 /// Who may use a symbol, as the language defines it; `Internal` is
 /// visible within a bounded unit such as a crate, but not outside it.
@@ -254,37 +231,14 @@ pub enum EdgeKind {
     AccessesPrivate,
 }
 
-impl EdgeKind {
-    /// The spelling used in files and expressions.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Calls => "calls",
-            Self::References => "references",
-            Self::Imports => "imports",
-            Self::Contains => "contains",
-            Self::Implements => "implements",
-            Self::AccessesPrivate => "accesses-private",
-        }
-    }
-}
-
-impl std::str::FromStr for EdgeKind {
-    type Err = ();
-
-    fn from_str(text: &str) -> Result<Self, ()> {
-        [
-            Self::Calls,
-            Self::References,
-            Self::Imports,
-            Self::Contains,
-            Self::Implements,
-            Self::AccessesPrivate,
-        ]
-        .into_iter()
-        .find(|kind| kind.as_str() == text)
-        .ok_or(())
-    }
-}
+vocabulary!(EdgeKind, "edge kind" {
+    Calls => "calls",
+    References => "references",
+    Imports => "imports",
+    Contains => "contains",
+    Implements => "implements",
+    AccessesPrivate => "accesses-private",
+});
 
 /// How reliable an [`Edge`]'s target is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -445,9 +399,7 @@ struct Index {
     sites: BTreeMap<SymbolId, Vec<Site>>,
     /// Positions in `edges` of the edges that start at a symbol.
     edges_from: BTreeMap<SymbolId, Vec<usize>>,
-    /// The interfaces a type implements, by resolved `implements` edges.
-    implements: BTreeMap<SymbolId, Vec<SymbolId>>,
-    /// The types that implement an interface: the reverse of `implements`.
+    /// The types that implement an interface, by resolved `implements` edges.
     implementers: BTreeMap<SymbolId, Vec<SymbolId>>,
 }
 
@@ -474,14 +426,16 @@ impl Project {
     /// never fails: what it drops or leaves ambiguous is reported by [`Project::notices`].
     pub fn merge(parts: impl IntoIterator<Item = Fragment>) -> Self {
         let (mut all, mut notices, files) = sorted_union(parts);
-        let (ambiguous, sited) = resolve_all(&mut all, &files);
+        let ambiguous = resolve_all(&mut all);
         if ambiguous > 0 {
             notices.push(format!(
                 "{ambiguous} edge target(s) matched several symbols and stayed unresolved"
             ));
         }
+        let sites = sites_of(&all, &files);
+        dedup_edges(&mut all);
         let mut index = Index::new(&all);
-        index.sites = sites_of(&all, sited);
+        index.sites = sites;
         Self {
             all,
             index,
@@ -560,26 +514,26 @@ impl Project {
     /// Distinct symbols with a resolved, non-heuristic `calls` edge to `id`,
     /// excluding itself.
     pub fn callers(&self, id: &SymbolId) -> &[SymbolId] {
-        self.index.callers.get(id).map_or(&[], Vec::as_slice)
+        slice(&self.index.callers, id)
     }
 
     /// Distinct symbols with a resolved `references` edge to `id`, excluding
     /// itself: every use of `id` as a value rather than a call. Heuristic edges
     /// are included: they say a symbol might be used.
     pub fn references(&self, id: &SymbolId) -> &[SymbolId] {
-        self.index.references.get(id).map_or(&[], Vec::as_slice)
+        slice(&self.index.references, id)
     }
 
     /// Distinct symbols `id` calls or references through a resolved,
     /// non-heuristic edge, excluding itself: every use `id` makes of another
     /// symbol, whether as a call or as a value.
     pub fn uses(&self, id: &SymbolId) -> &[SymbolId] {
-        self.index.uses.get(id).map_or(&[], Vec::as_slice)
+        slice(&self.index.uses, id)
     }
 
     /// Symbols whose `owner` is `id`: fields, methods, associated items.
     pub fn members(&self, id: &SymbolId) -> &[SymbolId] {
-        self.index.members.get(id).map_or(&[], Vec::as_slice)
+        slice(&self.index.members, id)
     }
 
     /// The test case of a test symbol.
@@ -601,7 +555,7 @@ impl Project {
     /// references and the other relations alike, in file order. Empty when the
     /// provider reports no reference sites.
     pub fn sites(&self, id: &SymbolId) -> &[Site] {
-        self.index.sites.get(id).map_or(&[], Vec::as_slice)
+        slice(&self.index.sites, id)
     }
 
     /// Comments of `path`, in source order.
@@ -622,21 +576,21 @@ impl Project {
             .map(|at| &self.all.edges[*at])
     }
 
-    /// The interfaces the type `id` implements.
-    pub fn implements(&self, id: &SymbolId) -> &[SymbolId] {
-        self.index.implements.get(id).map_or(&[], Vec::as_slice)
-    }
-
     /// The types that implement the interface `id`, in test files too.
     pub fn implementers(&self, id: &SymbolId) -> &[SymbolId] {
-        self.index.implementers.get(id).map_or(&[], Vec::as_slice)
+        slice(&self.index.implementers, id)
     }
 
     /// Distinct symbols `id` has a resolved, non-heuristic `calls` edge to,
     /// excluding itself.
     pub fn callees(&self, id: &SymbolId) -> &[SymbolId] {
-        self.index.callees.get(id).map_or(&[], Vec::as_slice)
+        slice(&self.index.callees, id)
     }
+}
+
+/// The entries of `map` under `id`, none when it has none.
+fn slice<'a, T>(map: &'a BTreeMap<SymbolId, Vec<T>>, id: &SymbolId) -> &'a [T] {
+    map.get(id).map_or(&[], Vec::as_slice)
 }
 
 impl Index {
@@ -657,26 +611,33 @@ impl Index {
                 .or_default()
                 .push(at);
         }
-        index.edges_from = edges_from(all);
-        index.implements = implements(all);
-        index.implementers = implementers(all);
         for (at, function) in all.functions.iter().enumerate() {
             index.functions.insert(function.symbol.clone(), at);
         }
-        index.link_calls(all);
+        index.link_edges(all);
         index
     }
 
-    /// Indexes the calls, uses and references between resolved symbols.
-    fn link_calls(&mut self, all: &Fragment) {
+    /// Indexes the edges by source, the implementers of interfaces, and the
+    /// calls, uses and references between resolved symbols.
+    fn link_edges(&mut self, all: &Fragment) {
         let mut calls = BTreeSet::new();
         let mut references = BTreeSet::new();
         let mut uses = BTreeSet::new();
-        for edge in &all.edges {
-            let (Node::Symbol(from), Target::Resolved(Node::Symbol(to))) = (&edge.from, &edge.to)
-            else {
+        for (at, edge) in all.edges.iter().enumerate() {
+            let Node::Symbol(from) = &edge.from else {
                 continue;
             };
+            self.edges_from.entry(from.clone()).or_default().push(at);
+            let Target::Resolved(Node::Symbol(to)) = &edge.to else {
+                continue;
+            };
+            if edge.kind == EdgeKind::Implements {
+                self.implementers
+                    .entry(to.clone())
+                    .or_default()
+                    .push(from.clone());
+            }
             let precise = edge.resolution != Resolution::Heuristic;
             if from != to && precise && matches!(edge.kind, EdgeKind::Calls | EdgeKind::References)
             {

@@ -34,16 +34,6 @@ fn binding() -> ModelBinding {
 }
 
 #[test]
-fn a_reference_is_a_provider_and_a_model_split_at_the_first_slash() {
-    assert_eq!(
-        ModelBinding::split("openrouter/qwen/qwen3-coder:free"),
-        Some(("openrouter", "qwen/qwen3-coder:free"))
-    );
-    assert_eq!(ModelBinding::split("local"), None);
-    assert_eq!(ModelBinding::split("/m"), None);
-}
-
-#[test]
 fn the_project_binds_models_by_reference_and_limits_what_they_cost() {
     let binding = binding();
     assert_eq!(binding.classification, ["openrouter/qwen/qwen3-coder:free"]);

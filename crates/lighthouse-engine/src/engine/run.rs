@@ -240,7 +240,7 @@ impl Engine {
         found.sort_by(|a, b| {
             (&a.file, a.span.start, &a.rule_id).cmp(&(&b.file, b.span.start, &b.rule_id))
         });
-        let ordinal = identity::assign(&mut found, scene.project);
+        let ordinal = Diagnostic::disambiguate(&mut found, scene.project);
         let subjects = Subjects::new(scene.project, scene.facts, scene.inputs);
         progress.outcome.facts = found
             .iter()

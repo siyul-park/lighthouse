@@ -3,6 +3,7 @@
 
 use std::fmt::Write;
 
+use lighthouse_model::squash;
 use similar::TextDiff;
 
 use lighthouse_spec::{
@@ -20,7 +21,7 @@ pub fn pack_markdown(pack: &Pack) -> String {
     let mut out = format!(
         "{NOTICE}\n\n# {}\n\n{}\n\n",
         pack.title,
-        one_line(&pack.intro)
+        squash(&pack.intro)
     );
     for section in &pack.sections {
         section_markdown(&mut out, pack, section);
@@ -67,7 +68,7 @@ fn section_markdown(out: &mut String, pack: &Pack, section: &Section) {
         out,
         "## {}\n\n{}\n\n",
         section.title,
-        one_line(&section.intro)
+        squash(&section.intro)
     );
     let _ = writeln!(out, "| id | title | check | fix | requirement |");
     let _ = writeln!(out, "| --- | --- | --- | --- | --- |");
@@ -119,10 +120,10 @@ fn entry_markdown(out: &mut String, decision: &Decision, dir: &str) {
         let _ = write!(meta, " · supersedes {}", decision.supersedes.join(", "));
     }
     let _ = writeln!(out, "{meta}\n");
-    let _ = writeln!(out, "*{}*\n", one_line(&decision.context));
+    let _ = writeln!(out, "*{}*\n", squash(&decision.context));
     let _ = writeln!(out, "{}\n", decision.requirement.trim());
     if let Some(consequences) = &decision.consequences {
-        let _ = writeln!(out, "Consequences: {}\n", one_line(consequences));
+        let _ = writeln!(out, "Consequences: {}\n", squash(consequences));
     }
     if !decision.provenance.is_empty() {
         let _ = writeln!(
@@ -285,10 +286,6 @@ fn level(decision: &Decision) -> String {
     }
 }
 
-fn one_line(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
 fn cell(text: &str) -> String {
-    one_line(text).replace('|', "\\|")
+    squash(text).replace('|', "\\|")
 }

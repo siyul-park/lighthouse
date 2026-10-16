@@ -5,10 +5,10 @@ pub const UNUSED_ALLOW: &str = "core/no-unused-allow";
 
 const REASON_SEPARATOR: &str = "--";
 
-/// The markers a directive starts with, longest first so that
-/// `lighthouse-disable-next-line` is not read as `lighthouse-disable`.
-/// Every marker a directive can start with, longest first, with its form.
-pub const MARKERS: [(&str, Form); 4] = [
+/// Every marker a directive can start with, longest first so that
+/// `lighthouse-disable-next-line` is not read as `lighthouse-disable`, with
+/// its form.
+const MARKERS: [(&str, Form); 4] = [
     ("lighthouse-disable-next-line", Form::NextLine),
     ("lighthouse-disable-line", Form::Line),
     ("lighthouse-disable", Form::Disable),
@@ -31,18 +31,14 @@ pub enum Form {
     Line,
 }
 
-impl Form {
-    /// The spelling in facts and messages: `disable`, `enable`,
-    /// `disable-next-line` or `disable-line`.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Disable => "disable",
-            Self::Enable => "enable",
-            Self::NextLine => "disable-next-line",
-            Self::Line => "disable-line",
-        }
-    }
+vocabulary!(Form, "directive form" {
+    Disable => "disable",
+    Enable => "enable",
+    NextLine => "disable-next-line",
+    Line => "disable-line",
+});
 
+impl Form {
     /// Whether the form needs a reason: every form that disables.
     pub fn needs_reason(self) -> bool {
         self != Self::Enable
@@ -63,15 +59,10 @@ pub struct Directive {
     pub reason: Option<String>,
 }
 
-/// The first directive in a comment's text, if a line of it is one. Prose that
-/// merely mentions a marker mid-line is not a directive, and a documentation
-/// comment (`///`, `//!`, `/** */`, `/*! */`) never holds one.
-pub fn parse(comment: &str) -> Option<Directive> {
-    directives(comment).into_iter().next().map(|(_, d)| d)
-}
-
 /// Every directive of a comment's text with the index of its line in the text:
-/// adjacent line comments form one comment, and each line may hold one.
+/// adjacent line comments form one comment, and each line may hold one. Prose
+/// that merely mentions a marker mid-line is not a directive, and a
+/// documentation comment (`///`, `//!`, `/** */`, `/*! */`) never holds one.
 pub fn directives(comment: &str) -> Vec<(usize, Directive)> {
     if documents(comment) {
         return Vec::new();

@@ -445,7 +445,7 @@ impl<'a> Builder<'a> {
                         .filter(|(_, d)| d.form.needs_reason())
                         .map(|(_, d)| {
                             json!({
-                                "form": d.form.name(),
+                                "form": d.form.as_str(),
                                 "rules": d.rules,
                                 "reason": d.reason.unwrap_or_default(),
                                 "line": c.span.start.line,

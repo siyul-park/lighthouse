@@ -78,18 +78,13 @@ pub enum EventKind {
     ErrorfUnwrapped,
 }
 
-impl EventKind {
-    /// The spelling used in files and expressions.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Panic => "panic",
-            Self::Unwrap => "unwrap",
-            Self::ErrorCompare => "error-compare",
-            Self::ErrorAssert => "error-assert",
-            Self::ErrorfUnwrapped => "errorf-unwrapped",
-        }
-    }
-}
+vocabulary!(EventKind, "event kind" {
+    Panic => "panic",
+    Unwrap => "unwrap",
+    ErrorCompare => "error-compare",
+    ErrorAssert => "error-assert",
+    ErrorfUnwrapped => "errorf-unwrapped",
+});
 
 /// One body event: its kind, place and a kind-specific detail.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

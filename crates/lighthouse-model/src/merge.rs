@@ -7,7 +7,11 @@ use std::{
     path::PathBuf,
 };
 
-use super::{Edge, EdgeKind, Fragment, Node, Site, Symbol, SymbolId, SymbolKind, Target};
+use super::{EdgeKind, Fragment, Node, Site, Symbol, SymbolId, SymbolKind, Target};
+
+/// A run of consecutive edges that came from one fragment: how many, and the
+/// file of the fragment when it is about one.
+type EdgeRun = (usize, Option<PathBuf>);
 
 struct Resolver<'a> {
     symbols: BTreeSet<&'a str>,
@@ -66,14 +70,9 @@ impl<'a> Resolver<'a> {
     }
 }
 
-/// Resolves edge, test and forwarding targets in place, drops duplicate edges
-/// (the same relation at several sites is one edge, which keeps its first
-/// site), and returns how many targets stayed ambiguous with every edge that
-/// has a site and the file of the fragment it came from.
-pub(super) fn resolve_all(
-    all: &mut Fragment,
-    files: &[Option<PathBuf>],
-) -> (usize, Vec<(Edge, Option<PathBuf>)>) {
+/// Resolves edge, test and forwarding targets in place and returns how many
+/// targets stayed ambiguous.
+pub(super) fn resolve_all(all: &mut Fragment) -> usize {
     let resolver = Resolver::new(all);
     let resolved: Vec<Target> = all
         .edges
@@ -99,36 +98,32 @@ pub(super) fn resolve_all(
     for (edge, to) in all.edges.iter_mut().zip(resolved) {
         edge.to = to;
     }
-    let sited: Vec<(Edge, Option<PathBuf>)> = all
-        .edges
-        .iter()
-        .zip(files)
-        .filter(|(e, _)| e.site.is_some())
-        .map(|(e, f)| (e.clone(), f.clone()))
-        .collect();
-    let mut seen = HashSet::new();
-    all.edges.retain(|e| {
-        let key = Edge {
-            site: None,
-            ..e.clone()
-        };
-        seen.insert(key)
-    });
     for (test, targets) in all.tests.iter_mut().zip(targets) {
         test.targets = targets;
     }
     for (function, to) in all.functions.iter_mut().zip(forwards) {
         function.forwards_to = to;
     }
-    (ambiguous, sited)
+    ambiguous
+}
+
+/// Drops duplicate edges: the same relation at several sites is one edge,
+/// which keeps its first site.
+pub(super) fn dedup_edges(all: &mut Fragment) {
+    let mut seen = HashSet::new();
+    let keep: Vec<bool> = all
+        .edges
+        .iter()
+        .map(|e| seen.insert((e.kind, &e.from, &e.to, e.resolution)))
+        .collect();
+    let mut keep = keep.into_iter();
+    all.edges.retain(|_| keep.next().unwrap_or(true));
 }
 
 /// The sited edges that end at a symbol, grouped by target, ordered by file
-/// and position.
-pub(super) fn sites_of(
-    all: &Fragment,
-    sited: Vec<(Edge, Option<PathBuf>)>,
-) -> BTreeMap<SymbolId, Vec<Site>> {
+/// and position. `runs` says how many of `all.edges`, in order, came from the
+/// fragment of which file.
+pub(super) fn sites_of(all: &Fragment, runs: &[EdgeRun]) -> BTreeMap<SymbolId, Vec<Site>> {
     let file_of = |from: &Node| match from {
         Node::Symbol(id) => all
             .symbols
@@ -137,12 +132,16 @@ pub(super) fn sites_of(
             .map(|at| all.symbols[at].file.clone()),
         Node::Module(_) => None,
     };
+    let mut files = runs
+        .iter()
+        .flat_map(|(len, file)| std::iter::repeat_n(file.as_ref(), *len));
     let mut sites: BTreeMap<SymbolId, Vec<Site>> = BTreeMap::new();
-    for (edge, file) in sited {
+    for edge in &all.edges {
+        let file = files.next().flatten();
         let (Target::Resolved(Node::Symbol(to)), Some(span)) = (&edge.to, edge.site) else {
             continue;
         };
-        let Some(file) = file.or_else(|| file_of(&edge.from)) else {
+        let Some(file) = file.cloned().or_else(|| file_of(&edge.from)) else {
             continue;
         };
         sites.entry(to.clone()).or_default().push(Site {
@@ -161,10 +160,12 @@ pub(super) fn sites_of(
 }
 
 /// The fragments concatenated, sorted and deduplicated by identity, with a
-/// notice when a symbol id is declared in several files.
+/// notice when a symbol id is declared in several files, and for each
+/// fragment how many edges it had and the file of the fragment when it is
+/// about one.
 pub(super) fn sorted_union(
     parts: impl IntoIterator<Item = Fragment>,
-) -> (Fragment, Vec<String>, Vec<Option<PathBuf>>) {
+) -> (Fragment, Vec<String>, Vec<EdgeRun>) {
     let mut all = Fragment::default();
     let mut edge_files = Vec::new();
     for part in parts {
@@ -172,7 +173,7 @@ pub(super) fn sorted_union(
             [only] => Some(only.path.clone()),
             _ => None,
         };
-        edge_files.extend(part.edges.iter().map(|_| file.clone()));
+        edge_files.push((part.edges.len(), file));
         all.files.extend(part.files);
         all.modules.extend(part.modules);
         all.symbols.extend(part.symbols);
@@ -198,7 +199,7 @@ pub(super) fn sorted_union(
     (all, notices, edge_files)
 }
 
-pub(super) fn duplicate_notice(sorted: &[Symbol]) -> Option<String> {
+fn duplicate_notice(sorted: &[Symbol]) -> Option<String> {
     let mut groups: Vec<(&SymbolId, Vec<String>)> = Vec::new();
     for pair in sorted.windows(2) {
         if pair[0].id != pair[1].id || pair[0].file == pair[1].file {

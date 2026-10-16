@@ -16,9 +16,9 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_model::{Diagnostic, hash};
+use lighthouse_model::{Diagnostic, evidence_digest, hash};
 use lighthouse_resource::write_atomic;
-use lighthouse_session::{cache_dir, evidence_digest};
+use lighthouse_session::cache_dir;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

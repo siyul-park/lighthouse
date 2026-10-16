@@ -70,7 +70,7 @@ impl Digests {
         }
         ties.orphans(&mut whole)?;
         Ok(Self {
-            project: whole.finish_bytes(),
+            project: whole.finish(),
             files: paths.into_iter().map(Path::to_owned).zip(digests).collect(),
         })
     }
@@ -102,14 +102,14 @@ pub fn documents(documents: &[Document]) -> Result<Digest, Error> {
             ),
         )?;
     }
-    Ok(hasher.finish_bytes())
+    Ok(hasher.finish())
 }
 
 /// The hash of the JSON of `value`.
 pub(crate) fn digest_of<T: Serialize + ?Sized>(value: &T) -> Result<Digest, Error> {
     let mut hasher = Hasher::new();
     feed(&mut hasher, value)?;
-    Ok(hasher.finish_bytes())
+    Ok(hasher.finish())
 }
 
 /// Feeds the JSON of `value` to `hasher`.

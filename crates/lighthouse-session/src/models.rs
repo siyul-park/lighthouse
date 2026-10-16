@@ -3,6 +3,7 @@
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use lighthouse_engine::CommandModels;
+use lighthouse_model::ModelRef;
 use lighthouse_plugin::Classifier;
 use lighthouse_rpc::Command;
 use serde::Serialize;
@@ -42,8 +43,8 @@ pub fn bound_models(session: &Session, decisions: &[String]) -> Result<Vec<Bound
     let selector = Selector::new(decisions)?;
     selector.expand(known.iter().copied())?;
     let remote = |model: &str| {
-        lighthouse_spec::ModelBinding::split(model)
-            .and_then(|(provider, _)| bound.provider(provider))
+        ModelRef::parse(model)
+            .and_then(|model| bound.provider(model.provider))
             .is_some_and(|provider| provider.remote())
     };
     let mut found = Vec::new();

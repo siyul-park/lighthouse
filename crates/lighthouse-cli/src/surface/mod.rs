@@ -24,5 +24,4 @@ pub mod tools;
 pub use cli::{Action, run};
 pub use reply::{Caller, Context, Reply};
 
-/// Errors cross threads: the MCP server runs operations on a blocking pool.
-pub type Result<T> = lighthouse_session::Result<T>;
+pub use lighthouse_model::Result;

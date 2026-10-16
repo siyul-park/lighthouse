@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use lighthouse_model::Severity;
+use lighthouse_model::{Severity, squash};
 use lighthouse_resource::{Metadata, Resource, Spec};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -338,10 +338,6 @@ impl DecisionSpec {
             .collect();
         json!({ "properties": properties, "languages": languages })
     }
-}
-
-pub(crate) fn squash(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// What an option contributes to the meaning: its type and default, and the

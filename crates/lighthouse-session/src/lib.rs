@@ -28,8 +28,6 @@ mod train;
 mod trust;
 mod validate;
 
-use std::error::Error;
-
 pub use attach::{Attachment, Detachment, attach, detach};
 pub use authoring::{Authored, create_decision, replace_decision};
 pub use cache::{cache_dir, clean_cache};
@@ -56,7 +54,6 @@ pub use lighthouse_resource::schema_file;
 pub use lighthouse_spec::FILE_NAME;
 pub use lighthouse_store::{
     FindingRecord, JudgmentEvent, NewJudgment, Standing, StatusFilter, SuppressionEvent,
-    evidence_digest,
 };
 pub use models::{Binding, BoundModel, bound_models, remote_bound};
 pub use project::{DEFAULT_CONFIG, Session, catalog_at, config_file, project_root};
@@ -77,5 +74,4 @@ pub use validate::{Problem, Validated, validate_paths};
 /// Directories no search for files enters.
 pub use lighthouse_engine::SKIPPED_DIRS;
 
-/// Errors cross threads (the MCP server runs operations on a blocking pool).
-pub type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
+pub use lighthouse_model::Result;

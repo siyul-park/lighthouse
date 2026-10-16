@@ -6,7 +6,7 @@
 
 use std::{fs, path::Path};
 
-use lighthouse_model::{canonical, hash::sha256};
+use lighthouse_model::hash::digest;
 use lighthouse_plugin::{Classifier, FineTuningJobStatus, MODELS_DIR};
 use serde::Serialize;
 use serde_json::Value;
@@ -84,7 +84,7 @@ pub fn artifact(root: &Path, hex: &str) -> Result<Artifact> {
     };
     let document: Value =
         serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
-    let actual = sha256(canonical(&document));
+    let actual = digest(&document);
     Ok(if actual == hex {
         Artifact::Present
     } else {

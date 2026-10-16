@@ -1,4 +1,4 @@
-use lighthouse_store::evidence_digest;
+use lighthouse_model::evidence_digest;
 use serde_json::json;
 
 #[test]

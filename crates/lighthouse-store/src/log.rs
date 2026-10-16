@@ -328,10 +328,7 @@ pub(crate) fn seal(event: &mut JudgmentEvent) -> Result<(), Error> {
 
 /// The id of a spec: the hash of its canonical form.
 pub(crate) fn id_of<S: Serialize>(spec: &S) -> Result<String, Error> {
-    Ok(hash::short(
-        &canonical(&serde_json::to_value(spec)?),
-        ID_BYTES,
-    ))
+    Ok(hash::short_digest(&serde_json::to_value(spec)?, ID_BYTES))
 }
 
 /// The line of a record: a canonical resource with keys in sorted order, so
@@ -438,10 +435,7 @@ fn decode(value: Value) -> Result<Record, String> {
     }
     // The id covers the spec as written, fields this build does not know
     // included.
-    let written = hash::short(
-        &canonical(value.get("spec").unwrap_or(&Value::Null)),
-        ID_BYTES,
-    );
+    let written = hash::short_digest(value.get("spec").unwrap_or(&Value::Null), ID_BYTES);
     let name = value
         .pointer("/metadata/name")
         .and_then(Value::as_str)

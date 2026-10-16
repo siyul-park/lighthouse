@@ -32,6 +32,6 @@ impl KeyBuilder {
 
     /// The key of the parts added.
     pub fn finish(self) -> Key {
-        Key(self.0.finish_bytes())
+        Key(self.0.finish())
     }
 }

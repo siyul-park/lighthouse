@@ -14,8 +14,7 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_model::RunScope;
-use lighthouse_model::{Diagnostic, Position, Project, Span};
+use lighthouse_model::{Diagnostic, Position, Project, RunScope, Span, squash};
 use lighthouse_plugin::{Ctx, Error as PluginError, RuleManifest};
 use lighthouse_process::Spec;
 use lighthouse_spec::{Batch, Check, CheckOutput, CheckStdin, CommandCheck};
@@ -292,7 +291,7 @@ impl Run<'_> {
                     line: position.0,
                     col: position.1,
                 };
-                let snippet: String = message.split_whitespace().collect::<Vec<_>>().join(" ");
+                let snippet = squash(message);
                 // Where the line is does not identify the finding: moving
                 // code must not make it a new one. The engine tells
                 // repeats of the same text apart.

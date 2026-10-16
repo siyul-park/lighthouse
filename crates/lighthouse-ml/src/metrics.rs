@@ -1,7 +1,7 @@
 //! The metrics of evaluating a check against labels, with Wilson 95%
 //! intervals. A proportion over nothing is `None`, never zero.
 
-use lighthouse_model::wilson;
+use lighthouse_model::stats::wilson;
 use serde::Serialize;
 
 /// The equal-width bins of P(fail) the expected calibration error uses.
