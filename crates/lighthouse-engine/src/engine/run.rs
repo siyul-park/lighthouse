@@ -152,7 +152,7 @@ impl Engine {
             .iter()
             .any(|rule| self.documented.contains(&rule.manifest().id));
         let project = if documented {
-            let found = documents::find(&self.ws.root, overlays);
+            let found = Documents::scan(&self.ws.root, overlays);
             progress.outcome.notices.extend(found.notices);
             project.with_documents(found.documents)
         } else {

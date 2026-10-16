@@ -3,7 +3,6 @@ pub mod cache;
 mod documents;
 mod engine;
 mod fix;
-mod generated;
 mod subject;
 mod tester;
 mod timings;

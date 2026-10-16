@@ -16,16 +16,16 @@ use lighthouse_plugin::{
     Workspace,
 };
 use lighthouse_spec::{
-    Catalog, Config, Error as SpecError, GeneratedCheck, GlobSet, Models as BoundModels, Projects,
-    RuleConfig, Rules, Subject as DecisionSubject,
+    Attributes, Catalog, Config, Error as SpecError, GeneratedCheck, GlobSet,
+    Models as BoundModels, Projects, RuleConfig, Rules, Subject as DecisionSubject,
 };
 use rayon::prelude::*;
 use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
-    annotations, documents,
-    generated::Attributes,
+    annotations,
+    documents::Documents,
     subject::Subjects,
     timings::{Timings, in_pool},
 };
@@ -315,7 +315,7 @@ impl Engine {
         validate_config(&registry, &config, &binding, &projects)?;
         let (providers, languages) = load_languages(&registry, &config)?;
         let root = root.canonicalize().map_err(io_error(root))?;
-        let (attributes, found) = Attributes::of(&root);
+        let (attributes, found) = Attributes::new(&root);
         notices.extend(found);
         let ws = Workspace {
             root,

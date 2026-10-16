@@ -16,7 +16,7 @@ const ATTRIBUTE: &str = "linguist-generated";
 /// `-linguist-generated` switch it off again. Nested attribute files are not
 /// read.
 #[derive(Debug, Default)]
-pub(crate) struct Attributes {
+pub struct Attributes {
     rules: Vec<(GlobMatcher, bool)>,
 }
 
@@ -24,18 +24,19 @@ impl Attributes {
     /// The attributes of the project at `root`, and what the user should know
     /// about them; none when it has no file. A file that cannot be read and a
     /// pattern that is not a glob are notices: the attribute is not applied.
-    pub(crate) fn of(root: &Path) -> (Self, Vec<String>) {
-        match fs::read_to_string(root.join(ATTRIBUTES_FILE)) {
-            Ok(text) => Self::parse(&text),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (Self::default(), Vec::new()),
-            Err(e) => (
-                Self::default(),
-                vec![format!("{ATTRIBUTES_FILE}: not read, {e}")],
-            ),
-        }
-    }
-
-    pub(crate) fn parse(text: &str) -> (Self, Vec<String>) {
+    pub fn new(root: &Path) -> (Self, Vec<String>) {
+        let text = match fs::read_to_string(root.join(ATTRIBUTES_FILE)) {
+            Ok(text) => text,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return (Self::default(), Vec::new());
+            }
+            Err(e) => {
+                return (
+                    Self::default(),
+                    vec![format!("{ATTRIBUTES_FILE}: not read, {e}")],
+                );
+            }
+        };
         let mut rules = Vec::new();
         let mut notices = Vec::new();
         for line in text.lines() {
@@ -57,7 +58,7 @@ impl Attributes {
     }
 
     /// Whether the last line that names `path` marks it generated.
-    pub(crate) fn is_generated(&self, path: &Path) -> bool {
+    pub fn is_generated(&self, path: &Path) -> bool {
         self.rules
             .iter()
             .rev()

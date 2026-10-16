@@ -1,3 +1,4 @@
+mod attributes;
 mod catalog;
 mod check;
 mod command;
@@ -16,6 +17,7 @@ mod validate;
 
 use lighthouse_resource::Descriptor;
 
+pub use attributes::Attributes;
 pub use catalog::Catalog;
 pub use catalog::load::{load_local, local_dir, local_files};
 pub use check::{
