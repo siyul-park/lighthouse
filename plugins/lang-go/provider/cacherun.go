@@ -44,8 +44,7 @@ func (p *Provider) indexCached(r *run, params sdk.IndexParams) bool {
 	}
 	store := &cacheStore{dir: params.Context.Cache.Dir}
 	pl := &planner{r: r, used: map[string]fileFacts{}, units: map[string]*cacheUnit{}}
-	version := digest(cacheSchema, p.identity())
-	plan, ok := p.prepare(pl, store, version, params)
+	plan, ok := p.prepare(pl, store, params)
 	if !ok {
 		return false
 	}
@@ -63,7 +62,7 @@ func (p *Provider) finish(r *run, store *cacheStore, plan *cachePlan, sub *run, 
 	install(r, plan, sub)
 	p.record(store, plan, sub)
 	if !reflect.DeepEqual(pl.used, pl.facts) {
-		store.write(factsFile, factsRecord{Version: digest(cacheSchema, p.identity()), Files: pl.used})
+		store.write(factsFile, factsRecord{Version: cacheSchema, Files: pl.used})
 	}
 	if notice := store.notice(); notice != "" {
 		r.result.Notices = append(r.result.Notices, notice)
@@ -80,14 +79,14 @@ func (p *Provider) finish(r *run, store *cacheStore, plan *cachePlan, sub *run, 
 }
 
 // prepare reads the environment and the cached facts and plans the units.
-func (p *Provider) prepare(pl *planner, store *cacheStore, version string, params sdk.IndexParams) (*cachePlan, bool) {
+func (p *Provider) prepare(pl *planner, store *cacheStore, params sdk.IndexParams) (*cachePlan, bool) {
 	candidates, _ := pl.r.candidates()
 	batches := pl.r.batches(candidates)
 	if len(batches) == 0 {
 		return nil, false
 	}
 	var stored factsRecord
-	if store.read(factsFile, &stored) && stored.Version == version {
+	if store.read(factsFile, &stored) && stored.Version == cacheSchema {
 		pl.facts = stored.Files
 	}
 	env, modules, ok := pl.environment(batches)
@@ -112,7 +111,7 @@ func (p *Provider) plan(pl *planner, store *cacheStore, env string, candidates [
 	}
 	sort.Slice(pl.requestedUnits, func(i, j int) bool { return pl.requestedUnits[i].rel < pl.requestedUnits[j].rel })
 	options := string(params.Context.Options[language])
-	base := digest(cacheSchema, p.identity(), p.id, p.version, options, env, pl.interfaceDigest())
+	base := digest(cacheSchema, p.id, p.version, options, env, pl.interfaceDigest())
 	plan := &cachePlan{units: pl.requestedUnits, hits: map[*cacheUnit]unitRecord{}, previous: map[*cacheUnit]unitRecord{}}
 	for _, u := range plan.units {
 		u.apiKey = unitAPIKey(base, u)

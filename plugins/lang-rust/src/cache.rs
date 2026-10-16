@@ -79,7 +79,7 @@ impl Cache {
         {
             return None;
         }
-        let version = digest(&[SCHEMA, provider, &executable_digest()]);
+        let version = digest(&[SCHEMA, provider]);
         let path = Path::new(dir).join(FILE);
         let stored = fs::read(&path)
             .ok()
@@ -294,15 +294,6 @@ fn span_of(file: &SourceFile, block: &syn::Block) -> Option<(usize, usize)> {
         file.offset(open.line, open.column)?,
         file.offset(close.line, close.column)?,
     ))
-}
-
-/// The digest of the running binary: a rebuilt provider must not read what an
-/// older one wrote.
-fn executable_digest() -> String {
-    std::env::current_exe().and_then(fs::read).map_or_else(
-        |_| "unknown".to_owned(),
-        |bytes| hex(&Sha256::digest(bytes)),
-    )
 }
 
 fn digest(parts: &[&str]) -> String {

@@ -14,8 +14,6 @@ type Provider struct {
 	id      string
 	version string
 	last    RunStats
-	// build identifies the running binary, once known.
-	build string
 }
 
 const language = "go"

@@ -124,21 +124,6 @@ func vendorStamp(root string) string {
 	return digest(parts...)
 }
 
-// identity names the running binary by its size and modification time: a
-// rebuilt provider must not read what an older one wrote.
-func (p *Provider) identity() string {
-	if p.build != "" {
-		return p.build
-	}
-	p.build = "unknown"
-	if path, err := os.Executable(); err == nil {
-		if info, err := os.Stat(path); err == nil {
-			p.build = digest(path, strconv.FormatInt(info.Size(), 10), strconv.FormatInt(info.ModTime().UnixNano(), 10))
-		}
-	}
-	return p.build
-}
-
 // within reports whether path is root or lies under it, links resolved.
 func within(root, path string) bool {
 	if resolved, err := filepath.EvalSymlinks(root); err == nil {
