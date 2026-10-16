@@ -6,7 +6,12 @@ mod group;
 mod render;
 
 use lighthouse_model::{Diagnostic, Incomplete};
-use lighthouse_report::{Briefing, agent_report};
+use lighthouse_report::{Briefing, Format, render, report};
+
+/// [`render`] with nothing known beyond the diagnostics.
+fn plain(format: Format, diagnostics: &[Diagnostic], incomplete: &[Incomplete]) -> String {
+    render(format, diagnostics, incomplete, &Briefing::default())
+}
 
 /// The JSON report of a check on one line: what `check --format json` prints
 /// before the frontend adds its summary.
@@ -15,8 +20,8 @@ fn agent_json(
     incomplete: &[Incomplete],
     briefing: &Briefing,
 ) -> String {
-    let report = agent_report(diagnostics, incomplete, briefing);
-    let mut line = serde_json::to_string(&report.fields).expect("a report serializes");
+    let fields = report(diagnostics, incomplete, briefing).fields;
+    let mut line = serde_json::to_string(&fields).expect("a report serializes");
     line.push('\n');
     line
 }

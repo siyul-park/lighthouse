@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use lighthouse_model::{
     Diagnostic, Fingerprint, Position, Preview, PreviewEdit, PreviewFile, Severity, Span,
 };
-use lighthouse_report::{Briefing, Entry, Format, GroupOptions, Grouped, render_with};
+use lighthouse_report::{Briefing, Entry, Format, GroupOptions, Grouped, render};
 use serde_json::{Value, json};
 
 fn span(line: u32) -> Span {
@@ -38,7 +38,7 @@ fn entry(
     fingerprint: &str,
 ) -> Entry<'static> {
     Entry {
-        rule: rule.to_owned(),
+        decision: rule.to_owned(),
         severity,
         authored: severity,
         review: severity != Severity::Error,
@@ -77,7 +77,7 @@ fn grouped_of_orders_errors_first_and_cuts_at_the_limit() {
         .as_array()
         .unwrap()
         .iter()
-        .map(|g| g["rule"].as_str().unwrap().to_owned())
+        .map(|g| g["decision"].as_str().unwrap().to_owned())
         .collect();
     assert_eq!(rules, ["acme/b", "acme/a"]);
 
@@ -236,8 +236,7 @@ fn sarif_columns_count_utf16_code_units_and_not_bytes() {
         sources: Some(&sources),
         ..Briefing::default()
     };
-    let sarif: Value =
-        serde_json::from_str(&render_with(Format::Sarif, &[d], &[], &briefing)).unwrap();
+    let sarif: Value = serde_json::from_str(&render(Format::Sarif, &[d], &[], &briefing)).unwrap();
     let result = &sarif["runs"][0]["results"][0];
     let region = &result["locations"][0]["physicalLocation"]["region"];
     assert_eq!(

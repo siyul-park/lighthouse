@@ -1,8 +1,5 @@
-use lighthouse_model::Judgment;
+use lighthouse_model::{Fingerprint, Judgment};
 use thiserror::Error;
-
-/// Fewest characters of a fingerprint that name a finding, as in git.
-pub const MIN_PREFIX: usize = 7;
 
 /// Why a store operation failed.
 #[derive(Debug, Error)]
@@ -30,7 +27,10 @@ pub enum Error {
     },
     #[error("no recorded finding matches `{0}`")]
     UnknownFinding(String),
-    #[error("`{0}` is too short for a fingerprint: give at least {MIN_PREFIX} characters")]
+    #[error(
+        "`{0}` is too short for a fingerprint: give at least {min} characters",
+        min = Fingerprint::MIN_PREFIX
+    )]
     ShortFingerprint(String),
     #[error(
         "`{prefix}` matches several recorded findings; retry with a longer prefix. Candidates: {}",

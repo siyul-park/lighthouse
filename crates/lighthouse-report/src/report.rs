@@ -7,19 +7,15 @@ use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, Preview, Severity, Suppressed, squash,
 };
 use lighthouse_spec::{Catalog, authored_severity};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{Map, Value, json};
 
 use crate::{
-    evidence::{evidence, evidence_line},
-    expected::{Expected, Subject, expected},
+    expected::{ExampleKey, Expected, expected},
     fix::Shown,
-    group::{Entry, GroupOptions, Grouped, judgments, judgments_line},
+    group::{Entry, GroupOptions, Grouped, judgments, judgments_line, resolve_command},
+    text::{evidence, evidence_line},
 };
-
-/// Shortest fingerprint prefix the full shape shows; longer when needed to
-/// stay unambiguous.
-const PREFIX_MIN: usize = 12;
 
 /// What the agent formats add to a bare diagnostic: the catalog the rules
 /// come from, what the analysis knew about each finding, how many findings
@@ -63,8 +59,7 @@ pub struct Briefing<'a> {
 }
 
 /// How much each finding carries.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Detail {
     /// Findings grouped by decision, then by file: what is common to a
     /// decision is said once and a finding is one short line.
@@ -102,26 +97,16 @@ impl Briefing<'_> {
     }
 }
 
-/// The agent report as typed data, the fields of the JSON object a frontend
-/// prints or wraps.
+/// The report as typed data, the fields of the JSON object a frontend prints
+/// or wraps.
 ///
 /// Compact: `status`, `counts`, `groups`, then when they apply `incomplete`
 /// (`[path, reason]` pairs), `omitted`, and the `resolve` hint and `judgments`
 /// table once for all shown findings that ask for review. Full: `findings`,
 /// `incomplete` and `judgments` as records, `omitted` as a count.
 #[derive(Debug, Clone, PartialEq)]
-pub struct AgentReport {
+pub struct Report {
     pub fields: Map<String, Value>,
-}
-
-/// The full shape: the findings that fit `briefing.limit`, the gaps, how many
-/// findings were left out, and the judgments table when a shown finding asks
-/// for review.
-struct FullReport {
-    findings: Vec<Value>,
-    incomplete: Vec<Value>,
-    omitted: usize,
-    judgments: Option<Value>,
 }
 
 #[derive(Serialize)]
@@ -133,11 +118,17 @@ struct Location {
     end_line: u32,
 }
 
+/// How a judgment is recorded on a finding.
+#[derive(Serialize)]
+struct Resolve {
+    command: String,
+}
+
 #[derive(Serialize)]
 struct Finding<'a> {
     #[serde(rename = "type")]
     kind: &'static str,
-    rule: &'a str,
+    decision: &'a str,
     severity: Severity,
     authored: Severity,
     location: Location,
@@ -156,9 +147,9 @@ struct Finding<'a> {
     note: Option<String>,
     fingerprint: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
-    fix: Option<Value>,
+    fix: Option<Shown>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    resolve: Option<Value>,
+    resolve: Option<Resolve>,
 }
 
 /// The agent text: grouped by decision unless `briefing.detail` is full.
@@ -187,27 +178,17 @@ pub fn shown<'d>(diagnostics: &'d [Diagnostic], briefing: &Briefing) -> Vec<&'d 
         .collect()
 }
 
-/// Builds the [`AgentReport`]: the JSON report of a check.
-pub fn agent_report(
+/// Builds the [`Report`]: the JSON report of a check.
+pub fn report(
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
     briefing: &Briefing,
-) -> AgentReport {
+) -> Report {
     let fields = match briefing.detail {
         Detail::Compact => compact_fields(diagnostics, incomplete, briefing),
-        Detail::Full => {
-            let full = full_report(diagnostics, incomplete, briefing);
-            let mut fields = Map::new();
-            fields.insert("findings".to_owned(), Value::Array(full.findings));
-            fields.insert("incomplete".to_owned(), Value::Array(full.incomplete));
-            fields.insert("omitted".to_owned(), json!(full.omitted));
-            if let Some(judgments) = full.judgments {
-                fields.insert("judgments".to_owned(), judgments);
-            }
-            fields
-        }
+        Detail::Full => full_fields(diagnostics, incomplete, briefing),
     };
-    AgentReport { fields }
+    Report { fields }
 }
 
 /// The findings to print: all of them, or the first `limit` by severity
@@ -241,10 +222,7 @@ fn compact_text(
         let _ = writeln!(out, "{}", incomplete_line(item));
     }
     if grouped.asks_review() {
-        let _ = writeln!(
-            out,
-            "resolve: lighthouse review resolve <fingerprint> --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>"
-        );
+        let _ = writeln!(out, "resolve: {}", resolve_command("<fingerprint>"));
         let _ = writeln!(out, "judgments: {}", judgments_line());
     }
     let _ = writeln!(out, "{}", summary_line(diagnostics, incomplete, briefing));
@@ -258,7 +236,7 @@ fn entries<'a>(diagnostics: &[Diagnostic], briefing: &Briefing<'a>) -> Vec<Entry
         .map(|d| {
             let decision = briefing.catalog.and_then(|c| c.decision(&d.rule_id));
             Entry {
-                rule: d.rule_id.clone(),
+                decision: d.rule_id.clone(),
                 severity: d.severity,
                 authored: authored_severity(d.severity, decision),
                 review: briefing.needs_review(d),
@@ -269,10 +247,7 @@ fn entries<'a>(diagnostics: &[Diagnostic], briefing: &Briefing<'a>) -> Vec<Entry
                 symbol: d.symbol.clone(),
                 evidence: d.evidence.clone(),
                 attributes: Map::new(),
-                note: d
-                    .review
-                    .clone()
-                    .or_else(|| briefing.notes.and_then(|n| n.get(&d.fingerprint)).cloned()),
+                note: note_of(d, briefing),
                 fingerprint: d.fingerprint.as_str().to_owned(),
                 facts: briefing.facts.and_then(|f| f.get(&d.fingerprint)).cloned(),
                 fix: briefing.fixes.and_then(|f| f.get(d.fingerprint.as_str())),
@@ -281,13 +256,25 @@ fn entries<'a>(diagnostics: &[Diagnostic], briefing: &Briefing<'a>) -> Vec<Entry
         .collect()
 }
 
+/// Why the finding is reported although a judgment was recorded on it: its
+/// own review note, else the briefing's.
+fn note_of(diagnostic: &Diagnostic, briefing: &Briefing) -> Option<String> {
+    diagnostic.review.clone().or_else(|| {
+        briefing
+            .notes
+            .and_then(|notes| notes.get(&diagnostic.fingerprint))
+            .cloned()
+    })
+}
+
 /// One block per finding, then the gaps, a footer naming the judgments review
 /// accepts when a finding asks for review, and the summary.
 fn full_text(diagnostics: &[Diagnostic], incomplete: &[Incomplete], briefing: &Briefing) -> String {
     let (shown, omitted) = select(diagnostics, briefing.limit);
-    let width = prefix_len(&shown);
+    let widths = widths(diagnostics);
     let mut out = String::new();
     for diagnostic in &shown {
+        let width = widths[diagnostic.fingerprint.as_str()];
         out.push_str(&block(&finding(diagnostic, briefing, width), width));
         out.push('\n');
     }
@@ -361,45 +348,43 @@ fn counts(diagnostics: &[Diagnostic], briefing: &Briefing) -> Value {
     Value::Object(counts)
 }
 
-fn full_report(
+/// The full fields: the findings that fit `briefing.limit`, the gaps, how many
+/// findings were left out, and the judgments table when a shown finding asks
+/// for review.
+fn full_fields(
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
     briefing: &Briefing,
-) -> FullReport {
+) -> Map<String, Value> {
     let (shown, omitted) = select(diagnostics, briefing.limit);
-    let width = prefix_len(&shown);
-    let findings = shown
+    let widths = widths(diagnostics);
+    let findings: Vec<Value> = shown
         .iter()
-        .map(|d| serde_json::to_value(finding(d, briefing, width)).expect("finding serializes"))
+        .map(|d| {
+            let record = finding(d, briefing, widths[d.fingerprint.as_str()]);
+            serde_json::to_value(record).expect("finding serializes")
+        })
         .collect();
-    let incomplete = incomplete
+    let gaps: Vec<Value> = incomplete
         .iter()
         .map(|item| json!({ "type": "incomplete", "path": item.path, "reason": item.reason }))
         .collect();
-    FullReport {
-        findings,
-        incomplete,
-        omitted,
-        judgments: shown
-            .iter()
-            .any(|d| briefing.needs_review(d))
-            .then(judgments),
+    let mut fields = Map::new();
+    fields.insert("findings".to_owned(), Value::Array(findings));
+    fields.insert("incomplete".to_owned(), Value::Array(gaps));
+    fields.insert("omitted".to_owned(), json!(omitted));
+    if shown.iter().any(|d| briefing.needs_review(d)) {
+        fields.insert("judgments".to_owned(), judgments());
     }
+    fields
 }
 
-/// How many characters of a fingerprint tell the shown findings apart.
-fn prefix_len(shown: &[&Diagnostic]) -> usize {
-    let distinct = |len: usize| {
-        let mut seen = std::collections::BTreeSet::new();
-        shown
-            .iter()
-            .all(|d| seen.insert(prefix(d.fingerprint.as_str(), len)))
-    };
-    (PREFIX_MIN..=64).find(|&len| distinct(len)).unwrap_or(64)
-}
-
-fn prefix(fingerprint: &str, len: usize) -> &str {
-    fingerprint.get(..len).unwrap_or(fingerprint)
+/// How many characters of each fingerprint tell it apart from the others of
+/// the run, by fingerprint.
+fn widths(diagnostics: &[Diagnostic]) -> BTreeMap<&str, usize> {
+    let fingerprints: Vec<&str> = diagnostics.iter().map(|d| d.fingerprint.as_str()).collect();
+    let widths = Fingerprint::prefix_widths(&fingerprints);
+    fingerprints.into_iter().zip(widths).collect()
 }
 
 fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) -> Finding<'a> {
@@ -409,14 +394,15 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
     let facts = briefing
         .facts
         .and_then(|facts| facts.get(&diagnostic.fingerprint));
-    let subject = Subject::of(facts);
+    let key = ExampleKey::new(facts);
+    let fingerprint = diagnostic.fingerprint.as_str();
     Finding {
         kind: if diagnostic.review.is_some() {
             "review"
         } else {
             "finding"
         },
-        rule: &diagnostic.rule_id,
+        decision: &diagnostic.rule_id,
         severity: diagnostic.severity,
         authored: authored_severity(diagnostic.severity, decision),
         location: Location {
@@ -430,31 +416,21 @@ fn finding<'a>(diagnostic: &'a Diagnostic, briefing: &Briefing, width: usize) ->
         requirement: decision.map(|d| squash(&d.requirement)),
         context: decision.map(|d| squash(&d.context)),
         evidence: evidence(&diagnostic.evidence, diagnostic.symbol.as_deref()),
-        expected: decision.and_then(|d| expected(d, &subject, &diagnostic.file)),
-        note: diagnostic.review.clone().or_else(|| {
-            briefing
-                .notes
-                .and_then(|notes| notes.get(&diagnostic.fingerprint))
-                .cloned()
-        }),
-        fingerprint: diagnostic.fingerprint.as_str(),
+        expected: decision.and_then(|d| expected(d, &key, &diagnostic.file)),
+        note: note_of(diagnostic, briefing),
+        fingerprint,
         fix: briefing
             .fixes
-            .and_then(|f| f.get(diagnostic.fingerprint.as_str()))
-            .map(|fix| Shown::of(fix, &diagnostic.file.display().to_string()).json()),
-        resolve: briefing
-            .needs_review(diagnostic)
-            .then(|| resolve(diagnostic, width)),
+            .and_then(|f| f.get(fingerprint))
+            .map(|fix| Shown::new(fix, &diagnostic.file.display().to_string())),
+        resolve: briefing.needs_review(diagnostic).then(|| Resolve {
+            command: resolve_command(prefix(fingerprint, width)),
+        }),
     }
 }
 
-fn resolve(diagnostic: &Diagnostic, width: usize) -> Value {
-    json!({
-        "command": format!(
-            "lighthouse review resolve {} --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>",
-            prefix(diagnostic.fingerprint.as_str(), width)
-        ),
-    })
+fn prefix(fingerprint: &str, width: usize) -> &str {
+    fingerprint.get(..width).unwrap_or(fingerprint)
 }
 
 fn block(finding: &Finding, width: usize) -> String {
@@ -466,7 +442,7 @@ fn block(finding: &Finding, width: usize) -> String {
     };
     let mut out = format!(
         "{}  {}{authored}  {}:{}:{}\n",
-        finding.rule, finding.severity, location.path, location.line, location.column
+        finding.decision, finding.severity, location.path, location.line, location.column
     );
     for (label, value) in fields(finding, width) {
         let mut lines = value.lines();
@@ -497,43 +473,24 @@ fn fields(finding: &Finding, width: usize) -> Vec<(&'static str, String)> {
     fields.extend(evidence_line(&finding.evidence).map(|text| ("evidence:", text)));
     if let Some(expected) = &finding.expected {
         let picture = expected.excerpt.lines().map(|l| format!("  {l}"));
-        let lines: Vec<String> = std::iter::once(expected_heading(expected))
-            .chain(picture)
-            .collect();
+        let lines: Vec<String> = std::iter::once(expected.heading()).chain(picture).collect();
         fields.push(("expected:", lines.join("\n")));
     }
     fields.extend(finding.note.clone().map(|text| ("note:", text)));
     if let Some(fix) = &finding.fix {
-        let safety = fix["safety"].as_str().unwrap_or_default();
-        let body = fix["diff"].as_str().or(fix["summary"].as_str());
-        fields.push(("fix:", format!("{safety}\n{}", body.unwrap_or_default())));
+        fields.push(("fix:", fix.block()));
     }
     fields.push((
         "fingerprint:",
         prefix(finding.fingerprint, width).to_owned(),
     ));
     if let Some(resolve) = &finding.resolve {
-        let command = resolve["command"].as_str().unwrap_or_default();
-        fields.push(("resolve:", command.to_owned()));
+        fields.push(("resolve:", resolve.command.clone()));
     }
     fields
 }
 
-fn expected_heading(expected: &Expected) -> String {
-    match (&expected.name, &expected.path) {
-        (Some(name), Some(path)) => format!(
-            "valid {} example `{name}` ({path}), {}",
-            expected.language, expected.basis
-        ),
-        (Some(name), None) => format!(
-            "valid {} example `{name}`, {}",
-            expected.language, expected.basis
-        ),
-        _ => format!("{} tuning", expected.language),
-    }
-}
-
-fn incomplete_line(item: &Incomplete) -> String {
+pub(crate) fn incomplete_line(item: &Incomplete) -> String {
     match &item.path {
         Some(path) => format!("{}: incomplete: {}", path.display(), item.reason),
         None => format!("incomplete: {}", item.reason),

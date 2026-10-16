@@ -260,7 +260,7 @@ fn rules_of(report: &Value) -> Vec<&str> {
         .as_array()
         .unwrap()
         .iter()
-        .map(|g| g["rule"].as_str().unwrap())
+        .map(|g| g["decision"].as_str().unwrap())
         .collect()
 }
 
@@ -291,7 +291,11 @@ fn check_reports_findings_and_never_calls_an_incomplete_run_clean() {
 
     let full = client.tool("check", json!({ "detail": "full" })).unwrap();
     let records = full["findings"].as_array().unwrap();
-    assert!(records.iter().any(|f| f["rule"] == "design/exported-doc"));
+    assert!(
+        records
+            .iter()
+            .any(|f| f["decision"] == "design/exported-doc")
+    );
     assert!(records[0]["location"]["line"].is_u64(), "{full}");
     assert!(
         client
@@ -317,7 +321,7 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
         .as_array()
         .unwrap()
         .iter()
-        .find(|g| g["rule"] == "design/errors")
+        .find(|g| g["decision"] == "design/errors")
         .unwrap_or_else(|| panic!("{tasks}"));
     let (path, rows) = group["files"].as_object().unwrap().iter().next().unwrap();
     let instance = &rows[0];
@@ -613,7 +617,7 @@ fn fix_selects_by_fingerprint_and_holds_suggestions_back_until_asked() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|g| g["rule"] == "design/comments")
+        .find(|g| g["decision"] == "design/comments")
         .unwrap_or_else(|| panic!("{found}"));
     let fingerprint = banners["files"]["src/lib.rs"][0][2].as_str().unwrap();
 

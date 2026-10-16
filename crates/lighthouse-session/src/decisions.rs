@@ -4,10 +4,17 @@ use std::{cell::RefCell, collections::BTreeSet, fmt::Write};
 
 use lighthouse_engine::RuleTester;
 use lighthouse_plugin::Registry;
+use lighthouse_report::docs::{Density, decision_markdown};
 use lighthouse_spec::{Catalog, Decision, authored_severity};
 use serde::Serialize;
 
 use crate::{Result, Selector, Session};
+
+/// A decision shown on its own: titled at heading 1, examples named without links.
+const ENTRY: Density<'static> = Density::Entry {
+    level: 1,
+    sources: None,
+};
 
 /// The language examples without a provider run in.
 const NEUTRAL: &str = "text";
@@ -98,7 +105,7 @@ pub fn decision_text(session: &Session, id: &str) -> Result<String> {
     let decision = catalog
         .decision(id)
         .ok_or_else(|| format!("unknown decision `{id}`"))?;
-    Ok(lighthouse_report::docs::decision_markdown(decision, 1))
+    Ok(decision_markdown(decision, ENTRY))
 }
 
 /// The text that explains a decision or rule: context, requirement, examples and
@@ -109,7 +116,7 @@ pub fn explain(catalog: &Catalog, registry: &Registry, id: &str) -> Result<Strin
     let mut out = String::new();
     match (decision, rule) {
         (Some(decision), _) => {
-            out.push_str(&lighthouse_report::docs::decision_markdown(decision, 1));
+            out.push_str(&decision_markdown(decision, ENTRY));
             let _ = writeln!(out, "Status: {}", status(decision, registry));
         }
         (None, Some(rule)) => {

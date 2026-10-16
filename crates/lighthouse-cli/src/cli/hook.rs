@@ -27,7 +27,7 @@ use std::{
 };
 
 use clap::ValueEnum;
-use lighthouse_report::{Briefing, Detail, Format, render_with};
+use lighthouse_report::{Briefing, Detail, Format, render};
 use lighthouse_resource::STATE_DIR;
 use lighthouse_session::{CheckRequest, Checked, RunStatus, SKIPPED_DIRS, Session};
 use serde_json::{Value, json};
@@ -331,7 +331,7 @@ fn at_stop(checked: &Checked, allow_incomplete: bool, stop_hook_active: bool) ->
 fn feedback(checked: &Checked, limit: usize) -> String {
     let outcome = &checked.outcome;
     let fixes = checked.shown_fixes(Some(limit), Detail::default());
-    render_with(
+    render(
         Format::Agent,
         &outcome.diagnostics,
         &outcome.incomplete,

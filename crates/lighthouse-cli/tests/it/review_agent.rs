@@ -46,7 +46,7 @@ fn full_detail_keeps_one_record_per_finding() {
     assert!(findings.iter().all(|f| f["type"] == "finding"));
     let panic = findings
         .iter()
-        .find(|f| f["rule"] == "design/errors")
+        .find(|f| f["decision"] == "design/errors")
         .unwrap();
     assert_eq!(panic["location"]["line"], 2);
     assert_eq!(panic["symbol"], "demo::run#function");
@@ -61,7 +61,7 @@ fn group<'a>(report: &'a Value, rule: &str) -> &'a Value {
         .as_array()
         .unwrap()
         .iter()
-        .find(|g| g["rule"] == rule)
+        .find(|g| g["decision"] == rule)
         .unwrap_or_else(|| panic!("{rule} in {report}"))
 }
 
@@ -75,7 +75,7 @@ fn the_resolve_command_of_a_full_finding_runs_as_given() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|f| f["rule"] == "design/errors")
+        .find(|f| f["decision"] == "design/errors")
         .unwrap();
     let prefix = finding["fingerprint"].as_str().unwrap()[..7].to_owned();
     let command = finding["resolve"]["command"].as_str().unwrap();

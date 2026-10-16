@@ -35,7 +35,7 @@ fn findings(dir: &Path) -> Vec<(String, String)> {
         for rows in group["files"].as_object().unwrap().values() {
             for row in rows.as_array().unwrap() {
                 found.push((
-                    group["rule"].as_str().unwrap().to_owned(),
+                    group["decision"].as_str().unwrap().to_owned(),
                     row[1].as_str().unwrap().to_owned(),
                 ));
             }

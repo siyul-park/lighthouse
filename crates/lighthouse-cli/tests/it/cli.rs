@@ -124,7 +124,7 @@ fn json_and_sarif_formats() {
         .unwrap();
     let line: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(line["status"], "findings");
-    assert_eq!(line["groups"][0]["rule"], "core/file-size");
+    assert_eq!(line["groups"][0]["decision"], "core/file-size");
     assert_eq!(line["groups"][0]["evidence"]["lines"], 8);
 
     let out = lighthouse(dir.path())
@@ -295,7 +295,7 @@ fn explain_describes_judged_decisions() {
         .output()
         .unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
-    assert!(text.contains("**Requirement**\n\nMultiple implementations of the same behavior"));
+    assert!(text.contains("\n\nMultiple implementations of the same behavior"));
     assert!(text.contains("Status: judged"));
 }
 

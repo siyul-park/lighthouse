@@ -2,7 +2,7 @@
 //! prefixes, the same everywhere.
 
 use globset::{GlobBuilder, GlobMatcher};
-use lighthouse_store::MIN_PREFIX;
+use lighthouse_model::Fingerprint;
 
 use crate::Result;
 
@@ -89,9 +89,9 @@ impl Pattern {
     }
 }
 
-/// Refuses a fingerprint prefix shorter than [`MIN_PREFIX`].
+/// Refuses a fingerprint prefix shorter than [`Fingerprint::MIN_PREFIX`].
 pub fn long_enough(prefix: &str) -> Result<()> {
-    if prefix.len() < MIN_PREFIX {
+    if prefix.len() < Fingerprint::MIN_PREFIX {
         return Err(lighthouse_store::Error::ShortFingerprint(prefix.to_owned()).into());
     }
     Ok(())

@@ -59,7 +59,7 @@ pub(crate) fn fingerprints(dir: &Path) -> BTreeMap<String, String> {
     let mut found = BTreeMap::new();
     let report: Value = serde_json::from_slice(&out.stdout).unwrap();
     for v in report["findings"].as_array().unwrap() {
-        if v["rule"] == "local/naming-ban" {
+        if v["decision"] == "local/naming-ban" {
             let message = v["message"].as_str().unwrap();
             let name = message.split(' ').next().unwrap().to_owned();
             found.insert(name, v["fingerprint"].as_str().unwrap().to_owned());

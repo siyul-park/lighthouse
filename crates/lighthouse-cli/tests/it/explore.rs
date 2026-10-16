@@ -42,7 +42,7 @@ fn reasons(dir: &Path) -> Vec<String> {
         .as_array()
         .unwrap()
         .iter()
-        .filter(|f| f["rule"] == DECISION)
+        .filter(|f| f["decision"] == DECISION)
         .filter_map(|f| f["note"].as_str().map(str::to_owned))
         .collect();
     found.sort();
@@ -118,7 +118,7 @@ fn a_layer_below_that_decides_carries_what_the_explored_model_said() {
         .as_array()
         .unwrap()
         .iter()
-        .filter(|f| f["rule"] == DECISION && f["evidence"]["explored"].is_object())
+        .filter(|f| f["decision"] == DECISION && f["evidence"]["explored"].is_object())
         .collect();
     assert_eq!(explored.len(), 1, "{report}");
     let said = explored[0]["evidence"]["explored"]["model"]

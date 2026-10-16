@@ -2,7 +2,7 @@
 
 use std::time::Instant;
 
-use lighthouse_report::{Briefing, Format, agent_report, render_with};
+use lighthouse_report::{Briefing, Format, render, report};
 use lighthouse_session::{CheckRequest, Checked, FailOn, ModelFlags, Session};
 use serde_json::{Value, json};
 
@@ -110,7 +110,7 @@ pub fn json_report(checked: &Checked, args: &CheckArgs) -> Value {
     let limit = Some(args.limit.unwrap_or(JSON_LIMIT));
     let detail = args.detail.into();
     let fixes = checked.shown_fixes(limit, detail);
-    let report = agent_report(
+    let mut body = report(
         &shown(checked),
         &outcome.incomplete,
         &Briefing {
@@ -120,8 +120,8 @@ pub fn json_report(checked: &Checked, args: &CheckArgs) -> Value {
             tool_form: true,
             ..checked.briefing(limit)
         },
-    );
-    let mut body = report.fields;
+    )
+    .fields;
     match args.detail {
         Detail::Compact => {
             if !checked.messages.is_empty() {
@@ -162,7 +162,7 @@ fn shown(checked: &Checked) -> Vec<lighthouse_model::Diagnostic> {
 
 fn text(checked: &Checked, args: &CheckArgs) -> String {
     let outcome = &checked.outcome;
-    render_with(
+    render(
         Format::Text,
         &shown(checked),
         &outcome.incomplete,
@@ -175,7 +175,7 @@ fn sarif(checked: &Checked, args: &CheckArgs) -> String {
     let all: Vec<_> = outcome.diagnostics.iter().take(SARIF_FIXES).collect();
     let fixes = checked.fixes(&all);
     let sources = checked.sources();
-    render_with(
+    render(
         Format::Sarif,
         &shown(checked),
         &outcome.incomplete,

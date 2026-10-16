@@ -3,21 +3,21 @@
 
 use std::{collections::BTreeMap, path::Path};
 
-use lighthouse_model::{Attribution, Judgment, Role, Severity, evidence_digest};
+use lighthouse_model::{Attribution, Fingerprint, Judgment, Role, Severity, evidence_digest};
 use rusqlite::{
     Connection, OptionalExtension, Row, Transaction, named_params, params, types::Type,
 };
 use serde_json::{Value, json};
 
 use crate::{
-    Error, FindingRecord, JudgmentEvent, JudgmentSpec, MIN_PREFIX, NewJudgment, Subject,
-    SuppressionEvent, SuppressionSpec, Versions, standings::Standings,
+    Error, FindingRecord, JudgmentEvent, JudgmentSpec, NewJudgment, Subject, SuppressionEvent,
+    SuppressionSpec, Versions, standings::Standings,
 };
 
 use super::{JUDGMENT_COLUMNS, MAX_CANDIDATES, SNAPSHOT_VERSION};
 
 /// The full fingerprint that `prefix` names, among findings and judgments: a
-/// whole fingerprint, or a unique prefix of at least [`MIN_PREFIX`] characters.
+/// whole fingerprint, or a unique prefix of at least [`Fingerprint::MIN_PREFIX`] characters.
 pub(super) fn expand(conn: &Connection, prefix: &str) -> Result<String, Error> {
     let whole = conn
         .query_row(
@@ -30,7 +30,7 @@ pub(super) fn expand(conn: &Connection, prefix: &str) -> Result<String, Error> {
     if let Some(whole) = whole {
         return Ok(whole);
     }
-    if prefix.len() < MIN_PREFIX {
+    if prefix.len() < Fingerprint::MIN_PREFIX {
         return Err(Error::ShortFingerprint(prefix.to_owned()));
     }
     let mut stmt = conn.prepare(

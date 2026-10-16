@@ -1,20 +1,20 @@
-mod agent;
 pub mod docs;
-mod evidence;
 mod expected;
 mod fix;
 mod group;
+mod report;
 mod sarif;
+mod text;
 
 use std::fmt::Write;
 
 use lighthouse_model::{Diagnostic, Incomplete, Severity};
 
-pub use agent::{AgentReport, Briefing, Detail, agent_report, shown};
 pub use group::{Entry, GroupOptions, Grouped};
+pub use report::{Briefing, Detail, Report, report, shown};
 
-/// Output format of [`render`]. The JSON report of a check is
-/// [`agent_report`]; it is not rendered here.
+/// Output format of [`render`]. The JSON report of a check is [`report`]; it
+/// is not rendered here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
     Text,
@@ -30,16 +30,11 @@ pub enum Format {
 /// with a `summary:` line of counts whenever there is anything to report. An
 /// incomplete analysis is stated in every format: text prints `incomplete`
 /// lines and SARIF marks its invocation as unsuccessful with a tool
-/// notification per entry.
-pub fn render(format: Format, diagnostics: &[Diagnostic], incomplete: &[Incomplete]) -> String {
-    render_with(format, diagnostics, incomplete, &Briefing::default())
-}
-
-/// Like [`render`], with the catalog, subject facts and suppressed count the
-/// agent formats draw on. The agent formats always end with a summary, a
-/// clean run included, so that silence cannot be mistaken for success; the
-/// other formats ignore the briefing.
-pub fn render_with(
+/// notification per entry. The briefing carries the catalog, subject facts and
+/// suppressed count the agent formats draw on; they always end with a summary,
+/// a clean run included, so that silence cannot be mistaken for success. The
+/// other formats ignore what does not concern them.
+pub fn render(
     format: Format,
     diagnostics: &[Diagnostic],
     incomplete: &[Incomplete],
@@ -55,13 +50,13 @@ pub fn render_with(
             briefing.suppressions.unwrap_or_default(),
             briefing.sources,
         ),
-        Format::Agent => agent::text(diagnostics, incomplete, briefing),
+        Format::Agent => report::text(diagnostics, incomplete, briefing),
     }
 }
 
 fn text(diagnostics: &[Diagnostic], incomplete: &[Incomplete], limit: Option<usize>) -> String {
     let mut out = String::new();
-    let (shown, omitted) = agent::select(diagnostics, limit);
+    let (shown, omitted) = report::select(diagnostics, limit);
     for d in shown {
         let _ = writeln!(
             out,
@@ -78,14 +73,7 @@ fn text(diagnostics: &[Diagnostic], incomplete: &[Incomplete], limit: Option<usi
         let _ = writeln!(out, "... {omitted} more not shown (raise --limit)");
     }
     for item in incomplete {
-        match &item.path {
-            Some(path) => {
-                let _ = writeln!(out, "{}: incomplete: {}", path.display(), item.reason);
-            }
-            None => {
-                let _ = writeln!(out, "incomplete: {}", item.reason);
-            }
-        }
+        let _ = writeln!(out, "{}", report::incomplete_line(item));
     }
     if !diagnostics.is_empty() || !incomplete.is_empty() {
         let count = |s: Severity| diagnostics.iter().filter(|d| d.severity == s).count();

@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Position, Severity, Span};
-use lighthouse_report::{Briefing, Detail, Format, render, render_with, shown};
+use lighthouse_report::{Briefing, Detail, Format, render, shown};
+
+use crate::plain;
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 
@@ -154,7 +156,7 @@ fn full_agent_text_gives_each_finding_everything_needed_to_act() {
         detail: Detail::Full,
         ..Briefing::default()
     };
-    insta::assert_snapshot!(render_with(Format::Agent, &findings, &gap(), &briefing));
+    insta::assert_snapshot!(render(Format::Agent, &findings, &gap(), &briefing));
 }
 
 #[test]
@@ -185,7 +187,7 @@ fn full_agent_json_is_one_object_of_tagged_records() {
     assert!(report["judgments"]["notApplicable"].is_string());
 
     let coupling = &records[0];
-    assert_eq!(coupling["rule"], "design/complexity");
+    assert_eq!(coupling["decision"], "design/complexity");
     assert_eq!(coupling["authored"], "warn");
     assert_eq!(coupling["symbol"], "jit::compile#function");
     assert_eq!(coupling["location"]["line"], 350);
@@ -205,7 +207,7 @@ fn full_agent_json_is_one_object_of_tagged_records() {
         command.starts_with("lighthouse review resolve "),
         "{command}"
     );
-    assert!(command.contains(&review["fingerprint"].as_str().unwrap()[..12]));
+    assert!(command.contains(&review["fingerprint"].as_str().unwrap()[..7]));
 
     let custom = &records[2];
     assert_eq!(custom["authored"], "error");
@@ -219,7 +221,7 @@ fn full_agent_json_is_one_object_of_tagged_records() {
 
 #[test]
 fn agent_formats_state_a_clean_run() {
-    let text = render(Format::Agent, &[], &[]);
+    let text = plain(Format::Agent, &[], &[]);
     assert_eq!(
         text,
         "summary: 0 error, 0 warn, 0 info, 0 review, 0 incomplete, 0 suppressed, 0 allowed\n"
@@ -283,7 +285,7 @@ fn full_limit_keeps_the_most_severe_findings_and_counts_the_rest() {
         detail: Detail::Full,
         ..b
     });
-    let text = render_with(Format::Agent, &findings, &[], &briefing);
+    let text = render(Format::Agent, &findings, &[], &briefing);
     assert!(text.contains("acme/custom  error"), "{text}");
     assert!(text.contains("design/complexity  warn"), "{text}");
     assert!(!text.contains("no-panic  info"), "{text}");
@@ -306,7 +308,7 @@ fn full_limit_keeps_the_most_severe_findings_and_counts_the_rest() {
     assert_eq!(findings.len(), 2);
     assert_eq!(json[0]["omitted"], 1);
     assert_eq!(
-        findings[0]["rule"], "design/complexity",
+        findings[0]["decision"], "design/complexity",
         "original order is kept"
     );
     assert!(json[0]["judgments"].is_object());
@@ -320,7 +322,7 @@ fn limit_counts_findings_and_keeps_errors_then_the_larger_groups() {
         limit: Some(2),
         ..b
     });
-    let text = render_with(Format::Agent, &findings, &[], &briefing);
+    let text = render(Format::Agent, &findings, &[], &briefing);
     assert!(text.starts_with("acme/custom error\n"), "{text}");
     assert!(text.contains("design/complexity warn [review]"), "{text}");
     assert!(!text.contains("no-panic"), "{text}");
@@ -340,7 +342,7 @@ fn limit_counts_findings_and_keeps_errors_then_the_larger_groups() {
         .as_array()
         .unwrap()
         .iter()
-        .map(|g| g["rule"].as_str().unwrap())
+        .map(|g| g["decision"].as_str().unwrap())
         .collect();
     assert_eq!(rules, ["acme/custom", "design/complexity"]);
     assert_eq!(json[0]["omitted"], json!({ "groups": 1, "findings": 1 }));
@@ -379,7 +381,7 @@ fn notes_say_why_a_finding_is_reported() {
         notes: Some(&notes),
         ..b
     });
-    let text = render_with(Format::Agent, &findings, &[], &briefing);
+    let text = render(Format::Agent, &findings, &[], &briefing);
     assert!(
         text.contains("(note: judgment expired: decision changed)"),
         "{text}"
@@ -418,7 +420,7 @@ fn evidence_leaves_out_the_owner_symbol_and_cuts_long_values() {
     assert!(evidence.get("symbol").is_none());
     assert_eq!(evidence["fan_in"], 2);
     assert!(evidence["callees"].as_str().unwrap().len() < 140);
-    let text = render_with(Format::Agent, &findings, &[], &briefing);
+    let text = render(Format::Agent, &findings, &[], &briefing);
     assert!(!text.contains("symbol=jit"), "{text}");
 
     let compact = records_of(&crate::agent_json(&findings, &[], &briefed(&facts, |b| b)));
@@ -442,7 +444,7 @@ fn fingerprint_prefixes_are_git_short_and_grow_until_the_findings_are_distinct()
     let b = format!("{}2{}", "a".repeat(12), "0".repeat(51));
     let c = format!("{}{}", "b".repeat(4), "0".repeat(60));
     let findings = [make(&a), make(&b), make(&c)];
-    let text = render(Format::Agent, &findings, &[]);
+    let text = plain(Format::Agent, &findings, &[]);
     for fingerprint in [&a[..13], &b[..13], &c[..7]] {
         assert!(text.contains(&format!(" {fingerprint}\n")), "{text}");
     }
@@ -450,7 +452,7 @@ fn fingerprint_prefixes_are_git_short_and_grow_until_the_findings_are_distinct()
         detail: Detail::Full,
         ..Briefing::default()
     };
-    let text = render_with(Format::Agent, &findings, &[], &full);
+    let text = render(Format::Agent, &findings, &[], &full);
     assert!(
         text.contains(&format!("fingerprint: {}", &a[..13])),
         "{text}"
@@ -547,7 +549,7 @@ fn expected_structure_prefers_canonical_then_a_match_then_the_shortest() {
 }
 
 #[test]
-fn agent_report_has_the_fields_the_json_prints() {
+fn report_has_the_fields_the_json_prints() {
     let catalog = Catalog::bundled();
     let briefing = Briefing {
         catalog: Some(catalog),
@@ -559,7 +561,7 @@ fn agent_report_has_the_fields_the_json_prints() {
         path: None,
         reason: "plugin crashed".to_owned(),
     }];
-    let report = lighthouse_report::agent_report(&findings, &gaps, &briefing);
+    let report = lighthouse_report::report(&findings, &gaps, &briefing);
     let fields = &report.fields;
     assert_eq!(fields["status"], "incomplete");
     assert_eq!(fields["groups"].as_array().unwrap().len(), 1);
@@ -571,7 +573,7 @@ fn agent_report_has_the_fields_the_json_prints() {
         "the finding that asks for review was left out"
     );
 
-    let all = lighthouse_report::agent_report(
+    let all = lighthouse_report::report(
         &findings,
         &[],
         &Briefing {
@@ -585,7 +587,7 @@ fn agent_report_has_the_fields_the_json_prints() {
     assert!(all.fields["judgments"].is_object());
     assert!(all.fields["resolve"].is_string());
 
-    let full = lighthouse_report::agent_report(
+    let full = lighthouse_report::report(
         &findings,
         &gaps,
         &Briefing {
@@ -645,7 +647,7 @@ fn compact_agent_text_groups_findings_by_decision() {
         allowed: 1,
         ..Briefing::default()
     };
-    insta::assert_snapshot!(render_with(Format::Agent, &findings, &gap(), &briefing));
+    insta::assert_snapshot!(render(Format::Agent, &findings, &gap(), &briefing));
 }
 
 #[test]
@@ -678,7 +680,7 @@ fn each_further_identical_finding_adds_one_short_line_and_one_entry() {
         let findings = flagged(n);
         let facts = go_facts(&findings);
         let briefing = briefed(&facts, |b| b);
-        let text = render_with(Format::Agent, &findings, &[], &briefing);
+        let text = render(Format::Agent, &findings, &[], &briefing);
         let json = records_of(&crate::agent_json(&findings, &[], &briefing));
         (text, json)
     };
@@ -720,7 +722,7 @@ fn compact_output_is_at_most_forty_percent_of_the_full_output() {
         if json {
             crate::agent_json(&findings, &[], &briefing).len()
         } else {
-            render_with(Format::Agent, &findings, &[], &briefing).len()
+            render(Format::Agent, &findings, &[], &briefing).len()
         }
     };
     for json in [false, true] {

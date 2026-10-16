@@ -2,21 +2,23 @@
 //! agent formats, a unified diff or a one-line summary.
 
 use lighthouse_model::{Preview, Safety};
-use serde_json::{Value, json};
+use serde::Serialize;
 
 /// Longest diff an agent finding carries inline, in lines; a longer fix is
 /// summarized.
 const DIFF_LINES: usize = 12;
 
-/// How an agent finding shows its fix: the diff, or a summary when the diff
-/// is long.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// How an agent finding shows its fix: `{"safety", "diff"}`, or `{"safety",
+/// "summary"}` when the diff is long.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct Shown {
     safety: Safety,
+    #[serde(flatten)]
     body: Body,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
 enum Body {
     Diff(String),
     Summary(String),
@@ -25,7 +27,7 @@ enum Body {
 impl Shown {
     /// How `fix`, proposed for a finding in `finding_file`, is shown. A file
     /// other than the finding's gets `---`/`+++` headers.
-    pub(crate) fn of(fix: &Preview, finding_file: &str) -> Self {
+    pub(crate) fn new(fix: &Preview, finding_file: &str) -> Self {
         let diff = diff(fix, finding_file);
         let body = if diff.lines().count() <= DIFF_LINES {
             Body::Diff(diff)
@@ -39,12 +41,10 @@ impl Shown {
         }
     }
 
-    /// `{"safety", "diff"}`, or `{"safety", "summary"}` for a long fix.
-    pub(crate) fn json(&self) -> Value {
-        match &self.body {
-            Body::Diff(diff) => json!({ "safety": self.safety.to_string(), "diff": diff }),
-            Body::Summary(text) => json!({ "safety": self.safety.to_string(), "summary": text }),
-        }
+    /// The safety, then the diff or the summary, one per line.
+    pub(crate) fn block(&self) -> String {
+        let (Body::Diff(body) | Body::Summary(body)) = &self.body;
+        format!("{}\n{body}", self.safety)
     }
 
     /// The lines to print under a finding, indented by `indent`.

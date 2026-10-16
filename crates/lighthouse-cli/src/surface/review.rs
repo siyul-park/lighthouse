@@ -3,6 +3,7 @@
 
 use std::fmt::Write;
 
+use lighthouse_model::Fingerprint;
 use lighthouse_report::{Entry, GroupOptions, Grouped};
 use lighthouse_session::{
     FindingRecord, JudgmentEvent, NewJudgment, Standing, TaskQuery, catalog_at, head, long_enough,
@@ -19,9 +20,6 @@ use crate::surface::{
 
 /// Findings of a JSON listing when `--limit` is not given.
 const JSON_LIMIT: usize = 50;
-/// Characters of a fingerprint that text listings show; any unique prefix of
-/// at least seven names a finding.
-const SHORT: usize = 12;
 
 /// `review list`.
 pub fn list(args: &ReviewListArgs, output: Output) -> Result<Reply> {
@@ -53,7 +51,10 @@ pub fn list(args: &ReviewListArgs, output: Output) -> Result<Reply> {
     let reply = match output {
         Output::Text => {
             let shown = page(tasks.findings, args.limit);
-            let mut text: String = shown.items.iter().map(|f| row(f) + "\n").collect();
+            let ids: Vec<&str> = shown.items.iter().map(|f| f.fingerprint.as_str()).collect();
+            let mut text: String = (shown.items.iter().zip(prefixes(&ids)))
+                .map(|(f, prefix)| row(f, prefix) + "\n")
+                .collect();
             text.push_str(&omitted_line(shown.omitted));
             Reply::text(text)
         }
@@ -87,7 +88,14 @@ pub fn history(args: &FingerprintArgs, output: Output) -> Result<Reply> {
     });
     let reply = match output {
         Output::Json => Reply::json(value)?,
-        Output::Text => Reply::text(events.iter().map(|e| event_row(e) + "\n").collect()),
+        Output::Text => {
+            let ids: Vec<&str> = events.iter().map(|e| e.id.as_str()).collect();
+            let rows = events.iter().zip(prefixes(&ids));
+            Reply::text(
+                rows.map(|(e, prefix)| event_row(e, prefix) + "\n")
+                    .collect(),
+            )
+        }
     };
     Ok(reply.with_notes(notes))
 }
@@ -193,7 +201,7 @@ fn resolved_text(recorded: &lighthouse_session::Recorded) -> String {
     let mut out = format!(
         "recorded {}{suppressed} for {} {}\n",
         event.spec.judgment,
-        short(&event.spec.fingerprint),
+        &event.spec.fingerprint[..Fingerprint::MIN_PREFIX],
         event.spec.decision
     );
     match recorded.standing {
@@ -224,7 +232,7 @@ fn entry(f: &FindingRecord) -> Entry<'_> {
         attributes.insert("judgment".to_owned(), json!(judgment));
     }
     Entry {
-        rule: f.decision.clone(),
+        decision: f.decision.clone(),
         severity: f.severity,
         authored: f.authored_severity,
         review: f.needs_review(),
@@ -262,10 +270,10 @@ fn task(f: &FindingRecord) -> Value {
 
 /// One line per finding: fingerprint, rule, severity, location, state, latest
 /// review and message, tab-separated.
-fn row(finding: &FindingRecord) -> String {
+fn row(finding: &FindingRecord, fingerprint: &str) -> String {
     format!(
         "{}\t{}\t{}\t{}:{}\t{}\t{}\t{}",
-        short(&finding.fingerprint),
+        fingerprint,
         finding.decision,
         finding.severity,
         finding.path,
@@ -335,13 +343,13 @@ fn detail(finding: &FindingRecord) -> String {
     out
 }
 
-fn event_row(event: &JudgmentEvent) -> String {
+fn event_row(event: &JudgmentEvent, id: &str) -> String {
     let suppression = event.suppressions.first().map_or("-".to_owned(), |s| {
         format!("{}:{}", s.spec.kind, s.spec.justification)
     });
     format!(
         "{}\t{}\t{}\t{}\t{}:{}\t{}\t{}",
-        short(&event.id),
+        id,
         event.spec.generated_at_time,
         event.spec.judgment,
         suppression,
@@ -356,6 +364,10 @@ fn line(locator: &Value) -> u64 {
     locator["span"]["start"]["line"].as_u64().unwrap_or(0)
 }
 
-fn short(fingerprint: &str) -> &str {
-    fingerprint.get(..SHORT).unwrap_or(fingerprint)
+/// Each id cut to the width that tells it apart from the others listed.
+fn prefixes<'a>(ids: &[&'a str]) -> Vec<&'a str> {
+    let widths = Fingerprint::prefix_widths(ids);
+    (ids.iter().zip(widths))
+        .map(|(id, width)| id.get(..width).unwrap_or(id))
+        .collect()
 }

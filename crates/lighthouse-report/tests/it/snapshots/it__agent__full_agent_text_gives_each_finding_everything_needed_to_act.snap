@@ -1,7 +1,6 @@
 ---
 source: crates/lighthouse-report/tests/it/agent.rs
-assertion_line: 157
-expression: "render_with(Format::Agent, &findings, &gap(), &briefing)"
+expression: "render(Format::Agent, &findings, &gap(), &briefing)"
 ---
 design/complexity  warn  internal/jit/compile.go:350:1
   owner:       jit::compile#function
@@ -19,8 +18,8 @@ design/complexity  warn  internal/jit/compile.go:350:1
 
                      return sum
                  }
-  fingerprint: 95c1bd45cd45
-  resolve:     lighthouse review resolve 95c1bd45cd45 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>
+  fingerprint: 95c1bd4
+  resolve:     lighthouse review resolve 95c1bd4 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>
 
 design/errors  info (authored warn)  src/lib.rs:7:1
   owner:       m::helper#function
@@ -36,12 +35,12 @@ design/errors  info (authored warn)  src/lib.rs:7:1
                  pub fn is_missing(err: &Failure) -> bool {
                      *err == Failure::Missing
                  }
-  fingerprint: 46aa7792468f
-  resolve:     lighthouse review resolve 46aa7792468f --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>
+  fingerprint: 46aa779
+  resolve:     lighthouse review resolve 46aa779 --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>
 
 acme/custom  error  a.txt:1:1
   message:     custom finding
-  fingerprint: c8dfae349df1
+  fingerprint: c8dfae3
 
 broken.go: incomplete: type error
 judgments: fail=the finding is right; add `suppress` with a justification to leave it in place; pass=false positive: the code conforms; notApplicable=the decision does not apply here; a hint to narrow it

@@ -1,5 +1,7 @@
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Position, Severity, Span};
-use lighthouse_report::{Briefing, Format, render, render_with};
+use lighthouse_report::{Briefing, Format, render};
+
+use crate::plain;
 use lighthouse_spec::Catalog;
 use serde_json::json;
 
@@ -37,18 +39,18 @@ fn fixture() -> Vec<Diagnostic> {
 
 #[test]
 fn text_is_gofmt_like() {
-    insta::assert_snapshot!(render(Format::Text, &fixture(), &[]));
+    insta::assert_snapshot!(plain(Format::Text, &fixture(), &[]));
 }
 
 #[test]
 fn sarif_carries_partial_fingerprints() {
-    insta::assert_snapshot!(render(Format::Sarif, &fixture(), &[]));
+    insta::assert_snapshot!(plain(Format::Sarif, &fixture(), &[]));
 }
 
 #[test]
 fn empty_input_renders_valid_documents() {
-    assert_eq!(render(Format::Text, &[], &[]), "");
-    let sarif: serde_json::Value = serde_json::from_str(&render(Format::Sarif, &[], &[])).unwrap();
+    assert_eq!(plain(Format::Text, &[], &[]), "");
+    let sarif: serde_json::Value = serde_json::from_str(&plain(Format::Sarif, &[], &[])).unwrap();
     assert_eq!(sarif["version"], "2.1.0");
     assert_eq!(sarif["runs"][0]["results"], json!([]));
 }
@@ -68,13 +70,13 @@ fn gaps() -> Vec<Incomplete> {
 
 #[test]
 fn text_states_what_was_not_analyzed() {
-    insta::assert_snapshot!(render(Format::Text, &[], &gaps()));
+    insta::assert_snapshot!(plain(Format::Text, &[], &gaps()));
 }
 
 #[test]
 fn sarif_marks_the_invocation_unsuccessful_with_notifications() {
     let sarif: serde_json::Value =
-        serde_json::from_str(&render(Format::Sarif, &fixture(), &gaps())).unwrap();
+        serde_json::from_str(&plain(Format::Sarif, &fixture(), &gaps())).unwrap();
     let invocation = &sarif["runs"][0]["invocations"][0];
     assert_eq!(invocation["executionSuccessful"], false);
     let notes = invocation["toolExecutionNotifications"].as_array().unwrap();
@@ -86,7 +88,7 @@ fn sarif_marks_the_invocation_unsuccessful_with_notifications() {
         "src/b%20c/%C3%A9%231.go"
     );
     let complete: serde_json::Value =
-        serde_json::from_str(&render(Format::Sarif, &fixture(), &[])).unwrap();
+        serde_json::from_str(&plain(Format::Sarif, &fixture(), &[])).unwrap();
     assert_eq!(
         complete["runs"][0]["invocations"][0]["executionSuccessful"],
         true
@@ -109,7 +111,7 @@ fn sarif_maps_severities_one_to_one() {
     let findings = [at(Severity::Error), at(Severity::Warn), at(Severity::Info)];
 
     let sarif: serde_json::Value =
-        serde_json::from_str(&render(Format::Sarif, &findings, &[])).unwrap();
+        serde_json::from_str(&plain(Format::Sarif, &findings, &[])).unwrap();
 
     let levels: Vec<&str> = sarif["runs"][0]["results"]
         .as_array()
@@ -129,7 +131,7 @@ fn sarif_describes_a_rule_by_the_decision_it_cites_and_links_its_docs() {
     };
 
     let sarif: serde_json::Value =
-        serde_json::from_str(&render_with(Format::Sarif, &findings, &[], &briefing)).unwrap();
+        serde_json::from_str(&render(Format::Sarif, &findings, &[], &briefing)).unwrap();
 
     let rules = sarif["runs"][0]["tool"]["driver"]["rules"]
         .as_array()
@@ -186,7 +188,7 @@ fn sarif_lists_suppressed_findings_leaving_out_the_default_status_and_an_empty_j
     };
 
     let sarif: serde_json::Value =
-        serde_json::from_str(&render_with(Format::Sarif, &[], &[], &briefing)).unwrap();
+        serde_json::from_str(&render(Format::Sarif, &[], &[], &briefing)).unwrap();
 
     let results = sarif["runs"][0]["results"].as_array().unwrap();
     assert_eq!(results.len(), 3);

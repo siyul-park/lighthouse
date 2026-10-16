@@ -217,7 +217,7 @@ fn review_show_and_text_listings_describe_a_finding() {
     let list =
         stdout(lighthouse(dir.path()).args(["review", "list", "--decision", "design/errors"]));
     assert_eq!(list.lines().count(), 1);
-    assert!(list.starts_with(&fingerprint[..12]), "{list}");
+    assert!(list.starts_with(&fingerprint[..7]), "{list}");
     assert!(list.contains("\topen\t-\t"), "{list}");
 
     let show = stdout(lighthouse(dir.path()).args(["review", "show", &fingerprint[..10]]));

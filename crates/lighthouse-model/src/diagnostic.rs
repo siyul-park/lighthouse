@@ -50,6 +50,26 @@ impl Severity {
 pub struct Fingerprint(String);
 
 impl Fingerprint {
+    /// Fewest characters of a fingerprint that name a finding, as in git: the
+    /// least accepted as input and the least printed.
+    pub const MIN_PREFIX: usize = 7;
+
+    /// For each of `fingerprints`, how many characters tell it apart from every
+    /// other one, at least [`Self::MIN_PREFIX`]: the width to print it at.
+    pub fn prefix_widths(fingerprints: &[&str]) -> Vec<usize> {
+        let mut order: Vec<usize> = (0..fingerprints.len()).collect();
+        order.sort_by_key(|&i| fingerprints[i]);
+        let mut widths = vec![Self::MIN_PREFIX; fingerprints.len()];
+        for pair in order.windows(2) {
+            let (a, b) = (fingerprints[pair[0]], fingerprints[pair[1]]);
+            let shared = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count();
+            for &i in pair {
+                widths[i] = widths[i].max(shared + 1);
+            }
+        }
+        widths
+    }
+
     /// Hashes the rule, the symbol path (separators normalized to `/`) and the
     /// whitespace-normalized snippet.
     pub fn new(rule_id: &str, symbol_path: &str, snippet: &str) -> Self {

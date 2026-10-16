@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use lighthouse_report::docs::{
-    OPERATIONS, decision_markdown, fix_operations_markdown, help_path, pages,
+    Density, OPERATIONS, decision_markdown, fix_operations_markdown, help_path, pages,
 };
 use lighthouse_spec::Catalog;
 use lighthouse_test_support::catalog::{decision, files, pack};
@@ -92,9 +92,15 @@ fn docs_never_mention_implementation_details() {
 #[test]
 fn decision_markdown_honours_heading_level() {
     let catalog = fixture();
-    let text = decision_markdown(catalog.decision("demo/beta").unwrap(), 1);
+    let text = decision_markdown(
+        catalog.decision("demo/beta").unwrap(),
+        Density::Entry {
+            level: 1,
+            sources: None,
+        },
+    );
     assert!(text.starts_with("# Beta is advice\n"));
-    assert!(text.contains("severity `none`"));
+    assert!(text.contains("· doc"));
 }
 
 #[test]

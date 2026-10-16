@@ -5,19 +5,16 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Judgment, Preview, Safety, Severity, squash};
+use lighthouse_model::{Fingerprint, Judgment, Preview, Safety, Severity, squash};
 use lighthouse_spec::{Catalog, Decision, FixKind};
 use serde_json::{Map, Value, json};
 
 use crate::{
-    evidence::{bounded, evidence, pairs},
-    expected::{Subject, expected},
+    expected::{ExampleKey, expected},
     fix::Shown,
+    text::{bounded, evidence, pairs},
 };
 
-/// Shortest fingerprint prefix shown, as in git; longer when the findings of
-/// the run share more.
-const PREFIX_MIN: usize = 7;
 /// Longest a symbol's own name may be to count as mentioned by a message.
 const NAME_MIN: usize = 3;
 /// How a judgment is recorded, said once per report.
@@ -40,7 +37,7 @@ const MEANINGS: [(Judgment, &str); 3] = [
 /// diagnostic or a remembered finding.
 #[derive(Debug, Clone)]
 pub struct Entry<'a> {
-    pub rule: String,
+    pub decision: String,
     pub severity: Severity,
     /// The severity the decision authored; shown only when it differs.
     pub authored: Severity,
@@ -87,7 +84,7 @@ pub struct Grouped {
 /// The findings of one decision at one severity.
 #[derive(Debug, Clone)]
 struct Group {
-    rule: String,
+    decision: String,
     severity: Severity,
     authored: Option<Severity>,
     /// Some finding of the group asks for review; when only some do,
@@ -124,11 +121,12 @@ impl Grouped {
     /// Fingerprint prefixes are unique among all `entries`, shown or not.
     pub fn of(entries: Vec<Entry<'_>>, options: &GroupOptions) -> Self {
         let limit = options.limit;
-        let widths = prefix_widths(&entries);
+        let fingerprints: Vec<&str> = entries.iter().map(|e| e.fingerprint.as_str()).collect();
+        let widths = Fingerprint::prefix_widths(&fingerprints);
         let mut buckets: BTreeMap<(Severity, &str), Vec<(&Entry<'_>, usize)>> = BTreeMap::new();
         for (entry, width) in entries.iter().zip(widths) {
             buckets
-                .entry((entry.severity, entry.rule.as_str()))
+                .entry((entry.severity, entry.decision.as_str()))
                 .or_default()
                 .push((entry, width));
         }
@@ -213,7 +211,7 @@ impl Group {
         let first = rows[0].0;
         let review = rows.iter().any(|(entry, _)| entry.review);
         let mixed = review && rows.iter().any(|(entry, _)| !entry.review);
-        let decision = options.catalog.and_then(|c| c.decision(&first.rule));
+        let decision = options.catalog.and_then(|c| c.decision(&first.decision));
         let attributes: Vec<Map<String, Value>> =
             rows.iter().map(|(entry, _)| attributes(entry)).collect();
         let shared: Map<String, Value> = attributes[0]
@@ -224,7 +222,7 @@ impl Group {
         let mut expecteds: Vec<(Option<String>, String)> = Vec::new();
         if let Some(decision) = decision {
             for (entry, _) in &rows {
-                let subject = Subject::of(entry.facts.as_ref());
+                let subject = ExampleKey::new(entry.facts.as_ref());
                 let language = subject.language.map(str::to_owned);
                 if expecteds.iter().any(|(l, _)| *l == language) {
                     continue;
@@ -249,12 +247,12 @@ impl Group {
                     .to_owned(),
                 evidence: attributes,
                 note: entry.note.clone(),
-                fix: entry.fix.map(|fix| Shown::of(fix, &entry.path)),
+                fix: entry.fix.map(|fix| Shown::new(fix, &entry.path)),
                 review: mixed && entry.review,
             });
         }
         Self {
-            rule: first.rule.clone(),
+            decision: first.decision.clone(),
             severity: first.severity,
             authored: (first.authored != first.severity).then_some(first.authored),
             review,
@@ -268,7 +266,7 @@ impl Group {
 
     fn to_json(&self) -> Value {
         let mut group = Map::new();
-        group.insert("rule".to_owned(), json!(self.rule));
+        group.insert("decision".to_owned(), json!(self.decision));
         group.insert("severity".to_owned(), json!(self.severity));
         if let Some(authored) = self.authored {
             group.insert("authored".to_owned(), json!(authored));
@@ -313,7 +311,7 @@ impl Group {
     }
 
     fn write_text(&self, out: &mut String) {
-        let _ = write!(out, "{} {}", self.rule, self.severity);
+        let _ = write!(out, "{} {}", self.decision, self.severity);
         if let Some(authored) = self.authored {
             let _ = write!(out, " (authored {authored})");
         }
@@ -367,7 +365,7 @@ impl Instance {
             varying.insert("note".to_owned(), json!(note));
         }
         if let Some(fix) = &self.fix {
-            varying.insert("fix".to_owned(), fix.json());
+            varying.insert("fix".to_owned(), json!(fix));
         }
         if self.review {
             varying.insert("review".to_owned(), json!(true));
@@ -406,6 +404,14 @@ impl Instance {
 pub(crate) fn judgments() -> Value {
     let meanings: BTreeMap<&str, &str> = MEANINGS.iter().map(|(j, m)| (j.as_str(), *m)).collect();
     json!(meanings)
+}
+
+/// The command line that records a judgment on the finding `fingerprint`
+/// names.
+pub(crate) fn resolve_command(fingerprint: &str) -> String {
+    format!(
+        "lighthouse review resolve {fingerprint} --judgment <pass|fail|notApplicable> [--suppress <justification>] [--reason <text>] --attributed-to agent:<id>"
+    )
 }
 
 pub(crate) fn judgments_line() -> String {
@@ -477,20 +483,4 @@ fn contains_word(text: &str, word: &str) -> bool {
                 .next()
                 .is_none_or(|c| !identifier(c))
     })
-}
-
-/// For each entry, how many characters of its fingerprint tell it apart from
-/// every other entry, at least [`PREFIX_MIN`].
-fn prefix_widths(entries: &[Entry]) -> Vec<usize> {
-    let mut order: Vec<usize> = (0..entries.len()).collect();
-    order.sort_by(|&a, &b| entries[a].fingerprint.cmp(&entries[b].fingerprint));
-    let mut widths = vec![PREFIX_MIN; entries.len()];
-    for pair in order.windows(2) {
-        let (a, b) = (&entries[pair[0]].fingerprint, &entries[pair[1]].fingerprint);
-        let shared = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count();
-        for &i in pair {
-            widths[i] = widths[i].max(shared + 1);
-        }
-    }
-    widths
 }

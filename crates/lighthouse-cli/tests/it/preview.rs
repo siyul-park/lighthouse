@@ -50,7 +50,7 @@ fn group(report: &Value, rule: &str) -> Value {
         .as_array()
         .unwrap()
         .iter()
-        .find(|g| g["rule"] == rule)
+        .find(|g| g["decision"] == rule)
         .unwrap_or_else(|| panic!("{rule} in {report}"))
         .clone()
 }
@@ -91,7 +91,7 @@ fn a_declaration_move_shows_its_diff_and_how_to_apply_it() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|r| r["rule"] == "design/declaration-groups")
+        .find(|r| r["decision"] == "design/declaration-groups")
         .unwrap();
     assert!(record["fix"]["diff"].as_str().unwrap().starts_with("@@ -"));
 }

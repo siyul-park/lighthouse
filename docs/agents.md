@@ -86,7 +86,7 @@ Findings are grouped by decision and severity, errors first, then larger groups:
 
 ```json
 {"status":"findings","counts":{"error":0,"warn":2,"review":2},
- "groups":[{"rule":"design/exported-doc","severity":"warn","review":true,
+ "groups":[{"decision":"design/exported-doc","severity":"warn","review":true,
    "requirement":"<one line>","expected":"<excerpt, once>",
    "evidence":{"keys":"identical across the group"},
    "files":{"bar/bar.go":[["3:1","message","a1b2c3d"],["5:6","message","e4f5a6b",{"varying":"evidence"}]]}}],
@@ -106,7 +106,7 @@ candidate full fingerprints. The symbol
 is evidence unless the message names it; `authored` appears on a group only when
 it differs from the severity; `context` is left to `decision_show`. `limit` counts
 findings (default 25 for `check`, 50 for `review_list`) and what is cut is in
-`omitted`. The hooks print a header per group (`rule severity [review] -
+`omitted`. The hooks print a header per group (`decision severity [review] -
 requirement`), `expected:` once, then `path:line:col message fingerprint` per
 finding, the gaps, `resolve:` and `reasons:` once, and the summary.
 
