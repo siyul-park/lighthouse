@@ -129,6 +129,20 @@ fn command_check_exit_codes_and_empty_findings_are_execution_errors() {
 }
 
 #[test]
+fn command_check_gets_the_same_environment_as_a_fix_command() {
+    let dir = project(&decision(
+        "  check:\n    type: command\n    argv: [sh, -c, \"test -n \\\"$HOME\\\" && test -n \\\"$LIGHTHOUSE_API_VERSION\\\" && test -z \\\"$LIGHTHOUSE_TEST_SECRET\\\" && echo \\\"$1:1: has the contract\\\"; exit 1\", sh, \"{file}\"]\n",
+    ));
+    trust(dir.path());
+    lighthouse(dir.path())
+        .env("LIGHTHOUSE_TEST_SECRET", "leaked")
+        .arg("check")
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("has the contract"));
+}
+
+#[test]
 fn command_check_output_past_the_cap_is_incomplete_not_clean() {
     let dir = project(&decision(
         "  check:\n    type: command\n    argv: [sh, -c, \"yes finding | head -c 2000000; exit 1\", sh, \"{file}\"]\n",
