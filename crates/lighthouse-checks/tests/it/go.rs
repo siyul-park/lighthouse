@@ -7,7 +7,7 @@ use std::{
 use lighthouse_checks::metrics::{COGNITIVE, CYCLOMATIC};
 use lighthouse_engine::Engine;
 use lighthouse_model::{File, Project};
-use lighthouse_plugin::{Ctx, Facts, Registry, Source, Workspace};
+use lighthouse_plugin::{Context, Facts, Registry, Source, Workspace};
 use lighthouse_spec::{Catalog, Config};
 use serde_json::Value;
 
@@ -36,7 +36,8 @@ fn measure(plugin: &Path, analyzer: &str, source: &str) -> BTreeMap<String, u32>
     let registry = registry(plugin);
     let provider = registry
         .languages()
-        .map(|(_, l)| l)
+        .iter()
+        .map(|l| l.provider.as_ref())
         .find(|l| l.manifest().id == "go")
         .unwrap();
     let file = File {
@@ -59,8 +60,8 @@ fn measure(plugin: &Path, analyzer: &str, source: &str) -> BTreeMap<String, u32>
     assert!(indexed.incomplete.is_empty(), "{:?}", indexed.incomplete);
     let project = Project::merge(indexed.fragments);
     let facts = Facts::new();
-    let ctx = Ctx {
-        ws: &ws,
+    let ctx = Context {
+        workspace: &ws,
         project: &project,
         file: Some((&file, source)),
         facts: &facts,

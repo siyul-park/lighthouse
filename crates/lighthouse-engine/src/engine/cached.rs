@@ -74,7 +74,7 @@ impl Engine {
         &self,
         scene: &Scene,
         rule: &dyn Rule,
-        ctx: &Ctx,
+        ctx: &Context,
         options: &Options,
     ) -> Result<Vec<Diagnostic>, lighthouse_plugin::Error> {
         let plan = scene
@@ -206,7 +206,7 @@ impl RunCache {
         &self,
         plan: &Plan,
         rule: &dyn Rule,
-        ctx: &Ctx,
+        ctx: &Context,
         options: &Options,
     ) -> Result<Vec<Diagnostic>, lighthouse_plugin::Error> {
         let tag = tag(ctx.applies, options);
@@ -239,7 +239,7 @@ impl RunCache {
         plan: &Plan,
         file: &File,
         rule: &dyn Rule,
-        ctx: &Ctx,
+        ctx: &Context,
         options: &Options,
     ) -> Result<Vec<Diagnostic>, lighthouse_plugin::Error> {
         let tag = tag(ctx.applies, options);

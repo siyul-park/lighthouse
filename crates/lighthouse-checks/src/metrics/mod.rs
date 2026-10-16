@@ -7,7 +7,7 @@ use std::{collections::BTreeMap, sync::LazyLock};
 
 use lighthouse_model::RunScope;
 use lighthouse_model::{FlowKind, FunctionSummary, Project, Symbol, SymbolId};
-use lighthouse_plugin::{Analyzer, AnalyzerManifest, Ctx, Error, Plugin, PluginManifest};
+use lighthouse_plugin::{Analyzer, AnalyzerManifest, Context, Error, Plugin, PluginManifest};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
@@ -105,7 +105,7 @@ impl<T: Serialize + Send + Sync> Analyzer for PerFunction<T> {
         &self.manifest
     }
 
-    fn run(&self, ctx: &Ctx) -> Result<Value, Error> {
+    fn run(&self, ctx: &Context) -> Result<Value, Error> {
         let (file, _) = ctx
             .file
             .ok_or_else(|| Error::Failed(format!("{} needs a file", self.manifest.id)))?;
@@ -126,7 +126,7 @@ impl<T: Serialize + Send + Sync> Analyzer for PerFunction<T> {
 
 /// Reads the metric fact of `analyzer` for the focused file, by function.
 pub fn read<T: DeserializeOwned>(
-    ctx: &Ctx,
+    ctx: &Context,
     analyzer: &str,
 ) -> Result<BTreeMap<SymbolId, T>, Error> {
     let all: Vec<Measured<T>> = ctx.fact(analyzer)?;

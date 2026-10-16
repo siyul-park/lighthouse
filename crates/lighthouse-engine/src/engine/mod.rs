@@ -12,7 +12,7 @@ use lighthouse_model::{
     Suppressed, hash,
 };
 use lighthouse_plugin::{
-    Ctx, Facts, Indexed, LanguageProvider, Memo, Notices, Registry, Rule, RuleManifest, Source,
+    Context, Facts, Indexed, LanguageProvider, Memo, Notices, Registry, Rule, RuleManifest, Source,
     Workspace,
 };
 use lighthouse_spec::{

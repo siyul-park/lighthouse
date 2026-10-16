@@ -14,8 +14,9 @@ use lighthouse_model::{
     Capability, Diagnostic, Fingerprint, Fragment, Incomplete, Options, Position, Severity, Span,
 };
 use lighthouse_plugin::{
-    Analyzer, AnalyzerManifest, Conventions, Ctx, Error as PluginError, Indexed, LanguageProvider,
-    Plugin, PluginManifest, ProviderManifest, Registry, Rule, RuleManifest, Source, Workspace,
+    Analyzer, AnalyzerManifest, Context, Conventions, Error as PluginError, Indexed,
+    LanguageProvider, Plugin, PluginManifest, ProviderManifest, Registry, Rule, RuleManifest,
+    Source, Workspace,
 };
 use lighthouse_spec::Catalog;
 use lighthouse_spec::Config;
@@ -69,7 +70,7 @@ impl Analyzer for CountFiles {
     fn manifest(&self) -> &AnalyzerManifest {
         &self.0
     }
-    fn run(&self, ctx: &Ctx) -> Result<Value, PluginError> {
+    fn run(&self, ctx: &Context) -> Result<Value, PluginError> {
         Ok(json!(ctx.project.files.len()))
     }
 }
@@ -111,7 +112,7 @@ impl Rule for Fake {
             _ => Ok(()),
         }
     }
-    fn check(&self, ctx: &Ctx, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
+    fn check(&self, ctx: &Context, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
         let at = Span {
             start: Position { line: 1, col: 1 },
             end: Position { line: 1, col: 1 },

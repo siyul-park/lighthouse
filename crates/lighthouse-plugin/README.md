@@ -15,7 +15,7 @@ The in-process plugin SPI: the traits and the registry through which rules, anal
 ## Invariants
 - Every id is prefixed `<plugin>/` and registered once; analyzers form a DAG, so a missing or cyclic `requires` fails registration.
 - It re-exports only the model API types (`SystemOneRequest`, `Question`, `DecisionRef`, ...), never the language wire; wire to model conversion belongs to rpc.
-- `decide` and `UPPER` (0.9) are the one policy that makes a model's probability of failing a verdict (at or above the bound, else abstain); checks and engine both call them.
+- `fails` and `FAIL_AT` (0.9) are the one policy that turns a model's probability of failing into a judgment (at or above the bound it fails the subject, else it abstains); checks, engine and ml all call them.
 - A plugin is a contract boundary, not a process boundary: see [docs/architecture.md](../../docs/architecture.md#plugin-kinds-and-manifests).
 
 ## Tests

@@ -31,7 +31,7 @@ impl Fixer for Both {
             };
             lighthouse_model::Span { start: at, end: at }
         };
-        let b = fs::read_to_string(request.ws.root.join("b.toy")).unwrap();
+        let b = fs::read_to_string(request.workspace.root.join("b.toy")).unwrap();
         Ok(FixOutcome::Proposed {
             description: "both".to_owned(),
             ops: vec![

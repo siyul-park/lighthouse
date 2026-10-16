@@ -160,7 +160,8 @@ pub(crate) fn test_catalog(
         Some(language) => BTreeSet::from([language.to_owned()]),
         None => probe
             .languages()
-            .map(|(_, l)| l.manifest().id.clone())
+            .iter()
+            .map(|l| l.provider.manifest().id.clone())
             .filter(|l| l != NEUTRAL)
             .collect(),
     };

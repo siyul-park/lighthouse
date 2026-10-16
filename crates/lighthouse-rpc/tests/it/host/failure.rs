@@ -230,5 +230,5 @@ fn a_plugin_that_dies_during_initialize_is_incomplete_not_a_config_error() {
     assert_eq!(registered.incomplete.len(), 1);
     assert!(registered.incomplete[0].reason.contains("unavailable"));
     assert!(registry.has_plugin("fake"));
-    assert_eq!(registry.languages().count(), 0);
+    assert_eq!(registry.languages().len(), 0);
 }

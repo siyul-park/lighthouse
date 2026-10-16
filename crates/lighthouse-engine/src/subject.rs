@@ -20,11 +20,8 @@ pub(crate) struct Subjects<'a> {
 impl<'a> Subjects<'a> {
     pub(crate) fn new(project: &'a Project, facts: &'a Facts, inputs: &'a [Input]) -> Self {
         let mut measured: BTreeMap<&str, Vec<(&str, &Value)>> = BTreeMap::new();
-        for ((analyzer, key), value) in facts {
-            measured
-                .entry(key.as_str())
-                .or_default()
-                .push((analyzer.as_str(), value));
+        for (analyzer, key, value) in facts.iter() {
+            measured.entry(key).or_default().push((analyzer, value));
         }
         let lines = inputs
             .iter()

@@ -15,7 +15,7 @@ use lighthouse_model::{
     Comment, Edge, FunctionSummary, Node, Project, Symbol, SymbolId, SymbolKind, Target,
     Visibility, annotation,
 };
-use lighthouse_plugin::{Ctx, Error, KeyCtx, OrderKey, Workspace};
+use lighthouse_plugin::{Context, Error, KeyContext, OrderKey, Workspace};
 use serde_json::{Map, Value, json};
 
 use crate::{
@@ -71,7 +71,7 @@ pub(crate) struct Builder<'a> {
 
 impl<'a> Builder<'a> {
     pub(crate) fn new(
-        ctx: &'a Ctx<'a>,
+        ctx: &'a Context<'a>,
         needs: &'a Needs,
         options: &'a Map<String, Value>,
         rule: &'a str,
@@ -88,7 +88,7 @@ impl<'a> Builder<'a> {
             .collect();
         Ok(Self {
             project: ctx.project,
-            ws: ctx.ws,
+            ws: ctx.workspace,
             needs,
             rule,
             language: ctx
@@ -482,7 +482,7 @@ impl<'a> Builder<'a> {
             .project
             .file(&symbol.file)
             .map_or(self.language.as_str(), |f| f.lang.as_str());
-        let ctx = KeyCtx {
+        let ctx = KeyContext {
             project: self.project,
             language,
             rule: self.rule,

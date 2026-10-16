@@ -100,8 +100,8 @@ impl Engine {
     fn provider(&self, language: usize) -> &dyn LanguageProvider {
         self.registry
             .languages()
-            .nth(language)
-            .map(|(_, l)| l)
+            .get(language)
+            .map(|l| l.provider.as_ref())
             .expect("language index comes from the registry")
     }
 
@@ -194,8 +194,8 @@ impl Engine {
                     .collect(),
             };
             for (input, key) in runs {
-                let ctx = Ctx {
-                    ws: &self.ws,
+                let ctx = Context {
+                    workspace: &self.ws,
                     project,
                     file: input.map(|i| (&i.file, i.text.as_str())),
                     facts: &facts,
@@ -207,7 +207,7 @@ impl Engine {
                     models: &lighthouse_plugin::NoModels,
                 };
                 let fact = analyzer.run(&ctx)?;
-                facts.insert((analyzer.manifest().id.clone(), key), fact);
+                facts.insert(&analyzer.manifest().id, key, fact);
             }
             timings
                 .analyzers
@@ -279,8 +279,8 @@ impl Engine {
                 continue;
             }
             let notices = Notices::default();
-            let ctx = Ctx {
-                ws: &self.ws,
+            let ctx = Context {
+                workspace: &self.ws,
                 project: scene.project,
                 file: Some((file, input.text.as_str())),
                 facts: scene.facts,
@@ -364,8 +364,8 @@ impl Engine {
             return Ok(gathered);
         }
         let notices = Notices::default();
-        let ctx = Ctx {
-            ws: &self.ws,
+        let ctx = Context {
+            workspace: &self.ws,
             project: scene.project,
             file: None,
             facts: scene.facts,

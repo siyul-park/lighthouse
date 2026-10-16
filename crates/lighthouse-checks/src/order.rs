@@ -3,7 +3,7 @@
 use std::sync::LazyLock;
 
 use lighthouse_model::{Symbol, SymbolKind, SymbolRole};
-use lighthouse_plugin::{Error, KeyCtx, OrderKey, OrderKeyManifest};
+use lighthouse_plugin::{Error, KeyContext, OrderKey, OrderKeyManifest};
 use lighthouse_spec::Catalog;
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -39,7 +39,7 @@ impl OrderKey for GroupKey {
         &MANIFEST
     }
 
-    fn rank(&self, ctx: &KeyCtx, symbol: &Symbol) -> Result<Option<u64>, Error> {
+    fn rank(&self, ctx: &KeyContext, symbol: &Symbol) -> Result<Option<u64>, Error> {
         let project = ctx.project;
         let Some(file) = project.file(&symbol.file) else {
             return Ok(None);
@@ -76,7 +76,7 @@ impl OrderKey for ConstructorKey {
         &MANIFEST
     }
 
-    fn rank(&self, ctx: &KeyCtx, symbol: &Symbol) -> Result<Option<u64>, Error> {
+    fn rank(&self, ctx: &KeyContext, symbol: &Symbol) -> Result<Option<u64>, Error> {
         let generated = ctx.project.file(&symbol.file).is_none_or(|f| f.generated);
         if symbol.kind != SymbolKind::Method
             || owner_key(symbol).is_none()

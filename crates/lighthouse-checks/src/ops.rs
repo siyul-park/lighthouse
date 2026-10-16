@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cel::Program;
 use lighthouse_model::{Diagnostic, EdgeKind, Node, Project, Reach, Symbol, SymbolId, Target};
-use lighthouse_plugin::{Ctx, Error as PluginError, KeyCtx, OrderKey, RuleManifest};
+use lighthouse_plugin::{Context, Error as PluginError, KeyContext, OrderKey, RuleManifest};
 use lighthouse_spec::{BuiltinOp, CycleLevel, OrderReport, OrderScope};
 use serde_json::{Map, Value, json};
 
@@ -91,7 +91,7 @@ impl OrderRule {
     pub(crate) fn check(
         &self,
         meta: &RuleManifest,
-        ctx: &Ctx,
+        ctx: &Context,
         options: &Map<String, Value>,
     ) -> Result<Vec<Diagnostic>, PluginError> {
         let builder = Builder::new(ctx, &self.needs, options, &meta.id)?;
@@ -115,19 +115,19 @@ impl Clause {
         &self,
         at_clause: usize,
         meta: &RuleManifest,
-        ctx: &Ctx,
+        ctx: &Context,
         builder: &Builder,
         base: &cel::Context<'static>,
         options: &Map<String, Value>,
     ) -> Result<Vec<Diagnostic>, PluginError> {
         let keys = self.keys(ctx, &meta.id)?;
         let language = ctx.file.map_or("", |(file, _)| file.lang.as_str());
-        let key_ctx = KeyCtx {
+        let key_ctx = KeyContext {
             project: ctx.project,
             language,
             rule: &meta.id,
             options,
-            constructors: ctx.ws.constructor_prefixes(language),
+            constructors: ctx.workspace.constructor_prefixes(language),
         };
         let mut found = Vec::new();
         for module in declarations(ctx) {
@@ -190,7 +190,11 @@ impl Clause {
         }
     }
 
-    fn keys<'c>(&self, ctx: &Ctx<'c>, rule: &str) -> Result<Vec<&'c dyn OrderKey>, PluginError> {
+    fn keys<'c>(
+        &self,
+        ctx: &Context<'c>,
+        rule: &str,
+    ) -> Result<Vec<&'c dyn OrderKey>, PluginError> {
         self.by
             .iter()
             .map(|id| {
@@ -238,7 +242,7 @@ impl CycleRule {
     pub(crate) fn check(
         &self,
         meta: &RuleManifest,
-        ctx: &Ctx,
+        ctx: &Context,
     ) -> Result<Vec<Diagnostic>, PluginError> {
         let project = ctx.project;
         let graph = self.graph(project);
@@ -395,7 +399,7 @@ fn applies(
     frame_rule: &str,
     when: Option<&Program>,
     builder: &Builder,
-    ctx: &Ctx,
+    ctx: &Context,
     options: &Map<String, Value>,
 ) -> Result<bool, PluginError> {
     if ctx
@@ -427,7 +431,7 @@ fn node_value(builder: &Builder, symbol: Option<&Symbol>) -> Value {
 /// The declarations the first key orders, each with its ranks by every key; a
 /// key that does not order a declaration the first key does ranks it last.
 fn ranked<'a>(
-    ctx: &KeyCtx,
+    ctx: &KeyContext,
     keys: &[&dyn OrderKey],
     symbols: &[&'a Symbol],
 ) -> Result<Vec<(&'a Symbol, Vec<u64>)>, PluginError> {

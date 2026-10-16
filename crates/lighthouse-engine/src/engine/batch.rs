@@ -8,7 +8,7 @@ use std::{collections::BTreeMap, sync::Arc, sync::PoisonError, sync::atomic::Ord
 
 use lighthouse_model::{Diagnostic, hash::sha256};
 use lighthouse_plugin::{
-    Ask, Classifier, Decided, Explored, Judged, Model, Open, Settle, decide, request_of,
+    Abstained, Answered, Ask, Classifier, Decided, Explored, Model, Settle, fails, request_of,
 };
 use rayon::prelude::*;
 
@@ -34,7 +34,7 @@ type At = (usize, usize);
 
 /// P(fail) and the model that gave it as evidence names it, or why the
 /// subject stays open.
-type Answer = Result<(f64, String), Open>;
+type Answer = Result<(f64, String), Abstained>;
 
 /// Why a model did not answer a request.
 enum Miss {
@@ -48,9 +48,9 @@ impl<'a> RunModels<'a> {
     /// Settles every ask: each layer of the cascade is put to the subjects
     /// still open, an abstention or an unsure answer going on to the next.
     pub(super) fn run(&self, pending: Vec<Pending<'a>>) -> Vec<(String, Vec<Diagnostic>)> {
-        let mut judged: Vec<Vec<Judged>> = pending
+        let mut judged: Vec<Vec<Answered>> = pending
             .iter()
-            .map(|p| vec![Judged::Open(Open::Undecided); p.ask.subjects.len()])
+            .map(|p| vec![Answered::Abstained(Abstained::Undecided); p.ask.subjects.len()])
             .collect();
         let layers = pending.iter().map(|p| p.routes.len()).max().unwrap_or(0);
         for layer in 0..layers {
@@ -75,14 +75,14 @@ impl<'a> RunModels<'a> {
 
     /// The open subjects the routes of `layer` are to judge, grouped by the
     /// route and what it reads of the subject: one request each.
-    fn groups(pending: &[Pending<'a>], judged: &[Vec<Judged>], layer: usize) -> Vec<Vec<At>> {
+    fn groups(pending: &[Pending<'a>], judged: &[Vec<Answered>], layer: usize) -> Vec<Vec<At>> {
         let mut groups: BTreeMap<(String, String), Vec<At>> = BTreeMap::new();
         for (p, item) in pending.iter().enumerate() {
             let Some(route) = item.routes.get(layer) else {
                 continue;
             };
             for (i, subject) in item.ask.subjects.iter().enumerate() {
-                if matches!(judged[p][i], Judged::Decided(_)) {
+                if matches!(judged[p][i], Answered::Decided(_)) {
                     continue;
                 }
                 groups
@@ -104,7 +104,7 @@ impl<'a> RunModels<'a> {
             let ask = &pending[at.0].ask;
             let subject = &ask.subjects[at.1];
             if !self.reported(subject) {
-                out.push((at, Err(Open::Undecided)));
+                out.push((at, Err(Abstained::Undecided)));
                 continue;
             }
             let kept = order.iter().find_map(|model| {
@@ -141,10 +141,10 @@ impl<'a> RunModels<'a> {
             }
         }
         let open = match failure {
-            Some(reason) => Open::Failed(reason),
+            Some(reason) => Abstained::Failed(reason),
             None => {
                 self.over_budget.fetch_add(chunk.len(), Ordering::SeqCst);
-                Open::OverBudget
+                Abstained::OverBudget
             }
         };
         chunk.iter().map(|&at| (at, Err(open.clone()))).collect()
@@ -181,7 +181,7 @@ impl<'a> RunModels<'a> {
                 let ask = &pending[at.0].ask;
                 let answer = match result.answers.get(&ask.decision.id) {
                     Some(answer) if answer.kind == "noul" => Ok((answer.noul, by.clone())),
-                    _ => Err(Open::Failed(self.report(
+                    _ => Err(Abstained::Failed(self.report(
                         manifest,
                         format!("it gave no `noul` answer for `{}`", ask.decision.id),
                     ))),
@@ -202,29 +202,29 @@ impl<'a> RunModels<'a> {
         &self,
         item: &Pending<'a>,
         (layer, i): At,
-        prior: &Judged,
+        prior: &Answered,
         answer: Answer,
-    ) -> Judged {
+    ) -> Answered {
         let kept = explored(prior);
         let (noul, model) = match answer {
             Ok(given) => given,
-            Err(Open::Undecided) if kept.is_some() => return prior.clone(),
-            Err(open) => return Judged::Open(open),
+            Err(Abstained::Undecided) if kept.is_some() => return prior.clone(),
+            Err(open) => return Answered::Abstained(open),
         };
-        let Some(confidence) = decide(noul, item.ask.upper) else {
+        let Some(confidence) = fails(noul) else {
             return if kept.is_some() {
                 prior.clone()
             } else {
-                Judged::Open(Open::Undecided)
+                Answered::Abstained(Abstained::Undecided)
             };
         };
         let subject = &item.ask.subjects[i].key;
         let sample =
             item.routes[layer].attached && sampled(&item.ask.rule, subject, self.binding.explore);
         if sample {
-            return Judged::Open(Open::Explored(Explored { model, confidence }));
+            return Answered::Abstained(Abstained::Explored(Explored { model, confidence }));
         }
-        Judged::Decided(Decided {
+        Answered::Decided(Decided {
             confidence,
             model,
             explored: kept.cloned(),
@@ -241,9 +241,9 @@ fn sampled(rule: &str, subject: &str, explore: f64) -> bool {
 
 /// What an exploration of the subject said so far, kept when the layers below
 /// have nothing to add.
-fn explored(prior: &Judged) -> Option<&Explored> {
+fn explored(prior: &Answered) -> Option<&Explored> {
     match prior {
-        Judged::Open(Open::Explored(explored)) => Some(explored),
+        Answered::Abstained(Abstained::Explored(explored)) => Some(explored),
         _ => None,
     }
 }

@@ -4,16 +4,16 @@
 //! may not run, because the project is not trusted, is skipped with a notice.
 
 use lighthouse_model::{Diagnostic, Position, Span};
-use lighthouse_plugin::{Ctx, Error as PluginError, RuleManifest};
+use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
 use serde_json::json;
 
 /// Checks the focused file against its language's formatter; a file of a
 /// language with no formatter is not judged.
-pub(crate) fn check(meta: &RuleManifest, ctx: &Ctx) -> Result<Vec<Diagnostic>, PluginError> {
+pub(crate) fn check(meta: &RuleManifest, ctx: &Context) -> Result<Vec<Diagnostic>, PluginError> {
     let Some((file, text)) = ctx.file else {
         return Ok(Vec::new());
     };
-    let Some(formatter) = ctx.ws.formatters.get(&file.lang) else {
+    let Some(formatter) = ctx.workspace.formatters.get(&file.lang) else {
         return Ok(Vec::new());
     };
     let name = &formatter.argv[0];
@@ -24,7 +24,7 @@ pub(crate) fn check(meta: &RuleManifest, ctx: &Ctx) -> Result<Vec<Diagnostic>, P
         return Ok(Vec::new());
     }
     let formatted = formatter
-        .format(&ctx.ws.root, &file.path, text)
+        .format(&ctx.workspace.root, &file.path, text)
         .map_err(PluginError::Incomplete)?;
     if formatted == text {
         return Ok(Vec::new());

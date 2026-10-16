@@ -18,8 +18,8 @@ use std::{
 
 use lighthouse_model::stats::assign;
 use lighthouse_plugin::{
-    Classifier, DATASETS_DIR, DecisionRef, FineTuningJobStatus, MODELS_DIR, Subject, UPPER,
-    artifact_path, decide, request_of,
+    Classifier, DATASETS_DIR, DecisionRef, FineTuningJobStatus, MODELS_DIR, Subject, artifact_path,
+    fails, request_of,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -284,7 +284,7 @@ pub fn overlay(layer: &Layer, base: &Found, labels: &[Label]) -> Result<Layered>
             Ok((noul, by, cost)) => {
                 found.calls += 1;
                 found.cost += cost;
-                let fails = decide(noul, UPPER).is_some();
+                let fails = fails(noul).is_some();
                 if label.observed.is_some() {
                     label.observed = Some(if fails {
                         Outcome::Fail

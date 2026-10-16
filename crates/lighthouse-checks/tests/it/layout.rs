@@ -6,7 +6,7 @@ use lighthouse_checks::layout::{
 use lighthouse_model::{
     File, Fragment, Position, Project, Span, Symbol, SymbolId, SymbolKind, SymbolRole, Visibility,
 };
-use lighthouse_plugin::{Ctx, NoKeys, Workspace};
+use lighthouse_plugin::{Context, NoKeys, Workspace};
 
 fn at(line: u32) -> Span {
     let p = Position { line, col: 1 };
@@ -55,8 +55,8 @@ fn declarations_lists_each_module_of_a_file_in_source_order() {
     }]);
     let ws = Workspace::new(".");
     let facts = Default::default();
-    let ctx = Ctx {
-        ws: &ws,
+    let ctx = Context {
+        workspace: &ws,
         project: &project,
         file: Some((&file, "")),
         facts: &facts,

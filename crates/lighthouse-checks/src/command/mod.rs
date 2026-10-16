@@ -15,7 +15,7 @@ use std::{
 };
 
 use lighthouse_model::{Diagnostic, Position, Project, RunScope, Span, squash};
-use lighthouse_plugin::{Ctx, Error as PluginError, RuleManifest};
+use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
 use lighthouse_process::{GRACE, Invocation, Stdin};
 use lighthouse_spec::{Batch, Check, CheckOutput, CommandCheck};
 use serde_json::{Map, Value, json};
@@ -48,7 +48,7 @@ impl CommandRule {
     pub(crate) fn check(
         &self,
         meta: &RuleManifest,
-        ctx: &Ctx,
+        ctx: &Context,
         options: &Map<String, Value>,
     ) -> Result<Vec<Diagnostic>, PluginError> {
         let incomplete = |reason: String| PluginError::Incomplete(reason);
@@ -75,7 +75,7 @@ impl CommandRule {
                 let mut found = Vec::new();
                 for file in &ctx.project.files {
                     let text = self.spec.stdin == Stdin::File;
-                    let content = text.then(|| ctx.ws.read(&file.path)).transpose()?;
+                    let content = text.then(|| ctx.workspace.read(&file.path)).transpose()?;
                     found.extend(run.one(&file.path, content.as_deref())?);
                 }
                 Ok(found)
@@ -110,7 +110,7 @@ impl Ran {
 struct Run<'a> {
     rule: &'a CommandRule,
     meta: &'a RuleManifest,
-    ctx: &'a Ctx<'a>,
+    ctx: &'a Context<'a>,
     options: &'a Map<String, Value>,
 }
 
@@ -173,7 +173,7 @@ impl Run<'_> {
     /// and a value that starts with `-` is refused so none can grow into an
     /// option. A program named by a relative path is the project's own.
     fn arguments(&self, files: &[PathBuf]) -> Result<Vec<String>, PluginError> {
-        let root = &self.ctx.ws.root;
+        let root = &self.ctx.workspace.root;
         let mut argv = Vec::new();
         for (at, arg) in self.rule.spec.argv.iter().enumerate() {
             if at == 0 && arg.contains('/') && !Path::new(arg).is_absolute() {
@@ -203,7 +203,7 @@ impl Run<'_> {
         let incomplete = |what: String| PluginError::Incomplete(format!("`{shown}` {what}"));
         let output = lighthouse_process::run(&Invocation {
             argv,
-            dir: &self.ctx.ws.root,
+            dir: &self.ctx.workspace.root,
             stdin,
             env: Some(&self.environment()),
             limit: self.rule.timeout,
@@ -326,7 +326,7 @@ impl Run<'_> {
     fn project_path(&self, path: &str) -> Option<PathBuf> {
         let candidate = Path::new(path);
         let relative = candidate
-            .strip_prefix(&self.ctx.ws.root)
+            .strip_prefix(&self.ctx.workspace.root)
             .unwrap_or(candidate)
             .components()
             .filter(|c| !matches!(c, std::path::Component::CurDir))

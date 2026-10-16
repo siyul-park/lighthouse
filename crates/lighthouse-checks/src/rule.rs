@@ -11,7 +11,7 @@ use lighthouse_model::{
     annotation::{ANNOTATION_REASON, UNUSED_ALLOW},
     hash,
 };
-use lighthouse_plugin::{Caching, Ctx, Error as PluginError, Rule, RuleManifest};
+use lighthouse_plugin::{Caching, Context, Error as PluginError, Rule, RuleManifest};
 use lighthouse_spec::{BuiltinCheck, BuiltinOp, CheckKind, Decision, FORMATTED, Select};
 use serde_json::{Map, Value};
 
@@ -144,7 +144,11 @@ impl DeclarativeRule {
     }
 
     /// The options of the focused file's language over the decision's defaults.
-    fn resolved(&self, configured: &Options, ctx: &Ctx) -> Result<Map<String, Value>, PluginError> {
+    fn resolved(
+        &self,
+        configured: &Options,
+        ctx: &Context,
+    ) -> Result<Map<String, Value>, PluginError> {
         let language = ctx.file.map(|(file, _)| file.lang.as_str());
         rule_options(&self.decision, configured, language)
     }
@@ -167,7 +171,7 @@ impl Rule for DeclarativeRule {
     }
 
     /// Runs once per file or once over the project, following the decision's scope.
-    fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, PluginError> {
+    fn check(&self, ctx: &Context, options: &Options) -> Result<Vec<Diagnostic>, PluginError> {
         let resolved = self.resolved(options, ctx)?;
         let meta = &self.meta;
         match self.kind.as_ref() {

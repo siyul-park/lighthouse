@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use lighthouse_model::RunScope;
 use lighthouse_model::{File, Fragment, Options, Project, Severity};
-use lighthouse_plugin::{Ctx, Error, Facts, Workspace};
+use lighthouse_plugin::{Context, Error, Facts, Workspace};
 use lighthouse_spec::{Catalog, Config, Rules};
 use serde_json::json;
 
@@ -35,8 +35,8 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
     let ws = Workspace::new(".");
     let project = Project::merge([Fragment::default()]);
     let facts = Facts::new();
-    let ctx = Ctx {
-        ws: &ws,
+    let ctx = Context {
+        workspace: &ws,
         project: &project,
         file: Some((&file, text)),
         facts: &facts,
@@ -257,11 +257,12 @@ fn default_limit_comes_from_the_catalog() {
 #[test]
 fn bundled_plugins_provide_only_the_fallback_text_language() {
     let registry = lighthouse_checks::registry();
-    let plugins: Vec<_> = registry.plugins().collect();
+    let plugins: Vec<_> = registry.manifests().iter().map(|p| p.id.as_str()).collect();
     assert_eq!(plugins, ["core", "metrics", "design", "testing"]);
     let languages: Vec<_> = registry
         .languages()
-        .map(|(_, l)| l.manifest().id.clone())
+        .iter()
+        .map(|l| l.provider.manifest().id.clone())
         .collect();
     assert_eq!(languages, ["text"]);
     let design: Vec<_> = registry

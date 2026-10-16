@@ -17,7 +17,7 @@ use lighthouse_model::{
     Span,
 };
 use lighthouse_plugin::{
-    Caching, Ctx, Error as PluginError, Indexed, LanguageProvider, Plugin, PluginManifest,
+    Caching, Context, Error as PluginError, Indexed, LanguageProvider, Plugin, PluginManifest,
     ProviderManifest, Registry, Rule, RuleManifest, Source, Workspace,
 };
 use lighthouse_spec::{Catalog, Config};
@@ -58,7 +58,7 @@ impl Rule for Counting {
     fn validate(&self, _: &Options) -> Result<(), PluginError> {
         Ok(())
     }
-    fn check(&self, ctx: &Ctx, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
+    fn check(&self, ctx: &Context, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
         self.runs.fetch_add(1, Ordering::SeqCst);
         ctx.notices.push(format!("{} ran", self.meta.id));
         let (file, message) = match ctx.file {

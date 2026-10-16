@@ -15,9 +15,9 @@ use lighthouse_model::Diagnostic;
 
 use crate::Error;
 
-/// The probability at which an uncalibrated model's answer is a `fail`; a
-/// model that has not been calibrated never clears a subject.
-pub const UPPER: f64 = 0.9;
+/// The probability at which a model's answer is a `fail`; a model never
+/// clears a subject.
+pub const FAIL_AT: f64 = 0.9;
 
 /// A model offered by a plugin.
 pub trait Classifier: Send + Sync {
@@ -26,7 +26,9 @@ pub trait Classifier: Send + Sync {
     fn classify(&self, params: &SystemOneRequest) -> Result<SystemOneResponse, Error>;
     /// Runs a fine-tuning job; only a model whose manifest supports `fine_tuning` does.
     /// The job is final: `succeeded` or `failed`.
-    fn train(&self, request: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error>;
+    fn train(&self, _request: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {
+        Err(Error::model(&self.manifest().id, "does not train"))
+    }
 }
 
 /// Subjects of one decision to be judged.
@@ -37,10 +39,8 @@ pub struct Ask {
     /// Changes whenever the way the rule judges changes; cached answers of
     /// another revision are not used.
     pub revision: String,
-    /// P(fail) at or above which a model's answer is a `fail`; below it the
-    /// subject is left for review.
-    pub upper: f64,
     pub decision: DecisionRef,
+
     pub subjects: Vec<Subject>,
 }
 
@@ -68,8 +68,8 @@ pub struct Explored {
 
 /// Why a subject was left undecided: it is a candidate for agent review.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Open {
-    /// Every model of the cascade abstained or was unsure.
+pub enum Abstained {
+    /// Every model of the route abstained or was unsure.
     Undecided,
     /// No model is bound to the decision, or models are off.
     Unbound,
@@ -81,7 +81,7 @@ pub enum Open {
     Explored(Explored),
 }
 
-impl std::fmt::Display for Open {
+impl std::fmt::Display for Abstained {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Undecided => f.write_str("no model decided"),
@@ -95,15 +95,15 @@ impl std::fmt::Display for Open {
     }
 }
 
-/// The outcome for one subject.
+/// The models' answer for one subject.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Judged {
+pub enum Answered {
     Decided(Decided),
-    Open(Open),
+    Abstained(Abstained),
 }
 
-/// How a queued ask turns into diagnostics once its subjects are judged.
-pub type Settle = Box<dyn FnOnce(Vec<Judged>) -> Vec<Diagnostic> + Send + Sync>;
+/// How a queued ask turns into diagnostics once its subjects are answered.
+pub type Settle = Box<dyn FnOnce(Vec<Answered>) -> Vec<Diagnostic> + Send + Sync>;
 
 /// What a run offers rules that ask models.
 pub trait Models: Send + Sync {
@@ -131,7 +131,7 @@ pub trait Models: Send + Sync {
         let unbound = ask
             .subjects
             .iter()
-            .map(|_| Judged::Open(Open::Unbound))
+            .map(|_| Answered::Abstained(Abstained::Unbound))
             .collect();
         Some(settle(unbound))
     }
@@ -166,9 +166,8 @@ pub fn request_of<'a>(
     }
 }
 
-/// A probability of failing, made a verdict by the band: `Some(confidence)`
-/// when the model fails the subject (P at or above `upper`), `None` when it
-/// abstains. M1 has no calibration, so no lower bound clears a subject.
-pub fn decide(noul: f64, upper: f64) -> Option<f64> {
-    (noul >= upper).then(|| noul.max(1.0 - noul))
+/// `Some(confidence)` when a model that gave `p` fails the subject (`p` at or
+/// above [`FAIL_AT`]), `None` when it abstains: no lower bound clears a subject.
+pub fn fails(p: f64) -> Option<f64> {
+    (p >= FAIL_AT).then(|| p.max(1.0 - p))
 }

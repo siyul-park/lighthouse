@@ -23,7 +23,12 @@ fn skill_for_lists_every_rule_the_engines_registry_enables() {
     // The registry the engine runs with has the language plugin started.
     let (registry, registered) = session.registry().unwrap();
     assert!(registered.incomplete.is_empty());
-    assert!(registry.languages().any(|(_, l)| l.manifest().id == "rust"));
+    assert!(
+        registry
+            .languages()
+            .iter()
+            .any(|l| l.provider.manifest().id == "rust")
+    );
     let enabled = active_rules(
         &session.config,
         &session.catalog().unwrap().projects().unwrap(),

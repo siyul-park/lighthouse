@@ -2,11 +2,12 @@
 //! read: said once per run as notices, never silently.
 
 use std::{
+    borrow::Cow,
     collections::BTreeMap,
     path::{Path, PathBuf},
 };
 
-use lighthouse_plugin::{Ctx, Notices};
+use lighthouse_plugin::{Context, Notices};
 
 /// The tally of one run of a log.
 #[derive(Default)]
@@ -25,9 +26,9 @@ impl Tally {
     }
 
     /// The text of a project file, read once; `None` when it cannot be read.
-    pub(super) fn text(&mut self, ctx: &Ctx, path: &Path) -> Option<&str> {
+    pub(super) fn text(&mut self, ctx: &Context, path: &Path) -> Option<&str> {
         if !self.texts.contains_key(path) {
-            let text = ctx.ws.read(path).ok();
+            let text = ctx.workspace.read(path).ok().map(Cow::into_owned);
             if text.is_none() {
                 self.unreadable.push(path.to_owned());
             }

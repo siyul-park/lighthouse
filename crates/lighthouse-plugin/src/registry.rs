@@ -1,16 +1,25 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    cmp::Reverse,
+    collections::{BTreeMap, BTreeSet},
+};
 
 use crate::{
     Analyzer, Classifier, Error, Fixer, LanguageProvider, OrderKey, OrderKeys, Plugin,
     PluginManifest, Rule,
 };
 
+/// A language provider with the id of the plugin that registered it.
+pub struct Language {
+    pub plugin: String,
+    pub provider: Box<dyn LanguageProvider>,
+}
+
 /// The registered plugins and everything they contribute. `register` is atomic,
 /// so a registry never holds a half-registered plugin.
 #[derive(Default)]
 pub struct Registry {
     plugins: Vec<PluginManifest>,
-    languages: Vec<(String, Box<dyn LanguageProvider>)>,
+    languages: Vec<Language>,
     analyzers: BTreeMap<String, Box<dyn Analyzer>>,
     rules: BTreeMap<String, Box<dyn Rule>>,
     fixers: BTreeMap<String, Box<dyn Fixer>>,
@@ -22,6 +31,14 @@ pub struct Registry {
 enum Mark {
     Visiting,
     Done,
+}
+
+/// The analyzers of one dependency walk, dependencies first.
+struct Walk<'r> {
+    registry: &'r Registry,
+    marks: BTreeMap<String, Mark>,
+    stack: Vec<String>,
+    out: Vec<&'r dyn Analyzer>,
 }
 
 impl Registry {
@@ -37,16 +54,67 @@ impl Registry {
         let fixers = plugin.fixers();
         let keys = plugin.order_keys();
         let models = plugin.models();
-        self.check_models(&manifest.id, &models)?;
+        let id = manifest.id.as_str();
+        let own = |model: &str| model == id;
+        let qualified = |item: &str| plugin_of(item) == id && item.contains('/');
+        let mut seen = BTreeSet::new();
+        claim(
+            models.iter().map(|m| m.manifest().id.as_str()),
+            own,
+            |m| self.models.contains_key(m),
+            &mut BTreeSet::new(),
+            id,
+        )?;
         self.check_languages(&languages)?;
-        check_prefixes(&manifest.id, &analyzers, &rules)?;
-        self.check_unique(&analyzers, &rules)?;
-        self.check_fixers(&manifest.id, &fixers, &keys)?;
+        claim(
+            analyzers.iter().map(|a| a.manifest().id.as_str()),
+            qualified,
+            |a| self.analyzers.contains_key(a),
+            &mut seen,
+            id,
+        )?;
+        claim(
+            rules.iter().map(|r| r.manifest().id.as_str()),
+            qualified,
+            |r| self.rules.contains_key(r),
+            &mut seen,
+            id,
+        )?;
+        claim(
+            fixers.iter().map(|f| f.manifest().id.as_str()),
+            qualified,
+            |f| self.fixers.contains_key(f),
+            &mut BTreeSet::new(),
+            id,
+        )?;
+        claim(
+            keys.iter().map(|k| k.manifest().id.as_str()),
+            qualified,
+            |k| self.keys.contains_key(k),
+            &mut BTreeSet::new(),
+            id,
+        )?;
 
         let id = manifest.id.clone();
         self.plugins.push(manifest);
         self.languages
-            .extend(languages.into_iter().map(|l| (id.clone(), l)));
+            .extend(languages.into_iter().map(|provider| Language {
+                plugin: id.clone(),
+                provider,
+            }));
+        // Regular providers by descending priority (registration order among
+        // equals), then the fallback ones: the first provider matching a file wins.
+        self.languages.sort_by_key(|l| {
+            let manifest = l.provider.manifest();
+            (
+                manifest.fallback,
+                Reverse(if manifest.fallback {
+                    0
+                } else {
+                    manifest.priority
+                }),
+            )
+        });
         self.analyzers
             .extend(analyzers.into_iter().map(|a| (a.manifest().id.clone(), a)));
         self.rules
@@ -57,60 +125,6 @@ impl Registry {
             .extend(keys.into_iter().map(|k| (k.manifest().id.clone(), k)));
         self.models
             .extend(models.into_iter().map(|m| (m.manifest().id.clone(), m)));
-        Ok(())
-    }
-
-    /// Fixer and order key ids are qualified with the plugin and unique.
-    fn check_fixers(
-        &self,
-        plugin: &str,
-        fixers: &[Box<dyn Fixer>],
-        keys: &[Box<dyn OrderKey>],
-    ) -> Result<(), Error> {
-        let mut seen = BTreeSet::new();
-        for f in fixers {
-            let id = f.manifest().id.as_str();
-            if plugin_of(id) != plugin || !id.contains('/') {
-                return Err(Error::Prefix {
-                    plugin: plugin.to_owned(),
-                    id: id.to_owned(),
-                });
-            }
-            if self.fixers.contains_key(id) || !seen.insert(id) {
-                return Err(Error::Duplicate(id.to_owned()));
-            }
-        }
-        let mut seen = BTreeSet::new();
-        for k in keys {
-            let id = k.manifest().id.as_str();
-            if plugin_of(id) != plugin || !id.contains('/') {
-                return Err(Error::Prefix {
-                    plugin: plugin.to_owned(),
-                    id: id.to_owned(),
-                });
-            }
-            if self.keys.contains_key(id) || !seen.insert(id) {
-                return Err(Error::Duplicate(id.to_owned()));
-            }
-        }
-        Ok(())
-    }
-
-    /// A model's id is the id of its plugin, and unique.
-    fn check_models(&self, plugin: &str, models: &[Box<dyn Classifier>]) -> Result<(), Error> {
-        let mut seen = BTreeSet::new();
-        for m in models {
-            let id = m.manifest().id.as_str();
-            if id != plugin {
-                return Err(Error::Prefix {
-                    plugin: plugin.to_owned(),
-                    id: id.to_owned(),
-                });
-            }
-            if self.models.contains_key(id) || !seen.insert(id) {
-                return Err(Error::Duplicate(id.to_owned()));
-            }
-        }
         Ok(())
     }
 
@@ -139,39 +153,12 @@ impl Registry {
             if self
                 .languages
                 .iter()
-                .any(|(_, x)| x.manifest().id == l.manifest().id)
+                .any(|x| x.provider.manifest().id == l.manifest().id)
             {
                 return Err(Error::Duplicate(l.manifest().id.clone()));
             }
         }
         Ok(())
-    }
-
-    /// No id may exist already or repeat within the plugin.
-    fn check_unique(
-        &self,
-        analyzers: &[Box<dyn Analyzer>],
-        rules: &[Box<dyn Rule>],
-    ) -> Result<(), Error> {
-        let mut seen = BTreeSet::new();
-        for a in analyzers {
-            let id = a.manifest().id.as_str();
-            if self.analyzers.contains_key(id) || !seen.insert(id) {
-                return Err(Error::Duplicate(id.to_owned()));
-            }
-        }
-        for r in rules {
-            let rule = r.manifest().id.as_str();
-            if self.rules.contains_key(rule) || !seen.insert(rule) {
-                return Err(Error::Duplicate(rule.to_owned()));
-            }
-        }
-        Ok(())
-    }
-
-    /// Ids of registered plugins, in registration order.
-    pub fn plugins(&self) -> impl Iterator<Item = &str> {
-        self.plugins.iter().map(|m| m.id.as_str())
     }
 
     /// The manifests of the registered plugins, in registration order.
@@ -184,17 +171,11 @@ impl Registry {
         self.plugins.iter().any(|m| m.id == id)
     }
 
-    /// With the owning plugin id: regular providers by descending priority
-    /// (registration order among equals), then fallback providers; the first
-    /// provider matching a file wins.
-    pub fn languages(&self) -> impl Iterator<Item = (&str, &dyn LanguageProvider)> {
-        let (mut regular, fallback): (Vec<_>, Vec<_>) = self
-            .languages
-            .iter()
-            .map(|(p, l)| (p.as_str(), l.as_ref()))
-            .partition(|(_, l)| !l.manifest().fallback);
-        regular.sort_by_key(|(_, l)| std::cmp::Reverse(l.manifest().priority));
-        regular.into_iter().chain(fallback)
+    /// Regular providers by descending priority (registration order among
+    /// equals), then fallback providers; the first provider matching a file
+    /// wins.
+    pub fn languages(&self) -> &[Language] {
+        &self.languages
     }
 
     /// The rule with this qualified id.
@@ -213,54 +194,22 @@ impl Registry {
         ids: impl IntoIterator<Item = &'a str>,
     ) -> Result<Vec<&dyn Analyzer>, Error> {
         let roots: BTreeSet<&str> = ids.into_iter().collect();
-        let mut marks = BTreeMap::new();
-        let mut out = Vec::new();
+        let mut walk = Walk {
+            registry: self,
+            marks: BTreeMap::new(),
+            stack: Vec::new(),
+            out: Vec::new(),
+        };
         for id in roots {
-            self.visit(id, "requested", &mut Vec::new(), &mut marks, &mut out)?;
+            walk.visit(id, "requested")?;
         }
-        Ok(out)
+        Ok(walk.out)
     }
 
     /// Checks every registered analyzer for missing requirements and cycles.
     pub fn validate(&self) -> Result<(), Error> {
         self.order(self.analyzers.keys().map(String::as_str))
             .map(drop)
-    }
-
-    fn visit<'r>(
-        &'r self,
-        id: &str,
-        required_by: &str,
-        stack: &mut Vec<String>,
-        marks: &mut BTreeMap<String, Mark>,
-        out: &mut Vec<&'r dyn Analyzer>,
-    ) -> Result<(), Error> {
-        let analyzer = self
-            .analyzers
-            .get(id)
-            .ok_or_else(|| Error::MissingAnalyzer {
-                id: id.to_owned(),
-                required_by: required_by.to_owned(),
-            })?;
-        match marks.get(id) {
-            Some(Mark::Done) => return Ok(()),
-            Some(Mark::Visiting) => {
-                let from = stack.iter().position(|s| s == id).unwrap_or(0);
-                let mut cycle = stack[from..].to_vec();
-                cycle.push(id.to_owned());
-                return Err(Error::Cycle(cycle));
-            }
-            None => {}
-        }
-        marks.insert(id.to_owned(), Mark::Visiting);
-        stack.push(id.to_owned());
-        for dep in &analyzer.manifest().requires {
-            self.visit(dep, id, stack, marks, out)?;
-        }
-        stack.pop();
-        marks.insert(id.to_owned(), Mark::Done);
-        out.push(analyzer.as_ref());
-        Ok(())
     }
 }
 
@@ -271,27 +220,61 @@ impl OrderKeys for Registry {
     }
 }
 
+impl<'r> Walk<'r> {
+    fn visit(&mut self, id: &str, required_by: &str) -> Result<(), Error> {
+        let analyzer = self
+            .registry
+            .analyzers
+            .get(id)
+            .ok_or_else(|| Error::MissingAnalyzer {
+                id: id.to_owned(),
+                required_by: required_by.to_owned(),
+            })?;
+        match self.marks.get(id) {
+            Some(Mark::Done) => return Ok(()),
+            Some(Mark::Visiting) => {
+                let from = self.stack.iter().position(|s| s == id).unwrap_or(0);
+                let mut cycle = self.stack[from..].to_vec();
+                cycle.push(id.to_owned());
+                return Err(Error::Cycle(cycle));
+            }
+            None => {}
+        }
+        self.marks.insert(id.to_owned(), Mark::Visiting);
+        self.stack.push(id.to_owned());
+        for dep in &analyzer.manifest().requires {
+            self.visit(dep, id)?;
+        }
+        self.stack.pop();
+        self.marks.insert(id.to_owned(), Mark::Done);
+        self.out.push(analyzer.as_ref());
+        Ok(())
+    }
+}
+
 /// Plugin id of a qualified `plugin/name` id.
 pub fn plugin_of(id: &str) -> &str {
     id.split_once('/').map_or(id, |(plugin, _)| plugin)
 }
 
-/// Every id a plugin contributes must be qualified with the plugin's own id.
-fn check_prefixes(
+/// Every id a plugin contributes is named as `named` demands, and neither
+/// `taken` already nor repeated in `seen`.
+fn claim<'a>(
+    ids: impl Iterator<Item = &'a str>,
+    named: impl Fn(&str) -> bool,
+    taken: impl Fn(&str) -> bool,
+    seen: &mut BTreeSet<&'a str>,
     plugin: &str,
-    analyzers: &[Box<dyn Analyzer>],
-    rules: &[Box<dyn Rule>],
 ) -> Result<(), Error> {
-    let ids = analyzers
-        .iter()
-        .map(|a| a.manifest().id.as_str())
-        .chain(rules.iter().map(|r| r.manifest().id.as_str()));
-    for item in ids {
-        if plugin_of(item) != plugin || !item.contains('/') {
+    for id in ids {
+        if !named(id) {
             return Err(Error::Prefix {
                 plugin: plugin.to_owned(),
-                id: item.to_owned(),
+                id: id.to_owned(),
             });
+        }
+        if taken(id) || !seen.insert(id) {
+            return Err(Error::Duplicate(id.to_owned()));
         }
     }
     Ok(())

@@ -9,7 +9,7 @@ use lighthouse_engine::cache::Digests;
 use lighthouse_model::{
     Applicability, EdgeKind, File, Project, Symbol, SymbolId, SymbolKind, SymbolRole, Visibility,
 };
-use lighthouse_plugin::{Ctx, Memo, NoKeys, Notices, Workspace};
+use lighthouse_plugin::{Context, Memo, NoKeys, Notices, Workspace};
 use serde_json::Value;
 
 use crate::support::World;
@@ -35,13 +35,13 @@ fn symbol(project: &Project, name: &str) -> Symbol {
         .clone()
 }
 
-fn ctx_run<R>(project: &Project, file: Option<&File>, run: impl FnOnce(&Ctx) -> R) -> R {
+fn ctx_run<R>(project: &Project, file: Option<&File>, run: impl FnOnce(&Context) -> R) -> R {
     let ws = Workspace::new(".");
     let facts = Default::default();
     let memo = Memo::default();
     let notices = Notices::default();
-    let ctx = Ctx {
-        ws: &ws,
+    let ctx = Context {
+        workspace: &ws,
         project,
         file: file.map(|f| (f, "")),
         facts: &facts,

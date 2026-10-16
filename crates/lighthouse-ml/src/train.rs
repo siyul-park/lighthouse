@@ -11,8 +11,7 @@ use std::{
 
 use lighthouse_plugin::{
     Classifier, CreateFineTuningJobRequest, DATASETS_DIR, DecisionRef, FineTuneMethod,
-    FineTuneSupervisedMethod, FineTuningJob, MODELS_DIR, Subject, UPPER, artifact_path, decide,
-    request_of,
+    FineTuneSupervisedMethod, FineTuningJob, MODELS_DIR, Subject, artifact_path, fails, request_of,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -251,9 +250,9 @@ fn taught(
         let Some(noul) = answered.answers.get(&decision.id).map(|a| a.noul) else {
             continue;
         };
-        let fail = if decide(noul, UPPER).is_some() {
+        let fail = if fails(noul).is_some() {
             true
-        } else if decide(1.0 - noul, UPPER).is_some() {
+        } else if fails(1.0 - noul).is_some() {
             false
         } else {
             continue;

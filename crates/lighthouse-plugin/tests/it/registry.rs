@@ -1,6 +1,6 @@
 use lighthouse_model::RunScope;
 use lighthouse_plugin::{
-    Analyzer, AnalyzerManifest, Ctx, Error, Indexed, LanguageProvider, Plugin, PluginManifest,
+    Analyzer, AnalyzerManifest, Context, Error, Indexed, LanguageProvider, Plugin, PluginManifest,
     ProviderManifest, Registry, Source, Workspace, options,
 };
 use serde_json::Value;
@@ -11,7 +11,7 @@ impl Analyzer for Node {
     fn manifest(&self) -> &AnalyzerManifest {
         &self.0
     }
-    fn run(&self, _: &Ctx) -> Result<Value, Error> {
+    fn run(&self, _: &Context) -> Result<Value, Error> {
         Ok(Value::Null)
     }
 }
@@ -126,14 +126,6 @@ fn registry_register() {
 }
 
 #[test]
-fn plugins_are_listed_in_registration_order() {
-    let mut registry = Registry::default();
-    registry.register(&Graph::new("b", &[])).unwrap();
-    registry.register(&Graph::new("a", &[])).unwrap();
-    assert_eq!(registry.plugins().collect::<Vec<_>>(), ["b", "a"]);
-}
-
-#[test]
 fn registry_manifests_carry_the_version_of_each_plugin_in_registration_order() {
     let mut registry = Registry::default();
     registry.register(&Graph::new("b", &[])).unwrap();
@@ -198,7 +190,8 @@ fn fallback_providers_come_after_regular_ones_whatever_the_registration_order() 
         .unwrap();
     let ids: Vec<_> = registry
         .languages()
-        .map(|(_, l)| l.manifest().id.clone())
+        .iter()
+        .map(|l| l.provider.manifest().id.clone())
         .collect();
     assert_eq!(ids, ["go", "py", "text"]);
 }
@@ -214,7 +207,8 @@ fn higher_priority_providers_come_first_and_ties_keep_registration_order() {
         .unwrap();
     let ids: Vec<_> = registry
         .languages()
-        .map(|(_, l)| l.manifest().id.clone())
+        .iter()
+        .map(|l| l.provider.manifest().id.clone())
         .collect();
     assert_eq!(ids, ["high", "tie", "tie2", "low"]);
 }

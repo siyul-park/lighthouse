@@ -8,7 +8,7 @@ use std::{
 
 use cel::Program;
 use lighthouse_model::{Diagnostic, File, Node, Position, Project, Reach, Span, Symbol, SymbolId};
-use lighthouse_plugin::{Ctx, Error as PluginError, RuleManifest};
+use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
 use lighthouse_spec::{CelCheck, Decision, Select};
 use serde_json::{Map, Value};
 
@@ -149,7 +149,7 @@ impl CelRule {
     pub(crate) fn check(
         &self,
         meta: &RuleManifest,
-        ctx: &Ctx,
+        ctx: &Context,
         options: &Map<String, Value>,
     ) -> Result<Vec<Diagnostic>, PluginError> {
         let builder = Builder::new(ctx, &self.needs, options, &meta.id)?;
@@ -185,7 +185,7 @@ struct Run<'a> {
 }
 
 impl Run<'_> {
-    fn check_file(&self, ctx: &Ctx) -> Result<Vec<Diagnostic>, PluginError> {
+    fn check_file(&self, ctx: &Context) -> Result<Vec<Diagnostic>, PluginError> {
         let Some((file, text)) = ctx.file else {
             return Ok(Vec::new());
         };
@@ -211,7 +211,7 @@ impl Run<'_> {
     }
 
     /// The symbols of `file` that are subjects of the decision's scope.
-    fn check_symbols(&self, ctx: &Ctx, file: &File) -> Result<Vec<Diagnostic>, PluginError> {
+    fn check_symbols(&self, ctx: &Context, file: &File) -> Result<Vec<Diagnostic>, PluginError> {
         let project = ctx.project;
         let mut found = Vec::new();
         for symbol in project
@@ -251,7 +251,7 @@ impl Run<'_> {
     /// The comments of `file` that are subjects of the decision's scope.
     fn check_comments(
         &self,
-        ctx: &Ctx,
+        ctx: &Context,
         file: &File,
         text: &str,
     ) -> Result<Vec<Diagnostic>, PluginError> {
@@ -272,7 +272,7 @@ impl Run<'_> {
         Ok(found)
     }
 
-    fn check_project(&self, ctx: &Ctx) -> Result<Vec<Diagnostic>, PluginError> {
+    fn check_project(&self, ctx: &Context) -> Result<Vec<Diagnostic>, PluginError> {
         let project = ctx.project;
         let first_file = module_anchors(project);
         let files_of = files_by_module(project);
@@ -518,7 +518,7 @@ fn files_by_module(project: &Project) -> BTreeMap<&str, BTreeSet<&std::path::Pat
 
 /// Whether a module is a subject of the decision, by the files that declare it.
 fn admits_module(
-    ctx: &Ctx,
+    ctx: &Context,
     files_of: &BTreeMap<&str, BTreeSet<&std::path::Path>>,
     module: &lighthouse_model::Module,
 ) -> bool {

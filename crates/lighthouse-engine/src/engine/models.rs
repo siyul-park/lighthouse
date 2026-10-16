@@ -15,7 +15,9 @@ use std::{
 
 use crate::cache::{Cache, DEFAULT_LIMIT, KeyBuilder};
 use lighthouse_model::{Diagnostic, ModelRef, hash};
-use lighthouse_plugin::{Ask, Classifier, Judged, Model, Models, Open, Question, Settle, Subject};
+use lighthouse_plugin::{
+    Abstained, Answered, Ask, Classifier, Model, Models, Question, Settle, Subject,
+};
 use lighthouse_spec::{ModelBinding, Routing};
 use serde::{Deserialize, Serialize};
 
@@ -407,7 +409,7 @@ impl Models for RunModels<'_> {
     fn queue(&self, group: &str, ask: Ask, settle: Settle) -> Option<Vec<Diagnostic>> {
         let routes = self.cascade(&ask.rule);
         if routes.is_empty() {
-            let unbound = vec![Judged::Open(Open::Unbound); ask.subjects.len()];
+            let unbound = vec![Answered::Abstained(Abstained::Unbound); ask.subjects.len()];
             return Some(settle(unbound));
         }
         self.queued

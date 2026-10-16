@@ -5,7 +5,7 @@ use lighthouse_model::{
     Edge, EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Node, Position, Project,
     Resolution, Span, Symbol, SymbolId, SymbolKind, Target, Visibility,
 };
-use lighthouse_plugin::{Ctx, Facts, Plugin, Workspace};
+use lighthouse_plugin::{Context, Facts, Plugin, Workspace};
 use serde::de::DeserializeOwned;
 
 const FILE: &str = "m/m.go";
@@ -79,8 +79,8 @@ fn run<T: DeserializeOwned>(project: &Project, analyzer: &str, path: &str) -> Ve
     let ws = Workspace::new(".");
     let file = file(path, false);
     let facts = Facts::new();
-    let ctx = Ctx {
-        ws: &ws,
+    let ctx = Context {
+        workspace: &ws,
         project,
         file: Some((&file, "")),
         facts: &facts,
@@ -311,15 +311,16 @@ fn read_maps_the_metric_fact_by_function_and_fails_when_it_is_missing() {
     let ws = Workspace::new(".");
     let mut facts = Facts::new();
     facts.insert(
-        (CYCLOMATIC.to_owned(), String::new()),
+        CYCLOMATIC,
+        String::new(),
         serde_json::to_value([Measured {
             symbol: f.id.clone(),
             value: 3u32,
         }])
         .unwrap(),
     );
-    let ctx = Ctx {
-        ws: &ws,
+    let ctx = Context {
+        workspace: &ws,
         project: &project,
         file: None,
         facts: &facts,

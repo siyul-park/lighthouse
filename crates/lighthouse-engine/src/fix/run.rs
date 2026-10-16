@@ -328,8 +328,9 @@ impl Orchestrator<'_> {
         let provided = engine
             .registry
             .languages()
-            .find(|(_, l)| l.manifest().id == language)
-            .map(|(_, l)| l.manifest().capabilities.as_slice());
+            .iter()
+            .find(|l| l.provider.manifest().id == language)
+            .map(|l| l.provider.manifest().capabilities.as_slice());
         if !provides(engine, language, Capability::Overlays) {
             return Err(format!(
                 "the provider of `{language}` does not analyze overlays, so an edit cannot be verified before it is written"
@@ -361,7 +362,7 @@ impl Orchestrator<'_> {
             decision: &binding.decision,
             options: &options,
             project: &outcome.project,
-            ws: &engine.ws,
+            workspace: &engine.ws,
             text: &text,
             keys: &engine.registry,
             trusted: self.trusted,
@@ -410,8 +411,9 @@ pub(super) fn provides(engine: &Engine, language: &str, capability: Capability) 
     engine
         .registry
         .languages()
-        .find(|(_, l)| l.manifest().id == language)
-        .is_some_and(|(_, l)| l.manifest().capabilities.contains(&capability))
+        .iter()
+        .find(|l| l.provider.manifest().id == language)
+        .is_some_and(|l| l.provider.manifest().capabilities.contains(&capability))
 }
 
 fn op_name(op: &EditOp) -> &'static str {

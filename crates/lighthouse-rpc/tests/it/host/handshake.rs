@@ -150,5 +150,5 @@ fn an_explicit_path_disambiguates_and_relative_commands_resolve_next_to_the_mani
     )
     .unwrap();
     assert!(registry.has_plugin("fake"));
-    assert_eq!(registry.languages().count(), 1);
+    assert_eq!(registry.languages().len(), 1);
 }

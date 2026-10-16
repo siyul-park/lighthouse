@@ -3,7 +3,7 @@
 //! keys registered by other plugins use the same vocabulary.
 
 use lighthouse_model::{File, Project, Symbol, SymbolKind, SymbolRole, Visibility};
-use lighthouse_plugin::Ctx;
+use lighthouse_plugin::Context;
 
 /// Declarations of the focused file in source order, one list per module the
 /// file declares (an inline module is a module of its own). A declaration is a
@@ -11,7 +11,7 @@ use lighthouse_plugin::Ctx;
 /// of an interface and not nested in a function body. Test code is left out,
 /// except the fixtures of a test file, which are ordered like any other
 /// declarations.
-pub fn declarations<'a>(ctx: &Ctx<'a>) -> Vec<Vec<&'a Symbol>> {
+pub fn declarations<'a>(ctx: &Context<'a>) -> Vec<Vec<&'a Symbol>> {
     ctx.file
         .map_or_else(Vec::new, |(file, _)| declarations_in(ctx.project, file))
 }

@@ -2,13 +2,13 @@
 //! the result cache to what the facts depend on. Not part of the API.
 
 use lighthouse_model::{File, Project, Symbol};
-use lighthouse_plugin::{Ctx, Error};
+use lighthouse_plugin::{Context, Error};
 use serde_json::{Map, Value};
 
 use crate::{builder::Builder, facts, library::Needs};
 
 /// The value of `fact` of `symbol`, as an expression that mentions it sees it.
-pub fn symbol_fact(ctx: &Ctx, symbol: &Symbol, fact: &'static str) -> Result<Value, Error> {
+pub fn symbol_fact(ctx: &Context, symbol: &Symbol, fact: &'static str) -> Result<Value, Error> {
     let needs = Needs::of([fact]);
     let options = Map::new();
     let builder = Builder::new(ctx, &needs, &options, "probe")?;
@@ -16,7 +16,12 @@ pub fn symbol_fact(ctx: &Ctx, symbol: &Symbol, fact: &'static str) -> Result<Val
 }
 
 /// The value of `fact` of `file`, whose text is `text`.
-pub fn file_fact(ctx: &Ctx, file: &File, text: &str, fact: &'static str) -> Result<Value, Error> {
+pub fn file_fact(
+    ctx: &Context,
+    file: &File,
+    text: &str,
+    fact: &'static str,
+) -> Result<Value, Error> {
     let needs = Needs::of([fact]);
     let options = Map::new();
     let builder = Builder::new(ctx, &needs, &options, "probe")?;

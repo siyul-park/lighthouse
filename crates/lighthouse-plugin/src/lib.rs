@@ -5,8 +5,9 @@ mod notices;
 mod registry;
 
 use std::{
+    borrow::Cow,
     collections::BTreeMap,
-    fs,
+    fmt, fs,
     path::{Path, PathBuf},
 };
 
@@ -20,21 +21,21 @@ use serde_json::Value;
 use thiserror::Error;
 
 pub use fix::{
-    FixDecision, FixRequest, Fixer, FixerManifest, KeyCtx, NoKeys, OrderKey, OrderKeyManifest,
+    FixDecision, FixRequest, Fixer, FixerManifest, KeyContext, NoKeys, OrderKey, OrderKeyManifest,
     OrderKeys,
 };
 pub use lighthouse_protocol::Conventions;
 pub use memo::Memo;
 pub use models::{
-    Answer, Ask, Capabilities, Classifier, CreateFineTuningJobRequest, DATASETS_DIR, Decided,
-    DecisionRef, Example, Explored, FineTuneJobError, FineTuneMethod,
-    FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
-    FineTuningJobStatus, Judged, LineKeys, ListModelResponse, MODELS_DIR, Model, Models, Neighbor,
-    NoModels, Open, Question, Settle, State, Subject, Supports, SystemOneRequest,
-    SystemOneResponse, TrainingLine, UPPER, artifact_path, dataset_path, decide, request_of,
+    Abstained, Answer, Answered, Ask, Capabilities, Classifier, CreateFineTuningJobRequest,
+    DATASETS_DIR, Decided, DecisionRef, Example, Explored, FAIL_AT, FineTuneJobError,
+    FineTuneMethod, FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
+    FineTuningJobStatus, LineKeys, ListModelResponse, MODELS_DIR, Model, Models, Neighbor,
+    NoModels, Question, Settle, State, Subject, Supports, SystemOneRequest, SystemOneResponse,
+    TrainingLine, artifact_path, dataset_path, fails, request_of,
 };
 pub use notices::Notices;
-pub use registry::{Registry, plugin_of};
+pub use registry::{Language, Registry, plugin_of};
 
 /// Why registering a plugin, resolving analyzers, reading facts or running a
 /// rule failed. Messages name the offending id and are fit to show the user.
@@ -61,6 +62,13 @@ pub enum Error {
     /// the same as passing. The run reports the gap and goes on.
     #[error("{0}")]
     Incomplete(String),
+}
+
+impl Error {
+    /// A failure of the model `id`, for the user to read.
+    pub fn model(id: &str, reason: impl fmt::Display) -> Self {
+        Self::Failed(format!("model `{id}`: {reason}"))
+    }
 }
 
 /// Identity of a plugin: `id` prefixes every analyzer, rule and fixer
@@ -94,8 +102,38 @@ pub struct Workspace {
     pub cache_dir: Option<PathBuf>,
 }
 
-/// Fact key: analyzer id and scope key (file path, or empty for project scope).
-pub type Facts = BTreeMap<(String, String), Value>;
+/// What the analyzers computed in one run, by analyzer id and scope key (the
+/// file path, or empty for project scope).
+#[derive(Debug, Clone, Default)]
+pub struct Facts(BTreeMap<String, BTreeMap<String, Value>>);
+
+impl Facts {
+    /// No facts yet.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Keeps `value` as the fact of `analyzer` at `key`.
+    pub fn insert(&mut self, analyzer: &str, key: String, value: Value) {
+        self.0
+            .entry(analyzer.to_owned())
+            .or_default()
+            .insert(key, value);
+    }
+
+    /// The fact of `analyzer` at `key`.
+    pub fn get(&self, analyzer: &str, key: &str) -> Option<&Value> {
+        self.0.get(analyzer)?.get(key)
+    }
+
+    /// Every fact as `(analyzer, key, value)`, sorted.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str, &Value)> {
+        self.0.iter().flat_map(|(analyzer, keys)| {
+            keys.iter()
+                .map(move |(key, value)| (analyzer.as_str(), key.as_str(), value))
+        })
+    }
+}
 
 impl Workspace {
     /// A workspace at `root` with no language options.
@@ -111,11 +149,12 @@ impl Workspace {
     }
 
     /// The text of a file as the run sees it: the overlay, else the disk.
-    pub fn read(&self, path: &Path) -> Result<String, Error> {
+    pub fn read(&self, path: &Path) -> Result<Cow<'_, str>, Error> {
         if let Some(text) = self.overlays.get(path) {
-            return Ok(text.clone());
+            return Ok(Cow::Borrowed(text));
         }
         fs::read_to_string(self.root.join(path))
+            .map(Cow::Owned)
             .map_err(|e| Error::Incomplete(format!("{}: {e}", path.display())))
     }
 
@@ -126,8 +165,8 @@ impl Workspace {
 }
 
 /// Everything an analyzer or rule may read in one run.
-pub struct Ctx<'a> {
-    pub ws: &'a Workspace,
+pub struct Context<'a> {
+    pub workspace: &'a Workspace,
     pub project: &'a Project,
     /// The focused file and its text; `None` for project scope.
     pub file: Option<(&'a File, &'a str)>,
@@ -150,22 +189,18 @@ pub struct Ctx<'a> {
     pub models: &'a dyn Models,
 }
 
-impl Ctx<'_> {
+impl Context<'_> {
     /// The analyzer's fact for the focused file, else its project fact.
     pub fn fact<T: DeserializeOwned>(&self, analyzer: &str) -> Result<T, Error> {
-        let at = |key| self.facts.get(&(analyzer.to_owned(), key));
-        let value = at(self.key())
-            .or_else(|| at(String::new()))
+        let file = self.file.map(|(f, _)| f.path.to_string_lossy());
+        let value = file
+            .and_then(|key| self.facts.get(analyzer, &key))
+            .or_else(|| self.facts.get(analyzer, ""))
             .ok_or_else(|| Error::MissingFact(analyzer.to_owned()))?;
         T::deserialize(value).map_err(|e| Error::BadFact {
             analyzer: analyzer.to_owned(),
             message: e.to_string(),
         })
-    }
-
-    fn key(&self) -> String {
-        self.file
-            .map_or_else(String::new, |(f, _)| f.path.to_string_lossy().into_owned())
     }
 }
 
@@ -218,19 +253,19 @@ pub struct Indexed {
 }
 
 /// Turns the files of one language into UCM fragments. Implementations must
-/// be thread-safe, and `index` must not read outside `files` and `ws`.
+/// be thread-safe, and `index` must not read outside `files` and `workspace`.
 pub trait LanguageProvider: Send + Sync {
     fn manifest(&self) -> &ProviderManifest;
     /// Indexes every file of this provider in one call. An `Err` means the
     /// whole batch failed; every file is then incomplete.
-    fn index(&self, ws: &Workspace, files: &[Source]) -> Result<Indexed, Error>;
+    fn index(&self, workspace: &Workspace, files: &[Source]) -> Result<Indexed, Error>;
 }
 
 /// Computes one fact, declared by `id`, from the project and the facts of its `requires`.
 /// `run` must be deterministic for equal inputs; the engine runs it once per `scope`.
 pub trait Analyzer: Send + Sync {
     fn manifest(&self) -> &AnalyzerManifest;
-    fn run(&self, ctx: &Ctx) -> Result<Value, Error>;
+    fn run(&self, ctx: &Context) -> Result<Value, Error>;
 }
 
 /// What an analyzer declares: the fact it computes, what that fact is
@@ -300,7 +335,7 @@ pub struct Caching {
 pub trait Rule: Send + Sync {
     fn manifest(&self) -> &RuleManifest;
     fn validate(&self, options: &Options) -> Result<(), Error>;
-    fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, Error>;
+    fn check(&self, ctx: &Context, options: &Options) -> Result<Vec<Diagnostic>, Error>;
     /// Whether the rule puts subjects to models (a `review` route). Its findings
     /// are stored only for a run that does not ask the models.
     fn reviews(&self) -> bool {

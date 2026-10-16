@@ -59,8 +59,9 @@ pub(super) fn validate_config(
 pub(super) fn constructors(registry: &Registry, config: &Config) -> BTreeMap<String, Vec<String>> {
     let mut found: BTreeMap<String, Vec<String>> = registry
         .languages()
-        .map(|(_, provider)| {
-            let manifest = provider.manifest();
+        .iter()
+        .map(|language| {
+            let manifest = language.provider.manifest();
             (
                 manifest.id.clone(),
                 manifest.conventions.constructor_prefixes.clone(),
@@ -80,13 +81,13 @@ pub(super) fn load_languages(
 ) -> Result<(Vec<usize>, Vec<Language>), Error> {
     let mut providers = Vec::new();
     let mut languages = Vec::new();
-    for (plugin, provider) in registry.languages() {
-        if config.lists(plugin) {
+    for entry in registry.languages() {
+        if config.lists(&entry.plugin) {
             providers.push(languages.len());
         }
         languages.push(Language {
-            files: glob_set(&provider.manifest().globs)?,
-            tests: glob_set(&provider.manifest().conventions.test_globs)?,
+            files: glob_set(&entry.provider.manifest().globs)?,
+            tests: glob_set(&entry.provider.manifest().conventions.test_globs)?,
         });
     }
     Ok((providers, languages))

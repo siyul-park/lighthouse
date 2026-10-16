@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use lighthouse_model::SymbolId;
-use lighthouse_plugin::{Ctx, Error};
+use lighthouse_plugin::{Context, Error};
 
 use crate::metrics::{COGNITIVE, CYCLOMATIC, FAN, Fan, NESTING, SIZE, Size, read};
 
@@ -17,7 +17,7 @@ pub(super) struct Measures {
     pub(super) fans: BTreeMap<SymbolId, Fan>,
 }
 
-pub(super) fn measures(ctx: &Ctx) -> Result<Measures, Error> {
+pub(super) fn measures(ctx: &Context) -> Result<Measures, Error> {
     Ok(Measures {
         sizes: read(ctx, SIZE)?,
         cyclomatic: read(ctx, CYCLOMATIC)?,

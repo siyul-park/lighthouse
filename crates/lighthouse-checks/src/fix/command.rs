@@ -159,7 +159,14 @@ fn arguments(
         // the project root, though the command runs in the scratch directory;
         // trust is judged on that same file.
         if at == 0 && arg.contains('/') && !Path::new(arg).is_absolute() {
-            argv.push(request.ws.root.join(arg).to_string_lossy().into_owned());
+            argv.push(
+                request
+                    .workspace
+                    .root
+                    .join(arg)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
             continue;
         }
         let value = match arg.as_str() {

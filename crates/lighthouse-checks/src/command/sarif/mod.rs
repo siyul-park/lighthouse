@@ -12,7 +12,7 @@ pub mod words;
 use std::path::{Path, PathBuf};
 
 use lighthouse_model::{ColumnUnit, Diagnostic, Position, Span, Suppression, byte_position};
-use lighthouse_plugin::{Ctx, RuleManifest};
+use lighthouse_plugin::{Context, RuleManifest};
 use lighthouse_spec::{SarifColumns, SarifSelect};
 use serde_json::{Map, Value, json};
 
@@ -27,7 +27,7 @@ const DEFAULT_LEVEL: &str = "warning";
 
 /// A SARIF log being read for one rule.
 pub(super) struct Reading<'a> {
-    pub ctx: &'a Ctx<'a>,
+    pub ctx: &'a Context<'a>,
     pub meta: &'a RuleManifest,
     pub select: Option<&'a SarifSelect>,
     /// The decision's column unit, which wins over the log's `columnKind`.
@@ -128,7 +128,7 @@ impl Reading<'_> {
         let Some(path) = place::path_of(location, &run.original_uri_base_ids) else {
             return Place::Project;
         };
-        let path = place::relative(&path, &self.ctx.ws.root);
+        let path = place::relative(&path, &self.ctx.workspace.root);
         if self.ctx.project.file(&path).is_none() {
             tally.left_out(&path);
             return Place::Outside;

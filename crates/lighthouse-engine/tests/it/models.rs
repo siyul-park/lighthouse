@@ -3,8 +3,8 @@
 
 use lighthouse_engine::{Engine, ModelOptions};
 use lighthouse_plugin::{
-    Answer, Capabilities, Classifier, CreateFineTuningJobRequest, DecisionRef, Error, Explored,
-    FineTuningJob, Model, Open, Plugin, PluginManifest, Registry, State, SystemOneRequest,
+    Abstained, Answer, Capabilities, Classifier, CreateFineTuningJobRequest, DecisionRef, Error,
+    Explored, FineTuningJob, Model, Plugin, PluginManifest, Registry, State, SystemOneRequest,
     SystemOneResponse,
 };
 use lighthouse_spec::{Catalog, Config};
@@ -136,10 +136,13 @@ fn a_reference_names_a_provider_and_the_model_it_is_asked_for() {
 
 #[test]
 fn a_subject_nothing_decided_says_why() {
-    assert_eq!(Open::Unbound.to_string(), "no model is bound");
-    assert_eq!(Open::OverBudget.to_string(), "the model budget was spent");
-    assert!(Open::Failed("x".to_owned()).to_string().contains('x'));
-    let explored = Open::Explored(Explored {
+    assert_eq!(Abstained::Unbound.to_string(), "no model is bound");
+    assert_eq!(
+        Abstained::OverBudget.to_string(),
+        "the model budget was spent"
+    );
+    assert!(Abstained::Failed("x".to_owned()).to_string().contains('x'));
+    let explored = Abstained::Explored(Explored {
         model: "local/m@1".to_owned(),
         confidence: 0.951,
     });
@@ -150,15 +153,15 @@ fn a_subject_nothing_decided_says_why() {
 }
 
 #[test]
-fn a_probability_fails_a_subject_only_at_or_above_the_upper_bound() {
-    use lighthouse_plugin::{UPPER, decide};
+fn a_probability_fails_a_subject_only_at_or_above_the_fail_threshold() {
+    use lighthouse_plugin::{FAIL_AT, fails};
 
-    assert_eq!(decide(0.95, UPPER), Some(0.95));
-    assert_eq!(decide(UPPER, UPPER), Some(UPPER));
-    assert_eq!(decide(0.5, UPPER), None);
+    assert_eq!(fails(0.95), Some(0.95));
+    assert_eq!(fails(FAIL_AT), Some(FAIL_AT));
+    assert_eq!(fails(0.5), None);
     // Even a model that is sure the subject is fine leaves it for review: the
     // band has no lower bound in M1.
-    assert_eq!(decide(0.02, UPPER), None);
+    assert_eq!(fails(0.02), None);
 }
 
 #[test]

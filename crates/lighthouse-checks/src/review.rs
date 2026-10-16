@@ -5,7 +5,9 @@
 
 use cel::Program;
 use lighthouse_model::{Diagnostic, Position, Span, SymbolId, hash};
-use lighthouse_plugin::{Ask, Ctx, DecisionRef, Judged, Neighbor, RuleManifest, State, Subject};
+use lighthouse_plugin::{
+    Answered, Ask, Context, DecisionRef, Neighbor, RuleManifest, State, Subject,
+};
 use lighthouse_spec::{CelCheck, Decision, Select};
 use serde_json::{Value, json};
 
@@ -27,7 +29,6 @@ pub(crate) struct Review {
     fact: Program,
     select: Select,
     decision: DecisionRef,
-    upper: f64,
     revision: String,
 }
 
@@ -62,7 +63,6 @@ impl Review {
             fact: compile(id, "review", select.variable())?,
             select,
             decision: decision_ref,
-            upper: lighthouse_plugin::UPPER,
             revision,
         }))
     }
@@ -90,7 +90,7 @@ impl Review {
     /// model could be asked.
     pub(crate) fn settle(
         &self,
-        ctx: &Ctx,
+        ctx: &Context,
         rule: &RuleManifest,
         candidates: Vec<Candidate>,
     ) -> Vec<Diagnostic> {
@@ -115,23 +115,22 @@ impl Review {
         let ask = Ask {
             rule: rule.id.clone(),
             revision: self.revision.clone(),
-            upper: self.upper,
             decision: self.decision.clone(),
             subjects,
         };
         let decision = self.decision.clone();
-        let settle = Box::new(move |judged: Vec<Judged>| {
-            judged
+        let settle = Box::new(move |answered: Vec<Answered>| {
+            answered
                 .into_iter()
                 .zip(candidates)
-                .map(|(judged, candidate)| outcome(judged, candidate, &decision))
+                .map(|(answered, candidate)| outcome(answered, candidate, &decision))
                 .collect()
         });
         let group = file.path.to_string_lossy();
         ctx.models.queue(&group, ask, settle).unwrap_or_default()
     }
 
-    fn subject(&self, ctx: &Ctx, source: &str, candidate: &Candidate) -> Subject {
+    fn subject(&self, ctx: &Context, source: &str, candidate: &Candidate) -> Subject {
         let diagnostic = &candidate.diagnostic;
         let symbol = diagnostic
             .symbol
@@ -173,16 +172,16 @@ impl Review {
     }
 }
 
-/// What a model's judgment makes of a candidate: the finding it confirms,
+/// What the models' answer makes of a candidate: the finding it confirms,
 /// with the model and its confidence as the evidence; a review task for a
-/// subject left open.
-fn outcome(judged: Judged, candidate: Candidate, decision: &DecisionRef) -> Diagnostic {
+/// subject left undecided.
+fn outcome(answered: Answered, candidate: Candidate, decision: &DecisionRef) -> Diagnostic {
     let mut diagnostic = candidate.diagnostic;
     if diagnostic.message.is_empty() {
         diagnostic.message.clone_from(&decision.requirement);
     }
-    match judged {
-        Judged::Decided(decided) => {
+    match answered {
+        Answered::Decided(decided) => {
             diagnostic.evidence = json!({
                 "model": decided.model,
                 "confidence": decided.confidence,
@@ -194,14 +193,14 @@ fn outcome(judged: Judged, candidate: Candidate, decision: &DecisionRef) -> Diag
                 });
             }
         }
-        Judged::Open(open) => diagnostic.review = Some(open.to_string()),
+        Answered::Abstained(abstained) => diagnostic.review = Some(abstained.to_string()),
     }
     diagnostic
 }
 
 /// The callers and callees of a symbol, with the source of those in the same
 /// file.
-fn neighbors(ctx: &Ctx, source: &str, symbol: &lighthouse_model::Symbol) -> Vec<Neighbor> {
+fn neighbors(ctx: &Context, source: &str, symbol: &lighthouse_model::Symbol) -> Vec<Neighbor> {
     let project = ctx.project;
     let around = |ids: &[SymbolId], relation: &str| -> Vec<Neighbor> {
         ids.iter()

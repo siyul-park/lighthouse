@@ -12,7 +12,7 @@ use lighthouse_model::{
     Options, Position, Safety, Severity, Span, Symbol, SymbolId, SymbolKind, Visibility,
 };
 use lighthouse_plugin::{
-    Ctx, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, Indexed,
+    Context, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, Indexed,
     LanguageProvider, Plugin, PluginManifest, ProviderManifest, Registry, Rule, RuleManifest,
     Source, Workspace,
 };
@@ -120,7 +120,7 @@ impl Rule for Word {
         Ok(())
     }
 
-    fn check(&self, ctx: &Ctx, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
+    fn check(&self, ctx: &Context, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
         let (file, text) = ctx
             .file
             .ok_or_else(|| PluginError::Failed("no file".into()))?;

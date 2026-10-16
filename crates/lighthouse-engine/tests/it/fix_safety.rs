@@ -7,7 +7,7 @@ use std::fs;
 use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun};
 use lighthouse_model::{Diagnostic, EditOp, FixOutcome, Options, Safety};
 use lighthouse_plugin::{
-    Ctx, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, LanguageProvider,
+    Context, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, LanguageProvider,
     Plugin, PluginManifest, Registry, Rule, RuleManifest,
 };
 use lighthouse_spec::Config;
@@ -403,7 +403,7 @@ fn fixes_that_undo_each_other_stop_the_run_and_name_their_rules() {
         fn validate(&self, _: &Options) -> Result<(), PluginError> {
             Ok(())
         }
-        fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, PluginError> {
+        fn check(&self, ctx: &Context, options: &Options) -> Result<Vec<Diagnostic>, PluginError> {
             let mut found = Word::new("flip/any", "TODO").check(ctx, options)?;
             found.extend(Word::new("flip/any", "BAD").check(ctx, options)?);
             Ok(found)

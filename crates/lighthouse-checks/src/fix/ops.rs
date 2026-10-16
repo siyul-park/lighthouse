@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use cel::{Context, Program};
 use lighthouse_model::{Anchor, EditOp, Node, Owner, Project, Span, Symbol, SymbolId, SymbolKind};
-use lighthouse_plugin::{Error as PluginError, FixRequest, KeyCtx};
+use lighthouse_plugin::{Error as PluginError, FixRequest, KeyContext};
 use lighthouse_spec::{OpSpec, ReorderScope};
 use serde_json::{Value, json};
 
@@ -281,12 +281,12 @@ impl<'a> Env<'a> {
             return Ok(Err("the finding has no symbol to reorder around".to_owned()));
         };
         let language = project.file(&anchor.file).map_or("", |f| f.lang.as_str());
-        let ctx = KeyCtx {
+        let ctx = KeyContext {
             project,
             language,
             rule: &request.finding.rule_id,
             options: request.options,
-            constructors: request.ws.constructor_prefixes(language),
+            constructors: request.workspace.constructor_prefixes(language),
         };
         let mut keys = Vec::new();
         for id in by {

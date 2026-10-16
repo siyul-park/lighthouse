@@ -230,8 +230,9 @@ fn config(registry: &Registry, decision: &Decision, example: &Example) -> Result
         rule.insert("options".to_owned(), options.into());
     }
     let plugins: Vec<toml::Value> = registry
-        .plugins()
-        .map(|id| toml::Value::String(id.to_owned()))
+        .manifests()
+        .iter()
+        .map(|plugin| toml::Value::String(plugin.id.clone()))
         .collect();
     let mut rules = toml::Table::new();
     rules.insert(decision.id().to_owned(), rule.into());

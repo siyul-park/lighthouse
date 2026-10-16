@@ -36,7 +36,7 @@ pub struct FixRequest<'a> {
     /// The options the finding's rule ran with.
     pub options: &'a Options,
     pub project: &'a Project,
-    pub ws: &'a Workspace,
+    pub workspace: &'a Workspace,
     /// The text of `finding.file`.
     pub text: &'a str,
     /// The registered order keys of the run's plugins.
@@ -55,7 +55,7 @@ pub trait Fixer: Send + Sync {
 }
 
 /// What an order key reads when it ranks a declaration.
-pub struct KeyCtx<'a> {
+pub struct KeyContext<'a> {
     pub project: &'a Project,
     /// Language of the file being reordered.
     pub language: &'a str,
@@ -70,7 +70,7 @@ pub struct KeyCtx<'a> {
 /// `None` for a declaration the key does not order: it stays where it is.
 pub trait OrderKey: Send + Sync {
     fn manifest(&self) -> &OrderKeyManifest;
-    fn rank(&self, ctx: &KeyCtx, symbol: &Symbol) -> Result<Option<u64>, Error>;
+    fn rank(&self, ctx: &KeyContext, symbol: &Symbol) -> Result<Option<u64>, Error>;
 }
 
 /// What an order key declares about itself.

@@ -9,8 +9,8 @@ use lighthouse_model::{
     Position, Project, Severity, Span, Symbol, SymbolId, SymbolKind, Visibility,
 };
 use lighthouse_plugin::{
-    Error, FixDecision, FixRequest, Fixer, KeyCtx, OrderKey, OrderKeyManifest, OrderKeys, Plugin,
-    Workspace,
+    Error, FixDecision, FixRequest, Fixer, KeyContext, OrderKey, OrderKeyManifest, OrderKeys,
+    Plugin, Workspace,
 };
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
@@ -152,7 +152,7 @@ impl OrderKey for Table {
         &self.0
     }
 
-    fn rank(&self, _: &KeyCtx, symbol: &Symbol) -> Result<Option<u64>, Error> {
+    fn rank(&self, _: &KeyContext, symbol: &Symbol) -> Result<Option<u64>, Error> {
         Ok(self
             .1
             .iter()
@@ -202,7 +202,7 @@ fn run(
         decision: &decision,
         options: &options,
         project,
-        ws: &ws,
+        workspace: &ws,
         text,
         keys,
         trusted,

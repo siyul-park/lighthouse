@@ -7,7 +7,7 @@ use lighthouse_model::{
     Suppression, SuppressionKind,
 };
 use lighthouse_plugin::{
-    Ctx, Error as PluginError, LanguageProvider, Plugin, PluginManifest, Registry, Rule,
+    Context, Error as PluginError, LanguageProvider, Plugin, PluginManifest, Registry, Rule,
     RuleManifest,
 };
 use lighthouse_spec::{Catalog, Config};
@@ -27,7 +27,7 @@ impl Rule for Wrapped {
         Ok(())
     }
 
-    fn check(&self, ctx: &Ctx, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
+    fn check(&self, ctx: &Context, _: &Options) -> Result<Vec<Diagnostic>, PluginError> {
         let (file, _) = ctx.file.expect("a file rule");
         ctx.notices.push("tool: 2 result(s) were dropped");
         let at = Position { line: 1, col: 1 };

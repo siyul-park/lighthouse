@@ -5,7 +5,7 @@ use lighthouse_model::{
     Severity, Span,
 };
 use lighthouse_plugin::{
-    Ctx, Error, FixRequest, Fixer, FixerManifest, Indexed, LanguageProvider, Plugin,
+    Context, Error, FixRequest, Fixer, FixerManifest, Indexed, LanguageProvider, Plugin,
     PluginManifest, ProviderManifest, Registry, Rule, RuleManifest, Source, Workspace,
 };
 use lighthouse_spec::Catalog;
@@ -50,7 +50,7 @@ impl Rule for Marker {
         }
     }
 
-    fn check(&self, ctx: &Ctx, options: &Options) -> Result<Vec<Diagnostic>, Error> {
+    fn check(&self, ctx: &Context, options: &Options) -> Result<Vec<Diagnostic>, Error> {
         let (file, text) = ctx
             .file
             .ok_or_else(|| Error::Failed("no file".to_owned()))?;
