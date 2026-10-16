@@ -8,8 +8,8 @@
 use std::{env, path::PathBuf};
 
 use lighthouse_checks::metrics::{
-    own,
-    reach::{modules, symbols},
+    Measures,
+    propagation::{modules, symbols},
 };
 use lighthouse_model::{SymbolId, SymbolKind};
 use lighthouse_session::{CheckRequest, Result, Session, check};
@@ -47,7 +47,7 @@ fn main() -> Result<()> {
             let symbol = project.symbol(&SymbolId::parse(id)?)?;
             let function = matches!(symbol.kind, SymbolKind::Function | SymbolKind::Method);
             let summary = project.function(&symbol.id).filter(|_| function)?;
-            let cognitive = own(project, symbol, summary).cognitive;
+            let cognitive = Measures::of(project, symbol, summary).cognitive;
             let share = f64::from(reach.vfi) / by_symbol.nodes.len() as f64;
             Some((
                 id,

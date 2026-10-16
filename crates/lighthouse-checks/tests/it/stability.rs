@@ -5,8 +5,8 @@
 use std::{fs, path::Path};
 
 use lighthouse_checks::metrics::{
-    own,
-    reach::{System, modules, symbols},
+    Measures,
+    propagation::{System, modules, symbols},
 };
 use lighthouse_engine::Engine;
 use lighthouse_model::{EdgeKind, Flow, FlowKind, Symbol, SymbolKind};
@@ -341,12 +341,12 @@ fn the_rust_provider_indexes_modules_that_reach_each_other() {
 }
 
 #[test]
-fn own_measures_a_function_the_way_the_hotspots_weigh_it() {
+fn measures_weigh_a_function_the_way_the_hotspots_do() {
     let mut w = World::default();
     let f = w.func("m", "f", "m/a.ucm");
     w.summarize(&f, 3, &[Flow::new(FlowKind::If, 0); 2]);
     let project = w.project();
-    let measured = own(&project, &f, project.function(&f.id).unwrap());
+    let measured = Measures::of(&project, &f, project.function(&f.id).unwrap());
     assert_eq!(
         (
             measured.lines,

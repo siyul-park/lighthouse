@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_checks::metrics::{COGNITIVE, CYCLOMATIC};
+use lighthouse_checks::metrics::MEASURES;
 use lighthouse_engine::Engine;
 use lighthouse_model::{File, Project};
 use lighthouse_plugin::{Context, Facts, Registry, Source, Workspace};
@@ -28,8 +28,8 @@ fn registry(plugin: &Path) -> Registry {
     registry
 }
 
-/// Metric of every function of one Go source, by function name.
-fn measure(plugin: &Path, analyzer: &str, source: &str) -> BTreeMap<String, u32> {
+/// The measure `metric` of every function of one Go source, by function name.
+fn measure(plugin: &Path, metric: &str, source: &str) -> BTreeMap<String, u32> {
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), "go.mod", "module example.com/app\n");
     write(dir.path(), "p.go", source);
@@ -72,18 +72,17 @@ fn measure(plugin: &Path, analyzer: &str, source: &str) -> BTreeMap<String, u32>
         applies: lighthouse_model::Applicability::default(),
         models: &lighthouse_plugin::NoModels,
     };
-    let analyzer = registry.order([analyzer]).unwrap().remove(0);
+    let analyzer = registry.order([MEASURES]).unwrap().remove(0);
     let value: Value = analyzer.run(&ctx).unwrap();
     value
-        .as_array()
+        .as_object()
         .unwrap()
         .iter()
-        .map(|m| {
-            let id = m["symbol"].as_str().unwrap();
+        .map(|(id, m)| {
             let name = id.split("::").nth(1).unwrap().split('#').next().unwrap();
             (
                 name.to_owned(),
-                u32::try_from(m["value"].as_u64().unwrap()).unwrap(),
+                u32::try_from(m[metric].as_u64().unwrap()).unwrap(),
             )
         })
         .collect()
@@ -167,7 +166,7 @@ func straight() {}
 #[test]
 fn go_cognitive_complexity_matches_the_specification_examples() {
     let Some(plugin) = go_plugin() else { return };
-    let got = measure(&plugin, COGNITIVE, SPEC);
+    let got = measure(&plugin, "cognitive", SPEC);
     let want: BTreeMap<String, u32> = [
         ("sumOfPrimes", 7),
         ("words", 1),
@@ -187,7 +186,7 @@ fn go_cognitive_complexity_matches_the_specification_examples() {
 #[test]
 fn go_cyclomatic_complexity_counts_every_decision_point() {
     let Some(plugin) = go_plugin() else { return };
-    let got = measure(&plugin, CYCLOMATIC, SPEC);
+    let got = measure(&plugin, "cyclomatic", SPEC);
     let want: BTreeMap<String, u32> = [
         ("sumOfPrimes", 4),
         ("words", 3),

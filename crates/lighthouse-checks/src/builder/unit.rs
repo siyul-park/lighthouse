@@ -10,7 +10,7 @@ use lighthouse_model::{
 use serde_json::{Value, json};
 
 use super::Builder;
-use crate::metrics::own;
+use crate::metrics::Measures;
 
 impl Builder<'_> {
     /// `{ lines, statements, cyclomatic, cognitive, helpers, caller }`: the
@@ -23,12 +23,12 @@ impl Builder<'_> {
         };
         let project = self.project;
         let helpers = helpers_of(project, &symbol.id);
-        let mut total = own(project, symbol, summary);
+        let mut total = Measures::of(project, symbol, summary);
         for helper in &helpers {
             let Some(summary) = project.function(&helper.id) else {
                 continue;
             };
-            let part = own(project, helper, summary);
+            let part = Measures::of(project, helper, summary);
             total.lines += part.lines;
             total.statements += part.statements;
             total.cognitive += part.cognitive;

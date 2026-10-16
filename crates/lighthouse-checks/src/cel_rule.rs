@@ -14,10 +14,11 @@ use serde_json::{Map, Value};
 
 use crate::{
     Error,
-    builder::{Builder, METRIC_ANALYZERS},
+    builder::Builder,
     eval::{Fact, Frame, Template, cel_fact, compile, compile_all},
     facts,
     library::{self, Needs},
+    metrics::MEASURES,
     modules, reach,
     review::{Candidate, Review},
 };
@@ -129,7 +130,7 @@ impl CelRule {
     /// The analyzers whose facts the expressions read.
     pub(crate) fn analyzers(&self) -> Vec<String> {
         if self.needs.function("metrics") {
-            METRIC_ANALYZERS.iter().map(|a| (*a).to_owned()).collect()
+            vec![MEASURES.to_owned()]
         } else {
             Vec::new()
         }

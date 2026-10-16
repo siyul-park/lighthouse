@@ -47,30 +47,24 @@ pub(crate) struct Needs {
 
 impl Needs {
     pub(crate) fn of<'a>(sources: impl IntoIterator<Item = &'a str>) -> Self {
-        let sources: Vec<String> = sources.into_iter().map(str::to_owned).collect();
-        let names = FUNCTIONS
+        let mut needs = Self {
+            names: Vec::new(),
+            sources: sources.into_iter().map(str::to_owned).collect(),
+        };
+        needs.names = FUNCTIONS
             .iter()
             .map(|(name, _)| *name)
-            .filter(|name| {
-                let call = format!("{name}(");
-                sources.iter().any(|source| calls(source, &call))
-            })
+            .filter(|name| needs.calls(name))
             .collect();
-        Self { names, sources }
+        needs
     }
 
     /// Whether some expression calls a function `name`, as a function or as a
-    /// method of its first argument.
+    /// method of its first argument (`n.metrics()`).
     pub(crate) fn calls(&self, name: &str) -> bool {
-        let call = format!("{name}(");
-        self.sources.iter().any(|source| {
-            source.match_indices(&call).any(|(at, _)| {
-                source[..at]
-                    .chars()
-                    .next_back()
-                    .is_none_or(|c| !(c.is_alphanumeric() || c == '_'))
-            })
-        })
+        self.sources
+            .iter()
+            .any(|source| occurrences(source, name).any(|rest| rest.starts_with('(')))
     }
 
     /// Whether some expression mentions the fact `word`; the one way the
@@ -83,7 +77,8 @@ impl Needs {
         self.mentions(word)
     }
 
-    /// Whether some expression calls library function `name`.
+    /// Whether some expression calls a function of the library that reads a
+    /// fact of the node; [`Needs::calls`], asked once for all expressions.
     pub(crate) fn function(&self, name: &str) -> bool {
         self.names.contains(&name)
     }
@@ -91,7 +86,9 @@ impl Needs {
     /// Whether some expression mentions `word`, such as a fact field: as a
     /// whole identifier, so `role` is not found in `test_role`.
     pub(crate) fn mentions(&self, word: &str) -> bool {
-        self.sources.iter().any(|source| names(source, word))
+        self.sources
+            .iter()
+            .any(|source| occurrences(source, word).next().is_some())
     }
 
     /// The single-quoted or double-quoted string literals of the expressions
@@ -137,11 +134,16 @@ pub(crate) fn context() -> Context<'static> {
     context
 }
 
-/// The `N` arguments of a call.
+/// The `N` arguments of a call, the receiver of a method call first.
 pub(super) fn arguments<'a, const N: usize>(
     ftx: &'a FunctionContext,
 ) -> Result<[&'a dyn Val; N], ExecutionError> {
-    let args: Vec<&dyn Val> = ftx.args.iter().map(AsRef::as_ref).collect();
+    let args: Vec<&dyn Val> = ftx
+        .this
+        .iter()
+        .chain(&ftx.args)
+        .map(AsRef::as_ref)
+        .collect();
     <[&dyn Val; N]>::try_from(args)
         .map_err(|args| ExecutionError::invalid_argument_count(N, args.len()))
 }
@@ -243,26 +245,16 @@ fn exposed() -> Builtin {
     })
 }
 
-/// Whether `source` contains `word` not as part of a longer identifier.
-fn names(source: &str, word: &str) -> bool {
+/// What follows each occurrence of `word` in `source` that is not part of a
+/// longer identifier.
+fn occurrences<'a>(source: &'a str, word: &'a str) -> impl Iterator<Item = &'a str> {
     let ident = |c: char| c.is_alphanumeric() || c == '_';
-    source.match_indices(word).any(|(at, _)| {
+    source.match_indices(word).filter_map(move |(at, _)| {
         let before = source[..at].chars().next_back();
-        let after = source[at + word.len()..].chars().next();
+        let rest = &source[at + word.len()..];
         let starts = !word.starts_with(ident) || !before.is_some_and(ident);
-        let ends = !word.ends_with(ident) || !after.is_some_and(ident);
-        starts && ends
-    })
-}
-
-/// Whether `source` calls the function whose name and `(` are `call`, as a
-/// function and not as the tail of a longer name.
-fn calls(source: &str, call: &str) -> bool {
-    source.match_indices(call).any(|(at, _)| {
-        source[..at]
-            .chars()
-            .next_back()
-            .is_none_or(|c| !(c.is_alphanumeric() || c == '_' || c == '.'))
+        let ends = !word.ends_with(ident) || !rest.chars().next().is_some_and(ident);
+        (starts && ends).then_some(rest)
     })
 }
 

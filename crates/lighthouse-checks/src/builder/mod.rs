@@ -10,7 +10,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::metrics::{COGNITIVE, CYCLOMATIC, FAN, NESTING, SIZE, is_dispatcher, is_flat_dispatch};
+use crate::metrics::{MEASURES, Measures};
 use lighthouse_model::{
     Comment, FunctionSummary, Project, Symbol, SymbolId, SymbolKind, Visibility,
 };
@@ -31,7 +31,6 @@ mod effective;
 mod forward;
 mod gap;
 mod imports;
-mod measures;
 mod ownership;
 mod parent;
 mod role;
@@ -40,10 +39,6 @@ mod unit;
 mod widths;
 
 use forward::{cyclic, forwarded};
-use measures::{Measures, measures};
-
-/// The analyzers a check needs when its expressions call `metrics`.
-pub(crate) const METRIC_ANALYZERS: [&str; 5] = [SIZE, CYCLOMATIC, COGNITIVE, NESTING, FAN];
 
 /// Builds the values of one run of a check over one file (or the project).
 pub(crate) struct Builder<'a> {
@@ -54,7 +49,7 @@ pub(crate) struct Builder<'a> {
     language: String,
     naming: Option<Tests<'a>>,
     keys: Vec<(String, &'a dyn OrderKey)>,
-    measures: Option<Measures>,
+    measures: Option<BTreeMap<SymbolId, Measures>>,
     table: Arc<Table>,
     single: Arc<effective::Single>,
     imports: Arc<imports::Imports>,
@@ -73,7 +68,7 @@ impl<'a> Builder<'a> {
         rule: &'a str,
     ) -> Result<Self, Error> {
         let measures = if needs.function("metrics") {
-            Some(measures(ctx)?)
+            Some(ctx.fact(MEASURES)?)
         } else {
             None
         };
@@ -246,7 +241,7 @@ impl<'a> Builder<'a> {
         let project = self.project;
         let needs = self.needs;
         if needs.function("metrics") {
-            map.insert("__metrics".to_owned(), self.metrics(symbol, summary));
+            map.insert("__metrics".to_owned(), self.metrics(symbol));
         }
         if needs.function("callers") {
             map.insert(
@@ -430,32 +425,11 @@ impl<'a> Builder<'a> {
         json!(ranks)
     }
 
-    fn metrics(&self, symbol: &Symbol, summary: Option<&FunctionSummary>) -> Value {
-        let measures = self.measures.as_ref();
-        let found = measures.and_then(|m| {
-            Some((
-                m.sizes.get(&symbol.id)?,
-                m.cyclomatic.get(&symbol.id)?,
-                m.cognitive.get(&symbol.id)?,
-                m.nesting.get(&symbol.id)?,
-                m.fans.get(&symbol.id)?,
-            ))
-        });
-        let Some((size, cyclomatic, cognitive, nesting, fan)) = found else {
-            return json!({ "measured": false, "cyclomatic": 0, "cognitive": 0, "statements": 0, "lines": 0, "nesting": 0, "fan_in": 0, "fan_out": 0, "dispatcher": false, "flat_dispatch": false });
-        };
-        json!({
-            "measured": true,
-            "cyclomatic": cyclomatic,
-            "cognitive": cognitive,
-            "statements": size.statements,
-            "lines": size.lines,
-            "nesting": nesting,
-            "fan_in": fan.fan_in,
-            "fan_out": fan.fan_out,
-            "dispatcher": summary.is_some_and(is_dispatcher),
-            "flat_dispatch": summary.is_some_and(is_flat_dispatch),
-        })
+    fn metrics(&self, symbol: &Symbol) -> Value {
+        let found = self.measures.as_ref().and_then(|m| m.get(&symbol.id));
+        let mut value = json!(found.copied().unwrap_or_default());
+        value["measured"] = json!(found.is_some());
+        value
     }
 
     /// The first test of the symbol's file, by position.

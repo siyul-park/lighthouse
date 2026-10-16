@@ -262,7 +262,7 @@ fn decision_list_and_explain() {
     assert!(
         String::from_utf8(out.stdout)
             .unwrap()
-            .contains("Analyzers: metrics/size")
+            .contains("Analyzers: metrics/function")
     );
     lighthouse(dir.path())
         .args(["decision", "show", "core/nope"])

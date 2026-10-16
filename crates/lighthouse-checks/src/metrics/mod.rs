@@ -1,58 +1,98 @@
-mod cognitive;
-mod fan;
 mod graph;
-pub mod reach;
+pub mod propagation;
 
 use std::{collections::BTreeMap, sync::LazyLock};
 
-use lighthouse_model::RunScope;
-use lighthouse_model::{FlowKind, FunctionSummary, Project, Symbol, SymbolId};
+use lighthouse_model::{
+    FlowKind, FunctionSummary, Project, RunScope, Symbol, SymbolId, SymbolKind,
+};
 use lighthouse_plugin::{Analyzer, AnalyzerManifest, Context, Error, Plugin, PluginManifest};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
-pub use fan::Fan;
 
 /// Plugin id.
 const ID: &str = "metrics";
-/// Analyzer id of the per-function [`Size`] fact.
-pub const SIZE: &str = "metrics/size";
-/// Analyzer id of the per-function cyclomatic complexity fact (`u32`).
-pub const CYCLOMATIC: &str = "metrics/cyclomatic";
-/// Analyzer id of the per-function cognitive complexity fact (`u32`).
-pub const COGNITIVE: &str = "metrics/cognitive";
-/// Analyzer id of the per-function deepest-nesting fact (`u32`).
-pub const NESTING: &str = "metrics/nesting";
-/// Analyzer id of the per-function [`Fan`] fact.
-pub const FAN: &str = "metrics/fan";
+/// Analyzer id of the per-function [`Measures`] fact: a map from the functions
+/// declared in the focused file to what is measured of each.
+pub const MEASURES: &str = "metrics/function";
 
 /// Deepest nesting of a flat dispatch's arms.
 const FLAT_DISPATCH_NESTING: u32 = 2;
 
-/// A function's value of one metric; every metric fact is a list of these.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Measured<T> {
-    pub symbol: SymbolId,
-    pub value: T,
-}
-
-/// Statement and line count of a function; `lines` is inclusive of both ends.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Size {
-    pub statements: u32,
-    pub lines: u32,
-}
-
-/// The measures of one function that add up over the functions of a unit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Own {
+/// What is measured of one function.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Measures {
+    /// Lines of the declaration, inclusive of both ends.
     pub lines: u32,
     pub statements: u32,
+    /// McCabe 1976: one path plus every decision point. Each `if`, `else if`,
+    /// loop and handler counts one, a switch counts its non-default arms, and
+    /// every boolean operator counts one.
     pub cyclomatic: u32,
+    /// Cognitive Complexity (Campbell, SonarSource 2018): constructs that
+    /// break linear flow add 1 and, for structures that nest, the nesting
+    /// level at which they occur; `else if`, `else`, jumps, boolean operator
+    /// runs and recursion add 1 flat.
     pub cognitive: u32,
+    /// The deepest nesting level.
+    pub nesting: u32,
+    /// Direct fan-in and fan-out (Henry and Kafura 1981) among the functions
+    /// and methods of its module; calls from test files do not count.
+    pub fan_in: u32,
+    pub fan_out: u32,
+    /// Whether the body is [`is_dispatcher`].
+    pub dispatcher: bool,
+    /// Whether the body is [`is_flat_dispatch`].
+    pub flat_dispatch: bool,
 }
 
-/// The plugin providing the `metrics/*` analyzers; stateless.
+impl Measures {
+    /// Measures `symbol`, whose summary is `summary`.
+    pub fn of(project: &Project, symbol: &Symbol, summary: &FunctionSummary) -> Self {
+        let (mut cyclomatic, mut cognitive) = (1, 0);
+        for flow in &summary.flow {
+            cyclomatic += match flow.kind {
+                FlowKind::If | FlowKind::ElseIf | FlowKind::Loop | FlowKind::Catch => 1,
+                FlowKind::Switch => flow.arms,
+                FlowKind::Logic => flow.operators,
+                FlowKind::Else | FlowKind::Jump | FlowKind::Recursion => 0,
+            };
+            cognitive += match flow.kind {
+                FlowKind::If | FlowKind::Switch | FlowKind::Loop | FlowKind::Catch => {
+                    1 + flow.nesting
+                }
+                FlowKind::ElseIf
+                | FlowKind::Else
+                | FlowKind::Jump
+                | FlowKind::Logic
+                | FlowKind::Recursion => 1,
+            };
+        }
+        let module = symbol.id.module();
+        let callable = |id: &&SymbolId| {
+            id.module() == module
+                && project
+                    .symbol(id)
+                    .is_some_and(|s| matches!(s.kind, SymbolKind::Function | SymbolKind::Method))
+        };
+        let count = |ids: &[SymbolId], keep: &dyn Fn(&&SymbolId) -> bool| {
+            u32::try_from(ids.iter().filter(callable).filter(keep).count()).unwrap_or(u32::MAX)
+        };
+        Self {
+            lines: symbol.span.end.line - symbol.span.start.line + 1,
+            statements: summary.statements,
+            cyclomatic,
+            cognitive,
+            nesting: summary.max_nesting,
+            fan_in: count(project.callers(&symbol.id), &|id| !project.in_test(id)),
+            fan_out: count(project.callees(&symbol.id), &|_| true),
+            dispatcher: is_dispatcher(summary),
+            flat_dispatch: is_flat_dispatch(summary),
+        }
+    }
+}
+
+/// The plugin providing the `metrics/function` analyzer; stateless.
 pub struct Metrics;
 
 impl Plugin for Metrics {
@@ -65,77 +105,41 @@ impl Plugin for Metrics {
         &MANIFEST
     }
 
-    /// One per-function analyzer per metric constant, each file-scoped.
     fn analyzers(&self) -> Vec<Box<dyn Analyzer>> {
-        vec![
-            Box::new(PerFunction::new(SIZE, size)),
-            Box::new(PerFunction::new(CYCLOMATIC, cyclomatic)),
-            Box::new(PerFunction::new(COGNITIVE, cognitive::score)),
-            Box::new(PerFunction::new(NESTING, nesting)),
-            Box::new(PerFunction::new(FAN, |project, symbol, _| {
-                fan::measure(project, symbol)
-            })),
-        ]
+        vec![Box::new(Self)]
     }
 }
-
-type Measure<T> = fn(&Project, &Symbol, &FunctionSummary) -> T;
 
 /// Measures every function declared in the focused file.
-struct PerFunction<T> {
-    manifest: AnalyzerManifest,
-    measure: Measure<T>,
-}
-
-impl<T> PerFunction<T> {
-    fn new(id: &'static str, measure: Measure<T>) -> Self {
-        Self {
-            manifest: AnalyzerManifest {
-                id: id.to_owned(),
-                requires: Vec::new(),
-                scope: RunScope::File,
-            },
-            measure,
-        }
-    }
-}
-
-impl<T: Serialize + Send + Sync> Analyzer for PerFunction<T> {
+impl Analyzer for Metrics {
     fn manifest(&self) -> &AnalyzerManifest {
-        &self.manifest
+        static MANIFEST: LazyLock<AnalyzerManifest> = LazyLock::new(|| AnalyzerManifest {
+            id: MEASURES.to_owned(),
+            requires: Vec::new(),
+            scope: RunScope::File,
+        });
+        &MANIFEST
     }
 
     fn run(&self, ctx: &Context) -> Result<Value, Error> {
         let (file, _) = ctx
             .file
-            .ok_or_else(|| Error::Failed(format!("{} needs a file", self.manifest.id)))?;
-        let values: Vec<Measured<T>> = ctx
+            .ok_or_else(|| Error::Failed(format!("{MEASURES} needs a file")))?;
+        let measures: BTreeMap<&SymbolId, Measures> = ctx
             .project
             .symbols_in(&file.path)
             .filter_map(|symbol| {
                 let summary = ctx.project.function(&symbol.id)?;
-                Some(Measured {
-                    symbol: symbol.id.clone(),
-                    value: (self.measure)(ctx.project, symbol, summary),
-                })
+                Some((&symbol.id, Measures::of(ctx.project, symbol, summary)))
             })
             .collect();
-        serde_json::to_value(values).map_err(|e| Error::Failed(e.to_string()))
+        serde_json::to_value(measures).map_err(|e| Error::Failed(e.to_string()))
     }
-}
-
-/// Reads the metric fact of `analyzer` for the focused file, by function.
-pub fn read<T: DeserializeOwned>(
-    ctx: &Context,
-    analyzer: &str,
-) -> Result<BTreeMap<SymbolId, T>, Error> {
-    let all: Vec<Measured<T>> = ctx.fact(analyzer)?;
-    Ok(all.into_iter().map(|m| (m.symbol, m.value)).collect())
 }
 
 /// A body that is one multi-way branch with a single return per arm: a table
 /// in code form, long but not complex.
-pub fn is_dispatcher(summary: &FunctionSummary) -> bool {
+fn is_dispatcher(summary: &FunctionSummary) -> bool {
     summary.top_level == 1
         && summary
             .flow
@@ -147,7 +151,7 @@ pub fn is_dispatcher(summary: &FunctionSummary) -> bool {
 /// its arms do, nested at most two levels: many paths, one shape. Its
 /// cyclomatic complexity overstates how hard it is to follow; only cognitive
 /// complexity can still mark it.
-pub fn is_flat_dispatch(summary: &FunctionSummary) -> bool {
+fn is_flat_dispatch(summary: &FunctionSummary) -> bool {
     let mut top_level = summary.flow.iter().filter(|f| {
         f.nesting == 0
             && matches!(
@@ -162,43 +166,4 @@ pub fn is_flat_dispatch(summary: &FunctionSummary) -> bool {
     summary.max_nesting <= FLAT_DISPATCH_NESTING
         && top_level.next().is_some_and(|f| f.kind == FlowKind::Switch)
         && top_level.next().is_none()
-}
-
-/// What the analyzers measure for a function, read without the file scope
-/// of their facts, so that a function of another file can be measured too.
-pub fn own(project: &Project, symbol: &Symbol, summary: &FunctionSummary) -> Own {
-    let Size { statements, lines } = size(project, symbol, summary);
-    Own {
-        lines,
-        statements,
-        cyclomatic: cyclomatic(project, symbol, summary),
-        cognitive: cognitive::score(project, symbol, summary),
-    }
-}
-
-fn size(_: &Project, symbol: &Symbol, summary: &FunctionSummary) -> Size {
-    Size {
-        statements: summary.statements,
-        lines: symbol.span.end.line - symbol.span.start.line + 1,
-    }
-}
-
-/// McCabe 1976: one path plus every decision point. Each `if`, `else if`,
-/// loop and handler counts one, a switch counts its non-default arms, and
-/// every boolean operator counts one.
-fn cyclomatic(_: &Project, _: &Symbol, summary: &FunctionSummary) -> u32 {
-    1 + summary
-        .flow
-        .iter()
-        .map(|flow| match flow.kind {
-            FlowKind::If | FlowKind::ElseIf | FlowKind::Loop | FlowKind::Catch => 1,
-            FlowKind::Switch => flow.arms,
-            FlowKind::Logic => flow.operators,
-            FlowKind::Else | FlowKind::Jump | FlowKind::Recursion => 0,
-        })
-        .sum::<u32>()
-}
-
-fn nesting(_: &Project, _: &Symbol, summary: &FunctionSummary) -> u32 {
-    summary.max_nesting
 }

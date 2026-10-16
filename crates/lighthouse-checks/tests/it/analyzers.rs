@@ -1,12 +1,11 @@
-use lighthouse_checks::metrics::{
-    COGNITIVE, CYCLOMATIC, FAN, Fan, Measured, Metrics, NESTING, SIZE, Size,
-};
+use std::collections::BTreeMap;
+
+use lighthouse_checks::metrics::{MEASURES, Measures, Metrics};
 use lighthouse_model::{
     Edge, EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Node, Position, Project,
     Resolution, Span, Symbol, SymbolId, SymbolKind, Target, Visibility,
 };
 use lighthouse_plugin::{Context, Facts, Plugin, Workspace};
-use serde::de::DeserializeOwned;
 
 const FILE: &str = "m/m.go";
 
@@ -70,11 +69,11 @@ fn call(from: &Symbol, to: &Symbol) -> Edge {
     }
 }
 
-fn run<T: DeserializeOwned>(project: &Project, analyzer: &str, path: &str) -> Vec<Measured<T>> {
+fn run(project: &Project, path: &str) -> BTreeMap<SymbolId, Measures> {
     let metrics = Metrics.analyzers();
     let analyzer = metrics
         .iter()
-        .find(|a| a.manifest().id == analyzer)
+        .find(|a| a.manifest().id == MEASURES)
         .unwrap();
     let ws = Workspace::new(".");
     let file = file(path, false);
@@ -94,22 +93,31 @@ fn run<T: DeserializeOwned>(project: &Project, analyzer: &str, path: &str) -> Ve
     serde_json::from_value(analyzer.run(&ctx).unwrap()).unwrap()
 }
 
-fn one(flow: &[Flow]) -> Project {
-    let f = symbol("m", "f", SymbolKind::Function, FILE, (1, 1));
+fn with_summary(f: Symbol, summary: FunctionSummary) -> Project {
     Project::merge([Fragment {
         files: vec![file(FILE, false)],
-        functions: vec![summary(&f, 0, 1, flow)],
+        functions: vec![summary],
         symbols: vec![f],
         ..Fragment::default()
     }])
+}
+
+fn one(flow: &[Flow]) -> Project {
+    let f = symbol("m", "f", SymbolKind::Function, FILE, (1, 1));
+    let summary = summary(&f, 0, 1, flow);
+    with_summary(f, summary)
 }
 
 fn at(kind: FlowKind, nesting: u32) -> Flow {
     Flow::new(kind, nesting)
 }
 
+fn measures(project: &Project) -> Measures {
+    run(project, FILE).into_values().next().unwrap()
+}
+
 fn cognitive(flow: &[Flow]) -> u32 {
-    run::<u32>(&one(flow), COGNITIVE, FILE)[0].value
+    measures(&one(flow)).cognitive
 }
 
 #[test]
@@ -123,7 +131,7 @@ fn cyclomatic_counts_one_path_plus_every_decision_point() {
         operators: 2,
         ..Flow::new(Logic, 0)
     };
-    let cyclomatic = |flow: &[Flow]| run::<u32>(&one(flow), CYCLOMATIC, FILE)[0].value;
+    let cyclomatic = |flow: &[Flow]| measures(&one(flow)).cyclomatic;
     assert_eq!(cyclomatic(&[]), 1);
     assert_eq!(cyclomatic(&[at(If, 0)]), 2);
     let all = [
@@ -149,14 +157,10 @@ fn dispatchers_are_single_switches_whose_arms_only_return() {
         ..Flow::new(Switch, 0)
     };
     let with = |top_level: u32, flow: &[Flow]| {
-        let mut s = summary(
-            &symbol("m", "f", SymbolKind::Function, FILE, (1, 1)),
-            0,
-            1,
-            flow,
-        );
+        let f = symbol("m", "f", SymbolKind::Function, FILE, (1, 1));
+        let mut s = summary(&f, 0, 1, flow);
         s.top_level = top_level;
-        lighthouse_checks::metrics::is_dispatcher(&s)
+        measures(&with_summary(f, s)).dispatcher
     };
     assert!(with(1, &[table, at(Logic, 1)]));
     assert!(!with(2, &[table]));
@@ -182,13 +186,9 @@ fn dispatchers_are_single_switches_whose_arms_only_return() {
 fn flat_dispatch_is_one_top_level_switch_nested_at_most_two_levels() {
     use FlowKind::*;
     let flat = |nesting: u32, flow: &[Flow]| {
-        let s = summary(
-            &symbol("m", "f", SymbolKind::Function, FILE, (1, 1)),
-            nesting,
-            1,
-            flow,
-        );
-        lighthouse_checks::metrics::is_flat_dispatch(&s)
+        let f = symbol("m", "f", SymbolKind::Function, FILE, (1, 1));
+        let s = summary(&f, nesting, 1, flow);
+        measures(&with_summary(f, s)).flat_dispatch
     };
     let arms = [Flow::new(Switch, 0), at(If, 1), at(Logic, 1), at(Loop, 2)];
     assert!(flat(2, &arms));
@@ -233,15 +233,9 @@ fn size_reports_statements_and_lines_and_nesting_the_deepest_level() {
         symbols: vec![f],
         ..Fragment::default()
     }]);
-    let size = run::<Size>(&project, SIZE, FILE);
-    assert_eq!(
-        size[0].value,
-        Size {
-            statements: 12,
-            lines: 15
-        }
-    );
-    assert_eq!(run::<u32>(&project, NESTING, FILE)[0].value, 3);
+    let measured = measures(&project);
+    assert_eq!((measured.statements, measured.lines), (12, 15));
+    assert_eq!(measured.nesting, 3);
 }
 
 #[test]
@@ -255,9 +249,8 @@ fn metrics_cover_only_functions_of_the_focused_file() {
         symbols: vec![a.clone(), b, t],
         ..Fragment::default()
     }]);
-    let found = run::<u32>(&project, CYCLOMATIC, FILE);
-    assert_eq!(found.len(), 1);
-    assert_eq!(found[0].symbol, a.id);
+    let found = run(&project, FILE);
+    assert_eq!(found.keys().collect::<Vec<_>>(), [&a.id]);
 }
 
 #[test]
@@ -293,47 +286,6 @@ fn fan_counts_same_module_functions_and_ignores_tests_types_and_self() {
         symbols: all.iter().map(|s| (*s).clone()).collect(),
         ..Fragment::default()
     }]);
-    let fan = run::<Fan>(&project, FAN, FILE);
-    assert_eq!(fan.len(), 1);
-    assert_eq!(
-        fan[0].value,
-        Fan {
-            fan_in: 2,
-            fan_out: 2
-        }
-    );
-}
-
-#[test]
-fn read_maps_the_metric_fact_by_function_and_fails_when_it_is_missing() {
-    let f = symbol("m", "f", SymbolKind::Function, FILE, (1, 1));
-    let project = one(&[]);
-    let ws = Workspace::new(".");
-    let mut facts = Facts::new();
-    facts.insert(
-        CYCLOMATIC,
-        String::new(),
-        serde_json::to_value([Measured {
-            symbol: f.id.clone(),
-            value: 3u32,
-        }])
-        .unwrap(),
-    );
-    let ctx = Context {
-        workspace: &ws,
-        project: &project,
-        file: None,
-        facts: &facts,
-        keys: &lighthouse_plugin::NoKeys,
-        trusted: false,
-        memo: &lighthouse_plugin::Memo::default(),
-        notices: &lighthouse_plugin::Notices::default(),
-        applies: lighthouse_model::Applicability::default(),
-        models: &lighthouse_plugin::NoModels,
-    };
-
-    let by_function = lighthouse_checks::metrics::read::<u32>(&ctx, CYCLOMATIC).unwrap();
-
-    assert_eq!(by_function[&f.id], 3);
-    assert!(lighthouse_checks::metrics::read::<u32>(&ctx, COGNITIVE).is_err());
+    let measured = measures(&project);
+    assert_eq!((measured.fan_in, measured.fan_out), (2, 2));
 }

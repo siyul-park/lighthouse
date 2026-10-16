@@ -7,7 +7,7 @@ use lighthouse_model::{Module, Symbol};
 use serde_json::{Value, json};
 
 use super::Builder;
-use crate::metrics::reach::{self, Stability, System};
+use crate::metrics::propagation::{self, Stability, System};
 
 /// The graphs of the project, each built by the first check that asks and
 /// shared by the others.
@@ -25,7 +25,7 @@ impl Builder<'_> {
         let system = self
             .stabilities
             .modules
-            .get_or_init(|| reach::modules(self.project));
+            .get_or_init(|| propagation::modules(self.project));
         let Some(s) = system.of(&module.path) else {
             return Value::Null;
         };
@@ -48,7 +48,7 @@ impl Builder<'_> {
         let system = self
             .stabilities
             .symbols
-            .get_or_init(|| reach::symbols(self.project));
+            .get_or_init(|| propagation::symbols(self.project));
         let Some(s) = system.of(symbol.id.as_str()) else {
             return json!({
                 "measured": false, "ca": 0, "ce": 0, "vfi": 0, "vfo": 0,

@@ -69,6 +69,16 @@ fn a_unit_without_helpers_measures_the_function_alone() {
 }
 
 #[test]
+fn a_function_called_as_a_method_is_computed_too() {
+    let mut w = World::default();
+    let f = helper(&mut w, "f", 3, 2);
+    assert_eq!(
+        functions(&w, "func.metrics().statements == 3"),
+        [f.name.as_str()]
+    );
+}
+
+#[test]
 fn a_helper_with_two_callers_is_not_folded() {
     let mut w = World::default();
     let f = helper(&mut w, "f", 1, 0);
