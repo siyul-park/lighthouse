@@ -20,7 +20,7 @@ use crate::{
     spans::{extent_of, span_of},
     syntax::{built_type, constructs, count_tokens, doc_of, signature_counts},
     testcase,
-    tree::{SourceFile, Vis, vis},
+    tree::{SourceFile, vis},
 };
 
 /// What macros kept from the analysis in one file.
@@ -597,14 +597,14 @@ impl Extractor<'_> {
 
     /// Trait impl members are as visible as the trait and the type allow;
     /// inherent members as visible as written, capped by the type.
-    fn member_visibility(&self, ctx: &ImplCtx, written: Vis) -> Visibility {
+    fn member_visibility(&self, ctx: &ImplCtx, written: Visibility) -> Visibility {
         if !self.idx.is_library(ctx.m) {
             return Visibility::Private;
         }
         let base = match &ctx.via {
             Some(ViaTrait::Project(t)) => self.idx.visibility(t.vis, t.module, &t.id),
             Some(ViaTrait::Foreign) => Visibility::Public,
-            None => declared(written),
+            None => written,
         };
         ctx.owner_vis.map_or(base, |o| cap(base, o))
     }
@@ -689,14 +689,6 @@ fn rank(v: Visibility) -> u8 {
         Visibility::Public => 0,
         Visibility::Internal => 1,
         Visibility::Private => 2,
-    }
-}
-
-fn declared(v: Vis) -> Visibility {
-    match v {
-        Vis::Pub => Visibility::Public,
-        Vis::Crate => Visibility::Internal,
-        Vis::Private => Visibility::Private,
     }
 }
 

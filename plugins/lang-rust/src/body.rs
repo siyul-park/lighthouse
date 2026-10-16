@@ -408,7 +408,7 @@ impl<'i> Walker<'i> {
                     flatten(&u.tree, &mut Vec::new(), &mut entries);
                     for (path, name) in entries {
                         self.extra.push(UseEntry {
-                            vis: crate::tree::Vis::Private,
+                            vis: lighthouse_protocol::Visibility::Private,
                             path,
                             name,
                             module: self.cx.module,

@@ -35,7 +35,7 @@ impl Index<'_> {
             if self.exported_mods.contains(&at) {
                 return true;
             }
-            if module.vis != Vis::Pub {
+            if module.vis != Visibility::Public {
                 return false;
             }
             at = parent;
@@ -46,7 +46,7 @@ impl Index<'_> {
         let entries: Vec<UseEntry> = self.names[m]
             .uses
             .iter()
-            .filter(|u| u.vis == Vis::Pub)
+            .filter(|u| u.vis == Visibility::Public)
             .cloned()
             .collect();
         for entry in entries {
@@ -77,8 +77,8 @@ impl Index<'_> {
         let names = &self.names[target];
         for def in names.types.values().chain(names.values.values()) {
             match def {
-                Def::Sym(s) if s.vis == Vis::Pub => found.push(s.id.clone()),
-                Def::Module(child, Vis::Pub) => modules.push(*child),
+                Def::Sym(s) if s.vis == Visibility::Public => found.push(s.id.clone()),
+                Def::Module(child, Visibility::Public) => modules.push(*child),
                 _ => {}
             }
         }
@@ -91,18 +91,20 @@ impl Index<'_> {
     /// it. Binary, test and example crates export nothing; the public items of
     /// a library that cannot be published are importable only inside the
     /// project, like Go's `internal` packages.
-    pub fn visibility(&self, declared: Vis, m: ModId, id: &str) -> Visibility {
+    pub fn visibility(&self, declared: Visibility, m: ModId, id: &str) -> Visibility {
         if !self.is_library(m) {
             return Visibility::Private;
         }
         match declared {
-            Vis::Private => Visibility::Private,
-            Vis::Crate => Visibility::Internal,
-            Vis::Pub if !self.tree.crates[self.tree.mods[m].krate].exported => Visibility::Internal,
-            Vis::Pub if self.exported.contains(id) || self.module_reachable(m) => {
+            Visibility::Private => Visibility::Private,
+            Visibility::Internal => Visibility::Internal,
+            Visibility::Public if !self.tree.crates[self.tree.mods[m].krate].exported => {
+                Visibility::Internal
+            }
+            Visibility::Public if self.exported.contains(id) || self.module_reachable(m) => {
                 Visibility::Public
             }
-            Vis::Pub => Visibility::Internal,
+            Visibility::Public => Visibility::Internal,
         }
     }
 }

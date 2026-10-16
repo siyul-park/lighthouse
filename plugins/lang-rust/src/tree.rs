@@ -9,21 +9,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lighthouse_protocol::Visibility;
 use proc_macro2::{TokenStream, TokenTree};
 use syn::{
-    Attribute, Expr, ExprLit, Item, Lit, Meta, Token, Visibility, parse::Parser,
-    punctuated::Punctuated,
+    Attribute, Expr, ExprLit, Item, Lit, Meta, Token, parse::Parser, punctuated::Punctuated,
 };
 
 use crate::cargo::TargetKind;
-
-/// Declared visibility, before it is capped by the surrounding modules.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Vis {
-    Pub,
-    Crate,
-    Private,
-}
 
 pub struct SourceFile {
     pub rel: String,
@@ -87,7 +79,7 @@ pub struct Mod {
     /// Indexes of the nested inline `mod` items leading from the file's items
     /// to this module's items.
     pub inline: Vec<usize>,
-    pub vis: Vis,
+    pub vis: Visibility,
     pub cfg_test: bool,
     dir: PathBuf,
     nested: bool,
@@ -187,7 +179,7 @@ impl Tree {
             krate,
             file,
             inline: Vec::new(),
-            vis: Vis::Pub,
+            vis: Visibility::Public,
             cfg_test,
             dir,
             nested: false,
@@ -400,18 +392,19 @@ enum Load {
 
 struct Child {
     name: String,
-    vis: Vis,
+    vis: Visibility,
     cfg_test: bool,
     path: Option<String>,
     inline: Option<usize>,
 }
 
-pub fn vis(v: &Visibility) -> Vis {
+/// Declared visibility, before it is capped by the surrounding modules.
+pub fn vis(v: &syn::Visibility) -> Visibility {
     match v {
-        Visibility::Public(_) => Vis::Pub,
-        Visibility::Restricted(r) if r.path.is_ident("self") => Vis::Private,
-        Visibility::Restricted(_) => Vis::Crate,
-        Visibility::Inherited => Vis::Private,
+        syn::Visibility::Public(_) => Visibility::Public,
+        syn::Visibility::Restricted(r) if r.path.is_ident("self") => Visibility::Private,
+        syn::Visibility::Restricted(_) => Visibility::Internal,
+        syn::Visibility::Inherited => Visibility::Private,
     }
 }
 

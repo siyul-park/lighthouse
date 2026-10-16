@@ -1,6 +1,7 @@
 //! The fragment cache: the symbols, edges and summaries of a file are kept
-//! between runs, keyed by the file's text and by a digest of everything the
-//! other files and manifests contribute to its analysis. A body edit changes
+//! between runs, keyed by the content digest the host sent for the file and by
+//! a digest of everything the other files and manifests contribute to its
+//! analysis. A body edit changes
 //! the text of one file and no one's contribution (function bodies are left
 //! out of it), so only that file is analyzed again. Any other change misses
 //! everything. The module tree and name resolution always run: they are the
@@ -51,6 +52,8 @@ pub struct Cache {
     path: PathBuf,
     version: String,
     context: Option<String>,
+    /// The content digests the host sent, by path.
+    hashes: BTreeMap<String, String>,
     stored: BTreeMap<String, Entry>,
     fresh: BTreeMap<String, Entry>,
     analyzed: usize,
@@ -89,6 +92,11 @@ impl Cache {
             path,
             version,
             context: None,
+            hashes: params
+                .files
+                .iter()
+                .map(|f| (f.path.clone(), f.hash.clone()))
+                .collect(),
             stored,
             fresh: BTreeMap::new(),
             analyzed: 0,
@@ -165,7 +173,7 @@ impl Cache {
 
     fn key(&self, file: &SourceFile) -> Option<String> {
         let context = self.context.as_ref()?;
-        Some(digest(&[context, &file.rel, &digest(&[&file.text])]))
+        Some(digest(&[context, &file.rel, self.hashes.get(&file.rel)?]))
     }
 
     /// Writes the cache when the run changed it. A failure is returned as a

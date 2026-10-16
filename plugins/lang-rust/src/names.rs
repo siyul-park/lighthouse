@@ -18,7 +18,7 @@ use syn::{Item, UseTree};
 
 use crate::{
     syntax::doc_of,
-    tree::{Tree, Vis, vis},
+    tree::{Tree, vis},
 };
 
 /// Attributes that make a function a test, matched on the whole path:
@@ -53,12 +53,12 @@ pub struct Sym {
     pub name: String,
     pub kind: SymbolKind,
     pub module: ModId,
-    pub vis: Vis,
+    pub vis: Visibility,
 }
 
 #[derive(Debug, Clone)]
 pub enum Def {
-    Module(ModId, Vis),
+    Module(ModId, Visibility),
     Sym(Sym),
 }
 
@@ -75,7 +75,7 @@ pub enum Res {
 
 #[derive(Debug, Clone)]
 pub struct UseEntry {
-    pub vis: Vis,
+    pub vis: Visibility,
     pub path: Vec<String>,
     /// The bound name, `*` for a glob and `_` for an anonymous import.
     pub name: String,

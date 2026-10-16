@@ -5,10 +5,7 @@ use lighthouse_protocol as wire;
 use quote::ToTokens;
 use syn::{Attribute, Field, FnArg, ReturnType, Signature, Type};
 
-use crate::{
-    names::{Index, ModId, TyCx, generics_of},
-    tree::Vis,
-};
+use crate::names::{Index, ModId, TyCx, generics_of};
 
 /// The collections and wrappers whose empty value means "not given".
 const OPTIONAL_TYPES: [&str; 5] = ["Option", "Vec", "HashMap", "BTreeMap", "IndexMap"];
@@ -45,7 +42,7 @@ fn type_ref(idx: &Index, cx: &TyCx, ty: &Type) -> wire::TypeRef {
     let sym = idx.type_sym(ty, cx);
     wire::TypeRef {
         text: spelled(ty),
-        exported: sym.as_ref().map(|s| s.vis == Vis::Pub),
+        exported: sym.as_ref().map(|s| s.vis == wire::Visibility::Public),
         symbol: sym.map(|s| s.id.split('#').next().unwrap_or(&s.id).to_owned()),
     }
 }

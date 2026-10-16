@@ -11,6 +11,7 @@ use std::{
 use lighthouse_protocol::{
     self as wire, FileRef, IndexParams, IndexResult, Message, read_message, write_message,
 };
+use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
 pub(crate) fn project(files: &[(&str, &str)]) -> TempDir {
@@ -54,7 +55,7 @@ pub(crate) fn index_with(
             .iter()
             .map(|path| FileRef {
                 path: path.clone(),
-                hash: String::new(),
+                hash: format!("{:x}", Sha256::digest(fs::read(root.join(path)).unwrap())),
             })
             .collect(),
         context: wire::Context {

@@ -66,7 +66,7 @@ impl Index<'_> {
         self.names[m].values.entry(name).or_insert(Def::Sym(sym));
     }
 
-    fn sym(&self, m: ModId, parts: &[&str], kind: SymbolKind, v: Vis) -> Sym {
+    fn sym(&self, m: ModId, parts: &[&str], kind: SymbolKind, v: Visibility) -> Sym {
         let name = parts.last().copied().unwrap_or("").to_owned();
         Sym {
             id: symbol_id(self.module_path(m), parts, kind),
@@ -243,7 +243,7 @@ impl Index<'_> {
                 );
                 self.sigs.insert(id.clone(), signature(sig, cx));
                 if i.trait_.is_none() {
-                    let public = declared == Vis::Pub;
+                    let public = declared == Visibility::Public;
                     self.inherent_methods
                         .entry(name.clone())
                         .or_default()

@@ -5,7 +5,7 @@ use lighthouse_protocol::{Node, Symbol, SymbolKind};
 use quote::ToTokens;
 use syn::Attribute;
 
-use super::{Extractor, Owner, Shape, cap, declared};
+use super::{Extractor, Owner, Shape, cap};
 use crate::{
     names::{ModId, symbol_id},
     signature::{field_type, optional_field, serde_default},
@@ -66,7 +66,7 @@ impl Extractor<'_> {
             };
             let name = ident.to_string();
             let id = symbol_id(&owner.module, &[&owner.name, &name], SymbolKind::Field);
-            let visibility = cap(declared(vis(&field.vis)), owner.visibility);
+            let visibility = cap(vis(&field.vis), owner.visibility);
             let optional = optional_field(field, container_default);
             self.declare(
                 Symbol {
