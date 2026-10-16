@@ -107,7 +107,7 @@ impl World {
     }
 
     fn digests(&self) -> Digests {
-        Digests::of(&self.project()).unwrap()
+        Digests::new(&self.project()).unwrap()
     }
 
     /// The digests of a file after `change` was made to the callee `b`.
@@ -198,7 +198,7 @@ fn the_project_digest_is_stable_and_follows_any_change() {
     assert_eq!(world.digests().project(), world.digests().project());
     let shuffled = Project::merge([world.b.clone(), world.a.clone()]);
     assert_eq!(
-        Digests::of(&shuffled).unwrap().project(),
+        Digests::new(&shuffled).unwrap().project(),
         world.digests().project()
     );
     let mut edited = World::new();

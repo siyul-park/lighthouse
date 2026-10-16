@@ -4,7 +4,7 @@
 //! its size is capped, oldest use first. Any doubt is a miss.
 //!
 //! [`Digests`] hash the merged project once, per file and as a whole; a
-//! [`Key`] is built from those and from the rule; [`Cache`] stores the
+//! [`KeyBuilder`] builds a key from those and from the rule; [`Cache`] stores the
 //! findings under it in `results.db`.
 
 use std::{fs, io, path::Path};
@@ -16,8 +16,9 @@ mod key;
 mod neighbors;
 mod store;
 
+pub(crate) use digest::digest_of;
 pub use digest::{Digest, Digests, FileDigest, documents};
-pub use key::{Key, KeyBuilder};
+pub use key::KeyBuilder;
 pub use store::{Cache, DEFAULT_LIMIT, Stats, Stored};
 
 /// Name of the cache directory under `.lighthouse`.
@@ -33,7 +34,7 @@ pub enum Error {
         path: std::path::PathBuf,
         source: io::Error,
     },
-    #[error("the code model cannot be hashed: {0}")]
+    #[error("a value cannot be hashed: {0}")]
     Hash(#[from] serde_json::Error),
 }
 

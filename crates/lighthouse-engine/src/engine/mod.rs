@@ -32,16 +32,17 @@ use crate::{
 
 mod batch;
 mod cached;
+mod classifier;
 mod config;
-mod instance;
 mod models;
 mod phases;
 mod run;
 
+use crate::cache::Cache;
 use cached::RunCache;
+pub use classifier::CommandModels;
 pub use config::active_rules;
 use config::{constructors, io_error, load_languages, validate_config};
-pub use instance::CommandModels;
 
 /// Name of the file, in `.gitignore` syntax, that keeps files out of the
 /// analysis altogether, such as fixtures that are broken on purpose.
@@ -207,7 +208,7 @@ struct Scene<'a> {
     memo: &'a Memo,
     /// Where findings of an earlier run are looked up and kept, if the run has
     /// a cache.
-    cache: Option<&'a RunCache>,
+    cache: Option<&'a RunCache<'a>>,
     /// The models the rules may ask.
     models: &'a dyn lighthouse_plugin::Models,
 }

@@ -1,8 +1,8 @@
 use std::fs;
 
-use lighthouse_engine::cache::{Cache, Key, KeyBuilder};
+use lighthouse_engine::cache::{Cache, Digest, KeyBuilder};
 
-fn key(name: &str) -> Key {
+fn key(name: &str) -> Digest {
     let mut key = KeyBuilder::new();
     key.part(name);
     key.finish()
@@ -116,12 +116,6 @@ fn cleaning_deletes_the_directory_and_what_a_plugin_kept_in_it() {
     assert!(lighthouse_engine::cache::clean(&cache).unwrap());
     assert!(!cache.exists());
     assert!(!lighthouse_engine::cache::clean(&cache).unwrap());
-}
-
-#[test]
-fn key_as_bytes_is_a_sha256() {
-    assert_eq!(key("a").as_bytes().len(), 32);
-    assert_ne!(key("a").as_bytes(), key("b").as_bytes());
 }
 
 #[test]

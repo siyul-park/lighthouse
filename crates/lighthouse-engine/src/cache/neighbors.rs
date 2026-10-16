@@ -13,6 +13,7 @@ use serde::Serialize;
 use super::{
     Error,
     digest::{Digest, FileDigest, digest_of, feed},
+    key::KeyBuilder,
 };
 
 /// What the passes over files share: the project, the description of every
@@ -24,7 +25,7 @@ pub(crate) struct Ties<'p> {
 }
 
 impl<'p> Ties<'p> {
-    pub(crate) fn of(project: &'p Project) -> Self {
+    pub(crate) fn new(project: &'p Project) -> Self {
         let described = project
             .symbols
             .par_iter()
@@ -263,44 +264,36 @@ fn describe(project: &Project, symbol: &Symbol) -> Described {
         file.is_some_and(|f| f.generated),
         project.function(id).is_some_and(|f| f.implementation),
     ];
-    let mut hasher = Hasher::new();
-    let mut part = |bytes: &[u8]| {
-        hasher.update((bytes.len() as u64).to_le_bytes());
-        hasher.update(bytes);
-    };
-    part(id.as_str().as_bytes());
-    part(symbol.name.as_bytes());
-    part(symbol.kind.as_str().as_bytes());
-    part(&[
-        symbol.visibility as u8,
-        symbol.role.map_or(255, |r| r as u8),
-    ]);
-    part(
-        symbol
-            .owner
-            .as_ref()
-            .map_or("", SymbolId::as_str)
-            .as_bytes(),
-    );
-    part(owner.map_or("", |o| o.kind.as_str()).as_bytes());
-    part(
-        owner
-            .map_or(Path::new(""), |o| o.file.as_path())
-            .as_os_str()
-            .as_encoded_bytes(),
-    );
-    part(symbol.file.as_os_str().as_encoded_bytes());
-    part(file.map_or("", |f| f.lang.as_str()).as_bytes());
-    part(&flags.map(u8::from));
-    counts.iter().for_each(|n| part(&(*n as u64).to_le_bytes()));
-    let plain = hasher.clone().finish();
+    let mut key = KeyBuilder::new();
+    key.part(id.as_str())
+        .part(&symbol.name)
+        .part(symbol.kind.as_str())
+        .part([
+            symbol.visibility as u8,
+            symbol.role.map_or(255, |r| r as u8),
+        ])
+        .part(symbol.owner.as_ref().map_or("", SymbolId::as_str))
+        .part(owner.map_or("", |o| o.kind.as_str()))
+        .part(
+            owner
+                .map_or(Path::new(""), |o| o.file.as_path())
+                .as_os_str()
+                .as_encoded_bytes(),
+        )
+        .part(symbol.file.as_os_str().as_encoded_bytes())
+        .part(file.map_or("", |f| f.lang.as_str()))
+        .part(flags.map(u8::from));
+    for n in counts {
+        key.part((n as u64).to_le_bytes());
+    }
+    let plain = key.clone().finish();
     let span = symbol.span;
     for n in [span.start.line, span.start.col, span.end.line, span.end.col] {
-        hasher.update(n.to_le_bytes());
+        key.part(n.to_le_bytes());
     }
     Described {
         plain,
-        at: hasher.finish(),
+        at: key.finish(),
     }
 }
 
@@ -308,12 +301,9 @@ fn describe(project: &Project, symbol: &Symbol) -> Described {
 /// what is at the other end.
 fn tie(direction: &[u8], at: &SymbolId, kind: [u8; 2], (plain, placed): (Digest, Digest)) -> Tie {
     let make = |other: Digest| {
-        let mut hasher = Hasher::new();
-        for part in [direction, at.as_str().as_bytes(), &kind, &other] {
-            hasher.update((part.len() as u64).to_le_bytes());
-            hasher.update(part);
-        }
-        hasher.finish()
+        let mut key = KeyBuilder::new();
+        key.part(direction).part(at.as_str()).part(kind).part(other);
+        key.finish()
     };
     Tie {
         plain: make(plain),

@@ -13,10 +13,10 @@ struct Progress {
 }
 
 /// The files of a project and the model the providers made of them.
-struct Loaded {
+struct Loaded<'c> {
     inputs: Vec<Input>,
     project: Project,
-    cache: Option<RunCache>,
+    cache: Option<RunCache<'c>>,
 }
 
 impl Engine {
@@ -30,8 +30,16 @@ impl Engine {
         let selected = self.select_rules(only);
         let mut progress = self.begin(reported)?;
         let scopes = progress.scopes.clone();
-        let models = self.run_models(&scopes);
-        let loaded = self.load(&selected, &models, overlays, &mut progress);
+        let cache = self.cache.as_ref().and_then(|settings| {
+            Cache::open(&settings.dir, settings.limit)
+                .map_err(|e| {
+                    let note = format!("the result cache is not used: {e}");
+                    progress.outcome.notices.insert(note);
+                })
+                .ok()
+        });
+        let models = self.run_models(&scopes, cache.as_ref());
+        let loaded = self.load(&selected, &models, cache.as_ref(), overlays, &mut progress);
         let memo = Memo::default();
         let facts = self.analyze(
             &selected,
@@ -54,8 +62,20 @@ impl Engine {
         progress.outcome.probabilities = models.probabilities();
         (progress.outcome.model_calls, progress.outcome.model_cost) = models.usage();
         progress.outcome.notices.extend(models.finish());
-        if let Some(cache) = scene.cache {
-            self.close_cache(cache, &mut progress.timings, &mut progress.outcome.notices);
+        if let Some(cache) = &cache {
+            if let Some(run) = scene.cache {
+                run.store_rows();
+            }
+            match cache.finish() {
+                Ok(stats) => {
+                    progress.timings.cache_hits = stats.hits;
+                    progress.timings.cache_misses = stats.misses;
+                }
+                Err(e) => {
+                    let note = format!("the result cache was not saved: {e}");
+                    progress.outcome.notices.insert(note);
+                }
+            }
         }
         let started = Instant::now();
         let found = self.suppress(found, &scene, &mut progress)?;
@@ -128,13 +148,14 @@ impl Engine {
 
     /// Reads the files, has the providers index them, and finds the project's
     /// own documents when a selected rule is about them.
-    fn load(
+    fn load<'c>(
         &self,
         selected: &[&dyn Rule],
         models: &super::models::RunModels,
+        cache: Option<&'c Cache>,
         overlays: &Overlays,
         progress: &mut Progress,
-    ) -> Loaded {
+    ) -> Loaded<'c> {
         let started = Instant::now();
         let inputs = self.read(
             overlays,
@@ -159,7 +180,15 @@ impl Engine {
             project
         };
         let started = Instant::now();
-        let cache = self.open_cache(&project, selected, models, &mut progress.outcome.notices);
+        let cache = cache.and_then(|cache| {
+            self.run_cache(
+                cache,
+                &project,
+                selected,
+                models,
+                &mut progress.outcome.notices,
+            )
+        });
         progress.timings.hashing = started.elapsed();
         Loaded {
             inputs,

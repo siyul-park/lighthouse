@@ -56,7 +56,7 @@ fn ctx_run<R>(project: &Project, file: Option<&File>, run: impl FnOnce(&Context)
 }
 
 fn digests(project: &Project, file: &str) -> (lighthouse_engine::cache::FileDigest, Digests) {
-    let all = Digests::of(project).unwrap();
+    let all = Digests::new(project).unwrap();
     (*all.file(Path::new(file)).unwrap(), all)
 }
 

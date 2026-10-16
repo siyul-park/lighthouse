@@ -4,15 +4,16 @@
 //! (the overflow goes in the next request). Requests run concurrently. A
 //! request moves to the next model of its route when a model fails.
 
-use std::{collections::BTreeMap, sync::Arc, sync::PoisonError, sync::atomic::Ordering};
+use std::{collections::BTreeMap, sync::Arc};
 
+use crate::cache::Digest;
 use lighthouse_model::{Diagnostic, hash::sha256};
 use lighthouse_plugin::{
-    Abstained, Answered, Ask, Classifier, Decided, Explored, Model, Settle, fails, request_of,
+    Abstained, Answered, Ask, Classifier, Decided, Explored, Settle, fails, request_of,
 };
 use rayon::prelude::*;
 
-use super::models::{Route, RunModels, digest_of};
+use super::models::{Layer, RunModels, named};
 
 /// The most questions put to a model in one request.
 pub(super) const MAX_QUESTIONS: usize = 32;
@@ -21,12 +22,17 @@ pub(super) const MAX_QUESTIONS: usize = 32;
 /// subject's place in the sample a share between 0 and 1.
 const SAMPLE_SPAN: f64 = 4_294_967_296.0;
 
-/// What a rule asked and has not had answered: its routes, most specific
-/// first, and what to make of the judgments.
+/// What a rule asked and has not had answered: its binding layers, most
+/// specific first, what to make of the judgments, and the digests of what the
+/// models are told, which key their answers.
 pub(super) struct Pending<'a> {
     pub(super) ask: Ask,
     pub(super) settle: Settle,
-    pub(super) routes: Vec<Route<'a>>,
+    pub(super) layers: Vec<Layer<'a>>,
+    /// The state of each subject of the ask.
+    pub(super) states: Vec<Digest>,
+    /// The question the ask puts.
+    pub(super) question: Digest,
 }
 
 /// The `i`th subject of the `p`th ask.
@@ -52,7 +58,7 @@ impl<'a> RunModels<'a> {
             .iter()
             .map(|p| vec![Answered::Abstained(Abstained::Undecided); p.ask.subjects.len()])
             .collect();
-        let layers = pending.iter().map(|p| p.routes.len()).max().unwrap_or(0);
+        let layers = pending.iter().map(|p| p.layers.len()).max().unwrap_or(0);
         for layer in 0..layers {
             let groups = Self::groups(&pending, &judged, layer);
             let answers: Vec<(At, Answer)> = groups
@@ -73,20 +79,20 @@ impl<'a> RunModels<'a> {
             .collect()
     }
 
-    /// The open subjects the routes of `layer` are to judge, grouped by the
-    /// route and what it reads of the subject: one request each.
+    /// The open subjects the layer `layer` is to judge, grouped by the
+    /// models and what they read of the subject: one request each.
     fn groups(pending: &[Pending<'a>], judged: &[Vec<Answered>], layer: usize) -> Vec<Vec<At>> {
-        let mut groups: BTreeMap<(String, String), Vec<At>> = BTreeMap::new();
+        let mut groups: BTreeMap<(&str, Digest), Vec<At>> = BTreeMap::new();
         for (p, item) in pending.iter().enumerate() {
-            let Some(route) = item.routes.get(layer) else {
+            let Some(models) = item.layers.get(layer) else {
                 continue;
             };
-            for (i, subject) in item.ask.subjects.iter().enumerate() {
+            for (i, state) in item.states.iter().enumerate() {
                 if matches!(judged[p][i], Answered::Decided(_)) {
                     continue;
                 }
                 groups
-                    .entry((route.id.clone(), digest_of(&subject.state)))
+                    .entry((models.id.as_str(), *state))
                     .or_default()
                     .push((p, i));
             }
@@ -94,22 +100,21 @@ impl<'a> RunModels<'a> {
         groups.into_values().collect()
     }
 
-    /// What a route says about the subjects at `items`, which share a state:
+    /// What a layer says about the subjects at `items`, which share a state:
     /// kept answers first, the rest in requests of at most [`MAX_QUESTIONS`].
     fn ask_group(&self, pending: &[Pending<'a>], layer: usize, items: &[At]) -> Vec<(At, Answer)> {
-        let order = pending[items[0].0].routes[layer].order(self.binding.routing);
+        let order = pending[items[0].0].layers[layer].order(self.binding.routing);
         let mut out = Vec::new();
         let mut todo = Vec::new();
         for &at in items {
-            let ask = &pending[at.0].ask;
-            let subject = &ask.subjects[at.1];
-            if !self.reported(subject) {
+            let item = &pending[at.0];
+            if !self.reported(&item.ask.subjects[at.1]) {
                 out.push((at, Err(Abstained::Undecided)));
                 continue;
             }
             let kept = order.iter().find_map(|model| {
                 let manifest = model.manifest();
-                let noul = self.recall(manifest, ask, subject)?;
+                let noul = self.recall(manifest, item, at.1)?;
                 Some((noul, named(manifest)))
             });
             match kept {
@@ -123,7 +128,7 @@ impl<'a> RunModels<'a> {
         out
     }
 
-    /// One request, put to the models of the route in turn until one answers.
+    /// One request, put to the models of the layer in turn until one answers.
     /// Only a failure or a refusal of the budget moves on; an abstention is an
     /// answer. Every model out, the subjects are left to review.
     fn send(
@@ -143,7 +148,7 @@ impl<'a> RunModels<'a> {
         let open = match failure {
             Some(reason) => Abstained::Failed(reason),
             None => {
-                self.over_budget.fetch_add(chunk.len(), Ordering::SeqCst);
+                self.count_over_budget(chunk.len());
                 Abstained::OverBudget
             }
         };
@@ -159,7 +164,7 @@ impl<'a> RunModels<'a> {
         chunk: &[At],
     ) -> Result<Vec<(At, Answer)>, Miss> {
         let manifest = model.manifest();
-        if let Some(reason) = self.cooled(&manifest.id) {
+        if let Some(reason) = self.skipped(&manifest.id) {
             return Err(Miss::Failed(reason));
         }
         if manifest.cost > 0.0 && !self.spend() {
@@ -169,25 +174,25 @@ impl<'a> RunModels<'a> {
             pending[chunk[0].0].ask.subjects[chunk[0].1].state.clone(),
             chunk.iter().map(|&(p, _)| &pending[p].ask.decision),
         );
-        self.calls.fetch_add(1, Ordering::SeqCst);
-        *self.cost.lock().unwrap_or_else(PoisonError::into_inner) += manifest.cost;
+        self.count_call(manifest.cost);
         let result = model
             .classify(&params)
-            .map_err(|e| Miss::Failed(self.fail(manifest, e.to_string())))?;
+            .map_err(|e| Miss::Failed(self.failure(manifest, e.to_string())))?;
         let by = named(manifest);
         Ok(chunk
             .iter()
             .map(|&at| {
-                let ask = &pending[at.0].ask;
-                let answer = match result.answers.get(&ask.decision.id) {
+                let item = &pending[at.0];
+                let decision = &item.ask.decision.id;
+                let answer = match result.answers.get(decision) {
                     Some(answer) if answer.kind == "noul" => Ok((answer.noul, by.clone())),
-                    _ => Err(Abstained::Failed(self.report(
+                    _ => Err(Abstained::Failed(self.note_failure(
                         manifest,
-                        format!("it gave no `noul` answer for `{}`", ask.decision.id),
+                        format!("it gave no `noul` answer for `{decision}`"),
                     ))),
                 };
                 if let Ok((noul, _)) = answer {
-                    self.keep(manifest, ask, &ask.subjects[at.1], noul);
+                    self.keep(manifest, item, at.1, noul);
                 }
                 (at, answer)
             })
@@ -220,7 +225,7 @@ impl<'a> RunModels<'a> {
         };
         let subject = &item.ask.subjects[i].key;
         let sample =
-            item.routes[layer].attached && sampled(&item.ask.rule, subject, self.binding.explore);
+            item.layers[layer].attached && sampled(&item.ask.rule, subject, self.binding.explore);
         if sample {
             return Answered::Abstained(Abstained::Explored(Explored { model, confidence }));
         }
@@ -246,9 +251,4 @@ fn explored(prior: &Answered) -> Option<&Explored> {
         Answered::Abstained(Abstained::Explored(explored)) => Some(explored),
         _ => None,
     }
-}
-
-/// The model as evidence names it: `<provider>/<model>@<version>`.
-fn named(manifest: &Model) -> String {
-    format!("{}@{}", manifest.id, manifest.version)
 }

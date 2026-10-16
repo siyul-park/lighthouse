@@ -4,6 +4,7 @@
 //! in one transaction, at the end.
 
 use std::{
+    borrow::Cow,
     fs,
     path::{Path, PathBuf},
     sync::{
@@ -17,7 +18,7 @@ use lighthouse_model::Diagnostic;
 use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension, params};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
-use super::{Error, Key};
+use super::{Digest, Error};
 
 /// The file the results live in, under the cache directory.
 const DB: &str = "results.db";
@@ -45,9 +46,9 @@ const TOUCH_AFTER: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// What a rule found for one subject and told about it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Stored {
-    pub diagnostics: Vec<Diagnostic>,
-    pub notices: Vec<String>,
+pub struct Stored<'a> {
+    pub diagnostics: Cow<'a, [Diagnostic]>,
+    pub notices: Cow<'a, [String]>,
 }
 
 /// What a run did with the cache.
@@ -62,8 +63,8 @@ pub struct Stats {
 }
 
 /// A value waiting to be written, as serialized.
-struct Pending {
-    key: Key,
+struct Write {
+    key: Digest,
     value: Vec<u8>,
 }
 
@@ -72,8 +73,8 @@ pub struct Cache {
     path: PathBuf,
     writer: Mutex<Connection>,
     readers: Mutex<Vec<Connection>>,
-    used: Mutex<Vec<Key>>,
-    fresh: Mutex<Vec<Pending>>,
+    used: Mutex<Vec<Digest>>,
+    fresh: Mutex<Vec<Write>>,
     limit: u64,
     hits: AtomicUsize,
     misses: AtomicUsize,
@@ -119,7 +120,7 @@ impl Cache {
 
     /// What was stored under `key`. A value that cannot be read is a miss.
     /// Counting the lookup as a hit or a miss is [`Cache::count`]'s.
-    pub fn get<T: DeserializeOwned>(&self, key: &Key) -> Option<T> {
+    pub fn get<T: DeserializeOwned>(&self, key: &Digest) -> Option<T> {
         let found = self.read(key)?;
         let value = serde_json::from_slice(&found.0).ok()?;
         if found.1 + TOUCH_AFTER.as_millis() as i64 <= millis() {
@@ -132,11 +133,11 @@ impl Cache {
     }
 
     /// Stores serialized `value` under `key` when the run ends.
-    pub fn put_bytes(&self, key: Key, value: Vec<u8>) {
+    pub fn put_bytes(&self, key: Digest, value: Vec<u8>) {
         self.fresh
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .push(Pending { key, value });
+            .push(Write { key, value });
     }
 
     /// Counts a lookup as answered by the cache, or not.
@@ -147,14 +148,10 @@ impl Cache {
 
     /// Stores `value` under `key` when the run ends. A value that cannot be
     /// serialized is not stored.
-    pub fn put<T: Serialize>(&self, key: Key, value: &T) {
-        let Ok(value) = serde_json::to_vec(value) else {
-            return;
-        };
-        self.fresh
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .push(Pending { key, value });
+    pub fn put<T: Serialize>(&self, key: Digest, value: &T) {
+        if let Ok(value) = serde_json::to_vec(value) {
+            self.put_bytes(key, value);
+        }
     }
 
     /// Writes what the run stored and used, then prunes down to the limit.
@@ -169,11 +166,11 @@ impl Cache {
                 "INSERT OR REPLACE INTO results (key, value, used_at) VALUES (?1, ?2, ?3)",
             )?;
             for stored in &fresh {
-                insert.execute(params![stored.key.as_bytes(), stored.value, now])?;
+                insert.execute(params![stored.key, stored.value, now])?;
             }
             let mut touch = tx.prepare_cached("UPDATE results SET used_at = ?2 WHERE key = ?1")?;
             for key in &used {
-                touch.execute(params![key.as_bytes(), now])?;
+                touch.execute(params![key, now])?;
             }
         }
         let pruned = prune(&tx, self.limit)?;
@@ -187,7 +184,7 @@ impl Cache {
     }
 
     /// The value and the time it was last used, from a connection of the pool.
-    fn read(&self, key: &Key) -> Option<(Vec<u8>, i64)> {
+    fn read(&self, key: &Digest) -> Option<(Vec<u8>, i64)> {
         let pooled = self
             .readers
             .lock()
@@ -206,9 +203,7 @@ impl Cache {
             .ok()
             .and_then(|mut query| {
                 query
-                    .query_row(params![key.as_bytes()], |row| {
-                        Ok((row.get(0)?, row.get(1)?))
-                    })
+                    .query_row(params![key], |row| Ok((row.get(0)?, row.get(1)?)))
                     .optional()
                     .ok()
                     .flatten()
@@ -240,8 +235,9 @@ fn connect(path: &Path) -> Result<Connection, Error> {
          CREATE INDEX IF NOT EXISTS results_used ON results (used_at);",
     )?;
     db.pragma_update(None, "user_version", SCHEMA)?;
-    // Reads the table once: a damaged file fails here, not in the middle of a run.
-    db.query_row("SELECT count(*) FROM results", [], |_| Ok(()))?;
+    // Reads a page of the table: a damaged file fails here, not in the middle
+    // of a run. Damage further in is a read that fails, which is a miss.
+    db.prepare("SELECT 1 FROM results LIMIT 1")?.exists([])?;
     Ok(db)
 }
 

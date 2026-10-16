@@ -8,28 +8,29 @@
 //! project state, holding every file's findings, instead of one entry per file.
 
 use std::{
-    collections::HashMap,
+    borrow::Cow,
+    collections::{HashMap, HashSet},
     sync::{Mutex, OnceLock, PoisonError},
 };
 
-use crate::cache::{Cache, Digest, Digests, Key, KeyBuilder, Stored};
-use lighthouse_model::{Reach, TestScope, hash::Hasher};
+use crate::cache::{Cache, Digest, Digests, KeyBuilder, Stored};
+use lighthouse_model::{Reach, TestScope};
 use lighthouse_plugin::Models;
 use serde::{Deserialize, Serialize};
 
 use super::*;
 
 /// The cache a run reads and writes, with the digests its keys are built from.
-pub(super) struct RunCache {
-    cache: Cache,
+pub(super) struct RunCache<'c> {
+    cache: &'c Cache,
     digests: Digests,
     documents: Digest,
-    plans: HashMap<String, Plan>,
+    prefixes: HashMap<String, Prefix>,
 }
 
 /// What is known of a rule before any unit runs.
-struct Plan {
-    prefix: KeyBuilder,
+struct Prefix {
+    key: KeyBuilder,
     reach: Reach,
     positions: bool,
     /// The row of a global rule that runs per file, read on first use.
@@ -38,32 +39,20 @@ struct Plan {
 
 /// The findings of a global rule over every file of one project state.
 struct Row {
-    key: Key,
-    loaded: HashMap<PathBuf, Entry>,
-    fresh: Mutex<Vec<Vec<u8>>>,
+    key: Digest,
+    loaded: HashMap<PathBuf, Entry<'static>>,
+    /// The entries judged this run, as written, by file.
+    fresh: Mutex<Vec<(PathBuf, Vec<u8>)>>,
 }
 
 /// One file of a row: the tag says which options and applicability it was
 /// judged with.
 #[derive(Serialize, Deserialize)]
-struct Entry {
-    file: PathBuf,
-    tag: String,
-    found: Stored,
-}
-
-/// An entry as it is written, borrowing what the run found.
-#[derive(Serialize)]
-struct EntryRef<'a> {
-    file: &'a Path,
-    tag: &'a str,
-    found: FoundRef<'a>,
-}
-
-#[derive(Serialize)]
-struct FoundRef<'a> {
-    diagnostics: &'a [Diagnostic],
-    notices: &'a [String],
+struct Entry<'a> {
+    file: Cow<'a, Path>,
+    // Not `Cow<str>`: serde borrows that from the input, and a row is owned.
+    tag: Cow<'a, String>,
+    found: Stored<'a>,
 }
 
 impl Engine {
@@ -77,41 +66,39 @@ impl Engine {
         ctx: &Context,
         options: &Options,
     ) -> Result<Vec<Diagnostic>, lighthouse_plugin::Error> {
-        let plan = scene
+        let prefix = scene
             .cache
-            .and_then(|run| Some((run, run.plans.get(&rule.manifest().id)?)));
-        let Some((run, plan)) = plan else {
+            .and_then(|run| Some((run, run.prefixes.get(&rule.manifest().id)?)));
+        let Some((run, prefix)) = prefix else {
             return rule.check(ctx, options);
         };
         match ctx.file {
-            Some((file, _)) if plan.reach == Reach::Global => {
-                run.in_row(plan, file, rule, ctx, options)
+            Some((file, _)) if prefix.reach == Reach::Global => {
+                run.in_row(prefix, file, rule, ctx, options)
             }
-            _ => run.alone(plan, rule, ctx, options),
+            _ => run.alone(prefix, rule, ctx, options),
         }
     }
 
-    /// Opens the cache for a run over `project` when the engine has one, and
-    /// hashes the project for its keys; what goes wrong is a notice and the
-    /// run goes on without.
-    pub(super) fn open_cache(
+    /// The cache of a run over `project`, with the project hashed for its
+    /// keys; what goes wrong is a notice and the run goes on without.
+    pub(super) fn run_cache<'c>(
         &self,
+        cache: &'c Cache,
         project: &Project,
         selected: &[&dyn Rule],
         models: &dyn Models,
         notices: &mut BTreeSet<String>,
-    ) -> Option<RunCache> {
-        let settings = self.cache.as_ref()?;
-        let opened = Cache::open(&settings.dir, settings.limit).and_then(|cache| {
-            Ok(RunCache {
+    ) -> Option<RunCache<'c>> {
+        let digests = Digests::new(project)
+            .and_then(|digests| Ok((digests, crate::cache::documents(project.documents())?)));
+        match digests {
+            Ok((digests, documents)) => Some(RunCache {
                 cache,
-                digests: Digests::of(project)?,
-                documents: crate::cache::documents(project.documents())?,
-                plans: self.plans(selected, models),
-            })
-        });
-        match opened {
-            Ok(run) => Some(run),
+                digests,
+                documents,
+                prefixes: self.prefixes(selected, models),
+            }),
             Err(e) => {
                 notices.insert(format!("the result cache is not used: {e}"));
                 None
@@ -121,7 +108,7 @@ impl Engine {
 
     /// The prefix of the keys of each selected rule that may be cached: not one
     /// whose `review` route the models are asked about this run.
-    fn plans(&self, selected: &[&dyn Rule], models: &dyn Models) -> HashMap<String, Plan> {
+    fn prefixes(&self, selected: &[&dyn Rule], models: &dyn Models) -> HashMap<String, Prefix> {
         let base = self.cache_base();
         selected
             .iter()
@@ -131,102 +118,104 @@ impl Engine {
                     return None;
                 }
                 let caching = meta.caching.as_ref()?;
-                let mut prefix = KeyBuilder::new();
-                prefix
-                    .part(base)
-                    .part(&meta.id)
+                let mut key = base.clone();
+                key.part(&meta.id)
                     .part(&caching.revision)
                     .part([caching.reach as u8, u8::from(caching.positions)]);
-                let plan = Plan {
-                    prefix,
+                let prefix = Prefix {
+                    key,
                     reach: caching.reach,
                     positions: caching.positions,
                     row: OnceLock::new(),
                 };
-                Some((meta.id.clone(), plan))
+                Some((meta.id.clone(), prefix))
             })
             .collect()
     }
 
     /// What every key of this engine depends on besides its rule: the build,
     /// the plugins, and how the languages are configured.
-    fn cache_base(&self) -> Digest {
-        let mut hasher = Hasher::new();
-        let mut part = |bytes: &[u8]| {
-            hasher.update((bytes.len() as u64).to_le_bytes());
-            hasher.update(bytes);
-        };
-        part(crate::cache::build_identity().as_bytes());
+    fn cache_base(&self) -> KeyBuilder {
+        let mut key = KeyBuilder::new();
+        key.part(crate::cache::build_identity());
         for plugin in self.registry.manifests() {
-            part(plugin.id.as_bytes());
-            part(plugin.version.as_bytes());
+            key.part(&plugin.id).part(&plugin.version);
         }
         // Maps of sorted keys: the same configuration is the same text.
-        part(
-            serde_json::to_string(&self.ws.languages)
-                .unwrap_or_default()
-                .as_bytes(),
-        );
-        part(
-            serde_json::to_string(&self.ws.constructors)
-                .unwrap_or_default()
-                .as_bytes(),
-        );
-        part(
-            serde_json::to_string(&self.ws.formatters)
-                .unwrap_or_default()
-                .as_bytes(),
-        );
-        hasher.finish()
-    }
-
-    /// Writes what the run stored and used, and says how it went.
-    pub(super) fn close_cache(
-        &self,
-        run: &RunCache,
-        timings: &mut Timings,
-        notices: &mut BTreeSet<String>,
-    ) {
-        run.store_rows();
-        match run.cache.finish() {
-            Ok(stats) => {
-                timings.cache_hits = stats.hits;
-                timings.cache_misses = stats.misses;
-            }
-            Err(e) => {
-                notices.insert(format!("the result cache was not saved: {e}"));
-            }
+        let maps = [
+            serde_json::to_string(&self.ws.languages),
+            serde_json::to_string(&self.ws.constructors),
+            serde_json::to_string(&self.ws.formatters),
+        ];
+        for map in maps {
+            key.part(map.unwrap_or_default());
         }
+        key
     }
 }
 
-impl RunCache {
+impl RunCache<'_> {
+    /// Hands the rows that gained files to the cache.
+    pub(super) fn store_rows(&self) {
+        for prefix in self.prefixes.values() {
+            let Some(row) = prefix.row.get() else {
+                continue;
+            };
+            let fresh =
+                std::mem::take(&mut *row.fresh.lock().unwrap_or_else(PoisonError::into_inner));
+            if fresh.is_empty() {
+                continue;
+            }
+            // With the files it already held that this run did not judge again.
+            let judged: HashSet<&Path> = fresh.iter().map(|(file, _)| file.as_path()).collect();
+            let kept: Vec<Vec<u8>> = row
+                .loaded
+                .values()
+                .filter(|entry| !judged.contains(&*entry.file))
+                .filter_map(|entry| serde_json::to_vec(entry).ok())
+                .collect();
+            let entries: Vec<&[u8]> = kept
+                .iter()
+                .map(Vec::as_slice)
+                .chain(fresh.iter().map(|(_, bytes)| bytes.as_slice()))
+                .collect();
+            self.cache.put_bytes(
+                row.key,
+                [b"[", entries.join(&b',').as_slice(), b"]"].concat(),
+            );
+        }
+    }
+
     /// Runs a unit that has an entry of its own.
     fn alone(
         &self,
-        plan: &Plan,
+        prefix: &Prefix,
         rule: &dyn Rule,
         ctx: &Context,
         options: &Options,
     ) -> Result<Vec<Diagnostic>, lighthouse_plugin::Error> {
         let tag = tag(ctx.applies, options);
         let file = ctx.file.map(|(file, _)| file);
-        let Some(key) = self.key(plan, &tag, file) else {
+        let Some(key) = self.key(prefix, &tag, file) else {
             return rule.check(ctx, options);
         };
         let stored = self.cache.get::<Stored>(&key);
         self.cache.count(stored.is_some());
         if let Some(stored) = stored {
-            stored.notices.into_iter().for_each(|n| ctx.notices.push(n));
-            return Ok(stored.diagnostics);
+            stored
+                .notices
+                .into_owned()
+                .into_iter()
+                .for_each(|n| ctx.notices.push(n));
+            return Ok(stored.diagnostics.into_owned());
         }
         let found = rule.check(ctx, options)?;
         let notices = ctx.notices.take();
         self.cache.put(
             key,
-            &FoundRef {
-                diagnostics: &found,
-                notices: &notices,
+            &Stored {
+                diagnostics: Cow::Borrowed(&found),
+                notices: Cow::Borrowed(&notices),
             },
         );
         notices.into_iter().for_each(|n| ctx.notices.push(n));
@@ -236,15 +225,15 @@ impl RunCache {
     /// Runs a unit that is a file's part of a row.
     fn in_row(
         &self,
-        plan: &Plan,
+        prefix: &Prefix,
         file: &File,
         rule: &dyn Rule,
         ctx: &Context,
         options: &Options,
     ) -> Result<Vec<Diagnostic>, lighthouse_plugin::Error> {
         let tag = tag(ctx.applies, options);
-        let row = self.row(plan);
-        let loaded = row.loaded.get(&file.path).filter(|entry| entry.tag == tag);
+        let row = self.row(prefix);
+        let loaded = row.loaded.get(&file.path).filter(|entry| *entry.tag == tag);
         self.cache.count(loaded.is_some());
         if let Some(entry) = loaded {
             let found = &entry.found;
@@ -252,23 +241,23 @@ impl RunCache {
                 .notices
                 .iter()
                 .for_each(|n| ctx.notices.push(n.clone()));
-            return Ok(found.diagnostics.clone());
+            return Ok(found.diagnostics.to_vec());
         }
         let found = rule.check(ctx, options)?;
         let notices = ctx.notices.take();
-        let entry = EntryRef {
-            file: &file.path,
-            tag: &tag,
-            found: FoundRef {
-                diagnostics: &found,
-                notices: &notices,
+        let entry = Entry {
+            file: Cow::Borrowed(&file.path),
+            tag: Cow::Borrowed(&tag),
+            found: Stored {
+                diagnostics: Cow::Borrowed(&found),
+                notices: Cow::Borrowed(&notices),
             },
         };
         if let Ok(bytes) = serde_json::to_vec(&entry) {
             row.fresh
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
-                .push(bytes);
+                .push((file.path.clone(), bytes));
         }
         notices.into_iter().for_each(|n| ctx.notices.push(n));
         Ok(found)
@@ -276,16 +265,16 @@ impl RunCache {
 
     /// The key of a unit over `file` (the project for a project rule), by the
     /// reach of its rule; `None` when the file is not one the digests know.
-    fn key(&self, plan: &Plan, tag: &str, file: Option<&File>) -> Option<Key> {
-        let mut key = plan.prefix.clone();
+    fn key(&self, prefix: &Prefix, tag: &str, file: Option<&File>) -> Option<Digest> {
+        let mut key = prefix.key.clone();
         key.part(tag);
-        match (file, plan.reach) {
+        match (file, prefix.reach) {
             (Some(file), Reach::Local | Reach::Neighbors) => {
                 let digests = self.digests.file(&file.path)?;
                 key.part(file.path.as_os_str().as_encoded_bytes())
                     .part(digests.slice);
-                if plan.reach == Reach::Neighbors {
-                    key.part(if plan.positions {
+                if prefix.reach == Reach::Neighbors {
+                    key.part(if prefix.positions {
                         digests.neighbors_at
                     } else {
                         digests.neighbors
@@ -300,9 +289,9 @@ impl RunCache {
     }
 
     /// The row of a global rule that runs per file.
-    fn row<'a>(&self, plan: &'a Plan) -> &'a Row {
-        plan.row.get_or_init(|| {
-            let mut key = plan.prefix.clone();
+    fn row<'a>(&self, prefix: &'a Prefix) -> &'a Row {
+        prefix.row.get_or_init(|| {
+            let mut key = prefix.key.clone();
             key.part(self.digests.project()).part(self.documents);
             let key = key.finish();
             let loaded = self
@@ -310,7 +299,7 @@ impl RunCache {
                 .get::<Vec<Entry>>(&key)
                 .unwrap_or_default()
                 .into_iter()
-                .map(|entry| (entry.file.clone(), entry))
+                .map(|entry| (entry.file.to_path_buf(), entry))
                 .collect();
             Row {
                 key,
@@ -318,32 +307,6 @@ impl RunCache {
                 fresh: Mutex::default(),
             }
         })
-    }
-
-    /// Hands the rows that gained files to the cache, with the files they
-    /// already held that this run did not judge again.
-    fn store_rows(&self) {
-        for plan in self.plans.values() {
-            let Some(row) = plan.row.get() else { continue };
-            let fresh =
-                std::mem::take(&mut *row.fresh.lock().unwrap_or_else(PoisonError::into_inner));
-            if fresh.is_empty() {
-                continue;
-            }
-            let judged: Vec<Entry> = fresh
-                .iter()
-                .filter_map(|bytes| serde_json::from_slice(bytes).ok())
-                .collect();
-            let mut all: Vec<Vec<u8>> = row
-                .loaded
-                .values()
-                .filter(|entry| !judged.iter().any(|j| j.file == entry.file))
-                .filter_map(|entry| serde_json::to_vec(entry).ok())
-                .collect();
-            all.extend(fresh);
-            self.cache
-                .put_bytes(row.key, [b"[", all.join(&b',').as_slice(), b"]"].concat());
-        }
     }
 }
 

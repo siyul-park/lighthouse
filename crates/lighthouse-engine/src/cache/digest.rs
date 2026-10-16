@@ -45,8 +45,8 @@ pub struct Digests {
 
 impl Digests {
     /// Hashes `project`.
-    pub fn of(project: &Project) -> Result<Self, Error> {
-        let ties = Ties::of(project);
+    pub fn new(project: &Project) -> Result<Self, Error> {
+        let ties = Ties::new(project);
         let mut paths: BTreeSet<&Path> = project.files.iter().map(|f| f.path.as_path()).collect();
         paths.extend(
             project

@@ -1,7 +1,7 @@
 //! The models of a run: which model judges a decision, what asking costs, and
 //! the answers kept between runs. A rule hands over the subjects it suspects;
-//! this puts them to the routes of the decision's bindings, most specific
-//! first, and an abstention or an unsure answer goes on to the next. A route
+//! this puts them to the layers of the decision's bindings, most specific
+//! first, and an abstention or an unsure answer goes on to the next. A layer
 //! is one model or several: a failure moves a request to the next of them.
 
 use std::{
@@ -13,34 +13,30 @@ use std::{
     },
 };
 
-use crate::cache::{Cache, DEFAULT_LIMIT, KeyBuilder};
-use lighthouse_model::{Diagnostic, ModelRef, hash};
+use crate::cache::{Cache, Digest, KeyBuilder, digest_of};
+use lighthouse_model::{Diagnostic, ModelRef};
 use lighthouse_plugin::{
     Abstained, Answered, Ask, Classifier, Model, Models, Question, Settle, Subject,
 };
 use lighthouse_spec::{Models as BoundModels, Routing};
-use serde::{Deserialize, Serialize};
 
-use super::{batch::Pending, instance::Host};
+use super::{batch::Pending, classifier::Classifiers};
 
 /// Failures of a model, in one run, after which it is no longer asked.
-pub(super) const ALLOWED_FAILS: usize = 3;
+pub(super) const MAX_FAILURES: usize = 3;
 
-/// What a run without attached models is given as the attached ones.
-static NONE: BTreeMap<String, String> = BTreeMap::new();
-
-/// A layer of the cascade: the models one binding names, tried in turn.
-pub(super) struct Route<'a> {
+/// A binding layer: the models one binding names, tried in turn.
+pub(super) struct Layer<'a> {
     /// The references of the models, joined with `,`.
     pub(super) id: String,
     models: Vec<Arc<dyn Classifier + 'a>>,
-    /// Requests that went through the route this run, to rotate its models.
+    /// Requests that went through the layer this run, to rotate its models.
     turn: Arc<AtomicUsize>,
-    /// The route is the model a revision attached, the first layer.
+    /// The layer is the model a revision attached, the first one.
     pub(super) attached: bool,
 }
 
-impl<'a> Route<'a> {
+impl<'a> Layer<'a> {
     /// The models in the order a request tries them: as written, or rotated
     /// by one more than the request before.
     pub(super) fn order(&self, routing: Routing) -> Vec<&Arc<dyn Classifier + 'a>> {
@@ -57,10 +53,20 @@ impl<'a> Route<'a> {
     }
 }
 
+/// What the models of a run were asked and cost.
+#[derive(Default)]
+struct Usage {
+    /// Requests that went through to a model; answers kept are not counted.
+    calls: usize,
+    cost: f64,
+    /// Subjects left to review because the budget was spent.
+    over_budget: usize,
+}
+
 /// What a run needs to ask models: who is bound, how much may be spent, and
 /// where answers are kept.
 pub(super) struct RunModels<'a> {
-    host: Host<'a>,
+    classifiers: Classifiers<'a>,
     pub(super) binding: &'a BoundModels,
     /// The model attached to a decision by a revision, by decision id.
     attached: &'a BTreeMap<String, String>,
@@ -70,7 +76,8 @@ pub(super) struct RunModels<'a> {
     /// The only subjects models are asked about, by fingerprint.
     subjects: Option<&'a BTreeSet<String>>,
     budget: AtomicUsize,
-    answers: Option<Cache>,
+    /// Where answers are kept between runs: the cache of the run.
+    answers: Option<&'a Cache>,
     /// Models are not asked: the subjects stay for review.
     off: bool,
     collect: bool,
@@ -79,24 +86,15 @@ pub(super) struct RunModels<'a> {
     /// the model that gave it: the answer of the last one that gave one.
     answered: Mutex<BTreeMap<String, (f64, String)>>,
     /// Failures of each model this run, and the last reason, by reference.
-    fails: Mutex<BTreeMap<String, (usize, String)>>,
-    /// Requests that went through each route, by route id.
+    failures: Mutex<BTreeMap<String, (usize, String)>>,
+    /// Requests that went through each layer, by layer id.
     turns: Mutex<BTreeMap<String, Arc<AtomicUsize>>>,
     notes: Mutex<BTreeSet<String>>,
     /// Models built so far, by reference; `None` for one that cannot serve.
     built: Mutex<BTreeMap<String, Option<Arc<dyn Classifier + 'a>>>>,
     /// What rules asked and has not been put to the models yet, by group.
     queued: Mutex<BTreeMap<String, Vec<Pending<'a>>>>,
-    pub(super) over_budget: AtomicUsize,
-    pub(super) calls: AtomicUsize,
-    pub(super) cost: Mutex<f64>,
-}
-
-/// What is kept of an answer: the probability of failing. The model that gave
-/// it is in the key.
-#[derive(Serialize, Deserialize)]
-struct Kept {
-    noul: f64,
+    usage: Mutex<Usage>,
 }
 
 impl super::Engine {
@@ -107,65 +105,47 @@ impl super::Engine {
         let unknown = || super::Error::UnknownModel(reference.to_owned());
         let model = ModelRef::parse(reference).ok_or_else(unknown)?;
         let provider = binding.provider(model.provider).ok_or_else(unknown)?;
-        Ok(self.host().build(reference, model.model, &provider))
+        Ok(self.classifiers().build(reference, model.model, &provider))
     }
 
-    fn host(&self) -> Host<'_> {
-        Host {
+    fn classifiers(&self) -> Classifiers<'_> {
+        Classifiers {
             registry: &self.registry,
             trusted: self.trusted,
             commands: self.commands.as_ref(),
         }
     }
 
-    /// The models of a run that reports `scopes`.
-    pub(super) fn run_models<'a>(&'a self, scopes: &'a [PathBuf]) -> RunModels<'a> {
-        let binding = &self.binding;
-        RunModels::new(
-            self.host(),
-            binding,
-            &self.models,
-            scopes,
-            self.cache.as_ref().map(|c| c.dir.as_path()),
-        )
-    }
-}
-
-impl<'a> RunModels<'a> {
-    pub(super) fn new(
-        host: Host<'a>,
-        binding: &'a BoundModels,
-        options: &'a super::ModelOptions,
+    /// The models of a run that reports `scopes`, keeping answers in `cache`.
+    pub(super) fn run_models<'a>(
+        &'a self,
         scopes: &'a [PathBuf],
-        cache_dir: Option<&std::path::Path>,
-    ) -> Self {
-        Self {
-            host,
-            binding,
-            attached: if options.detached {
-                &NONE
-            } else {
-                &options.attached
-            },
+        cache: Option<&'a Cache>,
+    ) -> RunModels<'a> {
+        let options = &self.models;
+        RunModels {
+            classifiers: self.classifiers(),
+            binding: &self.binding,
+            attached: &options.attached,
             scopes: (!options.all && options.subjects.is_none()).then_some(scopes),
             subjects: options.subjects.as_ref(),
-            budget: AtomicUsize::new(binding.budget),
-            answers: cache_dir.and_then(|dir| Cache::open(dir, DEFAULT_LIMIT).ok()),
+            budget: AtomicUsize::new(self.binding.budget),
+            answers: cache,
             off: options.off,
             collect: options.collect,
             seen: Mutex::default(),
             answered: Mutex::default(),
-            fails: Mutex::default(),
+            failures: Mutex::default(),
             turns: Mutex::default(),
             notes: Mutex::default(),
             built: Mutex::default(),
             queued: Mutex::default(),
-            over_budget: AtomicUsize::new(0),
-            calls: AtomicUsize::new(0),
-            cost: Mutex::default(),
+            usage: Mutex::default(),
         }
     }
+}
 
+impl<'a> RunModels<'a> {
     /// The subjects the rules put to the models this run, by fingerprint.
     pub(super) fn subjects(&self) -> BTreeMap<String, Subject> {
         self.seen
@@ -191,7 +171,7 @@ impl<'a> RunModels<'a> {
     }
 
     /// Notes that `manifest`'s model failed, and returns the reason.
-    pub(super) fn report(&self, manifest: &Model, reason: String) -> String {
+    pub(super) fn note_failure(&self, manifest: &Model, reason: String) -> String {
         self.note(format!(
             "model {} failed, its subjects are left to review: {reason}",
             manifest.id
@@ -199,74 +179,88 @@ impl<'a> RunModels<'a> {
         reason
     }
 
-    /// Counts a failure of the whole request to a model; at [`ALLOWED_FAILS`]
+    /// Counts a failure of the whole request to a model; at [`MAX_FAILURES`]
     /// the model is skipped for the rest of the run. Returns the reason.
-    pub(super) fn fail(&self, manifest: &Model, reason: String) -> String {
-        let reason = self.report(manifest, reason);
-        let mut fails = self.fails.lock().unwrap_or_else(PoisonError::into_inner);
-        let (count, last) = fails.entry(manifest.id.clone()).or_default();
+    pub(super) fn failure(&self, manifest: &Model, reason: String) -> String {
+        let reason = self.note_failure(manifest, reason);
+        let mut failures = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
+        let (count, last) = failures.entry(manifest.id.clone()).or_default();
         *count += 1;
         last.clone_from(&reason);
-        if *count == ALLOWED_FAILS {
+        if *count == MAX_FAILURES {
             self.note(format!(
-                "model {} failed {ALLOWED_FAILS} times; it is skipped for the rest of the run",
+                "model {} failed {MAX_FAILURES} times; it is skipped for the rest of the run",
                 manifest.id
             ));
         }
         reason
     }
 
-    /// Why a model is skipped, when it failed [`ALLOWED_FAILS`] times.
-    pub(super) fn cooled(&self, reference: &str) -> Option<String> {
-        let fails = self.fails.lock().unwrap_or_else(PoisonError::into_inner);
-        let (count, last) = fails.get(reference)?;
-        (*count >= ALLOWED_FAILS).then(|| last.clone())
+    /// Why a model is skipped, when it failed [`MAX_FAILURES`] times.
+    pub(super) fn skipped(&self, reference: &str) -> Option<String> {
+        let failures = self.failures.lock().unwrap_or_else(PoisonError::into_inner);
+        let (count, last) = failures.get(reference)?;
+        (*count >= MAX_FAILURES).then(|| last.clone())
+    }
+
+    /// Counts a request that goes to a model.
+    pub(super) fn count_call(&self, cost: f64) {
+        let mut usage = self.usage.lock().unwrap_or_else(PoisonError::into_inner);
+        usage.calls += 1;
+        usage.cost += cost;
+    }
+
+    /// Counts subjects left to review for want of budget.
+    pub(super) fn count_over_budget(&self, subjects: usize) {
+        self.usage
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .over_budget += subjects;
     }
 
     /// How many questions were put to models this run, and what they cost.
     pub(super) fn usage(&self) -> (usize, f64) {
-        let cost = *self.cost.lock().unwrap_or_else(PoisonError::into_inner);
-        (self.calls.load(Ordering::SeqCst), cost)
+        let usage = self.usage.lock().unwrap_or_else(PoisonError::into_inner);
+        (usage.calls, usage.cost)
     }
 
-    /// Writes the answers kept this run, and says what went wrong with the
-    /// models: a failure never makes the run incomplete, but it is not silent.
+    /// What went wrong with the models: a failure never makes the run
+    /// incomplete, but it is not silent.
     pub(super) fn finish(&self) -> Vec<String> {
         let mut notes: Vec<String> =
             std::mem::take(&mut *self.notes.lock().unwrap_or_else(PoisonError::into_inner))
                 .into_iter()
                 .collect();
-        let spent = self.over_budget.load(Ordering::SeqCst);
+        let spent = self
+            .usage
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .over_budget;
         if spent > 0 {
             notes.push(format!(
                 "the model budget ({}) was spent: {spent} subject(s) are left to review",
                 self.binding.budget
             ));
         }
-        if let Some(kept) = &self.answers
-            && let Err(e) = kept.finish()
-        {
-            notes.push(format!("the model answers were not saved: {e}"));
-        }
         notes
     }
 
-    /// The routes that judge the rule's decision, most specific binding first:
+    /// The layers that judge the rule's decision, most specific binding first:
     /// the model a revision attached, the models the rule names, the
     /// project's. A reference that does not resolve, or whose model cannot
-    /// classify, is skipped with a notice; a route left with none abstains.
-    pub(super) fn cascade(&self, rule: &str) -> Vec<Route<'a>> {
+    /// classify, is skipped with a notice; a layer left with none abstains.
+    pub(super) fn layers(&self, rule: &str) -> Vec<Layer<'a>> {
         if self.off {
             return Vec::new();
         }
         let attached = self.attached.get(rule).map(|model| vec![model.clone()]);
-        let layers = [
+        let bound = [
             attached,
             self.binding.route(rule).map(<[String]>::to_vec),
             Some(self.binding.classification.clone()),
         ];
-        let mut found: Vec<Route<'a>> = Vec::new();
-        for (at, references) in layers.into_iter().enumerate() {
+        let mut found: Vec<Layer<'a>> = Vec::new();
+        for (at, references) in bound.into_iter().enumerate() {
             let Some(references) = references else {
                 continue;
             };
@@ -276,10 +270,10 @@ impl<'a> RunModels<'a> {
             }
             let ids: Vec<&str> = models.iter().map(|m| m.manifest().id.as_str()).collect();
             let id = ids.join(",");
-            if found.iter().all(|route| route.id != id) {
+            if found.iter().all(|layer| layer.id != id) {
                 let turn = self.turn(&id);
                 let attached = at == 0;
-                found.push(Route {
+                found.push(Layer {
                     id,
                     models,
                     turn,
@@ -290,7 +284,7 @@ impl<'a> RunModels<'a> {
         found
     }
 
-    /// The counter of the route `id`, shared by every layer that names it.
+    /// The counter of the layer `id`, shared by every binding that names it.
     fn turn(&self, id: &str) -> Arc<AtomicUsize> {
         let mut turns = self.turns.lock().unwrap_or_else(PoisonError::into_inner);
         Arc::clone(turns.entry(id.to_owned()).or_default())
@@ -317,7 +311,7 @@ impl<'a> RunModels<'a> {
             return None;
         };
         let model: Arc<dyn Classifier + 'a> =
-            Arc::from(self.host.build(reference, model, &provider));
+            Arc::from(self.classifiers.build(reference, model, &provider));
         if model
             .manifest()
             .capabilities
@@ -362,30 +356,28 @@ impl<'a> RunModels<'a> {
             .is_ok()
     }
 
-    pub(super) fn recall(&self, manifest: &Model, ask: &Ask, subject: &Subject) -> Option<f64> {
-        let kept: Kept =
-            self.answers
-                .as_ref()?
-                .get(&self.key(&manifest.id, &manifest.version, ask, subject))?;
-        Some(kept.noul)
+    /// The probability of failing a model gave the `i`th subject of `item`
+    /// in an earlier run.
+    pub(super) fn recall(&self, model: &Model, item: &Pending<'a>, i: usize) -> Option<f64> {
+        self.answers?.get(&Self::key(model, item, i))
     }
 
-    pub(super) fn keep(&self, manifest: &Model, ask: &Ask, subject: &Subject, noul: f64) {
-        let Some(answers) = &self.answers else { return };
-        let key = self.key(&manifest.id, &manifest.version, ask, subject);
-        answers.put(key, &Kept { noul });
+    pub(super) fn keep(&self, model: &Model, item: &Pending<'a>, i: usize, noul: f64) {
+        if let Some(answers) = self.answers {
+            answers.put(Self::key(model, item, i), &noul);
+        }
     }
 
-    fn key(&self, model: &str, version: &str, ask: &Ask, subject: &Subject) -> crate::cache::Key {
-        // The check's revision, the model at its version, what the model reads
-        // of the subject and what it is asked. The band is not part of it: the
-        // cache holds the raw probability.
+    /// The key of an answer: the check's revision, the model at its version,
+    /// what the model reads of the subject and what it is asked. The band is
+    /// not part of it: the cache holds the raw probability.
+    fn key(model: &Model, item: &Pending<'a>, i: usize) -> Digest {
         let mut key = KeyBuilder::new();
         key.part("model-answer")
-            .part(&ask.revision)
-            .part(format!("{model}@{version}"))
-            .part(digest_of(&subject.state))
-            .part(digest_of(&Question::new(&ask.decision)));
+            .part(&item.ask.revision)
+            .part(named(model))
+            .part(item.states[i])
+            .part(item.question);
         key.finish()
     }
 }
@@ -396,7 +388,7 @@ impl Models for RunModels<'_> {
     }
 
     fn asks(&self, rule: &str) -> bool {
-        self.collect || self.scopes.is_none() || !self.cascade(rule).is_empty()
+        self.collect || self.scopes.is_none() || !self.layers(rule).is_empty()
     }
 
     fn observe(&self, subjects: Vec<Subject>) {
@@ -407,11 +399,17 @@ impl Models for RunModels<'_> {
     }
 
     fn queue(&self, group: &str, ask: Ask, settle: Settle) -> Option<Vec<Diagnostic>> {
-        let routes = self.cascade(&ask.rule);
-        if routes.is_empty() {
+        let layers = self.layers(&ask.rule);
+        if layers.is_empty() {
             let unbound = vec![Answered::Abstained(Abstained::Unbound); ask.subjects.len()];
             return Some(settle(unbound));
         }
+        let states = ask
+            .subjects
+            .iter()
+            .map(|subject| digest_of(&subject.state).unwrap_or_default())
+            .collect();
+        let question = digest_of(&Question::new(&ask.decision)).unwrap_or_default();
         self.queued
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -420,7 +418,9 @@ impl Models for RunModels<'_> {
             .push(Pending {
                 ask,
                 settle,
-                routes,
+                layers,
+                states,
+                question,
             });
         None
     }
@@ -436,10 +436,9 @@ impl Models for RunModels<'_> {
     }
 }
 
-/// The digest of a value as canonical JSON.
-pub(super) fn digest_of<T: Serialize>(value: &T) -> String {
-    let value = serde_json::to_value(value).unwrap_or_default();
-    hash::digest(&value)
+/// The model as evidence names it: `<provider>/<model>@<version>`.
+pub(super) fn named(model: &Model) -> String {
+    format!("{}@{}", model.id, model.version)
 }
 
 #[cfg(test)]
@@ -521,7 +520,7 @@ mod tests {
                 super::super::Engine::new(registry, config, Catalog::bundled(), dir.path())
                     .unwrap()
                     .with_models(super::super::ModelOptions::default());
-            let models = engine.run_models(&[]);
+            let models = engine.run_models(&[], None);
 
             assert_eq!(models.model("work/echo").is_some(), supported);
             if !supported {

@@ -1,18 +1,10 @@
 use lighthouse_model::hash::Hasher;
 
-/// The identity of one stored result: a SHA-256 of everything it depends on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Key([u8; 32]);
+use super::Digest;
 
-impl Key {
-    /// The key as stored.
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-/// Builds a [`Key`] from parts. Every part is length-prefixed, so that
-/// `["ab", "c"]` and `["a", "bc"]` are different keys.
+/// Builds a [`Digest`] from parts, the identity of one stored result. Every
+/// part is length-prefixed, so that `["ab", "c"]` and `["a", "bc"]` are
+/// different keys.
 #[derive(Clone, Default)]
 pub struct KeyBuilder(Hasher);
 
@@ -31,7 +23,7 @@ impl KeyBuilder {
     }
 
     /// The key of the parts added.
-    pub fn finish(self) -> Key {
-        Key(self.0.finish())
+    pub fn finish(self) -> Digest {
+        self.0.finish()
     }
 }
