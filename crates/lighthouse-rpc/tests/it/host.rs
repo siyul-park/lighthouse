@@ -41,7 +41,7 @@ fn config(plugins: &str) -> Config {
 fn paths(found: &[lighthouse_rpc::Found]) -> Vec<(String, PathBuf)> {
     found
         .iter()
-        .map(|f| (f.manifest.id.clone(), f.dir.clone()))
+        .map(|f| (f.id().to_owned(), f.dir.clone()))
         .collect()
 }
 #[test]
@@ -230,12 +230,9 @@ fn plugin_manifest_reads_command_and_defaults_args_and_rejects_unknown_keys() {
     )
     .unwrap();
     let found = lighthouse_rpc::load(dir.path()).unwrap();
-    let manifest: &lighthouse_rpc::ProcessManifest = &found.manifest;
-    assert_eq!(
-        (manifest.id.as_str(), manifest.command.as_str()),
-        ("x", "./run")
-    );
-    assert_eq!(manifest.args, ["-v"]);
+    let runtime = &found.resource.spec.runtime;
+    assert_eq!((found.id(), runtime.command.as_str()), ("x", "./run"));
+    assert_eq!(runtime.args, ["-v"]);
 
     fs::write(
         dir.path().join(lighthouse_rpc::FILE_NAME),
@@ -245,7 +242,9 @@ fn plugin_manifest_reads_command_and_defaults_args_and_rejects_unknown_keys() {
     assert!(
         lighthouse_rpc::load(dir.path())
             .unwrap()
-            .manifest
+            .resource
+            .spec
+            .runtime
             .args
             .is_empty()
     );
@@ -263,7 +262,7 @@ fn plugin_manifest_reads_command_and_defaults_args_and_rejects_unknown_keys() {
 #[test]
 fn a_manifest_is_a_document_in_toml_yaml_or_json() {
     let toml = plugin_document("x", "./run", "args = [\"-v\"]\n");
-    let yaml = "apiVersion: lighthouse/v1alpha1\nkind: Plugin\nmetadata: {name: x}\nspec:\n  version: '1'\n  runtime: {command: ./run, args: ['-v']}\n  provides: {languages: [go], orderKeys: [x/group]}\n";
+    let yaml = "apiVersion: lighthouse/v1alpha1\nkind: Plugin\nmetadata: {name: x}\nspec:\n  version: '1'\n  runtime: {command: ./run, args: ['-v']}\n  provides: {languages: [go]}\n";
     let json = r#"{"apiVersion":"lighthouse/v1alpha1","kind":"Plugin","metadata":{"name":"x"},"spec":{"version":"1","runtime":{"command":"./run","args":["-v"]}}}"#;
     for (file, text) in [
         ("lighthouse-plugin.toml", toml.as_str()),
@@ -275,75 +274,39 @@ fn a_manifest_is_a_document_in_toml_yaml_or_json() {
 
         let found = lighthouse_rpc::load(dir.path()).unwrap();
 
-        assert_eq!(found.manifest.id, "x", "{file}");
-        assert_eq!(found.manifest.command, "./run", "{file}");
-        assert_eq!(found.manifest.args, ["-v"], "{file}");
+        assert_eq!(found.id(), "x", "{file}");
+        assert_eq!(found.resource.spec.runtime.command, "./run", "{file}");
+        assert_eq!(found.resource.spec.runtime.args, ["-v"], "{file}");
     }
 }
 
 #[test]
-fn the_plugin_kind_has_a_schema_and_provides_nothing_unless_it_says_so() {
+fn the_plugin_kind_has_a_schema_and_provides_what_it_says() {
     let kinds: Vec<&str> = lighthouse_rpc::descriptors()
         .iter()
         .map(|d| d.kind)
         .collect();
     assert_eq!(kinds, ["Plugin"]);
 
-    let bare = lighthouse_rpc::parse(
-        lighthouse_resource::Format::Toml,
-        "x",
-        &plugin_document("x", "./run", ""),
-    )
-    .unwrap();
-    assert_eq!(bare.provides, lighthouse_rpc::Provides::default());
-
-    let yaml = "apiVersion: lighthouse/v1alpha1\nkind: Plugin\nmetadata: {name: x}\nspec:\n  version: '1'\n  runtime: {command: ./run}\n  provides: {languages: [go], decisions: [decisions], orderKeys: [x/group], embedders: [x/e], fixOps: [x/op]}\n";
-    let rich = lighthouse_rpc::parse(lighthouse_resource::Format::Yaml, "x", yaml).unwrap();
-    assert_eq!(rich.provides.languages, ["go"]);
-    assert_eq!(rich.provides.order_keys, ["x/group"]);
-    assert_eq!(rich.provides.fix_ops, ["x/op"]);
-}
-
-#[test]
-fn a_manifest_is_found_in_a_directory_by_any_of_its_names() {
     let dir = tempfile::tempdir().unwrap();
-    assert_eq!(lighthouse_rpc::file_in(dir.path()), None);
+    let write = |provides: &str| {
+        let yaml = format!(
+            "apiVersion: lighthouse/v1alpha1\nkind: Plugin\nmetadata: {{name: x}}\nspec:\n  version: '1'\n  runtime: {{command: ./run}}\n{provides}"
+        );
+        fs::write(dir.path().join("lighthouse-plugin.yaml"), yaml).unwrap();
+        lighthouse_rpc::load(dir.path())
+    };
 
-    fs::write(dir.path().join("lighthouse-plugin.json"), "{}").unwrap();
+    let bare = write("").unwrap();
     assert_eq!(
-        lighthouse_rpc::file_in(dir.path()),
-        Some(dir.path().join("lighthouse-plugin.json"))
+        bare.resource.spec.provides,
+        lighthouse_rpc::Provides::default()
     );
-    fs::write(dir.path().join(lighthouse_rpc::FILE_NAME), "").unwrap();
-    assert_eq!(
-        lighthouse_rpc::file_in(dir.path()),
-        Some(dir.path().join(lighthouse_rpc::FILE_NAME))
-    );
-}
-
-#[test]
-fn a_parsed_plugin_document_becomes_a_manifest() {
-    let document = lighthouse_resource::Resource::new(
-        lighthouse_resource::Metadata::named("x"),
-        lighthouse_rpc::PluginSpec {
-            version: "2".to_owned(),
-            runtime: lighthouse_rpc::Runtime {
-                command: "run".to_owned(),
-                args: vec!["-v".to_owned()],
-            },
-            provides: lighthouse_rpc::Provides::default(),
-        },
-    );
-
-    let manifest = lighthouse_rpc::ProcessManifest::from_resource(document);
-
-    assert_eq!(
-        (
-            manifest.id.as_str(),
-            manifest.version.as_str(),
-            manifest.command.as_str()
-        ),
-        ("x", "2", "run")
-    );
-    assert_eq!(manifest.args, ["-v"]);
+    let rich = write("  provides: {languages: [go], models: [m]}\n").unwrap();
+    assert_eq!(rich.resource.spec.provides.languages, ["go"]);
+    assert_eq!(rich.resource.spec.provides.models, ["m"]);
+    assert!(matches!(
+        write("  provides: {orderKeys: [x/group]}\n"),
+        Err(Error::Manifest { .. })
+    ));
 }

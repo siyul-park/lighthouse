@@ -60,11 +60,8 @@ pub(crate) fn indexed(result: wire::IndexResult, sources: &[Source]) -> Result<I
         .iter()
         .map(|s| (s.file.path.clone(), s.file))
         .collect();
-    let mut incomplete: BTreeSet<core::Incomplete> = result
-        .incomplete
-        .into_iter()
-        .map(self::incomplete)
-        .collect();
+    let mut incomplete: BTreeSet<core::Incomplete> =
+        result.incomplete.into_iter().map(incomplete_of).collect();
     let mut out = Indexed {
         notices: result.notices,
         ..Indexed::default()
@@ -93,7 +90,7 @@ pub(crate) fn indexed(result: wire::IndexResult, sources: &[Source]) -> Result<I
             continue;
         }
         let generated = fragment.file.generated;
-        let mut converted = self::fragment(fragment)?;
+        let mut converted = fragment_of(fragment)?;
         converted.files = vec![core::File {
             generated: generated || file.generated,
             ..(*file).clone()
@@ -137,14 +134,14 @@ fn belongs(f: &wire::Fragment) -> Result<(), String> {
     Ok(())
 }
 
-fn incomplete(item: wire::Incomplete) -> core::Incomplete {
+fn incomplete_of(item: wire::Incomplete) -> core::Incomplete {
     core::Incomplete {
         path: item.path.map(PathBuf::from),
         reason: item.reason,
     }
 }
 
-fn fragment(f: wire::Fragment) -> Result<core::Fragment, String> {
+fn fragment_of(f: wire::Fragment) -> Result<core::Fragment, String> {
     let path = PathBuf::from(&f.file.path);
     Ok(core::Fragment {
         files: Vec::new(),

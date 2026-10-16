@@ -11,18 +11,12 @@ use lighthouse_protocol::{self as wire, FineTuningJobStatus};
 use crate::client::Client;
 
 /// A model that answers over the connection of its plugin.
-pub(crate) struct Model {
+pub(crate) struct Remote {
     pub(crate) manifest: ModelInfo,
     pub(crate) client: Arc<Client>,
 }
 
-impl Model {
-    fn failed(&self, reason: impl std::fmt::Display) -> Error {
-        Error::Failed(format!("model `{}`: {reason}", self.manifest.id))
-    }
-}
-
-impl Classifier for Model {
+impl Classifier for Remote {
     fn manifest(&self) -> &ModelInfo {
         &self.manifest
     }
@@ -32,13 +26,16 @@ impl Classifier for Model {
         let result: SystemOneResponse = self
             .client
             .call(wire::CLASSIFY, params)
-            .map_err(|reason| self.failed(reason))?;
+            .map_err(|reason| Error::model(&self.manifest.id, reason))?;
         if let Some(stray) = result
             .answers
             .keys()
             .find(|id| !params.questions.contains_key(*id))
         {
-            return Err(self.failed(format!("it answers `{stray}`, which was not asked")));
+            return Err(Error::model(
+                &self.manifest.id,
+                format!("it answers `{stray}`, which was not asked"),
+            ));
         }
         Ok(result)
     }
@@ -52,16 +49,22 @@ impl Classifier for Model {
             .fine_tuning
             .is_some_and(|capability| capability.supported)
         {
-            return Err(self.failed("it does not train"));
+            return Err(Error::model(&self.manifest.id, "it does not train"));
         }
         let job: FineTuningJob = self
             .client
             .call(wire::TRAIN, request)
-            .map_err(|reason| self.failed(reason))?;
+            .map_err(|reason| Error::model(&self.manifest.id, reason))?;
         match (&job.error, job.status) {
-            (Some(error), _) => Err(self.failed(format!("{}: {}", error.code, error.message))),
+            (Some(error), _) => Err(Error::model(
+                &self.manifest.id,
+                format!("{}: {}", error.code, error.message),
+            )),
             (None, FineTuningJobStatus::Succeeded) if job.fine_tuned_model.is_some() => Ok(job),
-            _ => Err(self.failed("the training did not succeed")),
+            _ => Err(Error::model(
+                &self.manifest.id,
+                "the training did not succeed",
+            )),
         }
     }
 }

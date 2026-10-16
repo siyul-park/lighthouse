@@ -57,27 +57,8 @@
     },
     "Provides": {
       "additionalProperties": false,
-      "description": "What a plugin contributes, declared so that tools can list it without\nstarting the process. `languages` is checked against what the process\nreports when it starts; the other lists are read by the tooling that\nhandles their kind.",
+      "description": "What a plugin contributes, declared so that tools can list it without\nstarting the process. Each list is checked against what the process\nreports when it starts.",
       "properties": {
-        "decisions": {
-          "description": "Catalog directories of decisions, relative to the manifest.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "embedders": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "fixOps": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
         "languages": {
           "description": "Language ids.",
           "items": {
@@ -86,13 +67,7 @@
           "type": "array"
         },
         "models": {
-          "description": "Model ids; checked against what the process reports when it starts.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "orderKeys": {
+          "description": "Model ids.",
           "items": {
             "type": "string"
           },

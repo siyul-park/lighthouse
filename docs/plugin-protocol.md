@@ -115,9 +115,10 @@ narrowed to the files a user asked to see; reporting is the host's concern.
 for every language, as JSON; a provider reads its own entry and MUST reject
 unknown keys in it (as an `incomplete` entry, see below).
 
-`context.cache` is `{ "dir": "/abs/root/.lighthouse/cache/<plugin id>" }`, a directory
-the host owns and the provider MAY keep derived results in between runs. It is absent
-when the host runs without a cache. A provider reads and writes only inside it, writes
+`context.cache` is `{ "dir": "/abs/root/.lighthouse/cache/<plugin id>/<binary digest>" }`, a directory
+the host owns, named by the digest of the plugin binary, and the provider MAY keep derived
+results in it between runs. It is absent when the host runs without a cache and when the
+request carries `overlays`: their texts are not what is on disk. A provider reads and writes only inside it, writes
 atomically (a temporary file and a rename), and answers exactly the same with the
 directory empty, full or absent: the same fragments, the same notices (apart from one
 saying the directory cannot be written), the same `incomplete` entries. An entry is
@@ -403,12 +404,11 @@ command = "./lang-go"       # relative path: next to the manifest; bare name: PA
 args = []
 
 [spec.provides]             # optional
-languages = ["go"]          # checked against what the process reports
+languages = ["go"]                 # checked against what the process reports
 ```
 
-`provides` also lists `decisions` (catalog directories), `orderKeys`,
-`embedders` and `fixOps`, so tools can see a plugin's contributions without
-starting it; only `languages` is checked today.
+`provides` lists the `languages` and `models` the plugin offers, so tools can see them
+without starting it; both are checked against what the process reports.
 
 Only plugins listed in `lighthouse.toml` are started. Manifests that do not parse are ignored (with a notice) unless the directory
 is named after a listed id. A bare id is looked up in

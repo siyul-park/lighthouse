@@ -1,6 +1,6 @@
-use std::{fs, path::Path, sync::Arc, time::Duration};
+use std::{collections::BTreeSet, fs, path::Path, sync::Arc, time::Duration};
 
-use lighthouse_model::Incomplete;
+use lighthouse_model::{Incomplete, hash};
 use lighthouse_plugin::{
     Classifier, Error, Indexed, LanguageProvider, Plugin, PluginManifest, ProviderManifest, Source,
     Workspace,
@@ -8,27 +8,34 @@ use lighthouse_plugin::{
 use lighthouse_protocol as wire;
 use serde_json::Value;
 
-use crate::{client::Client, convert, manifest::Found, model::Model};
+use crate::{client::Client, convert, manifest::Found, model::Remote};
 
-/// A language plugin running as a separate process.
+/// Characters of the binary digest that name a plugin's cache directory.
+const DIGEST_CHARS: usize = 16;
+
+/// A plugin running as a separate process: the languages and models it
+/// declared in the handshake, sharing one connection.
 pub struct RpcPlugin {
     manifest: PluginManifest,
     languages: Vec<wire::ProviderManifest>,
     models: Vec<lighthouse_plugin::Model>,
     client: Arc<Client>,
+    /// Digest of the binary the process runs, which keys its cache directory:
+    /// a rebuilt plugin never reads what an older build kept.
+    digest: String,
 }
 
 impl RpcPlugin {
     /// Starts the process and performs the `initialize` handshake.
     pub fn connect(found: &Found, root: &Path, timeout: Duration) -> Result<Self, crate::Error> {
-        let id = &found.manifest.id;
+        let id = found.id();
         let failed = |reason: String| crate::Error::Plugin {
-            id: id.clone(),
+            id: id.to_owned(),
             reason,
         };
-        let client = Client::spawn(&found.manifest, &found.dir, root, timeout).map_err(failed)?;
+        let client = Client::spawn(found, root, timeout).map_err(failed)?;
         let unavailable = |client: &Client, reason: String| crate::Error::Unavailable {
-            id: id.clone(),
+            id: id.to_owned(),
             reason,
             notices: client.drain_stderr(),
         };
@@ -50,42 +57,25 @@ impl RpcPlugin {
                 wire::VERSION
             )));
         }
-        if result.id != *id {
+        if result.id != id {
             return Err(failed(format!(
                 "identifies itself as `{}`, its manifest says `{id}`",
                 result.id
             )));
         }
-        let declared = &found.manifest.provides.languages;
-        let mut reported: Vec<&str> = result.languages.iter().map(|l| l.id.as_str()).collect();
-        reported.sort_unstable();
-        let mut promised: Vec<&str> = declared.iter().map(String::as_str).collect();
-        promised.sort_unstable();
-        if !promised.is_empty() && promised != reported {
-            return Err(failed(format!(
-                "its manifest provides languages [{}], the process reports [{}]",
-                promised.join(", "),
-                reported.join(", ")
-            )));
-        }
+        let provides = &found.resource.spec.provides;
+        let reported: Vec<&str> = result.languages.iter().map(|l| l.id.as_str()).collect();
+        declared("languages", &provides.languages, &reported).map_err(failed)?;
         let models = result.models.data;
-        let mut offered: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
-        offered.sort_unstable();
-        let mut named: Vec<&str> = found
-            .manifest
-            .provides
-            .models
-            .iter()
-            .map(String::as_str)
-            .collect();
-        named.sort_unstable();
-        if !named.is_empty() && named != offered {
-            return Err(failed(format!(
-                "its manifest provides models [{}], the process reports [{}]",
-                named.join(", "),
-                offered.join(", ")
-            )));
-        }
+        let offered: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        declared("models", &provides.models, &offered).map_err(failed)?;
+        let digest = if result.languages.is_empty() {
+            String::new()
+        } else {
+            let binary = fs::read(found.command_path());
+            let version = &found.resource.spec.version;
+            hash::sha256(binary.as_deref().unwrap_or(version.as_bytes()))
+        };
         Ok(Self {
             manifest: PluginManifest {
                 id: result.id,
@@ -94,8 +84,25 @@ impl RpcPlugin {
             languages: result.languages,
             models,
             client: Arc::new(client),
+            digest,
         })
     }
+}
+
+/// Checks what a manifest promised against what the process reported; a
+/// manifest that promises nothing is not checked.
+fn declared(kind: &str, promised: &[String], reported: &[&str]) -> Result<(), String> {
+    let promised: BTreeSet<&str> = promised.iter().map(String::as_str).collect();
+    let reported: BTreeSet<&str> = reported.iter().copied().collect();
+    if promised.is_empty() || promised == reported {
+        return Ok(());
+    }
+    let list = |ids: &BTreeSet<&str>| ids.iter().copied().collect::<Vec<_>>().join(", ");
+    Err(format!(
+        "its manifest provides {kind} [{}], the process reports [{}]",
+        list(&promised),
+        list(&reported)
+    ))
 }
 
 impl Plugin for RpcPlugin {
@@ -104,7 +111,7 @@ impl Plugin for RpcPlugin {
         self.models
             .iter()
             .map(|manifest| {
-                Box::new(Model {
+                Box::new(Remote {
                     manifest: manifest.clone(),
                     client: Arc::clone(&self.client),
                 }) as Box<dyn Classifier>
@@ -123,10 +130,10 @@ impl Plugin for RpcPlugin {
             .iter()
             .map(|language| {
                 Box::new(Provider {
-                    plugin: self.manifest.id.clone(),
-                    language: language.clone(),
+                    language: language.id.clone(),
                     manifest: convert::provider_manifest(language),
                     client: Arc::clone(&self.client),
+                    digest: self.digest.clone(),
                 }) as Box<dyn LanguageProvider>
             })
             .collect()
@@ -134,10 +141,10 @@ impl Plugin for RpcPlugin {
 }
 
 struct Provider {
-    plugin: String,
-    language: wire::ProviderManifest,
+    language: String,
     manifest: ProviderManifest,
     client: Arc<Client>,
+    digest: String,
 }
 
 impl LanguageProvider for Provider {
@@ -153,8 +160,12 @@ impl LanguageProvider for Provider {
             .client
             .call::<_, wire::IndexResult>(wire::INDEX, request)
             .and_then(|result| {
-                convert::indexed(result, files)
-                    .map_err(|e| format!("plugin `{}` sent a malformed result: {e}", self.plugin))
+                convert::indexed(result, files).map_err(|e| {
+                    format!(
+                        "plugin `{}` sent a malformed result: {e}",
+                        self.client.plugin()
+                    )
+                })
             });
         let mut indexed = response.unwrap_or_else(|reason| Indexed {
             incomplete: vec![Incomplete {
@@ -171,16 +182,23 @@ impl LanguageProvider for Provider {
 
 impl Provider {
     /// The request, and a notice when the cache directory could not be made.
+    /// A request that carries overlays has no cache: the texts it sends are
+    /// not what is on disk, and results from them must not be kept as if they
+    /// were.
     fn request(&self, ws: &Workspace, files: &[Source]) -> (wire::IndexParams, Option<String>) {
-        let (cache, notice) = match self.cache_of(ws) {
-            Ok(cache) => (cache, None),
-            Err(reason) => (None, Some(reason)),
+        let overlays = overlays_of(ws, files);
+        let (cache, notice) = match overlays {
+            Some(_) => (None, None),
+            None => match self.cache_of(ws) {
+                Ok(cache) => (cache, None),
+                Err(reason) => (None, Some(reason)),
+            },
         };
         let params = wire::IndexParams {
             project: wire::ProjectRef {
                 root: ws.root.to_string_lossy().into_owned(),
             },
-            language: self.language.id.clone(),
+            language: self.language.clone(),
             files: files
                 .iter()
                 .map(|s| wire::FileRef {
@@ -194,23 +212,24 @@ impl Provider {
                     .iter()
                     .map(|(id, options)| (id.clone(), Value::Object(options.clone())))
                     .collect(),
-                overlays: overlays_of(ws, files),
+                overlays,
                 cache,
             },
         };
         (params, notice)
     }
-}
 
-impl Provider {
-    /// The directory of this plugin's cache, created on demand and kept out of
-    /// version control; `Ok(None)` when the run has no cache, and the reason
-    /// when the directory cannot be made.
+    /// The directory of this plugin build's cache, created on demand and kept
+    /// out of version control; `Ok(None)` when the run has no cache, and the
+    /// reason when the directory cannot be made.
     fn cache_of(&self, ws: &Workspace) -> Result<Option<wire::CacheRef>, String> {
         let Some(base) = ws.cache_dir.as_ref() else {
             return Ok(None);
         };
-        let dir = base.join(&self.plugin);
+        let plugin = self.client.plugin();
+        let dir = base
+            .join(plugin)
+            .join(&self.digest[..DIGEST_CHARS.min(self.digest.len())]);
         let made = fs::create_dir_all(&dir).and_then(|()| {
             let ignore = base.join(".gitignore");
             if ignore.exists() {
@@ -221,9 +240,8 @@ impl Provider {
         });
         made.map_err(|e| {
             format!(
-                "cache directory {} cannot be made, `{}` runs without a cache: {e}",
-                dir.display(),
-                self.plugin
+                "cache directory {} cannot be made, `{plugin}` runs without a cache: {e}",
+                dir.display()
             )
         })?;
         Ok(Some(wire::CacheRef {

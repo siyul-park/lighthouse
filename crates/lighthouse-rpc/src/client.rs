@@ -14,7 +14,7 @@ use std::{
 use lighthouse_protocol::{Id, Message, read_message, write_message};
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::manifest::ProcessManifest;
+use crate::Found;
 
 /// Most recent stderr lines kept, and the bytes kept of each.
 const STDERR_LINES: usize = 50;
@@ -62,16 +62,11 @@ pub(crate) struct Client {
 }
 
 impl Client {
-    pub(crate) fn spawn(
-        manifest: &ProcessManifest,
-        dir: &Path,
-        cwd: &Path,
-        timeout: Duration,
-    ) -> Result<Self, String> {
-        let command = manifest.command_path(dir);
+    pub(crate) fn spawn(found: &Found, cwd: &Path, timeout: Duration) -> Result<Self, String> {
+        let command = found.command_path();
         let mut process = Command::new(&command);
         process
-            .args(&manifest.args)
+            .args(&found.resource.spec.runtime.args)
             .current_dir(cwd)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -93,7 +88,7 @@ impl Client {
         thread::spawn(move || collect_stderr(BufReader::new(stderr_pipe), &sink));
 
         Ok(Self {
-            plugin: manifest.id.clone(),
+            plugin: found.id().to_owned(),
             timeout,
             session: Mutex::new(Ok(Session {
                 child,
@@ -103,6 +98,11 @@ impl Client {
             })),
             stderr,
         })
+    }
+
+    /// The id of the plugin this client speaks to.
+    pub(crate) fn plugin(&self) -> &str {
+        &self.plugin
     }
 
     /// Sends a request and waits for its response. The `Err` side is a reason
@@ -122,7 +122,7 @@ impl Client {
             Err(Failure::Rejected(reason)) => Err(reason),
             Err(Failure::Broken(reason)) => {
                 if let Ok(mut dead) = std::mem::replace(&mut *guard, Err(reason.clone())) {
-                    reap(&mut dead.child);
+                    lighthouse_process::reap(&mut dead.child);
                 }
                 Err(reason)
             }
@@ -248,7 +248,7 @@ impl Drop for Client {
         while matches!(session.child.try_wait(), Ok(None)) && Instant::now() < deadline {
             thread::sleep(POLL);
         }
-        reap(&mut session.child);
+        lighthouse_process::reap(&mut session.child);
     }
 }
 
@@ -329,10 +329,4 @@ fn discard_line(reader: &mut impl BufRead) {
             _ => return,
         }
     }
-}
-
-/// Kills a plugin that is still running together with everything it started,
-/// then collects it.
-fn reap(child: &mut Child) {
-    lighthouse_process::reap(child);
 }

@@ -152,3 +152,29 @@ fn an_explicit_path_disambiguates_and_relative_commands_resolve_next_to_the_mani
     assert!(registry.has_plugin("fake"));
     assert_eq!(registry.languages().len(), 1);
 }
+
+#[test]
+fn the_cache_directory_is_named_by_the_plugin_binary_and_absent_with_overlays() {
+    let fake = Fake::new("ok");
+    let provider = fake.provider(T);
+    let cache = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::new(fake.path());
+    ws.cache_dir = Some(cache.path().to_owned());
+    let sent = || -> Value {
+        let text = fs::read_to_string(fake.path().join("log.request")).unwrap();
+        serde_json::from_str::<Value>(&text).unwrap()["params"]["context"].clone()
+    };
+
+    index(provider.as_ref(), &ws, &["a.fake"]);
+
+    let digest = lighthouse_model::hash::sha256(fs::read(fake.path().join("plugin.sh")).unwrap());
+    let expected = cache.path().join("fake").join(&digest[..16]);
+    assert_eq!(sent()["cache"]["dir"], expected.to_string_lossy().as_ref());
+    assert!(expected.is_dir());
+
+    ws.overlays.insert("a.fake".into(), "edited".to_owned());
+    index(provider.as_ref(), &ws, &["a.fake"]);
+
+    assert!(sent().get("cache").is_none(), "{}", sent());
+    assert_eq!(sent()["overlays"][0]["path"], "a.fake");
+}

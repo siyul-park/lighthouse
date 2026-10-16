@@ -1,9 +1,9 @@
 use std::{
-    fs, io,
+    env, fs, io,
     path::{Path, PathBuf},
 };
 
-use lighthouse_resource::{Format, Spec, documents, resource};
+use lighthouse_resource::{Format, Resource, STATE_DIR, Spec, documents, resource};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -14,7 +14,7 @@ pub const FILE_NAME: &str = "lighthouse-plugin.toml";
 
 /// Names a plugin manifest may have, in the order they are tried; the format
 /// follows the extension.
-pub const FILE_NAMES: [&str; 3] = [
+const FILE_NAMES: [&str; 3] = [
     FILE_NAME,
     "lighthouse-plugin.yaml",
     "lighthouse-plugin.json",
@@ -47,70 +47,42 @@ pub struct Runtime {
 }
 
 /// What a plugin contributes, declared so that tools can list it without
-/// starting the process. `languages` is checked against what the process
-/// reports when it starts; the other lists are read by the tooling that
-/// handles their kind.
+/// starting the process. Each list is checked against what the process
+/// reports when it starts.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct Provides {
     /// Language ids.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub languages: Vec<String>,
-    /// Catalog directories of decisions, relative to the manifest.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub decisions: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub order_keys: Vec<String>,
-    /// Model ids; checked against what the process reports when it starts.
+    /// Model ids.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub models: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub embedders: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub fix_ops: Vec<String>,
 }
 
-/// A plugin manifest: the `Plugin` document of a plugin directory.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProcessManifest {
-    /// `metadata.name`; must equal the id the plugin reports.
-    pub id: String,
-    pub version: String,
-    /// Executable. A relative path with a separator is resolved against the
-    /// manifest directory; a bare name is looked up on `PATH`.
-    pub command: String,
-    pub args: Vec<String>,
-    pub provides: Provides,
-}
-
-impl ProcessManifest {
-    /// Reads a parsed `Plugin` document.
-    pub fn from_resource(plugin: lighthouse_resource::Resource<PluginSpec>) -> Self {
-        let lighthouse_resource::Resource { metadata, spec } = plugin;
-        Self {
-            id: metadata.name,
-            version: spec.version,
-            command: spec.runtime.command,
-            args: spec.runtime.args,
-            provides: spec.provides,
-        }
-    }
-
-    pub(crate) fn command_path(&self, dir: &Path) -> PathBuf {
-        let command = Path::new(&self.command);
-        if command.is_relative() && self.command.contains('/') {
-            dir.join(command)
-        } else {
-            command.to_owned()
-        }
-    }
-}
-
-/// A manifest and the directory it was found in.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A `Plugin` document and the directory it was found in.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Found {
-    pub manifest: ProcessManifest,
+    /// `metadata.name` must equal the id the plugin reports.
+    pub resource: Resource<PluginSpec>,
     pub dir: PathBuf,
+}
+
+impl Found {
+    pub fn id(&self) -> &str {
+        &self.resource.metadata.name
+    }
+
+    /// The executable, resolved against the manifest directory unless it is a
+    /// bare name.
+    pub(crate) fn command_path(&self) -> PathBuf {
+        let command = &self.resource.spec.runtime.command;
+        if Path::new(command).is_relative() && command.contains('/') {
+            self.dir.join(command)
+        } else {
+            PathBuf::from(command)
+        }
+    }
 }
 
 /// What a search found: usable manifests, and manifests that did not parse.
@@ -122,9 +94,20 @@ pub struct Discovered {
     pub broken: Vec<Error>,
 }
 
-/// The manifest file in `dir`, if it has one.
-pub fn file_in(dir: &Path) -> Option<PathBuf> {
-    lighthouse_resource::file_in(dir, &FILE_NAMES)
+/// Where plugin manifests are searched: `<root>/.lighthouse/plugins`,
+/// `$XDG_DATA_HOME/lighthouse/plugins` (default `~/.local/share/lighthouse/plugins`)
+/// and `plugins` next to the executable. A
+/// development checkout is reached only through an explicit `path`.
+pub fn search_dirs(root: &Path) -> Vec<PathBuf> {
+    let mut dirs = vec![root.join(STATE_DIR).join("plugins")];
+    dirs.extend(lighthouse_resource::xdg_plugins());
+    if let Some(dir) = env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|p| p.join("plugins")))
+    {
+        dirs.push(dir);
+    }
+    dirs
 }
 
 /// Reads the manifest of `dir` (`lighthouse-plugin.toml`, `.yaml` or
@@ -137,33 +120,24 @@ pub fn load(dir: &Path) -> Result<Found, Error> {
         source,
     })?;
     let label = path.display().to_string();
-    let manifest = parse(
-        Format::of_path(&path).unwrap_or(Format::Toml),
-        &label,
-        &text,
-    )
-    .map_err(|message| Error::Manifest {
+    let manifest = |message: String| Error::Manifest {
         path: path.clone(),
         message,
-    })?;
-    Ok(Found {
-        manifest,
-        dir: dir.to_owned(),
-    })
-}
-
-/// Parses the text of a manifest.
-pub fn parse(format: Format, path: &str, text: &str) -> Result<ProcessManifest, String> {
-    let mut docs = documents(format, path, text).map_err(|e| e.to_string())?;
+    };
+    let format = Format::of_path(&path).unwrap_or(Format::Toml);
+    let mut docs = documents(format, &label, &text).map_err(|e| manifest(e.to_string()))?;
     if docs.len() != 1 {
-        return Err(format!(
+        return Err(manifest(format!(
             "expected one Plugin document, found {}",
             docs.len()
-        ));
+        )));
     }
-    resource::<PluginSpec>(path, &docs.remove(0))
-        .map(ProcessManifest::from_resource)
-        .map_err(|e| e.to_string())
+    let resource =
+        resource::<PluginSpec>(&label, &docs.remove(0)).map_err(|e| manifest(e.to_string()))?;
+    Ok(Found {
+        resource,
+        dir: dir.to_owned(),
+    })
 }
 
 /// Manifests in `<search>/*/lighthouse-plugin.{toml,yaml,json}` for every existing search
@@ -195,6 +169,11 @@ pub fn discover(search: &[PathBuf]) -> Result<Discovered, Error> {
         }
     }
     Ok(out)
+}
+
+/// The manifest file in `dir`, if it has one.
+fn file_in(dir: &Path) -> Option<PathBuf> {
+    lighthouse_resource::file_in(dir, &FILE_NAMES)
 }
 
 fn provides_nothing(provides: &Provides) -> bool {

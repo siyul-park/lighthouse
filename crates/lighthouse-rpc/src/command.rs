@@ -8,21 +8,20 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_model::hash;
+use lighthouse_model::{canonical, hash};
 use lighthouse_plugin::{
-    Answer, Capabilities, Classifier, CreateFineTuningJobRequest, Error, FineTuningJob, Model,
-    Supports, SystemOneRequest, SystemOneResponse,
+    Answer, Capabilities, Classifier, Error, Model, Supports, SystemOneRequest, SystemOneResponse,
 };
 use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT};
 use lighthouse_protocol::prompt::{self, json_in, noul_of};
 use lighthouse_resource::Duration as Limit;
 use lighthouse_spec::{ModelInput, ModelProvider};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 /// How long a command model may take when the instance says nothing.
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(120);
+const MODEL_TIMEOUT: Duration = Duration::from_secs(120);
 /// A program run as a model.
-pub struct Command {
+pub struct CommandModel {
     manifest: Model,
     model: String,
     argv: Vec<String>,
@@ -33,7 +32,7 @@ pub struct Command {
     timeout: Duration,
 }
 
-impl Command {
+impl CommandModel {
     /// The model `model` of a `command` provider, named `name` (the whole
     /// reference), run from `dir`; `None` for a provider of another kind.
     pub fn new(dir: &Path, name: &str, model: &str, provider: &ModelProvider) -> Option<Self> {
@@ -70,10 +69,15 @@ impl Command {
                     fine_tuning: None,
                 },
                 version: hash::short(
-                    &format!(
-                        "{argv:?}{model}{stdin:?}{pointer:?}{env:?}{key_env:?}{}",
-                        program_hash(dir, argv)
-                    ),
+                    &canonical(&json!({
+                        "argv": argv,
+                        "model": model,
+                        "stdin": stdin,
+                        "pointer": pointer,
+                        "env": env,
+                        "keyEnv": key_env,
+                        "program": program_hash(dir, argv),
+                    })),
                     6,
                 ),
                 deterministic: false,
@@ -85,20 +89,19 @@ impl Command {
             pointer: pointer.clone(),
             dir: dir.to_owned(),
             env: command_env(env, key_env.as_deref()),
-            timeout: timeout.map_or(DEFAULT_TIMEOUT, Limit::get),
+            timeout: timeout.map_or(MODEL_TIMEOUT, Limit::get),
         })
     }
 }
 
-impl Classifier for Command {
+impl Classifier for CommandModel {
     fn manifest(&self) -> &Model {
         &self.manifest
     }
 
     /// Output that does not fit the shape of an answer is a provider error.
     fn classify(&self, params: &SystemOneRequest) -> Result<SystemOneResponse, Error> {
-        let failed =
-            |reason: String| Error::Failed(format!("model `{}`: {reason}", self.manifest.id));
+        let failed = |reason: String| Error::model(&self.manifest.id, reason);
         let mut asked = params.clone();
         asked.model.clone_from(&self.model);
         let input = match self.stdin {
@@ -141,13 +144,6 @@ impl Classifier for Command {
             answers,
             usage: Value::Null,
         })
-    }
-
-    fn train(&self, _: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {
-        Err(Error::Failed(format!(
-            "model `{}`: a command model does not train",
-            self.manifest.id
-        )))
     }
 }
 

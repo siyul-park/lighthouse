@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use lighthouse_plugin::{Classifier, DecisionRef, Question, State, SystemOneRequest};
-use lighthouse_rpc::Command;
+use lighthouse_rpc::CommandModel;
 use lighthouse_spec::Config;
 
 fn provider(argv: &str) -> lighthouse_spec::ModelProvider {
@@ -45,7 +45,7 @@ fn command_new_runs_a_program_that_prints_the_answer() {
     let dir = tempfile::tempdir().unwrap();
     let provider = provider(r#"["sh", "-c", "cat >/dev/null; printf '{\"noul\": 0.75}'"]"#);
 
-    let command = Command::new(dir.path(), "p/m", "m", &provider).unwrap();
+    let command = CommandModel::new(dir.path(), "p/m", "m", &provider).unwrap();
     let answer = command.classify(&request()).unwrap();
 
     assert_eq!(command.manifest().id, "p/m");
@@ -57,7 +57,7 @@ fn command_new_fails_a_program_that_exits_with_an_error() {
     let dir = tempfile::tempdir().unwrap();
     let provider = provider(r#"["sh", "-c", "exit 3"]"#);
 
-    let command = Command::new(dir.path(), "p/m", "m", &provider).unwrap();
+    let command = CommandModel::new(dir.path(), "p/m", "m", &provider).unwrap();
 
     assert!(command.classify(&request()).is_err());
 }
@@ -75,7 +75,7 @@ fn command_new_is_none_for_a_provider_that_is_not_a_command() {
         .provider("p")
         .unwrap();
 
-    assert!(Command::new(dir.path(), "p/m", "m", &provider).is_none());
+    assert!(CommandModel::new(dir.path(), "p/m", "m", &provider).is_none());
 }
 
 #[test]
@@ -83,7 +83,7 @@ fn command_new_gives_the_program_the_login_variables_and_no_other_of_the_environ
     let dir = tempfile::tempdir().unwrap();
     let provider = provider(r#"["sh", "-c", "env | cut -d= -f1 | tr '\\n' ' ' >&2; exit 1"]"#);
 
-    let command = Command::new(dir.path(), "p/m", "m", &provider).unwrap();
+    let command = CommandModel::new(dir.path(), "p/m", "m", &provider).unwrap();
     let failed = command.classify(&request()).unwrap_err().to_string();
 
     for name in ["PATH", "HOME", "USER", "LOGNAME"] {

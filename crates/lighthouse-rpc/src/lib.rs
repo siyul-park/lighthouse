@@ -6,27 +6,22 @@ mod model;
 mod plugin;
 
 use std::{
-    env,
     path::{Path, PathBuf},
     time::Duration,
 };
 
 use lighthouse_model::Incomplete;
 use lighthouse_plugin::{Plugin, Registry};
-use lighthouse_resource::STATE_DIR;
 use lighthouse_spec::{Config, PluginRef};
 use thiserror::Error;
 
-pub use command::Command;
-pub use manifest::{
-    Discovered, FILE_NAME, FILE_NAMES, Found, PluginSpec, ProcessManifest, Provides, Runtime,
-    discover, file_in, load, parse,
-};
+pub use command::CommandModel;
+pub use manifest::{FILE_NAME, Found, PluginSpec, Provides, discover, load, search_dirs};
 pub use plugin::RpcPlugin;
 
 /// Per-request limit unless the plugin entry sets `timeout`; generous because
 /// a first index may build a cold cache.
-pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(600);
+const PLUGIN_TIMEOUT: Duration = Duration::from_secs(600);
 
 /// Why discovering, starting or registering an external plugin failed. Every
 /// variant but `Unavailable` is a configuration error that aborts the run.
@@ -84,22 +79,6 @@ pub fn descriptors() -> Vec<lighthouse_resource::Descriptor> {
     vec![lighthouse_resource::Descriptor::new::<PluginSpec>()]
 }
 
-/// Where plugin manifests are searched: `<root>/.lighthouse/plugins`,
-/// `$XDG_DATA_HOME/lighthouse/plugins` (default `~/.local/share/lighthouse/plugins`)
-/// and `plugins` next to the executable. A
-/// development checkout is reached only through an explicit `path`.
-pub fn search_dirs(root: &Path) -> Vec<PathBuf> {
-    let mut dirs = vec![root.join(STATE_DIR).join("plugins")];
-    dirs.extend(lighthouse_resource::xdg_plugins());
-    if let Some(dir) = env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(|p| p.join("plugins")))
-    {
-        dirs.push(dir);
-    }
-    dirs
-}
-
 /// Starts every plugin listed in `config` that is not already registered and
 /// registers it. An entry with `path` uses that directory (relative to
 /// `root`); other ids are looked up in `search`. An id provided by more than
@@ -122,7 +101,7 @@ pub fn register(
         let id = listed.id.as_str();
         let chosen = choose(listed, registry.has_plugin(id), &discovered.found, root)?;
         let Some(one) = chosen.first() else { continue };
-        let timeout = listed.timeout().unwrap_or(DEFAULT_TIMEOUT);
+        let timeout = listed.timeout().unwrap_or(PLUGIN_TIMEOUT);
         let registration = match RpcPlugin::connect(one, root, timeout) {
             Ok(plugin) => registry.register(&plugin),
             Err(Error::Unavailable {
@@ -138,8 +117,8 @@ pub fn register(
                     ),
                 });
                 registry.register(&Unavailable(lighthouse_plugin::PluginManifest {
-                    id: one.manifest.id.clone(),
-                    version: one.manifest.version.clone(),
+                    id: one.id().to_owned(),
+                    version: one.resource.spec.version.clone(),
                 }))
             }
             Err(e) => return Err(e),
@@ -189,20 +168,16 @@ fn choose(
         Some(path) => {
             let dir = root.join(path);
             let one = load(&dir)?;
-            if one.manifest.id != id {
+            if one.id() != id {
                 return Err(Error::IdMismatch {
                     id: id.to_owned(),
-                    found: one.manifest.id,
+                    found: one.id().to_owned(),
                     dir,
                 });
             }
             vec![one]
         }
-        None => found
-            .iter()
-            .filter(|f| f.manifest.id == id)
-            .cloned()
-            .collect(),
+        None => found.iter().filter(|f| f.id() == id).cloned().collect(),
     };
     if chosen.len() + usize::from(builtin) > 1 {
         let mut places: Vec<String> = chosen.iter().map(|f| f.dir.display().to_string()).collect();

@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 use lighthouse_engine::CommandModels;
 use lighthouse_model::ModelRef;
 use lighthouse_plugin::Classifier;
-use lighthouse_rpc::Command;
+use lighthouse_rpc::CommandModel;
 use serde::Serialize;
 
 use crate::{Result, Selector, Session, attached_models};
@@ -88,7 +88,7 @@ pub fn remote_bound(session: &Session) -> bool {
 pub(crate) fn command_models(root: &Path) -> CommandModels {
     let root = root.to_owned();
     Arc::new(move |name, model, provider| {
-        Command::new(&root, name, model, provider)
+        CommandModel::new(&root, name, model, provider)
             .map(|command| Box::new(command) as Box<dyn Classifier>)
     })
 }
