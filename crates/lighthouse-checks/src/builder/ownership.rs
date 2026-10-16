@@ -89,9 +89,12 @@ impl Builder<'_> {
             {
                 members.entry(&owner.id).or_default().insert(&member.name);
             }
+            // A submodule uses its parent's types as a matter of course, so
+            // that use says nothing about where a function belongs.
             if id.module() == symbol.id.module() {
                 own += 1;
-            } else if !inside(symbol.id.module(), id.module()) && !generated(project, id) {
+            } else if !layout::contains(id.module(), symbol.id.module()) && !generated(project, id)
+            {
                 modules.entry(id.module()).or_default().insert(id);
             }
         }
@@ -192,15 +195,6 @@ fn generated(project: &Project, id: &SymbolId) -> bool {
         .symbol(id)
         .and_then(|s| project.file(&s.file))
         .is_some_and(|f| f.generated)
-}
-
-/// Whether `inner` lies inside `outer`: a submodule uses its parent's types
-/// as a matter of course, so that use says nothing about where a function
-/// belongs.
-fn inside(inner: &str, outer: &str) -> bool {
-    inner
-        .strip_prefix(outer)
-        .is_some_and(|rest| rest.starts_with('/'))
 }
 
 /// The type whose member `id` is: not an interface, whose methods any type

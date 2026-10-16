@@ -46,6 +46,15 @@ pub fn exposed(symbol: &Symbol) -> bool {
     symbol.visibility != Visibility::Private
 }
 
+/// Whether module `outer` is `inner` or holds it (a nested module path,
+/// `crate/a/b` inside `crate`).
+pub(crate) fn contains(outer: &str, inner: &str) -> bool {
+    inner == outer
+        || inner
+            .strip_prefix(outer)
+            .is_some_and(|rest| rest.starts_with('/'))
+}
+
 /// What a member belongs to: its owner, or for a member of a type declared
 /// elsewhere, the written owner path of its id.
 pub fn owner_key(symbol: &Symbol) -> Option<String> {

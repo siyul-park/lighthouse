@@ -9,6 +9,8 @@ use std::{
 use lighthouse_model::{Module, Project, Symbol, SymbolId, SymbolKind, TestCase};
 use serde::Deserialize;
 
+use crate::layout::contains;
+
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Naming {
@@ -233,12 +235,10 @@ fn testing_modules(project: &Project, module: &str) -> Vec<String> {
 /// Whether `tests` tests `module` or a module that contains it (a nested
 /// module path, `crate/a/b` inside `crate`).
 fn tests_ancestor(tests: &Module, module: &str) -> bool {
-    tests.test_of.as_deref().is_some_and(|tested| {
-        tested == module
-            || module
-                .strip_prefix(tested)
-                .is_some_and(|rest| rest.starts_with('/'))
-    })
+    tests
+        .test_of
+        .as_deref()
+        .is_some_and(|tested| contains(tested, module))
 }
 
 fn test_name(id: &SymbolId) -> Option<&str> {

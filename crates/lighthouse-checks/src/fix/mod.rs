@@ -61,18 +61,8 @@ impl lighthouse_plugin::Fixer for Fixer {
     }
 
     fn fix(&self, request: &FixRequest) -> Result<FixOutcome, PluginError> {
-        match self.compiled.as_ref() {
-            Compiled::Ops(steps) => {
-                let ops = steps.evaluate(&self.meta.id, request)?;
-                Ok(match ops {
-                    Ok(ops) => FixOutcome::Proposed {
-                        description: self.description.clone(),
-                        ops,
-                        safety: self.safety,
-                    },
-                    Err(reason) => FixOutcome::declined(reason),
-                })
-            }
+        let evaluated = match self.compiled.as_ref() {
+            Compiled::Ops(steps) => steps.evaluate(&self.meta.id, request)?,
             Compiled::Command(spec) => {
                 if !request.trusted {
                     return Ok(FixOutcome::declined(format!(
@@ -81,15 +71,16 @@ impl lighthouse_plugin::Fixer for Fixer {
                         spec.argv.join(" ")
                     )));
                 }
-                command::run(&self.meta.id, spec, request).map(|outcome| match outcome {
-                    Ok(ops) => FixOutcome::Proposed {
-                        description: self.description.clone(),
-                        ops,
-                        safety: self.safety,
-                    },
-                    Err(reason) => FixOutcome::declined(reason),
-                })
+                command::run(&self.meta.id, spec, request)?
             }
-        }
+        };
+        Ok(match evaluated {
+            Ok(ops) => FixOutcome::Proposed {
+                description: self.description.clone(),
+                ops,
+                safety: self.safety,
+            },
+            Err(reason) => FixOutcome::declined(reason),
+        })
     }
 }

@@ -20,6 +20,7 @@ use serde_json::{Map, Value, json};
 use crate::{
     eval::{Fact, cel_fact, with_entries, with_fact},
     facts,
+    layout::contains,
     library::Needs,
     naming::{Naming, Tests},
     table::Table,
@@ -590,10 +591,6 @@ fn data_only(project: &Project, symbol: &Symbol) -> bool {
 fn module_tested(project: &Project, module: &str) -> bool {
     project.modules.iter().any(|m| {
         let tested = m.test_of.as_deref().unwrap_or(&m.path);
-        let covers = tested == module
-            || module
-                .strip_prefix(tested)
-                .is_some_and(|rest| rest.starts_with('/'));
-        covers && !project.tests_in(&m.path).is_empty()
+        contains(tested, module) && !project.tests_in(&m.path).is_empty()
     })
 }
