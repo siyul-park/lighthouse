@@ -7,7 +7,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{Fingerprint, hash};
+use lighthouse_model::Fingerprint;
+
+use lighthouse_protocol::hash;
 use lighthouse_resource::{write_atomic, write_atomic_guarded};
 
 use super::{

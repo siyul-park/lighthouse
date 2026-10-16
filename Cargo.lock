@@ -780,7 +780,6 @@ checksum = "d817e038c30374a4bcb22f94d0a8a0e216958d4c3dcde369b1439fec4bdda6e6"
 name = "fake-model"
 version = "0.1.0"
 dependencies = [
- "lighthouse-model",
  "lighthouse-protocol",
  "serde_json",
 ]
@@ -1663,6 +1662,7 @@ dependencies = [
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-process",
+ "lighthouse-protocol",
  "lighthouse-resource",
  "lighthouse-rpc",
  "lighthouse-spec",
@@ -1687,6 +1687,7 @@ dependencies = [
  "lighthouse-engine",
  "lighthouse-model",
  "lighthouse-plugin",
+ "lighthouse-protocol",
  "lighthouse-report",
  "lighthouse-resource",
  "lighthouse-rpc",
@@ -1715,6 +1716,7 @@ dependencies = [
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-process",
+ "lighthouse-protocol",
  "lighthouse-resource",
  "lighthouse-spec",
  "rayon",
@@ -1734,6 +1736,7 @@ dependencies = [
  "lighthouse-engine",
  "lighthouse-model",
  "lighthouse-plugin",
+ "lighthouse-protocol",
  "lighthouse-spec",
  "serde",
  "serde_json",
@@ -1744,10 +1747,10 @@ dependencies = [
 name = "lighthouse-model"
 version = "0.1.0"
 dependencies = [
+ "lighthouse-protocol",
  "schemars",
  "serde",
  "serde_json",
- "sha2",
  "thiserror",
 ]
 
@@ -1781,6 +1784,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror",
 ]
 
@@ -1840,6 +1844,7 @@ dependencies = [
  "lighthouse-ml",
  "lighthouse-model",
  "lighthouse-plugin",
+ "lighthouse-protocol",
  "lighthouse-report",
  "lighthouse-resource",
  "lighthouse-rpc",
@@ -1879,6 +1884,7 @@ name = "lighthouse-store"
 version = "0.1.0"
 dependencies = [
  "lighthouse-model",
+ "lighthouse-protocol",
  "lighthouse-resource",
  "rusqlite",
  "schemars",
@@ -2023,7 +2029,6 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "hf-hub",
- "lighthouse-model",
  "lighthouse-protocol",
  "ort",
  "serde",

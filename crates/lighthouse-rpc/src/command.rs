@@ -8,12 +8,12 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_model::{canonical, hash};
 use lighthouse_plugin::{
     Answer, Capabilities, Classifier, Error, Model, Supports, SystemOneRequest, SystemOneResponse,
 };
 use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT};
 use lighthouse_protocol::prompt::{self, json_in, noul_of};
+use lighthouse_protocol::{canonical, hash};
 use lighthouse_resource::Duration as Limit;
 use lighthouse_spec::{ModelInput, ModelProvider};
 use serde_json::{Value, json};

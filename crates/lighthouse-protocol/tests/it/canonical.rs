@@ -1,4 +1,4 @@
-use lighthouse_model::canonical;
+use lighthouse_protocol::canonical;
 use serde_json::json;
 
 #[test]

@@ -7,10 +7,11 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use crate::cache::Digest;
-use lighthouse_model::{Diagnostic, hash::sha256};
+use lighthouse_model::Diagnostic;
 use lighthouse_plugin::{
     Abstained, Answered, Ask, Classifier, Decided, Explored, Settle, fails, request_of,
 };
+use lighthouse_protocol::hash::sha256;
 use rayon::prelude::*;
 
 use super::models::{Layer, RunModels, named};

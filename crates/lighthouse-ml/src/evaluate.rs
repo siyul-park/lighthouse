@@ -410,7 +410,7 @@ fn audit_rows(request: &EvalRequest, repo: &Repo, found: &Found) -> Vec<String> 
         return Vec::new();
     };
     let mut rows: Vec<&(String, String)> = found.unflagged.iter().collect();
-    rows.sort_by_cached_key(|(fingerprint, _)| lighthouse_model::hash::short(fingerprint, 8));
+    rows.sort_by_cached_key(|(fingerprint, _)| lighthouse_protocol::hash::short(fingerprint, 8));
     rows.into_iter()
         .take(n)
         .map(|(fingerprint, place)| {

@@ -4,7 +4,7 @@
 
 use std::{fs, path::Path};
 
-use lighthouse_model::hash::sha256;
+use lighthouse_protocol::hash::sha256;
 use lighthouse_protocol::{CreateFineTuningJobRequest, dataset_path};
 use serde_json::Value;
 

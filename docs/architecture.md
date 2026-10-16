@@ -659,7 +659,7 @@ Dependencies point down only, by the layer table in `lighthouse.toml`; the proje
 | L3 | [report](../crates/lighthouse-report/README.md), [store](../crates/lighthouse-store/README.md), [ml](../crates/lighthouse-ml/README.md) |
 | L2 | [engine](../crates/lighthouse-engine/README.md), [checks](../crates/lighthouse-checks/README.md), [rpc](../crates/lighthouse-rpc/README.md) |
 | L1 | [plugin](../crates/lighthouse-plugin/README.md), [spec](../crates/lighthouse-spec/README.md) |
-| L0 | [model](../crates/lighthouse-model/README.md), [resource](../crates/lighthouse-resource/README.md), [protocol](../crates/lighthouse-protocol/README.md), `process` |
+| L0 | [model](../crates/lighthouse-model/README.md), [resource](../crates/lighthouse-resource/README.md), `process`, all on [protocol](../crates/lighthouse-protocol/README.md), which depends on no workspace crate |
 
 - [cli](../crates/lighthouse-cli/README.md): `surface`, `cli` and `mcp` frontends.
 - [session](../crates/lighthouse-session/README.md): the shared operations; composition root.
@@ -671,7 +671,7 @@ Dependencies point down only, by the layer table in `lighthouse.toml`; the proje
 - [rpc](../crates/lighthouse-rpc/README.md): language plugins as processes.
 - [plugin](../crates/lighthouse-plugin/README.md): SPI and Registry.
 - [spec](../crates/lighthouse-spec/README.md): decision kinds, Catalog, local layer.
-- [model](../crates/lighthouse-model/README.md), [resource](../crates/lighthouse-resource/README.md), [protocol](../crates/lighthouse-protocol/README.md): L0 vocabulary, resources and the wire.
+- [model](../crates/lighthouse-model/README.md), [resource](../crates/lighthouse-resource/README.md), [protocol](../crates/lighthouse-protocol/README.md): L0 vocabulary, resources and the wire; protocol also owns the hashes and folds that host and plugin must compute alike.
 - `process`: child-process helper (no README). `test-support`: dev-only helper of the test suites (no README).
 - Plugins: [lang-rust](../plugins/lang-rust/README.md), [lang-go](../plugins/lang-go/README.md), [model-http](../plugins/model-http/README.md), [fake-model](../plugins/fake-model/README.md).
 

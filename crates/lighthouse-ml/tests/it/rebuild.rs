@@ -8,8 +8,8 @@ use lighthouse_ml::{
     },
     train::{Rows, write_dataset},
 };
-use lighthouse_model::{canonical, hash::sha256};
 use lighthouse_plugin::{DecisionRef, Subject};
+use lighthouse_protocol::{canonical, hash::sha256};
 use lighthouse_spec::Catalog;
 use serde_json::json;
 

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use lighthouse_model::hash;
+use lighthouse_protocol::hash;
 use lighthouse_resource::Spec;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

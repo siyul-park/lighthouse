@@ -4,10 +4,11 @@
 //! left to agent review.
 
 use cel::Program;
-use lighthouse_model::{Diagnostic, Position, Span, SymbolId, hash};
+use lighthouse_model::{Diagnostic, Position, Span, SymbolId};
 use lighthouse_plugin::{
     Answered, Ask, Context, DecisionRef, Neighbor, RuleManifest, State, Subject,
 };
+use lighthouse_protocol::hash;
 use lighthouse_spec::{CelCheck, Decision, Select};
 use serde_json::{Value, json};
 

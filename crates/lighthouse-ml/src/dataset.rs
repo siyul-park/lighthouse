@@ -10,10 +10,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{canonical, hash::sha256};
 use lighthouse_plugin::{
     DATASETS_DIR, DecisionRef, LineKeys, Question, Subject, TrainingLine, dataset_path,
 };
+use lighthouse_protocol::{canonical, hash::sha256};
 use serde_json::Value;
 
 use crate::Result;

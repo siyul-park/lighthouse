@@ -4,8 +4,9 @@ use std::fs;
 
 use crate::support::*;
 use lighthouse_model::{
-    AgentKind, Attribution, Judgment, Label, SuppressionKind, SuppressionStatus, canonical, hash,
+    AgentKind, Attribution, Judgment, Label, SuppressionKind, SuppressionStatus,
 };
+use lighthouse_protocol::{canonical, hash};
 use lighthouse_store::{Error, JudgmentSpec, Observed, Records, Standing, Store, SuppressionSpec};
 use tempfile::TempDir;
 
@@ -251,7 +252,7 @@ fn a_judgment_with_a_field_this_build_does_not_know_is_still_read() {
     let mut record: serde_json::Value = serde_json::from_str(log_of(dir.path()).trim()).unwrap();
     record["spec"]["futureField"] = serde_json::json!({ "from": "a newer build" });
     let canonical = serde_json::to_string(&record["spec"]).unwrap();
-    record["metadata"]["name"] = lighthouse_model::hash::short(&canonical, 16).into();
+    record["metadata"]["name"] = lighthouse_protocol::hash::short(&canonical, 16).into();
     fs::write(&path, format!("{record}\n")).unwrap();
     fs::remove_file(Store::path_in(dir.path())).unwrap();
 
@@ -517,7 +518,7 @@ fn a_suppression_without_its_judgment_is_ignored_with_a_notice() {
     record["spec"]["judgment"] =
         serde_json::from_str::<serde_json::Value>(lines[1]).unwrap()["metadata"]["name"].clone();
     let canonical = serde_json::to_string(&record["spec"]).unwrap();
-    record["metadata"]["name"] = lighthouse_model::hash::short(&canonical, 16).into();
+    record["metadata"]["name"] = lighthouse_protocol::hash::short(&canonical, 16).into();
     fs::write(&path, format!("{without}{record}\n")).unwrap();
     let store = Store::open(dir.path()).unwrap();
     assert_eq!(store.notices().len(), 1, "{:?}", store.notices());

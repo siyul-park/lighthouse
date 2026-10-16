@@ -1,7 +1,7 @@
 //! What a trained model's out-of-fold probabilities say about it: the band
 //! in which they can be trusted, and how well they rank.
 
-use lighthouse_model::stats::wilson;
+use lighthouse_protocol::stats::wilson;
 use serde::Serialize;
 
 use crate::rows::Line;

@@ -1,6 +1,7 @@
 //! The statistics a learned model and the host that grades it share: the
 //! folds of a cross-validation and the Wilson interval of a proportion. They
-//! live in L0 because plugins cannot import the crates that grade.
+//! live in the protocol because plugins import nothing else, and the fold of
+//! a group must be the same on both sides.
 
 use std::collections::BTreeSet;
 

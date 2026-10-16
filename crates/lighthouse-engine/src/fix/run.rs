@@ -7,7 +7,7 @@ use std::{
 };
 
 use lighthouse_model::Fingerprint;
-use lighthouse_model::hash::Hasher;
+use lighthouse_protocol::hash::Hasher;
 
 use super::{AppliedFix, DeclinedFix, FixPlan, FixReport, FixRun, MAX_ROUNDS, propose::Proposer};
 

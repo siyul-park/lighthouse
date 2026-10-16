@@ -16,11 +16,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::stats::assign;
 use lighthouse_plugin::{
     Classifier, DATASETS_DIR, DecisionRef, FineTuningJobStatus, MODELS_DIR, Subject, artifact_path,
     fails, request_of,
 };
+use lighthouse_protocol::stats::assign;
 use serde::Serialize;
 use serde_json::Value;
 

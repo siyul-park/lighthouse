@@ -167,7 +167,8 @@ fn the_cache_directory_is_named_by_the_plugin_binary_and_absent_with_overlays() 
 
     index(provider.as_ref(), &ws, &["a.fake"]);
 
-    let digest = lighthouse_model::hash::sha256(fs::read(fake.path().join("plugin.sh")).unwrap());
+    let digest =
+        lighthouse_protocol::hash::sha256(fs::read(fake.path().join("plugin.sh")).unwrap());
     let expected = cache.path().join("fake").join(&digest[..16]);
     assert_eq!(sent()["cache"]["dir"], expected.to_string_lossy().as_ref());
     assert!(expected.is_dir());

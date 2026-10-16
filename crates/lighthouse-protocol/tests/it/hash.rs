@@ -1,4 +1,4 @@
-use lighthouse_model::hash::{Hasher, digest, sha256, short, short_digest};
+use lighthouse_protocol::hash::{Hasher, digest, sha256, short, short_digest};
 
 const ABC: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
 

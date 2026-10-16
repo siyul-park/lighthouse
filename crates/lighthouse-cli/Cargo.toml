@@ -12,6 +12,7 @@ doctest = false
 clap.workspace = true
 clap_complete.workspace = true
 lighthouse-model.workspace = true
+lighthouse-protocol.workspace = true
 lighthouse-report.workspace = true
 lighthouse-resource.workspace = true
 lighthouse-session.workspace = true

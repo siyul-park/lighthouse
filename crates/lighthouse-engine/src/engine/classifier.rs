@@ -4,11 +4,11 @@
 
 use std::sync::Arc;
 
-use lighthouse_model::hash;
 use lighthouse_plugin::{
     Capabilities, Classifier, CreateFineTuningJobRequest, Error, FineTuningJob, Model, Registry,
     Supports, SystemOneRequest, SystemOneResponse,
 };
+use lighthouse_protocol::hash;
 use lighthouse_spec::ModelProvider;
 use serde_json::{Map, Value};
 

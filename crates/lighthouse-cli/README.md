@@ -2,7 +2,7 @@
 
 The `lighthouse` binary and the frontends over the session: one table of operations (`surface/`), the terminal (`cli/`) and the MCP server (`mcp/`).
 
-**Layer.** L5; depends on session and report, and the L0 vocabulary crates model and resource. No engine, store, ml or plugin edge.
+**Layer.** L5; depends on session and report, and the L0 vocabulary crates model, resource and protocol. No engine, store, ml or plugin edge.
 
 ## Entry points
 - `surface::run`, `Action`: the command tree and the operations behind it, shared by both frontends.

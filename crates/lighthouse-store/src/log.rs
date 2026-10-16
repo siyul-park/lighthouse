@@ -24,9 +24,9 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{
-    Attribution, Judgment, Label, SuppressionKind, SuppressionStatus, canonical, hash,
-};
+use lighthouse_model::{Attribution, Judgment, Label, SuppressionKind, SuppressionStatus};
+
+use lighthouse_protocol::{canonical, hash};
 use lighthouse_resource::{API_VERSION, Metadata, Resource, Spec};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};

@@ -2,21 +2,17 @@
 mod vocabulary;
 
 pub mod annotation;
-mod canonical;
 mod clock;
 mod diagnostic;
 mod document;
 mod fix;
-pub mod hash;
 mod merge;
 mod model_ref;
 mod review;
 mod scope;
-pub mod stats;
 mod text;
 mod ucm;
 
-pub use canonical::canonical;
 pub use clock::now;
 pub use diagnostic::{
     Diagnostic, Fingerprint, Incomplete, Severity, Suppressed, Suppression, SuppressionKind,

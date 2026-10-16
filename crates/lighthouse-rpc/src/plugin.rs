@@ -1,11 +1,13 @@
 use std::{collections::BTreeSet, fs, path::Path, sync::Arc, time::Duration};
 
-use lighthouse_model::{Incomplete, hash};
+use lighthouse_model::Incomplete;
+
 use lighthouse_plugin::{
     Classifier, Error, Indexed, LanguageProvider, Plugin, PluginManifest, ProviderManifest, Source,
     Workspace,
 };
 use lighthouse_protocol as wire;
+use lighthouse_protocol::hash;
 use serde_json::Value;
 
 use crate::{client::Client, convert, manifest::Found, model::Remote};

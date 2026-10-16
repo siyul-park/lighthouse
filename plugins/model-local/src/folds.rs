@@ -3,7 +3,7 @@
 //! fitted on and the part it is judged on), and how a probability on them is
 //! judged.
 
-use lighthouse_model::stats::assign;
+use lighthouse_protocol::stats::assign;
 
 use crate::rows::Line;
 
@@ -51,7 +51,7 @@ pub fn out_of_fold<T>(rows: &[&Line], score: impl Fn(&[&Line], &[&Line]) -> Vec<
 }
 
 /// The indices of each fold, by the rule the host grades with
-/// (`lighthouse_model::stats::assign`). Empty folds are dropped.
+/// (`lighthouse_protocol::stats::assign`). Empty folds are dropped.
 fn folds(rows: &[&Line]) -> Vec<Vec<usize>> {
     let groups: Vec<&str> = rows.iter().map(|r| r.group.as_str()).collect();
     let assigned = assign(&groups);

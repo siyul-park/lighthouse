@@ -5,12 +5,12 @@
 use std::{fs, path::Path};
 
 use base64::{Engine, engine::general_purpose::STANDARD};
-use lighthouse_model::{
+use lighthouse_protocol::artifact_path;
+use lighthouse_protocol::{
     canonical,
     hash::{digest, sha256},
     stats::FOLDS,
 };
-use lighthouse_protocol::artifact_path;
 use serde_json::{Map, Value, json};
 
 use crate::{

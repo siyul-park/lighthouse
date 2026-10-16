@@ -6,7 +6,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{Fingerprint, Severity, hash};
+use lighthouse_model::{Fingerprint, Severity};
+
+use lighthouse_protocol::hash;
 
 use super::{
     super::edits::overlap,

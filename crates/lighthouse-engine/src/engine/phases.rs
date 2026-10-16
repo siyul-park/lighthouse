@@ -3,7 +3,9 @@
 
 use std::sync::OnceLock;
 
-use lighthouse_model::{Capability, hash};
+use lighthouse_model::Capability;
+
+use lighthouse_protocol::hash;
 use rayon::ThreadPool;
 
 use super::*;

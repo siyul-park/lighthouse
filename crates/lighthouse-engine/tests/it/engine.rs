@@ -735,7 +735,7 @@ fn active_rules_are_those_a_configuration_enables() {
 #[test]
 fn hash_of_is_the_sha256_hex_the_model_records() {
     assert_eq!(
-        lighthouse_model::hash::sha256("abc"),
+        lighthouse_protocol::hash::sha256("abc"),
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
 }
@@ -753,11 +753,11 @@ fn an_overlaid_check_reads_the_overlay_not_the_disk_and_leaves_the_disk_alone() 
         |o: &lighthouse_engine::Run, f: &str| o.project.file(Path::new(f)).unwrap().hash.clone();
     assert_eq!(
         hash(&out, "a.txt"),
-        lighthouse_model::hash::sha256("overlaid")
+        lighthouse_protocol::hash::sha256("overlaid")
     );
     assert_eq!(
         hash(&plain, "a.txt"),
-        lighthouse_model::hash::sha256("on disk")
+        lighthouse_protocol::hash::sha256("on disk")
     );
     assert_eq!(hash(&out, "b.txt"), hash(&plain, "b.txt"));
     assert_eq!(

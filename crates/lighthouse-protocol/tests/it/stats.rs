@@ -1,4 +1,4 @@
-use lighthouse_model::stats::{FOLDS, assign, fold, wilson};
+use lighthouse_protocol::stats::{FOLDS, assign, fold, wilson};
 
 #[test]
 fn the_fold_of_a_group_is_its_hash_modulo_the_folds() {
@@ -16,6 +16,17 @@ fn groups_enough_are_folded_by_hash() {
     for (group, at) in groups.iter().zip(&folds) {
         assert_eq!(*at, fold(group, FOLDS));
     }
+}
+
+#[test]
+fn the_folds_of_five_groups_are_pinned() {
+    // sha256 of "c", "d" and "e" start with 2e7d2c03, 18ac3e73 and 3f79bb7b, which
+    // are 779955203, 413941363 and 1064942459: modulo 5, 3, 3 and 4.
+    assert_eq!(assign(&["a", "b", "c", "d", "e"]), [0, 1, 3, 3, 4]);
+    assert_eq!(
+        assign(&["f.go", "main.go", "src/a.go", "src/b.go", "pkg/c.go"]),
+        [3, 1, 4, 0, 1]
+    );
 }
 
 #[test]

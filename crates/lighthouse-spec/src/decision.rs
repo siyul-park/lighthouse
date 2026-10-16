@@ -9,8 +9,8 @@ use serde_json::{Map, Value, json};
 use crate::{
     Check, CheckKind, DecisionStatus, Error, Example, ExampleKind, Fix, OptionsSchema, Scope,
 };
-use lighthouse_model::hash;
 use lighthouse_protocol::DecisionRef;
+use lighthouse_protocol::hash;
 
 /// What one language changes about a decision: the values of its options.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

@@ -6,8 +6,8 @@
 
 use std::{fs, path::Path};
 
-use lighthouse_model::hash::digest;
 use lighthouse_plugin::{Classifier, FineTuningJobStatus, MODELS_DIR, artifact_path};
+use lighthouse_protocol::hash::digest;
 use serde::Serialize;
 use serde_json::Value;
 

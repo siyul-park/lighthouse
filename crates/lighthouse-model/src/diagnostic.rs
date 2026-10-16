@@ -7,11 +7,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{
-    Project, Span,
-    hash::{Hasher, short_digest},
-    squash,
-};
+use lighthouse_protocol::hash::{Hasher, short_digest};
+
+use crate::{Project, Span, squash};
 
 /// How hard a finding fails a run; serialized and parsed as the lowercase
 /// variant name. Whether a finding also asks for review is not a level: it

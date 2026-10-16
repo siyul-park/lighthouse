@@ -18,12 +18,12 @@ use std::{
     process::ExitCode,
 };
 
-use lighthouse_model::{canonical, hash::sha256};
 use lighthouse_protocol::{
     Answer, Capabilities, CreateFineTuningJobRequest, ErrorObject, FineTuningJob,
     FineTuningJobStatus, Handler, InitializeParams, InitializeResult, Model, NOUL,
     SystemOneRequest, SystemOneResponse, artifact_path, dataset_path, serve,
 };
+use lighthouse_protocol::{canonical, hash::sha256};
 use serde_json::{Value, json};
 
 const ID: &str = "fake-model";

@@ -5,7 +5,7 @@ use std::{
     sync::OnceLock,
 };
 
-use lighthouse_model::hash;
+use lighthouse_protocol::hash;
 use lighthouse_resource::{Resource, SCHEMA_URL_BASE, Spec, header, to_yaml, write_atomic};
 
 use crate::{

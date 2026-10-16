@@ -15,7 +15,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::hash::Hasher;
+use lighthouse_protocol::hash::Hasher;
 
 use crate::Result;
 

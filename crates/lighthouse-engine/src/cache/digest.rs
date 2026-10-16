@@ -19,7 +19,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{Document, Project, hash::Hasher};
+use lighthouse_model::{Document, Project};
+
+use lighthouse_protocol::hash::Hasher;
 use rayon::prelude::*;
 use serde::Serialize;
 

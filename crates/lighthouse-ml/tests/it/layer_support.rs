@@ -13,12 +13,13 @@ use lighthouse_ml::{
     labels::{Label, Source},
     metrics::{Outcome, Truth},
 };
-use lighthouse_model::{Diagnostic, Fingerprint, Position, Severity, Span, hash::sha256};
+use lighthouse_model::{Diagnostic, Fingerprint, Position, Severity, Span};
 use lighthouse_plugin::{
     Answer, Capabilities, Classifier, CreateFineTuningJobRequest, DecisionRef, Error,
     FineTuningJob, FineTuningJobStatus, Model, State, Subject, Supports, SystemOneRequest,
     SystemOneResponse,
 };
+use lighthouse_protocol::hash::sha256;
 use lighthouse_spec::Evaluation;
 use serde_json::{Value, json};
 

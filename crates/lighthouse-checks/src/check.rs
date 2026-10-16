@@ -9,9 +9,10 @@ use std::sync::Arc;
 use lighthouse_model::{
     Diagnostic, Options, Reach, RunScope,
     annotation::{ANNOTATION_REASON, UNUSED_ALLOW},
-    hash,
 };
+
 use lighthouse_plugin::{Caching, Context, Error as PluginError, Rule, RuleManifest};
+use lighthouse_protocol::hash;
 use lighthouse_spec::{BuiltinCheck, BuiltinOp, CheckKind, Decision, FORMATTED, Select};
 use serde_json::{Map, Value};
 

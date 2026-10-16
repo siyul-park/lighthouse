@@ -236,7 +236,7 @@ fn model_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
         let parsed: Value = serde_json::from_str(line).unwrap();
         assert_eq!(parsed["messages"].as_array().unwrap().len(), 3);
         assert!(parsed["weight"].is_number());
-        assert_eq!(line, lighthouse_model::canonical(&parsed));
+        assert_eq!(line, lighthouse_protocol::canonical(&parsed));
     }
 
     // The model was handed the same lines, and keeps them in the store of

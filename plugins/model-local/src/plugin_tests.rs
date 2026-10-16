@@ -3,7 +3,7 @@
 
 use std::{fs, path::Path};
 
-use lighthouse_model::hash::sha256;
+use lighthouse_protocol::hash::sha256;
 use lighthouse_protocol::{
     ClientInfo, CreateFineTuningJobRequest, Criteria, Criterion, FineTuneMethod,
     FineTuningJobStatus, Handler, InitializeParams, Instructions, MODELS_DIR, Question, State,

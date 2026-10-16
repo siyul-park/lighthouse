@@ -9,6 +9,5 @@ name = "fake-model"
 path = "src/main.rs"
 
 [dependencies]
-lighthouse-model.workspace = true
 lighthouse-protocol.workspace = true
 serde_json.workspace = true

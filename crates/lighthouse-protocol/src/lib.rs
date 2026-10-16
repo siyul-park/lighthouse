@@ -1,6 +1,10 @@
+mod canonical;
+pub mod hash;
 mod language;
 mod model;
+pub mod stats;
 
+pub use canonical::canonical;
 pub use language::{
     frame::{ErrorObject, FrameError, Id, Message, read_message, write_message},
     serve::{Handler, ServeError, serve},

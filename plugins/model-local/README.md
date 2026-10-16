@@ -2,7 +2,7 @@
 
 The model that is trained from the labels of a project: it embeds the labelled subjects, fits the simplest learner the data supports, and answers `lighthouse/classify` with the stored model its reference names.
 
-**Layer.** Out-of-process plugin; depends on `lighthouse-protocol` and `lighthouse-model`. Built by `make plugins`; its manifest provides the model `model-local`, whose one model is `learned`, referenced as `learned@sha256:<hex>`.
+**Layer.** Out-of-process plugin; depends on `lighthouse-protocol` only. Built by `make plugins`; its manifest provides the model `model-local`, whose one model is `learned`, referenced as `learned@sha256:<hex>`.
 
 ## Entry points
 - `serve`: the handshake and handler for `lighthouse/classify` and `lighthouse/train`.

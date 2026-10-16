@@ -6,7 +6,9 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Edge, Node, Project, Symbol, SymbolId, Target, hash::Hasher};
+use lighthouse_model::{Edge, Node, Project, Symbol, SymbolId, Target};
+
+use lighthouse_protocol::hash::Hasher;
 use rayon::prelude::*;
 use serde::Serialize;
 
