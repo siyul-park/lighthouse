@@ -1,7 +1,7 @@
 //! A `cel` check: a `where` expression that is true for a violation of the
 //! selected values, a message and evidence.
 
-use std::cell::RefCell;
+use std::{cell::RefCell, collections::BTreeMap};
 
 use cel::Program;
 use lighthouse_model::{Diagnostic, File, Node, Position, Project, Reach, Span, Symbol, SymbolId};
@@ -295,23 +295,7 @@ impl Evaluation<'_> {
             }
             Select::Edge => {
                 for edge in &project.edges {
-                    let (anchor, admitted) = match &edge.from {
-                        Node::Symbol(id) => (
-                            project.symbol(id),
-                            project
-                                .symbol(id)
-                                .is_none_or(|s| ctx.applies.admits_symbol(project, s)),
-                        ),
-                        Node::Module(m) => (
-                            declared.get(m.as_str()).map(|d| d.anchor),
-                            project.module(m).is_none_or(|module| {
-                                declared
-                                    .get(m.as_str())
-                                    .is_none_or(|d| admits_module(ctx, d, module))
-                            }),
-                        ),
-                    };
-                    let Some(anchor) = anchor.filter(|_| admitted) else {
+                    let Some(anchor) = edge_anchor(ctx, &declared, &edge.from) else {
                         continue;
                     };
                     let value = cel_fact(&facts::edge(project, edge));
@@ -480,6 +464,28 @@ impl Evaluation<'_> {
             },
         };
         Ok(Anchor { span, ..default })
+    }
+}
+
+/// The symbol the findings about an edge are reported at, when the edge starts
+/// at a subject of the decision's scope.
+fn edge_anchor<'p>(
+    ctx: &Context<'p>,
+    declared: &BTreeMap<&str, Declared<'p>>,
+    from: &Node,
+) -> Option<&'p Symbol> {
+    let project = ctx.project;
+    match from {
+        Node::Symbol(id) => project
+            .symbol(id)
+            .filter(|s| ctx.applies.admits_symbol(project, s)),
+        Node::Module(m) => {
+            let declared = declared.get(m.as_str())?;
+            project
+                .module(m)
+                .is_none_or(|module| admits_module(ctx, declared, module))
+                .then_some(declared.anchor)
+        }
     }
 }
 
