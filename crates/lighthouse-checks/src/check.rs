@@ -58,30 +58,20 @@ impl Check {
         let Some(check) = &decision.check else {
             return Ok(None);
         };
-        let (kind, analyzers) = match &check.kind {
-            CheckKind::Cel(cel) => {
-                let rule = CelRule::new(decision, cel)?;
-                let analyzers = rule.analyzers();
-                (Kind::Cel(Box::new(rule)), analyzers)
-            }
+        let kind = match &check.kind {
+            CheckKind::Cel(cel) => Kind::Cel(Box::new(CelRule::new(decision, cel)?)),
             CheckKind::Builtin(BuiltinCheck::Op(op)) => match op {
-                BuiltinOp::Order { .. } => {
-                    let rule = ops::OrderRule::new(id, op)?;
-                    let analyzers = rule.analyzers();
-                    (Kind::Order(rule), analyzers)
-                }
-                BuiltinOp::Cycle { .. } => (Kind::Cycle(ops::CycleRule::new(id, op)?), Vec::new()),
+                BuiltinOp::Order { .. } => Kind::Order(ops::OrderRule::new(id, op)?),
+                BuiltinOp::Cycle { .. } => Kind::Cycle(ops::CycleRule::new(id, op)?),
             },
-            CheckKind::Command(command) => {
-                (Kind::Command(CommandRule::new(check, command)), Vec::new())
-            }
+            CheckKind::Command(command) => Kind::Command(CommandRule::new(check, command)),
             CheckKind::Builtin(BuiltinCheck::Named(named)) if named.id == FORMATTED => {
-                (Kind::Formatted, Vec::new())
+                Kind::Formatted
             }
             CheckKind::Builtin(BuiltinCheck::Named(named))
                 if ANNOTATION_RULES.contains(&named.id.as_str()) =>
             {
-                (Kind::Annotation, Vec::new())
+                Kind::Annotation
             }
             CheckKind::Model(model) => {
                 // A model check only ranges over subjects of a file; the
@@ -95,15 +85,15 @@ impl Check {
                 if cel.selects(decision.scope.subject).map(Select::scope) != Some(RunScope::File) {
                     return Ok(None);
                 }
-                let rule = CelRule::new(decision, &cel)?;
-                let analyzers = rule.analyzers();
-                (Kind::Cel(Box::new(rule)), analyzers)
+                Kind::Cel(Box::new(CelRule::new(decision, &cel)?))
             }
             CheckKind::Builtin(BuiltinCheck::Named(_)) => return Ok(None),
         };
         let mut meta = rule_manifest(decision)
             .ok_or_else(|| Error::invalid(id, "the decision has no severity or check"))?;
-        meta.analyzers = analyzers;
+        if let Kind::Cel(rule) = &kind {
+            meta.analyzers = rule.analyzers();
+        }
         meta.capabilities.clone_from(&check.requires);
         let revision = serde_json::to_vec(&(
             decision.uid(),

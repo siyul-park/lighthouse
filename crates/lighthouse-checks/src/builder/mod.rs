@@ -184,11 +184,9 @@ impl<'a> Builder<'a> {
     pub(crate) fn module(
         &self,
         module: &lighthouse_model::Module,
-        files: usize,
-        symbols: usize,
-        stats: &crate::modules::Stats,
+        declared: &crate::modules::Declared,
     ) -> Value {
-        let mut value = facts::module(module, files, symbols, stats);
+        let mut value = facts::module(module, declared);
         if self.needs.fact("types") {
             value["types"] = self.module_types(&module.path);
         }

@@ -90,6 +90,25 @@ impl OrderKey for ConstructorKey {
     }
 }
 
+/// The ranks of `symbol` by each of `keys`; `None` when the first key does not
+/// order it. A later key that does not order what the first key does ranks it
+/// last.
+pub(crate) fn ranks(
+    ctx: &KeyContext,
+    keys: &[&dyn OrderKey],
+    symbol: &Symbol,
+) -> Result<Option<Vec<u64>>, Error> {
+    let mut ranks = Vec::with_capacity(keys.len());
+    for (n, key) in keys.iter().enumerate() {
+        match key.rank(ctx, symbol)? {
+            Some(rank) => ranks.push(rank),
+            None if n == 0 => return Ok(None),
+            None => ranks.push(u64::MAX),
+        }
+    }
+    Ok(Some(ranks))
+}
+
 /// The order keys of the pack.
 pub(crate) fn keys() -> Vec<Box<dyn OrderKey>> {
     vec![Box::new(GroupKey), Box::new(ConstructorKey)]

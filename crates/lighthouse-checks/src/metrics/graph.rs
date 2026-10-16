@@ -6,12 +6,12 @@
 const NONE: u32 = u32::MAX;
 
 /// A directed graph without parallel edges or self-loops.
-pub(super) struct Graph {
+pub(crate) struct Graph {
     succ: Vec<Vec<u32>>,
 }
 
 /// What a node reaches, per node.
-pub(super) struct Reached {
+pub(crate) struct Reached {
     /// Distinct direct successors.
     pub ce: Vec<u32>,
     /// Distinct direct predecessors.
@@ -27,7 +27,7 @@ pub(super) struct Reached {
 }
 
 impl Graph {
-    pub(super) fn new(nodes: usize, edges: impl IntoIterator<Item = (u32, u32)>) -> Self {
+    pub(crate) fn new(nodes: usize, edges: impl IntoIterator<Item = (u32, u32)>) -> Self {
         let mut succ = vec![Vec::new(); nodes];
         for (from, to) in edges.into_iter().filter(|(from, to)| from != to) {
             succ[from as usize].push(to);
@@ -39,7 +39,7 @@ impl Graph {
         Self { succ }
     }
 
-    pub(super) fn reached(&self) -> Reached {
+    pub(crate) fn reached(&self) -> Reached {
         let back = self.reversed();
         let (scc, count) = self.components();
         let mut sizes = vec![0; count];
@@ -55,6 +55,19 @@ impl Graph {
             scc,
             sizes,
         }
+    }
+
+    /// The cycles: the components of two nodes or more, each with its nodes
+    /// ascending, in the order of their first nodes.
+    pub(crate) fn cycles(&self) -> Vec<Vec<u32>> {
+        let (scc, count) = self.components();
+        let mut members = vec![Vec::new(); count];
+        for (v, &c) in (0..).zip(&scc) {
+            members[c as usize].push(v);
+        }
+        members.retain(|m| m.len() > 1);
+        members.sort();
+        members
     }
 
     fn reversed(&self) -> Self {

@@ -11,7 +11,7 @@ use lighthouse_model::{
 
 use crate::{
     layout::{is_declaration, owner_key},
-    modules::Stats,
+    modules::Declared,
     text,
 };
 use serde_json::{Value, json};
@@ -175,16 +175,16 @@ pub(crate) fn document(d: &Document) -> Value {
     })
 }
 
-pub(crate) fn module(m: &Module, files: usize, symbols: usize, stats: &Stats) -> Value {
+pub(crate) fn module(m: &Module, declared: &Declared) -> Value {
     json!({
         "path": m.path,
         "name": m.name.clone().unwrap_or_else(|| m.path.clone()),
         "test_of": m.test_of.clone().unwrap_or_default(),
-        "files": files,
-        "symbols": symbols,
-        "lines": stats.lines,
-        "dependents": stats.dependents,
-        "declares": stats.declares,
+        "files": declared.files.len(),
+        "symbols": declared.symbols,
+        "lines": declared.lines,
+        "dependents": declared.dependents,
+        "declares": declared.declares,
     })
 }
 

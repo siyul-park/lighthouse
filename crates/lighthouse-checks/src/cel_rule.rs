@@ -1,10 +1,7 @@
 //! A `cel` check: a `where` expression that is true for a violation of the
 //! selected values, a message and evidence.
 
-use std::{
-    cell::RefCell,
-    collections::{BTreeMap, BTreeSet},
-};
+use std::cell::RefCell;
 
 use cel::Program;
 use lighthouse_model::{Diagnostic, File, Node, Position, Project, Reach, Span, Symbol, SymbolId};
@@ -20,7 +17,7 @@ use crate::{
     facts,
     library::{self, Needs},
     metrics::MEASURES,
-    modules,
+    modules::{self, Declared},
     review::{Candidate, Review},
 };
 
@@ -276,29 +273,20 @@ impl Evaluation<'_> {
 
     fn check_project(&self, ctx: &Context) -> Result<Vec<Diagnostic>, PluginError> {
         let project = ctx.project;
-        let first_file = module_anchors(project);
-        let files_of = files_by_module(project);
+        let declared = modules::index(project);
         let mut found = Vec::new();
         match self.rule.select {
             Select::Module => {
-                let stats = modules::stats(project);
-                let none = modules::Stats::default();
                 for module in &project.modules {
-                    let Some((anchor, count)) = first_file.get(module.path.as_str()) else {
+                    let Some(declared) = declared.get(module.path.as_str()) else {
                         continue;
                     };
-                    if !admits_module(ctx, &files_of, module) {
+                    if !admits_module(ctx, declared, module) {
                         continue;
                     }
-                    let files = files_of.get(module.path.as_str()).map_or(0, BTreeSet::len);
-                    let value = cel_fact(&self.builder.module(
-                        module,
-                        files,
-                        *count,
-                        stats.get(module.path.as_str()).unwrap_or(&none),
-                    ));
+                    let value = cel_fact(&self.builder.module(module, declared));
                     let place = Anchor {
-                        file: anchor.file.clone(),
+                        file: declared.anchor.file.clone(),
                         span: top_of_file(),
                         symbol: None,
                     };
@@ -307,22 +295,25 @@ impl Evaluation<'_> {
             }
             Select::Edge => {
                 for edge in &project.edges {
-                    let anchor = match &edge.from {
-                        Node::Symbol(id) => project.symbol(id),
-                        Node::Module(m) => first_file.get(m.as_str()).map(|(s, _)| *s),
+                    let (anchor, admitted) = match &edge.from {
+                        Node::Symbol(id) => (
+                            project.symbol(id),
+                            project
+                                .symbol(id)
+                                .is_none_or(|s| ctx.applies.admits_symbol(project, s)),
+                        ),
+                        Node::Module(m) => (
+                            declared.get(m.as_str()).map(|d| d.anchor),
+                            project.module(m).is_none_or(|module| {
+                                declared
+                                    .get(m.as_str())
+                                    .is_none_or(|d| admits_module(ctx, d, module))
+                            }),
+                        ),
                     };
-                    let Some(anchor) = anchor else { continue };
-                    let admitted = match &edge.from {
-                        Node::Symbol(id) => project
-                            .symbol(id)
-                            .is_none_or(|s| ctx.applies.admits_symbol(project, s)),
-                        Node::Module(m) => project
-                            .module(m)
-                            .is_none_or(|module| admits_module(ctx, &files_of, module)),
-                    };
-                    if !admitted {
+                    let Some(anchor) = anchor.filter(|_| admitted) else {
                         continue;
-                    }
+                    };
                     let value = cel_fact(&facts::edge(project, edge));
                     let key = format!("{:?}->{:?}", edge.from, edge.to);
                     let place = Anchor {
@@ -492,42 +483,11 @@ impl Evaluation<'_> {
     }
 }
 
-/// The symbol of each module that sorts first by file and position, with the
-/// module's symbol count; project-scope findings are reported there.
-fn module_anchors(project: &Project) -> BTreeMap<&str, (&Symbol, usize)> {
-    let mut anchors: BTreeMap<&str, (&Symbol, usize)> = BTreeMap::new();
-    for symbol in &project.symbols {
-        let entry = anchors.entry(symbol.id.module()).or_insert((symbol, 0));
-        entry.1 += 1;
-        if (&symbol.file, symbol.span.start) < (&entry.0.file, entry.0.span.start) {
-            entry.0 = symbol;
-        }
-    }
-    anchors
-}
-
-/// The files that declare a symbol of each module.
-fn files_by_module(project: &Project) -> BTreeMap<&str, BTreeSet<&std::path::Path>> {
-    let mut files: BTreeMap<&str, BTreeSet<&std::path::Path>> = BTreeMap::new();
-    for symbol in &project.symbols {
-        files
-            .entry(symbol.id.module())
-            .or_default()
-            .insert(symbol.file.as_path());
-    }
-    files
-}
-
 /// Whether a module is a subject of the decision, by the files that declare it.
-fn admits_module(
-    ctx: &Context,
-    files_of: &BTreeMap<&str, BTreeSet<&std::path::Path>>,
-    module: &lighthouse_model::Module,
-) -> bool {
-    let files: Vec<&File> = files_of
-        .get(module.path.as_str())
-        .into_iter()
-        .flatten()
+fn admits_module(ctx: &Context, declared: &Declared, module: &lighthouse_model::Module) -> bool {
+    let files: Vec<&File> = declared
+        .files
+        .iter()
         .filter_map(|path| ctx.project.file(path))
         .collect();
     ctx.applies.admits_module(module, &files)

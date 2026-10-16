@@ -75,9 +75,8 @@ impl<'a> Frame<'a> {
         }
     }
 
-    pub(crate) fn set(&mut self, name: &str, value: &Value) -> Result<(), PluginError> {
+    pub(crate) fn set(&mut self, name: &str, value: &Value) {
         self.set_fact(name, cel_fact(value));
-        Ok(())
     }
 
     pub(crate) fn set_fact(&mut self, name: &str, value: Fact) {
@@ -88,8 +87,8 @@ impl<'a> Frame<'a> {
         self.context.add_variable_from_value(name, value);
     }
 
-    pub(crate) fn options(&mut self, options: &Map<String, Value>) -> Result<(), PluginError> {
-        self.set("options", &Value::Object(options.clone()))
+    pub(crate) fn options(&mut self, options: &Map<String, Value>) {
+        self.set("options", &Value::Object(options.clone()));
     }
 
     pub(crate) fn run(&self, program: &Program) -> Result<cel::Value, PluginError> {

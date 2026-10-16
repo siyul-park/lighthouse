@@ -15,6 +15,7 @@ use crate::{
     eval::{Template, render, to_json},
     facts,
     glob::slashed,
+    order,
 };
 
 /// The result of evaluating: edit operations, or the reason none apply.
@@ -305,15 +306,7 @@ impl<'a> Env<'a> {
         members.sort_by_key(|s| (s.extent.map(|e| e.start), s.id.clone()));
         let mut ranked: Vec<(Vec<u64>, usize)> = Vec::new();
         for (at, symbol) in members.iter().enumerate() {
-            let mut ranks = Vec::new();
-            for (n, key) in keys.iter().enumerate() {
-                match key.rank(&ctx, symbol)? {
-                    Some(rank) => ranks.push(rank),
-                    None if n == 0 => break,
-                    None => ranks.push(u64::MAX),
-                }
-            }
-            if ranks.len() == keys.len() {
+            if let Some(ranks) = order::ranks(&ctx, &keys, symbol)? {
                 ranked.push((ranks, at));
             }
         }

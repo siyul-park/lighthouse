@@ -1,4 +1,4 @@
-mod graph;
+pub(crate) mod graph;
 pub mod propagation;
 
 use std::{collections::BTreeMap, sync::LazyLock};

@@ -4,7 +4,7 @@
 //! decision: the keys, the groups, the wording and the evidence come from the
 //! check that uses them.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use cel::Program;
 use lighthouse_model::{Diagnostic, EdgeKind, Node, Project, Reach, Symbol, SymbolId, Target};
@@ -19,6 +19,7 @@ use crate::{
     eval::{Frame, Template, compile, compile_all},
     layout::declarations,
     library::{self, Needs},
+    metrics::graph::Graph,
     order,
 };
 
@@ -26,6 +27,7 @@ use crate::{
 pub(crate) struct OrderRule {
     clauses: Vec<Clause>,
     needs: Needs,
+    library: cel::Context<'static>,
 }
 
 struct Clause {
@@ -70,11 +72,8 @@ impl OrderRule {
         Ok(Self {
             clauses: compiled,
             needs: Needs::of(sources),
+            library: library::context(),
         })
-    }
-
-    pub(crate) fn analyzers(&self) -> Vec<String> {
-        Vec::new()
     }
 
     /// The declarations of a file are ordered by what the file says of them,
@@ -96,15 +95,42 @@ impl OrderRule {
         options: &Map<String, Value>,
     ) -> Result<Vec<Diagnostic>, PluginError> {
         let builder = Builder::new(ctx, &self.needs, options, &meta.id)?;
-        let base = library::context();
         let mut found = Vec::new();
         for (at, clause) in self.clauses.iter().enumerate() {
-            if !applies(&meta.id, clause.when.as_ref(), &builder, ctx, options)? {
+            if !self.applies(&meta.id, clause.when.as_ref(), &builder, ctx, options)? {
                 continue;
             }
-            found.extend(clause.check(at, meta, ctx, &builder, &base, options)?);
+            found.extend(clause.check(at, meta, ctx, &builder, &self.library, options)?);
         }
         Ok(found)
+    }
+
+    /// Whether the clause runs on the focused file: the file is a subject of
+    /// the decision's scope and the clause's own `when` holds.
+    fn applies(
+        &self,
+        rule: &str,
+        when: Option<&Program>,
+        builder: &Builder,
+        ctx: &Context,
+        options: &Map<String, Value>,
+    ) -> Result<bool, PluginError> {
+        if ctx
+            .file
+            .is_some_and(|(file, _)| !ctx.applies.admits_file(file))
+        {
+            return Ok(false);
+        }
+        let Some(when) = when else {
+            return Ok(true);
+        };
+        let Some((file, text)) = ctx.file else {
+            return Ok(false);
+        };
+        let mut frame = Frame::new(rule, &self.library);
+        frame.set("file", &builder.file(file, text));
+        frame.options(options);
+        frame.truth(when)
     }
 }
 
@@ -137,13 +163,13 @@ impl Clause {
                 for (at, earlier) in self.reported(&ranked) {
                     let (symbol, ranks) = &ranked[at];
                     let mut frame = Frame::new(&meta.id, base);
-                    frame.set("symbol", &builder.symbol(symbol))?;
+                    frame.set("symbol", &builder.symbol(symbol));
                     let other = node_value(builder, earlier.map(|i| ranked[i].0));
-                    frame.set("after", &other)?;
-                    frame.set("earlier", &other)?;
-                    frame.set("rank", &json!(ranks.first()))?;
-                    frame.set("ranks", &json!(ranks))?;
-                    frame.options(options)?;
+                    frame.set("after", &other);
+                    frame.set("earlier", &other);
+                    frame.set("rank", &json!(ranks.first()));
+                    frame.set("ranks", &json!(ranks));
+                    frame.options(options);
                     found.push(finding(
                         meta,
                         symbol,
@@ -246,13 +272,20 @@ impl CycleRule {
         ctx: &Context,
     ) -> Result<Vec<Diagnostic>, PluginError> {
         let project = ctx.project;
-        let graph = self.graph(project);
+        let edges = self.edges(project);
+        let units: BTreeSet<&String> = edges.iter().flat_map(|(from, to)| [from, to]).collect();
+        let units: Vec<&String> = units.into_iter().collect();
+        let at = |unit: &String| u32::try_from(units.binary_search(&unit).ok()?).ok();
+        let graph = Graph::new(
+            units.len(),
+            edges
+                .iter()
+                .filter_map(|(from, to)| Some((at(from)?, at(to)?))),
+        );
         let mut found = Vec::new();
-        for component in strongly_connected(&graph) {
-            if component.len() < 2 {
-                continue;
-            }
-            let Some(anchor) = self.anchor(project, &component[0]) else {
+        for cycle in graph.cycles() {
+            let component: Vec<&str> = cycle.iter().map(|&v| units[v as usize].as_str()).collect();
+            let Some(anchor) = self.anchor(project, component[0]) else {
                 continue;
             };
             let unit = match self.level {
@@ -281,22 +314,19 @@ impl CycleRule {
         Ok(found)
     }
 
-    /// The adjacency of the graph, by sorted unit name.
-    fn graph(&self, project: &Project) -> BTreeMap<String, BTreeSet<String>> {
-        let mut graph: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-        for edge in project.edges.iter().filter(|e| e.kind == self.edge) {
-            let Target::Resolved(to) = &edge.to else {
-                continue;
-            };
-            let (Some(from), Some(to)) = (self.unit(&edge.from), self.unit(to)) else {
-                continue;
-            };
-            graph.entry(to.clone()).or_default();
-            if from != to {
-                graph.entry(from).or_default().insert(to);
-            }
-        }
-        graph
+    /// The edges of the graph, between the units they join.
+    fn edges(&self, project: &Project) -> Vec<(String, String)> {
+        project
+            .edges
+            .iter()
+            .filter(|e| e.kind == self.edge)
+            .filter_map(|edge| {
+                let Target::Resolved(to) = &edge.to else {
+                    return None;
+                };
+                Some((self.unit(&edge.from)?, self.unit(to)?))
+            })
+            .collect()
     }
 
     fn unit(&self, node: &Node) -> Option<String> {
@@ -321,107 +351,6 @@ impl CycleRule {
     }
 }
 
-/// The state of one Tarjan walk.
-struct Walk<'g> {
-    graph: &'g BTreeMap<String, BTreeSet<String>>,
-    index: BTreeMap<&'g str, usize>,
-    low: BTreeMap<&'g str, usize>,
-    /// Nodes entered whose component is not yet closed.
-    open: Vec<&'g str>,
-    on_open: BTreeSet<&'g str>,
-    components: Vec<Vec<String>>,
-}
-
-impl<'g> Walk<'g> {
-    fn from(&mut self, root: &'g str) {
-        // Each frame is a node and the successors it has yet to visit.
-        let mut frames = vec![(root, self.enter(root))];
-        while let Some((node, successors)) = frames.last_mut() {
-            let node = *node;
-            match successors.next() {
-                Some(successor) => {
-                    let successor = successor.as_str();
-                    if self.index.contains_key(successor) {
-                        self.lower(node, successor);
-                    } else {
-                        let following = self.enter(successor);
-                        frames.push((successor, following));
-                    }
-                }
-                None => {
-                    frames.pop();
-                    if let Some((parent, _)) = frames.last() {
-                        let lowest = self.low[parent].min(self.low[node]);
-                        self.low.insert(parent, lowest);
-                    }
-                    self.close(node);
-                }
-            }
-        }
-    }
-
-    /// Numbers `node` and gives its successors.
-    fn enter(&mut self, node: &'g str) -> std::collections::btree_set::Iter<'g, String> {
-        let number = self.index.len();
-        self.index.insert(node, number);
-        self.low.insert(node, number);
-        self.open.push(node);
-        self.on_open.insert(node);
-        self.graph[node].iter()
-    }
-
-    /// A node already seen lowers `node` only while its component is open.
-    fn lower(&mut self, node: &'g str, seen: &'g str) {
-        if self.on_open.contains(seen) {
-            let lowest = self.low[node].min(self.index[seen]);
-            self.low.insert(node, lowest);
-        }
-    }
-
-    /// Closes the component `node` roots, if it roots one.
-    fn close(&mut self, node: &'g str) {
-        if self.low[node] != self.index[node] {
-            return;
-        }
-        let at = self.open.iter().rposition(|n| *n == node).unwrap_or(0);
-        let closed: Vec<&str> = self.open.drain(at..).collect();
-        for member in &closed {
-            self.on_open.remove(member);
-        }
-        let mut component: Vec<String> = closed.into_iter().map(str::to_owned).collect();
-        component.sort();
-        self.components.push(component);
-    }
-}
-
-/// Whether the check runs on the focused file: the file is a subject of the
-/// decision's scope and the check's own `when` holds.
-fn applies(
-    frame_rule: &str,
-    when: Option<&Program>,
-    builder: &Builder,
-    ctx: &Context,
-    options: &Map<String, Value>,
-) -> Result<bool, PluginError> {
-    if ctx
-        .file
-        .is_some_and(|(file, _)| !ctx.applies.admits_file(file))
-    {
-        return Ok(false);
-    }
-    let Some(when) = when else {
-        return Ok(true);
-    };
-    let Some((file, text)) = ctx.file else {
-        return Ok(false);
-    };
-    let base = library::context();
-    let mut frame = Frame::new(frame_rule, &base);
-    frame.set("file", &builder.file(file, text))?;
-    frame.options(options)?;
-    frame.truth(when)
-}
-
 fn node_value(builder: &Builder, symbol: Option<&Symbol>) -> Value {
     symbol.map_or_else(
         || json!({ "id": "", "name": "", "kind": "", "owner": "", "file": "", "line": 0 }),
@@ -438,15 +367,7 @@ fn ranked<'a>(
 ) -> Result<Vec<(&'a Symbol, Vec<u64>)>, PluginError> {
     let mut ranked = Vec::new();
     for symbol in symbols {
-        let mut ranks = Vec::new();
-        for (n, key) in keys.iter().enumerate() {
-            match key.rank(ctx, symbol)? {
-                Some(rank) => ranks.push(rank),
-                None if n == 0 => break,
-                None => ranks.push(u64::MAX),
-            }
-        }
-        if ranks.len() == keys.len() {
+        if let Some(ranks) = order::ranks(ctx, keys, symbol)? {
             ranked.push((*symbol, ranks));
         }
     }
@@ -502,25 +423,4 @@ fn finding(
     diagnostic.symbol = Some(symbol.id.as_str().to_owned());
     diagnostic.evidence = evidence;
     diagnostic
-}
-
-/// Tarjan's algorithm, without recursion so a long chain cannot overflow the
-/// stack: the strongly connected components of `graph`, each sorted, in the
-/// order of their first member.
-fn strongly_connected(graph: &BTreeMap<String, BTreeSet<String>>) -> Vec<Vec<String>> {
-    let mut walk = Walk {
-        graph,
-        index: BTreeMap::new(),
-        low: BTreeMap::new(),
-        open: Vec::new(),
-        on_open: BTreeSet::new(),
-        components: Vec::new(),
-    };
-    for root in graph.keys() {
-        if !walk.index.contains_key(root.as_str()) {
-            walk.from(root);
-        }
-    }
-    walk.components.sort();
-    walk.components
 }

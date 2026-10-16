@@ -158,12 +158,16 @@ fn measure(names: &[&str], graph: Graph) -> System {
             }
         })
         .collect();
-    let mut members = vec![Vec::new(); reached.sizes.len()];
-    for (v, &c) in reached.scc.iter().enumerate() {
-        members[c as usize].push(names[v].to_owned());
-    }
-    let mut cycles: Vec<Vec<String>> = members.into_iter().filter(|m| m.len() > 1).collect();
-    cycles.sort();
+    let cycles: Vec<Vec<String>> = graph
+        .cycles()
+        .into_iter()
+        .map(|cycle| {
+            cycle
+                .iter()
+                .map(|&v| names[v as usize].to_owned())
+                .collect()
+        })
+        .collect();
     let share = |count: usize| if n == 0 { 0.0 } else { count as f64 / n as f64 };
     let reach: u64 = reached.vfo.iter().map(|&v| u64::from(v)).sum();
     System {
