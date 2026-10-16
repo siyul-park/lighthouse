@@ -56,6 +56,14 @@ pub fn help_path(decision: &Decision) -> String {
     }
 }
 
+/// One decision as Markdown, with a trailing newline.
+pub fn decision_markdown(decision: &Decision, density: Density) -> String {
+    match density {
+        Density::Row => row(decision),
+        Density::Entry { level, sources } => entry(decision, level, sources),
+    }
+}
+
 /// A decision enforced by review or not at all, with nothing beyond its
 /// requirement.
 pub(super) fn is_row(decision: &Decision) -> bool {
@@ -86,14 +94,6 @@ fn anchor(title: &str) -> String {
             _ => None,
         })
         .collect()
-}
-
-/// One decision as Markdown, with a trailing newline.
-pub fn decision_markdown(decision: &Decision, density: Density) -> String {
-    match density {
-        Density::Row => row(decision),
-        Density::Entry { level, sources } => entry(decision, level, sources),
-    }
 }
 
 fn row(decision: &Decision) -> String {
@@ -304,6 +304,7 @@ fn level(decision: &Decision) -> String {
     }
 }
 
-pub(super) fn cell(text: &str) -> String {
+/// `text` on one line, safe inside a table cell.
+fn cell(text: &str) -> String {
     squash(text).replace('|', "\\|")
 }

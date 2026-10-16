@@ -208,6 +208,14 @@ pub(crate) fn select(
     (shown, diagnostics.len() - limit)
 }
 
+/// The line that states one gap of the analysis.
+pub(crate) fn incomplete_line(item: &Incomplete) -> String {
+    match &item.path {
+        Some(path) => format!("{}: incomplete: {}", path.display(), item.reason),
+        None => format!("incomplete: {}", item.reason),
+    }
+}
+
 /// One header per decision with its requirement and expected structure, one
 /// line per finding under it, then the gaps, how to record a judgment and the
 /// judgments it accepts when a shown finding asks for review, and the summary.
@@ -488,13 +496,6 @@ fn fields(finding: &Finding, width: usize) -> Vec<(&'static str, String)> {
         fields.push(("resolve:", resolve.command.clone()));
     }
     fields
-}
-
-pub(crate) fn incomplete_line(item: &Incomplete) -> String {
-    match &item.path {
-        Some(path) => format!("{}: incomplete: {}", path.display(), item.reason),
-        None => format!("incomplete: {}", item.reason),
-    }
 }
 
 /// How many findings have this severity; a subject left to review is no

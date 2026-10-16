@@ -271,6 +271,13 @@ pub(super) fn finding_record(row: &Row, standings: &Standings) -> rusqlite::Resu
     })
 }
 
+pub(super) fn io(path: &Path, source: std::io::Error) -> Error {
+    Error::Io {
+        path: path.display().to_string(),
+        source,
+    }
+}
+
 fn judgment_event(row: &Row) -> rusqlite::Result<JudgmentEvent> {
     Ok(JudgmentEvent {
         id: row.get("judgment_id")?,
@@ -319,13 +326,6 @@ where
 
 fn conversion(error: impl std::error::Error + Send + Sync + 'static) -> rusqlite::Error {
     rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(error))
-}
-
-pub(super) fn io(path: &Path, source: std::io::Error) -> Error {
-    Error::Io {
-        path: path.display().to_string(),
-        source,
-    }
 }
 
 fn role_of(text: Option<String>) -> rusqlite::Result<Option<Role>> {

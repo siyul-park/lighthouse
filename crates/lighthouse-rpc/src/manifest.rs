@@ -69,6 +69,7 @@ pub struct Found {
 }
 
 impl Found {
+    /// The id the plugin is known by.
     pub fn id(&self) -> &str {
         &self.resource.metadata.name
     }

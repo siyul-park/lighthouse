@@ -30,6 +30,16 @@ fn fingerprint_is_hex_sha256() {
 }
 
 #[test]
+fn prefix_widths_grow_only_for_fingerprints_that_share_a_prefix() {
+    let widths = Fingerprint::prefix_widths(&["abcdefghij", "abcdefgxyz", "0123456789"]);
+    assert_eq!(widths, [8, 8, Fingerprint::MIN_PREFIX]);
+    assert_eq!(
+        Fingerprint::prefix_widths(&["abc"]),
+        [Fingerprint::MIN_PREFIX]
+    );
+}
+
+#[test]
 fn severity_round_trips_through_text() {
     for s in [Severity::Error, Severity::Warn, Severity::Info] {
         assert_eq!(s.to_string().parse::<Severity>().unwrap(), s);

@@ -89,22 +89,6 @@ impl RpcPlugin {
     }
 }
 
-/// Checks what a manifest promised against what the process reported; a
-/// manifest that promises nothing is not checked.
-fn declared(kind: &str, promised: &[String], reported: &[&str]) -> Result<(), String> {
-    let promised: BTreeSet<&str> = promised.iter().map(String::as_str).collect();
-    let reported: BTreeSet<&str> = reported.iter().copied().collect();
-    if promised.is_empty() || promised == reported {
-        return Ok(());
-    }
-    let list = |ids: &BTreeSet<&str>| ids.iter().copied().collect::<Vec<_>>().join(", ");
-    Err(format!(
-        "its manifest provides {kind} [{}], the process reports [{}]",
-        list(&promised),
-        list(&reported)
-    ))
-}
-
 impl Plugin for RpcPlugin {
     /// One model per entry the process declared, sharing its connection.
     fn models(&self) -> Vec<Box<dyn Classifier>> {
@@ -248,6 +232,22 @@ impl Provider {
             dir: dir.to_string_lossy().into_owned(),
         }))
     }
+}
+
+/// Checks what a manifest promised against what the process reported; a
+/// manifest that promises nothing is not checked.
+fn declared(kind: &str, promised: &[String], reported: &[&str]) -> Result<(), String> {
+    let promised: BTreeSet<&str> = promised.iter().map(String::as_str).collect();
+    let reported: BTreeSet<&str> = reported.iter().copied().collect();
+    if promised.is_empty() || promised == reported {
+        return Ok(());
+    }
+    let list = |ids: &BTreeSet<&str>| ids.iter().copied().collect::<Vec<_>>().join(", ");
+    Err(format!(
+        "its manifest provides {kind} [{}], the process reports [{}]",
+        list(&promised),
+        list(&reported)
+    ))
 }
 
 /// The texts that stand in for requested files, for the `index` context; none

@@ -261,6 +261,30 @@ fn a_judgment_with_a_field_this_build_does_not_know_is_still_read() {
 }
 
 #[test]
+fn suppression_event() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::open(dir.path()).unwrap();
+    store
+        .record(&run(vec![observed("f1", "design/a", "a.go")]))
+        .unwrap();
+    judge_suppressed(&mut store, "f1", "named policy");
+
+    let event = store.history("f1").unwrap().remove(0);
+    let suppression = &event.suppressions[0];
+
+    assert_eq!(suppression.spec.judgment, event.id);
+    assert_eq!(suppression.spec.justification, "named policy");
+    assert_eq!(
+        suppression.spec.was_attributed_to,
+        event.spec.was_attributed_to
+    );
+    assert_eq!(
+        suppression.spec.generated_at_time,
+        event.spec.generated_at_time
+    );
+}
+
+#[test]
 fn to_json_shows_a_judgment_in_camel_case_with_its_id_label_and_suppressions() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = Store::open(dir.path()).unwrap();
