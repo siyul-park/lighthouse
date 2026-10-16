@@ -2,13 +2,13 @@
 //! the Rust provider: `lighthouse-disable` with `lighthouse-enable`,
 //! `lighthouse-disable-next-line` and `lighthouse-disable-line`.
 
-use lighthouse_engine::Outcome;
+use lighthouse_engine::Run;
 
 use crate::annotations::{DOC_RULE, check, rules_of};
 
 const BANNERS: &str = "\"design/comments\" = \"warn\"\n";
 
-fn lines_of(outcome: &Outcome, rule: &str) -> Vec<u32> {
+fn lines_of(outcome: &Run, rule: &str) -> Vec<u32> {
     outcome
         .diagnostics
         .iter()
@@ -17,7 +17,7 @@ fn lines_of(outcome: &Outcome, rule: &str) -> Vec<u32> {
         .collect()
 }
 
-fn message_of<'a>(outcome: &'a Outcome, rule: &str) -> &'a str {
+fn message_of<'a>(outcome: &'a Run, rule: &str) -> &'a str {
     outcome
         .diagnostics
         .iter()

@@ -6,7 +6,7 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::PathBuf,
+    path::Path,
     sync::{
         Arc, Mutex, PoisonError,
         atomic::{AtomicUsize, Ordering},
@@ -20,7 +20,7 @@ use lighthouse_plugin::{
 };
 use lighthouse_spec::{Models as BoundModels, Routing};
 
-use super::{batch::Pending, classifier::Classifiers};
+use super::{Scopes, batch::Pending, classifier::Classifiers};
 
 /// Failures of a model, in one run, after which it is no longer asked.
 pub(super) const MAX_FAILURES: usize = 3;
@@ -72,9 +72,9 @@ pub(super) struct RunModels<'a> {
     attached: &'a BTreeMap<String, String>,
     /// The paths whose findings the run reports; the whole project when it
     /// asks about everything.
-    scopes: Option<&'a [PathBuf]>,
+    scopes: Option<&'a Scopes>,
     /// The only subjects models are asked about, by fingerprint.
-    subjects: Option<&'a BTreeSet<String>>,
+    fingerprints: Option<&'a BTreeSet<String>>,
     budget: AtomicUsize,
     /// Where answers are kept between runs: the cache of the run.
     answers: Option<&'a Cache>,
@@ -119,7 +119,7 @@ impl super::Engine {
     /// The models of a run that reports `scopes`, keeping answers in `cache`.
     pub(super) fn run_models<'a>(
         &'a self,
-        scopes: &'a [PathBuf],
+        scopes: &'a Scopes,
         cache: Option<&'a Cache>,
     ) -> RunModels<'a> {
         let options = &self.models;
@@ -127,8 +127,8 @@ impl super::Engine {
             classifiers: self.classifiers(),
             binding: &self.binding,
             attached: &options.attached,
-            scopes: (!options.all && options.subjects.is_none()).then_some(scopes),
-            subjects: options.subjects.as_ref(),
+            scopes: (!options.all && options.fingerprints.is_none()).then_some(scopes),
+            fingerprints: options.fingerprints.as_ref(),
             budget: AtomicUsize::new(self.binding.budget),
             answers: cache,
             off: options.off,
@@ -337,14 +337,11 @@ impl<'a> RunModels<'a> {
     /// Whether models are asked about a subject: it is one the run is limited
     /// to, else it lies in the files the run reports.
     pub(super) fn reported(&self, subject: &Subject) -> bool {
-        if let Some(only) = self.subjects {
+        if let Some(only) = self.fingerprints {
             return only.contains(&subject.key);
         }
-        self.scopes.is_none_or(|scopes| {
-            scopes
-                .iter()
-                .any(|scope| std::path::Path::new(&subject.state.file).starts_with(scope))
-        })
+        self.scopes
+            .is_none_or(|scopes| scopes.contains(Path::new(&subject.state.file)))
     }
 
     /// Takes one unit of the budget for a request to a model that costs.
@@ -520,7 +517,8 @@ mod tests {
                 super::super::Engine::new(registry, config, Catalog::bundled(), dir.path())
                     .unwrap()
                     .with_models(super::super::ModelOptions::default());
-            let models = engine.run_models(&[], None);
+            let scopes = Scopes::default();
+            let models = engine.run_models(&scopes, None);
 
             assert_eq!(models.model("work/echo").is_some(), supported);
             if !supported {

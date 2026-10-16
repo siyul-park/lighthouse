@@ -6,7 +6,7 @@ use std::{
     time::Instant,
 };
 
-use lighthouse_engine::{Engine, FixPlan, ModelOptions, Outcome};
+use lighthouse_engine::{Engine, FixPlan, ModelOptions, Run};
 use lighthouse_model::{Diagnostic, Preview, Severity, Suppressed};
 use lighthouse_report::{Briefing, Detail};
 use lighthouse_spec::{Catalog, Decision};
@@ -90,7 +90,7 @@ pub struct Summary {
 
 /// A finished run with what the store decided about it.
 pub struct Checked {
-    pub outcome: Outcome,
+    pub outcome: Run,
     pub catalog: Catalog,
     pub remembered: Remembered,
     /// Every suppressed finding with its suppression, the ones a directive in
@@ -228,14 +228,17 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
         .with_incomplete(plugins.incomplete)
         .with_trust(trusted)
         .with_commands(command_models(&root));
-    let attached = attached_models(&root, &catalog);
+    let attached = if request.models.detached {
+        BTreeMap::new()
+    } else {
+        attached_models(&root, &catalog)
+    };
     let engine = engine.with_models(ModelOptions {
         off: request.models.off,
         all: request.models.all,
-        subjects: request.models.subjects.clone(),
+        fingerprints: request.models.subjects.clone(),
         collect: request.models.collect,
         attached,
-        detached: request.models.detached,
     });
     let engine = if request.cache {
         engine.with_cache(cache_dir(&root), cache_limit())
@@ -247,7 +250,7 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     let enabled = catalog
         .decisions()
         .map(Decision::id)
-        .filter(|id| engine.is_active(id));
+        .filter(|id| engine.active(id));
     let rules = Selector::new(&request.rules)?.expand(enabled)?;
     let mut outcome = analyze(&engine, &root, request, &rules, &mut messages)?;
     outcome.timings.setup = setup;
@@ -306,7 +309,7 @@ pub fn attached_models(root: &Path, catalog: &Catalog) -> BTreeMap<String, Strin
 
 /// Records what models failed as judgments attributed to them, in the role of
 /// a model: the reason names the model and its probability.
-fn record_model_labels(root: &Path, outcome: &Outcome) -> Vec<String> {
+fn record_model_labels(root: &Path, outcome: &Run) -> Vec<String> {
     let mut done = 0;
     let mut notes = Vec::new();
     for d in &outcome.diagnostics {
@@ -345,7 +348,7 @@ fn analyze(
     request: &CheckRequest,
     rules: &[String],
     messages: &mut Vec<String>,
-) -> Result<Outcome> {
+) -> Result<Run> {
     let files = match (request.changed, request.diff.as_deref()) {
         (true, _) => Some(scope::changed(root)?),
         (_, Some(base)) => Some(scope::since(root, base)?),

@@ -171,10 +171,13 @@ fn a_file_that_changes_while_verifying_is_not_written_over() {
         "[languages.toy]\nformatter = [\"sh\", \"-c\", \"echo '// saved elsewhere' >> '{}'\"]\n",
         path.display()
     );
-    let engine = engine(&dir, &formatter);
+    let engine = engine(&dir, &formatter).with_trust(true);
 
     let report = engine
-        .fix(&plan("fake/to-done", Safety::Safe, true), &trusted())
+        .fix(
+            &plan("fake/to-done", Safety::Safe, true),
+            &FixRun::default(),
+        )
         .unwrap();
 
     assert_eq!(

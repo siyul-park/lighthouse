@@ -82,7 +82,6 @@ fn one(request: &EvalRequest, repo: &Repo, inputs: &Inputs) -> Result<Part> {
     // the run afterwards, by the same code that grades a model not attached.
     let models = ModelOptions {
         all: true,
-        detached: true,
         ..ModelOptions::default()
     };
     let labels = labels_of(

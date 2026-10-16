@@ -2,15 +2,14 @@ mod annotations;
 pub mod cache;
 mod documents;
 mod engine;
+mod facts;
 mod fix;
-mod subject;
 mod tester;
 mod timings;
 
 pub use documents::SKIPPED_DIRS;
 pub use engine::{
-    CommandModels, EXIT_INCOMPLETE, Engine, Error, FailOn, ModelOptions, Outcome, Overlays,
-    active_rules,
+    CommandModels, EXIT_INCOMPLETE, Engine, Error, FailOn, ModelOptions, Overlays, Run, active,
 };
 pub use fix::{
     AppliedFix, DeclinedFix, FileChange, FixBinding, FixPlan, FixReport, FixRun, MAX_ROUNDS,

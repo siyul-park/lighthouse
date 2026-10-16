@@ -3,7 +3,7 @@
 
 use std::{collections::BTreeSet, fmt::Write};
 
-use lighthouse_engine::active_rules;
+use lighthouse_engine::active;
 use lighthouse_spec::{Catalog, authored_severity};
 
 use crate::{Result, Session};
@@ -18,7 +18,7 @@ const HEAD: &str = include_str!("skill-head.md");
 /// The skill of the project: its catalog layers and its configuration.
 pub fn skill_for(session: &Session) -> Result<String> {
     let catalog = session.catalog()?;
-    let active = active_rules(&session.config, catalog.projects())?;
+    let active = active(&session.config, catalog.projects())?;
     Ok(skill(&catalog, &active))
 }
 

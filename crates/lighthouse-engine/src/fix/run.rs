@@ -17,7 +17,7 @@ use super::{
     lower::{Lowerer, Sources},
 };
 
-use crate::{Engine, Error, Outcome, Overlays};
+use crate::{Engine, Error, Overlays, Run, engine::Scopes};
 
 /// A finding's fix, lowered and ready to apply.
 pub(super) struct Proposal {
@@ -59,8 +59,6 @@ pub(super) struct Orchestrator<'e> {
     original: BTreeMap<PathBuf, (String, String)>,
     /// Hashes of the states the rounds reached, to stop an oscillation.
     states: BTreeSet<String>,
-    /// The project was trusted to run commands.
-    trusted: bool,
     applied: Vec<AppliedFix>,
     declined: BTreeMap<Fingerprint, DeclinedFix>,
     notes: Vec<String>,
@@ -82,27 +80,16 @@ impl Engine {
                 ));
             }
         }
-        let mut orchestrator = Orchestrator {
-            engine: self,
-            plan,
-            run,
-            texts: Overlays::new(),
-            original: BTreeMap::new(),
-            states: BTreeSet::new(),
-            trusted: run.trusted,
-            applied: Vec::new(),
-            declined: BTreeMap::new(),
-            notes: Vec::new(),
-            rounds: 0,
-        };
+        let mut orchestrator = Orchestrator::new(self, plan, run);
         let outcome = orchestrator.rounds();
         orchestrator.finish(outcome)
     }
 }
 
 impl<'e> Orchestrator<'e> {
-    /// An orchestrator that only proposes: it holds no text and writes nothing.
-    pub(super) fn for_preview(engine: &'e Engine, plan: &'e FixPlan, run: &'e FixRun) -> Self {
+    /// A run that has changed nothing yet. A preview only proposes with it:
+    /// it holds no text and writes nothing.
+    pub(super) fn new(engine: &'e Engine, plan: &'e FixPlan, run: &'e FixRun) -> Self {
         Self {
             engine,
             plan,
@@ -110,7 +97,6 @@ impl<'e> Orchestrator<'e> {
             texts: Overlays::new(),
             original: BTreeMap::new(),
             states: BTreeSet::new(),
-            trusted: false,
             applied: Vec::new(),
             declined: BTreeMap::new(),
             notes: Vec::new(),
@@ -122,8 +108,8 @@ impl<'e> Orchestrator<'e> {
 impl Orchestrator<'_> {
     /// Rounds until one applies nothing; the outcome of the last check.
     /// Candidates live in memory only, so an error leaves the disk as it was.
-    fn rounds(&mut self) -> Result<Outcome, Error> {
-        let mut checked: Option<Outcome> = None;
+    fn rounds(&mut self) -> Result<Run, Error> {
+        let mut checked: Option<Run> = None;
         self.states.insert(self.state_hash());
         for round in 1..=MAX_ROUNDS {
             let outcome = match checked.take() {
@@ -198,11 +184,11 @@ impl Orchestrator<'_> {
 
     /// The proposals this round can try, with the findings that cannot be
     /// fixed recorded as declined.
-    fn propose(&mut self, outcome: &Outcome) -> Result<Vec<Proposal>, Error> {
+    fn propose(&mut self, outcome: &Run) -> Result<Vec<Proposal>, Error> {
         let texts = self.texts.clone();
         let sources = Sources::new(&self.engine.ws.root, &outcome.project, &texts);
         let engine = self.engine;
-        let complete = |language: &str| provides(engine, language, Capability::CompleteReferences);
+        let complete = |language: &str| engine.provides(language, Capability::CompleteReferences);
         let lowerer = Lowerer::new(&outcome.project, &sources, &complete);
         let mut proposals = Vec::new();
         let candidates = self.select(outcome)?;
@@ -271,14 +257,13 @@ impl Orchestrator<'_> {
 
     /// The findings the run was asked to fix. A finding of a rule without a
     /// fix is left out unless the selection names it.
-    fn select<'o>(&self, outcome: &'o Outcome) -> Result<Vec<&'o Diagnostic>, Error> {
-        let mut ignored = Vec::new();
-        let scopes = self.engine.scopes(&self.run.paths, &mut ignored)?;
+    fn select<'o>(&self, outcome: &'o Run) -> Result<Vec<&'o Diagnostic>, Error> {
+        let (scopes, _) = Scopes::new(&self.run.paths, &self.engine.ws.root)?;
         let explicit = !self.run.rules.is_empty() || !self.run.fingerprints.is_empty();
         Ok(outcome
             .diagnostics
             .iter()
-            .filter(|d| scopes.iter().any(|s| d.file.starts_with(s)))
+            .filter(|d| scopes.contains(&d.file))
             .filter(|d| self.run.rules.is_empty() || self.run.rules.contains(&d.rule_id))
             .filter(|d| {
                 self.run.fingerprints.is_empty()
@@ -312,7 +297,7 @@ impl Orchestrator<'_> {
 
     pub(super) fn propose_one(
         &self,
-        outcome: &Outcome,
+        outcome: &Run,
         finding: &Diagnostic,
         binding: &FixBinding,
         lowerer: &Lowerer,
@@ -326,12 +311,9 @@ impl Orchestrator<'_> {
         let file = outcome.project.file(&finding.file);
         let language = file.map_or("", |f| f.lang.as_str());
         let provided = engine
-            .registry
-            .languages()
-            .iter()
-            .find(|l| l.provider.manifest().id == language)
-            .map(|l| l.provider.manifest().capabilities.as_slice());
-        if !provides(engine, language, Capability::Overlays) {
+            .language(language)
+            .map(|provider| provider.manifest().capabilities.as_slice());
+        if !engine.provides(language, Capability::Overlays) {
             return Err(format!(
                 "the provider of `{language}` does not analyze overlays, so an edit cannot be verified before it is written"
             ));
@@ -365,7 +347,7 @@ impl Orchestrator<'_> {
             workspace: &engine.ws,
             text: &text,
             keys: &engine.registry,
-            trusted: self.trusted,
+            trusted: engine.trusted,
         };
         match fixer
             .fix(&request)
@@ -404,16 +386,6 @@ impl Orchestrator<'_> {
             }
         }
     }
-}
-
-/// Whether the provider of `language` declares `capability`.
-pub(super) fn provides(engine: &Engine, language: &str, capability: Capability) -> bool {
-    engine
-        .registry
-        .languages()
-        .iter()
-        .find(|l| l.provider.manifest().id == language)
-        .is_some_and(|l| l.provider.manifest().capabilities.contains(&capability))
 }
 
 fn op_name(op: &EditOp) -> &'static str {

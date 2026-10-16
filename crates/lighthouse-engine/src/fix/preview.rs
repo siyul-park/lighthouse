@@ -15,9 +15,9 @@ use super::{
     FixPlan, FixRun,
     edits::apply,
     lower::{Lowerer, Sources},
-    run::{Orchestrator, provides},
+    run::Orchestrator,
 };
-use crate::{Engine, Outcome, Overlays};
+use crate::{Engine, Overlays, Run};
 
 impl Engine {
     /// The previews of the fixes of `findings`, those that propose a fix that
@@ -27,14 +27,14 @@ impl Engine {
     pub fn preview_fixes(
         &self,
         plan: &FixPlan,
-        outcome: &Outcome,
+        outcome: &Run,
         findings: &[&Diagnostic],
     ) -> Vec<Preview> {
         let run = FixRun::default();
-        let orchestrator = Orchestrator::for_preview(self, plan, &run);
+        let orchestrator = Orchestrator::new(self, plan, &run);
         let overlays = Overlays::new();
         let sources = Sources::new(&self.ws.root, &outcome.project, &overlays);
-        let complete = |language: &str| provides(self, language, Capability::CompleteReferences);
+        let complete = |language: &str| self.provides(language, Capability::CompleteReferences);
         let lowerer = Lowerer::new(&outcome.project, &sources, &complete);
         findings
             .iter()

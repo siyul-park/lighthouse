@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_engine::Outcome as Run;
+use lighthouse_engine::Run;
 use lighthouse_ml::{
     Result,
     evaluate::{EvalRequest, Found, Gathered, Layer, Layered, Repo, grade},
@@ -243,7 +243,7 @@ pub fn base(reviews: &[(&str, &str, &str)]) -> Found {
             .iter()
             .map(|(f, file, _)| reviewed(f, file))
             .collect(),
-        subjects: reviews
+        questions: reviews
             .iter()
             .map(|(f, file, text)| ((*f).to_owned(), subject(file, text)))
             .collect(),

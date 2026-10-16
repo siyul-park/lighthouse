@@ -3,107 +3,82 @@
 
 use super::*;
 
-/// What a run gathers on its way to an [`Outcome`].
-struct Progress {
-    outcome: Outcome,
-    timings: Timings,
-    incomplete: Vec<Incomplete>,
-    /// The paths whose findings the run reports.
-    scopes: Vec<PathBuf>,
-}
-
-/// The files of a project and the model the providers made of them.
-struct Loaded<'c> {
-    inputs: Vec<Input>,
-    project: Project,
-    cache: Option<RunCache<'c>>,
-}
-
 impl Engine {
     pub(super) fn run(
         &self,
-        reported: Reported,
+        scopes: Scopes,
+        gaps: Vec<Incomplete>,
         only: &[String],
         overlays: &Overlays,
-    ) -> Result<Outcome, Error> {
-        self.validate_only(only)?;
+    ) -> Result<Run, Error> {
         let selected = self.select_rules(only);
-        let mut progress = self.begin(reported)?;
-        let scopes = progress.scopes.clone();
+        let ran: BTreeSet<String> = selected.iter().map(|r| r.manifest().id.clone()).collect();
+        let mut run = Run {
+            notices: self.notices.iter().cloned().collect(),
+            incomplete: self.startup.iter().cloned().chain(gaps).collect(),
+            ran: ran.iter().cloned().collect(),
+            active: self.active.iter().cloned().collect(),
+            ..Run::default()
+        };
         let cache = self.cache.as_ref().and_then(|settings| {
             Cache::open(&settings.dir, settings.limit)
                 .map_err(|e| {
-                    let note = format!("the result cache is not used: {e}");
-                    progress.outcome.notices.insert(note);
+                    run.notices
+                        .insert(format!("the result cache is not used: {e}"));
                 })
                 .ok()
         });
         let models = self.run_models(&scopes, cache.as_ref());
-        let loaded = self.load(&selected, &models, cache.as_ref(), overlays, &mut progress);
+        let (inputs, project) = self.load(&selected, overlays, &mut run);
+        let started = Instant::now();
+        let run_cache = cache.as_ref().and_then(|cache| {
+            self.run_cache(cache, &project, &selected, &models, &mut run.notices)
+        });
+        run.timings.hashing = started.elapsed();
         let memo = Memo::default();
-        let facts = self.analyze(
-            &selected,
-            &loaded.inputs,
-            &loaded.project,
-            &memo,
-            &mut progress.timings,
-        )?;
+        let facts = self.analyze(&selected, &inputs, &project, &memo, &mut run.timings)?;
         let scene = Scene {
             rules: &selected,
-            inputs: &loaded.inputs,
-            project: &loaded.project,
+            inputs: &inputs,
+            project: &project,
             facts: &facts,
             memo: &memo,
-            cache: loaded.cache.as_ref(),
+            cache: run_cache.as_ref(),
             models: &models,
         };
-        let found = self.collect(&scene, &mut progress)?;
-        progress.outcome.subjects = models.subjects();
-        progress.outcome.probabilities = models.probabilities();
-        (progress.outcome.model_calls, progress.outcome.model_cost) = models.usage();
-        progress.outcome.notices.extend(models.finish());
+        let found = self.collect(&scene, &mut run)?;
+        run.questions = models.subjects();
+        run.probabilities = models.probabilities();
+        (run.model_calls, run.model_cost) = models.usage();
+        run.notices.extend(models.finish());
         if let Some(cache) = &cache {
-            if let Some(run) = scene.cache {
-                run.store_rows();
+            if let Some(run_cache) = &run_cache {
+                run_cache.store_rows();
             }
             match cache.finish() {
                 Ok(stats) => {
-                    progress.timings.cache_hits = stats.hits;
-                    progress.timings.cache_misses = stats.misses;
+                    run.timings.cache_hits = stats.hits;
+                    run.timings.cache_misses = stats.misses;
                 }
                 Err(e) => {
-                    let note = format!("the result cache was not saved: {e}");
-                    progress.outcome.notices.insert(note);
+                    run.notices
+                        .insert(format!("the result cache was not saved: {e}"));
                 }
             }
         }
         let started = Instant::now();
-        let found = self.suppress(found, &scene, &mut progress)?;
-        self.identify(found, &scene, &mut progress)?;
-        progress.timings.identity = started.elapsed();
-        Ok(self.finish(progress, loaded.project))
-    }
-
-    /// The outcome of the run over `project`.
-    fn finish(&self, progress: Progress, project: Project) -> Outcome {
-        let Progress {
-            mut outcome,
-            timings,
-            mut incomplete,
-            scopes,
-        } = progress;
-        outcome.timings = timings;
-        outcome.reported = scopes;
-        outcome.project = project;
-        outcome.configured = self.active.iter().cloned().collect();
-        incomplete.sort();
-        incomplete.dedup();
-        outcome.incomplete = incomplete;
-        outcome
+        let found = self.suppress(found, &scene, &ran, &scopes, &mut run)?;
+        self.identify(found, &scene, &mut run)?;
+        run.timings.fingerprints = started.elapsed();
+        run.incomplete.sort();
+        run.incomplete.dedup();
+        run.reported = scopes.0.clone();
+        run.project = project;
+        Ok(run)
     }
 
     /// Rejects a rule that is unknown or not enabled.
-    fn validate_only(&self, only: &[String]) -> Result<(), Error> {
+    pub(super) fn validate_only(&self, only: &[String]) -> Result<(), Error> {
         for id in only {
             if self.registry.rule(id).is_none() {
                 return Err(Error::UnknownRule(id.clone()));
@@ -128,104 +103,54 @@ impl Engine {
             .collect()
     }
 
-    /// The state of a run before anything is read: what assembling the engine
-    /// noted and the gaps known up front.
-    fn begin(&self, reported: Reported) -> Result<Progress, Error> {
-        let mut outcome = Outcome::default();
-        outcome.notices.extend(self.notices.iter().cloned());
-        let mut incomplete = self.startup.clone();
-        let scopes = match reported {
-            Reported::Paths(paths) => self.scopes(paths, &mut incomplete)?,
-            Reported::Files(files) => files.to_vec(),
-        };
-        Ok(Progress {
-            outcome,
-            timings: Timings::default(),
-            incomplete,
-            scopes,
-        })
-    }
-
     /// Reads the files, has the providers index them, and finds the project's
     /// own documents when a selected rule is about them.
-    fn load<'c>(
+    fn load(
         &self,
         selected: &[&dyn Rule],
-        models: &super::models::RunModels,
-        cache: Option<&'c Cache>,
         overlays: &Overlays,
-        progress: &mut Progress,
-    ) -> Loaded<'c> {
+        run: &mut Run,
+    ) -> (Vec<Input>, Project) {
         let started = Instant::now();
-        let inputs = self.read(
-            overlays,
-            &mut progress.outcome.notices,
-            &mut progress.incomplete,
-        );
-        progress.timings.read = started.elapsed();
-        let (inputs, project) = self.build_project(
-            inputs,
-            overlays,
-            (&mut progress.outcome.notices, &mut progress.incomplete),
-            &mut progress.timings,
-        );
+        let inputs = self.read(overlays, run);
+        run.timings.read = started.elapsed();
+        let (inputs, project) = self.build_project(inputs, overlays, run);
         let documented = selected
             .iter()
             .any(|rule| self.documented.contains(&rule.manifest().id));
-        let project = if documented {
-            let found = Documents::scan(&self.ws.root, overlays);
-            progress.outcome.notices.extend(found.notices);
-            project.with_documents(found.documents)
-        } else {
-            project
-        };
-        let started = Instant::now();
-        let cache = cache.and_then(|cache| {
-            self.run_cache(
-                cache,
-                &project,
-                selected,
-                models,
-                &mut progress.outcome.notices,
-            )
-        });
-        progress.timings.hashing = started.elapsed();
-        Loaded {
-            inputs,
-            project,
-            cache,
+        if !documented {
+            return (inputs, project);
         }
+        let found = Documents::scan(&self.ws.root, overlays);
+        run.notices.extend(found.notices);
+        (inputs, project.with_documents(found.documents))
     }
 
     /// Applies the rules and keeps what they found, noticed and could not
     /// finish.
-    fn collect(&self, scene: &Scene, progress: &mut Progress) -> Result<Vec<Diagnostic>, Error> {
+    fn collect(&self, scene: &Scene, run: &mut Run) -> Result<Vec<Diagnostic>, Error> {
         let started = Instant::now();
         let applied = self.apply(scene)?;
-        progress.timings.rules_wall = started.elapsed();
-        progress.timings.add_rules(applied.spent);
-        progress.outcome.notices.extend(applied.notices);
-        progress.incomplete.extend(applied.incomplete);
+        run.timings.rules = started.elapsed();
+        run.timings.add_rules(applied.times);
+        run.notices.extend(applied.notices);
+        run.incomplete.extend(applied.incomplete);
         let (reviews, found) = applied.found.into_iter().partition(|d| d.review.is_some());
-        progress.outcome.reviews = reviews;
+        run.reviews = reviews;
         Ok(found)
     }
 
     /// Takes out what an `allow` annotation waives and what lies outside the
-    /// reported paths; the waived findings go to the outcome.
+    /// reported paths; the waived findings go to the run.
     fn suppress(
         &self,
         found: Vec<Diagnostic>,
         scene: &Scene,
-        progress: &mut Progress,
+        ran: &BTreeSet<String>,
+        scopes: &Scopes,
+        run: &mut Run,
     ) -> Result<Vec<Diagnostic>, Error> {
-        let ran = ran_rules(scene.rules);
         let level = |rule: &str, file: &Path, lang: &str| self.level_at(rule, file, lang);
-        let manifests: BTreeMap<String, &RuleManifest> = scene
-            .rules
-            .iter()
-            .map(|r| (r.manifest().id.clone(), r.manifest()))
-            .collect();
         let texts: BTreeMap<&Path, &str> = scene
             .inputs
             .iter()
@@ -235,55 +160,46 @@ impl Engine {
         let gate = annotations::Gate {
             level: &level,
             active: &self.active,
-            selected: &ran,
-            manifests: &manifests,
+            selected: ran,
+            registry: &self.registry,
             text: &text,
         };
         let applied = annotations::apply(found, scene.project, &gate)?;
-        let scopes = &progress.scopes;
         let mut kept = applied.kept;
-        kept.retain(|d| scopes.iter().any(|s| d.file.starts_with(s)));
-        progress
-            .outcome
-            .reviews
-            .retain(|d| scopes.iter().any(|s| d.file.starts_with(s)));
-        progress.outcome.reviews.sort_by(|a, b| {
-            (&a.file, a.span.start, &a.rule_id).cmp(&(&b.file, b.span.start, &b.rule_id))
-        });
-        progress.outcome.suppressed = applied
+        kept.retain(|d| scopes.contains(&d.file));
+        run.reviews.retain(|d| scopes.contains(&d.file));
+        in_order(&mut run.reviews);
+        run.suppressed = applied
             .allowed
             .into_iter()
-            .filter(|a| scopes.iter().any(|s| a.diagnostic.file.starts_with(s)))
+            .filter(|a| scopes.contains(&a.diagnostic.file))
             .collect();
         Ok(kept)
     }
 
     /// Orders the findings, gives each its identity and the facts and options
-    /// it was judged with, and puts them in the outcome.
+    /// it was judged with, and puts them in the run.
     fn identify(
         &self,
         mut found: Vec<Diagnostic>,
         scene: &Scene,
-        progress: &mut Progress,
+        run: &mut Run,
     ) -> Result<(), Error> {
-        found.sort_by(|a, b| {
-            (&a.file, a.span.start, &a.rule_id).cmp(&(&b.file, b.span.start, &b.rule_id))
-        });
+        in_order(&mut found);
         let ordinal = Diagnostic::disambiguate(&mut found, scene.project);
-        let subjects = Subjects::new(scene.project, scene.facts, scene.inputs);
-        progress.outcome.facts = found
+        let facts = FindingFacts::new(scene.project, scene.facts, scene.inputs);
+        run.facts = found
             .iter()
             .map(|d| {
-                let mut subject = subjects.of(d);
+                let mut facts = facts.of(d);
                 if ordinal.contains(&d.fingerprint) {
-                    subject["ordinal"] = Value::Bool(true);
+                    facts["ordinal"] = Value::Bool(true);
                 }
-                (d.fingerprint.clone(), subject)
+                (d.fingerprint.clone(), facts)
             })
             .collect();
-        progress.outcome.options = self.options_of(&found, scene.project)?;
-        progress.outcome.rules = ran_rules(scene.rules).into_iter().collect();
-        progress.outcome.diagnostics = found;
+        run.options = self.options_of(&found, scene.project)?;
+        run.diagnostics = found;
         Ok(())
     }
 
@@ -312,41 +228,20 @@ impl Engine {
                 .rule(&d.rule_id)
                 .is_some_and(|r| r.manifest().scope == RunScope::Project);
             let (path, lang) = match project.file(&d.file) {
-                Some(file) if !project_scope => (file.path.clone(), file.lang.clone()),
-                _ => (PathBuf::new(), String::new()),
+                Some(file) if !project_scope => (file.path.as_path(), file.lang.as_str()),
+                _ => (Path::new(""), ""),
             };
-            let rules = self.config.resolve(&path, &lang, &self.projects)?;
+            let rules = self.config.resolve(path, lang, &self.projects)?;
             let found = rules.get(&d.rule_id).map(|c| c.options.clone());
             options.insert(d.fingerprint.clone(), found.unwrap_or_default());
         }
         Ok(options)
     }
-
-    /// Report paths relative to the root; those outside it are incomplete.
-    pub(crate) fn scopes(
-        &self,
-        paths: &[PathBuf],
-        incomplete: &mut Vec<Incomplete>,
-    ) -> Result<Vec<PathBuf>, Error> {
-        if paths.is_empty() {
-            return Ok(vec![PathBuf::new()]);
-        }
-        let mut scopes = Vec::new();
-        for path in paths {
-            let abs = path.canonicalize().map_err(io_error(path))?;
-            match abs.strip_prefix(&self.ws.root) {
-                Ok(rel) => scopes.push(rel.to_owned()),
-                Err(_) => incomplete.push(Incomplete {
-                    path: Some(path.clone()),
-                    reason: format!("outside {}, not checked", self.ws.root.display()),
-                }),
-            }
-        }
-        Ok(scopes)
-    }
 }
 
-/// The ids of the rules a run applied.
-fn ran_rules(selected: &[&dyn Rule]) -> BTreeSet<String> {
-    selected.iter().map(|r| r.manifest().id.clone()).collect()
+/// Sorts findings by file, position and rule.
+fn in_order(found: &mut [Diagnostic]) {
+    found.sort_by(|a, b| {
+        (&a.file, a.span.start, &a.rule_id).cmp(&(&b.file, b.span.start, &b.rule_id))
+    });
 }

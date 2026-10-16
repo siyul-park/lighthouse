@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use lighthouse_engine::Outcome as Run;
+use lighthouse_engine::Run;
 use lighthouse_ml::{
     evaluate::{Candidate, EvalRequest, Found, Gathered, Repo, Setup, grade, repos},
     labels::{Label, Shown, Source},

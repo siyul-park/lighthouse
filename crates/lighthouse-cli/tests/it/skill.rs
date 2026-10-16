@@ -3,7 +3,7 @@
 
 use std::fs;
 
-use lighthouse_engine::active_rules;
+use lighthouse_engine::active;
 use lighthouse_session::{Session, skill_for};
 
 #[test]
@@ -30,7 +30,7 @@ fn skill_for_lists_every_rule_the_engines_registry_enables() {
             .any(|l| l.provider.manifest().id == "rust")
     );
     let catalog = session.catalog().unwrap();
-    let enabled = active_rules(&session.config, catalog.projects()).unwrap();
+    let enabled = active(&session.config, catalog.projects()).unwrap();
     assert!(!enabled.is_empty());
 
     let skill = skill_for(&session).unwrap();

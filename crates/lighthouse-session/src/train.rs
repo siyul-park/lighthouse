@@ -153,7 +153,7 @@ fn gather(
         .transpose()?;
     let rows = Rows::of(
         &labels,
-        &checked.outcome.subjects,
+        &checked.outcome.questions,
         teacher.as_deref(),
         &decision_ref,
     )?;

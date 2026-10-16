@@ -264,10 +264,13 @@ fn the_formatter_runs_on_a_changed_file() {
 [languages.toy]
 formatter = ["sh", "-c", "tr -s ' ' < \"$0\" > \"$0.tmp\" && mv \"$0.tmp\" \"$0\""]
 "#;
-    let engine = engine(&dir, formatter);
+    let engine = engine(&dir, formatter).with_trust(true);
 
     engine
-        .fix(&plan("fake/to-done", Safety::Safe, true), &trusted())
+        .fix(
+            &plan("fake/to-done", Safety::Safe, true),
+            &FixRun::default(),
+        )
         .unwrap();
 
     assert_eq!(text(&dir), "DONE here\n");
@@ -276,10 +279,13 @@ formatter = ["sh", "-c", "tr -s ' ' < \"$0\" > \"$0.tmp\" && mv \"$0.tmp\" \"$0\
 #[test]
 fn a_formatter_that_fails_rolls_the_file_back() {
     let dir = project("TODO\n");
-    let engine = engine(&dir, "[languages.toy]\nformatter = [\"false\"]\n");
+    let engine = engine(&dir, "[languages.toy]\nformatter = [\"false\"]\n").with_trust(true);
 
     let report = engine
-        .fix(&plan("fake/to-done", Safety::Safe, true), &trusted())
+        .fix(
+            &plan("fake/to-done", Safety::Safe, true),
+            &FixRun::default(),
+        )
         .unwrap();
 
     assert_eq!(text(&dir), "TODO\n");

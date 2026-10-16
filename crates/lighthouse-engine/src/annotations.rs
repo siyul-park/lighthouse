@@ -1,6 +1,6 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
-    path::Path,
+    collections::{BTreeMap, BTreeSet, HashMap},
+    path::{Path, PathBuf},
 };
 
 use lighthouse_model::{
@@ -8,13 +8,12 @@ use lighthouse_model::{
     annotation::{self, ANNOTATION_REASON, Directive, Form, UNUSED_ALLOW},
     squash,
 };
-use lighthouse_plugin::RuleManifest;
-use lighthouse_spec::Error as ProjectError;
+use lighthouse_plugin::Registry;
+use lighthouse_spec::Error as SpecError;
 use serde_json::json;
 
 /// The level the configuration gives a rule at a file of a language.
-pub(crate) type LevelAt<'a> =
-    dyn Fn(&str, &Path, &str) -> Result<Option<Severity>, ProjectError> + 'a;
+pub(crate) type LevelAt<'a> = dyn Fn(&str, &Path, &str) -> Result<Option<Severity>, SpecError> + 'a;
 
 /// What the run knows about rules, which directives need to judge whether
 /// they are used.
@@ -25,9 +24,9 @@ pub(crate) struct Gate<'a> {
     pub active: &'a BTreeSet<String>,
     /// Rules that ran in this run.
     pub selected: &'a BTreeSet<String>,
-    /// The manifest of each rule that ran: its uid and former names seed the
+    /// The rules: the uid and former names of one that ran seed the
     /// fingerprints of the findings the engine reports itself.
-    pub manifests: &'a BTreeMap<String, &'a RuleManifest>,
+    pub registry: &'a Registry,
     /// The text of a file of the run.
     pub text: &'a dyn Fn(&Path) -> Option<&'a str>,
 }
@@ -51,7 +50,7 @@ struct Located<'a> {
 
 /// Which findings a claim reaches.
 #[derive(Clone, Copy)]
-enum Reach {
+enum Coverage {
     /// The line after the directive and its own line; and the symbol the
     /// comment documents, when the directive is the last line of the comment.
     NextLine(u32),
@@ -67,7 +66,7 @@ struct Claim<'a> {
     at: &'a Located<'a>,
     /// The decision's current id.
     rule: String,
-    reach: Reach,
+    coverage: Coverage,
 }
 
 /// The directives of one file read in source order: what each disables, which
@@ -85,7 +84,7 @@ struct Reader<'a, 'g> {
 }
 
 impl<'a> Reader<'a, '_> {
-    fn read(&mut self, at: &'a Located<'a>) -> Result<(), ProjectError> {
+    fn read(&mut self, at: &'a Located<'a>) -> Result<(), SpecError> {
         let directive = &at.directive;
         if directive.rules.is_empty() {
             let message = format!(
@@ -106,10 +105,10 @@ impl<'a> Reader<'a, '_> {
         }
         for id in &directive.rules {
             let rule = id.clone();
-            let reach = if directive.form == Form::Line {
-                Reach::Line(at.line)
+            let coverage = if directive.form == Form::Line {
+                Coverage::Line(at.line)
             } else if directive.form == Form::Disable {
-                Reach::Range {
+                Coverage::Range {
                     from: if at.line < self.first_code {
                         1
                     } else {
@@ -118,22 +117,22 @@ impl<'a> Reader<'a, '_> {
                     to: None,
                 }
             } else {
-                Reach::NextLine(at.line)
+                Coverage::NextLine(at.line)
             };
-            if matches!(reach, Reach::Range { .. }) {
+            if matches!(coverage, Coverage::Range { .. }) {
                 self.open
                     .entry(rule.clone())
                     .or_default()
                     .push(self.claims.len());
             }
-            self.claims.push(Claim { at, rule, reach });
+            self.claims.push(Claim { at, rule, coverage });
         }
         Ok(())
     }
 
     /// `lighthouse-enable` ends the open ranges of the rules it names; one
     /// that closes nothing is reported.
-    fn enable(&mut self, at: &'a Located<'a>) -> Result<(), ProjectError> {
+    fn enable(&mut self, at: &'a Located<'a>) -> Result<(), SpecError> {
         for id in &at.directive.rules {
             let rule = id.clone();
             let Some(ranges) = self.open.remove(&rule) else {
@@ -145,7 +144,7 @@ impl<'a> Reader<'a, '_> {
                 continue;
             };
             for range in ranges {
-                if let Reach::Range { to, .. } = &mut self.claims[range].reach {
+                if let Coverage::Range { to, .. } = &mut self.claims[range].coverage {
                     *to = Some(at.line);
                 }
             }
@@ -153,7 +152,7 @@ impl<'a> Reader<'a, '_> {
         Ok(())
     }
 
-    fn note(&mut self, at: &Located, rule: &str, message: String) -> Result<(), ProjectError> {
+    fn note(&mut self, at: &Located, rule: &str, message: String) -> Result<(), SpecError> {
         self.extra
             .extend(finding(self.gate, at, self.lang, rule, message)?);
         Ok(())
@@ -170,7 +169,7 @@ pub(crate) fn apply<'g>(
     found: Vec<Diagnostic>,
     project: &Project,
     gate: &'g Gate<'g>,
-) -> Result<Applied, ProjectError> {
+) -> Result<Applied, SpecError> {
     let mut allowed = Vec::new();
     let mut open = Vec::new();
     for mut diagnostic in found {
@@ -181,6 +180,17 @@ pub(crate) fn apply<'g>(
             }),
             None => open.push(diagnostic),
         }
+    }
+    // Where the findings stand, by file and rule, so that a claim looks at
+    // its own rule's findings of its own file only.
+    let mut index: HashMap<PathBuf, HashMap<String, Vec<usize>>> = HashMap::new();
+    for (n, d) in open.iter().enumerate() {
+        index
+            .entry(d.file.clone())
+            .or_default()
+            .entry(d.rule_id.clone())
+            .or_default()
+            .push(n);
     }
     let mut found: Vec<Option<Diagnostic>> = open.into_iter().map(Some).collect();
     let mut extra = Vec::new();
@@ -208,8 +218,9 @@ pub(crate) fn apply<'g>(
             ..
         } = reader;
         extra.extend(noted);
+        let here = index.get(&file.path);
         for claim in &claims {
-            let taken = take(&mut found, &file.path, claim);
+            let taken = take(&mut found, here, claim);
             extra.extend(unused_note(gate, &file.lang, claim, taken.is_empty())?);
             let reason = claim.at.directive.reason.clone().unwrap_or_default();
             allowed.extend(taken.into_iter().map(|diagnostic| Suppressed {
@@ -248,14 +259,14 @@ fn unused_note(
     lang: &str,
     claim: &Claim,
     nothing: bool,
-) -> Result<Option<Diagnostic>, ProjectError> {
+) -> Result<Option<Diagnostic>, SpecError> {
     if !nothing || !unused(gate, &claim.rule) {
         return Ok(None);
     }
     let marker = claim.at.directive.marker;
-    let place = match claim.reach {
-        Reach::Range { .. } => "in its range",
-        Reach::NextLine(_) | Reach::Line(_) => "here",
+    let place = match claim.coverage {
+        Coverage::Range { .. } => "in its range",
+        Coverage::NextLine(_) | Coverage::Line(_) => "here",
     };
     let message = format!(
         "`{marker} {}` suppresses nothing {place}; remove it",
@@ -264,15 +275,20 @@ fn unused_note(
     finding(gate, claim.at, lang, UNUSED_ALLOW, message)
 }
 
-/// Removes and returns the findings of the claim's rule that it reaches.
-fn take(found: &mut [Option<Diagnostic>], file: &Path, claim: &Claim) -> Vec<Diagnostic> {
+/// Removes and returns the findings of the claim's rule that it reaches;
+/// `here` is where the findings of the claim's file stand, by rule.
+fn take(
+    found: &mut [Option<Diagnostic>],
+    here: Option<&HashMap<String, Vec<usize>>>,
+    claim: &Claim,
+) -> Vec<Diagnostic> {
+    let slots = here
+        .and_then(|rules| rules.get(&claim.rule))
+        .map_or(&[][..], Vec::as_slice);
     let mut taken = Vec::new();
-    for slot in found.iter_mut() {
-        let reaches = slot
-            .as_ref()
-            .is_some_and(|d| d.rule_id == claim.rule && d.file == file && reaches(claim, d));
-        if reaches {
-            taken.extend(slot.take());
+    for &n in slots {
+        if found[n].as_ref().is_some_and(|d| reaches(claim, d)) {
+            taken.extend(found[n].take());
         }
     }
     taken
@@ -280,10 +296,10 @@ fn take(found: &mut [Option<Diagnostic>], file: &Path, claim: &Claim) -> Vec<Dia
 
 fn reaches(claim: &Claim, d: &Diagnostic) -> bool {
     let line = d.span.start.line;
-    match claim.reach {
-        Reach::NextLine(at) => line == at || line == at + 1 || documents(claim, d),
-        Reach::Line(at) => line == at,
-        Reach::Range { from, to } => line >= from && to.is_none_or(|to| line < to),
+    match claim.coverage {
+        Coverage::NextLine(at) => line == at || line == at + 1 || documents(claim, d),
+        Coverage::Line(at) => line == at,
+        Coverage::Range { from, to } => line >= from && to.is_none_or(|to| line < to),
     }
 }
 
@@ -312,7 +328,7 @@ fn finding(
     lang: &str,
     rule: &str,
     message: String,
-) -> Result<Option<Diagnostic>, ProjectError> {
+) -> Result<Option<Diagnostic>, SpecError> {
     let comment = at.comment;
     if !gate.selected.contains(rule) {
         return Ok(None);
@@ -325,8 +341,8 @@ fn finding(
         snippet.push_str(&format!(" #{}", at.index));
     }
     let path = comment.file.to_string_lossy();
-    let fingerprint = match gate.manifests.get(rule) {
-        Some(meta) => meta.fingerprint(&path, &snippet),
+    let fingerprint = match gate.registry.rule(rule) {
+        Some(rule) => rule.manifest().fingerprint(&path, &snippet),
         None => Fingerprint::new(rule, &path, &snippet),
     };
     let mut d = Diagnostic::new(

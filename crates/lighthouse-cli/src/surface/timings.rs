@@ -32,17 +32,14 @@ pub fn lines(timings: &Timings, report: Duration, total: Duration) -> Vec<String
             .iter()
             .map(|(analyzer, spent)| line(&format!("analyzer {analyzer}"), *spent)),
     );
-    out.push(format!(
-        "{} (wall clock)",
-        line("rules", timings.rules_wall)
-    ));
-    out.extend(timings.rules.iter().take(TOP_RULES).map(|(rule, spent)| {
+    out.push(format!("{} (wall clock)", line("rules", timings.rules)));
+    out.extend(timings.rule.iter().take(TOP_RULES).map(|(rule, spent)| {
         format!(
             "{} (summed over files)",
             line(&format!("rule {rule}"), *spent)
         )
     }));
-    out.push(line("identity", timings.identity));
+    out.push(line("fingerprints", timings.fingerprints));
     out.push(line("store", timings.store));
     out.push(line("report", report));
     out.push(line("total", total));

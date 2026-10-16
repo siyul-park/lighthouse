@@ -140,12 +140,9 @@ fn when_one_file_of_a_fix_changed_concurrently_neither_is_written() {
         b.display()
     );
     let (engine, plan) = pair(&dir, &formatter);
-    let run = FixRun {
-        trusted: true,
-        ..FixRun::default()
-    };
+    let engine = engine.with_trust(true);
 
-    let report = engine.fix(&plan, &run).unwrap();
+    let report = engine.fix(&plan, &FixRun::default()).unwrap();
 
     assert_eq!(
         fs::read_to_string(dir.path().join("a.toy")).unwrap(),
@@ -341,13 +338,12 @@ fn a_formatter_is_told_the_real_path_and_finds_the_settings_next_to_its_copy() {
     let dir = project("TODO\n");
     fs::write(dir.path().join(".editorconfig"), "root = true\n").unwrap();
     let by_path = "[languages.toy]\nformatter = { argv = [\"sh\", \"-c\", \"cat; echo \\\"// $0\\\"\", \"{path}\"], stdin = \"file\", output = \"text\" }\n";
-    let run = FixRun {
-        trusted: true,
-        ..FixRun::default()
-    };
-
     engine(&dir, by_path)
-        .fix(&plan("fake/to-done", Safety::Safe, true), &run)
+        .with_trust(true)
+        .fix(
+            &plan("fake/to-done", Safety::Safe, true),
+            &FixRun::default(),
+        )
         .unwrap();
 
     assert_eq!(text(&dir), "DONE\n// a.toy\n");
@@ -356,7 +352,11 @@ fn a_formatter_is_told_the_real_path_and_finds_the_settings_next_to_its_copy() {
     let by_copy = "[languages.toy]\nformatter = [\"sh\", \"-c\", \"cat \\\"$(dirname \\\"$0\\\")/.editorconfig\\\" > \\\"$0\\\"\"]\n";
 
     engine(&dir, by_copy)
-        .fix(&plan("fake/to-done", Safety::Safe, true), &run)
+        .with_trust(true)
+        .fix(
+            &plan("fake/to-done", Safety::Safe, true),
+            &FixRun::default(),
+        )
         .unwrap();
 
     assert_eq!(

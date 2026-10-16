@@ -111,14 +111,13 @@ pub fn fix(session: Session, request: &FixSelection) -> Result<Fixed> {
             catalog
                 .decisions()
                 .map(Decision::id)
-                .filter(|id| engine.is_active(id)),
+                .filter(|id| engine.active(id)),
         )?,
         fingerprints: request.targets.fingerprints.clone(),
         skip,
         dry_run: request.dry_run,
         unsafe_fixes: request.unsafe_fixes,
         fixer: request.fixer.clone(),
-        trusted,
     };
     let mut report = engine.fix(&plan, &run)?;
     messages.extend(report.notes.iter().cloned());

@@ -12,7 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_engine::Outcome as Run;
+use lighthouse_engine::Run;
 use lighthouse_plugin::Subject;
 use lighthouse_spec::{Catalog, Evaluation, local_files};
 use serde::Serialize;
@@ -190,12 +190,12 @@ impl Found {
             .filter_map(|(fp, answer)| Some((found.place.get(fp)?.clone(), answer.clone())))
             .collect();
         found.notices = run.notices.iter().cloned().collect();
-        found.subjects.clone_from(&run.subjects);
+        found.subjects.clone_from(&run.questions);
         found.calls = run.model_calls;
         found.cost = run.model_cost;
         let flagged: BTreeSet<&String> = found.by_fingerprint.keys().collect();
         found.unflagged = run
-            .subjects
+            .questions
             .iter()
             .filter(|(fingerprint, _)| !flagged.contains(fingerprint))
             .map(|(fingerprint, subject)| {

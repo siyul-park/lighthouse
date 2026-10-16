@@ -421,7 +421,7 @@ fn example_run_checks_an_example_with_the_given_configuration() {
         models: ModelOptions::default(),
     };
 
-    let outcome = run.outcome("fake/marker", &decision.examples[0]).unwrap();
+    let outcome = run.run("fake/marker", &decision.examples[0]).unwrap();
 
     assert_eq!(outcome.diagnostics.len(), 1);
     assert_eq!(outcome.diagnostics[0].span.start.line, 2);

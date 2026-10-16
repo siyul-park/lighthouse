@@ -1,26 +1,34 @@
 //! The phases of a run between reading files and collecting findings: read the
 //! files, have the providers index them, compute the facts and apply the rules.
 
+use std::sync::OnceLock;
+
+use lighthouse_model::{Capability, hash};
+use rayon::ThreadPool;
+
 use super::*;
 
+/// Why a file the languages claim is not an input: a notice for binary data a
+/// fallback provider claims, otherwise a gap in the analysis.
+enum Skipped {
+    Notice(String),
+    Incomplete(Incomplete),
+}
+
 impl Engine {
-    /// Reads every file under the root that a listed language claims.
-    pub(super) fn read(
-        &self,
-        overlays: &Overlays,
-        notices: &mut BTreeSet<String>,
-        incomplete: &mut Vec<Incomplete>,
-    ) -> Vec<Input> {
-        let mut inputs = Vec::new();
+    /// Reads every file under the root that a listed language claims, side by
+    /// side.
+    pub(super) fn read(&self, overlays: &Overlays, run: &mut Run) -> Vec<Input> {
         let walk = WalkBuilder::new(&self.ws.root)
             .require_git(false)
             .add_custom_ignore_filename(IGNORE_FILE)
             .build();
+        let mut files = Vec::new();
         for entry in walk {
             let entry = match entry {
                 Ok(entry) => entry,
                 Err(e) => {
-                    incomplete.push(Incomplete {
+                    run.incomplete.push(Incomplete {
                         path: None,
                         reason: format!("walk: {e}"),
                     });
@@ -30,58 +38,62 @@ impl Engine {
             if !entry.file_type().is_some_and(|t| t.is_file()) {
                 continue;
             }
-            let Ok(rel) = entry.path().strip_prefix(&self.ws.root) else {
-                incomplete.push(Incomplete {
+            match entry.path().strip_prefix(&self.ws.root) {
+                Ok(rel) => files.push(rel.to_owned()),
+                Err(_) => run.incomplete.push(Incomplete {
                     path: Some(entry.path().to_owned()),
                     reason: "outside the root, not checked".to_owned(),
-                });
-                continue;
-            };
-            if let Some(mut input) = self.read_input(entry.path(), rel, notices, incomplete) {
-                if let Some(text) = overlays.get(rel) {
-                    input.file.hash = hash::sha256(text);
-                    input.text.clone_from(text);
+                }),
+            }
+        }
+        let read: Vec<Result<Input, Skipped>> = in_pool(|| {
+            files
+                .par_iter()
+                .filter_map(|rel| self.read_input(rel, overlays))
+                .collect()
+        });
+        let mut inputs = Vec::new();
+        for read in read {
+            match read {
+                Ok(input) => inputs.push(input),
+                Err(Skipped::Notice(notice)) => {
+                    run.notices.insert(notice);
                 }
-                inputs.push(input);
+                Err(Skipped::Incomplete(gap)) => run.incomplete.push(gap),
             }
         }
         inputs.sort_by(|a, b| a.file.path.cmp(&b.file.path));
         inputs
     }
 
-    /// Reads one file if a listed language claims it; a file that cannot be read
-    /// becomes an incomplete entry (or a notice for binary data) and is dropped.
-    fn read_input(
-        &self,
-        path: &Path,
-        rel: &Path,
-        notices: &mut BTreeSet<String>,
-        incomplete: &mut Vec<Incomplete>,
-    ) -> Option<Input> {
+    /// Reads one file if a listed language claims it, from its overlay when
+    /// it has one; a file that cannot be read is not an input.
+    fn read_input(&self, rel: &Path, overlays: &Overlays) -> Option<Result<Input, Skipped>> {
         let &language = self
             .providers
             .iter()
             .find(|&&i| self.languages[i].files.is_match(rel))?;
-        let text = match fs::read_to_string(path) {
-            Ok(text) => text,
-            Err(e) if e.kind() == io::ErrorKind::InvalidData => {
-                if self.provider(language).manifest().fallback {
-                    notices.insert(format!("{}: skipped, not valid UTF-8", rel.display()));
-                } else {
-                    incomplete.push(Incomplete {
-                        path: Some(rel.to_owned()),
-                        reason: "not valid UTF-8".to_owned(),
-                    });
+        let text = match overlays.get(rel) {
+            Some(text) => text.clone(),
+            None => match fs::read_to_string(self.ws.root.join(rel)) {
+                Ok(text) => text,
+                Err(e) if e.kind() == io::ErrorKind::InvalidData => {
+                    return Some(Err(if self.provider(language).manifest().fallback {
+                        Skipped::Notice(format!("{}: skipped, not valid UTF-8", rel.display()))
+                    } else {
+                        Skipped::Incomplete(Incomplete {
+                            path: Some(rel.to_owned()),
+                            reason: "not valid UTF-8".to_owned(),
+                        })
+                    }));
                 }
-                return None;
-            }
-            Err(e) => {
-                incomplete.push(Incomplete {
-                    path: Some(rel.to_owned()),
-                    reason: format!("unreadable: {e}"),
-                });
-                return None;
-            }
+                Err(e) => {
+                    return Some(Err(Skipped::Incomplete(Incomplete {
+                        path: Some(rel.to_owned()),
+                        reason: format!("unreadable: {e}"),
+                    })));
+                }
+            },
         };
         let file = File {
             path: rel.to_owned(),
@@ -90,19 +102,30 @@ impl Engine {
             generated: self.config.is_generated(rel) || self.attributes.is_generated(rel),
             test: self.languages[language].tests.is_match(rel),
         };
-        Some(Input {
+        Some(Ok(Input {
             file,
             text,
             language,
-        })
+        }))
     }
 
     fn provider(&self, language: usize) -> &dyn LanguageProvider {
+        self.registry.languages()[language].provider.as_ref()
+    }
+
+    /// The provider of the language `id`, if one is registered.
+    pub(crate) fn language(&self, id: &str) -> Option<&dyn LanguageProvider> {
         self.registry
             .languages()
-            .get(language)
+            .iter()
             .map(|l| l.provider.as_ref())
-            .expect("language index comes from the registry")
+            .find(|provider| provider.manifest().id == id)
+    }
+
+    /// Whether the provider of `language` declares `capability`.
+    pub(crate) fn provides(&self, language: &str, capability: Capability) -> bool {
+        self.language(language)
+            .is_some_and(|provider| provider.manifest().capabilities.contains(&capability))
     }
 
     /// Has each provider index its files in one batch, the providers side by
@@ -112,8 +135,7 @@ impl Engine {
         &self,
         inputs: Vec<Input>,
         overlays: &Overlays,
-        (notices, incomplete): (&mut BTreeSet<String>, &mut Vec<Incomplete>),
-        timings: &mut Timings,
+        run: &mut Run,
     ) -> (Vec<Input>, Project) {
         let ws = Workspace {
             overlays: overlays.clone(),
@@ -144,14 +166,16 @@ impl Engine {
         let mut parts: Vec<Fragment> = Vec::new();
         for ((language, batch), (indexed, spent)) in batches.iter().zip(indexed) {
             let provider = self.provider(*language);
-            timings.index.push((provider.manifest().id.clone(), spent));
+            run.timings
+                .index
+                .push((provider.manifest().id.clone(), spent));
             match indexed {
                 Ok(indexed) => {
                     parts.extend(indexed.fragments);
-                    notices.extend(indexed.notices);
-                    incomplete.extend(indexed.incomplete);
+                    run.notices.extend(indexed.notices);
+                    run.incomplete.extend(indexed.incomplete);
                 }
-                Err(e) => incomplete.push(Incomplete {
+                Err(e) => run.incomplete.push(Incomplete {
                     path: None,
                     reason: format!(
                         "language `{}` had an execution error, {} file(s) not analyzed: {e}",
@@ -163,8 +187,8 @@ impl Engine {
         }
         let started = Instant::now();
         let project = Project::merge(parts);
-        timings.merge = started.elapsed();
-        notices.extend(project.notices().iter().cloned());
+        run.timings.merge = started.elapsed();
+        run.notices.extend(project.notices().iter().cloned());
         let kept = inputs
             .into_iter()
             .filter(|i| project.file(&i.file.path).is_some())
@@ -172,6 +196,9 @@ impl Engine {
         (kept, project)
     }
 
+    /// Computes the facts the rules read, analyzer by analyzer in dependency
+    /// order. The files of a file-scope analyzer are analyzed side by side:
+    /// an analyzer reads the facts of those it requires, never its own.
     pub(super) fn analyze(
         &self,
         rules: &[&dyn Rule],
@@ -186,32 +213,39 @@ impl Engine {
         let mut facts = Facts::new();
         for analyzer in self.registry.order(wanted)? {
             let started = Instant::now();
-            let runs: Vec<(Option<&Input>, String)> = match analyzer.manifest().scope {
-                RunScope::Project => vec![(None, String::new())],
-                RunScope::File => inputs
-                    .iter()
-                    .map(|i| (Some(i), i.file.path.to_string_lossy().into_owned()))
-                    .collect(),
-            };
-            for (input, key) in runs {
-                let ctx = Context {
+            let id = &analyzer.manifest().id;
+            let run = |input: Option<&Input>, facts: &Facts| {
+                analyzer.run(&Context {
                     workspace: &self.ws,
                     project,
                     file: input.map(|i| (&i.file, i.text.as_str())),
-                    facts: &facts,
+                    facts,
                     keys: &self.registry,
                     trusted: self.trusted,
                     memo,
                     notices: &Notices::default(),
                     applies: Applicability::default(),
                     models: &lighthouse_plugin::NoModels,
-                };
-                let fact = analyzer.run(&ctx)?;
-                facts.insert(&analyzer.manifest().id, key, fact);
+                })
+            };
+            match analyzer.manifest().scope {
+                RunScope::Project => {
+                    let fact = run(None, &facts)?;
+                    facts.insert(id, String::new(), fact);
+                }
+                RunScope::File => {
+                    let found: Vec<_> = in_pool(|| {
+                        inputs
+                            .par_iter()
+                            .map(|input| run(Some(input), &facts))
+                            .collect()
+                    });
+                    for (input, fact) in inputs.iter().zip(found) {
+                        facts.insert(id, input.file.path.to_string_lossy().into_owned(), fact?);
+                    }
+                }
             }
-            timings
-                .analyzers
-                .push((analyzer.manifest().id.clone(), started.elapsed()));
+            timings.analyzers.push((id.clone(), started.elapsed()));
         }
         Ok(facts)
     }
@@ -278,32 +312,8 @@ impl Engine {
                 ));
                 continue;
             }
-            let notices = Notices::default();
-            let ctx = Context {
-                workspace: &self.ws,
-                project: scene.project,
-                file: Some((file, input.text.as_str())),
-                facts: scene.facts,
-                keys: &self.registry,
-                trusted: self.trusted,
-                memo: scene.memo,
-                notices: &notices,
-                applies,
-                models: scene.models,
-            };
-            let started = Instant::now();
-            let checked = self.run_rule(scene, *rule, &ctx, &config.options);
-            gathered.notices.extend(notices.take());
-            *gathered.spent.entry(meta.id.clone()).or_default() += started.elapsed();
-            let found = unfinished(
-                checked,
-                &meta.id,
-                Some(&input.file.path),
-                &mut gathered.incomplete,
-            )?;
-            gathered
-                .found
-                .extend(found.into_iter().map(|d| leveled(d, level)));
+            let at = Some((file, input.text.as_str()));
+            self.run_one(scene, *rule, (config, level, applies), at, &mut gathered)?;
         }
         // The models answer what the file's rules queued, all at once.
         for (rule, found) in scene.models.flush(&input.file.path.to_string_lossy()) {
@@ -341,7 +351,7 @@ impl Engine {
         scene: &Scene,
         rule: &dyn Rule,
         languages: &BTreeSet<usize>,
-        resolved: &Rules,
+        resolved: &lighthouse_spec::Rules,
     ) -> Result<Gathered, Error> {
         let mut gathered = Gathered::default();
         let meta = rule.manifest();
@@ -363,32 +373,48 @@ impl Engine {
             ));
             return Ok(gathered);
         }
+        let applies = self.applies(meta.applicability, config);
+        self.run_one(scene, rule, (config, level, applies), None, &mut gathered)?;
+        Ok(gathered)
+    }
+
+    /// Runs `rule` for `file` and its text (the project when `None`) as the
+    /// configuration sets it, and adds what it found, noticed and could not
+    /// finish to `gathered`.
+    fn run_one(
+        &self,
+        scene: &Scene,
+        rule: &dyn Rule,
+        (config, level, applies): (&RuleConfig, Severity, Applicability),
+        file: Option<(&File, &str)>,
+        gathered: &mut Gathered,
+    ) -> Result<(), Error> {
+        let meta = rule.manifest();
         let notices = Notices::default();
         let ctx = Context {
             workspace: &self.ws,
             project: scene.project,
-            file: None,
+            file,
             facts: scene.facts,
             keys: &self.registry,
             trusted: self.trusted,
             memo: scene.memo,
             notices: &notices,
-            applies: self.applies(meta.applicability, config),
+            applies,
             models: scene.models,
         };
         let started = Instant::now();
         let checked = self.run_rule(scene, rule, &ctx, &config.options);
         gathered.notices.extend(notices.take());
-        *gathered.spent.entry(meta.id.clone()).or_default() += started.elapsed();
-        let found = unfinished(checked, &meta.id, None, &mut gathered.incomplete)?;
+        *gathered.times.entry(meta.id.clone()).or_default() += started.elapsed();
+        let at = file.map(|(file, _)| file.path.as_path());
+        let found = unfinished(checked, &meta.id, at, &mut gathered.incomplete)?;
         gathered
             .found
             .extend(found.into_iter().map(|d| leveled(d, level)));
-        Ok(gathered)
+        Ok(())
     }
-}
 
-impl Engine {
     /// What code a rule may report on at a file: the decision's scope, unless
     /// the project says otherwise for all its decisions (`generated.check`)
     /// or for this rule (`generated`).
@@ -442,5 +468,27 @@ fn unfinished(
             Ok(Vec::new())
         }
         other => Ok(other?),
+    }
+}
+
+/// Runs `op` on the worker threads the independent steps of a run share. A
+/// worker gets the stack the main thread has, as the expressions of a check
+/// recurse deeply. If such workers cannot start, workers with the default
+/// stack do, and failing that `op` runs on the global pool.
+pub(super) fn in_pool<R: Send>(op: impl FnOnce() -> R + Send) -> R {
+    const STACK: usize = 8 << 20;
+    static POOL: OnceLock<Option<ThreadPool>> = OnceLock::new();
+    let pool = POOL.get_or_init(|| {
+        let named =
+            || rayon::ThreadPoolBuilder::new().thread_name(|n| format!("lighthouse-worker-{n}"));
+        named()
+            .stack_size(STACK)
+            .build()
+            .or_else(|_| named().build())
+            .ok()
+    });
+    match pool {
+        Some(pool) => pool.install(op),
+        None => op(),
     }
 }

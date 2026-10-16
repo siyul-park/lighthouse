@@ -4,12 +4,12 @@
 use lighthouse_spec::Catalog;
 use std::fs;
 
-use lighthouse_engine::{Engine, Outcome};
+use lighthouse_engine::{Engine, Run};
 use lighthouse_model::Severity;
 use lighthouse_spec::Config;
 
 /// Checks a one-file crate with the design and core rules plus `rules`.
-pub(crate) fn check(source: &str, rules: &str) -> Outcome {
+pub(crate) fn check(source: &str, rules: &str) -> Run {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("Cargo.toml"),
@@ -37,7 +37,7 @@ pub(crate) fn check(source: &str, rules: &str) -> Outcome {
 
 pub(crate) const DOC_RULE: &str = "\"design/exported-doc\" = \"warn\"\n";
 
-pub(crate) fn rules_of(outcome: &Outcome) -> Vec<&str> {
+pub(crate) fn rules_of(outcome: &Run) -> Vec<&str> {
     outcome
         .diagnostics
         .iter()
@@ -197,12 +197,8 @@ fn outcome_lists_configured_rules_and_the_options_each_finding_ran_with() {
         "pub fn open() {}\n",
         "\"design/exported-doc\" = \"warn\"\n\"core/file-size\" = { level = \"warn\", options = { max = 1 } }\n",
     );
-    assert!(
-        outcome
-            .configured
-            .contains(&"design/exported-doc".to_owned())
-    );
-    assert!(outcome.configured.contains(&"core/file-size".to_owned()));
+    assert!(outcome.active.contains(&"design/exported-doc".to_owned()));
+    assert!(outcome.active.contains(&"core/file-size".to_owned()));
     let doc = outcome
         .diagnostics
         .iter()

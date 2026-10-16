@@ -5,7 +5,7 @@
 use lighthouse_spec::Catalog;
 use std::{fs, sync::LazyLock};
 
-use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun};
+use lighthouse_engine::{Engine, FixBinding, FixPlan};
 use lighthouse_model::{Applicability, RunScope};
 use lighthouse_model::{
     Capability, Diagnostic, EditOp, File, Fingerprint, FixOutcome, Fragment, Incomplete, LineIndex,
@@ -299,13 +299,6 @@ pub fn plan(fixer: &str, cap: Safety, mechanical: bool) -> FixPlan {
         },
     );
     plan
-}
-
-pub fn trusted() -> FixRun {
-    FixRun {
-        trusted: true,
-        ..FixRun::default()
-    }
 }
 
 pub fn text(dir: &TempDir) -> String {

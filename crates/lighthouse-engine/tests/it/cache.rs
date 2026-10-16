@@ -11,7 +11,7 @@ use std::{
     },
 };
 
-use lighthouse_engine::{Engine, Outcome};
+use lighthouse_engine::{Engine, Run};
 use lighthouse_model::{
     Applicability, Diagnostic, Fingerprint, Fragment, Options, Position, Reach, RunScope, Severity,
     Span,
@@ -179,7 +179,7 @@ fn project() -> TempDir {
 }
 
 /// Finds as `(file, message)`, to compare runs by.
-fn found(outcome: &Outcome) -> Vec<(String, String)> {
+fn found(outcome: &Run) -> Vec<(String, String)> {
     outcome
         .diagnostics
         .iter()

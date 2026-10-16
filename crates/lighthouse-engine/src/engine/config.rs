@@ -15,7 +15,7 @@ use super::{Error, Language};
 
 /// The rules the configuration enables for at least one file: the projects it
 /// extends and the entries it sets, resolved over `projects`.
-pub fn active_rules(config: &Config, projects: &Projects) -> Result<BTreeSet<String>, Error> {
+pub fn active(config: &Config, projects: &Projects) -> Result<BTreeSet<String>, Error> {
     let mut active: BTreeSet<String> = config
         .resolve(Path::new(""), "", projects)?
         .iter()

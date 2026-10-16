@@ -23,7 +23,7 @@ use lighthouse_spec::{Catalog, FixKind};
 
 pub use diff::unified_diff;
 
-use crate::Outcome;
+use crate::Run;
 
 /// How many apply-and-recheck rounds a run takes before it stops.
 pub const MAX_ROUNDS: usize = 5;
@@ -119,9 +119,6 @@ pub struct FixRun {
     /// catalog's; needs `rules` or `fingerprints`. Its proposals are
     /// suggestions at most.
     pub fixer: Option<String>,
-    /// The project is trusted to run commands: fixers that run a program, and
-    /// formatters. Without it they are declined or skipped.
-    pub trusted: bool,
 }
 
 /// A fix that was applied.
@@ -169,5 +166,5 @@ pub struct FixReport {
     pub notes: Vec<String>,
     /// The check of the state the run ended in. After a dry run it describes
     /// the fixed text, which is no longer on disk.
-    pub finished: Outcome,
+    pub finished: Run,
 }

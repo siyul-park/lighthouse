@@ -13,7 +13,7 @@ use super::{
     super::{AppliedFix, DeclinedFix},
     Orchestrator, Proposal,
 };
-use crate::{Error, Outcome};
+use crate::{Error, Run};
 
 impl Orchestrator<'_> {
     /// Applies what does not collide to the texts in memory, formats, verifies
@@ -21,10 +21,10 @@ impl Orchestrator<'_> {
     /// the resulting state, when nothing was dropped.
     pub(super) fn apply_round(
         &mut self,
-        before: Outcome,
+        before: Run,
         mut proposals: Vec<Proposal>,
         round: usize,
-    ) -> Result<Option<Outcome>, Error> {
+    ) -> Result<Option<Run>, Error> {
         // Safe fixes win a collision, so the ones that apply unasked are not
         // shut out by a suggestion.
         proposals.sort_by_key(|p| p.safety);
@@ -153,9 +153,9 @@ fn kept_proposals(proposals: Vec<Proposal>) -> (Vec<Proposal>, Vec<(Proposal, Fi
 /// none; a fingerprint can change when code moves, its owner does not), or a new
 /// gap in the analysis. A change that cannot be pinned on one file (a gap with
 /// no path, a finding in an untouched file) condemns them all.
-fn worse(before: &Outcome, after: &Outcome, changed: &[PathBuf]) -> BTreeMap<PathBuf, String> {
+fn worse(before: &Run, after: &Run, changed: &[PathBuf]) -> BTreeMap<PathBuf, String> {
     type Key = (PathBuf, String, String);
-    let count = |o: &Outcome| -> BTreeMap<Key, usize> {
+    let count = |o: &Run| -> BTreeMap<Key, usize> {
         let mut counts = BTreeMap::new();
         let loud = o
             .diagnostics

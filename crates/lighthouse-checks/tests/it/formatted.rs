@@ -3,7 +3,7 @@
 
 use std::fs;
 
-use lighthouse_engine::{Engine, Outcome};
+use lighthouse_engine::{Engine, Run};
 use lighthouse_spec::{Catalog, Config};
 
 const UPPERCASE: &str = r#"["tr", "a-z", "A-Z"]"#;
@@ -51,7 +51,7 @@ fn a_project_that_is_not_trusted_skips_the_formatter_with_a_notice() {
 
 /// Checks `a.txt` holding `text` with `core/formatted`, the text language
 /// formatted by `argv`.
-fn check(text: &str, argv: &str, trusted: bool) -> Outcome {
+fn check(text: &str, argv: &str, trusted: bool) -> Run {
     let dir = tempfile::tempdir().unwrap();
     fs::write(dir.path().join("a.txt"), text).unwrap();
     let config = Config::parse_inline(&format!(

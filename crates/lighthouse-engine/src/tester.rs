@@ -1,10 +1,12 @@
 use std::{fmt::Write as _, fs, path::Path};
 
+use tempfile::TempDir;
+
 use lighthouse_plugin::Registry;
 use lighthouse_spec::{Catalog, CheckKind, Config, Decision, Example, ExampleKind, FORMATTED};
 use serde_json::Value;
 
-use crate::{Engine, FixPlan, FixRun, ModelOptions, Outcome, unified_diff};
+use crate::{Engine, FixPlan, FixRun, ModelOptions, Run, unified_diff};
 
 /// Language of examples that need no language provider.
 const NEUTRAL: &str = "text";
@@ -86,14 +88,7 @@ impl<'a> RuleTester<'a> {
     }
 
     fn run(&self, decision: &Decision, example: &Example) -> Result<(), String> {
-        let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
-        for file in &example.files {
-            let path = dir.path().join(&file.path);
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-            }
-            fs::write(&path, file.text()).map_err(|e| e.to_string())?;
-        }
+        let dir = materialize(example)?;
         let registry = (self.registry)();
         let config = config(&registry, decision, example)?;
         let engine = Engine::new(registry, config, self.catalog, dir.path())
@@ -102,11 +97,7 @@ impl<'a> RuleTester<'a> {
         let outcome = engine
             .check(&[], &[decision.id().to_owned()])
             .map_err(|e| e.to_string())?;
-        let found: Vec<(u32, &str)> = outcome
-            .diagnostics
-            .iter()
-            .map(|d| (d.span.start.line, d.message.as_str()))
-            .collect();
+        let found = found(&outcome);
         match example.kind {
             ExampleKind::Valid if found.is_empty() => Ok(()),
             ExampleKind::Valid => Err(format!("expected no diagnostics, got {}", describe(&found))),
@@ -134,7 +125,6 @@ impl<'a> RuleTester<'a> {
         let run = FixRun {
             rules: vec![decision.id().to_owned()],
             unsafe_fixes: true,
-            trusted: self.trusted,
             ..FixRun::default()
         };
         let report = engine.fix(&plan, &run).map_err(|e| format!("fix: {e}"))?;
@@ -162,14 +152,9 @@ impl<'a> RuleTester<'a> {
             .check(&[], &[decision.id().to_owned()])
             .map_err(|e| e.to_string())?;
         if !again.diagnostics.is_empty() {
-            let found: Vec<(u32, &str)> = again
-                .diagnostics
-                .iter()
-                .map(|d| (d.span.start.line, d.message.as_str()))
-                .collect();
             return Err(format!(
                 "the rule still fires after the fix: {}",
-                describe(&found)
+                describe(&found(&again))
             ));
         }
         let second = engine
@@ -196,16 +181,9 @@ pub struct ExampleRun<'a> {
 
 impl ExampleRun<'_> {
     /// Checks the files of `example` in a directory of their own, with the
-    /// rule `rule` only, and gives the outcome.
-    pub fn outcome(self, rule: &str, example: &Example) -> Result<Outcome, String> {
-        let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
-        for file in &example.files {
-            let path = dir.path().join(&file.path);
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-            }
-            fs::write(&path, file.text()).map_err(|e| e.to_string())?;
-        }
+    /// rule `rule` only.
+    pub fn run(self, rule: &str, example: &Example) -> Result<Run, String> {
+        let dir = materialize(example)?;
         let engine = Engine::new(self.registry, self.config, self.catalog, dir.path())
             .map_err(|e| e.to_string())?
             .with_trust(self.trusted)
@@ -214,6 +192,27 @@ impl ExampleRun<'_> {
             .check(&[], &[rule.to_owned()])
             .map_err(|e| e.to_string())
     }
+}
+
+/// A directory holding the files of `example`.
+fn materialize(example: &Example) -> Result<TempDir, String> {
+    let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
+    for file in &example.files {
+        let path = dir.path().join(&file.path);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        fs::write(&path, file.text()).map_err(|e| e.to_string())?;
+    }
+    Ok(dir)
+}
+
+/// The line and message of each finding of the run.
+fn found(run: &Run) -> Vec<(u32, &str)> {
+    run.diagnostics
+        .iter()
+        .map(|d| (d.span.start.line, d.message.as_str()))
+        .collect()
 }
 
 fn config(registry: &Registry, decision: &Decision, example: &Example) -> Result<Config, String> {

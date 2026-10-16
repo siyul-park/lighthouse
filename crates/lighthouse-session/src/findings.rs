@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-use lighthouse_engine::Outcome;
+use lighthouse_engine as engine;
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Suppressed, Suppression};
 use lighthouse_spec::{Catalog, Decision, authored_severity};
 use lighthouse_store::{Observed, Ruling, Run, Standing, Store, Subject, Unchecked};
@@ -93,7 +93,7 @@ impl Seen {
 /// in the report with a note. A store that cannot be used never fails the
 /// check: it is reported, and judgments already recorded are still applied
 /// read-only.
-pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut Outcome) -> Remembered {
+pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut engine::Run) -> Remembered {
     let mut remembered = Remembered::default();
     let rulings = match record(root, catalog, outcome) {
         Ok((rulings, notices)) => {
@@ -159,7 +159,7 @@ pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut Outcome) -> Rememb
 pub fn apply_judgments(
     root: &Path,
     catalog: &Catalog,
-    outcome: &mut Outcome,
+    outcome: &mut engine::Run,
 ) -> Result<usize, lighthouse_store::Error> {
     let (rulings, _) = read_only(root, catalog, outcome)?;
     let before = outcome.diagnostics.len();
@@ -187,7 +187,7 @@ fn note(ruling: &Ruling) -> Option<String> {
 fn record(
     root: &Path,
     catalog: &Catalog,
-    outcome: &Outcome,
+    outcome: &engine::Run,
 ) -> Result<Judged, lighthouse_store::Error> {
     let mut store = Store::open(root)?;
     let run = run_of(root, catalog, outcome);
@@ -201,7 +201,7 @@ fn record(
 fn read_only(
     root: &Path,
     catalog: &Catalog,
-    outcome: &Outcome,
+    outcome: &engine::Run,
 ) -> Result<Judged, lighthouse_store::Error> {
     let Some(store) = Store::open_existing(root)? else {
         return Ok((BTreeMap::new(), Vec::new()));
@@ -214,7 +214,7 @@ fn read_only(
 }
 
 /// Every finding of the run as the store records it.
-fn observed_all(catalog: &Catalog, outcome: &Outcome) -> Vec<Observed> {
+fn observed_all(catalog: &Catalog, outcome: &engine::Run) -> Vec<Observed> {
     let mut seen = Seen::default();
     outcome
         .diagnostics
@@ -226,7 +226,7 @@ fn observed_all(catalog: &Catalog, outcome: &Outcome) -> Vec<Observed> {
 /// What the store needs to know about a run: its findings with their facts,
 /// options and rule versions, the paths and rules it covered, what it could not
 /// check, and where and with which tools it ran.
-fn run_of(root: &Path, catalog: &Catalog, outcome: &Outcome) -> Run {
+fn run_of(root: &Path, catalog: &Catalog, outcome: &engine::Run) -> Run {
     Run {
         observed: observed_all(catalog, outcome),
         reported: outcome
@@ -234,8 +234,8 @@ fn run_of(root: &Path, catalog: &Catalog, outcome: &Outcome) -> Run {
             .iter()
             .map(|p| slashed(&p.to_string_lossy()))
             .collect(),
-        ran: outcome.rules.clone(),
-        active: outcome.configured.clone(),
+        ran: outcome.ran.clone(),
+        active: outcome.active.clone(),
         unchecked: unchecked(&outcome.incomplete),
         commit: git::head(root),
         dirty: git::dirty(root),
@@ -244,7 +244,7 @@ fn run_of(root: &Path, catalog: &Catalog, outcome: &Outcome) -> Run {
     }
 }
 
-fn observed(d: &Diagnostic, catalog: &Catalog, outcome: &Outcome, seen: &mut Seen) -> Observed {
+fn observed(d: &Diagnostic, catalog: &Catalog, outcome: &engine::Run, seen: &mut Seen) -> Observed {
     let facts = outcome.facts.get(&d.fingerprint);
     let decision = catalog.decision(&d.rule_id);
     let mut record = Observed::from_diagnostic(d, facts.cloned().unwrap_or_else(|| json!({})));
@@ -264,7 +264,7 @@ fn options(
     decision: Option<&Decision>,
     d: &Diagnostic,
     facts: Option<&Value>,
-    outcome: &Outcome,
+    outcome: &engine::Run,
 ) -> Value {
     let configured = outcome
         .options

@@ -106,7 +106,7 @@ fn timings_go_to_stderr_and_leave_the_report_alone() {
         "merge",
         "rules",
         "rule core/file-size",
-        "identity",
+        "fingerprints",
         "store",
         "report",
         "total",

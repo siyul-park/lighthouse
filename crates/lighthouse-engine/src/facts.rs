@@ -8,16 +8,16 @@ use crate::engine::Input;
 
 /// What the analysis knew about the subject of each finding, frozen into the
 /// finding's record so a later review can snapshot it without re-analysis.
-pub(crate) struct Subjects<'a> {
+pub(crate) struct FindingFacts<'a> {
     project: &'a Project,
-    /// Measured facts (`[{symbol, value}]` lists, or a single value for a
-    /// file) by the file key they were computed for; the empty key holds
+    /// Measured facts (a map by symbol id, or a single value for a file) by
+    /// the file key they were computed for; the empty key holds
     /// project-scope facts.
     measured: BTreeMap<&'a str, Vec<(&'a str, &'a Value)>>,
     lines: BTreeMap<&'a Path, usize>,
 }
 
-impl<'a> Subjects<'a> {
+impl<'a> FindingFacts<'a> {
     pub(crate) fn new(project: &'a Project, facts: &'a Facts, inputs: &'a [Input]) -> Self {
         let mut measured: BTreeMap<&str, Vec<(&str, &Value)>> = BTreeMap::new();
         for (analyzer, key, value) in facts.iter() {
@@ -62,7 +62,7 @@ impl<'a> Subjects<'a> {
         let key = file.to_string_lossy();
         let mut measures = Map::new();
         for (analyzer, value) in self.measured.get(key.as_ref()).into_iter().flatten() {
-            if !is_symbol_list(value) {
+            if !is_symbol_map(value) {
                 measures.insert((*analyzer).to_owned(), (*value).clone());
             }
         }
@@ -115,12 +115,8 @@ impl<'a> Subjects<'a> {
         let mut measures = Map::new();
         for key in &keys {
             for (analyzer, value) in self.measured.get(key.as_str()).into_iter().flatten() {
-                let hit =
-                    value.as_array().into_iter().flatten().find(|item| {
-                        item.get("symbol").and_then(Value::as_str) == Some(id.as_str())
-                    });
-                if let Some(value) = hit.and_then(|item| item.get("value")) {
-                    measures.insert((*analyzer).to_owned(), value.clone());
+                if let Some(measured) = value.get(id.as_str()) {
+                    measures.insert((*analyzer).to_owned(), measured.clone());
                 }
             }
         }
@@ -128,10 +124,10 @@ impl<'a> Subjects<'a> {
     }
 }
 
-/// Whether a fact is a per-symbol measurement list rather than a value about
-/// the file itself.
-fn is_symbol_list(value: &Value) -> bool {
+/// Whether a fact is a map of measurements by symbol rather than a value
+/// about the file itself.
+fn is_symbol_map(value: &Value) -> bool {
     value
-        .as_array()
-        .is_some_and(|items| items.iter().all(|i| i.get("symbol").is_some()))
+        .as_object()
+        .is_some_and(|map| map.keys().all(|key| SymbolId::parse(key).is_some()))
 }

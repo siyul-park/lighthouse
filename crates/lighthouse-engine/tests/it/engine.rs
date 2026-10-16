@@ -676,10 +676,10 @@ fn timings() {
 
     let indexed: Vec<&str> = timings.index.iter().map(|(id, _)| id.as_str()).collect();
     assert_eq!(indexed, ["any"]);
-    let mut ruled: Vec<&str> = timings.rules.iter().map(|(id, _)| id.as_str()).collect();
+    let mut ruled: Vec<&str> = timings.rule.iter().map(|(id, _)| id.as_str()).collect();
     ruled.sort_unstable();
     assert_eq!(ruled, ["fake/all", "fake/each"]);
-    assert!(timings.rules.windows(2).all(|pair| pair[0].1 >= pair[1].1));
+    assert!(timings.rule.windows(2).all(|pair| pair[0].1 >= pair[1].1));
 }
 
 #[test]
@@ -691,13 +691,13 @@ fn outcome_states_report_scope_rules_that_ran_and_subject_facts() {
         .check(&[dir.path().join("b")], &["fake/each".to_owned()])
         .unwrap();
     assert_eq!(by_path.reported, [PathBuf::from("b")]);
-    assert_eq!(by_path.rules, ["fake/each"]);
+    assert_eq!(by_path.ran, ["fake/each"]);
     let facts = &by_path.facts[&by_path.diagnostics[0].fingerprint];
     assert_eq!(facts["language"], "any");
 
     let whole = engine.check(&[], &[]).unwrap();
     assert_eq!(whole.reported, [PathBuf::new()]);
-    assert_eq!(whole.rules, ["fake/all", "fake/each", "fake/semantic"]);
+    assert_eq!(whole.ran, ["fake/all", "fake/each", "fake/semantic"]);
 
     let none = engine.check_files(&[], &[]).unwrap();
     assert!(none.reported.is_empty());
@@ -708,27 +708,27 @@ fn outcome_states_report_scope_rules_that_ran_and_subject_facts() {
 const TEAM: &str = "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: fake/p\nspec:\n  rules:\n    fake/each: warn\n";
 
 #[test]
-fn active_rules() {
+fn active_rules_are_those_a_configuration_enables() {
     let config = |toml: &str| Config::parse_inline(toml).unwrap();
     let team =
         Catalog::from_local(BTreeMap::from([("team.yaml".to_owned(), TEAM.to_owned())])).unwrap();
     let overlaid = Catalog::overlay(Catalog::bundled(), &team).unwrap();
     let projects = overlaid.projects();
-    let from_project = lighthouse_engine::active_rules(
+    let from_project = lighthouse_engine::active(
         &config("plugins = [\"fake\"]\nextends = [\"fake/p\"]\n"),
         projects,
     )
     .unwrap();
     assert_eq!(from_project.into_iter().collect::<Vec<_>>(), ["fake/each"]);
 
-    let set_by_entry = lighthouse_engine::active_rules(
+    let set_by_entry = lighthouse_engine::active(
         &config("plugins = [\"fake\"]\n[rules]\n\"fake/all\" = \"warn\"\n"),
         projects,
     )
     .unwrap();
     assert_eq!(set_by_entry.into_iter().collect::<Vec<_>>(), ["fake/all"]);
 
-    let unknown = lighthouse_engine::active_rules(&config("extends = [\"nope/p\"]\n"), projects);
+    let unknown = lighthouse_engine::active(&config("extends = [\"nope/p\"]\n"), projects);
     assert!(unknown.is_err());
 }
 
@@ -749,9 +749,8 @@ fn an_overlaid_check_reads_the_overlay_not_the_disk_and_leaves_the_disk_alone() 
     let out = engine.check_overlaid(&[], &[], &overlays).unwrap();
     let plain = engine.check(&[], &[]).unwrap();
 
-    let hash = |o: &lighthouse_engine::Outcome, f: &str| {
-        o.project.file(Path::new(f)).unwrap().hash.clone()
-    };
+    let hash =
+        |o: &lighthouse_engine::Run, f: &str| o.project.file(Path::new(f)).unwrap().hash.clone();
     assert_eq!(
         hash(&out, "a.txt"),
         lighthouse_model::hash::sha256("overlaid")

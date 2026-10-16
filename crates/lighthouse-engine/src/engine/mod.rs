@@ -9,25 +9,21 @@ use ignore::WalkBuilder;
 use lighthouse_model::RunScope;
 use lighthouse_model::{
     Applicability, Diagnostic, File, Fingerprint, Fragment, Incomplete, Options, Project, Severity,
-    Suppressed, hash,
+    Suppressed,
 };
 use lighthouse_plugin::{
-    Context, Facts, Indexed, LanguageProvider, Memo, Notices, Registry, Rule, RuleManifest, Source,
-    Workspace,
+    Context, Facts, Indexed, LanguageProvider, Memo, Notices, Registry, Rule, Source, Workspace,
 };
 use lighthouse_spec::{
     Attributes, Catalog, Config, Error as SpecError, GeneratedCheck, GlobSet,
-    Models as BoundModels, Projects, RuleConfig, Rules, Subject as DecisionSubject,
+    Models as BoundModels, Projects, RuleConfig, Subject as DecisionSubject,
 };
 use rayon::prelude::*;
 use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
-    annotations,
-    documents::Documents,
-    subject::Subjects,
-    timings::{Timings, in_pool},
+    annotations, cache::Cache, documents::Documents, facts::FindingFacts, timings::Timings,
 };
 
 mod batch;
@@ -37,12 +33,13 @@ mod config;
 mod models;
 mod phases;
 mod run;
+mod scopes;
 
-use crate::cache::Cache;
 use cached::RunCache;
 pub use classifier::CommandModels;
-pub use config::active_rules;
+pub use config::active;
 use config::{constructors, io_error, load_languages, validate_config};
+pub(crate) use scopes::Scopes;
 
 /// Name of the file, in `.gitignore` syntax, that keeps files out of the
 /// analysis altogether, such as fixtures that are broken on purpose.
@@ -53,7 +50,7 @@ pub const EXIT_INCOMPLETE: u8 = 3;
 
 /// Why a run could not start or finish: invalid configuration, unknown or
 /// unlisted plugin or rule, or an unreadable path. Analysis gaps are not
-/// errors; they are [`Outcome::incomplete`].
+/// errors; they are [`Run::incomplete`].
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
@@ -82,7 +79,7 @@ pub enum Error {
 
 /// The result of a run: findings, notices and the parts that were not analyzed.
 #[derive(Debug, Default)]
-pub struct Outcome {
+pub struct Run {
     /// Sorted by file, line, column, rule; limited to the requested paths.
     pub diagnostics: Vec<Diagnostic>,
     /// Facts the user should know that leave the analysis complete: rules
@@ -102,7 +99,7 @@ pub struct Outcome {
     pub reported: Vec<PathBuf>,
     /// The rules that ran; a finding of any other rule says nothing about
     /// the code in this run.
-    pub rules: Vec<String>,
+    pub ran: Vec<String>,
     /// What the analysis knew about each finding's subject (language, symbol
     /// shape, function summary, measures), by fingerprint.
     pub facts: BTreeMap<Fingerprint, Value>,
@@ -111,14 +108,14 @@ pub struct Outcome {
     pub options: BTreeMap<Fingerprint, Options>,
     /// Every rule the configuration enables for some file, whether or not it
     /// ran: a remembered finding of any other rule is no longer configured.
-    pub configured: Vec<String>,
+    pub active: Vec<String>,
     /// The subjects no check decided, within the report scope: a model
     /// abstained, was unsure, failed, was over budget, or none is bound.
     /// They are not findings and never change the exit code.
     pub reviews: Vec<Diagnostic>,
-    /// With [`ModelOptions::collect`], the subjects rules put to models, by
+    /// With [`ModelOptions::collect`], the questions rules put to models, by
     /// fingerprint: the same payload a model is asked about or trained on.
-    pub subjects: BTreeMap<String, lighthouse_plugin::Subject>,
+    pub questions: BTreeMap<String, lighthouse_plugin::Subject>,
     /// The probability of failing that models gave each subject this run,
     /// by fingerprint, whether or not it reached the band.
     pub probabilities: BTreeMap<String, (f64, String)>,
@@ -135,7 +132,7 @@ pub struct Outcome {
     pub timings: Timings,
 }
 
-impl Outcome {
+impl Run {
     /// Process exit code: 3 if the analysis is incomplete, unless
     /// `allow_incomplete`; else 1 if any error diagnostic, or when the
     /// warnings fail the run as `fail_on` says; otherwise 0. `info` never
@@ -181,12 +178,6 @@ impl From<bool> for FailOn {
 /// Replacement texts by project-relative path; see [`Engine::check_overlaid`].
 pub type Overlays = BTreeMap<PathBuf, String>;
 
-/// What a run reports: everything under some paths, or exactly some files.
-enum Reported<'a> {
-    Paths(&'a [PathBuf]),
-    Files(&'a [PathBuf]),
-}
-
 struct Language {
     files: GlobSet,
     tests: GlobSet,
@@ -220,7 +211,7 @@ struct Gathered {
     notices: BTreeSet<String>,
     incomplete: Vec<Incomplete>,
     /// The time spent in each rule.
-    spent: BTreeMap<String, Duration>,
+    times: BTreeMap<String, Duration>,
 }
 
 impl Gathered {
@@ -229,8 +220,8 @@ impl Gathered {
         self.found.extend(later.found);
         self.notices.extend(later.notices);
         self.incomplete.extend(later.incomplete);
-        for (rule, time) in later.spent {
-            *self.spent.entry(rule).or_default() += time;
+        for (rule, time) in later.times {
+            *self.times.entry(rule).or_default() += time;
         }
     }
 }
@@ -269,7 +260,9 @@ pub struct Engine {
     active: BTreeSet<String>,
     /// Gaps known before the run, such as a plugin that failed to start.
     startup: Vec<Incomplete>,
-    trusted: bool,
+    /// The user trusts the project to run the commands its checks, fixers
+    /// and formatters name.
+    pub(crate) trusted: bool,
     /// How a `command` model provider is run, when the host knows.
     commands: Option<CommandModels>,
     /// The result cache; `None` runs every rule every time.
@@ -287,17 +280,16 @@ pub struct ModelOptions {
     /// Ask models that cost about the whole project, not only the files the
     /// run reports.
     pub all: bool,
-    /// Ask models only about these subjects (their fingerprints), wherever
+    /// Ask models only about the subjects with these fingerprints, wherever
     /// they are; the rest are left to review. Overrides `all` and the report
     /// scope for what models are asked.
-    pub subjects: Option<BTreeSet<String>>,
-    /// Keep the subjects rules put to models in [`Outcome::subjects`].
+    pub fingerprints: Option<BTreeSet<String>>,
+    /// Keep the questions rules put to models in [`Run::questions`].
     pub collect: bool,
-    /// The model a revision attached to a decision, by decision id.
+    /// The model a revision attached to a decision, by decision id. A run
+    /// without them is the check without the layer a revision adds, which is
+    /// what grading that layer starts from.
     pub attached: BTreeMap<String, String>,
-    /// Ignore `attached`: the run is the check without the layer a revision
-    /// adds, which is what grading that layer starts from.
-    pub detached: bool,
 }
 
 impl Engine {
@@ -312,12 +304,10 @@ impl Engine {
     ) -> Result<Self, Error> {
         let projects = catalog.projects().clone();
         let binding = config.models(&projects)?;
-        let mut notices = Vec::new();
         validate_config(&registry, &config, &binding, &projects)?;
         let (providers, languages) = load_languages(&registry, &config)?;
         let root = root.canonicalize().map_err(io_error(root))?;
-        let (attributes, found) = Attributes::new(&root);
-        notices.extend(found);
+        let (attributes, notices) = Attributes::new(&root);
         let ws = Workspace {
             root,
             languages: config
@@ -332,7 +322,8 @@ impl Engine {
             overlays: BTreeMap::new(),
             cache_dir: None,
         };
-        let mut engine = Self {
+        let enabled = active(&config, &projects)?;
+        Ok(Self {
             registry,
             config,
             projects,
@@ -352,19 +343,17 @@ impl Engine {
             ws,
             providers,
             languages,
-            active: BTreeSet::new(),
+            active: enabled,
             startup: Vec::new(),
             trusted: false,
             commands: None,
             cache: None,
             models: ModelOptions::default(),
-        };
-        engine.active = active_rules(&engine.config, &engine.projects)?;
-        Ok(engine)
+        })
     }
 
     /// Whether the configuration enables the rule `id`.
-    pub fn is_active(&self, id: &str) -> bool {
+    pub fn active(&self, id: &str) -> bool {
         self.active.contains(id)
     }
 
@@ -405,8 +394,8 @@ impl Engine {
 
     /// Checks the whole project, then reports diagnostics under `paths`.
     /// `only` restricts which rules run; empty means all enabled rules.
-    pub fn check(&self, paths: &[PathBuf], only: &[String]) -> Result<Outcome, Error> {
-        self.run(Reported::Paths(paths), only, &Overlays::new())
+    pub fn check(&self, paths: &[PathBuf], only: &[String]) -> Result<Run, Error> {
+        self.check_overlaid(paths, only, &Overlays::new())
     }
 
     /// Like `check`, but the project is read with `overlays` standing in for
@@ -417,15 +406,18 @@ impl Engine {
         paths: &[PathBuf],
         only: &[String],
         overlays: &Overlays,
-    ) -> Result<Outcome, Error> {
-        self.run(Reported::Paths(paths), only, overlays)
+    ) -> Result<Run, Error> {
+        self.validate_only(only)?;
+        let (scopes, gaps) = Scopes::new(paths, &self.ws.root)?;
+        self.run(scopes, gaps, only, overlays)
     }
 
     /// Checks the whole project, then reports only the diagnostics in `files`,
     /// project-relative paths of changed files. Unlike `check`, no files means
     /// nothing is reported, not everything: analysis scope is unchanged, only
     /// the report is narrowed.
-    pub fn check_files(&self, files: &[PathBuf], only: &[String]) -> Result<Outcome, Error> {
-        self.run(Reported::Files(files), only, &Overlays::new())
+    pub fn check_files(&self, files: &[PathBuf], only: &[String]) -> Result<Run, Error> {
+        self.validate_only(only)?;
+        self.run(Scopes::files(files), Vec::new(), only, &Overlays::new())
     }
 }

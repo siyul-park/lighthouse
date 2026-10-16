@@ -73,7 +73,7 @@ pub fn decision_rows(catalog: &Catalog, registry: &Registry, all: bool) -> Vec<D
 /// projects it extends and the entries it sets, resolved over the catalog.
 pub fn active_decisions(session: &Session) -> Result<BTreeSet<String>> {
     let catalog = session.catalog()?;
-    Ok(lighthouse_engine::active_rules(
+    Ok(lighthouse_engine::active(
         &session.config,
         catalog.projects(),
     )?)

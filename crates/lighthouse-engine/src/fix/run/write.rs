@@ -16,7 +16,7 @@ use super::{
     super::{AppliedFix, DeclinedFix, FileChange, FixReport},
     Orchestrator, Proposal,
 };
-use crate::{Error, Outcome};
+use crate::{Error, Run};
 
 /// What a round did to the files its proposals touch.
 #[derive(Default)]
@@ -41,7 +41,7 @@ impl Orchestrator<'_> {
     /// and the hash are checked again right before the rename); if a write
     /// fails, the files already written are put back and nothing counts as
     /// applied. A dry run writes nothing.
-    pub(super) fn finish(mut self, outcome: Result<Outcome, Error>) -> Result<FixReport, Error> {
+    pub(super) fn finish(mut self, outcome: Result<Run, Error>) -> Result<FixReport, Error> {
         let outcome = outcome?;
         let changed: Vec<PathBuf> = self
             .texts
@@ -153,7 +153,7 @@ impl Orchestrator<'_> {
         &self,
         changed: &[PathBuf],
         skipped: &BTreeMap<PathBuf, String>,
-        outcome: &Outcome,
+        outcome: &Run,
     ) -> Option<(String, String)> {
         let root = &self.engine.ws.root;
         let sources = Sources::new(root, &outcome.project, &self.texts);
@@ -182,7 +182,7 @@ impl Orchestrator<'_> {
 
     /// The new text of every file the kept proposals edit, formatted. Files
     /// whose edits cannot be applied, or whose formatter fails, are `failed`.
-    pub(super) fn candidates(&self, kept: &[Proposal], before: &Outcome) -> Candidates {
+    pub(super) fn candidates(&self, kept: &[Proposal], before: &Run) -> Candidates {
         let sources = Sources::new(&self.engine.ws.root, &before.project, &self.texts);
         let mut by_file: BTreeMap<PathBuf, Vec<&TextEdit>> = BTreeMap::new();
         for edit in kept.iter().flat_map(|p| &p.edits) {
@@ -249,7 +249,7 @@ impl Orchestrator<'_> {
             return Ok(text);
         };
         let shown = formatter.argv.join(" ");
-        if !self.trusted {
+        if !self.engine.trusted {
             if !*skipped {
                 *skipped = true;
                 notes.push(format!(

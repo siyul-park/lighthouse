@@ -4,7 +4,7 @@
 //! invalid example is `fail` where it says it expects a diagnostic; a valid
 //! one is `pass` wherever the check looked.
 
-use lighthouse_engine::{ExampleRun, ModelOptions, Outcome as Run};
+use lighthouse_engine::{ExampleRun, ModelOptions, Run};
 use lighthouse_ml::{
     labels::Shown,
     metrics::{Outcome, Truth},
@@ -37,7 +37,7 @@ pub(crate) fn shown(
                 ..models.clone()
             },
         }
-        .outcome(rule, example)
+        .run(rule, example)
         .map_err(|e| format!("{} {}: {e}", decision.id(), example.name))?;
         all.extend(of_example(decision.id(), example, &run));
     }
@@ -63,7 +63,7 @@ fn of_example(decision: &str, example: &Example, run: &Run) -> Vec<Shown> {
                     truth: Truth::Fail,
                     outcome: hit.map_or(Outcome::Unselected, |(outcome, _)| outcome),
                     subject: hit
-                        .and_then(|(_, d)| run.subjects.get(d.fingerprint.as_str()).cloned()),
+                        .and_then(|(_, d)| run.questions.get(d.fingerprint.as_str()).cloned()),
                 }
             })
             .collect(),
@@ -78,7 +78,7 @@ fn of_example(decision: &str, example: &Example, run: &Run) -> Vec<Shown> {
                     Outcome::Pass
                 }
             };
-            let asked = run.subjects.iter().map(|(fingerprint, subject)| Shown {
+            let asked = run.questions.iter().map(|(fingerprint, subject)| Shown {
                 key: format!("{prefix}:{fingerprint}"),
                 truth: Truth::Pass,
                 outcome: state(fingerprint),
@@ -87,7 +87,7 @@ fn of_example(decision: &str, example: &Example, run: &Run) -> Vec<Shown> {
             let flagged = run
                 .diagnostics
                 .iter()
-                .filter(|d| !run.subjects.contains_key(d.fingerprint.as_str()))
+                .filter(|d| !run.questions.contains_key(d.fingerprint.as_str()))
                 .map(|d| Shown {
                     key: format!("{prefix}:{}", d.fingerprint.as_str()),
                     truth: Truth::Pass,
