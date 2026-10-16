@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use lighthouse_protocol::{
-    EXIT, Handler, HandlerError, INDEX, INITIALIZE, IndexParams, IndexResult, InitializeParams,
+    EXIT, ErrorObject, Handler, INDEX, INITIALIZE, IndexParams, IndexResult, InitializeParams,
     InitializeResult, Message, SHUTDOWN, ServeError, read_message, serve, write_message,
 };
 use serde_json::{Value, json};
@@ -11,17 +11,16 @@ struct Stub {
 }
 
 impl Handler for Stub {
-    fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, HandlerError> {
-        Ok(InitializeResult {
-            id: params.root,
-            version: "1".to_owned(),
-            protocol_version: params.protocol_version,
-            languages: Vec::new(),
-            models: lighthouse_protocol::ListModelResponse::default(),
-        })
+    fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, ErrorObject> {
+        Ok(InitializeResult::new(
+            params.root,
+            "1",
+            Vec::new(),
+            Vec::new(),
+        ))
     }
 
-    fn index(&mut self, _: IndexParams) -> Result<IndexResult, HandlerError> {
+    fn index(&mut self, _: IndexParams) -> Result<IndexResult, ErrorObject> {
         if self.panic {
             panic!("boom");
         }
@@ -106,17 +105,31 @@ fn serve_survives_a_panicking_handler_and_reports_bad_input() {
 }
 
 #[test]
-fn handler_error_keeps_the_body_beside_the_message() {
+fn an_error_keeps_the_body_beside_the_message() {
     let body = json!({ "error": { "message": "no" } });
-    let error = HandlerError::with_data("the service answered 400", body.clone());
+    let error = ErrorObject::with_data("the service answered 400", body.clone());
     assert_eq!(error.message, "the service answered 400");
+    assert_eq!(error.code, -32603);
     assert_eq!(error.data, Some(body));
-    assert_eq!(HandlerError::from("plain".to_owned()).data, None);
+    assert_eq!(ErrorObject::from("plain".to_owned()).data, None);
 }
 
 #[test]
-fn with_data_is_what_a_handler_returns_for_an_api_error() {
-    let body = json!({ "error": { "message": "no" } });
-    let error = HandlerError::with_data("m", body.clone());
-    assert_eq!(error.data.as_ref(), Some(&body));
+fn a_host_of_another_protocol_version_is_refused_before_the_handler_sees_it() {
+    let mut output = Vec::new();
+    let mut params = initialize_params();
+    params["protocolVersion"] = json!("0.1");
+    let messages = [
+        Message::request(1, INITIALIZE, params).unwrap(),
+        Message::request(2, SHUTDOWN, ()).unwrap(),
+        Message::notification(EXIT),
+    ];
+
+    serve(input(&messages), &mut output, &mut Stub { panic: false }).unwrap();
+
+    let refused = replies(output)[0].error.clone().unwrap();
+    assert!(
+        refused.message.contains("speaks protocol 0.1"),
+        "{refused:?}"
+    );
 }

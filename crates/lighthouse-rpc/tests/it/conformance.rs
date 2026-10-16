@@ -51,12 +51,7 @@ const GO: Lang = Lang {
     globs: &["**/*.go"],
     test_globs: &["**/*_test.go"],
     constructor_prefixes: &["New", "new"],
-    capabilities: &[
-        wire::SEMANTIC_EDGES,
-        wire::EXTENT,
-        wire::REFERENCE_SITES,
-        wire::OVERLAYS,
-    ],
+    capabilities: &["semantic-edges", "extent", "reference-sites", "overlays"],
 };
 
 const RUST: Lang = Lang {
@@ -69,7 +64,7 @@ const RUST: Lang = Lang {
     globs: &["**/*.rs"],
     test_globs: &["**/tests/**/*.rs", "**/tests.rs", "**/benches/**/*.rs"],
     constructor_prefixes: &["new"],
-    capabilities: &[wire::EXTENT, wire::REFERENCE_SITES, wire::OVERLAYS],
+    capabilities: &["extent", "reference-sites", "overlays"],
 };
 
 const LANGS: [&Lang; 2] = [&GO, &RUST];

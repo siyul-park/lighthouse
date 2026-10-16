@@ -14,14 +14,15 @@ use std::{
     collections::BTreeMap,
     fs,
     io::{Read, Write, stdin, stdout},
+    path::Path,
     process::ExitCode,
 };
 
 use lighthouse_model::{canonical, hash::sha256};
 use lighthouse_protocol::{
-    Answer, Capabilities, CreateFineTuningJobRequest, FineTuningJob, FineTuningJobStatus, Handler,
-    HandlerError, IndexParams, IndexResult, InitializeParams, InitializeResult, ListModelResponse,
-    Model, Supports, SystemOneRequest, SystemOneResponse, VERSION, serve,
+    Answer, Capabilities, CreateFineTuningJobRequest, ErrorObject, FineTuningJob,
+    FineTuningJobStatus, Handler, InitializeParams, InitializeResult, Model, NOUL,
+    SystemOneRequest, SystemOneResponse, artifact_path, dataset_path, serve,
 };
 use serde_json::{Value, json};
 
@@ -30,41 +31,16 @@ const ID: &str = "fake-model";
 struct Fake;
 
 impl Handler for Fake {
-    fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, HandlerError> {
-        if params.protocol_version != VERSION {
-            return Err(format!("speaks protocol {VERSION}").into());
-        }
-        Ok(InitializeResult {
-            id: ID.to_owned(),
-            version: "1".to_owned(),
-            protocol_version: VERSION.to_owned(),
-            languages: Vec::new(),
-            models: ListModelResponse {
-                object: "list".to_owned(),
-                data: vec![Model {
-                    id: ID.to_owned(),
-                    object: "model".to_owned(),
-                    created: 0,
-                    owned_by: ID.to_owned(),
-                    capabilities: Capabilities {
-                        classification: Some(Supports { supported: true }),
-                        embedding: None,
-                        fine_tuning: Some(Supports { supported: true }),
-                    },
-                    version: "1".to_owned(),
-                    deterministic: true,
-                    abstains: true,
-                    cost: 0.0,
-                }],
-            },
-        })
+    fn initialize(&mut self, _: InitializeParams) -> Result<InitializeResult, ErrorObject> {
+        let model = Model {
+            deterministic: true,
+            abstains: true,
+            ..Model::new(ID, "1", Capabilities::classifier(true))
+        };
+        Ok(InitializeResult::new(ID, "1", Vec::new(), vec![model]))
     }
 
-    fn index(&mut self, _: IndexParams) -> Result<IndexResult, HandlerError> {
-        Err("fake-model indexes no language".into())
-    }
-
-    fn classify(&mut self, params: SystemOneRequest) -> Result<SystemOneResponse, HandlerError> {
+    fn classify(&mut self, params: SystemOneRequest) -> Result<SystemOneResponse, ErrorObject> {
         let noul = noul_of(&params.state.text);
         Ok(SystemOneResponse {
             model: params.model,
@@ -73,10 +49,7 @@ impl Handler for Fake {
         })
     }
 
-    fn train(
-        &mut self,
-        request: CreateFineTuningJobRequest,
-    ) -> Result<FineTuningJob, HandlerError> {
+    fn train(&mut self, request: CreateFineTuningJobRequest) -> Result<FineTuningJob, ErrorObject> {
         let hex = request
             .training_file
             .strip_prefix("sha256:")
@@ -88,7 +61,7 @@ impl Handler for Fake {
             .ok_or("no datasets")?
             .clone();
         let dir = request.metadata.get("dir").ok_or("no dir")?.clone();
-        let text = fs::read_to_string(format!("{datasets}/sha256/{hex}.jsonl"))
+        let text = fs::read_to_string(dataset_path(Path::new(&datasets), &hex))
             .map_err(|e| format!("the dataset: {e}"))?;
         let lines: Vec<Value> = text
             .lines()
@@ -97,14 +70,16 @@ impl Handler for Fake {
             .map_err(|e| format!("a training line: {e}"))?;
         // An artifact of the store, named by the digest of its canonical form:
         // the same dataset makes the same file.
-        let store = format!("{dir}/sha256");
-        fs::create_dir_all(&store).map_err(|e| e.to_string())?;
         let artifact = canonical(&json!({
             "card": {"rows": lines.len(), "chosen": "fake", "metrics": {"brier": 0.25}, "band": {"upper": null, "lower": null}, "trainingFile": request.training_file},
             "subjects": lines,
         }));
         let digest = sha256(&artifact);
-        fs::write(format!("{store}/{digest}.json"), artifact).map_err(|e| e.to_string())?;
+        let path = artifact_path(Path::new(&dir), &digest);
+        if let Some(store) = path.parent() {
+            fs::create_dir_all(store).map_err(|e| e.to_string())?;
+        }
+        fs::write(path, artifact).map_err(|e| e.to_string())?;
         Ok(FineTuningJob {
             id: "ftjob-1".to_owned(),
             created_at: 0,
@@ -166,7 +141,7 @@ fn command() -> ExitCode {
         .unwrap_or_default();
     let answers: serde_json::Map<String, Value> = questions
         .keys()
-        .map(|id| (id.clone(), json!({"type": "noul", "noul": noul})))
+        .map(|id| (id.clone(), json!({"type": NOUL, "noul": noul})))
         .collect();
     println!("{}", json!({"model": request["model"], "answers": answers}));
     ExitCode::SUCCESS
@@ -205,14 +180,5 @@ fn noul_of(text: &str) -> f64 {
 }
 
 fn answers<'a>(ids: impl Iterator<Item = &'a String>, noul: f64) -> BTreeMap<String, Answer> {
-    ids.map(|id| {
-        (
-            id.clone(),
-            Answer {
-                kind: "noul".to_owned(),
-                noul,
-            },
-        )
-    })
-    .collect()
+    ids.map(|id| (id.clone(), Answer::new(noul))).collect()
 }

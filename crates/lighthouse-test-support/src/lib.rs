@@ -10,6 +10,8 @@ use std::{
     sync::OnceLock,
 };
 
+use lighthouse_resource::API_VERSION;
+
 static LANG_GO: OnceLock<Option<PathBuf>> = OnceLock::new();
 
 static LANG_RUST: OnceLock<PathBuf> = OnceLock::new();
@@ -24,7 +26,7 @@ static FAKE_MODEL: OnceLock<PathBuf> = OnceLock::new();
 pub fn project(spec: &str) -> String {
     let spec: toml::Table = toml::from_str(spec).expect("a project spec is TOML");
     format!(
-        "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Project\"\nmetadata = {{ name = \"test\" }}\nspec = {}\n",
+        "apiVersion = \"{API_VERSION}\"\nkind = \"Project\"\nmetadata = {{ name = \"test\" }}\nspec = {}\n",
         inline(&toml::Value::Table(spec))
     )
 }
@@ -92,16 +94,16 @@ fn build_lang_go() -> Option<PathBuf> {
     }
     let out = workspace().join("target/plugins-test/lang-go");
     fs::create_dir_all(&out).expect("create plugin dir");
-    let tmp = out.join(format!("lang-go.{}.tmp", std::process::id()));
-    let status = Command::new("go")
-        .args(["build", "-o"])
-        .arg(&tmp)
-        .arg("./cmd/lang-go")
-        .current_dir(&source)
-        .status()
-        .expect("run go build");
-    assert!(status.success(), "go build of plugins/lang-go failed");
-    fs::rename(&tmp, out.join("lang-go")).expect("install plugin binary");
+    install(&out.join("lang-go"), |tmp| {
+        let status = Command::new("go")
+            .args(["build", "-o"])
+            .arg(tmp)
+            .arg("./cmd/lang-go")
+            .current_dir(&source)
+            .status()
+            .expect("run go build");
+        assert!(status.success(), "go build of plugins/lang-go failed");
+    });
     install_manifest(&source, &out, &goroot(&source));
     Some(out)
 }
@@ -120,30 +122,31 @@ fn goroot(dir: &Path) -> String {
 /// version manager shims resolving a toolchain from the directory of a
 /// throwaway project.
 fn install_manifest(source: &Path, out: &Path, goroot: &str) {
-    let text = fs::read_to_string(source.join("lighthouse-plugin.toml")).unwrap();
-    let tmp = out.join(format!("manifest.{}.tmp", std::process::id()));
+    let mut text = fs::read_to_string(source.join("lighthouse-plugin.toml")).unwrap();
     if cfg!(unix) {
-        let launcher = out.join(format!("run.{}.tmp", std::process::id()));
         let script = format!(
             "#!/bin/sh\nPATH=\"{goroot}/bin:$PATH\" exec \"$(dirname \"$0\")/lang-go\" \"$@\"\n"
         );
-        fs::write(&launcher, script).unwrap();
-        #[cfg(unix)]
-        fs::set_permissions(
-            &launcher,
-            std::os::unix::fs::PermissionsExt::from_mode(0o755),
-        )
-        .unwrap();
-        fs::rename(&launcher, out.join("run")).unwrap();
-        fs::write(
-            &tmp,
-            text.replace("command = \"./lang-go\"", "command = \"./run\""),
-        )
-        .unwrap();
-    } else {
-        fs::write(&tmp, text).unwrap();
+        install(&out.join("run"), |tmp| {
+            fs::write(tmp, script).unwrap();
+            #[cfg(unix)]
+            fs::set_permissions(tmp, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+        });
+        text = text.replace("command = \"./lang-go\"", "command = \"./run\"");
     }
-    fs::rename(&tmp, out.join("lighthouse-plugin.toml")).expect("install plugin manifest");
+    install(&out.join("lighthouse-plugin.toml"), |tmp| {
+        fs::write(tmp, text).unwrap();
+    });
+}
+
+/// Puts the file `make` writes at `to`: it is written beside it under a name of
+/// this process and renamed into place, so that test processes building the
+/// same plugin at once never see a partial file.
+fn install(to: &Path, make: impl FnOnce(&Path)) {
+    let name = to.file_name().expect("a file name").to_string_lossy();
+    let tmp = to.with_file_name(format!("{name}.{}.tmp", std::process::id()));
+    make(&tmp);
+    fs::rename(&tmp, to).unwrap_or_else(|e| panic!("install {}: {e}", to.display()));
 }
 
 /// Builds the plugin crate `name` under `plugins/` and installs its manifest
@@ -163,19 +166,16 @@ fn build_rust_plugin(name: &str) -> PathBuf {
     let built = target.join("debug").join(&binary);
     let out = workspace().join("target/plugins-test").join(name);
     fs::create_dir_all(&out).expect("create plugin dir");
-    let tmp = out.join(format!("{name}.{}.tmp", std::process::id()));
-    fs::copy(&built, &tmp).expect("copy plugin binary");
-    fs::rename(&tmp, out.join(&binary)).expect("install plugin binary");
-    let manifest = out.join(format!("manifest.{}.tmp", std::process::id()));
-    fs::copy(
-        workspace()
-            .join("plugins")
-            .join(name)
-            .join("lighthouse-plugin.toml"),
-        &manifest,
-    )
-    .expect("copy plugin manifest");
-    fs::rename(&manifest, out.join("lighthouse-plugin.toml")).expect("install plugin manifest");
+    install(&out.join(&binary), |tmp| {
+        fs::copy(&built, tmp).expect("copy plugin binary");
+    });
+    let manifest = workspace()
+        .join("plugins")
+        .join(name)
+        .join("lighthouse-plugin.toml");
+    install(&out.join("lighthouse-plugin.toml"), |tmp| {
+        fs::copy(&manifest, tmp).expect("copy plugin manifest");
+    });
     out
 }
 

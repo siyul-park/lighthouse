@@ -4,7 +4,6 @@
 use serde::{Deserialize, Serialize};
 
 use super::{Flow, Span, SymbolId, Target};
-use crate::Fingerprint;
 
 /// Size and shape measures of one function or method, keyed by its symbol.
 /// Counts are the provider's; nothing here is recomputed from source.
@@ -22,8 +21,6 @@ pub struct FunctionSummary {
     pub tokens: u32,
     /// Control-flow constructs in source order.
     pub flow: Vec<Flow>,
-    /// Normalized AST/token fingerprint for clone detection.
-    pub clone_fingerprint: Option<Fingerprint>,
     /// The body is a single call that passes the receiver and every parameter
     /// on, in order.
     pub forwards_to: Option<Target>,

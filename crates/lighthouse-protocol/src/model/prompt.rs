@@ -25,12 +25,12 @@ const REPLY_LABEL: &str = "Answer with one word: `true` if the subject violates 
 /// check's prompt when it differs from the requirement, and the examples of
 /// both criteria.
 pub fn system(id: &str, question: &Question) -> String {
-    render(id, question, REPLY_NOUL)
+    section(id, question, REPLY_NOUL)
 }
 
 /// [`system`] for a model whose first token is the answer: `true` or `false`.
 pub fn system_label(id: &str, question: &Question) -> String {
-    render(id, question, REPLY_LABEL)
+    section(id, question, REPLY_LABEL)
 }
 
 /// The user part: the subject's place, facts, neighbors and source.
@@ -50,7 +50,7 @@ pub fn subject(state: &State) -> String {
 }
 
 /// One text with everything, for a program that reads a prompt on stdin.
-pub fn prompt(params: &SystemOneRequest) -> String {
+pub fn render(params: &SystemOneRequest) -> String {
     let mut out = String::new();
     for (id, question) in &params.questions {
         out.push_str(&system(id, question));
@@ -94,7 +94,7 @@ pub fn json_in(text: &str) -> Option<Value> {
     serde_json::from_str(unfenced).ok()
 }
 
-fn render(id: &str, question: &Question, reply: &str) -> String {
+fn section(id: &str, question: &Question, reply: &str) -> String {
     let instructions = &question.instructions;
     let mut out = format!(
         "{JOB} {reply}\n\nDecision: {id}\nRequirement: {}\n",

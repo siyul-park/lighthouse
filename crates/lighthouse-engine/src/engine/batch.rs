@@ -86,7 +86,7 @@ impl<'a> RunModels<'a> {
                     continue;
                 }
                 groups
-                    .entry((route.id.clone(), digest_of(&subject.state())))
+                    .entry((route.id.clone(), digest_of(&subject.state)))
                     .or_default()
                     .push((p, i));
             }
@@ -166,7 +166,7 @@ impl<'a> RunModels<'a> {
             return Err(Miss::Budget);
         }
         let params = request_of(
-            pending[chunk[0].0].ask.subjects[chunk[0].1].state(),
+            pending[chunk[0].0].ask.subjects[chunk[0].1].state.clone(),
             chunk.iter().map(|&(p, _)| &pending[p].ask.decision),
         );
         self.calls.fetch_add(1, Ordering::SeqCst);

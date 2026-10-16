@@ -7,7 +7,7 @@
 
 use std::time::Duration;
 
-use lighthouse_protocol::HandlerError;
+use lighthouse_protocol::ErrorObject;
 use serde_json::Value;
 
 /// How long a request may take.
@@ -22,7 +22,7 @@ pub trait Client: Sync {
     /// Posts `body` to `url`, with `key` as the bearer when there is one. An
     /// error status fails with the error body the service answered, which
     /// travels as the `data` of the JSON-RPC error.
-    fn post(&self, url: &str, key: Option<&str>, body: &Value) -> Result<Value, HandlerError>;
+    fn post(&self, url: &str, key: Option<&str>, body: &Value) -> Result<Value, ErrorObject>;
 }
 
 /// The client over the network: one agent, so connections are reused.
@@ -42,7 +42,7 @@ impl Http {
 }
 
 impl Client for Http {
-    fn post(&self, url: &str, key: Option<&str>, body: &Value) -> Result<Value, HandlerError> {
+    fn post(&self, url: &str, key: Option<&str>, body: &Value) -> Result<Value, ErrorObject> {
         let mut pause = Duration::from_secs(1);
         for _ in 0..RETRIES {
             match post(&self.agent, url, key, body) {
@@ -67,7 +67,7 @@ struct Refused {
     status: Option<u16>,
     /// The seconds the service asked to wait.
     retry_after: Option<u64>,
-    error: HandlerError,
+    error: ErrorObject,
 }
 
 fn unreached(e: ureq::Error) -> Refused {
@@ -96,10 +96,10 @@ fn post(agent: &ureq::Agent, url: &str, key: Option<&str>, body: &Value) -> Resu
     let text = response.body_mut().read_to_string().unwrap_or_default();
     let message = format!("the service answered {status}");
     let error = if text.trim().is_empty() {
-        HandlerError::from(message)
+        ErrorObject::from(message)
     } else {
         let body = serde_json::from_str(&text).unwrap_or(Value::String(text));
-        HandlerError::with_data(message, body)
+        ErrorObject::with_data(message, body)
     };
     Err(Refused {
         status: Some(status),

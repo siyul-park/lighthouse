@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use lighthouse_protocol::{FrameError, Id, Message, read_message, write_message};
+use lighthouse_protocol::{ErrorObject, FrameError, Id, Message, read_message, write_message};
 use serde_json::json;
 
 fn roundtrip(message: &Message) -> Message {
@@ -79,7 +79,14 @@ fn malformed_input_is_an_error_not_a_panic() {
 
 #[test]
 fn error_responses_come_back_on_the_err_side() {
-    let failure = Message::failure(Some(Id::Number(1)), -32601, "nope");
+    let failure = Message::failure(
+        Some(Id::Number(1)),
+        ErrorObject {
+            code: -32601,
+            message: "nope".to_owned(),
+            data: None,
+        },
+    );
     let result = roundtrip(&failure)
         .into_result::<serde_json::Value>()
         .unwrap();
@@ -98,9 +105,12 @@ fn message_into_params_reads_absent_params_as_null() {
 }
 
 #[test]
-fn failure_with_carries_the_error_body_as_data() {
+fn a_failure_carries_the_error_body_as_data() {
     let body = json!({ "error": { "type": "rate_limit" } });
-    let failure = Message::failure_with(Some(Id::Number(2)), -32603, "busy", Some(body.clone()));
+    let failure = Message::failure(
+        Some(Id::Number(2)),
+        ErrorObject::with_data("busy", body.clone()),
+    );
     let error = roundtrip(&failure)
         .into_result::<serde_json::Value>()
         .unwrap()

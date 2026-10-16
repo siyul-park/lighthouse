@@ -14,7 +14,7 @@ use lighthouse_plugin::{
     Supports, SystemOneRequest, SystemOneResponse,
 };
 use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT};
-use lighthouse_protocol::{json_in, noul_of};
+use lighthouse_protocol::prompt::{self, json_in, noul_of};
 use lighthouse_resource::Duration as Limit;
 use lighthouse_spec::{ModelInput, ModelProvider};
 use serde_json::Value;
@@ -103,7 +103,7 @@ impl Classifier for Command {
         asked.model.clone_from(&self.model);
         let input = match self.stdin {
             ModelInput::Request => serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?,
-            ModelInput::Prompt => lighthouse_protocol::prompt(&asked).into_bytes(),
+            ModelInput::Prompt => prompt::render(&asked).into_bytes(),
         };
         let output = lighthouse_process::run(&Invocation {
             argv: &self.argv,

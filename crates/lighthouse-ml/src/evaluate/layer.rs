@@ -18,7 +18,8 @@ use std::{
 
 use lighthouse_model::stats::assign;
 use lighthouse_plugin::{
-    Classifier, DecisionRef, FineTuningJobStatus, MODELS_DIR, Subject, UPPER, decide, request_of,
+    Classifier, DATASETS_DIR, DecisionRef, FineTuningJobStatus, MODELS_DIR, Subject, UPPER,
+    artifact_path, decide, request_of,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -26,7 +27,7 @@ use serde_json::Value;
 use super::Found;
 use crate::{
     Result,
-    dataset::{self, DIR, Line},
+    dataset::{self, Line},
     labels::{Label, Shown},
     metrics::Outcome,
     train::job,
@@ -77,7 +78,7 @@ impl CrossFit {
         };
         let lines = dataset::read(layer.root, &file)?.ok_or_else(|| {
             format!(
-                "the labels `{}` learned from (dataset {file}) are not in {DIR}; train it again",
+                "the labels `{}` learned from (dataset {file}) are not in {DATASETS_DIR}; train it again",
                 layer.model
             )
         })?;
@@ -196,7 +197,7 @@ struct Scratch {
 impl Scratch {
     fn of(root: &Path) -> Self {
         let dirs = [
-            root.join(DIR).join("sha256"),
+            root.join(DATASETS_DIR).join("sha256"),
             root.join(MODELS_DIR).join("sha256"),
         ];
         let before = dirs.iter().flat_map(|dir| files(dir)).collect();
@@ -318,10 +319,7 @@ pub(crate) fn trained_on(root: &Path, model: &str) -> Result<Option<String>> {
     let Some(hex) = digest.strip_prefix("sha256:") else {
         return Ok(None);
     };
-    let path = root
-        .join(MODELS_DIR)
-        .join("sha256")
-        .join(format!("{hex}.json"));
+    let path = artifact_path(&root.join(MODELS_DIR), hex);
     let Ok(text) = fs::read_to_string(path) else {
         return Ok(None);
     };
@@ -341,7 +339,7 @@ fn ask(
 ) -> std::result::Result<(f64, String, f64), String> {
     let manifest = model.manifest();
     let answered = model
-        .classify(&request_of(subject.state(), [decision]))
+        .classify(&request_of(subject.state.clone(), [decision]))
         .map_err(|e| e.to_string())?;
     match answered.answers.get(&decision.id) {
         Some(answer) if answer.kind == "noul" => Ok((

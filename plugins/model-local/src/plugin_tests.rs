@@ -6,8 +6,8 @@ use std::{fs, path::Path};
 use lighthouse_model::hash::sha256;
 use lighthouse_protocol::{
     ClientInfo, CreateFineTuningJobRequest, Criteria, Criterion, FineTuneMethod,
-    FineTuningJobStatus, Handler, InitializeParams, Instructions, MODELS_DIR, Question, ResultKind,
-    State, SystemOneRequest, VERSION,
+    FineTuningJobStatus, Handler, InitializeParams, Instructions, MODELS_DIR, Question, State,
+    SystemOneRequest, VERSION,
 };
 use serde_json::{Value, json};
 
@@ -40,13 +40,13 @@ fn offline(name: &str) -> Result<Embedder, String> {
 
 /// `fails` bad and `passes` good subjects, each in a file of its own.
 fn dataset(fails: usize, passes: usize) -> String {
-    let texts: Vec<(String, ResultKind, String)> = (0..fails)
-        .map(|i| (format!("bad {i}"), ResultKind::Fail, format!("f{i}.go")))
-        .chain((0..passes).map(|i| (format!("good {i}"), ResultKind::Pass, format!("p{i}.go"))))
+    let texts: Vec<(String, bool, String)> = (0..fails)
+        .map(|i| (format!("bad {i}"), true, format!("f{i}.go")))
+        .chain((0..passes).map(|i| (format!("good {i}"), false, format!("p{i}.go"))))
         .collect();
     let rows: Vec<_> = texts
         .iter()
-        .map(|(text, label, group)| (text.as_str(), *label, group.as_str(), PERSON))
+        .map(|(text, fail, group)| (text.as_str(), *fail, group.as_str(), PERSON))
         .collect();
     file(&rows)
 }

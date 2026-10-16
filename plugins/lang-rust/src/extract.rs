@@ -275,7 +275,6 @@ impl Extractor<'_> {
             returns,
             tokens: count_tokens(block.to_token_stream()),
             flow: facts.flow,
-            clone_fingerprint: None,
             forwards_to: facts.forwards_to,
             signature,
             events: events::of(self.src, block),

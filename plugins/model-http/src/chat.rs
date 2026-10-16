@@ -24,8 +24,8 @@ use async_openai::types::chat::{
     CreateChatCompletionResponse, ResponseFormat, ResponseFormatJsonSchema,
 };
 use lighthouse_protocol::{
-    Answer, HandlerError, Question, SystemOneRequest, SystemOneResponse, json_in, noul_of,
-    response_schema, subject_text, system_label_text, system_text,
+    Answer, ErrorObject, Question, SystemOneRequest, SystemOneResponse,
+    prompt::{self, json_in, noul_of, response_schema},
 };
 use serde_json::{Map, Value};
 
@@ -44,8 +44,8 @@ pub fn systemone(
     client: &dyn Client,
     endpoint: &Endpoint,
     request: &SystemOneRequest,
-) -> Result<SystemOneResponse, HandlerError> {
-    let user = subject_text(&request.state);
+) -> Result<SystemOneResponse, ErrorObject> {
+    let user = prompt::subject(&request.state);
     let mut answers = BTreeMap::new();
     for (id, question) in &request.questions {
         let (asked, fixed) = completion(&request.model, id, question, &user, endpoint.logprobs);
@@ -56,13 +56,7 @@ pub fn systemone(
             verbalized_noul(&response, id)?
         };
         if let Some(noul) = noul {
-            answers.insert(
-                id.clone(),
-                Answer {
-                    kind: "noul".to_owned(),
-                    noul,
-                },
-            );
+            answers.insert(id.clone(), Answer::new(noul));
         }
     }
     let mode = if endpoint.logprobs { "-logprobs" } else { "" };
@@ -77,7 +71,7 @@ pub fn systemone(
 fn verbalized_noul(
     response: &CreateChatCompletionResponse,
     id: &str,
-) -> Result<Option<f64>, HandlerError> {
+) -> Result<Option<f64>, ErrorObject> {
     let text = response
         .choices
         .first()
@@ -91,7 +85,7 @@ fn verbalized_noul(
 fn label_noul(
     response: &CreateChatCompletionResponse,
     model: &str,
-) -> Result<Option<f64>, HandlerError> {
+) -> Result<Option<f64>, ErrorObject> {
     let content = response
         .choices
         .first()
@@ -141,9 +135,9 @@ fn completion(
     logprobs: bool,
 ) -> (CreateChatCompletionRequest, Map<String, Value>) {
     let system = if logprobs {
-        system_label_text(id, question)
+        prompt::system_label(id, question)
     } else {
-        system_text(id, question)
+        prompt::system(id, question)
     };
     let mut request = CreateChatCompletionRequest {
         model: model.to_owned(),
@@ -261,7 +255,7 @@ mod tests {
     }
 
     /// P(fail) the logprobs mode reads from one reply.
-    fn read(reply: Value) -> Result<Option<f64>, HandlerError> {
+    fn read(reply: Value) -> Result<Option<f64>, ErrorObject> {
         let client = Recording::replying(vec![reply]);
         let result = systemone(&client, &labelled(None), &request(&["d/x"]))?;
         Ok(result.answers.get("d/x").map(|a| a.noul))

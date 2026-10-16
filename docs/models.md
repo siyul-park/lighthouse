@@ -35,7 +35,7 @@ command (`decision eval`, `model train`) asks for it.
 
 `plugins/model-http` serves the standard HTTP APIs. Each published API is one module of free
 functions, one per operation used, named by the API's operation in snake_case, with the signature
-`fn(client: &dyn Client, endpoint: &Endpoint, request: &Req) -> Result<Resp, HandlerError>`:
+`fn(client: &dyn Client, endpoint: &Endpoint, request: &Req) -> Result<Resp, ErrorObject>`:
 
 | Module | Operation | Types |
 | --- | --- | --- |

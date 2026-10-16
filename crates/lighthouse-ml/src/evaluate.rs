@@ -201,7 +201,7 @@ impl Found {
             .map(|(fingerprint, subject)| {
                 (
                     fingerprint.clone(),
-                    format!("{} {}", subject.file, subject.id),
+                    format!("{} {}", subject.state.file, subject.id),
                 )
             })
             .collect();

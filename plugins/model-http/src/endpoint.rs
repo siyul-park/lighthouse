@@ -1,6 +1,6 @@
 //! How a provider is reached, from the `options` of its declaration.
 
-use lighthouse_protocol::HandlerError;
+use lighthouse_protocol::ErrorObject;
 use serde_json::{Map, Value};
 
 #[derive(Debug, PartialEq)]
@@ -18,7 +18,7 @@ pub struct Endpoint {
 impl Endpoint {
     /// Reads the options of a provider: `spec` (one name or a list),
     /// `baseUrl`, `keyEnv`, `logprobs` and `extraBody`.
-    pub fn of(options: &Map<String, Value>) -> Result<Self, HandlerError> {
+    pub fn of(options: &Map<String, Value>) -> Result<Self, ErrorObject> {
         let text = |key: &str| options.get(key).and_then(Value::as_str).map(str::to_owned);
         let specs = match options.get("spec") {
             Some(Value::String(name)) => vec![name.clone()],
@@ -49,7 +49,7 @@ impl Endpoint {
 
     /// The key in the environment variable `keyEnv` names; `None` when the
     /// provider needs none.
-    pub fn key(&self) -> Result<Option<String>, HandlerError> {
+    pub fn key(&self) -> Result<Option<String>, ErrorObject> {
         match self.key_env.as_deref() {
             None => Ok(None),
             Some(name) => std::env::var(name)

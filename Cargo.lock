@@ -1892,6 +1892,7 @@ dependencies = [
 name = "lighthouse-test-support"
 version = "0.1.0"
 dependencies = [
+ "lighthouse-resource",
  "toml",
 ]
 

@@ -7,7 +7,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{Question, ResultKind, State};
+use crate::{NOUL, Question, State};
 
 /// One message of a supervised fine-tuning line, in OpenAI's chat format.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -38,11 +38,10 @@ pub struct TrainingLine {
 }
 
 impl TrainingLine {
-    /// The line for a subject asked `question` and labelled `label` (`Review`
-    /// is no label and is read as a pass).
-    pub fn new(question: &Question, state: &State, label: ResultKind, keys: LineKeys<'_>) -> Self {
+    /// The line for a subject asked `question` and labelled a fail or a pass.
+    pub fn new(question: &Question, state: &State, fail: bool, keys: LineKeys<'_>) -> Self {
         let json = |value: Value| value.to_string();
-        let noul = i32::from(label == ResultKind::Fail);
+        let noul = i32::from(fail);
         let message = |role: &str, content: String| ChatMessage {
             role: role.to_owned(),
             content,
@@ -59,7 +58,7 @@ impl TrainingLine {
                 ),
                 message(
                     "assistant",
-                    json(serde_json::json!({"type": "noul", "noul": noul})),
+                    json(serde_json::json!({"type": NOUL, "noul": noul})),
                 ),
             ],
             weight: keys.weight,
@@ -203,6 +202,17 @@ pub struct Capabilities {
     pub fine_tuning: Option<Supports>,
 }
 
+impl Capabilities {
+    /// A classifier, which learns from labels when `trains`.
+    pub fn classifier(trains: bool) -> Self {
+        Self {
+            classification: Some(Supports { supported: true }),
+            embedding: None,
+            fine_tuning: trains.then_some(Supports { supported: true }),
+        }
+    }
+}
+
 /// One model: OpenAI's model object, with what Lighthouse adds
 /// (`version`, `cost`, `deterministic`, `abstains`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -219,6 +229,24 @@ pub struct Model {
     pub abstains: bool,
 }
 
+impl Model {
+    /// The model `id` of the plugin that owns it, at `version`: free, not
+    /// deterministic and never abstaining until the caller says otherwise.
+    pub fn new(id: &str, version: &str, capabilities: Capabilities) -> Self {
+        Self {
+            id: id.to_owned(),
+            object: "model".to_owned(),
+            created: 0,
+            owned_by: id.to_owned(),
+            capabilities,
+            version: version.to_owned(),
+            cost: 0.0,
+            deterministic: false,
+            abstains: false,
+        }
+    }
+}
+
 /// OpenAI's list object of models: how a plugin says which it offers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ListModelResponse {
@@ -229,14 +257,19 @@ pub struct ListModelResponse {
 
 impl Default for ListModelResponse {
     fn default() -> Self {
-        Self {
-            object: "list".to_owned(),
-            data: Vec::new(),
-        }
+        Self::new(Vec::new())
     }
 }
 
 impl ListModelResponse {
+    /// The list of `data`.
+    pub fn new(data: Vec<Model>) -> Self {
+        Self {
+            object: "list".to_owned(),
+            data,
+        }
+    }
+
     /// Whether the list has no model.
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()

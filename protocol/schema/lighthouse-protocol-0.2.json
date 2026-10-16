@@ -10,7 +10,7 @@
         },
         "type": {
           "default": "noul",
-          "description": "`noul`.",
+          "description": "[`NOUL`].",
           "type": "string"
         }
       },
@@ -743,13 +743,6 @@
     "FunctionSummary": {
       "description": "Size and shape measures of one function or method, keyed by its symbol id.",
       "properties": {
-        "clone_fingerprint": {
-          "description": "Reserved: normalized fingerprint for clone detection.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "constructs": {
           "description": "The function builds a value of its owner type without taking one: an\nassociated function without a receiver that returns `Self` or the\nowner. Added in 0.1 before 1.0.",
           "type": "boolean"
@@ -1242,7 +1235,7 @@
           "$ref": "#/$defs/Instructions"
         },
         "type": {
-          "description": "`noul`.",
+          "description": "[`NOUL`].",
           "type": "string"
         }
       },

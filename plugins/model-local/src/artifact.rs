@@ -10,6 +10,7 @@ use lighthouse_model::{
     hash::{digest, sha256},
     stats::FOLDS,
 };
+use lighthouse_protocol::artifact_path;
 use serde_json::{Map, Value, json};
 
 use crate::{
@@ -96,9 +97,10 @@ pub fn document(card: Value, embedder: &str, model: &Model, examples: &Examples)
 pub fn write(dir: &Path, document: &Value) -> Result<String, String> {
     let text = canonical(document);
     let hex = sha256(&text);
-    let store = dir.join("sha256");
-    fs::create_dir_all(&store).map_err(|e| format!("{}: {e}", store.display()))?;
-    let path = store.join(format!("{hex}.json"));
+    let path = artifact_path(dir, &hex);
+    if let Some(store) = path.parent() {
+        fs::create_dir_all(store).map_err(|e| format!("{}: {e}", store.display()))?;
+    }
     fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok(hex)
 }
@@ -113,7 +115,7 @@ pub fn load(dir: &Path, hex: &str) -> Result<Loaded, String> {
     {
         return Err(format!("`sha256:{hex}` is not a SHA-256 digest"));
     }
-    let path = dir.join("sha256").join(format!("{hex}.json"));
+    let path = artifact_path(dir, hex);
     let text = fs::read_to_string(&path).map_err(|e| {
         format!(
             "{}: {e} (expected sha256:{hex}); run `lighthouse model rebuild`",

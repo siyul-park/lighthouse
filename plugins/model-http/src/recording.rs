@@ -1,6 +1,6 @@
 //! A client for tests: records what it is asked and answers with the next reply.
 
-use lighthouse_protocol::HandlerError;
+use lighthouse_protocol::ErrorObject;
 use serde_json::Value;
 
 use crate::http::Client;
@@ -26,7 +26,7 @@ impl Recording {
 }
 
 impl Client for Recording {
-    fn post(&self, url: &str, _: Option<&str>, body: &Value) -> Result<Value, HandlerError> {
+    fn post(&self, url: &str, _: Option<&str>, body: &Value) -> Result<Value, ErrorObject> {
         self.asked
             .lock()
             .unwrap()

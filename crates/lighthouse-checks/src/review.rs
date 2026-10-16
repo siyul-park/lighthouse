@@ -5,9 +5,7 @@
 
 use cel::Program;
 use lighthouse_model::{Diagnostic, Position, Span, SymbolId, hash};
-use lighthouse_plugin::{
-    Ask, Ctx, DecisionRef, Judged, Neighbor, RuleManifest, Subject, SubjectContext,
-};
+use lighthouse_plugin::{Ask, Ctx, DecisionRef, Judged, Neighbor, RuleManifest, State, Subject};
 use lighthouse_spec::{CelCheck, Decision, Select};
 use serde_json::{Value, json};
 
@@ -160,14 +158,14 @@ impl Review {
                 || diagnostic.file.to_string_lossy().into_owned(),
                 |s| s.id.as_str().to_owned(),
             ),
-            language: ctx
-                .project
-                .file(&diagnostic.file)
-                .map(|f| f.lang.clone())
-                .unwrap_or_default(),
-            file: diagnostic.file.to_string_lossy().replace('\\', "/"),
-            text,
-            context: SubjectContext {
+            state: State {
+                language: ctx
+                    .project
+                    .file(&diagnostic.file)
+                    .map(|f| f.lang.clone())
+                    .unwrap_or_default(),
+                file: diagnostic.file.to_string_lossy().replace('\\', "/"),
+                text,
                 facts: candidate.fact.clone(),
                 neighbors: symbol.map_or_else(Vec::new, |s| neighbors(ctx, source, s)),
             },

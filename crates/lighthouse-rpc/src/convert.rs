@@ -6,19 +6,31 @@ use std::{
 };
 
 use lighthouse_model as core;
-use lighthouse_plugin::{Conventions, Indexed, ProviderManifest, Source};
+use lighthouse_plugin::{Indexed, ProviderManifest, Source};
 use lighthouse_protocol as wire;
 
-/// Core capability for a wire capability name; unknown names are ignored.
-pub(crate) fn capability(name: &str) -> Option<core::Capability> {
-    match name {
-        wire::SEMANTIC_EDGES => Some(core::Capability::SemanticEdges),
-        wire::EXTENT => Some(core::Capability::Extent),
-        wire::REFERENCE_SITES => Some(core::Capability::ReferenceSites),
-        wire::COMPLETE_REFERENCES => Some(core::Capability::CompleteReferences),
-        wire::OVERLAYS => Some(core::Capability::Overlays),
-        _ => None,
+/// `fn $name` converting a wire enum to the core enum of the same variants.
+macro_rules! variants {
+    ($($name:ident: $kind:ident { $($variant:ident),+ $(,)? })+) => {$(
+        fn $name(kind: wire::$kind) -> core::$kind {
+            match kind {
+                $(wire::$kind::$variant => core::$kind::$variant,)+
+            }
+        }
+    )+};
+}
+
+variants! {
+    symbol_kind: SymbolKind {
+        Function, Method, Type, Field, Variant, Const, Var, Interface, Test,
     }
+    visibility: Visibility { Public, Private, Internal }
+    role: SymbolRole { TestHelper, Fixture }
+    edge_kind: EdgeKind { Calls, References, Imports, Contains, Implements, AccessesPrivate }
+    resolution: Resolution { Semantic, Syntactic, Heuristic }
+    flow_kind: FlowKind { If, ElseIf, Else, Switch, Loop, Catch, Jump, Logic, Recursion }
+    event_kind: EventKind { Panic, Unwrap, ErrorCompare, ErrorAssert, ErrorfUnwrapped }
+    test_style: TestStyle { Table, Scenario }
 }
 
 /// The core manifest of a language a plugin declared in `initialize`.
@@ -26,14 +38,12 @@ pub(crate) fn provider_manifest(language: &wire::ProviderManifest) -> ProviderMa
     ProviderManifest {
         id: language.id.clone(),
         globs: language.globs.clone(),
-        conventions: Conventions {
-            test_globs: language.conventions.test_globs.clone(),
-            constructor_prefixes: language.conventions.constructor_prefixes.clone(),
-        },
+        conventions: language.conventions.clone(),
+        // A name this host does not know is a capability it cannot use.
         capabilities: language
             .capabilities
             .iter()
-            .filter_map(|c| capability(c))
+            .filter_map(|c| c.parse().ok())
             .collect(),
         fallback: language.fallback,
         priority: language.priority,
@@ -175,11 +185,7 @@ fn symbol(s: wire::Symbol) -> Result<core::Symbol, String> {
     Ok(core::Symbol {
         id: id(s.id)?,
         kind: symbol_kind(s.kind),
-        visibility: match s.visibility {
-            wire::Visibility::Public => core::Visibility::Public,
-            wire::Visibility::Private => core::Visibility::Private,
-            wire::Visibility::Internal => core::Visibility::Internal,
-        },
+        visibility: visibility(s.visibility),
         owner: s.owner.map(id).transpose()?,
         file: PathBuf::from(s.file),
         span: span(s.span),
@@ -190,27 +196,6 @@ fn symbol(s: wire::Symbol) -> Result<core::Symbol, String> {
         optional: s.optional,
         type_ref: s.type_ref.map(type_ref),
     })
-}
-
-fn role(role: wire::SymbolRole) -> core::SymbolRole {
-    match role {
-        wire::SymbolRole::TestHelper => core::SymbolRole::TestHelper,
-        wire::SymbolRole::Fixture => core::SymbolRole::Fixture,
-    }
-}
-
-fn symbol_kind(kind: wire::SymbolKind) -> core::SymbolKind {
-    match kind {
-        wire::SymbolKind::Function => core::SymbolKind::Function,
-        wire::SymbolKind::Method => core::SymbolKind::Method,
-        wire::SymbolKind::Type => core::SymbolKind::Type,
-        wire::SymbolKind::Field => core::SymbolKind::Field,
-        wire::SymbolKind::Variant => core::SymbolKind::Variant,
-        wire::SymbolKind::Const => core::SymbolKind::Const,
-        wire::SymbolKind::Var => core::SymbolKind::Var,
-        wire::SymbolKind::Interface => core::SymbolKind::Interface,
-        wire::SymbolKind::Test => core::SymbolKind::Test,
-    }
 }
 
 fn span(s: wire::Span) -> core::Span {
@@ -226,41 +211,20 @@ fn span(s: wire::Span) -> core::Span {
 
 fn edge(e: wire::Edge) -> Result<core::Edge, String> {
     Ok(core::Edge {
-        kind: match e.kind {
-            wire::EdgeKind::Calls => core::EdgeKind::Calls,
-            wire::EdgeKind::References => core::EdgeKind::References,
-            wire::EdgeKind::Imports => core::EdgeKind::Imports,
-            wire::EdgeKind::Contains => core::EdgeKind::Contains,
-            wire::EdgeKind::Implements => core::EdgeKind::Implements,
-            wire::EdgeKind::AccessesPrivate => core::EdgeKind::AccessesPrivate,
-        },
+        kind: edge_kind(e.kind),
         from: match e.from {
             wire::Node::Module(path) => core::Node::Module(path),
             wire::Node::Symbol(raw) => core::Node::Symbol(id(raw)?),
         },
         to: core::Target::Path(e.to),
-        resolution: match e.resolution {
-            wire::Resolution::Semantic => core::Resolution::Semantic,
-            wire::Resolution::Syntactic => core::Resolution::Syntactic,
-            wire::Resolution::Heuristic => core::Resolution::Heuristic,
-        },
+        resolution: resolution(e.resolution),
         site: e.site.map(span),
     })
 }
 
 fn flow(f: wire::Flow) -> core::Flow {
     core::Flow {
-        kind: match f.kind {
-            wire::FlowKind::If => core::FlowKind::If,
-            wire::FlowKind::ElseIf => core::FlowKind::ElseIf,
-            wire::FlowKind::Else => core::FlowKind::Else,
-            wire::FlowKind::Switch => core::FlowKind::Switch,
-            wire::FlowKind::Loop => core::FlowKind::Loop,
-            wire::FlowKind::Catch => core::FlowKind::Catch,
-            wire::FlowKind::Jump => core::FlowKind::Jump,
-            wire::FlowKind::Logic => core::FlowKind::Logic,
-            wire::FlowKind::Recursion => core::FlowKind::Recursion,
-        },
+        kind: flow_kind(f.kind),
         nesting: f.nesting,
         arms: f.arms,
         operators: f.operators,
@@ -278,7 +242,6 @@ fn function(f: wire::FunctionSummary) -> Result<core::FunctionSummary, String> {
         returns: f.returns,
         tokens: f.tokens,
         flow: f.flow.into_iter().map(flow).collect(),
-        clone_fingerprint: f.clone_fingerprint.map(core::Fingerprint::from_raw),
         forwards_to: f.forwards_to.map(core::Target::Path),
         signature: core::Signature {
             params: f.signature.params.into_iter().map(type_ref).collect(),
@@ -301,13 +264,7 @@ fn type_ref(t: wire::TypeRef) -> core::TypeRef {
 
 fn event(e: wire::Event) -> core::Event {
     core::Event {
-        kind: match e.kind {
-            wire::EventKind::Panic => core::EventKind::Panic,
-            wire::EventKind::Unwrap => core::EventKind::Unwrap,
-            wire::EventKind::ErrorCompare => core::EventKind::ErrorCompare,
-            wire::EventKind::ErrorAssert => core::EventKind::ErrorAssert,
-            wire::EventKind::ErrorfUnwrapped => core::EventKind::ErrorfUnwrapped,
-        },
+        kind: event_kind(e.kind),
         span: span(e.span),
         detail: e.detail,
     }
@@ -317,10 +274,7 @@ fn test(t: wire::TestCase) -> Result<core::TestCase, String> {
     Ok(core::TestCase {
         symbol: id(t.symbol)?,
         nesting: t.nesting,
-        style: match t.style {
-            wire::TestStyle::Table => core::TestStyle::Table,
-            wire::TestStyle::Scenario => core::TestStyle::Scenario,
-        },
+        style: test_style(t.style),
         targets: t.targets.into_iter().map(core::Target::Path).collect(),
     })
 }

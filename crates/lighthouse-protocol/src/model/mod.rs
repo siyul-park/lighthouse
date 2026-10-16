@@ -3,4 +3,5 @@
 
 pub(crate) mod jobs;
 pub(crate) mod methods;
-pub(crate) mod prompt;
+pub mod prompt;
+pub(crate) mod store;

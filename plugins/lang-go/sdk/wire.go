@@ -207,18 +207,17 @@ type Flow struct {
 
 // FunctionSummary is the measured shape of one function or method.
 type FunctionSummary struct {
-	Symbol           string     `json:"symbol"`
-	MaxNesting       int        `json:"max_nesting"`
-	Statements       int        `json:"statements"`
-	TopLevel         int        `json:"top_level"`
-	Params           int        `json:"params"`
-	Returns          int        `json:"returns"`
-	Tokens           int        `json:"tokens"`
-	Flow             []Flow     `json:"flow"`
-	CloneFingerprint string     `json:"clone_fingerprint,omitempty"`
-	ForwardsTo       string     `json:"forwards_to,omitempty"`
-	Signature        *Signature `json:"signature,omitempty"`
-	Events           []Event    `json:"events,omitempty"`
+	Symbol     string     `json:"symbol"`
+	MaxNesting int        `json:"max_nesting"`
+	Statements int        `json:"statements"`
+	TopLevel   int        `json:"top_level"`
+	Params     int        `json:"params"`
+	Returns    int        `json:"returns"`
+	Tokens     int        `json:"tokens"`
+	Flow       []Flow     `json:"flow"`
+	ForwardsTo string     `json:"forwards_to,omitempty"`
+	Signature  *Signature `json:"signature,omitempty"`
+	Events     []Event    `json:"events,omitempty"`
 	// Implementation marks a method that satisfies an interface; Constructs a
 	// function without a receiver that returns a type of its package.
 	Implementation   bool `json:"implementation,omitempty"`

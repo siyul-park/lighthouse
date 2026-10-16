@@ -67,7 +67,6 @@ fn summary(of: &Symbol) -> FunctionSummary {
         returns: 0,
         tokens: 3,
         flow: Vec::new(),
-        clone_fingerprint: None,
         forwards_to: None,
         signature: Default::default(),
         events: Vec::new(),

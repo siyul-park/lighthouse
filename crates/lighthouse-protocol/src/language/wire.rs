@@ -53,6 +53,24 @@ pub struct InitializeResult {
     pub models: crate::ListModelResponse,
 }
 
+impl InitializeResult {
+    /// The answer of plugin `id` at `version`, speaking this crate's protocol.
+    pub fn new(
+        id: impl Into<String>,
+        version: impl Into<String>,
+        languages: Vec<ProviderManifest>,
+        models: Vec<crate::Model>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            version: version.into(),
+            protocol_version: crate::VERSION.to_owned(),
+            languages,
+            models: crate::ListModelResponse::new(models),
+        }
+    }
+}
+
 /// What a language provider declares: the language it indexes, how the host
 /// routes files to it and what it guarantees. A plugin's `initialize` result
 /// lists one per language.
@@ -156,7 +174,7 @@ pub struct IndexParams {
 
 /// A plugin's answer to `index`: one fragment per analyzed file plus what could
 /// not be analyzed. A file is never silently dropped.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct IndexResult {
     /// One fragment per analyzed file, ordered by path.
     pub fragments: Vec<Fragment>,
@@ -404,9 +422,6 @@ pub struct FunctionSummary {
     pub tokens: u32,
     /// Control-flow constructs in source order.
     pub flow: Vec<Flow>,
-    /// Reserved: normalized fingerprint for clone detection.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub clone_fingerprint: Option<String>,
     /// The types of the parameters and results, receiver excluded, one entry
     /// per occurrence in order. Added in 0.1 before 1.0; empty when the plugin
     /// does not report types.

@@ -76,9 +76,10 @@ fn a_model_that_fits_its_labels_is_graded_on_them_by_refits() {
         let state = run
             .subjects()
             .values()
-            .find(|s| s.text == text)
+            .find(|s| s.state.text == text)
             .unwrap()
-            .state();
+            .state
+            .clone();
         memory
             .classify(&lighthouse_plugin::request_of(state, [&decision]))
             .unwrap()

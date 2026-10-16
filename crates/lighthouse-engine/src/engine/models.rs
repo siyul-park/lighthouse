@@ -347,7 +347,7 @@ impl<'a> RunModels<'a> {
         self.scopes.is_none_or(|scopes| {
             scopes
                 .iter()
-                .any(|scope| std::path::Path::new(&subject.file).starts_with(scope))
+                .any(|scope| std::path::Path::new(&subject.state.file).starts_with(scope))
         })
     }
 
@@ -368,7 +368,7 @@ impl<'a> RunModels<'a> {
         key.part("model-answer")
             .part(&ask.revision)
             .part(format!("{model}@{version}"))
-            .part(digest_of(&subject.state()))
+            .part(digest_of(&subject.state))
             .part(digest_of(&Question::of(&ask.decision)));
         key.finish()
     }

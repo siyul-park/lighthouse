@@ -3,7 +3,7 @@ mod model;
 
 pub use language::{
     frame::{ErrorObject, FrameError, Id, Message, read_message, write_message},
-    serve::{Handler, HandlerError, ServeError, serve},
+    serve::{Handler, ServeError, serve},
     wire::{
         CacheRef, Call, ClientInfo, Comment, Context, Conventions, Edge, EdgeKind, Event,
         EventKind, FileInfo, FileRef, Flow, FlowKind, Fragment, FunctionSummary, Incomplete,
@@ -19,20 +19,12 @@ pub use model::{
         FineTuningJobStatus, LineKeys, ListModelResponse, Model, Supports, TrainingLine,
     },
     methods::{
-        Answer, Criteria, Criterion, DecisionRef, Example, Instructions, ModelMethods, Neighbor,
-        Question, ResultKind, State, Subject, SubjectContext, SystemOneRequest, SystemOneResponse,
+        Answer, Criteria, Criterion, DecisionRef, Example, Instructions, ModelMethods, NOUL,
+        Neighbor, Question, State, Subject, SystemOneRequest, SystemOneResponse,
     },
-    prompt::{
-        json_in, noul_of, prompt, response_schema, subject as subject_text, system as system_text,
-        system_label as system_label_text,
-    },
+    prompt,
+    store::{DATASETS_DIR, MODELS_DIR, artifact_path, dataset_path},
 };
-
-/// Where models are stored by content, under the project root:
-/// `sha256/<hex>.json` in it is one trained model. A trainer is told the
-/// directory in the `dir` of its request; a model that serves a trained model
-/// finds it under the root it was initialized with.
-pub const MODELS_DIR: &str = ".lighthouse/models";
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.
 pub const VERSION: &str = "0.2";
@@ -49,21 +41,6 @@ pub const TRAIN: &str = "lighthouse/train";
 pub const SHUTDOWN: &str = "shutdown";
 /// Notification: end the process; valid only after [`SHUTDOWN`] was answered.
 pub const EXIT: &str = "exit";
-
-/// Capability: `calls`, `references`, `implements` and `accesses-private`
-/// edges come from the language's own semantic analysis.
-pub const SEMANTIC_EDGES: &str = "semantic-edges";
-/// Capability: every symbol carries its `extent`, the full declaration range.
-pub const EXTENT: &str = "extent";
-/// Capability: the provider analyzes the `overlays` of an index request instead
-/// of the files on disk. A host declines fixes in files of a provider without it.
-pub const OVERLAYS: &str = "overlays";
-/// Capability: every reference to a symbol is reported as an edge with a
-/// `site`, signatures, fields and receivers included. No bundled provider
-/// declares it yet.
-pub const COMPLETE_REFERENCES: &str = "complete-references";
-/// Capability: edges carry the `site` where the reference occurs.
-pub const REFERENCE_SITES: &str = "reference-sites";
 
 /// JSON Schema of every method's params and result, with the wire types under
 /// `$defs`.

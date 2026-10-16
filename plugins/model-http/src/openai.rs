@@ -4,7 +4,7 @@
 //! type features are enabled, and the HTTP is this crate's [`Client`].
 
 use async_openai::types::chat::{CreateChatCompletionRequest, CreateChatCompletionResponse};
-use lighthouse_protocol::HandlerError;
+use lighthouse_protocol::ErrorObject;
 use serde_json::{Map, Value};
 
 use crate::{endpoint::Endpoint, http::Client};
@@ -19,7 +19,7 @@ pub fn create_chat_completion(
     endpoint: &Endpoint,
     request: &CreateChatCompletionRequest,
     fixed: Map<String, Value>,
-) -> Result<CreateChatCompletionResponse, HandlerError> {
+) -> Result<CreateChatCompletionResponse, ErrorObject> {
     let mut body = serde_json::to_value(request).map_err(|e| e.to_string())?;
     if let Some(fields) = body.as_object_mut() {
         fields.extend(fixed);
@@ -31,7 +31,7 @@ pub fn create_chat_completion(
         &body,
     )?;
     if let Some(error) = response.get("error").filter(|e| !e.is_null()) {
-        return Err(HandlerError::with_data(
+        return Err(ErrorObject::with_data(
             "the provider answered with an error",
             error.clone(),
         ));

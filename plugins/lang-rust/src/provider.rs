@@ -8,8 +8,8 @@ use std::{
 };
 
 use lighthouse_protocol::{
-    self as wire, Conventions, FileInfo, Fragment, Handler, HandlerError, Incomplete, IndexParams,
-    IndexResult, InitializeParams, InitializeResult, ProviderManifest,
+    Conventions, ErrorObject, FileInfo, Fragment, Handler, Incomplete, IndexParams, IndexResult,
+    InitializeParams, InitializeResult, ProviderManifest,
 };
 use serde::Deserialize;
 
@@ -29,43 +29,33 @@ pub struct Provider {
 }
 
 impl Handler for Provider {
-    fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, HandlerError> {
-        if params.protocol_version != wire::VERSION {
-            return Err(format!(
-                "host speaks protocol {}, this plugin speaks {}",
-                params.protocol_version,
-                wire::VERSION
-            )
-            .into());
-        }
-        Ok(InitializeResult {
-            id: self.id.clone(),
-            version: self.version.clone(),
-            protocol_version: wire::VERSION.to_owned(),
-            languages: vec![ProviderManifest {
-                id: LANGUAGE.to_owned(),
-                globs: vec!["**/*.rs".to_owned()],
-                priority: 0,
-                fallback: false,
-                conventions: Conventions {
-                    test_globs: vec![
-                        "**/tests/**/*.rs".to_owned(),
-                        "**/tests.rs".to_owned(),
-                        "**/benches/**/*.rs".to_owned(),
-                    ],
-                    constructor_prefixes: vec!["new".to_owned()],
-                },
-                capabilities: vec![
-                    lighthouse_protocol::EXTENT.to_owned(),
-                    lighthouse_protocol::REFERENCE_SITES.to_owned(),
-                    lighthouse_protocol::OVERLAYS.to_owned(),
+    fn initialize(&mut self, _: InitializeParams) -> Result<InitializeResult, ErrorObject> {
+        let language = ProviderManifest {
+            id: LANGUAGE.to_owned(),
+            globs: vec!["**/*.rs".to_owned()],
+            priority: 0,
+            fallback: false,
+            conventions: Conventions {
+                test_globs: vec![
+                    "**/tests/**/*.rs".to_owned(),
+                    "**/tests.rs".to_owned(),
+                    "**/benches/**/*.rs".to_owned(),
                 ],
-            }],
-            models: wire::ListModelResponse::default(),
-        })
+                constructor_prefixes: vec!["new".to_owned()],
+            },
+            capabilities: ["extent", "reference-sites", "overlays"]
+                .map(str::to_owned)
+                .to_vec(),
+        };
+        Ok(InitializeResult::new(
+            &self.id,
+            &self.version,
+            vec![language],
+            Vec::new(),
+        ))
     }
 
-    fn index(&mut self, params: IndexParams) -> Result<IndexResult, HandlerError> {
+    fn index(&mut self, params: IndexParams) -> Result<IndexResult, ErrorObject> {
         let options = match params.context.options.get(LANGUAGE) {
             Some(raw) => match Options::deserialize(raw) {
                 Ok(options) => options,

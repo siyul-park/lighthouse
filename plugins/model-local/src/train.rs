@@ -5,7 +5,7 @@
 use std::{fs, path::Path};
 
 use lighthouse_model::hash::sha256;
-use lighthouse_protocol::CreateFineTuningJobRequest;
+use lighthouse_protocol::{CreateFineTuningJobRequest, dataset_path};
 use serde_json::Value;
 
 use crate::{
@@ -96,9 +96,7 @@ fn read(request: &CreateFineTuningJobRequest) -> Result<Dataset, String> {
         .training_file
         .strip_prefix("sha256:")
         .ok_or("the training file is not a `sha256:<hex>` digest")?;
-    let path = Path::new(metadata(request, "datasets")?)
-        .join("sha256")
-        .join(format!("{hex}.jsonl"));
+    let path = dataset_path(Path::new(metadata(request, "datasets")?), hex);
     let text = fs::read_to_string(&path)
         .map_err(|e| format!("the training file {}: {e}", path.display()))?;
     if sha256(&text) != hex {

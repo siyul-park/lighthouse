@@ -11,18 +11,18 @@ use std::{
 };
 
 use lighthouse_model::{canonical, hash::sha256};
-use lighthouse_plugin::{DecisionRef, LineKeys, Question, ResultKind, Subject, TrainingLine};
+use lighthouse_plugin::{
+    DATASETS_DIR, DecisionRef, LineKeys, Question, Subject, TrainingLine, dataset_path,
+};
 use serde_json::Value;
 
 use crate::Result;
 
-/// The directory datasets are stored in, under the project root.
-pub const DIR: &str = ".lighthouse/datasets";
-
 /// A labelled subject, ready to be a line.
 pub(crate) struct Row {
     pub(crate) subject: Subject,
-    pub(crate) label: ResultKind,
+    /// Whether the subject fails the decision.
+    pub(crate) fail: bool,
     pub(crate) weight: f64,
     pub(crate) key: String,
     pub(crate) attribution: Value,
@@ -52,15 +52,15 @@ pub(crate) fn write(root: &Path, decision: &DecisionRef, mut rows: Vec<Row>) -> 
     let question = Question::of(decision);
     let mut lines = Vec::new();
     for row in &rows {
-        let group = if row.subject.file.is_empty() {
+        let group = if row.subject.state.file.is_empty() {
             row.key.as_str()
         } else {
-            row.subject.file.as_str()
+            row.subject.state.file.as_str()
         };
         let line = TrainingLine::new(
             &question,
-            &row.subject.state(),
-            row.label,
+            &row.subject.state,
+            row.fail,
             LineKeys {
                 weight: row.weight,
                 group,
@@ -79,9 +79,10 @@ pub(crate) fn write(root: &Path, decision: &DecisionRef, mut rows: Vec<Row>) -> 
 pub(crate) fn write_lines(root: &Path, lines: &[String]) -> Result<Dataset> {
     let text: String = lines.iter().map(|line| format!("{line}\n")).collect();
     let hex = sha256(&text);
-    let dir = root.join(DIR).join("sha256");
-    fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let path = dir.join(format!("{hex}.jsonl"));
+    let path = dataset_path(&root.join(DATASETS_DIR), &hex);
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    }
     fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok(Dataset {
         digest: format!("sha256:{hex}"),
@@ -93,7 +94,7 @@ pub(crate) fn write_lines(root: &Path, lines: &[String]) -> Result<Dataset> {
 /// The path of the dataset `digest` (`sha256:<hex>`) names.
 pub(crate) fn path_of(root: &Path, digest: &str) -> PathBuf {
     let hex = digest.strip_prefix("sha256:").unwrap_or(digest);
-    root.join(DIR).join("sha256").join(format!("{hex}.jsonl"))
+    dataset_path(&root.join(DATASETS_DIR), hex)
 }
 
 /// The lines of the dataset `digest` names, or `None` when the store does not

@@ -2,9 +2,8 @@
 //! to the API that serves it.
 
 use lighthouse_protocol::{
-    Capabilities, Handler, HandlerError, IndexParams, IndexResult, InitializeParams,
-    InitializeResult, ListModelResponse, Model, Supports, SystemOneRequest, SystemOneResponse,
-    VERSION,
+    Capabilities, ErrorObject, Handler, InitializeParams, InitializeResult, Model,
+    SystemOneRequest, SystemOneResponse,
 };
 
 use crate::{
@@ -28,41 +27,21 @@ impl Plugin {
 }
 
 impl Handler for Plugin {
-    fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, HandlerError> {
-        if params.protocol_version != VERSION {
-            return Err(format!("speaks protocol {VERSION}").into());
-        }
-        Ok(InitializeResult {
-            id: ID.to_owned(),
-            version: env!("CARGO_PKG_VERSION").to_owned(),
-            protocol_version: VERSION.to_owned(),
-            languages: Vec::new(),
-            models: ListModelResponse {
-                object: "list".to_owned(),
-                data: vec![Model {
-                    id: ID.to_owned(),
-                    object: "model".to_owned(),
-                    created: 0,
-                    owned_by: ID.to_owned(),
-                    capabilities: Capabilities {
-                        classification: Some(Supports { supported: true }),
-                        embedding: None,
-                        fine_tuning: None,
-                    },
-                    version: PROMPT_VERSION.to_owned(),
-                    deterministic: false,
-                    abstains: true,
-                    cost: 1.0,
-                }],
-            },
-        })
+    fn initialize(&mut self, _: InitializeParams) -> Result<InitializeResult, ErrorObject> {
+        let model = Model {
+            abstains: true,
+            cost: 1.0,
+            ..Model::new(ID, PROMPT_VERSION, Capabilities::classifier(false))
+        };
+        Ok(InitializeResult::new(
+            ID,
+            env!("CARGO_PKG_VERSION"),
+            Vec::new(),
+            vec![model],
+        ))
     }
 
-    fn index(&mut self, _: IndexParams) -> Result<IndexResult, HandlerError> {
-        Err("model-http indexes no language".into())
-    }
-
-    fn classify(&mut self, params: SystemOneRequest) -> Result<SystemOneResponse, HandlerError> {
+    fn classify(&mut self, params: SystemOneRequest) -> Result<SystemOneResponse, ErrorObject> {
         if params.model.is_empty() {
             return Err("the request names no model".into());
         }

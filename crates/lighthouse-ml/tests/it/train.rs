@@ -35,7 +35,7 @@ fn label(key: &str, truth: Truth, source: Source) -> Label {
 }
 
 fn subject() -> Subject {
-    serde_json::from_value(json!({"key": "k", "kind": "function", "id": "a", "language": "rust", "file": "a.rs", "text": "fn a() {}"}))
+    serde_json::from_value(json!({"key": "k", "kind": "function", "id": "a", "state": {"language": "rust", "file": "a.rs", "text": "fn a() {}", "facts": null, "neighbors": []}}))
         .expect("a subject")
 }
 

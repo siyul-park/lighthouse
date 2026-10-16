@@ -7,6 +7,11 @@ use thiserror::Error;
 const JSONRPC: &str = "2.0";
 const MAX_BODY: usize = 256 * 1024 * 1024;
 
+pub(super) const PARSE_ERROR: i64 = -32700;
+pub(super) const METHOD_NOT_FOUND: i64 = -32601;
+pub(super) const INVALID_PARAMS: i64 = -32602;
+pub(super) const INTERNAL_ERROR: i64 = -32603;
+
 /// Why a message could not be read or written; the stream is unusable after
 /// any variant but a clean end of input.
 #[derive(Debug, Error)]
@@ -29,13 +34,45 @@ pub enum Id {
     Text(String),
 }
 
-/// JSON-RPC error carried by a failed response.
+/// JSON-RPC error carried by a failed response, and what a handler fails
+/// with: a message turned into one is an internal error, and `data` holds the
+/// body of the error behind it when there is one (an API's own error object).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ErrorObject {
     pub code: i64,
     pub message: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data: Option<Value>,
+}
+
+impl ErrorObject {
+    pub(super) fn new(code: i64, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+            data: None,
+        }
+    }
+
+    /// An internal error with the error body of the API that caused it.
+    pub fn with_data(message: impl Into<String>, data: Value) -> Self {
+        Self {
+            data: Some(data),
+            ..Self::from(message.into())
+        }
+    }
+}
+
+impl From<String> for ErrorObject {
+    fn from(message: String) -> Self {
+        Self::new(INTERNAL_ERROR, message)
+    }
+}
+
+impl From<&str> for ErrorObject {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
 }
 
 /// One JSON-RPC 2.0 message: a request or notification (`method`), or a
@@ -88,25 +125,10 @@ impl Message {
     }
 
     /// An error response; `id` is `None` when the request could not be read.
-    pub fn failure(id: Option<Id>, code: i64, message: impl Into<String>) -> Self {
-        Self::failure_with(id, code, message, None)
-    }
-
-    /// An error response whose `data` carries the body of the error behind it,
-    /// such as the one an API answered with.
-    pub fn failure_with(
-        id: Option<Id>,
-        code: i64,
-        message: impl Into<String>,
-        data: Option<Value>,
-    ) -> Self {
+    pub fn failure(id: Option<Id>, error: ErrorObject) -> Self {
         Self {
             id,
-            error: Some(ErrorObject {
-                code,
-                message: message.into(),
-                data,
-            }),
+            error: Some(error),
             ..Self::empty()
         }
     }

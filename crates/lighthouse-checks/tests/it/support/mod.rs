@@ -148,7 +148,6 @@ impl World {
             returns: 0,
             tokens: 0,
             flow: flow.to_vec(),
-            clone_fingerprint: None,
             forwards_to: None,
             signature: Default::default(),
             events: Vec::new(),

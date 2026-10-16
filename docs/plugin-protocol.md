@@ -46,8 +46,8 @@ run verifies candidate edits this way, and writes only after they pass. `lang-go
 passes them to `go/packages` as its `Overlay`, `lang-rust` reads them in place of the
 files.
 
-Reserved for later versions, not implemented in 0.2: `clone_fingerprint`, and
-further methods for rules and analyzers.
+Reserved for later versions, not implemented in 0.2: further methods for rules
+and analyzers.
 
 ## Methods
 

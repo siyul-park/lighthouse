@@ -10,15 +10,16 @@ use std::{
 };
 
 use lighthouse_plugin::{
-    Classifier, CreateFineTuningJobRequest, DecisionRef, FineTuneMethod, FineTuneSupervisedMethod,
-    FineTuningJob, MODELS_DIR, ResultKind, Subject, UPPER, decide, request_of,
+    Classifier, CreateFineTuningJobRequest, DATASETS_DIR, DecisionRef, FineTuneMethod,
+    FineTuneSupervisedMethod, FineTuningJob, MODELS_DIR, Subject, UPPER, artifact_path, decide,
+    request_of,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::{
     Result,
-    dataset::{self, DIR, Row},
+    dataset::{self, Row},
     evaluate::Repo,
     labels::{Label, Source},
     metrics::Truth,
@@ -185,7 +186,7 @@ pub(crate) fn job(
             ("decision".to_owned(), decision.to_owned()),
             (
                 "datasets".to_owned(),
-                root.join(DIR).to_string_lossy().into_owned(),
+                root.join(DATASETS_DIR).to_string_lossy().into_owned(),
             ),
             (
                 "dir".to_owned(),
@@ -212,9 +213,9 @@ fn rows_of(
     let mut rows = Vec::new();
     let mut seen = BTreeSet::new();
     for label in labels.iter().filter(|l| teaches(l)) {
-        let kind = match label.truth {
-            Truth::Fail => ResultKind::Fail,
-            Truth::Pass => ResultKind::Pass,
+        let fail = match label.truth {
+            Truth::Fail => true,
+            Truth::Pass => false,
             Truth::NotApplicable => continue,
         };
         let Some(subject) = label.subject.as_ref().or_else(|| observed.get(&label.key)) else {
@@ -224,7 +225,7 @@ fn rows_of(
         rows.push(Sourced {
             row: Row {
                 subject: subject.clone(),
-                label: kind,
+                fail,
                 weight: label.weight,
                 key: label.key.clone(),
                 attribution: label.attribution.clone(),
@@ -246,21 +247,21 @@ fn taught(
     let attribution = json!({"type": "SoftwareAgent", "hadRole": "model"});
     let mut labelled = Vec::new();
     for (key, subject) in unlabelled {
-        let answered = teacher.classify(&request_of(subject.state(), [decision]))?;
+        let answered = teacher.classify(&request_of(subject.state.clone(), [decision]))?;
         let Some(noul) = answered.answers.get(&decision.id).map(|a| a.noul) else {
             continue;
         };
-        let kind = if decide(noul, UPPER).is_some() {
-            ResultKind::Fail
+        let fail = if decide(noul, UPPER).is_some() {
+            true
         } else if decide(1.0 - noul, UPPER).is_some() {
-            ResultKind::Pass
+            false
         } else {
             continue;
         };
         labelled.push(Sourced {
             row: Row {
                 subject,
-                label: kind,
+                fail,
                 weight: Source::Model.weight(),
                 key,
                 attribution: attribution.clone(),
@@ -275,10 +276,7 @@ fn taught(
 /// a `sha256:<hex>` document of the store.
 fn card_of(root: &Path, job: &FineTuningJob) -> Option<Value> {
     let hex = job.result_files.first()?.strip_prefix("sha256:")?;
-    let path = root
-        .join(MODELS_DIR)
-        .join("sha256")
-        .join(format!("{hex}.json"));
+    let path = artifact_path(&root.join(MODELS_DIR), hex);
     let artifact: Value = serde_json::from_str(&fs::read_to_string(path).ok()?).ok()?;
     artifact.get("card").cloned()
 }

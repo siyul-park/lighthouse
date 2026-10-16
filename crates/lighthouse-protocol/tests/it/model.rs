@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
 use lighthouse_protocol::{
-    Capabilities, DecisionRef, Example, ListModelResponse, Model, Question, ResultKind, State,
-    Subject, SubjectContext, Supports, SystemOneRequest, json_in, noul_of, prompt, response_schema,
-    subject_text, system_label_text, system_text,
+    Answer, Capabilities, DecisionRef, Example, ListModelResponse, Model, NOUL, Question, State,
+    Subject, SystemOneRequest, artifact_path, dataset_path,
+    prompt::{self, json_in, noul_of, response_schema},
 };
 use serde_json::json;
 
@@ -54,7 +54,7 @@ fn a_question_puts_invalid_examples_under_true_and_valid_ones_under_false() {
 
 #[test]
 fn the_system_text_carries_the_instructions_the_decision_and_its_examples() {
-    let text = system_text("design/x", &Question::of(&decision()));
+    let text = prompt::system("design/x", &Question::of(&decision()));
     assert!(text.contains("Is it small?") && text.contains("design/x"));
     assert!(text.contains("Criterion true") && text.contains("func big() {}"));
     assert!(text.contains("noul"));
@@ -63,7 +63,7 @@ fn the_system_text_carries_the_instructions_the_decision_and_its_examples() {
 #[test]
 fn the_label_system_text_asks_for_a_word_instead_of_a_probability() {
     let question = Question::of(&decision());
-    let text = system_label_text("design/x", &question);
+    let text = prompt::system_label("design/x", &question);
     assert!(text.contains("Answer with one word") && text.contains("func big() {}"));
     assert!(!text.contains("noul") && !text.contains("JSON"));
     // Only the reply instruction differs.
@@ -71,12 +71,12 @@ fn the_label_system_text_asks_for_a_word_instead_of_a_probability() {
         text.split_once("\n\nDecision")
             .map(|(_, rest)| rest.to_owned())
     };
-    assert_eq!(rest(&text), rest(&system_text("design/x", &question)));
+    assert_eq!(rest(&text), rest(&prompt::system("design/x", &question)));
 }
 
 #[test]
 fn the_subject_text_shows_the_file_and_the_source() {
-    let text = subject_text(&state());
+    let text = prompt::subject(&state());
     assert!(text.contains("a.go") && text.contains("func f() {}"));
 }
 
@@ -88,7 +88,7 @@ fn a_prompt_holds_both_and_the_schema_asks_for_a_probability() {
         questions: BTreeMap::from([("design/x".to_owned(), Question::of(&decision()))]),
         options: Default::default(),
     };
-    let text = prompt(&request);
+    let text = prompt::render(&request);
     assert!(text.contains("Is it small?") && text.contains("func f() {}"));
     assert_eq!(response_schema()["properties"]["noul"]["type"], "number");
 }
@@ -132,24 +132,11 @@ fn a_probability_is_read_from_a_system_one_body_or_a_bare_answer() {
 #[test]
 fn a_model_list_is_an_openai_list_object_with_lighthouse_capabilities() {
     let model = Model {
-        id: "m".to_owned(),
-        object: "model".to_owned(),
-        created: 0,
-        owned_by: "m".to_owned(),
-        capabilities: Capabilities {
-            classification: Some(Supports { supported: true }),
-            embedding: None,
-            fine_tuning: Some(Supports { supported: true }),
-        },
-        version: "1".to_owned(),
-        deterministic: false,
         abstains: true,
         cost: 2.0,
+        ..Model::new("m", "1", Capabilities::classifier(true))
     };
-    let list = ListModelResponse {
-        object: "list".to_owned(),
-        data: vec![model],
-    };
+    let list = ListModelResponse::new(vec![model]);
     let wire = serde_json::to_value(&list).unwrap();
 
     assert_eq!(wire["object"], "list");
@@ -169,12 +156,9 @@ fn a_subject_shows_a_model_its_state_and_json_may_come_fenced() {
         key: "k".to_owned(),
         kind: "function".to_owned(),
         id: "m::f".to_owned(),
-        language: "go".to_owned(),
-        file: "a.go".to_owned(),
-        text: "func f() {}".to_owned(),
-        context: SubjectContext::default(),
+        state: state(),
     };
-    assert_eq!(subject.state().text, "func f() {}");
+    assert_eq!(subject.state.text, "func f() {}");
     assert_eq!(
         json_in("```json\n{\"noul\": 0.5}\n```"),
         Some(json!({"noul": 0.5}))
@@ -195,7 +179,7 @@ fn a_training_line_is_openais_supervised_format_with_lighthouses_keys() {
         neighbors: Vec::new(),
     };
     let question = Question::of(&decision());
-    let line = |label| {
+    let line = |fail| {
         let keys = LineKeys {
             weight: 0.5,
             group: "a.go",
@@ -203,10 +187,10 @@ fn a_training_line_is_openais_supervised_format_with_lighthouses_keys() {
             key: "k",
             attribution: json!({"type": "Person"}),
         };
-        let line = TrainingLine::new(&question, &state, label, keys);
+        let line = TrainingLine::new(&question, &state, fail, keys);
         serde_json::to_value(line).unwrap()
     };
-    let fail = line(ResultKind::Fail);
+    let fail = line(true);
     let roles: Vec<&str> = fail["messages"]
         .as_array()
         .unwrap()
@@ -221,13 +205,26 @@ fn a_training_line_is_openais_supervised_format_with_lighthouses_keys() {
     assert_eq!(content(&fail, 0)["type"], "noul");
     assert_eq!(content(&fail, 1)["text"], "func f() {}");
     assert_eq!(content(&fail, 2), json!({"type": "noul", "noul": 1}));
-    assert_eq!(
-        content(&line(ResultKind::Pass), 2),
-        json!({"type": "noul", "noul": 0})
-    );
+    assert_eq!(content(&line(false), 2), json!({"type": "noul", "noul": 0}));
     assert_eq!(fail["weight"], 0.5);
     assert_eq!(fail["group"], "a.go");
     assert_eq!(fail["decision"], "design/x");
     assert_eq!(fail["key"], "k");
     assert_eq!(fail["attribution"]["type"], "Person");
+}
+
+#[test]
+fn an_answer_is_a_noul_and_the_store_names_files_by_digest() {
+    let answer = serde_json::to_value(Answer::new(0.25)).unwrap();
+    assert_eq!(answer, json!({"type": NOUL, "noul": 0.25}));
+
+    let dir = std::path::Path::new("/p/.lighthouse/models");
+    assert_eq!(
+        artifact_path(dir, "ab"),
+        std::path::Path::new("/p/.lighthouse/models/sha256/ab.json")
+    );
+    assert_eq!(
+        dataset_path(dir, "ab"),
+        std::path::Path::new("/p/.lighthouse/models/sha256/ab.jsonl")
+    );
 }

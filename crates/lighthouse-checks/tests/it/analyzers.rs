@@ -41,7 +41,6 @@ fn summary(symbol: &Symbol, nesting: u32, statements: u32, flow: &[Flow]) -> Fun
         returns: 0,
         tokens: 0,
         flow: flow.to_vec(),
-        clone_fingerprint: None,
         forwards_to: None,
         signature: Default::default(),
         events: Vec::new(),

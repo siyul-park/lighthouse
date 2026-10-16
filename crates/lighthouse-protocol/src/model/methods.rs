@@ -54,16 +54,6 @@ pub struct Neighbor {
     pub text: String,
 }
 
-/// What the host knows about a subject besides its text.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct SubjectContext {
-    /// The select's facts for the subject, as the builder made them.
-    #[serde(default)]
-    pub facts: Value,
-    #[serde(default)]
-    pub neighbors: Vec<Neighbor>,
-}
-
 /// One thing to judge.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Subject {
@@ -72,23 +62,8 @@ pub struct Subject {
     /// `symbol`, `function`, `file`, `test`, `comment` or `event`.
     pub kind: String,
     pub id: String,
-    pub language: String,
-    /// Project-relative, `/`-separated.
-    pub file: String,
-    /// The subject's source by extent.
-    pub text: String,
-    #[serde(default)]
-    pub context: SubjectContext,
-}
-
-/// How a subject came out, in the words of SARIF result kinds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum ResultKind {
-    Fail,
-    Pass,
-    /// The code shown is not enough to tell: someone else must look.
-    Review,
+    /// What a model reads of it.
+    pub state: State,
 }
 
 /// The part of a subject a model reads: TypeSafe System One's `state`.
@@ -128,10 +103,14 @@ pub struct Instructions {
     pub prompt: String,
 }
 
+/// The `type` of a question and of its answer: System One's `noul`, the
+/// probability of yes.
+pub const NOUL: &str = "noul";
+
 /// One yes/no question: System One's `noul`, the probability of yes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Question {
-    /// `noul`.
+    /// [`NOUL`].
     #[serde(rename = "type")]
     pub kind: String,
     pub instructions: Instructions,
@@ -141,8 +120,8 @@ pub struct Question {
 /// The answer to a question: P(fail).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Answer {
-    /// `noul`.
-    #[serde(rename = "type", default = "noul")]
+    /// [`NOUL`].
+    #[serde(rename = "type", default = "noul_kind")]
     pub kind: String,
     /// The probability that the subject fails the decision, from 0 to 1.
     pub noul: f64,
@@ -177,53 +156,42 @@ impl Question {
     /// The question a decision asks: it fails when `true`, its invalid
     /// examples show what that looks like, its valid examples the other side.
     pub fn of(decision: &DecisionRef) -> Self {
-        let side = |kind: ResultKind, meaning: String| Criterion {
-            meaning,
-            examples: match kind {
-                ResultKind::Fail => decision.invalid.clone(),
-                ResultKind::Pass => decision.valid.clone(),
-                ResultKind::Review => Vec::new(),
-            },
-        };
         Self {
-            kind: "noul".to_owned(),
+            kind: NOUL.to_owned(),
             instructions: Instructions {
                 requirement: decision.requirement.clone(),
                 prompt: decision.prompt.clone(),
             },
             criteria: Criteria {
-                fail: side(
-                    ResultKind::Fail,
-                    format!(
+                fail: Criterion {
+                    meaning: format!(
                         "The subject violates the requirement: {}",
                         decision.requirement
                     ),
-                ),
-                pass: side(
-                    ResultKind::Pass,
-                    format!(
+                    examples: decision.invalid.clone(),
+                },
+                pass: Criterion {
+                    meaning: format!(
                         "The subject complies with the requirement: {}",
                         decision.requirement
                     ),
-                ),
+                    examples: decision.valid.clone(),
+                },
             },
         }
     }
 }
 
-impl Subject {
-    /// What a model reads of the subject.
-    pub fn state(&self) -> State {
-        State {
-            language: self.language.clone(),
-            file: self.file.clone(),
-            text: self.text.clone(),
-            facts: self.context.facts.clone(),
-            neighbors: self.context.neighbors.clone(),
+impl Answer {
+    /// The answer that the subject fails with probability `noul`.
+    pub fn new(noul: f64) -> Self {
+        Self {
+            kind: NOUL.to_owned(),
+            noul,
         }
     }
 }
 
-fn noul() -> String {
-    "noul".to_owned()
+fn noul_kind() -> String {
+    NOUL.to_owned()
 }

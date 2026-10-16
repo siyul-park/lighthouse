@@ -25,7 +25,7 @@ fn dataset(root: &Path, texts: &[&str]) -> String {
     let observed: BTreeMap<String, Subject> = texts
         .iter()
         .map(|text| {
-            let subject: Subject = serde_json::from_value(json!({"key": text, "kind": "function", "id": text, "language": "rust", "file": format!("{text}.rs"), "text": text})).unwrap();
+            let subject: Subject = serde_json::from_value(json!({"key": text, "kind": "function", "id": text, "state": {"language": "rust", "file": format!("{text}.rs"), "text": text, "facts": null, "neighbors": []}})).unwrap();
             ((*text).to_owned(), subject)
         })
         .collect();

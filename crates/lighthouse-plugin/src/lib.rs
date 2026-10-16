@@ -23,14 +23,15 @@ pub use fix::{
     FixDecision, FixRequest, Fixer, FixerManifest, KeyCtx, NoKeys, OrderKey, OrderKeyManifest,
     OrderKeys,
 };
+pub use lighthouse_protocol::Conventions;
 pub use memo::Memo;
 pub use models::{
-    Answer, Ask, Capabilities, Classifier, CreateFineTuningJobRequest, Decided, DecisionRef,
-    Example, Explored, FineTuneJobError, FineTuneMethod, FineTuneSupervisedHyperparameters,
-    FineTuneSupervisedMethod, FineTuningJob, FineTuningJobStatus, Judged, LineKeys,
-    ListModelResponse, MODELS_DIR, Model, Models, Neighbor, NoModels, Open, Question, ResultKind,
-    Settle, State, Subject, SubjectContext, Supports, SystemOneRequest, SystemOneResponse,
-    TrainingLine, UPPER, decide, request_of,
+    Answer, Ask, Capabilities, Classifier, CreateFineTuningJobRequest, DATASETS_DIR, Decided,
+    DecisionRef, Example, Explored, FineTuneJobError, FineTuneMethod,
+    FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
+    FineTuningJobStatus, Judged, LineKeys, ListModelResponse, MODELS_DIR, Model, Models, Neighbor,
+    NoModels, Open, Question, Settle, State, Subject, Supports, SystemOneRequest,
+    SystemOneResponse, TrainingLine, UPPER, artifact_path, dataset_path, decide, request_of,
 };
 pub use notices::Notices;
 pub use registry::{Registry, plugin_of};
@@ -147,15 +148,6 @@ pub struct Ctx<'a> {
     pub applies: Applicability,
     /// The models rules may put subjects to.
     pub models: &'a dyn Models,
-}
-
-/// Layout conventions a language declares; the engine applies them to every file of that language.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Conventions {
-    pub test_globs: Vec<String>,
-    /// Name prefixes that make a function a constructor, unless the project
-    /// replaces them (see [`Workspace::constructors`]).
-    pub constructor_prefixes: Vec<String>,
 }
 
 impl Ctx<'_> {

@@ -5,10 +5,9 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use lighthouse_protocol::{
-    Answer, Capabilities, CreateFineTuningJobRequest, FineTuneJobError, FineTuningJob,
-    FineTuningJobStatus, Handler, HandlerError, IndexParams, IndexResult, InitializeParams,
-    InitializeResult, ListModelResponse, MODELS_DIR, Model, Supports, SystemOneRequest,
-    SystemOneResponse, VERSION,
+    Answer, Capabilities, CreateFineTuningJobRequest, ErrorObject, FineTuneJobError, FineTuningJob,
+    FineTuningJobStatus, Handler, InitializeParams, InitializeResult, MODELS_DIR, Model,
+    SystemOneRequest, SystemOneResponse,
 };
 use serde_json::{Value, json};
 
@@ -44,42 +43,25 @@ impl Plugin {
 }
 
 impl Handler for Plugin {
-    fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, HandlerError> {
-        if params.protocol_version != VERSION {
-            return Err(format!("speaks protocol {VERSION}").into());
-        }
+    fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, ErrorObject> {
         self.dir = PathBuf::from(params.root).join(MODELS_DIR);
-        Ok(InitializeResult {
-            id: ID.to_owned(),
-            version: env!("CARGO_PKG_VERSION").to_owned(),
-            protocol_version: VERSION.to_owned(),
-            languages: Vec::new(),
-            models: ListModelResponse {
-                object: "list".to_owned(),
-                data: vec![Model {
-                    id: ID.to_owned(),
-                    object: "model".to_owned(),
-                    created: 0,
-                    owned_by: ID.to_owned(),
-                    capabilities: Capabilities {
-                        classification: Some(Supports { supported: true }),
-                        embedding: None,
-                        fine_tuning: Some(Supports { supported: true }),
-                    },
-                    version: env!("CARGO_PKG_VERSION").to_owned(),
-                    deterministic: true,
-                    abstains: false,
-                    cost: 0.0,
-                }],
-            },
-        })
+        let model = Model {
+            deterministic: true,
+            ..Model::new(
+                ID,
+                env!("CARGO_PKG_VERSION"),
+                Capabilities::classifier(true),
+            )
+        };
+        Ok(InitializeResult::new(
+            ID,
+            env!("CARGO_PKG_VERSION"),
+            Vec::new(),
+            vec![model],
+        ))
     }
 
-    fn index(&mut self, _: IndexParams) -> Result<IndexResult, HandlerError> {
-        Err("model-local indexes no language".into())
-    }
-
-    fn classify(&mut self, params: SystemOneRequest) -> Result<SystemOneResponse, HandlerError> {
+    fn classify(&mut self, params: SystemOneRequest) -> Result<SystemOneResponse, ErrorObject> {
         let hex = digest_of(&params.model)?;
         if !self.loaded.contains_key(hex) {
             self.loaded
@@ -88,10 +70,7 @@ impl Handler for Plugin {
         Ok(answer(&self.loaded[hex], &mut self.embedders, params)?)
     }
 
-    fn train(
-        &mut self,
-        request: CreateFineTuningJobRequest,
-    ) -> Result<FineTuningJob, HandlerError> {
+    fn train(&mut self, request: CreateFineTuningJobRequest) -> Result<FineTuningJob, ErrorObject> {
         Ok(match train::run(&request, &mut self.embedders) {
             Ok(trained) => succeeded(request, &trained),
             Err(message) => failed(request, message),
@@ -133,10 +112,7 @@ fn answer(
     let answers = params
         .questions
         .into_keys()
-        .map(|id| {
-            let kind = "noul".to_owned();
-            (id, Answer { kind, noul })
-        })
+        .map(|id| (id, Answer::new(noul)))
         .collect();
     Ok(SystemOneResponse {
         model: params.model,

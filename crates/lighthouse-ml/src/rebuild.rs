@@ -7,7 +7,7 @@
 use std::{fs, path::Path};
 
 use lighthouse_model::hash::digest;
-use lighthouse_plugin::{Classifier, FineTuningJobStatus, MODELS_DIR};
+use lighthouse_plugin::{Classifier, FineTuningJobStatus, MODELS_DIR, artifact_path};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -75,10 +75,7 @@ pub fn learned(model: &str) -> Option<Learned<'_>> {
 
 /// What the model store of `root` holds for `hex`.
 pub fn artifact(root: &Path, hex: &str) -> Result<Artifact> {
-    let path = root
-        .join(MODELS_DIR)
-        .join("sha256")
-        .join(format!("{hex}.json"));
+    let path = artifact_path(&root.join(MODELS_DIR), hex);
     let Ok(text) = fs::read_to_string(&path) else {
         return Ok(Artifact::Missing);
     };

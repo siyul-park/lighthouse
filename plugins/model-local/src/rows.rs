@@ -97,23 +97,16 @@ fn source_of(attribution: &Value) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use lighthouse_protocol::ResultKind;
-
     use super::*;
     use crate::fixture::file;
 
     #[test]
     fn a_training_file_gives_lines_and_the_examples_of_the_question() {
         let text = file(&[
-            (
-                "fn a() {}",
-                ResultKind::Fail,
-                "a.go",
-                r#"{"type":"Person"}"#,
-            ),
+            ("fn a() {}", true, "a.go", r#"{"type":"Person"}"#),
             (
                 "fn b() {}",
-                ResultKind::Pass,
+                false,
                 "a.go",
                 r#"{"type":"SoftwareAgent","hadRole":"model"}"#,
             ),

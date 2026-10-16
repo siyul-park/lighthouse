@@ -1,12 +1,11 @@
 //! A training file for tests, as the host writes it.
 
-use lighthouse_protocol::{
-    DecisionRef, Example, LineKeys, Question, ResultKind, Subject, TrainingLine,
-};
-use serde_json::json;
+use lighthouse_protocol::{DecisionRef, Example, LineKeys, Question, State, TrainingLine};
+use serde_json::Value;
 
-/// One labelled subject: its text, label, group and PROV attribution (JSON).
-pub type Labelled<'a> = (&'a str, ResultKind, &'a str, &'a str);
+/// One labelled subject: its text, whether it fails, its group and PROV
+/// attribution (JSON).
+pub type Labelled<'a> = (&'a str, bool, &'a str, &'a str);
 
 /// The attribution of a person's label.
 pub const PERSON: &str = r#"{"type":"Person"}"#;
@@ -31,16 +30,18 @@ pub fn file(rows: &[Labelled]) -> String {
     };
     let question = Question::of(&decision);
     rows.iter()
-        .map(|(text, label, group, attribution)| {
-            let subject: Subject = serde_json::from_value(json!({
-                "key": "k", "kind": "function", "id": "a", "language": "go",
-                "file": "a.go", "text": text
-            }))
-            .unwrap();
+        .map(|(text, fail, group, attribution)| {
+            let state = State {
+                language: "go".to_owned(),
+                file: "a.go".to_owned(),
+                text: (*text).to_owned(),
+                facts: Value::Null,
+                neighbors: Vec::new(),
+            };
             let line = TrainingLine::new(
                 &question,
-                &subject.state(),
-                *label,
+                &state,
+                *fail,
                 LineKeys {
                     weight: 0.7,
                     group,

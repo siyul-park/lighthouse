@@ -16,7 +16,7 @@ use lighthouse_ml::{
 use lighthouse_model::{Diagnostic, Fingerprint, Position, Severity, Span, hash::sha256};
 use lighthouse_plugin::{
     Answer, Capabilities, Classifier, CreateFineTuningJobRequest, DecisionRef, Error,
-    FineTuningJob, FineTuningJobStatus, Model, Subject, Supports, SystemOneRequest,
+    FineTuningJob, FineTuningJobStatus, Model, State, Subject, Supports, SystemOneRequest,
     SystemOneResponse,
 };
 use lighthouse_spec::Evaluation;
@@ -195,10 +195,13 @@ pub fn subject(file: &str, text: &str) -> Subject {
         key: text.to_owned(),
         kind: "file".to_owned(),
         id: text.to_owned(),
-        language: "rust".to_owned(),
-        file: file.to_owned(),
-        text: text.to_owned(),
-        context: Default::default(),
+        state: State {
+            language: "rust".to_owned(),
+            file: file.to_owned(),
+            text: text.to_owned(),
+            facts: Value::Null,
+            neighbors: Vec::new(),
+        },
     }
 }
 

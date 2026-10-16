@@ -3,6 +3,8 @@
 
 use std::collections::BTreeMap;
 
+use lighthouse_resource::API_VERSION;
+
 /// The spec of decision `p/a`, indented as it sits under `spec:`.
 pub const SPEC: &str = "  title: A
   context: i
@@ -22,14 +24,14 @@ pub type Files = BTreeMap<String, String>;
 pub fn decision(id: &str, section: &str, spec: &str) -> String {
     let pack = id.split_once('/').map_or(id, |(pack, _)| pack);
     format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: {id}\n  labels:\n    lighthouse/pack: {pack}\n    lighthouse/section: {section}\nspec:\n{spec}"
+        "apiVersion: {API_VERSION}\nkind: Decision\nmetadata:\n  name: {id}\n  labels:\n    lighthouse/pack: {pack}\n    lighthouse/section: {section}\nspec:\n{spec}"
     )
 }
 
 /// A `Pack` document: each section with the decisions it lists.
 pub fn pack(id: &str, sections: &[(&str, &[&str])]) -> String {
     let mut out = format!(
-        "apiVersion: lighthouse/v1alpha1\nkind: Pack\nmetadata:\n  name: {id}\nspec:\n  title: {}\n  intro: x\n  sections:{}\n",
+        "apiVersion: {API_VERSION}\nkind: Pack\nmetadata:\n  name: {id}\nspec:\n  title: {}\n  intro: x\n  sections:{}\n",
         id.to_uppercase(),
         if sections.is_empty() { " []" } else { "" }
     );

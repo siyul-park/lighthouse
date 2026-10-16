@@ -3,7 +3,7 @@
 //! the path names it: `systemone`. The bodies are the protocol's
 //! [`SystemOneRequest`] and [`SystemOneResponse`], System One's own.
 
-use lighthouse_protocol::{HandlerError, SystemOneRequest, SystemOneResponse};
+use lighthouse_protocol::{ErrorObject, SystemOneRequest, SystemOneResponse};
 
 use crate::{endpoint::Endpoint, http::Client};
 
@@ -13,7 +13,7 @@ pub fn systemone(
     client: &dyn Client,
     endpoint: &Endpoint,
     request: &SystemOneRequest,
-) -> Result<SystemOneResponse, HandlerError> {
+) -> Result<SystemOneResponse, ErrorObject> {
     let mut api_request = request.clone();
     api_request.options.clear();
     let body = serde_json::to_value(api_request).map_err(|e| e.to_string())?;
