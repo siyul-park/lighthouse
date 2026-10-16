@@ -17,7 +17,7 @@ use crate::{
     band::rounded,
     candidates::similarities,
     embed::{Embedders, Open},
-    folds::Row,
+    rows::Line,
     train::{self, Trained},
 };
 
@@ -146,7 +146,7 @@ fn answer(
 }
 
 /// The subject as the model reads it. The rate reads nothing.
-fn row_of(loaded: &Loaded, embedders: &mut Embedders, text: &str) -> Result<Row, String> {
+fn row_of(loaded: &Loaded, embedders: &mut Embedders, text: &str) -> Result<Line, String> {
     let (vector, sims) = if loaded.model.embeds() {
         let name = loaded.embedder.split('@').next().unwrap_or_default();
         let embedder = embedders.get(name)?;
@@ -169,17 +169,17 @@ fn row_of(loaded: &Loaded, embedders: &mut Embedders, text: &str) -> Result<Row,
     } else {
         (Vec::new(), [0.0; 4])
     };
-    Ok(Row {
+    Ok(Line {
+        text: text.to_owned(),
         vector,
         sims,
-        label: 0.0,
         weight: 1.0,
-        group: String::new(),
+        ..Line::default()
     })
 }
 
 fn succeeded(request: CreateFineTuningJobRequest, trained: &Trained) -> FineTuningJob {
-    let hyperparameters = json!({"chosen": trained.learned.chosen, "embedder": trained.embedder});
+    let hyperparameters = json!({"chosen": trained.fitted.chosen, "embedder": trained.embedder});
     let reference = format!("{MODEL}@sha256:{}", trained.hex);
     let result = format!("sha256:{}", trained.hex);
     job(request, FineTuningJobStatus::Succeeded, |job| {

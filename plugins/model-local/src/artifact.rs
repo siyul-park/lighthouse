@@ -10,7 +10,7 @@ use serde_json::{Map, Value, json};
 
 use crate::{
     candidates::Model,
-    learn::Learned,
+    fit::Fitted,
     rows::{Dataset, sources},
 };
 
@@ -39,7 +39,7 @@ pub struct Loaded {
 }
 
 /// The card: what was trained on, what was tried and what was measured.
-pub fn card(dataset: &Dataset, training_file: &str, learned: &Learned, trainer: &str) -> Value {
+pub fn card(dataset: &Dataset, training_file: &str, fitted: &Fitted, trainer: &str) -> Value {
     let positives = dataset.lines.iter().filter(|l| l.label > 0.5).count();
     json!({
         "decision": dataset.decision,
@@ -48,10 +48,10 @@ pub fn card(dataset: &Dataset, training_file: &str, learned: &Learned, trainer: 
         "rows": dataset.lines.len(),
         "positives": positives,
         "sources": sources(&dataset.lines),
-        "candidates": learned.candidates,
-        "chosen": learned.chosen,
-        "metrics": {"brier": learned.brier, "auroc": learned.auroc},
-        "band": learned.band,
+        "candidates": fitted.candidates,
+        "chosen": fitted.chosen,
+        "metrics": {"brier": fitted.brier, "auroc": fitted.auroc},
+        "band": fitted.band,
     })
 }
 

@@ -8,10 +8,10 @@ mod artifact;
 mod band;
 mod candidates;
 mod embed;
+mod fit;
 #[cfg(test)]
 mod fixture;
 mod folds;
-mod learn;
 mod newton;
 #[cfg(test)]
 mod plugin_tests;

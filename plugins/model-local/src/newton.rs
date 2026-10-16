@@ -45,6 +45,55 @@ impl Platt {
     }
 }
 
+/// Rows with labels `y` (0 or 1) and weights `w`, and their kernel `X Xᵀ`
+/// (row-major), which every regularization strength reuses.
+pub struct Design<'a> {
+    x: &'a [Vec<f64>],
+    y: &'a [f64],
+    w: &'a [f64],
+    kernel: Vec<f64>,
+}
+
+impl<'a> Design<'a> {
+    pub fn new(x: &'a [Vec<f64>], y: &'a [f64], w: &'a [f64]) -> Self {
+        let n = x.len();
+        let mut kernel = vec![0.0; n * n];
+        for i in 0..n {
+            for j in 0..=i {
+                let value = dot(&x[i], &x[j]);
+                kernel[i * n + j] = value;
+                kernel[j * n + i] = value;
+            }
+        }
+        Self { x, y, w, kernel }
+    }
+
+    /// Minimizes `½|β|² + C Σ wᵢ·loss(yᵢ, b + xᵢ·β)` over `β` and the
+    /// intercept `b`, which is not penalized.
+    pub fn fit(&self, c: f64) -> Logit {
+        let n = self.x.len();
+        let mut scores = vec![0.0; n];
+        let mut coefficients = vec![0.0; n];
+        let mut centre = vec![1.0 / n as f64; n];
+        for _ in 0..ITERATIONS {
+            let step = Step::of(&self.kernel, &scores, self.y, self.w);
+            coefficients = step.solve(&self.kernel, 1.0 / c);
+            let next = step.scores(&self.kernel, &coefficients);
+            centre = step.centre;
+            let moved = scores
+                .iter()
+                .zip(&next)
+                .map(|(a, b)| (a - b).abs())
+                .fold(0.0, f64::max);
+            scores = next;
+            if moved < TOLERANCE {
+                break;
+            }
+        }
+        primal(self.x, &coefficients, &centre, &scores)
+    }
+}
+
 /// One Newton step as a weighted ridge regression on the working response.
 struct Step {
     /// The weight of each row, `wᵢ pᵢ (1 - pᵢ)`.
@@ -54,10 +103,13 @@ struct Step {
     /// The working response `zᵢ`, and its weighted mean.
     response: Vec<f64>,
     mean: f64,
+    /// The kernel's rows averaged by the centre, and that average again.
+    means: Vec<f64>,
+    grand: f64,
 }
 
 impl Step {
-    fn of(scores: &[f64], y: &[f64], w: &[f64]) -> Self {
+    fn of(kernel: &[f64], scores: &[f64], y: &[f64], w: &[f64]) -> Self {
         let mut weight = Vec::with_capacity(scores.len());
         let mut response = Vec::with_capacity(scores.len());
         for ((&f, &label), &row) in scores.iter().zip(y).zip(w) {
@@ -69,11 +121,18 @@ impl Step {
         let total: f64 = weight.iter().sum();
         let centre: Vec<f64> = weight.iter().map(|v| v / total).collect();
         let mean = centre.iter().zip(&response).map(|(c, z)| c * z).sum();
+        let n = scores.len();
+        let means: Vec<f64> = (0..n)
+            .map(|i| (0..n).map(|j| centre[j] * kernel[i * n + j]).sum())
+            .collect();
+        let grand = centre.iter().zip(&means).map(|(c, m)| c * m).sum();
         Self {
             weight,
             centre,
             response,
             mean,
+            means,
+            grand,
         }
     }
 
@@ -81,15 +140,11 @@ impl Step {
     /// with penalty `lambda` on the centred kernel.
     fn solve(&self, kernel: &[f64], lambda: f64) -> Vec<f64> {
         let n = self.weight.len();
-        let means: Vec<f64> = (0..n)
-            .map(|i| (0..n).map(|j| self.centre[j] * kernel[i * n + j]).sum())
-            .collect();
-        let grand: f64 = self.centre.iter().zip(&means).map(|(c, m)| c * m).sum();
         let root: Vec<f64> = self.weight.iter().map(|v| v.sqrt()).collect();
         let mut system = vec![0.0; n * n];
         for i in 0..n {
             for j in 0..n {
-                let centred = kernel[i * n + j] - means[i] - means[j] + grand;
+                let centred = kernel[i * n + j] - self.means[i] - self.means[j] + self.grand;
                 system[i * n + j] = root[i] * centred * root[j] + if i == j { lambda } else { 0.0 };
             }
         }
@@ -104,15 +159,15 @@ impl Step {
     fn scores(&self, kernel: &[f64], coefficients: &[f64]) -> Vec<f64> {
         let n = coefficients.len();
         let total: f64 = coefficients.iter().sum();
-        let means: Vec<f64> = (0..n)
-            .map(|i| (0..n).map(|j| self.centre[j] * kernel[i * n + j]).sum())
-            .collect();
-        let grand: f64 = self.centre.iter().zip(&means).map(|(c, m)| c * m).sum();
-        let shift: f64 = coefficients.iter().zip(&means).map(|(c, m)| c * m).sum();
+        let shift: f64 = coefficients
+            .iter()
+            .zip(&self.means)
+            .map(|(c, m)| c * m)
+            .sum();
         (0..n)
             .map(|i| {
                 let along: f64 = (0..n).map(|j| coefficients[j] * kernel[i * n + j]).sum();
-                self.mean - (shift - total * grand) + along - total * means[i]
+                self.mean - (shift - total * self.grand) + along - total * self.means[i]
             })
             .collect()
     }
@@ -136,51 +191,11 @@ pub fn dot(a: &[f64], b: &[f64]) -> f64 {
 /// weights `w`.
 pub fn platt(scores: &[f64], y: &[f64], w: &[f64]) -> Platt {
     let x: Vec<Vec<f64>> = scores.iter().map(|&s| vec![s]).collect();
-    let fit = fit(&x, y, w, PLATT_C);
+    let fit = Design::new(&x, y, w).fit(PLATT_C);
     Platt {
         a: fit.weights[0],
         b: fit.bias,
     }
-}
-
-/// Minimizes `½|β|² + C Σ wᵢ·loss(yᵢ, b + xᵢ·β)` over `β` and the unpenalized
-/// intercept `b`; `y` is 0 or 1.
-pub fn fit(x: &[Vec<f64>], y: &[f64], w: &[f64], c: f64) -> Logit {
-    let n = x.len();
-    let kernel = kernel(x);
-    let mut scores = vec![0.0; n];
-    let mut coefficients = vec![0.0; n];
-    let mut centre = vec![1.0 / n as f64; n];
-    for _ in 0..ITERATIONS {
-        let step = Step::of(&scores, y, w);
-        coefficients = step.solve(&kernel, 1.0 / c);
-        centre = step.centre.clone();
-        let next = step.scores(&kernel, &coefficients);
-        let moved = scores
-            .iter()
-            .zip(&next)
-            .map(|(a, b)| (a - b).abs())
-            .fold(0.0, f64::max);
-        scores = next;
-        if moved < TOLERANCE {
-            break;
-        }
-    }
-    primal(x, &coefficients, &centre, &scores)
-}
-
-/// `X Xᵀ` as a row-major matrix.
-fn kernel(x: &[Vec<f64>]) -> Vec<f64> {
-    let n = x.len();
-    let mut kernel = vec![0.0; n * n];
-    for i in 0..n {
-        for j in 0..=i {
-            let value = dot(&x[i], &x[j]);
-            kernel[i * n + j] = value;
-            kernel[j * n + i] = value;
-        }
-    }
-    kernel
 }
 
 /// The weights and intercept the coefficients stand for.

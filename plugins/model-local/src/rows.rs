@@ -7,10 +7,17 @@ use std::collections::BTreeMap;
 use lighthouse_protocol::{Question, State, TrainingLine};
 use serde_json::Value;
 
-/// One labelled subject.
-#[derive(Debug, Clone, PartialEq)]
+/// One subject: the labelled line of a training file, then embedded for the
+/// learners, or the subject a model is asked about.
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Line {
     pub text: String,
+    /// What the embedder gave for the text; empty until embedded, and for the
+    /// rate, which reads nothing.
+    pub vector: Vec<f64>,
+    /// Maximum and mean cosine to the invalid examples, then to the valid
+    /// ones; 0 when a side has none.
+    pub sims: [f64; 4],
     /// 1 for a fail, 0 for a pass.
     pub label: f64,
     pub weight: f64,
@@ -52,6 +59,7 @@ pub fn parse(text: &str) -> Result<Dataset, String> {
             weight: parsed.weight,
             group: parsed.group,
             source: source_of(&parsed.attribution).to_owned(),
+            ..Line::default()
         });
     }
     let question = question.ok_or("the training file has no line")?;

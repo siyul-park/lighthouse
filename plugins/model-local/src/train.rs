@@ -12,9 +12,8 @@ use crate::{
     artifact::{self, Examples},
     candidates::{MIN_PER_CLASS, similarities},
     embed::{DEFAULT, Embedders},
-    folds::Row,
-    learn::{Learned, learn},
-    rows::{self, Dataset},
+    fit::{Fitted, fit},
+    rows::{self, Dataset, Line},
 };
 
 /// What a fail and a pass of the band must be right about, unless asked.
@@ -24,14 +23,14 @@ const PRECISION: f64 = 0.9;
 pub struct Trained {
     /// The digest of its artifact (hex).
     pub hex: String,
-    pub learned: Learned,
+    pub fitted: Fitted,
     /// `<name>@<dimension>`, or the name alone when nothing was embedded.
     pub embedder: String,
 }
 
 /// The rows of a dataset, the vectors of its examples and the embedder.
 struct Featured {
-    rows: Vec<Row>,
+    rows: Vec<Line>,
     invalid: Vec<Vec<f64>>,
     valid: Vec<Vec<f64>>,
     embedder: String,
@@ -58,12 +57,12 @@ pub fn run(
         valid,
         embedder,
     } = featurize(&dataset, name, embedders)?;
-    let learned = learn(&rows, precision);
-    let card = artifact::card(&dataset, &request.training_file, &learned, trainer());
+    let fitted = fit(&rows, precision);
+    let card = artifact::card(&dataset, &request.training_file, &fitted, trainer());
     let document = artifact::document(
         card,
         &embedder,
-        &learned.model,
+        &fitted.model,
         &Examples {
             invalid: &invalid,
             valid: &valid,
@@ -73,7 +72,7 @@ pub fn run(
     let hex = artifact::write(Path::new(dir), &document)?;
     Ok(Trained {
         hex,
-        learned,
+        fitted,
         embedder,
     })
 }
@@ -144,12 +143,10 @@ fn featurize(dataset: &Dataset, name: &str, embedders: &mut Embedders) -> Result
         .lines
         .iter()
         .zip(vectors)
-        .map(|(line, vector)| Row {
+        .map(|(line, vector)| Line {
             sims: similarities(&vector, &invalid, &valid),
             vector,
-            label: line.label,
-            weight: line.weight,
-            group: line.group.clone(),
+            ..line.clone()
         })
         .collect();
     Ok(Featured {

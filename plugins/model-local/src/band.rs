@@ -4,7 +4,7 @@
 use lighthouse_model::wilson;
 use serde::Serialize;
 
-use crate::folds::Row;
+use crate::rows::Line;
 
 /// The decimals a probability is given in.
 const DECIMALS: f64 = 1e4;
@@ -22,8 +22,8 @@ pub struct Band {
 /// The band of probabilities `p` of `rows` failing: the smallest threshold
 /// from which the weighted precision of a fail has a Wilson 95% lower bound
 /// of at least `precision`, and likewise, from the other side, of a pass.
-pub fn band(p: &[f64], rows: &[&Row], precision: f64) -> Band {
-    let scored: Vec<(f64, &Row)> = p
+pub fn band(p: &[f64], rows: &[&Line], precision: f64) -> Band {
+    let scored: Vec<(f64, &Line)> = p
         .iter()
         .map(|p| rounded(*p))
         .zip(rows.iter().copied())
@@ -31,7 +31,7 @@ pub fn band(p: &[f64], rows: &[&Row], precision: f64) -> Band {
     let mut thresholds: Vec<f64> = scored.iter().map(|(p, _)| *p).collect();
     thresholds.sort_by(f64::total_cmp);
     thresholds.dedup();
-    let reached = |inside: fn(f64, f64) -> bool, hit: fn(&Row) -> f64, t: f64| {
+    let reached = |inside: fn(f64, f64) -> bool, hit: fn(&Line) -> f64, t: f64| {
         let (hits, of) = scored
             .iter()
             .filter(|(p, _)| inside(*p, t))
@@ -56,7 +56,7 @@ pub fn band(p: &[f64], rows: &[&Row], precision: f64) -> Band {
 
 /// The probability that a fail is given a higher probability than a pass,
 /// ties counting half; `None` when a class is missing.
-pub fn auroc(p: &[f64], rows: &[&Row]) -> Option<f64> {
+pub fn auroc(p: &[f64], rows: &[&Line]) -> Option<f64> {
     let of = |label: f64| -> Vec<f64> {
         p.iter()
             .zip(rows)
@@ -89,13 +89,11 @@ pub fn rounded(p: f64) -> f64 {
 mod tests {
     use super::*;
 
-    fn row(label: f64) -> Row {
-        Row {
-            vector: Vec::new(),
-            sims: [0.0; 4],
+    fn row(label: f64) -> Line {
+        Line {
             label,
             weight: 1.0,
-            group: String::new(),
+            ..Line::default()
         }
     }
 
@@ -104,7 +102,7 @@ mod tests {
         // 40 fails at 0.9, 40 passes at 0.1, and a mixed middle at 0.5. 40 of
         // 40 has a Wilson lower bound of 0.912, above 0.9; with the middle
         // (10 fails, 10 passes) in, 50 of 60 is 0.72 at best.
-        let mut rows: Vec<Row> = Vec::new();
+        let mut rows: Vec<Line> = Vec::new();
         let mut p = Vec::new();
         for (score, label, n) in [
             (0.9, 1.0, 40),
@@ -117,7 +115,7 @@ mod tests {
                 p.push(score);
             }
         }
-        let refs: Vec<&Row> = rows.iter().collect();
+        let refs: Vec<&Line> = rows.iter().collect();
         let band = band(&p, &refs, 0.9);
 
         assert_eq!(band.upper, Some(0.9));
@@ -126,8 +124,8 @@ mod tests {
 
     #[test]
     fn a_band_is_none_when_no_threshold_reaches_the_precision() {
-        let rows: Vec<Row> = (0..20).map(|i| row(f64::from(i % 2))).collect();
-        let refs: Vec<&Row> = rows.iter().collect();
+        let rows: Vec<Line> = (0..20).map(|i| row(f64::from(i % 2))).collect();
+        let refs: Vec<&Line> = rows.iter().collect();
         let band = band(&[0.5; 20], &refs, 0.9);
 
         assert_eq!((band.upper, band.lower), (None, None));
@@ -136,7 +134,7 @@ mod tests {
     #[test]
     fn auroc_counts_ties_half_and_needs_both_classes() {
         let rows = [row(1.0), row(0.0), row(1.0)];
-        let refs: Vec<&Row> = rows.iter().collect();
+        let refs: Vec<&Line> = rows.iter().collect();
         // Fails 0.8 and 0.4 against the pass 0.4: one win, one tie.
         assert_eq!(auroc(&[0.8, 0.4, 0.4], &refs), Some(0.75));
         assert_eq!(auroc(&[0.8, 0.4], &refs[..1]), None);

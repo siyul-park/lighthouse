@@ -5,8 +5,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    folds::{Row, brier, out_of_fold},
-    newton::{self, Platt, dot, logit, sigmoid},
+    folds::{brier, out_of_fold},
+    newton::{self, Design, Platt, dot, logit, sigmoid},
+    rows::Line,
 };
 
 /// The neighbours that vote.
@@ -25,7 +26,7 @@ pub const CANDIDATES: [(&str, Fit); 3] = [
     ("logistic", fit_logistic),
 ];
 
-pub type Fit = fn(&[&Row]) -> Model;
+pub type Fit = fn(&[&Line]) -> Model;
 
 /// A fitted learner, as the artifact stores it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -38,7 +39,7 @@ pub enum Model {
 
 impl Model {
     /// P(fail) of the row.
-    pub fn predict(&self, row: &Row) -> f64 {
+    pub fn predict(&self, row: &Line) -> f64 {
         match self {
             Self::Rate(model) => model.rate,
             Self::Knn(model) => predict_knn(model, row),
@@ -95,11 +96,11 @@ pub fn similarities(vector: &[f64], invalid: &[Vec<f64>], valid: &[Vec<f64>]) ->
     [bad[0], bad[1], good[0], good[1]]
 }
 
-fn fit_rate(rows: &[&Row]) -> Model {
+fn fit_rate(rows: &[&Line]) -> Model {
     Model::Rate(Rate { rate: prior(rows) })
 }
 
-fn fit_knn(rows: &[&Row]) -> Model {
+fn fit_knn(rows: &[&Line]) -> Model {
     let raw = out_of_fold(rows, |train, test| {
         let model = neighbours(train, Platt::IDENTITY);
         test.iter()
@@ -110,7 +111,7 @@ fn fit_knn(rows: &[&Row]) -> Model {
     Model::Knn(neighbours(rows, newton::platt(&raw, &labels, &weights)))
 }
 
-fn neighbours(rows: &[&Row], platt: Platt) -> Knn {
+fn neighbours(rows: &[&Line], platt: Platt) -> Knn {
     let (labels, weights) = labels_of(rows);
     Knn {
         k: K,
@@ -123,7 +124,7 @@ fn neighbours(rows: &[&Row], platt: Platt) -> Knn {
 }
 
 /// `(Σ w·y + ½) / (Σ w + 1)`.
-fn prior(rows: &[&Row]) -> f64 {
+fn prior(rows: &[&Line]) -> f64 {
     let fails: f64 = rows.iter().map(|r| r.weight * r.label).sum();
     let all: f64 = rows.iter().map(|r| r.weight).sum();
     (fails + 0.5) / (all + 1.0)
@@ -150,28 +151,35 @@ fn vote(model: &Knn, vector: &[f64]) -> f64 {
     (share * k + model.rate * PSEUDO) / (k + PSEUDO)
 }
 
-fn predict_knn(model: &Knn, row: &Row) -> f64 {
+fn predict_knn(model: &Knn, row: &Line) -> f64 {
     model.platt.apply(logit(vote(model, &row.vector)))
 }
 
-fn fit_logistic(rows: &[&Row]) -> Model {
+fn fit_logistic(rows: &[&Line]) -> Model {
     let (labels, weights) = labels_of(rows);
-    // Chosen inside the rows given, never on the ones that will judge it.
-    let tried = |c: f64| {
-        let raw = out_of_fold(rows, |train, test| {
-            let fit = fit_regression(train, c);
-            test.iter().map(|r| fit.score(&features(r))).collect()
-        });
+    // Chosen inside the rows given, never on the ones that will judge it: each
+    // fold's kernel is built once for every strength.
+    let raws = out_of_fold(rows, |train, test| {
+        let fits = regressions(train, &C_GRID);
+        test.iter()
+            .map(|r| {
+                let x = features(r);
+                fits.iter().map(|fit| fit.score(&x)).collect::<Vec<f64>>()
+            })
+            .collect()
+    });
+    let tried = |at: usize| {
+        let raw: Vec<f64> = raws.iter().map(|scores| scores[at]).collect();
         let p: Vec<f64> = raw.iter().copied().map(sigmoid).collect();
-        (c, brier(&p, rows), raw)
+        (at, brier(&p, rows), raw)
     };
-    let [first, rest @ ..] = C_GRID;
-    let (c, _, raw) =
-        rest.into_iter().map(tried).fold(
-            tried(first),
+    let (at, _, raw) =
+        (1..C_GRID.len()).map(tried).fold(
+            tried(0),
             |best, next| if next.1 < best.1 { next } else { best },
         );
-    let fit = fit_regression(rows, c);
+    let c = C_GRID[at];
+    let fit = regressions(rows, &[c]).remove(0);
     Model::Logistic(Logistic {
         c,
         weights: fit.weights,
@@ -180,23 +188,25 @@ fn fit_logistic(rows: &[&Row]) -> Model {
     })
 }
 
-fn fit_regression(rows: &[&Row], c: f64) -> newton::Logit {
+/// The regression on the rows at each strength in `cs`.
+fn regressions(rows: &[&Line], cs: &[f64]) -> Vec<newton::Logit> {
     let x: Vec<Vec<f64>> = rows.iter().map(|r| features(r)).collect();
     let (labels, weights) = labels_of(rows);
-    newton::fit(&x, &labels, &weights, c)
+    let design = Design::new(&x, &labels, &weights);
+    cs.iter().map(|&c| design.fit(c)).collect()
 }
 
-fn predict_logistic(model: &Logistic, row: &Row) -> f64 {
+fn predict_logistic(model: &Logistic, row: &Line) -> f64 {
     model
         .platt
         .apply(dot(&model.weights, &features(row)) + model.bias)
 }
 
-fn features(row: &Row) -> Vec<f64> {
+fn features(row: &Line) -> Vec<f64> {
     row.vector.iter().chain(&row.sims).copied().collect()
 }
 
-fn labels_of(rows: &[&Row]) -> (Vec<f64>, Vec<f64>) {
+fn labels_of(rows: &[&Line]) -> (Vec<f64>, Vec<f64>) {
     (
         rows.iter().map(|r| r.label).collect(),
         rows.iter().map(|r| r.weight).collect(),
@@ -208,7 +218,7 @@ mod tests {
     use super::*;
 
     /// Two clusters on the unit circle: fails near (1, 0), passes near (0, 1).
-    fn cluster(label: f64, n: usize) -> Vec<Row> {
+    fn cluster(label: f64, n: usize) -> Vec<Line> {
         (0..n)
             .map(|i| {
                 let angle = (i as f64 - n as f64 / 2.0) * 0.01;
@@ -217,46 +227,45 @@ mod tests {
                 } else {
                     std::f64::consts::FRAC_PI_2
                 };
-                Row {
+                Line {
                     vector: vec![(base + angle).cos(), (base + angle).sin()],
-                    sims: [0.0; 4],
                     label,
                     weight: 1.0,
                     group: format!("g{}-{i}", label),
+                    ..Line::default()
                 }
             })
             .collect()
     }
 
-    fn separable() -> Vec<Row> {
+    fn separable() -> Vec<Line> {
         let mut rows = cluster(1.0, 12);
         rows.extend(cluster(0.0, 12));
         rows
     }
 
-    fn near(vector: [f64; 2]) -> Row {
-        Row {
+    fn near(vector: [f64; 2]) -> Line {
+        Line {
             vector: vector.to_vec(),
-            sims: [0.0; 4],
-            label: 0.0,
             weight: 1.0,
             group: "q".to_owned(),
+            ..Line::default()
         }
     }
 
     #[test]
     fn the_rate_is_the_weighted_share_of_fails_shrunk_by_half_a_row() {
         let rows = [
-            Row {
+            Line {
                 weight: 2.0,
                 ..cluster(1.0, 1).remove(0)
             },
-            Row {
+            Line {
                 weight: 1.0,
                 ..cluster(0.0, 1).remove(0)
             },
         ];
-        let refs: Vec<&Row> = rows.iter().collect();
+        let refs: Vec<&Line> = rows.iter().collect();
         // (2 + 0.5) / (3 + 1)
         assert_eq!(prior(&refs), 0.625);
     }
@@ -286,7 +295,7 @@ mod tests {
     #[test]
     fn logistic_regression_separates_a_separable_set_and_beats_the_rate() {
         let rows = separable();
-        let refs: Vec<&Row> = rows.iter().collect();
+        let refs: Vec<&Line> = rows.iter().collect();
         let logistic = fit_logistic(&refs);
         let rate = fit_rate(&refs);
 
@@ -303,7 +312,7 @@ mod tests {
     #[test]
     fn knn_separates_the_same_set_after_calibration() {
         let rows = separable();
-        let refs: Vec<&Row> = rows.iter().collect();
+        let refs: Vec<&Line> = rows.iter().collect();
         let model = fit_knn(&refs);
 
         assert!(model.predict(&near([1.0, 0.0])) > 0.8);
