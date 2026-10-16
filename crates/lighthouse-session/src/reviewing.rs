@@ -6,7 +6,8 @@ use std::{env, path::Path};
 use lighthouse_model::{AgentKind, Attribution, Severity};
 use lighthouse_spec::{Catalog, Decision};
 use lighthouse_store::{
-    Filter, FindingRecord, JudgmentEvent, NewJudgment, Stamp, Standing, State, StatusFilter, Store,
+    Filter, FindingRecord, JudgmentEvent, NewJudgment, Standing, State, StatusFilter, Store,
+    Versions,
 };
 use serde_json::Value;
 
@@ -91,13 +92,13 @@ pub fn review_tasks(root: &Path, query: &TaskQuery) -> Result<Option<Tasks>> {
     };
     let selector = Selector::new(&query.rules)?;
     let found = store.list(&Filter {
-        rule: None,
+        decision: None,
         status: query.status,
     })?;
     Ok(Some(Tasks {
         findings: found
             .into_iter()
-            .filter(|f| selector.matches(&f.rule_id))
+            .filter(|f| selector.matches(&f.decision))
             .filter(|f| query.all_tiers || waits(f, query.status))
             .collect(),
         notices: store.notices().to_vec(),
@@ -131,7 +132,7 @@ pub fn record_judgment(root: &Path, review: &NewJudgment) -> Result<Recorded> {
         Err(e) => (None, Some(e.to_string())),
     };
     let resolved = store.resolve(review, |finding| stamp(catalog.as_ref(), finding))?;
-    let standing = store.finding(&resolved.event.fingerprint)?.standing;
+    let standing = store.finding(&resolved.event.spec.fingerprint)?.standing;
     Ok(Recorded {
         warnings: warnings(&resolved.finding),
         event: resolved.event,
@@ -158,12 +159,12 @@ fn existing_store(root: &Path) -> Result<Store> {
         .ok_or_else(|| "no findings recorded yet (run `lighthouse check`)".into())
 }
 
-fn stamp(catalog: Option<&Catalog>, finding: &FindingRecord) -> Stamp {
+fn stamp(catalog: Option<&Catalog>, finding: &FindingRecord) -> Versions {
     let Some(catalog) = catalog else {
-        return Stamp::default();
+        return Versions::default();
     };
-    let decision = catalog.decision(&finding.rule_id);
-    Stamp {
+    let decision = catalog.decision(&finding.decision);
+    Versions {
         decision_uid: decision.and_then(|d| d.uid()).map(str::to_owned),
         meaning_version: decision.map(|d| d.meaning_version()),
         check_revision: decision.map(|d| d.check_revision()),

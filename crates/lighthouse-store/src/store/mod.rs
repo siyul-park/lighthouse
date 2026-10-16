@@ -2,29 +2,28 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicU64, Ordering},
     thread,
     time::Duration,
 };
 
-use lighthouse_model::{Judgment, hash};
-use lighthouse_resource::STATE_DIR;
+use lighthouse_model::Judgment;
 use rusqlite::{
     Connection, ErrorCode, OptionalExtension, Transaction, TransactionBehavior, named_params,
     params,
 };
 
+use lighthouse_resource::STATE_DIR;
+
 use crate::{
-    Error, Filter, FindingRecord, FixEvent, JudgmentEvent, NewFix, NewJudgment, Observed, Resolved,
-    Ruling, Run, RunSummary, Stamp, Subject, Unchecked, judged::Judged, log, log::JudgmentSpec,
-    schema,
+    Error, Filter, FindingRecord, JudgmentEvent, NewJudgment, Observed, Resolved, Ruling, Run,
+    RunSummary, Subject, SuppressionEvent, Unchecked, Versions, log, schema,
 };
 
-/// File name of the database inside the store directory.
 mod rows;
 
 use rows::*;
 
+/// File name of the database inside the store directory.
 const FILE: &str = "lighthouse.db";
 /// How long a writer waits for another process holding the database.
 const BUSY: Duration = Duration::from_secs(5);
@@ -35,7 +34,7 @@ const OPEN_PAUSE: Duration = Duration::from_millis(20);
 /// Format version of the feature snapshot of a judgment.
 const SNAPSHOT_VERSION: u32 = 2;
 
-const JUDGMENT_COLUMNS: &str = "judgment_id, fingerprint, rule_id, decision_uid, meaning_version, \
+const JUDGMENT_COLUMNS: &str = "judgment_id, fingerprint, decision, decision_uid, meaning_version, \
      check_revision, decision_hash, catalog_version, lighthouse_version, judgment, reason, \
      agent_type, agent_id, agent_role, language, scope, evidence_digest, feature_snapshot, git_commit, \
      generated_at";
@@ -113,9 +112,9 @@ impl Store {
 
     /// Records what a run saw. Seen findings are inserted or refreshed (a
     /// resolved one is reopened); findings that were open inside the run's
-    /// reported paths and rules and are not seen now are resolved, except
-    /// where the run could not check; findings of rules the configuration no
-    /// longer enables become inactive.
+    /// reported paths and decisions and are not seen now are resolved, except
+    /// where the run could not check; findings of decisions the configuration
+    /// no longer enables become inactive.
     pub fn record(&mut self, run: &Run) -> Result<RunSummary, Error> {
         let tx = self
             .conn
@@ -142,25 +141,27 @@ impl Store {
     /// severity, decides). It is computed from the judgments alone, so it holds
     /// on a clone that has no findings recorded yet.
     pub fn standings_for(&self, subjects: &[Subject]) -> Result<BTreeMap<String, Ruling>, Error> {
-        let judged = Judged::load(&self.conn)?;
+        let standings = standings(&self.conn)?;
         Ok(subjects
             .iter()
-            .filter_map(|s| Some((s.fingerprint.clone(), judged.ruling(s)?)))
+            .filter_map(|s| Some((s.fingerprint.clone(), standings.ruling(s)?)))
             .collect())
     }
 
     /// The findings matching `filter`, by path and first sighting.
     pub fn list(&self, filter: &Filter) -> Result<Vec<FindingRecord>, Error> {
         let mut stmt = self.conn.prepare(
-            "SELECT * FROM findings WHERE (?1 IS NULL OR rule_id = ?1) \
+            "SELECT * FROM findings WHERE (?1 IS NULL OR decision = ?1) \
              ORDER BY path, first_seen, fingerprint",
         )?;
-        let judged = Judged::load(&self.conn)?;
-        let rows = stmt.query_map(params![filter.rule], |row| finding_record(row, &judged))?;
+        let standings = standings(&self.conn)?;
+        let rows = stmt.query_map(params![filter.decision], |row| {
+            finding_record(row, &standings)
+        })?;
         let found: Vec<FindingRecord> = rows.collect::<Result<_, _>>()?;
         Ok(found
             .into_iter()
-            .filter(|f| listed(f, filter.status))
+            .filter(|f| filter.status.includes(f))
             .collect())
     }
 
@@ -179,14 +180,14 @@ impl Store {
     /// Appends a judgment, and the suppression that goes with it, to the
     /// decision log, then to the cache. The finding is read inside the
     /// transaction that records the judgment, and its evidence and the facts
-    /// of its last sighting are frozen as the feature snapshot. `stamp`
+    /// of its last sighting are frozen as the feature snapshot. `versions`
     /// supplies the versions of the finding's decision. A suppression belongs
     /// to a `fail`, and when `expect_seen` is set the finding must not have
     /// been seen again since.
     pub fn resolve(
         &mut self,
         review: &NewJudgment,
-        stamp: impl FnOnce(&FindingRecord) -> Stamp,
+        versions: impl FnOnce(&FindingRecord) -> Versions,
     ) -> Result<Resolved, Error> {
         if review.suppress.is_some() && review.judgment != Judgment::Fail {
             return Err(Error::SuppressionWithoutFail(review.judgment));
@@ -210,102 +211,30 @@ impl Store {
                 actual: finding.last_seen,
             });
         }
-        let event = event_of(review, &finding, stamp(&finding), lighthouse_model::now())?;
-        let suppression = review
-            .suppress
-            .as_ref()
-            .map(|justification| suppression_of(&event, justification))
-            .transpose()?;
+        let mut event = event_of(
+            review,
+            &finding,
+            versions(&finding),
+            lighthouse_model::now(),
+        )?;
+        if let Some(justification) = &review.suppress {
+            let suppression = SuppressionEvent::external(&event, justification)?;
+            event.suppressions.push(suppression);
+        }
         if let Some(path) = &self.log {
-            let mut lines = vec![log::line(&event.id, JudgmentSpec::from(&event))?];
-            if let Some(s) = &suppression {
-                lines.push(log::line(&s.event.id, s.spec())?);
-            }
+            let lines = std::iter::once(log::line(&event.id, event.spec.clone()))
+                .chain(
+                    event
+                        .suppressions
+                        .iter()
+                        .map(|s| log::line(&s.id, s.spec.clone())),
+                )
+                .collect::<Result<Vec<_>, _>>()?;
             log::append(path, &lines)?;
         }
         insert_judgment(&tx, &event)?;
-        if let Some(s) = &suppression {
-            insert_suppression(&tx, s)?;
-        }
         tx.commit()?;
-        let mut event = event;
-        event.suppressions = suppression.into_iter().map(|s| s.event).collect();
         Ok(Resolved { event, finding })
-    }
-
-    /// Records that a fixer changed the code for a finding. The record is
-    /// local: unlike a judgment it is not written to the decision log.
-    pub fn record_fix(&mut self, fix: &NewFix) -> Result<FixEvent, Error> {
-        let tx = self
-            .conn
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let timestamp = lighthouse_model::now();
-        let files = serde_json::to_string(&fix.files)?;
-        static NONCE: AtomicU64 = AtomicU64::new(0);
-        let nonce = NONCE.fetch_add(1, Ordering::Relaxed);
-        let id = hash::short(
-            &format!(
-                "{}\0{}\0{}\0{files}\0{timestamp}\0{}\0{nonce}",
-                fix.fingerprint,
-                fix.fixer,
-                fix.description,
-                std::process::id()
-            ),
-            16,
-        );
-        tx.execute(
-            "INSERT OR IGNORE INTO fix_events (event_id, fingerprint, rule_id, fixer, safety, \
-                 description, files, git_commit, lighthouse_version, timestamp) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-            params![
-                id,
-                fix.fingerprint,
-                fix.rule_id,
-                fix.fixer,
-                fix.safety,
-                fix.description,
-                files,
-                fix.commit,
-                env!("CARGO_PKG_VERSION"),
-                timestamp
-            ],
-        )?;
-        tx.commit()?;
-        Ok(FixEvent {
-            id,
-            fingerprint: fix.fingerprint.clone(),
-            rule_id: fix.rule_id.clone(),
-            fixer: fix.fixer.clone(),
-            safety: fix.safety.clone(),
-            description: fix.description.clone(),
-            files: fix.files.clone(),
-            commit: fix.commit.clone(),
-            timestamp,
-        })
-    }
-
-    /// The fixes recorded for a finding, oldest first.
-    pub fn fixes(&self, fingerprint: &str) -> Result<Vec<FixEvent>, Error> {
-        let mut stmt = self.conn.prepare(
-            "SELECT event_id, fingerprint, rule_id, fixer, safety, description, files, \
-                 git_commit, timestamp FROM fix_events WHERE fingerprint = ?1 \
-             ORDER BY timestamp, event_id",
-        )?;
-        let rows = stmt.query_map(params![fingerprint], |row| {
-            let files: String = row.get(6)?;
-            Ok(FixEvent {
-                id: row.get(0)?,
-                fingerprint: row.get(1)?,
-                rule_id: row.get(2)?,
-                fixer: row.get(3)?,
-                safety: row.get(4)?,
-                description: row.get(5)?,
-                files: serde_json::from_str(&files).map_err(conversion)?,
-                commit: row.get(7)?,
-                timestamp: row.get(8)?,
-            })
-        })?;
-        Ok(rows.collect::<Result<_, _>>()?)
     }
 
     /// Deletes findings that are resolved or inactive, were never judged and
@@ -344,8 +273,9 @@ impl Store {
         let wanted: BTreeSet<&str> = read
             .judgments
             .iter()
-            .map(|e| e.id.as_str())
-            .chain(read.suppressions.iter().map(|s| s.event.id.as_str()))
+            .flat_map(|e| {
+                std::iter::once(e.id.as_str()).chain(e.suppressions.iter().map(|s| s.id.as_str()))
+            })
             .collect();
         let mut stale: Vec<(&str, &str, String)> = Vec::new();
         for (table, column) in [
@@ -373,9 +303,6 @@ impl Store {
         }
         for event in &read.judgments {
             insert_judgment(&tx, event)?;
-        }
-        for suppression in &read.suppressions {
-            insert_suppression(&tx, suppression)?;
         }
         tx.commit()?;
         Ok(())
@@ -447,15 +374,15 @@ fn upsert(tx: &Transaction, observed: &Observed, run: &Run, now: &str) -> Result
         Some(false) => Seen::Open,
     };
     tx.prepare_cached(
-        "INSERT INTO findings (fingerprint, rule_id, decision_uid, severity, authored_severity, path, locator, symbol, \
+        "INSERT INTO findings (fingerprint, decision, decision_uid, severity, authored_severity, path, locator, symbol, \
              first_seen, last_seen, last_message, last_evidence, last_facts, last_options, \
              last_commit, last_dirty, lighthouse_version, catalog_version, meaning_version, \
              check_revision, decision_hash, evidence_digest) \
-         VALUES (:fingerprint, :rule_id, :decision_uid, :severity, :authored, :path, :locator, :symbol, :now, :now, \
+         VALUES (:fingerprint, :decision, :decision_uid, :severity, :authored, :path, :locator, :symbol, :now, :now, \
              :message, :evidence, :facts, :options, :commit, :dirty, :version, :catalog, \
              :meaning_version, :check_revision, :decision_hash, :digest) \
          ON CONFLICT (fingerprint) DO UPDATE SET \
-             rule_id = excluded.rule_id, \
+             decision = excluded.decision, \
              decision_uid = COALESCE(excluded.decision_uid, decision_uid), \
              severity = excluded.severity, \
              authored_severity = excluded.authored_severity, path = excluded.path, locator = excluded.locator, \
@@ -472,7 +399,7 @@ fn upsert(tx: &Transaction, observed: &Observed, run: &Run, now: &str) -> Result
     .execute(
         named_params! {
             ":fingerprint": observed.fingerprint,
-            ":rule_id": observed.rule_id,
+            ":decision": observed.decision,
             ":decision_uid": observed.decision_uid,
             ":severity": observed.severity.to_string(),
             ":authored": observed.authored_severity.to_string(),
@@ -507,7 +434,7 @@ fn resolve_absent(tx: &Transaction, run: &Run, now: &str) -> Result<usize, Error
         .map(|o| o.fingerprint.as_str())
         .collect();
     let mut stmt =
-        tx.prepare("SELECT fingerprint, rule_id, path FROM findings WHERE resolved_at IS NULL")?;
+        tx.prepare("SELECT fingerprint, decision, path FROM findings WHERE resolved_at IS NULL")?;
     let open = stmt.query_map([], |row| {
         Ok((
             row.get::<_, String>(0)?,
@@ -517,10 +444,10 @@ fn resolve_absent(tx: &Transaction, run: &Run, now: &str) -> Result<usize, Error
     })?;
     let mut gone = Vec::new();
     for entry in open {
-        let (fingerprint, rule, path) = entry?;
-        let in_scope = run.rules.contains(&rule)
+        let (fingerprint, decision, path) = entry?;
+        let in_scope = run.ran.contains(&decision)
             && run.reported.iter().any(|p| Path::new(&path).starts_with(p))
-            && !unchecked(run, &path);
+            && !run.unchecked.covers(&path);
         if in_scope && !seen.contains(fingerprint.as_str()) {
             gone.push(fingerprint);
         }
@@ -534,20 +461,11 @@ fn resolve_absent(tx: &Transaction, run: &Run, now: &str) -> Result<usize, Error
     Ok(gone.len())
 }
 
-/// Whether the run could not check the file at `path`.
-fn unchecked(run: &Run, path: &str) -> bool {
-    match &run.unchecked {
-        Unchecked::Nothing => false,
-        Unchecked::Everything => true,
-        Unchecked::Paths(dirs) => dirs.iter().any(|dir| Path::new(path).starts_with(dir)),
-    }
-}
-
-/// Marks open findings of rules the configuration no longer enables as
-/// inactive, and clears the mark of those whose rule is enabled again.
+/// Marks open findings of decisions the configuration no longer enables as
+/// inactive, and clears the mark of those whose decision is enabled again.
 fn reconcile_inactive(tx: &Transaction, run: &Run, now: &str) -> Result<usize, Error> {
     let mut stmt = tx.prepare(
-        "SELECT fingerprint, rule_id, inactive_at IS NOT NULL FROM findings \
+        "SELECT fingerprint, decision, inactive_at IS NOT NULL FROM findings \
          WHERE resolved_at IS NULL OR inactive_at IS NOT NULL",
     )?;
     let candidates = stmt.query_map([], |row| {
@@ -559,15 +477,15 @@ fn reconcile_inactive(tx: &Transaction, run: &Run, now: &str) -> Result<usize, E
     })?;
     let mut deactivated = 0;
     for entry in candidates {
-        let (fingerprint, rule, inactive) = entry?;
-        let configured = run.configured.contains(&rule);
-        if configured == inactive {
-            let value = (!configured).then_some(now);
+        let (fingerprint, decision, inactive) = entry?;
+        let active = run.active.contains(&decision);
+        if active == inactive {
+            let value = (!active).then_some(now);
             tx.execute(
                 "UPDATE findings SET inactive_at = ?2 WHERE fingerprint = ?1",
                 params![fingerprint, value],
             )?;
-            deactivated += usize::from(!configured);
+            deactivated += usize::from(!active);
         }
     }
     Ok(deactivated)

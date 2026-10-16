@@ -5,6 +5,9 @@
     "authoredSeverity": {
       "type": "string"
     },
+    "decision": {
+      "type": "string"
+    },
     "evidence": {},
     "facts": {},
     "fingerprint": {
@@ -63,9 +66,6 @@
         }
       ]
     },
-    "ruleId": {
-      "type": "string"
-    },
     "severity": {
       "type": "string"
     },
@@ -92,7 +92,7 @@
   },
   "required": [
     "fingerprint",
-    "ruleId",
+    "decision",
     "severity",
     "path",
     "message",

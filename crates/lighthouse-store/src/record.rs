@@ -1,18 +1,17 @@
-use std::fmt;
+use std::{fmt, path::Path};
 
-use lighthouse_model::{
-    Attribution, Diagnostic, Judgment, Label, Severity, SuppressionKind, SuppressionStatus,
-    evidence_digest,
-};
+use lighthouse_model::{Attribution, Diagnostic, Judgment, Severity, evidence_digest};
 use serde::Serialize;
 use serde_json::{Value, json};
+
+use crate::JudgmentEvent;
 
 /// One finding as a run saw it. The locator and evidence are JSON so that
 /// artifacts other than source code fit the same record.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Observed {
     pub fingerprint: String,
-    pub rule_id: String,
+    pub decision: String,
     /// The uid of the finding's decision.
     pub decision_uid: Option<String>,
     pub severity: Severity,
@@ -49,7 +48,7 @@ impl Observed {
     pub fn from_diagnostic(diagnostic: &Diagnostic, facts: Value) -> Self {
         Self {
             fingerprint: diagnostic.fingerprint.as_str().to_owned(),
-            rule_id: diagnostic.rule_id.clone(),
+            decision: diagnostic.rule_id.clone(),
             decision_uid: None,
             severity: diagnostic.severity,
             authored_severity: diagnostic.severity,
@@ -104,8 +103,19 @@ pub enum Unchecked {
     Everything,
 }
 
+impl Unchecked {
+    /// Whether the run could not check the file at `path`.
+    pub(crate) fn covers(&self, path: &str) -> bool {
+        match self {
+            Self::Nothing => false,
+            Self::Everything => true,
+            Self::Paths(dirs) => dirs.iter().any(|dir| Path::new(path).starts_with(dir)),
+        }
+    }
+}
+
 /// What one analysis run saw and what it covered. Findings absent from
-/// `observed` are resolved only inside `reported` and `rules`, and not where
+/// `observed` are resolved only inside `reported` and `ran`, and not where
 /// the run `unchecked` something.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Run {
@@ -114,11 +124,11 @@ pub struct Run {
     /// Project-relative paths whose findings the run reports: a file or a
     /// directory prefix; the empty path is everything.
     pub reported: Vec<String>,
-    /// The rules that ran.
-    pub rules: Vec<String>,
-    /// Every rule the configuration enables; remembered findings of any other
-    /// rule become inactive.
-    pub configured: Vec<String>,
+    /// The decisions that ran.
+    pub ran: Vec<String>,
+    /// Every decision the configuration enables; remembered findings of any
+    /// other decision become inactive.
+    pub active: Vec<String>,
     pub unchecked: Unchecked,
     /// The commit and whether the working tree differed from it.
     pub commit: Option<String>,
@@ -145,17 +155,32 @@ pub enum StatusFilter {
     Suppressed,
     /// Judged `notApplicable`: the decision should be narrowed.
     Narrowing,
-    /// Of a rule the configuration no longer enables.
+    /// Of a decision the configuration no longer enables.
     Inactive,
     /// No longer reported by a complete run.
     Resolved,
     All,
 }
 
+impl StatusFilter {
+    /// Whether a finding belongs to a listing of this status.
+    pub(crate) fn includes(self, finding: &FindingRecord) -> bool {
+        let hidden = finding.standing == Some(Standing::Suppressed);
+        match self {
+            Self::Open => finding.resolved_at.is_none() && finding.inactive_at.is_none() && !hidden,
+            Self::Suppressed => hidden,
+            Self::Narrowing => hidden && finding.narrowing,
+            Self::Inactive => finding.inactive_at.is_some() && !hidden,
+            Self::Resolved => finding.resolved_at.is_some(),
+            Self::All => true,
+        }
+    }
+}
+
 /// What a listing selects.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Filter {
-    pub rule: Option<String>,
+    pub decision: Option<String>,
     pub status: StatusFilter,
 }
 
@@ -230,7 +255,7 @@ impl fmt::Display for State {
 #[serde(rename_all = "camelCase")]
 pub struct FindingRecord {
     pub fingerprint: String,
-    pub rule_id: String,
+    pub decision: String,
     /// The uid of the finding's decision, when the catalog gave it one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decision_uid: Option<String>,
@@ -311,7 +336,7 @@ pub struct NewJudgment {
 /// What a judgment records about the decision beyond the finding: the versions
 /// of the decision it judged and its scope.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Stamp {
+pub struct Versions {
     /// The uid of the finding's decision, when it differs from what the
     /// finding was recorded with.
     pub decision_uid: Option<String>,
@@ -331,94 +356,4 @@ pub struct Stamp {
 pub struct Resolved {
     pub event: JudgmentEvent,
     pub finding: FindingRecord,
-}
-
-/// A suppression that went with a judgment.
-#[derive(Debug, Clone, PartialEq)]
-pub struct SuppressionEvent {
-    pub id: String,
-    pub kind: SuppressionKind,
-    pub status: SuppressionStatus,
-    pub justification: String,
-    pub was_attributed_to: Attribution,
-    pub generated_at_time: String,
-}
-
-/// One entry of the decision log and of the judgments table: a judgment on a
-/// finding with everything needed to learn from it later. `id` is the hash of
-/// the record's spec, so the same entry read from two copies of the log is one
-/// entry.
-#[derive(Debug, Clone, PartialEq)]
-pub struct JudgmentEvent {
-    pub id: String,
-    pub fingerprint: String,
-    /// The name the decision had when the judgment was given; `decision_uid`
-    /// is what identifies it.
-    pub decision_name: String,
-    pub decision_uid: Option<String>,
-    pub meaning_version: Option<String>,
-    /// How the decision was checked; recorded for evaluation, never compared
-    /// to expire the judgment.
-    pub check_revision: Option<String>,
-    pub decision_hash: Option<String>,
-    pub catalog_version: Option<String>,
-    pub lighthouse_version: Option<String>,
-    pub judgment: Judgment,
-    pub reason: Option<String>,
-    pub was_attributed_to: Attribution,
-    pub generated_at_time: String,
-    pub language: Option<String>,
-    pub scope: Option<String>,
-    pub evidence_digest: Option<String>,
-    /// The finding frozen at judgment time: evidence, facts, options,
-    /// severities, when and where it was seen.
-    pub snapshot: Value,
-    pub commit: Option<String>,
-    pub suppressions: Vec<SuppressionEvent>,
-}
-
-impl JudgmentEvent {
-    /// What the judgment teaches a model about its decision.
-    pub fn label(&self) -> Label {
-        Label::new(
-            self.judgment,
-            self.suppressions
-                .iter()
-                .any(|s| s.status == SuppressionStatus::Accepted),
-        )
-    }
-
-    /// The finding's evidence when it was judged.
-    pub fn evidence(&self) -> &Value {
-        &self.snapshot["evidence"]
-    }
-}
-
-/// A fix to record: what a fixer changed for a finding.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NewFix {
-    pub fingerprint: String,
-    pub rule_id: String,
-    pub fixer: String,
-    /// `safe` or `suggested`.
-    pub safety: String,
-    pub description: String,
-    /// Project-relative paths of the files the fix changed.
-    pub files: Vec<String>,
-    pub commit: Option<String>,
-}
-
-/// A recorded fix; `fixed by` the fixer named, when.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FixEvent {
-    pub id: String,
-    pub fingerprint: String,
-    pub rule_id: String,
-    pub fixer: String,
-    pub safety: String,
-    pub description: String,
-    pub files: Vec<String>,
-    pub commit: Option<String>,
-    pub timestamp: String,
 }

@@ -14,12 +14,12 @@ pub(crate) fn judged(root: &Path) -> Result<Vec<Judged>> {
         .judgments
         .into_iter()
         .map(|event| Judged {
-            fingerprint: event.fingerprint,
-            decision_name: event.decision_name,
-            decision_uid: event.decision_uid,
-            meaning_version: event.meaning_version,
-            judgment: event.judgment,
-            by: event.was_attributed_to,
+            fingerprint: event.spec.fingerprint,
+            decision_name: event.spec.decision,
+            decision_uid: event.spec.decision_uid,
+            meaning_version: event.spec.meaning_version,
+            judgment: event.spec.judgment,
+            by: event.spec.was_attributed_to,
         })
         .collect())
 }

@@ -10,10 +10,9 @@ use lighthouse_engine::{
 };
 use lighthouse_model::Fingerprint;
 use lighthouse_spec::{Catalog, Decision};
-use lighthouse_store::{NewFix, Store};
 use serde::Serialize;
 
-use crate::{Result, Selector, Session, findings, git, long_enough, models::command_models};
+use crate::{Result, Selector, Session, findings, long_enough, models::command_models};
 
 /// Which findings to fix. At least one of `paths`, `fingerprints` and `rules`
 /// narrows a run from the whole project.
@@ -124,7 +123,8 @@ pub fn fix(session: Session, request: &FixSelection) -> Result<Fixed> {
     let mut report = engine.fix(&plan, &run)?;
     messages.extend(report.notes.iter().cloned());
     if request.store && !request.dry_run {
-        record(&root, &catalog, &mut report, &mut messages);
+        let remembered = findings::remember(&root, &catalog, &mut report.finished);
+        messages.extend(remembered.messages);
     }
     let diff = report
         .changes
@@ -190,36 +190,4 @@ fn suppressed(
         .map(|d| d.fingerprint.clone())
         .collect();
     Ok(all.difference(&kept).cloned().collect())
-}
-
-/// Records each applied fix, then the run that ended the fixing, which
-/// resolves the findings the fixes removed. A store that cannot be used is
-/// reported, never fatal: the files are already fixed.
-fn record(
-    root: &std::path::Path,
-    catalog: &Catalog,
-    report: &mut FixReport,
-    messages: &mut Vec<String>,
-) {
-    let written = (|| -> Result<()> {
-        let mut store = Store::open(root)?;
-        for fix in &report.applied {
-            store.record_fix(&NewFix {
-                fingerprint: fix.fingerprint.as_str().to_owned(),
-                rule_id: fix.rule_id.clone(),
-                fixer: fix.fixer.clone(),
-                safety: fix.safety.to_string(),
-                description: fix.description.clone(),
-                files: fix.files.iter().map(|f| slashed(f)).collect(),
-                commit: git::head(root),
-            })?;
-        }
-        Ok(())
-    })();
-    if let Err(e) = written {
-        messages.push(format!("fixes not recorded: {e}"));
-        return;
-    }
-    let remembered = findings::remember(root, catalog, &mut report.finished);
-    messages.extend(remembered.messages);
 }

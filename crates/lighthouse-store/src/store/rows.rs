@@ -3,17 +3,16 @@
 
 use std::{collections::BTreeMap, path::Path};
 
-use lighthouse_model::{Attribution, Judgment, Role, Severity};
+use lighthouse_model::{Attribution, Judgment, Role, Severity, evidence_digest};
 use rusqlite::{
     Connection, OptionalExtension, Row, Transaction, named_params, params, types::Type,
 };
 use serde_json::{Value, json};
 
 use crate::{
-    Error, FindingRecord, JudgmentEvent, MIN_PREFIX, NewJudgment, Stamp, Standing, StatusFilter,
-    Subject, SuppressionEvent, judged::Judged, log, log::LoggedSuppression,
+    Error, FindingRecord, JudgmentEvent, JudgmentSpec, MIN_PREFIX, NewJudgment, Subject,
+    SuppressionEvent, SuppressionSpec, Versions, standings::Standings,
 };
-use lighthouse_model::{SuppressionKind, SuppressionStatus};
 
 use super::{JUDGMENT_COLUMNS, MAX_CANDIDATES, SNAPSHOT_VERSION};
 
@@ -57,29 +56,19 @@ pub(super) fn expand(conn: &Connection, prefix: &str) -> Result<String, Error> {
 
 pub(super) fn load_finding(conn: &Connection, prefix: &str) -> Result<FindingRecord, Error> {
     let full = expand(conn, prefix)?;
-    let judged = Judged::load(conn)?;
+    let standings = standings(conn)?;
     conn.query_row(
         "SELECT * FROM findings WHERE fingerprint = ?1",
         params![full],
-        |row| finding_record(row, &judged),
+        |row| finding_record(row, &standings),
     )
     .optional()?
     .ok_or_else(|| Error::UnknownFinding(prefix.to_owned()))
 }
 
-/// Whether a finding belongs to a listing of `status`.
-pub(super) fn listed(finding: &FindingRecord, status: StatusFilter) -> bool {
-    let hidden = finding.standing == Some(Standing::Suppressed);
-    match status {
-        StatusFilter::Open => {
-            finding.resolved_at.is_none() && finding.inactive_at.is_none() && !hidden
-        }
-        StatusFilter::Suppressed => hidden,
-        StatusFilter::Narrowing => hidden && finding.narrowing,
-        StatusFilter::Inactive => finding.inactive_at.is_some() && !hidden,
-        StatusFilter::Resolved => finding.resolved_at.is_some(),
-        StatusFilter::All => true,
-    }
+/// What every judgment of the cache does to its finding.
+pub(super) fn standings(conn: &Connection) -> Result<Standings, Error> {
+    Ok(Standings::of(judgments_of(conn, None)?))
 }
 
 /// The judgments of one finding (every finding when `None`), oldest first,
@@ -95,28 +84,17 @@ pub(super) fn judgments_of(
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map(params![fingerprint], judgment_event)?;
     let mut events: Vec<JudgmentEvent> = rows.collect::<Result<_, _>>()?;
-    let mut by_judgment: BTreeMap<String, Vec<SuppressionEvent>> = BTreeMap::new();
-    for s in suppressions_of(conn)? {
-        by_judgment.entry(s.judgment).or_default().push(s.event);
-    }
-    for event in &mut events {
-        event.suppressions = by_judgment.remove(&event.id).unwrap_or_default();
-    }
-    Ok(events)
-}
-
-pub(super) fn suppressions_of(conn: &Connection) -> Result<Vec<LoggedSuppression>, Error> {
     let mut stmt = conn.prepare(
         "SELECT suppression_id, judgment_id, fingerprint, kind, status, justification, \
              agent_type, agent_id, agent_role, generated_at FROM suppressions \
-         ORDER BY generated_at, suppression_id",
+         WHERE (?1 IS NULL OR fingerprint = ?1) ORDER BY generated_at, suppression_id",
     )?;
-    let rows = stmt.query_map([], |row| {
-        Ok(LoggedSuppression {
-            judgment: row.get(1)?,
-            fingerprint: row.get(2)?,
-            event: SuppressionEvent {
-                id: row.get(0)?,
+    let rows = stmt.query_map(params![fingerprint], |row| {
+        Ok(SuppressionEvent {
+            id: row.get(0)?,
+            spec: SuppressionSpec {
+                judgment: row.get(1)?,
+                fingerprint: row.get(2)?,
                 kind: parse(&row.get::<_, String>(3)?)?,
                 status: parse(&row.get::<_, String>(4)?)?,
                 justification: row.get(5)?,
@@ -129,16 +107,27 @@ pub(super) fn suppressions_of(conn: &Connection) -> Result<Vec<LoggedSuppression
             },
         })
     })?;
-    Ok(rows.collect::<Result<_, _>>()?)
+    let mut by_judgment: BTreeMap<String, Vec<SuppressionEvent>> = BTreeMap::new();
+    for suppression in rows {
+        let suppression = suppression?;
+        by_judgment
+            .entry(suppression.spec.judgment.clone())
+            .or_default()
+            .push(suppression);
+    }
+    for event in &mut events {
+        event.suppressions = by_judgment.remove(&event.id).unwrap_or_default();
+    }
+    Ok(events)
 }
 
 /// The judgment that recording `review` on `finding` writes: the finding
-/// frozen as it was last seen, sealed with the id its content determines.
+/// frozen as it was last seen, with the id its content determines.
 pub(super) fn event_of(
     review: &NewJudgment,
     finding: &FindingRecord,
-    stamp: Stamp,
-    timestamp: String,
+    versions: Versions,
+    generated_at_time: String,
 ) -> Result<JudgmentEvent, Error> {
     let snapshot = json!({
         "v": SNAPSHOT_VERSION,
@@ -156,114 +145,90 @@ pub(super) fn event_of(
         "dirty": finding.dirty,
         "lighthouseVersion": finding.lighthouse_version,
     });
-    let mut event = JudgmentEvent {
-        id: String::new(),
+    JudgmentEvent::new(JudgmentSpec {
         fingerprint: finding.fingerprint.clone(),
-        decision_name: finding.rule_id.clone(),
-        decision_uid: stamp.decision_uid.or_else(|| finding.decision_uid.clone()),
-        meaning_version: stamp.meaning_version,
-        check_revision: stamp.check_revision,
-        decision_hash: stamp.decision_hash,
-        catalog_version: stamp.catalog_version,
+        decision: finding.decision.clone(),
+        decision_uid: versions
+            .decision_uid
+            .or_else(|| finding.decision_uid.clone()),
+        meaning_version: versions.meaning_version,
+        check_revision: versions.check_revision,
+        decision_hash: versions.decision_hash,
+        catalog_version: versions.catalog_version,
         lighthouse_version: Some(review.lighthouse_version.clone()),
         judgment: review.judgment,
         reason: review.reason.clone(),
         was_attributed_to: review.attribution.clone(),
-        generated_at_time: timestamp,
+        generated_at_time,
         language: finding
             .facts
             .get("language")
             .and_then(Value::as_str)
             .map(str::to_owned),
-        scope: stamp.scope,
-        evidence_digest: Some(lighthouse_model::evidence_digest(&finding.evidence)),
+        scope: versions.scope,
+        evidence_digest: Some(evidence_digest(&finding.evidence)),
         snapshot,
         commit: review.commit.clone(),
-        suppressions: Vec::new(),
-    };
-    log::seal(&mut event)?;
-    Ok(event)
+    })
 }
 
-/// The external suppression that goes with `event`, written by whoever wrote
-/// the judgment, at the same time.
-pub(super) fn suppression_of(
-    event: &JudgmentEvent,
-    justification: &str,
-) -> Result<LoggedSuppression, Error> {
-    let mut suppression = LoggedSuppression {
-        judgment: event.id.clone(),
-        fingerprint: event.fingerprint.clone(),
-        event: SuppressionEvent {
-            id: String::new(),
-            kind: SuppressionKind::External,
-            status: SuppressionStatus::Accepted,
-            justification: justification.to_owned(),
-            was_attributed_to: event.was_attributed_to.clone(),
-            generated_at_time: event.generated_at_time.clone(),
-        },
-    };
-    suppression.event.id = log::id_of(&suppression.spec())?;
-    Ok(suppression)
-}
-
+/// Writes the judgment and the suppressions that go with it.
 pub(super) fn insert_judgment(tx: &Transaction, event: &JudgmentEvent) -> Result<(), Error> {
+    let spec = &event.spec;
     tx.execute(
-        "INSERT OR IGNORE INTO judgments (judgment_id, fingerprint, rule_id, decision_uid, \
+        "INSERT OR IGNORE INTO judgments (judgment_id, fingerprint, decision, decision_uid, \
              meaning_version, check_revision, decision_hash, catalog_version, lighthouse_version, \
              judgment, reason, agent_type, agent_id, agent_role, language, scope, evidence_digest, \
              feature_snapshot, git_commit, generated_at) \
-         VALUES (:id, :fingerprint, :rule_id, :decision_uid, :meaning_version, :check_revision, \
+         VALUES (:id, :fingerprint, :decision, :decision_uid, :meaning_version, :check_revision, \
              :decision_hash, :catalog, :version, :judgment, :reason, :agent_type, :agent_id, :agent_role, \
              :language, :scope, :digest, :snapshot, :commit, :generated_at)",
         named_params! {
             ":id": event.id,
-            ":fingerprint": event.fingerprint,
-            ":rule_id": event.decision_name,
-            ":decision_uid": event.decision_uid,
-            ":meaning_version": event.meaning_version,
-            ":check_revision": event.check_revision,
-            ":decision_hash": event.decision_hash,
-            ":catalog": event.catalog_version,
-            ":version": event.lighthouse_version,
-            ":judgment": event.judgment.as_str(),
-            ":reason": event.reason,
-            ":agent_type": event.was_attributed_to.kind.as_str(),
-            ":agent_id": event.was_attributed_to.id,
-            ":agent_role": event.was_attributed_to.role.map(Role::as_str),
-            ":language": event.language,
-            ":scope": event.scope,
-            ":digest": event.evidence_digest,
-            ":snapshot": event.snapshot.to_string(),
-            ":commit": event.commit,
-            ":generated_at": event.generated_at_time,
+            ":fingerprint": spec.fingerprint,
+            ":decision": spec.decision,
+            ":decision_uid": spec.decision_uid,
+            ":meaning_version": spec.meaning_version,
+            ":check_revision": spec.check_revision,
+            ":decision_hash": spec.decision_hash,
+            ":catalog": spec.catalog_version,
+            ":version": spec.lighthouse_version,
+            ":judgment": spec.judgment.as_str(),
+            ":reason": spec.reason,
+            ":agent_type": spec.was_attributed_to.kind.as_str(),
+            ":agent_id": spec.was_attributed_to.id,
+            ":agent_role": spec.was_attributed_to.role.map(Role::as_str),
+            ":language": spec.language,
+            ":scope": spec.scope,
+            ":digest": spec.evidence_digest,
+            ":snapshot": spec.snapshot.to_string(),
+            ":commit": spec.commit,
+            ":generated_at": spec.generated_at_time,
         },
     )?;
+    for SuppressionEvent { id, spec: s } in &event.suppressions {
+        tx.execute(
+            "INSERT OR IGNORE INTO suppressions (suppression_id, judgment_id, fingerprint, kind, \
+                 status, justification, agent_type, agent_id, agent_role, generated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                id,
+                s.judgment,
+                s.fingerprint,
+                s.kind.as_str(),
+                s.status.as_str(),
+                s.justification,
+                s.was_attributed_to.kind.as_str(),
+                s.was_attributed_to.id,
+                s.was_attributed_to.role.map(Role::as_str),
+                s.generated_at_time,
+            ],
+        )?;
+    }
     Ok(())
 }
 
-pub(super) fn insert_suppression(tx: &Transaction, s: &LoggedSuppression) -> Result<(), Error> {
-    tx.execute(
-        "INSERT OR IGNORE INTO suppressions (suppression_id, judgment_id, fingerprint, kind, \
-             status, justification, agent_type, agent_id, agent_role, generated_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-        params![
-            s.event.id,
-            s.judgment,
-            s.fingerprint,
-            s.event.kind.as_str(),
-            s.event.status.as_str(),
-            s.event.justification,
-            s.event.was_attributed_to.kind.as_str(),
-            s.event.was_attributed_to.id,
-            s.event.was_attributed_to.role.map(Role::as_str),
-            s.event.generated_at_time,
-        ],
-    )?;
-    Ok(())
-}
-
-pub(super) fn finding_record(row: &Row, judged: &Judged) -> rusqlite::Result<FindingRecord> {
+pub(super) fn finding_record(row: &Row, standings: &Standings) -> rusqlite::Result<FindingRecord> {
     let authored_severity = severity(row, "authored_severity")?;
     let subject = Subject {
         fingerprint: row.get("fingerprint")?,
@@ -273,10 +238,10 @@ pub(super) fn finding_record(row: &Row, judged: &Judged) -> rusqlite::Result<Fin
             .get::<_, Option<String>>("evidence_digest")?
             .unwrap_or_default(),
     };
-    let ruling = judged.ruling(&subject);
+    let ruling = standings.ruling(&subject);
     Ok(FindingRecord {
         fingerprint: subject.fingerprint.clone(),
-        rule_id: row.get("rule_id")?,
+        decision: row.get("decision")?,
         decision_uid: row.get("decision_uid")?,
         severity: severity(row, "severity")?,
         authored_severity,
@@ -306,51 +271,53 @@ pub(super) fn finding_record(row: &Row, judged: &Judged) -> rusqlite::Result<Fin
     })
 }
 
-pub(super) fn judgment_event(row: &Row) -> rusqlite::Result<JudgmentEvent> {
+fn judgment_event(row: &Row) -> rusqlite::Result<JudgmentEvent> {
     Ok(JudgmentEvent {
         id: row.get("judgment_id")?,
-        fingerprint: row.get("fingerprint")?,
-        decision_name: row.get("rule_id")?,
-        decision_uid: row.get("decision_uid")?,
-        meaning_version: row.get("meaning_version")?,
-        check_revision: row.get("check_revision")?,
-        decision_hash: row.get("decision_hash")?,
-        catalog_version: row.get("catalog_version")?,
-        lighthouse_version: row.get("lighthouse_version")?,
-        judgment: parse(&row.get::<_, String>("judgment")?)?,
-        reason: row.get("reason")?,
-        was_attributed_to: Attribution {
-            kind: parse(&row.get::<_, String>("agent_type")?)?,
-            id: row.get("agent_id")?,
-            role: role_of(row.get("agent_role")?)?,
+        spec: JudgmentSpec {
+            fingerprint: row.get("fingerprint")?,
+            decision: row.get("decision")?,
+            decision_uid: row.get("decision_uid")?,
+            meaning_version: row.get("meaning_version")?,
+            check_revision: row.get("check_revision")?,
+            decision_hash: row.get("decision_hash")?,
+            catalog_version: row.get("catalog_version")?,
+            lighthouse_version: row.get("lighthouse_version")?,
+            judgment: parse(&row.get::<_, String>("judgment")?)?,
+            reason: row.get("reason")?,
+            was_attributed_to: Attribution {
+                kind: parse(&row.get::<_, String>("agent_type")?)?,
+                id: row.get("agent_id")?,
+                role: role_of(row.get("agent_role")?)?,
+            },
+            generated_at_time: row.get("generated_at")?,
+            language: row.get("language")?,
+            scope: row.get("scope")?,
+            evidence_digest: row.get("evidence_digest")?,
+            snapshot: json_column(row, "feature_snapshot")?,
+            commit: row.get("git_commit")?,
         },
-        generated_at_time: row.get("generated_at")?,
-        language: row.get("language")?,
-        scope: row.get("scope")?,
-        evidence_digest: row.get("evidence_digest")?,
-        snapshot: json_column(row, "feature_snapshot")?,
-        commit: row.get("git_commit")?,
         suppressions: Vec::new(),
     })
 }
 
-pub(super) fn severity(row: &Row, name: &str) -> rusqlite::Result<Severity> {
+fn severity(row: &Row, name: &str) -> rusqlite::Result<Severity> {
     parse(&row.get::<_, String>(name)?)
 }
 
-pub(super) fn json_column(row: &Row, name: &str) -> rusqlite::Result<Value> {
+fn json_column(row: &Row, name: &str) -> rusqlite::Result<Value> {
     let text: String = row.get(name)?;
     serde_json::from_str(&text).map_err(conversion)
 }
 
-pub(super) fn parse<T: std::str::FromStr>(text: &str) -> rusqlite::Result<T>
+fn parse<T: std::str::FromStr>(text: &str) -> rusqlite::Result<T>
 where
     T::Err: std::error::Error + Send + Sync + 'static,
 {
     text.parse().map_err(conversion)
 }
 
-pub(super) fn conversion(error: impl std::error::Error + Send + Sync + 'static) -> rusqlite::Error {
+fn conversion(error: impl std::error::Error + Send + Sync + 'static) -> rusqlite::Error {
     rusqlite::Error::FromSqlConversionFailure(0, Type::Text, Box::new(error))
 }
 

@@ -163,8 +163,7 @@ commands and asks (`--yes` only after reading the list), and `init --agent claud
 adds `Bash(lighthouse trust:*)` to the project's permission deny list so the agent cannot
 trust a project for you. Nothing is written until the whole run verified in memory, and
 a file that changed meanwhile is skipped and reported, with every file of a fix that
-spans it. Applied fixes
-are recorded in the local store (`fix_events`), and the findings they removed
+spans it. The findings the fixes removed
 are resolved by the run that ends the fixing. Recheck with `check` afterwards.
 
 ### Resources

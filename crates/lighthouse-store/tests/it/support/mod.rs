@@ -3,13 +3,13 @@
 use std::thread;
 
 use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};
-use lighthouse_store::{NewJudgment, Observed, Run, Stamp, Standing, Store, Unchecked};
+use lighthouse_store::{NewJudgment, Observed, Run, Standing, Store, Unchecked, Versions};
 use serde_json::json;
 
 pub fn observed(fingerprint: &str, rule: &str, path: &str) -> Observed {
     Observed {
         fingerprint: fingerprint.to_owned(),
-        rule_id: rule.to_owned(),
+        decision: rule.to_owned(),
         decision_uid: None,
         severity: Severity::Info,
         authored_severity: Severity::Info,
@@ -30,8 +30,8 @@ pub fn run(observed: Vec<Observed>) -> Run {
     Run {
         observed,
         reported: vec![String::new()],
-        rules: vec!["design/a".to_owned(), "design/b".to_owned()],
-        configured: vec!["design/a".to_owned(), "design/b".to_owned()],
+        ran: vec!["design/a".to_owned(), "design/b".to_owned()],
+        active: vec!["design/a".to_owned(), "design/b".to_owned()],
         unchecked: Unchecked::Nothing,
         commit: Some("abc123".to_owned()),
         dirty: true,
@@ -53,8 +53,8 @@ pub fn review(fingerprint: &str, judgment: Judgment) -> NewJudgment {
     }
 }
 
-pub fn stamp(version: &str) -> impl Fn(&lighthouse_store::FindingRecord) -> Stamp + '_ {
-    move |_| Stamp {
+pub fn stamp(version: &str) -> impl Fn(&lighthouse_store::FindingRecord) -> Versions + '_ {
+    move |_| Versions {
         decision_uid: None,
         meaning_version: Some(version.to_owned()),
         check_revision: Some("chk1".to_owned()),

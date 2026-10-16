@@ -10,22 +10,23 @@
 //! label.
 
 mod error;
-mod judged;
 mod log;
 mod record;
 mod records;
 mod schema;
+mod standings;
 mod store;
 
 use lighthouse_resource::Descriptor;
 
 pub use error::{Error, MIN_PREFIX};
-pub(crate) use log::SuppressionSpec;
-pub use log::{Change, JudgmentSpec, RevisionEvent, RevisionSpec};
+pub use log::{
+    Change, JudgmentEvent, JudgmentSpec, RevisionEvent, RevisionSpec, SuppressionEvent,
+    SuppressionSpec,
+};
 pub use record::{
-    Filter, FindingRecord, FixEvent, JudgmentEvent, NewFix, NewJudgment, Observed, Resolved,
-    Ruling, Run, RunSummary, Stamp, Standing, State, StatusFilter, Subject, SuppressionEvent,
-    Unchecked,
+    Filter, FindingRecord, NewJudgment, Observed, Resolved, Ruling, Run, RunSummary, Standing,
+    State, StatusFilter, Subject, Unchecked, Versions,
 };
 pub use records::{Records, append_revision};
 pub use store::Store;

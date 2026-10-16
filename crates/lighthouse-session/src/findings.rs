@@ -234,8 +234,8 @@ fn run_of(root: &Path, catalog: &Catalog, outcome: &Outcome) -> Run {
             .iter()
             .map(|p| slashed(&p.to_string_lossy()))
             .collect(),
-        rules: outcome.rules.clone(),
-        configured: outcome.configured.clone(),
+        ran: outcome.rules.clone(),
+        active: outcome.configured.clone(),
         unchecked: unchecked(&outcome.incomplete),
         commit: git::head(root),
         dirty: git::dirty(root),

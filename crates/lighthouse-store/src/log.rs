@@ -18,21 +18,21 @@
 //! from the cache.
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs::{self, OpenOptions},
     io::{Read, Seek, SeekFrom, Write},
     path::Path,
 };
 
 use lighthouse_model::{
-    Attribution, Judgment, SuppressionKind, SuppressionStatus, canonical, hash,
+    Attribution, Judgment, Label, SuppressionKind, SuppressionStatus, canonical, hash,
 };
 use lighthouse_resource::{API_VERSION, Metadata, Resource, Spec};
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde_json::{Value, json};
 
-use crate::{Error, JudgmentEvent, SuppressionEvent};
+use crate::{Error, Records};
 
 /// File name of the log inside the store directory.
 pub(crate) const FILE: &str = "decisions.jsonl";
@@ -50,7 +50,9 @@ pub struct JudgmentSpec {
     pub fingerprint: String,
     /// The name the decision had when the judgment was given, kept to be read;
     /// `decisionUid` is what identifies it.
-    pub decision_name: String,
+    // The key stays `decisionName`: the bytes of a record are what its id hashes.
+    #[serde(rename = "decisionName")]
+    pub decision: String,
     /// The uid of the decision: its identity across renames.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decision_uid: Option<String>,
@@ -164,77 +166,58 @@ impl Spec for SuppressionSpec {
     const KIND: &'static str = "Suppression";
 }
 
-impl From<&JudgmentEvent> for JudgmentSpec {
-    fn from(event: &JudgmentEvent) -> Self {
-        Self {
-            fingerprint: event.fingerprint.clone(),
-            decision_name: event.decision_name.clone(),
-            decision_uid: event.decision_uid.clone(),
-            meaning_version: event.meaning_version.clone(),
-            check_revision: event.check_revision.clone(),
-            decision_hash: event.decision_hash.clone(),
-            catalog_version: event.catalog_version.clone(),
-            lighthouse_version: event.lighthouse_version.clone(),
-            judgment: event.judgment,
-            reason: event.reason.clone(),
-            was_attributed_to: event.was_attributed_to.clone(),
-            generated_at_time: event.generated_at_time.clone(),
-            language: event.language.clone(),
-            scope: event.scope.clone(),
-            evidence_digest: event.evidence_digest.clone(),
-            snapshot: event.snapshot.clone(),
-            commit: event.commit.clone(),
-        }
-    }
+/// A judgment as the log holds it, with the suppressions that go with it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JudgmentEvent {
+    pub id: String,
+    pub spec: JudgmentSpec,
+    pub suppressions: Vec<SuppressionEvent>,
+}
+
+/// A suppression as the log holds it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SuppressionEvent {
+    pub id: String,
+    pub spec: SuppressionSpec,
 }
 
 impl JudgmentEvent {
-    fn from_spec(id: String, spec: JudgmentSpec) -> Self {
-        Self {
-            id,
-            fingerprint: spec.fingerprint,
-            decision_name: spec.decision_name,
-            decision_uid: spec.decision_uid,
-            meaning_version: spec.meaning_version,
-            check_revision: spec.check_revision,
-            decision_hash: spec.decision_hash,
-            catalog_version: spec.catalog_version,
-            lighthouse_version: spec.lighthouse_version,
-            judgment: spec.judgment,
-            reason: spec.reason,
-            was_attributed_to: spec.was_attributed_to,
-            generated_at_time: spec.generated_at_time,
-            language: spec.language,
-            scope: spec.scope,
-            evidence_digest: spec.evidence_digest,
-            snapshot: spec.snapshot,
-            commit: spec.commit,
+    /// The judgment of `spec` with the id its content determines.
+    pub(crate) fn new(spec: JudgmentSpec) -> Result<Self, Error> {
+        Ok(Self {
+            id: id_of(&spec)?,
+            spec,
             suppressions: Vec::new(),
-        }
+        })
+    }
+
+    /// What the judgment teaches a model about its decision.
+    pub fn label(&self) -> Label {
+        Label::new(
+            self.spec.judgment,
+            self.suppressions
+                .iter()
+                .any(|s| s.spec.status == SuppressionStatus::Accepted),
+        )
+    }
+
+    /// The finding's evidence when it was judged.
+    pub fn evidence(&self) -> &Value {
+        &self.spec.snapshot["evidence"]
     }
 
     /// The judgment as reports show it: the keys of a `Judgment` record in
     /// lowerCamelCase, with the record's `id`, its `label` and its
     /// `suppressions`.
     pub fn to_json(&self) -> Value {
-        let mut value =
-            serde_json::to_value(JudgmentSpec::from(self)).expect("a judgment serializes");
+        let mut value = serde_json::to_value(&self.spec).expect("a judgment serializes");
         value["id"] = Value::String(self.id.clone());
-        value["label"] = serde_json::json!(self.label());
+        value["label"] = json!(self.label());
         if !self.suppressions.is_empty() {
             let suppressions: Vec<Value> = self
                 .suppressions
                 .iter()
-                .map(|s| {
-                    serde_json::json!({
-                        "id": s.id,
-                        "kind": s.kind,
-                        "status": s.status,
-                        "justification": s.justification,
-                        "wasAttributedTo": s.was_attributed_to,
-                        "generatedAtTime": s.generated_at_time,
-                    })
-                })
+                .map(SuppressionEvent::to_json)
                 .collect();
             value["suppressions"] = Value::Array(suppressions);
         }
@@ -242,88 +225,43 @@ impl JudgmentEvent {
     }
 }
 
-/// A suppression read from the log with what it goes with.
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct LoggedSuppression {
-    pub judgment: String,
-    pub fingerprint: String,
-    pub event: SuppressionEvent,
-}
-
-impl LoggedSuppression {
-    fn from_spec(id: String, spec: SuppressionSpec) -> Self {
-        Self {
-            judgment: spec.judgment,
-            fingerprint: spec.fingerprint,
-            event: SuppressionEvent {
-                id,
-                kind: spec.kind,
-                status: spec.status,
-                justification: spec.justification,
-                was_attributed_to: spec.was_attributed_to,
-                generated_at_time: spec.generated_at_time,
-            },
-        }
+impl SuppressionEvent {
+    /// The external suppression that goes with `judgment`, written by whoever
+    /// wrote the judgment, at the same time.
+    pub(crate) fn external(judgment: &JudgmentEvent, justification: &str) -> Result<Self, Error> {
+        let spec = SuppressionSpec {
+            judgment: judgment.id.clone(),
+            fingerprint: judgment.spec.fingerprint.clone(),
+            kind: SuppressionKind::External,
+            status: SuppressionStatus::Accepted,
+            justification: justification.to_owned(),
+            was_attributed_to: judgment.spec.was_attributed_to.clone(),
+            generated_at_time: judgment.spec.generated_at_time.clone(),
+        };
+        Ok(Self {
+            id: id_of(&spec)?,
+            spec,
+        })
     }
 
-    pub(crate) fn spec(&self) -> SuppressionSpec {
-        SuppressionSpec {
-            judgment: self.judgment.clone(),
-            fingerprint: self.fingerprint.clone(),
-            kind: self.event.kind,
-            status: self.event.status,
-            justification: self.event.justification.clone(),
-            was_attributed_to: self.event.was_attributed_to.clone(),
-            generated_at_time: self.event.generated_at_time.clone(),
+    /// The suppression as its judgment shows it: the record without the
+    /// judgment and the finding it goes with.
+    fn to_json(&self) -> Value {
+        let mut value = serde_json::to_value(&self.spec).expect("a suppression serializes");
+        if let Some(object) = value.as_object_mut() {
+            object.remove("judgment");
+            object.remove("fingerprint");
         }
-    }
-}
-
-/// What a read of the log found.
-#[derive(Debug, Default)]
-pub(crate) struct Logged {
-    pub judgments: Vec<JudgmentEvent>,
-    pub suppressions: Vec<LoggedSuppression>,
-    pub revisions: Vec<RevisionEvent>,
-    /// What the reader skipped: a torn last line, a suppression that goes
-    /// with no judgment of its finding.
-    pub notices: Vec<String>,
-}
-
-impl Logged {
-    /// Removes the suppressions that go with no judgment of their finding.
-    fn drop_orphans(&mut self, path: &Path) {
-        let judged: BTreeSet<(&str, &str)> = self
-            .judgments
-            .iter()
-            .map(|j| (j.id.as_str(), j.fingerprint.as_str()))
-            .collect();
-        let (kept, orphans): (Vec<_>, Vec<_>) = std::mem::take(&mut self.suppressions)
-            .into_iter()
-            .partition(|s| judged.contains(&(s.judgment.as_str(), s.fingerprint.as_str())));
-        for orphan in &orphans {
-            self.notices.push(format!(
-                "{}: the suppression {} goes with no judgment of {} and was ignored",
-                path.display(),
-                orphan.event.id,
-                orphan.fingerprint
-            ));
-        }
-        self.suppressions = kept;
+        value["id"] = Value::String(self.id.clone());
+        value
     }
 }
 
 /// What a log line holds.
 enum Record {
     Judgment(Box<JudgmentEvent>),
-    Suppression(Box<LoggedSuppression>),
+    Suppression(Box<SuppressionEvent>),
     Revision(Box<RevisionEvent>),
-}
-
-/// Gives the judgment the id its content determines.
-pub(crate) fn seal(event: &mut JudgmentEvent) -> Result<(), Error> {
-    event.id = id_of(&JudgmentSpec::from(&*event))?;
-    Ok(())
 }
 
 /// The id of a spec: the hash of its canonical form.
@@ -344,14 +282,17 @@ pub(crate) fn line<S: Spec + Serialize>(id: &str, spec: S) -> Result<String, Err
 /// exception is a torn last line: one that does not end with a newline and is
 /// not JSON is what an interrupted write leaves, and is skipped with a notice.
 /// A suppression that goes with no judgment of its finding is skipped with a
-/// notice too.
-pub(crate) fn read(path: &Path) -> Result<Logged, Error> {
+/// notice too, and the others are attached to their judgment, by
+/// `generatedAtTime` then id. A record read twice is one record.
+pub(crate) fn read(path: &Path) -> Result<Records, Error> {
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Logged::default()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Records::default()),
         Err(source) => return Err(io(path, source)),
     };
-    let mut read = Logged::default();
+    let mut read = Records::default();
+    let mut suppressions = Vec::new();
+    let mut seen = BTreeSet::new();
     let torn_from = (!text.ends_with('\n')).then(|| text.lines().count());
     for (index, text) in text
         .lines()
@@ -376,12 +317,38 @@ pub(crate) fn read(path: &Path) -> Result<Logged, Error> {
             Err(e) => return Err(fail(e.to_string())),
         };
         match decode(value).map_err(fail)? {
-            Record::Judgment(event) => read.judgments.push(*event),
-            Record::Suppression(suppression) => read.suppressions.push(*suppression),
-            Record::Revision(revision) => read.revisions.push(*revision),
+            Record::Judgment(event) if seen.insert(event.id.clone()) => read.judgments.push(*event),
+            Record::Suppression(event) if seen.insert(event.id.clone()) => {
+                suppressions.push(*event)
+            }
+            Record::Revision(event) if seen.insert(event.id.clone()) => read.revisions.push(*event),
+            _ => {}
         }
     }
-    read.drop_orphans(path);
+    suppressions.sort_by(|a, b| {
+        (&a.spec.generated_at_time, &a.id).cmp(&(&b.spec.generated_at_time, &b.id))
+    });
+    let positions: BTreeMap<String, usize> = read
+        .judgments
+        .iter()
+        .enumerate()
+        .map(|(position, judgment)| (judgment.id.clone(), position))
+        .collect();
+    for suppression in suppressions {
+        let judgment = positions
+            .get(&suppression.spec.judgment)
+            .map(|&position| &mut read.judgments[position])
+            .filter(|judgment| judgment.spec.fingerprint == suppression.spec.fingerprint);
+        match judgment {
+            Some(judgment) => judgment.suppressions.push(suppression),
+            None => read.notices.push(format!(
+                "{}: the suppression {} goes with no judgment of {} and was ignored",
+                path.display(),
+                suppression.id,
+                suppression.spec.fingerprint
+            )),
+        }
+    }
     Ok(read)
 }
 
@@ -444,28 +411,27 @@ fn decode(value: Value) -> Result<Record, String> {
     if written != name {
         return Err("the id does not match the entry".to_owned());
     }
-    if kind == JudgmentSpec::KIND {
-        let record: Resource<JudgmentSpec> =
-            serde_json::from_value(value).map_err(|e| e.to_string())?;
-        Ok(Record::Judgment(Box::new(JudgmentEvent::from_spec(
-            name,
-            record.spec,
-        ))))
-    } else if kind == RevisionSpec::KIND {
-        let record: Resource<RevisionSpec> =
-            serde_json::from_value(value).map_err(|e| e.to_string())?;
-        Ok(Record::Revision(Box::new(RevisionEvent {
+    Ok(match kind {
+        JudgmentSpec::KIND => Record::Judgment(Box::new(JudgmentEvent {
             id: name,
-            spec: record.spec,
-        })))
-    } else {
-        let record: Resource<SuppressionSpec> =
-            serde_json::from_value(value).map_err(|e| e.to_string())?;
-        Ok(Record::Suppression(Box::new(LoggedSuppression::from_spec(
-            name,
-            record.spec,
-        ))))
-    }
+            spec: spec_of(value)?,
+            suppressions: Vec::new(),
+        })),
+        RevisionSpec::KIND => Record::Revision(Box::new(RevisionEvent {
+            id: name,
+            spec: spec_of(value)?,
+        })),
+        _ => Record::Suppression(Box::new(SuppressionEvent {
+            id: name,
+            spec: spec_of(value)?,
+        })),
+    })
+}
+
+/// The spec of a record line.
+fn spec_of<S: Spec + DeserializeOwned>(value: Value) -> Result<S, String> {
+    let record: Resource<S> = serde_json::from_value(value).map_err(|e| e.to_string())?;
+    Ok(record.spec)
 }
 
 /// Truncates the file after its last newline when the last line is not JSON.

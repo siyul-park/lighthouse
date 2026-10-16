@@ -73,14 +73,14 @@ pub(crate) fn shown(dir: &TempDir, fingerprint: &str) -> Value {
 
 pub(crate) fn fingerprint_of(dir: &TempDir, rule: &str) -> String {
     let all = listing(dir, "all");
-    let found = all.iter().find(|f| f["rule"] == rule).unwrap();
+    let found = all.iter().find(|f| f["decision"] == rule).unwrap();
     found["fingerprint"].as_str().unwrap().to_owned()
 }
 
 fn rules(records: &[Value]) -> Vec<&str> {
     let mut rules: Vec<_> = records
         .iter()
-        .map(|f| f["rule"].as_str().unwrap())
+        .map(|f| f["decision"].as_str().unwrap())
         .collect();
     rules.sort_unstable();
     rules
@@ -92,7 +92,10 @@ fn check_remembers_findings_and_marks_fixed_ones_resolved() {
     lighthouse(dir.path()).arg("check").assert().success();
     let open = listing(&dir, "open");
     assert_eq!(rules(&open), ["design/errors", "design/exported-doc"]);
-    let helper = open.iter().find(|f| f["rule"] == "design/errors").unwrap();
+    let helper = open
+        .iter()
+        .find(|f| f["decision"] == "design/errors")
+        .unwrap();
     assert_eq!(helper["symbol"], "demo::run#function");
     assert_eq!(helper["location"]["line"], 2);
     let record = shown(&dir, helper["fingerprint"].as_str().unwrap());
@@ -416,7 +419,7 @@ fn an_error_stays_reported_whatever_the_judgment() {
     lighthouse(dir.path()).arg("check").assert().code(1);
     let fingerprint = every(&dir, "all")
         .iter()
-        .find(|f| f["rule"] == "core/allow")
+        .find(|f| f["decision"] == "core/allow")
         .map(|f| f["fingerprint"].as_str().unwrap().to_owned())
         .unwrap();
     let out = lighthouse(dir.path())

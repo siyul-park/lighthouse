@@ -10,13 +10,16 @@ use serde_json::json;
 
 fn all() -> Filter {
     Filter {
-        rule: None,
+        decision: None,
         status: StatusFilter::All,
     }
 }
 
 fn status(status: StatusFilter) -> Filter {
-    Filter { rule: None, status }
+    Filter {
+        decision: None,
+        status,
+    }
 }
 
 fn fingerprints(store: &Store, filter: &Filter) -> Vec<String> {
@@ -36,14 +39,14 @@ fn store_opens_a_cache_and_builds_one_of_another_version_again_from_the_log() {
     assert!(Store::open_existing(dir.path()).unwrap().is_none());
 
     let mut first = Store::open(dir.path()).unwrap();
-    assert_eq!(first.schema_version().unwrap(), 9);
+    assert_eq!(first.schema_version().unwrap(), 10);
     first
         .record(&run(vec![observed("f1", "design/a", "a.go")]))
         .unwrap();
     judge(&mut first, "f1", Judgment::Pass);
     drop(first);
     let again = Store::open_existing(dir.path()).unwrap().unwrap();
-    assert_eq!(again.schema_version().unwrap(), 9);
+    assert_eq!(again.schema_version().unwrap(), 10);
     assert_eq!(again.finding("f1").unwrap().judgment, Some(Judgment::Pass));
     drop(again);
 
@@ -53,7 +56,7 @@ fn store_opens_a_cache_and_builds_one_of_another_version_again_from_the_log() {
             .pragma_update(None, "user_version", version)
             .unwrap();
         let rebuilt = Store::open(dir.path()).unwrap();
-        assert_eq!(rebuilt.schema_version().unwrap(), 9, "from {version}");
+        assert_eq!(rebuilt.schema_version().unwrap(), 10, "from {version}");
         assert!(
             matches!(rebuilt.finding("f1"), Err(Error::UnknownFinding(_))),
             "the sightings of a cache of another version are gone"
@@ -95,7 +98,7 @@ fn processes_opening_a_fresh_cache_together_all_succeed() {
         })
         .collect();
     for handle in handles {
-        assert_eq!(handle.join().unwrap(), 9);
+        assert_eq!(handle.join().unwrap(), 10);
     }
 }
 
@@ -189,7 +192,7 @@ fn record_resolves_only_inside_the_reported_scope() {
     ]);
     let partial = Run {
         reported: vec!["src".to_owned()],
-        rules: vec!["design/a".to_owned()],
+        ran: vec!["design/a".to_owned()],
         ..run(vec![])
     };
     assert_eq!(store.record(&partial).unwrap().resolved, 1);
@@ -241,8 +244,8 @@ fn findings_of_rules_no_longer_configured_go_inactive_and_come_back() {
         observed("dropped", "design/b", "b.go"),
     ]);
     let only_a = Run {
-        configured: vec!["design/a".to_owned()],
-        rules: vec!["design/a".to_owned()],
+        active: vec!["design/a".to_owned()],
+        ran: vec!["design/a".to_owned()],
         ..run(vec![observed("kept", "design/a", "a.go")])
     };
     assert_eq!(store.record(&only_a).unwrap().deactivated, 1);
@@ -305,25 +308,25 @@ fn resolve_freezes_the_finding_as_it_was_last_seen() {
     let resolved = store.resolve(&input, stamp("sem1")).unwrap();
     thread::sleep(std::time::Duration::from_millis(2));
     let event = &resolved.event;
-    assert_eq!(event.fingerprint, "f1");
-    assert_eq!(event.decision_name, "design/a");
-    assert_eq!(event.judgment, Judgment::Fail);
-    assert_eq!(event.reason.as_deref(), Some("hot path"));
+    assert_eq!(event.spec.fingerprint, "f1");
+    assert_eq!(event.spec.decision, "design/a");
+    assert_eq!(event.spec.judgment, Judgment::Fail);
+    assert_eq!(event.spec.reason.as_deref(), Some("hot path"));
     assert_eq!(event.suppressions.len(), 1);
-    assert_eq!(event.suppressions[0].justification, "named policy");
-    assert_eq!(event.meaning_version.as_deref(), Some("sem1"));
-    assert_eq!(event.decision_hash.as_deref(), Some("full1"));
-    assert_eq!(event.catalog_version.as_deref(), Some("cat1"));
-    assert_eq!(event.lighthouse_version.as_deref(), Some("0.1.0"));
-    assert_eq!(event.language.as_deref(), Some("go"));
-    assert_eq!(event.scope.as_deref(), Some("symbol"));
-    assert_eq!(event.commit.as_deref(), Some("def456"));
-    assert_eq!(event.was_attributed_to.id.as_deref(), Some("claude"));
+    assert_eq!(event.suppressions[0].spec.justification, "named policy");
+    assert_eq!(event.spec.meaning_version.as_deref(), Some("sem1"));
+    assert_eq!(event.spec.decision_hash.as_deref(), Some("full1"));
+    assert_eq!(event.spec.catalog_version.as_deref(), Some("cat1"));
+    assert_eq!(event.spec.lighthouse_version.as_deref(), Some("0.1.0"));
+    assert_eq!(event.spec.language.as_deref(), Some("go"));
+    assert_eq!(event.spec.scope.as_deref(), Some("symbol"));
+    assert_eq!(event.spec.commit.as_deref(), Some("def456"));
+    assert_eq!(event.spec.was_attributed_to.id.as_deref(), Some("claude"));
     assert_eq!(event.label(), Label::Separate);
     assert_eq!(event.id.len(), 32);
     assert_eq!(resolved.finding.fingerprint, "f1");
 
-    let snapshot = &event.snapshot;
+    let snapshot = &event.spec.snapshot;
     assert_eq!(snapshot["v"], 2);
     assert_eq!(snapshot["evidence"]["fan_out"], 14);
     assert_eq!(event.evidence()["fan_out"], 14);
@@ -342,8 +345,8 @@ fn resolve_freezes_the_finding_as_it_was_last_seen() {
     judge(&mut store, "f1", Judgment::Pass);
     let history = store.history("f1").unwrap();
     assert_eq!(history.len(), 2);
-    assert_eq!(history[0].snapshot["facts"]["callers"], 2);
-    assert_eq!(history[1].snapshot["facts"]["callers"], 50);
+    assert_eq!(history[0].spec.snapshot["facts"]["callers"], 2);
+    assert_eq!(history[1].spec.snapshot["facts"]["callers"], 50);
 }
 
 #[test]
@@ -565,7 +568,7 @@ fn list_filters_by_rule_and_status() {
         ["gone"]
     );
     let rule = Filter {
-        rule: Some("design/b".to_owned()),
+        decision: Some("design/b".to_owned()),
         status: StatusFilter::All,
     };
     assert_eq!(fingerprints(&store, &rule), ["b1", "gone"]);
@@ -794,7 +797,7 @@ fn a_cache_with_tables_and_no_version_is_built_again_from_the_log() {
 
     let rebuilt = Store::open(dir.path()).unwrap();
 
-    assert_eq!(rebuilt.schema_version().unwrap(), 9);
+    assert_eq!(rebuilt.schema_version().unwrap(), 10);
     assert_eq!(rebuilt.history("f1").unwrap().len(), 1, "from the log");
     assert!(rebuilt.list(&all()).unwrap().is_empty());
 }

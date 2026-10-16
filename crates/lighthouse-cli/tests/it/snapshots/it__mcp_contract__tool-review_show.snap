@@ -32,6 +32,9 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "authoredSeverity": {
         "type": "string"
       },
+      "decision": {
+        "type": "string"
+      },
       "evidence": {},
       "facts": {},
       "fingerprint": {
@@ -90,9 +93,6 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
           }
         ]
       },
-      "ruleId": {
-        "type": "string"
-      },
       "severity": {
         "type": "string"
       },
@@ -119,7 +119,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     },
     "required": [
       "fingerprint",
-      "ruleId",
+      "decision",
       "severity",
       "path",
       "message",

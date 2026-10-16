@@ -118,13 +118,13 @@ pub fn resolve(ctx: &Context, args: &ReviewResolveArgs, output: Output) -> Resul
     let event = &recorded.event;
     let value = json!({
         "recorded": {
-            "fingerprint": event.fingerprint,
-            "decision": event.decision_name,
-            "judgment": event.judgment.to_string(),
+            "fingerprint": event.spec.fingerprint,
+            "decision": event.spec.decision,
+            "judgment": event.spec.judgment.to_string(),
             "suppression": event.suppressions.first().map(|s| json!({
-                "kind": s.kind, "status": s.status, "justification": s.justification,
+                "kind": s.spec.kind, "status": s.spec.status, "justification": s.spec.justification,
             })),
-            "wasAttributedTo": event.was_attributed_to,
+            "wasAttributedTo": event.spec.was_attributed_to,
         },
         "standing": recorded.standing,
         "warnings": recorded.warnings,
@@ -183,13 +183,18 @@ fn resolved_text(recorded: &lighthouse_session::Recorded) -> String {
     let suppressed = event
         .suppressions
         .first()
-        .map(|s| format!(" and an {} suppression ({})", s.kind, s.justification))
+        .map(|s| {
+            format!(
+                " and an {} suppression ({})",
+                s.spec.kind, s.spec.justification
+            )
+        })
         .unwrap_or_default();
     let mut out = format!(
         "recorded {}{suppressed} for {} {}\n",
-        event.judgment,
-        short(&event.fingerprint),
-        event.decision_name
+        event.spec.judgment,
+        short(&event.spec.fingerprint),
+        event.spec.decision
     );
     match recorded.standing {
         Some(Standing::Suppressed) => out.push_str(
@@ -219,7 +224,7 @@ fn entry(f: &FindingRecord) -> Entry<'_> {
         attributes.insert("judgment".to_owned(), json!(judgment));
     }
     Entry {
-        rule: f.rule_id.clone(),
+        rule: f.decision.clone(),
         severity: f.severity,
         authored: f.authored_severity,
         review: f.needs_review(),
@@ -240,7 +245,7 @@ fn entry(f: &FindingRecord) -> Entry<'_> {
 fn task(f: &FindingRecord) -> Value {
     json!({
         "fingerprint": f.fingerprint,
-        "rule": f.rule_id,
+        "decision": f.decision,
         "severity": f.severity,
         "authored": f.authored_severity,
         "state": f.state().to_string(),
@@ -261,7 +266,7 @@ fn row(finding: &FindingRecord) -> String {
     format!(
         "{}\t{}\t{}\t{}:{}\t{}\t{}\t{}",
         short(&finding.fingerprint),
-        finding.rule_id,
+        finding.decision,
         finding.severity,
         finding.path,
         line(&finding.locator),
@@ -298,7 +303,7 @@ fn detail(finding: &FindingRecord) -> String {
     let tier = finding.authored_severity;
     field(
         "rule:",
-        format!("{} ({}, {tier})", finding.rule_id, finding.severity),
+        format!("{} ({}, {tier})", finding.decision, finding.severity),
     );
     field(
         "location:",
@@ -332,18 +337,18 @@ fn detail(finding: &FindingRecord) -> String {
 
 fn event_row(event: &JudgmentEvent) -> String {
     let suppression = event.suppressions.first().map_or("-".to_owned(), |s| {
-        format!("{}:{}", s.kind, s.justification)
+        format!("{}:{}", s.spec.kind, s.spec.justification)
     });
     format!(
         "{}\t{}\t{}\t{}\t{}:{}\t{}\t{}",
         short(&event.id),
-        event.generated_at_time,
-        event.judgment,
+        event.spec.generated_at_time,
+        event.spec.judgment,
         suppression,
-        event.was_attributed_to.kind,
-        event.was_attributed_to.id.as_deref().unwrap_or("-"),
+        event.spec.was_attributed_to.kind,
+        event.spec.was_attributed_to.id.as_deref().unwrap_or("-"),
         event.label(),
-        event.reason.as_deref().unwrap_or("")
+        event.spec.reason.as_deref().unwrap_or("")
     )
 }
 

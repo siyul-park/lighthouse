@@ -336,7 +336,7 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
         .as_array()
         .unwrap()
         .iter()
-        .find(|t| t["rule"] == "design/errors")
+        .find(|t| t["decision"] == "design/errors")
         .unwrap();
     let fingerprint = task["fingerprint"].as_str().unwrap();
     assert!(fingerprint.starts_with(prefix));

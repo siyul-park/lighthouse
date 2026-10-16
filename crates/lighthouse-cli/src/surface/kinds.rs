@@ -260,7 +260,7 @@ fn review_list() -> Value {
 fn finding() -> Value {
     object(
         json!({
-            "fingerprint": string(), "ruleId": string(),
+            "fingerprint": string(), "decision": string(),
             "severity": string(), "authoredSeverity": string(),
             "path": string(), "locator": { "type": "object" },
             "symbol": nullable(string()),
@@ -273,7 +273,7 @@ fn finding() -> Value {
         }),
         &[
             "fingerprint",
-            "ruleId",
+            "decision",
             "severity",
             "path",
             "message",

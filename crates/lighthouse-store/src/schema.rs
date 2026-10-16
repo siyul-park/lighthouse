@@ -6,7 +6,7 @@ use crate::Error;
 /// is a cache of the decision log and of what runs saw, so it has no migration
 /// chain: one with another version is dropped and built again, and the
 /// judgments come back from `decisions.jsonl`.
-pub(crate) const VERSION: i64 = 9;
+pub(crate) const VERSION: i64 = 10;
 
 /// Findings with the judgments and suppressions on them. Locators, evidence and
 /// facts are JSON text, so nothing here assumes the artifact is code.
@@ -19,7 +19,7 @@ pub(crate) const VERSION: i64 = 9;
 const SCHEMA: &str = "
 CREATE TABLE findings (
     fingerprint       TEXT PRIMARY KEY,
-    rule_id           TEXT NOT NULL,
+    decision          TEXT NOT NULL,
     decision_uid      TEXT,
     severity          TEXT NOT NULL CHECK (severity IN ('error', 'warn', 'info')),
     authored_severity TEXT NOT NULL CHECK (authored_severity IN ('error', 'warn', 'info')),
@@ -44,13 +44,13 @@ CREATE TABLE findings (
     decision_hash     TEXT,
     evidence_digest   TEXT
 );
-CREATE INDEX findings_rule ON findings (rule_id);
+CREATE INDEX findings_decision ON findings (decision);
 CREATE INDEX findings_path ON findings (path);
 
 CREATE TABLE judgments (
     judgment_id        TEXT PRIMARY KEY,
     fingerprint        TEXT NOT NULL,
-    rule_id            TEXT NOT NULL,
+    decision           TEXT NOT NULL,
     decision_uid       TEXT,
     meaning_version    TEXT,
     check_revision     TEXT,
@@ -70,7 +70,7 @@ CREATE TABLE judgments (
     generated_at       TEXT NOT NULL
 );
 CREATE INDEX judgments_fingerprint ON judgments (fingerprint, generated_at);
-CREATE INDEX judgments_rule ON judgments (rule_id);
+CREATE INDEX judgments_decision ON judgments (decision);
 
 CREATE TABLE suppressions (
     suppression_id TEXT PRIMARY KEY,
@@ -85,20 +85,6 @@ CREATE TABLE suppressions (
     generated_at   TEXT NOT NULL
 );
 CREATE INDEX suppressions_judgment ON suppressions (judgment_id);
-
-CREATE TABLE fix_events (
-    event_id           TEXT PRIMARY KEY,
-    fingerprint        TEXT NOT NULL,
-    rule_id            TEXT NOT NULL,
-    fixer              TEXT NOT NULL,
-    safety             TEXT NOT NULL CHECK (safety IN ('safe', 'suggested')),
-    description        TEXT NOT NULL,
-    files              TEXT NOT NULL,
-    git_commit         TEXT,
-    lighthouse_version TEXT,
-    timestamp          TEXT NOT NULL
-);
-CREATE INDEX fix_events_fingerprint ON fix_events (fingerprint, timestamp);
 ";
 
 /// The guards that keep a record from being edited or deleted while the cache

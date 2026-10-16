@@ -630,10 +630,8 @@ nothing counts as applied. A `--dry-run` never writes. A panic or Ctrl-C before 
 leaves the disk as it was: there is no journal to restore. Declined fixes accumulate over
 the rounds without duplicates. A fix is declined, before its fixer is asked, in a file whose
 provider does not declare the `overlays` capability. Language plugins never verify fixes themselves:
-verification is the re-check on the code model. Each applied fix is recorded in the local
-store (`fix_events`: finding, rule, fixer, safety, description, files, commit), not in the
-shared decision log, because it records what happened to this checkout, not a decision;
-the run that ends the fixing resolves the findings the fixes removed.
+verification is the re-check on the code model. An applied fix is not recorded: it records what happened to this checkout, not a decision.
+The run that ends the fixing resolves the findings the fixes removed.
 
 Bundled fixes: `design/declaration-groups` (a `reorder` by `design/group`, plus a `move`
 for constructors) and `testing/file-layout` (a `move` of a fixture above, or a helper

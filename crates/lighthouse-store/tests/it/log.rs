@@ -3,8 +3,10 @@
 use std::fs;
 
 use crate::support::*;
-use lighthouse_model::Judgment;
-use lighthouse_store::{Error, Observed, Standing, Store};
+use lighthouse_model::{
+    AgentKind, Attribution, Judgment, Label, SuppressionKind, SuppressionStatus, canonical, hash,
+};
+use lighthouse_store::{Error, JudgmentSpec, Observed, Records, Standing, Store, SuppressionSpec};
 use tempfile::TempDir;
 
 /// A project root that has recorded `findings` and judged some of them.
@@ -43,9 +45,15 @@ fn a_decision_log_carries_judgments_and_suppressions_to_another_clone() {
     assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
     assert_eq!(standing_of(&store, "f2"), None);
     let history = store.history("f1").unwrap();
-    assert_eq!(history[0].judgment, Judgment::Fail);
-    assert_eq!(history[0].was_attributed_to.id.as_deref(), Some("claude"));
-    assert_eq!(history[0].suppressions[0].justification, "named policy");
+    assert_eq!(history[0].spec.judgment, Judgment::Fail);
+    assert_eq!(
+        history[0].spec.was_attributed_to.id.as_deref(),
+        Some("claude")
+    );
+    assert_eq!(
+        history[0].suppressions[0].spec.justification,
+        "named policy"
+    );
 }
 
 #[test]
@@ -294,10 +302,10 @@ fn a_judgment_spec_is_what_a_recorded_judgment_shows() {
 
     let spec: lighthouse_store::JudgmentSpec = serde_json::from_value(event.to_json()).unwrap();
 
-    assert_eq!(spec.decision_name, "design/a");
+    assert_eq!(spec.decision, "design/a");
     assert_eq!(spec.judgment, Judgment::Pass);
     assert_eq!(spec.meaning_version.as_deref(), Some("sem1"));
-    assert_eq!(spec.generated_at_time, event.generated_at_time);
+    assert_eq!(spec.generated_at_time, event.spec.generated_at_time);
 }
 
 #[test]
@@ -490,4 +498,69 @@ fn a_suppression_without_its_judgment_is_ignored_with_a_notice() {
     let store = Store::open(dir.path()).unwrap();
     assert_eq!(store.notices().len(), 1, "{:?}", store.notices());
     assert_eq!(standing_of(&store, "f1"), Some(Standing::Judged));
+}
+
+#[test]
+fn the_bytes_and_ids_of_records_are_what_they_always_were() {
+    let judgment = JudgmentSpec {
+        fingerprint: "f1".to_owned(),
+        decision: "design/a".to_owned(),
+        decision_uid: None,
+        meaning_version: None,
+        check_revision: None,
+        decision_hash: None,
+        catalog_version: None,
+        lighthouse_version: None,
+        judgment: Judgment::Fail,
+        reason: None,
+        was_attributed_to: Attribution {
+            kind: AgentKind::Person,
+            id: Some("ada".to_owned()),
+            role: None,
+        },
+        generated_at_time: "2026-01-02T03:04:05.678Z".to_owned(),
+        language: None,
+        scope: None,
+        evidence_digest: None,
+        snapshot: serde_json::json!({ "evidence": { "n": 1 } }),
+        commit: None,
+    };
+    let suppression = SuppressionSpec {
+        judgment: "5dafd98550ae75665cc20ed6a7c2132b".to_owned(),
+        fingerprint: "f1".to_owned(),
+        kind: SuppressionKind::External,
+        status: SuppressionStatus::Accepted,
+        justification: "why".to_owned(),
+        was_attributed_to: judgment.was_attributed_to.clone(),
+        generated_at_time: judgment.generated_at_time.clone(),
+    };
+
+    let bytes = canonical(&serde_json::to_value(&judgment).unwrap());
+    assert_eq!(
+        bytes,
+        r#"{"decisionName":"design/a","fingerprint":"f1","generatedAtTime":"2026-01-02T03:04:05.678Z","judgment":"fail","snapshot":{"evidence":{"n":1}},"wasAttributedTo":{"id":"ada","type":"Person"}}"#
+    );
+    assert_eq!(hash::short(&bytes, 16), "5dafd98550ae75665cc20ed6a7c2132b");
+    let bytes = canonical(&serde_json::to_value(&suppression).unwrap());
+    assert_eq!(
+        bytes,
+        r#"{"fingerprint":"f1","generatedAtTime":"2026-01-02T03:04:05.678Z","judgment":"5dafd98550ae75665cc20ed6a7c2132b","justification":"why","kind":"external","status":"accepted","wasAttributedTo":{"id":"ada","type":"Person"}}"#
+    );
+    assert_eq!(hash::short(&bytes, 16), "94a7a74a3421be17ef6048fa73803c79");
+}
+
+#[test]
+fn reading_the_log_attaches_a_suppression_to_the_judgment_it_goes_with() {
+    let dir = clone_with(&[observed("f1", "design/a", "a.go")], &[]);
+    let mut store = Store::open(dir.path()).unwrap();
+    judge_suppressed(&mut store, "f1", "named policy");
+    drop(store);
+
+    let records = Records::read(dir.path()).unwrap();
+
+    assert_eq!(records.judgments.len(), 1);
+    let judgment = &records.judgments[0];
+    assert_eq!(judgment.suppressions.len(), 1);
+    assert_eq!(judgment.suppressions[0].spec.judgment, judgment.id);
+    assert_eq!(judgment.label(), Label::Separate);
 }

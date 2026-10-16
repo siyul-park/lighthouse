@@ -8,6 +8,7 @@ use crate::{Error, JudgmentEvent, RevisionEvent, RevisionSpec, Store, log};
 /// What the decision log of a project holds.
 #[derive(Debug, Default)]
 pub struct Records {
+    /// Every judgment, with the suppressions that go with it.
     pub judgments: Vec<JudgmentEvent>,
     pub revisions: Vec<RevisionEvent>,
     /// What the reader skipped.
@@ -17,12 +18,7 @@ pub struct Records {
 impl Records {
     /// The records of the project at `root`; none when it has no log.
     pub fn read(root: &Path) -> Result<Self, Error> {
-        let read = log::read(&Store::log_path_in(root))?;
-        Ok(Self {
-            judgments: read.judgments,
-            revisions: read.revisions,
-            notices: read.notices,
-        })
+        log::read(&Store::log_path_in(root))
     }
 
     /// The latest revision of `decision` (its uid, else its name), in log order.
