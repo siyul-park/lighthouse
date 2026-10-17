@@ -160,7 +160,10 @@ fn validate_models(registry: &Registry, config: &Config, binding: &Models) -> Re
         {
             return Err(Error::Model {
                 name: reference.to_owned(),
-                reason: format!("provider `{name}` does not serve `{task}`{}", only_for(task)),
+                reason: format!(
+                    "provider `{name}` does not serve `{task}`{}",
+                    only_for(task)
+                ),
             });
         }
     }

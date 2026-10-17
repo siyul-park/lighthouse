@@ -1,10 +1,10 @@
-//! A `command` model provider run as a model: it classifies or it chats.
+//! A `command` model provider run as a model: it classifies, chats or edits.
 
 use std::collections::BTreeMap;
 
 use lighthouse_plugin::{
-    ChatRequest, CreateChatCompletionRequest, DecisionRef, ModelClient, Question, State,
-    SystemOneRequest,
+    ChatRequest, CreateChatCompletionRequest, DecisionRef, EditRequest, ModelClient, Question,
+    State, SystemOneRequest,
 };
 use lighthouse_rpc::CommandModel;
 use lighthouse_spec::Config;
@@ -227,4 +227,66 @@ fn a_model_serves_only_the_task_of_its_protocol() {
             .to_string()
             .contains("does not classify")
     );
+}
+
+#[test]
+fn a_plain_text_command_edits_in_the_directory_it_is_given_and_keeps_what_it_said() {
+    let home = tempfile::tempdir().unwrap();
+    let work = tempfile::tempdir().unwrap();
+    let provider = provider_of("", r#"["sh", "-c", "cat > prompt.txt; echo fixed 1"]"#);
+    let command = CommandModel::new(home.path(), "p/m", "m", &provider).unwrap();
+
+    let said = command
+        .edit(&EditRequest {
+            prompt: "make it better",
+            dir: work.path(),
+        })
+        .unwrap();
+
+    assert_eq!(said, "fixed 1");
+    let prompt = std::fs::read_to_string(work.path().join("prompt.txt")).unwrap();
+    assert_eq!(prompt, "make it better");
+    assert!(!home.path().join("prompt.txt").exists());
+}
+
+#[test]
+fn what_an_agent_said_is_kept_to_two_kilobytes_and_a_failure_is_an_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let chatty = provider_of(
+        "",
+        r#"["sh", "-c", "head -c 5000 /dev/zero | tr '\\0' 'é'"]"#,
+    );
+    let failing = provider_of("", r#"["sh", "-c", "echo no >&2; exit 2"]"#);
+    let asked = EditRequest {
+        prompt: "p",
+        dir: dir.path(),
+    };
+
+    let said = CommandModel::new(dir.path(), "p/m", "m", &chatty)
+        .unwrap()
+        .edit(&asked)
+        .unwrap();
+    let error = CommandModel::new(dir.path(), "p/m", "m", &failing)
+        .unwrap()
+        .edit(&asked)
+        .unwrap_err();
+
+    assert!(said.len() <= 2048, "{}", said.len());
+    assert!(error.to_string().contains("exited with Some(2)"), "{error}");
+}
+
+#[test]
+fn a_command_with_a_protocol_does_not_edit() {
+    let dir = tempfile::tempdir().unwrap();
+    let provider = provider(r#"["sh", "-c", "true"]"#);
+    let command = CommandModel::new(dir.path(), "p/m", "m", &provider).unwrap();
+
+    let error = command
+        .edit(&EditRequest {
+            prompt: "p",
+            dir: dir.path(),
+        })
+        .unwrap_err();
+
+    assert!(error.to_string().contains("does not edit"), "{error}");
 }

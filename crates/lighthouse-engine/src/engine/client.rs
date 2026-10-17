@@ -5,8 +5,9 @@
 use std::sync::Arc;
 
 use lighthouse_plugin::{
-    Capabilities, ChatRequest, CreateChatCompletionResponse, CreateFineTuningJobRequest, Error,
-    FineTuningJob, Model, ModelClient, Registry, Supports, SystemOneRequest, SystemOneResponse,
+    Capabilities, ChatRequest, CreateChatCompletionResponse, CreateFineTuningJobRequest,
+    EditRequest, Error, FineTuningJob, Model, ModelClient, Registry, Supports, SystemOneRequest,
+    SystemOneResponse,
 };
 use lighthouse_protocol::hash;
 use lighthouse_spec::ModelProvider;
@@ -90,6 +91,10 @@ impl ModelClient for Refused {
     }
 
     fn chat(&self, _: &ChatRequest) -> Result<CreateChatCompletionResponse, Error> {
+        Err(self.failure())
+    }
+
+    fn edit(&self, _: &EditRequest<'_>) -> Result<String, Error> {
         Err(self.failure())
     }
 }

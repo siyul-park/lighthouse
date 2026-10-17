@@ -2,7 +2,8 @@
 //! `protocol = "typesafe"` it reads TypeSafe's System One request on stdin and
 //! prints the response (classification); with `protocol = "openai"` it reads
 //! a chat completion request and prints the response; without a protocol it
-//! reads the conversation as text and prints the answer (both `chat`). The
+//! reads the conversation as text and prints the answer (`chat`), and the same
+//! program serves `edit` when it is run in a directory it may change. The
 //! program runs under the process contract, so a trusted project is the only
 //! one that builds it.
 
@@ -14,7 +15,7 @@ use std::{
 
 use lighthouse_plugin::{
     Answer, Capabilities, ChatRequest, CreateChatCompletionRequest, CreateChatCompletionResponse,
-    Error, Model, ModelClient, Supports, SystemOneRequest, SystemOneResponse,
+    EditRequest, Error, Model, ModelClient, Supports, SystemOneRequest, SystemOneResponse,
 };
 use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT};
 use lighthouse_protocol::{
@@ -27,6 +28,10 @@ use serde_json::{Value, json};
 
 /// How long a command model may take when the instance says nothing.
 const MODEL_TIMEOUT: Duration = Duration::from_secs(120);
+/// How long an agent that edits may take when the instance says nothing.
+const EDIT_TIMEOUT: Duration = Duration::from_secs(600);
+/// How much of what an agent said is kept.
+const NOTES_BYTES: usize = 2048;
 /// A program run as a model.
 pub struct CommandModel {
     manifest: Model,
@@ -37,6 +42,7 @@ pub struct CommandModel {
     dir: PathBuf,
     env: Vec<(String, String)>,
     timeout: Duration,
+    edit_timeout: Duration,
 }
 
 impl CommandModel {
@@ -92,20 +98,22 @@ impl CommandModel {
             dir: dir.to_owned(),
             env: command_env(env, key_env.as_deref()),
             timeout: timeout.map_or(MODEL_TIMEOUT, Limit::get),
+            edit_timeout: timeout.map_or(EDIT_TIMEOUT, Limit::get),
         })
     }
 }
 
 impl CommandModel {
-    /// Runs the program over `input` and returns what it printed.
-    fn run(&self, input: &[u8]) -> Result<Vec<u8>, Error> {
+    /// Runs the program in `dir` for at most `limit` over `input` and returns
+    /// what it printed.
+    fn run(&self, dir: &Path, limit: Duration, input: &[u8]) -> Result<Vec<u8>, Error> {
         let failed = |reason: String| Error::model(&self.manifest.id, reason);
         let output = lighthouse_process::run(&Invocation {
             argv: &self.argv,
-            dir: &self.dir,
+            dir,
             stdin: input,
             env: Some(&self.env),
-            limit: self.timeout,
+            limit,
             grace: GRACE,
             max_output: MAX_OUTPUT,
         })
@@ -176,7 +184,7 @@ impl ModelClient for CommandModel {
         let mut asked = params.clone();
         asked.model.clone_from(&self.model);
         let input = serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?;
-        let stdout = self.run(&input)?;
+        let stdout = self.run(&self.dir, self.timeout, &input)?;
         let printed = printed_answer(&stdout, self.pointer.as_deref());
         let answers = params
             .questions
@@ -210,14 +218,33 @@ impl ModelClient for CommandModel {
             CommandProtocol::TypeSafe => Err(failed("it does not chat".to_owned())),
             CommandProtocol::OpenAi => {
                 let input = serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?;
-                self.completion(&self.run(&input)?)
+                self.completion(&self.run(&self.dir, self.timeout, &input)?)
             }
             CommandProtocol::PlainText => {
                 let input = conversation(&asked);
-                self.text_completion(&self.run(input.as_bytes())?)
+                self.text_completion(&self.run(&self.dir, self.timeout, input.as_bytes())?)
             }
         }
     }
+
+    /// The program run in the directory of the request with the prompt on
+    /// stdin; what it printed is kept for the notes, cut to a few kilobytes.
+    fn edit(&self, request: &EditRequest<'_>) -> Result<String, Error> {
+        if self.protocol != CommandProtocol::PlainText {
+            return Err(Error::model(&self.manifest.id, "it does not edit"));
+        }
+        let stdout = self.run(request.dir, self.edit_timeout, request.prompt.as_bytes())?;
+        Ok(capped(String::from_utf8_lossy(&stdout).trim(), NOTES_BYTES))
+    }
+}
+
+/// `text` cut to at most `max` bytes, at a character boundary.
+fn capped(text: &str, max: usize) -> String {
+    let end = (0..=max.min(text.len()))
+        .rev()
+        .find(|&at| text.is_char_boundary(at))
+        .unwrap_or_default();
+    text[..end].to_owned()
 }
 
 /// The conversation as plain text: the text of each message in turn, a blank

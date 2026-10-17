@@ -12,6 +12,8 @@ pub use lighthouse_protocol::{
     dataset_path,
 };
 
+use std::path::Path;
+
 use lighthouse_model::Diagnostic;
 
 use crate::Error;
@@ -19,6 +21,16 @@ use crate::Error;
 /// The probability at which a model's answer is a `fail`; a model never
 /// clears a subject.
 pub const FAIL_AT: f64 = 0.9;
+
+/// The task `edit`: an agent changes the files of a directory as a prompt
+/// says. It has no wire form; only a program the host runs there serves it.
+#[derive(Debug, Clone, Copy)]
+pub struct EditRequest<'a> {
+    /// What the agent is asked to do, as plain text.
+    pub prompt: &'a str,
+    /// The directory it runs in and may change.
+    pub dir: &'a Path,
+}
 
 /// A model offered by a plugin: one method per task, each refusing unless the
 /// model's manifest says it serves the task.
@@ -33,6 +45,11 @@ pub trait ModelClient: Send + Sync {
     /// does.
     fn chat(&self, _request: &ChatRequest) -> Result<CreateChatCompletionResponse, Error> {
         Err(Error::model(&self.manifest().id, "does not chat"))
+    }
+    /// Changes the files of a directory as the prompt says, and returns what
+    /// the agent said about it; only a program run by the host there does.
+    fn edit(&self, _request: &EditRequest<'_>) -> Result<String, Error> {
+        Err(Error::model(&self.manifest().id, "does not edit"))
     }
     /// Runs a fine-tuning job; only a model whose manifest supports `fine_tuning` does.
     /// The job is final: `succeeded` or `failed`.
