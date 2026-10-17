@@ -171,7 +171,11 @@ impl Fixed {
                 fix.path, fix.line, fix.decision, fix.reason
             ));
         }
-        lines.extend(self.models.iter().map(|(decision, counts)| counts.line(decision)));
+        lines.extend(
+            self.models
+                .iter()
+                .map(|(decision, counts)| counts.line(decision)),
+        );
         if let Some(usage) = &self.usage {
             lines.push(format!(
                 "models: {} request(s), cost {}",
@@ -204,7 +208,11 @@ impl Models {
         let declined = if declined.is_empty() {
             "0".to_owned()
         } else {
-            format!("{} ({})", self.declined.values().sum::<usize>(), declined.join(", "))
+            format!(
+                "{} ({})",
+                self.declined.values().sum::<usize>(),
+                declined.join(", ")
+            )
         };
         format!(
             "model fixes {decision}: asked {}, answered {}, verified {}, applied {}, previewed {}, declined {declined}",
