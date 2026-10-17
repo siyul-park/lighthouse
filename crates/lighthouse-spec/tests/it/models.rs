@@ -347,6 +347,9 @@ fn approval_and_the_commands_that_verify_fixes_are_read_and_checked() {
     .unwrap();
     assert_eq!(config.approval(), Approval::Verified);
     assert_eq!(config.verify(), [["cargo", "test", "-q"]]);
+    assert_eq!(config.verify_timeout(), std::time::Duration::from_secs(600));
+    let slow = Config::parse_inline("plugins = []\n[fix]\ntimeout = \"20m\"\n").unwrap();
+    assert_eq!(slow.verify_timeout(), std::time::Duration::from_secs(1200));
 
     for (text, wanted) in [
         ("[approval]\nfix = \"always\"\n", "always"),

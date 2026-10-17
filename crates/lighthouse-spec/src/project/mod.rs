@@ -25,6 +25,7 @@ use std::{
 
 pub use globset::GlobSet;
 
+use fixing::DEFAULT_VERIFY_TIMEOUT;
 pub use fixing::{Approval, ApprovalSpec, FixSpec};
 use globset::{GlobBuilder, GlobSetBuilder};
 use lighthouse_model::{Options, Severity};
@@ -169,6 +170,7 @@ pub struct Config {
     models: Models,
     approval: Approval,
     verify: Vec<Vec<String>>,
+    verify_timeout: Duration,
     extends: Vec<String>,
     rules: Rules,
     overrides: Vec<Override>,
@@ -272,6 +274,7 @@ impl Config {
             models: Models::new(&spec.models),
             approval: spec.approval.fix.unwrap_or_default(),
             verify: spec.fix.verify,
+            verify_timeout: spec.fix.timeout.unwrap_or(DEFAULT_VERIFY_TIMEOUT),
             extends: spec.extends,
             rules: rules(spec.rules),
             overrides,
@@ -388,6 +391,11 @@ impl Config {
     /// The commands that must pass with the fixes by models in place.
     pub fn verify(&self) -> &[Vec<String>] {
         &self.verify
+    }
+
+    /// How long each of those commands may run.
+    pub fn verify_timeout(&self) -> time::Duration {
+        self.verify_timeout.get()
     }
 
     /// Project names named in `extends`, in declaration order.

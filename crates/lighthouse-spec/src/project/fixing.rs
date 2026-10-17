@@ -1,8 +1,12 @@
 //! What a project says about fixes by models: whether a verified one is
 //! written without asking, and the commands that must pass after them.
 
+use lighthouse_resource::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+/// How long each command of `fix.verify` may run unless the project says.
+pub(super) const DEFAULT_VERIFY_TIMEOUT: Duration = Duration::from_secs(600);
 
 /// Whether a fix a model proposed and the checks accepted is written.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -42,11 +46,14 @@ pub struct FixSpec {
     /// run is withdrawn to a preview.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub verify: Vec<Vec<String>>,
+    /// How long each of those commands may run. Default: `10m`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<Duration>,
 }
 
 impl FixSpec {
     /// Whether the project says nothing about fixing.
     pub fn is_empty(&self) -> bool {
-        self.verify.is_empty()
+        self.verify.is_empty() && self.timeout.is_none()
     }
 }
