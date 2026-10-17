@@ -56,7 +56,7 @@ pub(crate) fn run(
         Stdin::File => request.text.as_bytes().to_vec(),
     };
     let decision = json!({
-        "rule": finding.rule_id,
+        "decision": finding.rule_id,
         "message": finding.message,
         "file": finding.file,
         "line": finding.span.start.line,

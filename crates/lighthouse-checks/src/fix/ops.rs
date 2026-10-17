@@ -159,7 +159,7 @@ impl<'a> Env<'a> {
             finding.evidence.clone()
         };
         let value = json!({
-            "rule": finding.rule_id,
+            "decision": finding.rule_id,
             "message": finding.message,
             "file": slashed(&finding.file),
             "span": finding.span,

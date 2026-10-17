@@ -336,7 +336,7 @@ fn delete_names_a_node_or_a_range() {
 #[test]
 fn rename_and_replace_fill_their_templates() {
     let rename = "safety: suggested\nrequires: [complete-references]\ntype: ops\nops: [{ op: rename, symbol: finding.symbol, name: '{{ symbol.name }}New{{ 1 + 1 }}' }]";
-    let replace = "safety: suggested\ntype: ops\nops: [{ op: replace, file: finding.file, span: finding.span, text: '// {{ finding.rule }}: {{ symbol.kind }}' }]";
+    let replace = "safety: suggested\ntype: ops\nops: [{ op: replace, file: finding.file, span: finding.span, text: '// {{ finding.decision }}: {{ symbol.kind }}' }]";
 
     let renamed = ops(evaluate(rename, &finding(Some("a"), json!({}))).unwrap());
     let replaced = ops(evaluate(replace, &finding(Some("a"), json!({}))).unwrap());
@@ -577,7 +577,7 @@ fn the_context_is_in_the_environment_and_nothing_else_is() {
         .find_map(|l| l.strip_prefix("LIGHTHOUSE_DECISION="))
         .unwrap();
     let decision: Value = serde_json::from_str(decision).unwrap();
-    assert_eq!(decision["rule"], "local/probe");
+    assert_eq!(decision["decision"], "local/probe");
     assert_eq!(decision["evidence"]["word"], "hi");
     assert!(text.contains("LIGHTHOUSE_API_VERSION=1"));
 }

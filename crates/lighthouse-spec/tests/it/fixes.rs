@@ -50,7 +50,7 @@ const MOVE: &str = "  fix:
       - op: replace
         file: finding.file
         span: finding.span
-        text: '// {{ finding.rule }}'
+        text: '// {{ finding.decision }}'
 ";
 
 #[test]
