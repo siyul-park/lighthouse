@@ -33,15 +33,16 @@ mod client;
 mod config;
 mod models;
 mod phases;
+mod route;
 mod run;
 mod scopes;
 
 use cached::RunCache;
-pub(crate) use chat::{ChatRoute, Refusal};
 pub use client::CommandModels;
 pub use config::active;
 use config::{constructors, io_error, load_languages, validate_config};
 use models::RunModels;
+pub(crate) use route::{Member, Refusal, Route, Usage};
 pub(crate) use scopes::Scopes;
 
 /// Name of the file, in `.gitignore` syntax, that keeps files out of the

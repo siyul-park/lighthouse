@@ -52,7 +52,7 @@ impl Orchestrator<'_> {
         let mut verdict = Verdict::default();
         if let Some(after) = &after {
             failed.extend(worse(before, after, &changed));
-            verdict = judge(&kept, before, after);
+            verdict = judge(&kept, &merged, before, after);
             failed.extend(verdict.files.clone());
         }
         let rolled = close_over(&kept, failed);
@@ -120,7 +120,10 @@ impl Orchestrator<'_> {
                 .map(|(p, _)| p);
             for p in std::iter::once(proposal).chain(covered) {
                 let model = p.fixer == FixedBy::Model;
-                if let Some((class, reason)) = &reason {
+                // A finding the edit of a file did not fix is declined while
+                // the edit stands for the others.
+                let reason = verdict.own.get(&p.fingerprint).or(reason.as_ref());
+                if let Some((class, reason)) = reason {
                     if model {
                         self.proposer
                             .note_model(&p.rule_id, Event::Declined(*class));

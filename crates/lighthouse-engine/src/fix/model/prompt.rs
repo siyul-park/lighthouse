@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 use super::extent::Extent;
 
 /// How many examples of the decision the prompt shows at most.
-const MAX_EXAMPLES: usize = 3;
+pub(super) const MAX_EXAMPLES: usize = 3;
 
 /// Tokens the answer may use beyond the size of the code, for its wrapper.
 const ANSWER_MARGIN: usize = 256;
@@ -106,33 +106,35 @@ impl Ask<'_> {
         );
         fenced(&mut text, self.language, &extent.text);
         for (n, example) in self.examples.iter().enumerate() {
-            for fixed in &example.fixed {
-                let before = example
-                    .files
-                    .iter()
-                    .find(|file| file.path == fixed.path)
-                    .map_or("", |file| file.text());
-                let _ = write!(text, "\nExample {} ({}), before:\n", n + 1, fixed.path);
-                fenced(&mut text, &example.language, before);
-                let _ = write!(text, "\nExample {} ({}), after:\n", n + 1, fixed.path);
-                fenced(&mut text, &example.language, fixed.text());
-            }
+            write_example(&mut text, n + 1, example);
         }
         text
     }
 }
 
-/// The examples the prompt of a finding in `language` shows: those that show a
-/// fix, those in that language first, each group in the order of the decision.
-pub(super) fn examples_for(examples: &[Example], language: &str) -> Vec<Example> {
+/// Appends the fixes `example` shows, as numbered before and after pairs.
+pub(super) fn write_example(text: &mut String, number: usize, example: &Example) {
+    for fixed in &example.fixed {
+        let before = example
+            .files
+            .iter()
+            .find(|file| file.path == fixed.path)
+            .map_or("", |file| file.text());
+        let _ = write!(text, "\nExample {number} ({}), before:\n", fixed.path);
+        fenced(text, &example.language, before);
+        let _ = write!(text, "\nExample {number} ({}), after:\n", fixed.path);
+        fenced(text, &example.language, fixed.text());
+    }
+}
+
+/// The examples the prompt of a finding in `language` shows, at most `limit`:
+/// those that show a fix, those in that language first, each group in the
+/// order of the decision.
+pub(super) fn examples_for(examples: &[Example], language: &str, limit: usize) -> Vec<Example> {
     let (same, other): (Vec<&Example>, Vec<&Example>) = examples
         .iter()
         .partition(|example| example.language == language);
-    same.into_iter()
-        .chain(other)
-        .take(MAX_EXAMPLES)
-        .cloned()
-        .collect()
+    same.into_iter().chain(other).take(limit).cloned().collect()
 }
 
 /// `at` as line:column of the extent, or `outside` when it is not in it.

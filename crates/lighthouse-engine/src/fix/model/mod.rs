@@ -1,16 +1,23 @@
-//! The fix by a model. A model is given the code of a finding, the symbol it
-//! is about or the small file it is in, and answers the new text of it. It
-//! proposes one replacement, which the orchestrator applies in memory and
-//! keeps only if the checks accept it (see [`verify`]); a model's word is
-//! never taken for the result.
+//! The fix by a model. Through `chat`, a model is given the code of a finding,
+//! the symbol it is about or the small file it is in, and answers the new text
+//! of it; through `edit`, an agent is given the findings of a file and changes
+//! the files of a scratch copy of the project (see [`edit`]). Either proposes
+//! a replacement, which the orchestrator applies in memory and keeps only if
+//! the checks accept it (see [`verify`]); a model's word is never taken for
+//! the result.
 
 mod account;
+mod edit;
+mod edit_prompt;
 mod extent;
 mod prompt;
 mod scratch;
 mod verify;
 
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    sync::{Mutex, PoisonError},
+};
 
 use lighthouse_model::{
     Safety,
@@ -24,10 +31,12 @@ use serde_json::Value;
 use super::FixedBy;
 use crate::{
     Engine,
-    engine::{ChatRoute, Refusal},
+    engine::{Refusal, Route, Usage},
 };
 pub use account::ModelCounts;
 pub(super) use account::{Account, Class, Event};
+pub(super) use edit::World;
+pub(super) use edit_prompt::MAX_FINDINGS;
 use prompt::Ask;
 pub(super) use scratch::run_verify;
 pub(super) use verify::{Verdict, judge};
@@ -70,13 +79,26 @@ impl ModelFix {
     }
 }
 
+/// How the model of a run is asked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Via {
+    /// `chat`: for each finding, the new text of the code around it.
+    Chat,
+    /// `edit`: for each file, an agent that changes the project.
+    Edit,
+}
+
 /// The fixer of the findings given to a model: asks the route of `[models]
-/// chat` and counts what happens.
+/// edit` if the project binds one, else that of `chat`, and counts what
+/// happens.
 pub(super) struct ModelFixer<'e> {
-    route: ChatRoute<'e>,
+    route: Route<'e>,
+    via: Via,
     fixes: &'e BTreeMap<String, ModelFix>,
     pub(super) account: Account,
     manifest: FixerManifest,
+    /// What the agents said, for the notes of the run.
+    said: Mutex<Vec<String>>,
 }
 
 impl<'e> ModelFixer<'e> {
@@ -86,25 +108,42 @@ impl<'e> ModelFixer<'e> {
         if fixes.is_empty() {
             return None;
         }
+        let (route, via) = match engine.edit_route() {
+            Some(route) => (route, Via::Edit),
+            None => (engine.chat_route()?, Via::Chat),
+        };
         Some(Self {
-            route: engine.chat_route()?,
+            route,
+            via,
             fixes,
             account: Account::default(),
             manifest: FixerManifest {
                 id: FixedBy::Model.to_string(),
                 requires: Vec::new(),
             },
+            said: Mutex::default(),
         })
     }
 
-    /// Requests that went to a model this run, and what they cost.
-    pub(super) fn usage(&self) -> (usize, f64) {
+    /// Whether the model is asked per file, to edit.
+    pub(super) fn edits(&self) -> bool {
+        self.via == Via::Edit
+    }
+
+    /// What the requests that went to a model this run took.
+    pub(super) fn usage(&self) -> Usage {
         self.route.usage()
     }
 
-    /// What the user should know about the route, once the run is over.
+    /// What the user should know about the route and the agents, once the run
+    /// is over.
     pub(super) fn finish(&self) -> Vec<String> {
-        self.route.finish()
+        let said = self.said.lock().unwrap_or_else(PoisonError::into_inner);
+        self.route
+            .finish()
+            .into_iter()
+            .chain(said.iter().cloned())
+            .collect()
     }
 
     fn decline(&self, decision: &str, class: Class, reason: String) -> Result<FixOutcome, Error> {
@@ -120,6 +159,13 @@ impl Fixer for ModelFixer<'_> {
 
     fn fix(&self, request: &FixRequest) -> Result<FixOutcome, Error> {
         let (decision, finding) = (request.decision, request.finding);
+        if self.edits() {
+            return self.decline(
+                &decision.id,
+                Class::Unanswered,
+                "a project that binds `edit` asks for the fixes of a file at once".to_owned(),
+            );
+        }
         let extent = match extent::choose(request.project, finding, request.text) {
             Ok(extent) => extent,
             Err(reason) => return self.decline(&decision.id, Class::NoExtent, reason),
@@ -129,7 +175,9 @@ impl Fixer for ModelFixer<'_> {
             .project
             .file(&finding.file)
             .map_or("", |f| f.lang.as_str());
-        let examples = fix.map_or_else(Vec::new, |f| prompt::examples_for(&f.examples, language));
+        let examples = fix.map_or_else(Vec::new, |f| {
+            prompt::examples_for(&f.examples, language, prompt::MAX_EXAMPLES)
+        });
         let ask = Ask {
             decision,
             instruction: fix.and_then(|f| f.instruction.as_deref()),
@@ -224,3 +272,6 @@ fn json_objects(answer: &str) -> impl Iterator<Item = Value> + '_ {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod edit_tests;

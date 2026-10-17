@@ -34,6 +34,17 @@ pub(super) struct Proposal {
     pub(super) edits: Vec<TextEdit>,
     /// The files the edits are in, sorted.
     pub(super) files: Vec<PathBuf>,
+    pub(super) aim: Aim,
+}
+
+/// What a fix by a model must have achieved for the checks to keep it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Aim {
+    /// The finding the proposal is for is gone.
+    Finding,
+    /// Of the findings of the file that one edit is for, at least one is gone;
+    /// those still there are declined, and the edit stands.
+    File,
 }
 
 /// Whose findings a round proposes fixes for: the rules, which derive a fix
@@ -49,7 +60,7 @@ pub(super) enum Phase {
 /// the fixers make of them.
 pub(super) struct Proposer<'e> {
     pub(super) engine: &'e Engine,
-    plan: &'e FixPlan,
+    pub(super) plan: &'e FixPlan,
     pub(super) run: &'e FixRun,
     /// The fixer of the model fixes; `None` when no model is to be asked.
     pub(super) models: Option<ModelFixer<'e>>,
@@ -93,6 +104,7 @@ impl<'e> Proposer<'e> {
         let complete = |language: &str| engine.provides(language, Capability::CompleteReferences);
         let lowerer = Lowerer::new(&outcome.project, &sources, &complete);
         let (mut proposals, mut declined) = (Vec::new(), BTreeMap::new());
+        let mut asked_to_edit = Vec::new();
         let mut decline = |finding: &Diagnostic, reason: String| {
             declined.insert(
                 finding.fingerprint.clone(),
@@ -105,7 +117,8 @@ impl<'e> Proposer<'e> {
                 },
             );
         };
-        for finding in self.select(outcome)? {
+        let (scopes, _) = Scopes::new(&self.run.paths, &self.engine.ws.root)?;
+        for finding in self.select(outcome, &scopes) {
             let binding = self.binding(&finding.rule_id);
             let model = binding.as_ref().is_some_and(|b| b.fixer == FixedBy::Model);
             if model != (phase == Phase::Models) {
@@ -134,6 +147,10 @@ impl<'e> Proposer<'e> {
                 }
                 continue;
             }
+            if model && self.models.as_ref().is_some_and(ModelFixer::edits) {
+                asked_to_edit.push((finding, binding));
+                continue;
+            }
             if let Some(why) = self.ineligible(&binding).filter(|_| !model) {
                 decline(finding, why);
                 continue;
@@ -154,6 +171,13 @@ impl<'e> Proposer<'e> {
                 Err(reason) => decline(finding, reason),
             }
         }
+        proposals.extend(self.propose_edits(
+            outcome,
+            texts,
+            (&lowerer, &sources, &scopes),
+            asked_to_edit,
+            &mut decline,
+        )?);
         Ok((proposals, declined))
     }
 
@@ -177,10 +201,9 @@ impl<'e> Proposer<'e> {
 
     /// The findings the run was asked to fix. A finding of a rule without a
     /// fix is left out unless the selection names it.
-    fn select<'o>(&self, outcome: &'o Run) -> Result<Vec<&'o Diagnostic>, Error> {
-        let (scopes, _) = Scopes::new(&self.run.paths, &self.engine.ws.root)?;
+    fn select<'o>(&self, outcome: &'o Run, scopes: &Scopes) -> Vec<&'o Diagnostic> {
         let explicit = !self.run.rules.is_empty() || !self.run.fingerprints.is_empty();
-        Ok(outcome
+        outcome
             .diagnostics
             .iter()
             .filter(|d| scopes.contains(&d.file))
@@ -195,7 +218,7 @@ impl<'e> Proposer<'e> {
             })
             .filter(|d| !self.run.skip.contains(&d.fingerprint))
             .filter(|d| explicit || self.binding(&d.rule_id).is_some())
-            .collect())
+            .collect()
     }
 
     fn binding(&self, rule: &str) -> Option<FixBinding> {
@@ -214,6 +237,16 @@ impl<'e> Proposer<'e> {
             }),
             None => self.plan.get(rule).cloned(),
         }
+    }
+
+    /// Why an edit of a file in `language` cannot be verified before it is
+    /// written, if it cannot.
+    pub(super) fn overlay_gap(&self, language: &str) -> Option<String> {
+        (!self.engine.provides(language, Capability::Overlays)).then(|| {
+            format!(
+                "the provider of `{language}` does not analyze overlays, so an edit cannot be verified before it is written"
+            )
+        })
     }
 
     pub(super) fn propose_one(
@@ -238,10 +271,8 @@ impl<'e> Proposer<'e> {
         let provided = engine
             .language(language)
             .map(|provider| provider.manifest().capabilities.as_slice());
-        if !engine.provides(language, Capability::Overlays) {
-            return Err(format!(
-                "the provider of `{language}` does not analyze overlays, so an edit cannot be verified before it is written"
-            ));
+        if let Some(gap) = self.overlay_gap(language) {
+            return Err(gap);
         }
         if let Some(missing) = fixer
             .manifest()
@@ -311,6 +342,7 @@ impl<'e> Proposer<'e> {
                     safety: safety.max(binding.cap),
                     edits,
                     files,
+                    aim: Aim::Finding,
                 })
             }
         }

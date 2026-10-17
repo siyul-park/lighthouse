@@ -14,17 +14,20 @@ use super::{
     Account, Class, Event, ModelFix, extent,
     extent::Extent,
     json_objects,
-    prompt::{Ask, examples_for},
+    prompt::{Ask, MAX_EXAMPLES, examples_for},
     replacement,
     scratch::run_verify,
     verify::judge,
 };
 use crate::{
     Run,
-    fix::{FixedBy, propose::Proposal},
+    fix::{
+        FixedBy,
+        propose::{Aim, Proposal},
+    },
 };
 
-const FILE: &str = "a.go";
+pub(super) const FILE: &str = "a.go";
 
 fn at(line: u32, col: u32) -> Position {
     Position { line, col }
@@ -69,7 +72,7 @@ fn project(symbols: Vec<Symbol>) -> Project {
     }])
 }
 
-fn finding(rule: &str, line: u32, severity: Severity, key: &str) -> Diagnostic {
+pub(super) fn finding(rule: &str, line: u32, severity: Severity, key: &str) -> Diagnostic {
     let mut finding = Diagnostic::new(
         rule,
         severity,
@@ -248,7 +251,7 @@ fn the_examples_shown_are_three_at_most_those_in_the_language_of_the_finding_fir
         example("rust", "c"),
         example("go", "d"),
     ];
-    let names: Vec<_> = examples_for(&all, "go")
+    let names: Vec<_> = examples_for(&all, "go", MAX_EXAMPLES)
         .into_iter()
         .map(|e| e.name)
         .collect();
@@ -316,7 +319,7 @@ fn the_newline_that_ends_the_extent_is_kept_as_it_was() {
     assert_eq!(json_objects("x { y").count(), 0);
 }
 
-fn proposal(finding: &Diagnostic) -> Proposal {
+pub(super) fn proposal(finding: &Diagnostic) -> Proposal {
     Proposal {
         fingerprint: finding.fingerprint.clone(),
         rule_id: finding.rule_id.clone(),
@@ -327,10 +330,11 @@ fn proposal(finding: &Diagnostic) -> Proposal {
         safety: Safety::Suggested,
         edits: Vec::new(),
         files: vec![finding.file.clone()],
+        aim: Aim::Finding,
     }
 }
 
-fn run(findings: Vec<Diagnostic>, incomplete: Vec<Incomplete>) -> Run {
+pub(super) fn run(findings: Vec<Diagnostic>, incomplete: Vec<Incomplete>) -> Run {
     Run {
         diagnostics: findings,
         incomplete,
@@ -345,7 +349,7 @@ fn a_fix_is_kept_when_the_finding_is_gone_and_nothing_loud_is_new() {
     let quiet = finding("other", 4, Severity::Info, "n");
     let after = run(vec![quiet], Vec::new());
 
-    let verdict = judge(&[proposal(&hit)], &before, &after);
+    let verdict = judge(&[proposal(&hit)], &[], &before, &after);
 
     assert!(
         verdict.own.is_empty() && verdict.files.is_empty(),
@@ -362,7 +366,7 @@ fn a_fix_that_leaves_the_finding_or_the_rule_in_the_file_did_not_resolve_it() {
         run(vec![hit.clone()], Vec::new()),
         run(vec![renamed], Vec::new()),
     ] {
-        let verdict = judge(&[proposal(&hit)], &before, &after);
+        let verdict = judge(&[proposal(&hit)], &[], &before, &after);
         let (class, reason) = &verdict.own[&hit.fingerprint];
         assert_eq!(*class, Class::Unresolved);
         assert_eq!(reason, "did not resolve the finding");
@@ -375,7 +379,7 @@ fn a_fix_that_adds_a_warning_or_an_error_to_the_file_introduced_it() {
     let hit = finding("r", 3, Severity::Warn, "a");
     let before = run(vec![hit.clone()], Vec::new());
     let new = finding("design/other", 7, Severity::Error, "z");
-    let verdict = judge(&[proposal(&hit)], &before, &run(vec![new], Vec::new()));
+    let verdict = judge(&[proposal(&hit)], &[], &before, &run(vec![new], Vec::new()));
     let (class, reason) = &verdict.own[&hit.fingerprint];
     assert_eq!(*class, Class::Introduced);
     assert_eq!(reason, "introduced design/other at line 7");
@@ -389,7 +393,7 @@ fn a_fix_that_leaves_its_file_partly_analyzed_is_not_kept() {
         path: Some(FILE.into()),
         reason: "syntax error".to_owned(),
     };
-    let verdict = judge(&[proposal(&hit)], &before, &run(Vec::new(), vec![gap]));
+    let verdict = judge(&[proposal(&hit)], &[], &before, &run(Vec::new(), vec![gap]));
     let (class, reason) = &verdict.own[&hit.fingerprint];
     assert_eq!(*class, Class::Incomplete);
     assert_eq!(reason, "analysis incomplete: syntax error");
@@ -401,7 +405,7 @@ fn only_fixes_by_a_model_are_judged() {
     let before = run(vec![hit.clone()], Vec::new());
     let mut rule_made = proposal(&hit);
     rule_made.fixer = FixedBy::Fixer("design/short-names".to_owned());
-    let verdict = judge(&[rule_made], &before, &run(vec![hit], Vec::new()));
+    let verdict = judge(&[rule_made], &[], &before, &run(vec![hit], Vec::new()));
     assert!(verdict.own.is_empty());
 }
 

@@ -4,6 +4,7 @@
 //! overlapping ones, applies the rest, formats, re-indexes and re-checks, rolls
 //! back every file that got worse and repeats until nothing is left to do.
 
+mod batch;
 mod edits;
 mod lower;
 mod model;
@@ -206,6 +207,14 @@ pub struct PreviewedFix {
     pub preview: Preview,
 }
 
+/// What the runs of an agent that edits took.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EditUsage {
+    /// Runs of the agent; answers kept from earlier runs are not counted.
+    pub runs: usize,
+    pub seconds: f64,
+}
+
 /// What a fix run did.
 #[derive(Debug, Default)]
 pub struct FixReport {
@@ -229,6 +238,9 @@ pub struct FixReport {
     /// and what they cost.
     pub model_calls: usize,
     pub model_cost: f64,
+    /// Present when the model is an agent that edits: its runs and the time
+    /// they took.
+    pub model_edits: Option<EditUsage>,
     /// The check of the state the run ended in. After a dry run it describes
     /// the fixed text, which is no longer on disk.
     pub finished: Run,

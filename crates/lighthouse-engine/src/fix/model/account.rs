@@ -12,6 +12,8 @@ pub(in crate::fix) enum Class {
     NoExtent,
     /// No model answered: the budget was spent or they failed.
     Unanswered,
+    /// The agent changed what it was not asked to.
+    OutOfScope,
     /// The answer was not a replacement.
     Unparsed,
     /// The answer left the code as it was.
@@ -31,6 +33,7 @@ impl Class {
         match self {
             Self::NoExtent => "no-extent",
             Self::Unanswered => "unanswered",
+            Self::OutOfScope => "out-of-scope",
             Self::Unparsed => "unparsed",
             Self::Unchanged => "unchanged",
             Self::Unresolved => "unresolved",

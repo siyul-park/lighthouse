@@ -42,8 +42,8 @@ pub struct Selection {
     pub fixer: Option<String>,
     /// Record the run and its fixes, and leave out what judgments hide.
     pub store: bool,
-    /// What models may do. Fixes by a model ask the project's chat model
-    /// unless `off`.
+    /// What models may do. Fixes by a model ask the project's edit or chat
+    /// model unless `off`.
     pub models: ModelOptions,
     /// Keep the answers of models in `.lighthouse/cache` and reuse them.
     pub cache: bool,
@@ -103,18 +103,29 @@ pub struct Models {
     /// Verified fixes left as previews.
     pub previewed: usize,
     /// Findings left as they were, by the class of the reason: `no-extent`,
-    /// `unanswered`, `unparsed`, `unchanged`, `unresolved`, `introduced`,
-    /// `incomplete` or `rolled-back`.
+    /// `unanswered`, `out-of-scope`, `unparsed`, `unchanged`, `unresolved`,
+    /// `introduced`, `incomplete` or `rolled-back`.
     pub declined: BTreeMap<String, usize>,
 }
 
 /// Requests to models and what they cost.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct Usage {
-    /// Requests that went to a model; answers kept from earlier runs are not
-    /// counted.
+    /// Requests that went to a model (a run of an agent is one); answers kept
+    /// from earlier runs are not counted.
     pub calls: usize,
     pub cost: f64,
+    /// Present when the model is an agent that edits.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edit: Option<Edits>,
+}
+
+/// What the runs of an agent that edits took.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Edits {
+    /// Runs of the agent; answers kept from earlier runs are not counted.
+    pub runs: usize,
+    pub seconds: f64,
 }
 
 /// A fix that was applied.
@@ -177,8 +188,11 @@ impl Fixed {
                 .map(|(decision, counts)| counts.line(decision)),
         );
         if let Some(usage) = &self.usage {
+            let runs = usage.edit.as_ref().map_or(String::new(), |edit| {
+                format!(", {} run(s) in {:.1}s", edit.runs, edit.seconds)
+            });
             lines.push(format!(
-                "models: {} request(s), cost {}",
+                "models: {} request(s), cost {}{runs}",
                 usage.calls, usage.cost
             ));
         }
@@ -287,9 +301,10 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
     }
     let catalog = &session.catalog;
     let root = &session.root;
-    let chat = !session.config.models(catalog.projects())?.chat.is_empty();
+    let bound = session.config.models(catalog.projects())?;
+    let asks_model = !bound.chat.is_empty() || !bound.edit.is_empty();
     let plan = FixPlan::from_catalog(catalog);
-    let plan = if chat {
+    let plan = if asks_model {
         plan.with_model_fixes(catalog)
     } else {
         plan
@@ -298,7 +313,7 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
     let engine = engine.with_models(request.models.clone());
     // The answers of models are kept in the cache; a project that asks none
     // runs as it always did.
-    let engine = if chat && request.cache {
+    let engine = if asks_model && request.cache {
         engine.with_cache(cache::dir(root), cache_limit())
     } else {
         engine
@@ -345,6 +360,10 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         usage: (!report.models.is_empty()).then_some(Usage {
             calls: report.model_calls,
             cost: report.model_cost,
+            edit: report.model_edits.map(|edit| Edits {
+                runs: edit.runs,
+                seconds: edit.seconds,
+            }),
         }),
         messages,
     })

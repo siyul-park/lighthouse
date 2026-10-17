@@ -43,6 +43,8 @@ impl Client {
             .stderr(Stdio::null());
         if trusted {
             command.env("LIGHTHOUSE_TRUST", "1");
+        } else {
+            command.env_remove("LIGHTHOUSE_TRUST");
         }
         let mut child = command.spawn().unwrap();
         let input = child.stdin.take().unwrap();

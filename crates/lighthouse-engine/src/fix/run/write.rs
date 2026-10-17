@@ -17,10 +17,19 @@ use super::{
     super::lower::Sources,
     super::model::{Class, Event},
     super::propose::Proposal,
-    super::{AppliedFix, DeclinedFix, FileChange, FixReport, FixedBy},
+    super::{AppliedFix, DeclinedFix, EditUsage, FileChange, FixReport, FixedBy},
     Orchestrator,
 };
 use crate::{Error, Run};
+
+/// What became of the findings given to a model by decision, the requests that
+/// went to it, their cost, and the runs of an agent that edits.
+type ModelCounts = (
+    BTreeMap<String, crate::ModelCounts>,
+    usize,
+    f64,
+    Option<EditUsage>,
+);
 
 /// What a round did to the files its proposals touch.
 #[derive(Default)]
@@ -123,7 +132,7 @@ impl Orchestrator<'_> {
                 },
             );
         }
-        let (models, model_calls, model_cost) = self.model_counts(&kept);
+        let (models, model_calls, model_cost, model_edits) = self.model_counts(&kept);
         Ok(FixReport {
             applied: kept,
             declined: self.declined.into_values().collect(),
@@ -134,25 +143,28 @@ impl Orchestrator<'_> {
             models,
             model_calls,
             model_cost,
+            model_edits,
             finished: outcome,
         })
     }
 
     /// What became of the findings given to a model, by decision, with the
-    /// requests that were made and what they cost; the fixes in `kept` were
-    /// written. Empty when no model was asked.
-    fn model_counts(
-        &mut self,
-        kept: &[AppliedFix],
-    ) -> (BTreeMap<String, crate::ModelCounts>, usize, f64) {
+    /// requests that were made and what they cost, and the runs of an agent
+    /// that edits; the fixes in `kept` were written. Empty when no model was
+    /// asked.
+    fn model_counts(&mut self, kept: &[AppliedFix]) -> ModelCounts {
         for fix in kept.iter().filter(|a| a.fixer == FixedBy::Model) {
             self.proposer.note_model(&fix.rule_id, Event::Applied);
         }
         match &self.proposer.models {
             Some(models) => {
-                let (calls, cost) = models.usage();
+                let usage = models.usage();
                 self.notes.extend(models.finish());
-                (models.account.counts(), calls, cost)
+                let edits = models.edits().then_some(EditUsage {
+                    runs: usage.calls,
+                    seconds: usage.time.as_secs_f64(),
+                });
+                (models.account.counts(), usage.calls, usage.cost, edits)
             }
             None => Default::default(),
         }
