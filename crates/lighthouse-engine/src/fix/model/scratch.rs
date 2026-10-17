@@ -4,7 +4,7 @@
 
 use std::{
     fs, io,
-    path::{Component, Path, PathBuf},
+    path::{Component, Path},
     time::Duration,
 };
 
@@ -95,7 +95,7 @@ fn copy_project(root: &Path, into: &Path, texts: &Overlays) -> io::Result<()> {
 }
 
 /// Creates the directory of `target` and fills the file by `write`.
-fn place(target: &PathBuf, write: impl FnOnce(&Path) -> io::Result<()>) -> io::Result<()> {
+fn place(target: &Path, write: impl FnOnce(&Path) -> io::Result<()>) -> io::Result<()> {
     if let Some(dir) = target.parent() {
         fs::create_dir_all(dir)?;
     }

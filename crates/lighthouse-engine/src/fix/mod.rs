@@ -127,15 +127,6 @@ impl FixPlan {
     }
 }
 
-/// The decision as a fixer is told about it.
-fn decision_of(decision: &Decision) -> FixDecision {
-    FixDecision {
-        id: decision.id().to_owned(),
-        requirement: decision.requirement.clone(),
-        context: decision.context.clone(),
-    }
-}
-
 /// What a fix run is asked to do.
 #[derive(Debug, Clone, Default)]
 pub struct FixRun {
@@ -221,4 +212,13 @@ pub struct FixReport {
     /// The check of the state the run ended in. After a dry run it describes
     /// the fixed text, which is no longer on disk.
     pub finished: Run,
+}
+
+/// The decision as a fixer is told about it.
+fn decision_of(decision: &Decision) -> FixDecision {
+    FixDecision {
+        id: decision.id().to_owned(),
+        requirement: decision.requirement.clone(),
+        context: decision.context.clone(),
+    }
 }

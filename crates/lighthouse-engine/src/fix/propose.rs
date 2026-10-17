@@ -18,6 +18,9 @@ use super::{
 };
 use crate::{Engine, Error, Overlays, Run, engine::Scopes};
 
+/// Why a fix by a model is not asked for.
+const NO_MODEL: &str = "no chat model is available: `[models] chat` is not bound, or model checks are off (`--no-models`)";
+
 /// A finding's fix, lowered and ready to apply.
 pub(super) struct Proposal {
     pub(super) fingerprint: Fingerprint,
@@ -307,9 +310,6 @@ impl<'e> Proposer<'e> {
         }
     }
 }
-
-/// Why a fix by a model is not asked for.
-const NO_MODEL: &str = "no chat model is available: `[models] chat` is not bound, or model checks are off (`--no-models`)";
 
 fn op_name(op: &EditOp) -> &'static str {
     match op {

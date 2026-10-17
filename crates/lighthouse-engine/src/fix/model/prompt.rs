@@ -119,6 +119,19 @@ impl Ask<'_> {
     }
 }
 
+/// The examples the prompt of a finding in `language` shows: those that show a
+/// fix, those in that language first, each group in the order of the decision.
+pub(super) fn examples_for(examples: &[Example], language: &str) -> Vec<Example> {
+    let (same, other): (Vec<&Example>, Vec<&Example>) = examples
+        .iter()
+        .partition(|example| example.language == language);
+    same.into_iter()
+        .chain(other)
+        .take(MAX_EXAMPLES)
+        .cloned()
+        .collect()
+}
+
 /// `at` as line:column of the extent, or `outside` when it is not in it.
 fn place(extent: &Extent, at: Position) -> String {
     extent.relative(at).map_or_else(
@@ -141,17 +154,4 @@ fn fenced(text: &mut String, language: &str, code: &str) {
         text.push('\n');
     }
     let _ = writeln!(text, "{fence}");
-}
-
-/// The examples the prompt of a finding in `language` shows: those that show a
-/// fix, those in that language first, each group in the order of the decision.
-pub(super) fn examples_for(examples: &[Example], language: &str) -> Vec<Example> {
-    let (same, other): (Vec<&Example>, Vec<&Example>) = examples
-        .iter()
-        .partition(|example| example.language == language);
-    same.into_iter()
-        .chain(other)
-        .take(MAX_EXAMPLES)
-        .cloned()
-        .collect()
 }

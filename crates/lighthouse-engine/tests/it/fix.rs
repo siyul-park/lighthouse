@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use lighthouse_engine::{Engine, Error, FixBinding, FixPlan, FixRun, unified_diff};
+use lighthouse_engine::{Engine, Error, FixBinding, FixPlan, FixRun, MODEL_FIXER, unified_diff};
 use lighthouse_model::{
     Safety,
     ucm::{EditOp, FixOutcome},
@@ -400,4 +400,22 @@ fn the_plan_of_a_catalog_binds_each_fixable_rule_to_the_fixer_of_its_pattern() {
     assert_eq!(banners.cap, Safety::Suggested);
     assert!(!banners.mechanical);
     assert!(plan.get("design/exported-doc").is_none());
+}
+
+#[test]
+fn model_fixes_are_given_to_the_rules_that_have_a_check_and_no_fix_of_their_own() {
+    let catalog = lighthouse_spec::Catalog::bundled();
+
+    let plan = FixPlan::from_catalog(catalog).with_model_fixes(catalog);
+
+    let documented = plan.get("design/exported-doc").unwrap();
+    assert_eq!(documented.fixer, MODEL_FIXER);
+    assert_eq!(documented.cap, Safety::Suggested);
+    assert!(!documented.mechanical && !documented.runs_command);
+    assert_eq!(documented.decision.id, "design/exported-doc");
+    let groups = plan.get("design/declaration-groups").unwrap();
+    assert_eq!(
+        groups.fixer, "design/declaration-groups",
+        "a fix of its own stays"
+    );
 }

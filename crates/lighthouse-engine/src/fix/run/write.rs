@@ -97,16 +97,14 @@ impl Orchestrator<'_> {
         let (kept, undone): (Vec<AppliedFix>, Vec<AppliedFix>) = std::mem::take(&mut self.applied)
             .into_iter()
             .partition(|a| !a.files.iter().any(|f| skipped.contains_key(f)));
+        for fix in undone.iter().filter(|a| a.fixer == MODEL_FIXER) {
+            self.proposer
+                .note_model(&fix.rule_id, Event::Declined(Class::RolledBack));
+        }
         let still: BTreeSet<&Fingerprint> =
             outcome.diagnostics.iter().map(|d| &d.fingerprint).collect();
         self.declined
             .retain(|fingerprint, _| still.contains(fingerprint));
-        for fix in &undone {
-            if fix.fixer == MODEL_FIXER {
-                self.proposer
-                    .note_model(&fix.rule_id, Event::Declined(Class::RolledBack));
-            }
-        }
         for fix in undone {
             let why = fix
                 .files
@@ -125,17 +123,7 @@ impl Orchestrator<'_> {
                 },
             );
         }
-        for fix in kept.iter().filter(|a| a.fixer == MODEL_FIXER) {
-            self.proposer.note_model(&fix.rule_id, Event::Applied);
-        }
-        let (models, model_calls, model_cost) = match &self.proposer.models {
-            Some(models) => {
-                let (calls, cost) = models.usage();
-                self.notes.extend(models.finish());
-                (models.account.counts(), calls, cost)
-            }
-            None => Default::default(),
-        };
+        let (models, model_calls, model_cost) = self.model_counts(&kept);
         Ok(FixReport {
             applied: kept,
             declined: self.declined.into_values().collect(),
@@ -148,6 +136,26 @@ impl Orchestrator<'_> {
             model_cost,
             finished: outcome,
         })
+    }
+
+    /// What became of the findings given to a model, by decision, with the
+    /// requests that were made and what they cost; the fixes in `kept` were
+    /// written. Empty when no model was asked.
+    fn model_counts(
+        &mut self,
+        kept: &[AppliedFix],
+    ) -> (BTreeMap<String, crate::ModelCounts>, usize, f64) {
+        for fix in kept.iter().filter(|a| a.fixer == MODEL_FIXER) {
+            self.proposer.note_model(&fix.rule_id, Event::Applied);
+        }
+        match &self.proposer.models {
+            Some(models) => {
+                let (calls, cost) = models.usage();
+                self.notes.extend(models.finish());
+                (models.account.counts(), calls, cost)
+            }
+            None => Default::default(),
+        }
     }
 
     /// Adds to `skipped` every file of an applied fix that touches a skipped

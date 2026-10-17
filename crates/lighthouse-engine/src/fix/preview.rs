@@ -19,6 +19,9 @@ use super::{
 };
 use crate::{Engine, Overlays, Run};
 
+/// Lines of unchanged text around a change in the hunks of a preview.
+const CONTEXT: usize = 1;
+
 impl Engine {
     /// The previews of the fixes of `findings`, those that propose a fix that
     /// applies cleanly and changes something. A finding without a fix, one
@@ -100,9 +103,6 @@ pub(super) fn preview_files(
     }
     (!changed.is_empty()).then_some(changed)
 }
-
-/// Lines of unchanged text around a change in the hunks of a preview.
-const CONTEXT: usize = 1;
 
 /// The change of one file from `before` to `after`, with `edits` as
 /// (start, end, text) in byte columns of `before`.
