@@ -32,7 +32,7 @@ binary = f"{root}/target/release/lighthouse"
 plugins = f"{root}/target/plugins"
 RUNS = 3
 SKIP = {".git", "target", ".lighthouse", "node_modules", "vendor", ".claude"}
-PHASES = ["total", "read", "index", "merge", "hashing", "rules", "identity"]
+PHASES = ["total", "read", "index", "merge", "hashing", "rules", "fingerprints"]
 
 PROBE = """apiVersion: lighthouse/v1alpha1
 kind: Decision

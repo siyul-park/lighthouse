@@ -31,7 +31,7 @@ All four run with the strict project (`baseline/strict-root.toml` for the Cargo 
 Median of 3 runs, in milliseconds, release build, Go build cache warm, `--no-store`. `index` sums the language
 providers (Go type-checks through `go list`, so it is the largest phase on Go repositories); `rules` is wall clock.
 
-| repo | setup | read | index | merge | analyzers | rules | identity | report | total |
+| repo | setup | read | index | merge | analyzers | rules | fingerprints | report | total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | strict-root | 10 | 16 | 503 | 25 | 6 | 264 | 6 | 1 | 734 |
 | cel | 8 | 37 | 619 | 60 | 13 | 608 | 24 | 3 | 1421 |
@@ -60,7 +60,7 @@ frozen `strict-root` copy.
 **The target is not met.** The design asked for a one-file edit under 40% of cold on each Go repository; it
 is at 83–95%. Where the time goes in the edit run (phases, ms; cold `--no-cache` in brackets):
 
-| repo | index | merge | hashing | rules | identity |
+| repo | index | merge | hashing | rules | fingerprints |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | lighthouse | 533 (677) | 38 (37) | 38 (0) | 207 (320) | 9 (9) |
 | cel | 1465 (1489) | 148 (145) | 126 (0) | 423 (801) | 47 (40) |
@@ -87,7 +87,7 @@ is at 83–95%. Where the time goes in the edit run (phases, ms; cold `--no-cach
 
 A reviewer read each sampled finding against the decision's requirement and called it true (TP) or false (FP).
 The interval is Wilson 95%. Rows that are not warn or error rules, or that sample little, are indications only.
-Sample files are `baseline/precision/<pack>/<decision>.tsv` (fingerprint, repo, location, verdict, reason).
+Sample files are `labels/<pack>/<decision>.tsv` (fingerprint, repo, location, verdict, reason).
 
 | decision | review | TP / sample | precision | Wilson 95% | samples |
 | --- | --- | ---: | ---: | --- | --- |

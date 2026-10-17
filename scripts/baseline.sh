@@ -70,18 +70,15 @@ def config(path, directory):
 
 def run(path, cfg):
     done = subprocess.run(
-        [binary, "check", ".", "--format", "json", "--timings", "--no-store", "--config", cfg],
+        [binary, "check", ".", "--format", "json", "--detail", "full", "--limit", "1000000",
+         "--timings", "--no-store", "--config", cfg],
         cwd=path, capture_output=True, text=True,
     )
-    counts, incomplete = {}, 0
-    for line in done.stdout.splitlines():
-        if not line.startswith("{"):
-            continue
-        found = json.loads(line)
-        if "ruleId" in found:
-            counts[found["ruleId"]] = counts.get(found["ruleId"], 0) + 1
-        else:
-            incomplete += 1
+    report = json.loads(done.stdout)
+    counts = {}
+    for found in report["findings"]:
+        counts[found["decision"]] = counts.get(found["decision"], 0) + 1
+    incomplete = len(report["incomplete"])
     times = {}
     for line in done.stderr.splitlines():
         m = re.match(r"timings: (.+?) ([0-9.]+)ms(?: \(.*\))?$", line)
