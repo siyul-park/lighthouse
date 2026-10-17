@@ -53,7 +53,7 @@ languages and editors are added.
 | Crate boundaries | 15 crates in layers, each one role, the edges enforced by `design/layers`; one name per concept across crates, protocol, schemas and docs (`Run`, `fingerprints`, `decision`) |
 | Hooks report the session's own changes | the first edit of a file records its findings; later hooks report only the findings the session introduced, and a turn with no edit is silent |
 | Stability signals | module stability, reach of functions and a stability probe on the reference repositories |
-| One concept model, first half | a check abstains (the CEL field `abstain`); a provider names the `protocol` it speaks and its reach (`baseUrl`, `command` or `plugin`); chat classification always reads logprobs; the core is free of the code model, with `design/layers` keeping `lighthouse_model::ucm` out of core, store, ml, report and session |
+| One concept model | a check abstains (the CEL field `abstain`); a provider names the `protocol` it speaks and its reach (`baseUrl`, `command` or `plugin`); chat classification always reads logprobs; the core is free of the code model, with `design/layers` keeping `lighthouse_model::ucm` out of core, store, ml, report and session; plugin protocol 0.3: `lighthouse/index`, `initialize` in MCP and LSP vocabulary (`workspaceFolders`, `serverInfo`, `capabilities`), LSP error codes, one method table with its HTTP twins, conformance transcripts replayed by every plugin and the Go sdk |
 
 ## Next
 
@@ -61,18 +61,11 @@ Rule accuracy and checking cost are measured; the [baseline](baseline.md) is the
 What is checked by hand is automated first where the result can be verified, then models
 where rules fall short, then reach. Each step below comes before the ones that build on it.
 
-### One concept model
-Renames and removals only, so that what follows builds on one vocabulary:
-- Derived strength replaces `mining`.
-- Protocol 0.3: `lighthouse/index`, `initialize` in LSP and MCP vocabulary, LSP error
-  codes, one method table with its HTTP twin, and recorded conformance transcripts for
-  the Rust and Go providers.
-
 ### Fixes by models, verified
 The biggest direct cut in agent work, and it needs no labels: the verifier already exists.
-- **LLM fixers are ordinary fix providers** (`command` for any CLI, `rpc` for a plugin),
-  chosen with `rules."<id>".fix`, and a `type: model` fix is an extent replacement or an
-  agent edit of a scratch workspace.
+- **A `type: model` fix** for every decision without a fix of its own, once `[models] edit`
+  or `chat` is bound: an extent replacement (`chat`) or an agent edit of a scratch
+  workspace (`edit`: a headless agent CLI, later an ACP agent).
   - Lighthouse ships a ready-made plugin with clients for standard APIs: OpenAI-compatible endpoints (OpenRouter, Ollama, vLLM, LM Studio) now, Anthropic later.
   - Headless agent CLIs are `chat` and `edit` providers (a `command` without a protocol);
     a measured comparison of API, local-server and agent-CLI arms decides the default.
