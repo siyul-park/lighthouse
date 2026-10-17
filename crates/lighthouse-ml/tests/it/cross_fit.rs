@@ -4,12 +4,11 @@
 use std::fs;
 
 use lighthouse_ml::{
-    Result,
-    evaluate::{Found, overlay},
+    evaluate::Found,
     labels::Label,
-    metrics::Truth,
-    train::{Rows, Target, TrainRequest, train},
+    train::{Fit, Rows, train},
 };
+use lighthouse_model::{Judgment, Result};
 use lighthouse_plugin::{Classifier, DecisionRef};
 
 use crate::layer_support::*;
@@ -39,20 +38,12 @@ fn a_model_that_fits_its_labels_is_graded_on_them_by_refits() {
     );
     let labels: Vec<Label> = places
         .iter()
-        .map(|(f, _, _)| label(f, Truth::Fail, None, None))
+        .map(|(f, _, _)| label(f, Judgment::Fail, None, None))
         .collect();
     let trainer = Memorizer(manifest(true));
     let trained = train(
-        &TrainRequest {
-            decision: RULE.to_owned(),
-            model: Some("fake/learned".to_owned()),
-            from_model: None,
-            baseline: None,
-            repos: Vec::new(),
-            config: None,
-        },
-        vec![Rows::of(&labels, run.subjects(), None, &decision).unwrap()],
-        &Target {
+        Rows::of(&labels, run.subjects(), None, &decision).unwrap(),
+        &Fit {
             root: root.path(),
             reference: Some("fake/learned"),
             decision: &decision,
@@ -88,12 +79,9 @@ fn a_model_that_fits_its_labels_is_graded_on_them_by_refits() {
     };
     assert!(places.iter().all(|(_, _, text)| asked(text) == 1.0));
 
-    let layered = overlay(
-        &over(&reference, root.path(), &decision, &models),
-        &run,
-        &labels,
-    )
-    .unwrap();
+    let layered = over(&reference, root.path(), &decision, &models)
+        .apply(&run, &labels)
+        .unwrap();
     let graded = report(&labels, &layered);
     // Each label is graded by a refit that never saw its file: nothing is
     // remembered, so nothing is failed.
@@ -123,14 +111,11 @@ fn a_trainer_that_is_not_deterministic_cannot_refit() {
             None => Box::new(Memorizer(manifest(false))),
         })
     };
-    let error = overlay(
-        &over(&reference, root.path(), &decision, &models),
-        &run,
-        &labels,
-    )
-    .err()
-    .unwrap()
-    .to_string();
+    let error = over(&reference, root.path(), &decision, &models)
+        .apply(&run, &labels)
+        .err()
+        .unwrap()
+        .to_string();
     assert!(
         error.contains("its trainer is not deterministic"),
         "{error}"
@@ -153,14 +138,11 @@ fn a_dataset_the_store_lost_is_named() {
             None => Box::new(Memorizer(manifest(true))),
         })
     };
-    let error = overlay(
-        &over(&reference, root.path(), &decision, &models),
-        &run,
-        &labels,
-    )
-    .err()
-    .unwrap()
-    .to_string();
+    let error = over(&reference, root.path(), &decision, &models)
+        .apply(&run, &labels)
+        .err()
+        .unwrap()
+        .to_string();
     assert!(
         error.contains("are not in .lighthouse/datasets; train it again"),
         "{error}"
@@ -178,21 +160,13 @@ fn learned(deterministic: bool) -> (tempfile::TempDir, Found, Vec<Label>, String
     let decision = decision();
     let run = base(&[("one", "a.rs", "first"), ("two", "b.rs", "second")]);
     let labels = vec![
-        label("one", Truth::Fail, None, None),
-        label("two", Truth::Fail, None, None),
+        label("one", Judgment::Fail, None, None),
+        label("two", Judgment::Fail, None, None),
     ];
     let trainer = Memorizer(manifest(deterministic));
     let trained = train(
-        &TrainRequest {
-            decision: RULE.to_owned(),
-            model: Some("fake/learned".to_owned()),
-            from_model: None,
-            baseline: None,
-            repos: Vec::new(),
-            config: None,
-        },
-        vec![Rows::of(&labels, run.subjects(), None, &decision).unwrap()],
-        &Target {
+        Rows::of(&labels, run.subjects(), None, &decision).unwrap(),
+        &Fit {
             root: root.path(),
             reference: Some("fake/learned"),
             decision: &decision,

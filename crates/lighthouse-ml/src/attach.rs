@@ -2,14 +2,10 @@
 //! whether the evaluation of the model allows it, and what justifies it. The
 //! revision itself is the caller's to write.
 
-use std::path::Path;
-
+use lighthouse_model::Result;
 use serde_json::{Value, json};
 
-use crate::{
-    Result,
-    evaluate::{EvalReport, shortfall, trained_on},
-};
+use crate::evaluate::EvalReport;
 
 /// Why the model an evaluation graded may not be attached: none when it may.
 /// The candidate side of `report` is the check with the model as its first
@@ -20,7 +16,7 @@ pub fn attachable(report: &EvalReport) -> Vec<String> {
     };
     let mut reasons = Vec::new();
     if report.meets_policy != Some(true) {
-        reasons.push(match shortfall(&candidate.metrics, report.policy) {
+        reasons.push(match candidate.metrics.shortfall(report.policy) {
             Some(missed) => format!("it misses the policy: {missed}"),
             None => "it has no precision to judge against the policy".to_owned(),
         });
@@ -48,9 +44,9 @@ pub fn attachable(report: &EvalReport) -> Vec<String> {
     reasons
 }
 
-/// What justifies attaching `model`: the numbers of its evaluation, with the
-/// dataset it learned from. A revision records it; a refusal shows it.
-pub fn evidence(report: &EvalReport, model: &str, root: &Path) -> Result<Value> {
+/// What justifies attaching the model the evaluation graded: its numbers, with
+/// the dataset it learned from. A revision records it; a refusal shows it.
+pub fn evidence(report: &EvalReport) -> Result<Value> {
     let candidate = report.candidate.as_ref().ok_or("nothing was graded")?;
     let metrics = &candidate.metrics;
     Ok(json!({
@@ -60,6 +56,6 @@ pub fn evidence(report: &EvalReport, model: &str, root: &Path) -> Result<Value> 
         "recall": metrics.recall,
         "coverage": metrics.coverage,
         "crossFitted": candidate.layer.as_ref().map_or(0, |layer| layer.cross_fitted),
-        "trainingFile": trained_on(root, model)?,
+        "trainingFile": candidate.layer.as_ref().and_then(|layer| layer.training_file.as_ref()),
     }))
 }

@@ -1,41 +1,23 @@
-use std::{fs, path::PathBuf};
-
 use lighthouse_engine::Run;
 use lighthouse_ml::{
-    evaluate::{Candidate, EvalRequest, Found, Gathered, Repo, Setup, grade, repos},
-    labels::{Label, Shown, Source},
-    metrics::{Outcome, Truth},
+    evaluate::{Candidate, EvalReport, Found, RepoResult, Usage, grade},
+    labels::{Label, Source},
+    metrics::Outcome,
 };
-use lighthouse_model::{Diagnostic, Fingerprint, Position, Severity, Span};
-use lighthouse_spec::{Catalog, Evaluation};
+use lighthouse_model::{Diagnostic, Fingerprint, Judgment, Position, Severity, Span};
+use lighthouse_spec::Evaluation;
 use serde_json::json;
 
 const RULE: &str = "core/file-size";
 
-fn request(audit: Option<usize>) -> EvalRequest {
-    EvalRequest {
-        decision: RULE.to_owned(),
-        repos: Vec::new(),
-        baseline: None,
-        candidate: None,
-        model: None,
-        config: None,
-        audit,
-    }
+fn graded(repo: &str, labels: &[Label], found: &Found, candidate: Option<Candidate>) -> RepoResult {
+    grade(RULE, None, Some(repo), policy(), labels, found, candidate)
 }
 
-fn repo() -> Repo {
-    Repo {
-        name: Some("cel".to_owned()),
-        dir: PathBuf::from("."),
-    }
-}
-
-fn label(key: &str, truth: Truth, observed: Option<Outcome>) -> Label {
+fn label(key: &str, judgment: Judgment, observed: Option<Outcome>) -> Label {
     Label {
         key: key.to_owned(),
-        truth,
-        weight: 1.0,
+        judgment,
         source: Source::Person,
         attribution: json!({}),
         observed,
@@ -72,38 +54,19 @@ fn policy() -> Evaluation {
 }
 
 #[test]
-fn repos_defaults_to_the_start_directory_and_joins_named_ones_to_it() {
-    let start = PathBuf::from("/work");
-    let own = repos(&[], &start);
-    assert_eq!(own.len(), 1);
-    assert_eq!(
-        (own[0].name.as_deref(), own[0].dir.clone()),
-        (None, start.clone())
-    );
-
-    let named = repos(&[repo()], &start);
-    assert_eq!(named[0].name.as_deref(), Some("cel"));
-    assert_eq!(named[0].dir, start.join("."));
-}
-
-#[test]
 fn found_of_a_run_keeps_what_the_check_flagged_by_fingerprint_and_place() {
     let found = found(&[("one", "a.rs")]);
     // A label the run flagged is a `fail` for the check; another is unselected.
-    let part = grade(
-        &request(None),
-        &repo(),
-        policy(),
+    let result = graded(
+        "cel",
         &[
-            label("one", Truth::Fail, None),
-            label("two", Truth::Fail, None),
+            label("one", Judgment::Fail, None),
+            label("two", Judgment::Fail, None),
         ],
         &found,
         None,
     );
-    let mut gathered = Gathered::default();
-    gathered.add(part);
-    let report = gathered.finish(&request(None), false).unwrap();
+    let report = EvalReport::pool(vec![result]).unwrap();
     let recall = report.current.metrics.recall.unwrap();
     assert_eq!((recall.hits, recall.of), (1, 2));
 }
@@ -120,24 +83,12 @@ fn the_probabilities_models_gave_score_the_labelled_subjects_they_answered() {
         .map(|(fingerprint, p)| (fingerprint.to_owned(), (p, "m/x@1".to_owned())))
         .collect();
     let labels = [
-        label("one", Truth::Fail, None),
-        label("two", Truth::Pass, None),
-        label("three", Truth::Pass, None),
+        label("one", Judgment::Fail, None),
+        label("two", Judgment::Pass, None),
+        label("three", Judgment::Pass, None),
     ];
-    let mut gathered = Gathered::default();
-    gathered.add(grade(
-        &request(None),
-        &repo(),
-        policy(),
-        &labels,
-        &Found::of(&run),
-        None,
-    ));
-    let metrics = gathered
-        .finish(&request(None), false)
-        .unwrap()
-        .current
-        .metrics;
+    let result = graded("cel", &labels, &Found::of(&run), None);
+    let metrics = EvalReport::pool(vec![result]).unwrap().current.metrics;
     // "three" abstained: counted in the labels, not scored.
     assert_eq!(metrics.labelled, 3);
     assert_eq!(metrics.answered, 2);
@@ -146,33 +97,27 @@ fn the_probabilities_models_gave_score_the_labelled_subjects_they_answered() {
 }
 
 #[test]
-fn finish_keeps_each_score_of_every_repository_sorted_by_repo_and_fingerprint() {
-    let mut gathered = Gathered::default();
-    for (name, fingerprint, truth, p) in [
-        ("zed", "b", Truth::Fail, 0.9),
-        ("cel", "c", Truth::Pass, 0.2),
-        ("cel", "a", Truth::NotApplicable, 0.5),
-        ("cel", "b", Truth::Fail, 0.7),
+fn pool_keeps_each_score_of_every_repository_sorted_by_repo_and_fingerprint() {
+    let mut results = Vec::new();
+    for (name, fingerprint, judgment, p) in [
+        ("zed", "b", Judgment::Fail, 0.9),
+        ("cel", "c", Judgment::Pass, 0.2),
+        ("cel", "a", Judgment::NotApplicable, 0.5),
+        ("cel", "b", Judgment::Fail, 0.7),
     ] {
         let mut run = Run {
             diagnostics: vec![flagged(fingerprint, "a.rs")],
             ..Run::default()
         };
         run.probabilities = [(fingerprint.to_owned(), (p, "m/x@1".to_owned()))].into();
-        let repo = Repo {
-            name: Some(name.to_owned()),
-            dir: PathBuf::from("."),
-        };
-        gathered.add(grade(
-            &request(None),
-            &repo,
-            policy(),
-            &[label(fingerprint, truth, None)],
+        results.push(graded(
+            name,
+            &[label(fingerprint, judgment, None)],
             &Found::of(&run),
             None,
         ));
     }
-    let side = gathered.finish(&request(None), false).unwrap().current;
+    let side = EvalReport::pool(results).unwrap().current;
     // The `notApplicable` label is about the selector and is not scored.
     let kept: Vec<_> = side
         .scores
@@ -200,22 +145,16 @@ fn finish_keeps_each_score_of_every_repository_sorted_by_repo_and_fingerprint() 
 
 #[test]
 fn the_notices_of_the_run_are_kept_on_the_side_without_repeats() {
-    let mut gathered = Gathered::default();
-    for _ in 0..2 {
-        let run = Run {
-            notices: ["model m/x failed".to_owned()].into(),
-            ..Run::default()
-        };
-        gathered.add(grade(
-            &request(None),
-            &repo(),
-            policy(),
-            &[],
-            &Found::of(&run),
-            None,
-        ));
-    }
-    let side = gathered.finish(&request(None), false).unwrap().current;
+    let results = (0..2)
+        .map(|_| {
+            let run = Run {
+                notices: ["model m/x failed".to_owned()].into(),
+                ..Run::default()
+            };
+            graded("cel", &[], &Found::of(&run), None)
+        })
+        .collect();
+    let side = EvalReport::pool(results).unwrap().current;
 
     assert_eq!(side.notices, ["model m/x failed"]);
 }
@@ -224,31 +163,18 @@ fn the_notices_of_the_run_are_kept_on_the_side_without_repeats() {
 fn grade_pairs_the_candidate_with_the_current_check_and_reads_examples_as_shown() {
     let current = found(&[("one", "a.rs")]);
     let beside = found(&[]);
+    let shown = [label("example:x", Judgment::Fail, Some(Outcome::Fail))];
     let candidate = Candidate {
         id: "local/next".to_owned(),
         found: &beside,
-        shown: vec![Shown {
-            key: "example:x".to_owned(),
-            truth: Truth::Fail,
-            outcome: Outcome::Fail,
-            subject: None,
-        }],
+        labels: &shown,
     };
     let labels = [
-        label("one", Truth::Fail, None),
-        label("example:x", Truth::Fail, Some(Outcome::Pass)),
+        label("one", Judgment::Fail, None),
+        label("example:x", Judgment::Fail, Some(Outcome::Pass)),
     ];
-    let part = grade(
-        &request(None),
-        &repo(),
-        policy(),
-        &labels,
-        &current,
-        Some(candidate),
-    );
-    let mut gathered = Gathered::default();
-    gathered.add(part);
-    let report = gathered.finish(&request(None), true).unwrap();
+    let result = graded("cel", &labels, &current, Some(candidate));
+    let report = EvalReport::pool(vec![result]).unwrap();
     let side = report.candidate.unwrap();
     assert_eq!(side.check, "local/next");
     // The example is flagged by the candidate; the finding it no longer flags.
@@ -258,41 +184,33 @@ fn grade_pairs_the_candidate_with_the_current_check_and_reads_examples_as_shown(
 }
 
 #[test]
-fn gathered_add_and_finish_pool_the_repositories_into_one_report() {
-    let mut gathered = Gathered::default();
-    for fingerprint in ["one", "two"] {
-        let found = found(&[(fingerprint, "a.rs")]);
-        let labels = [label(fingerprint, Truth::Fail, None)];
-        gathered.add(grade(
-            &request(None),
-            &repo(),
-            policy(),
-            &labels,
-            &found,
-            None,
-        ));
-    }
-    let report = gathered.finish(&request(None), false).unwrap();
+fn pool_puts_the_repositories_into_one_report() {
+    let results = ["one", "two"]
+        .into_iter()
+        .map(|fingerprint| {
+            let found = found(&[(fingerprint, "a.rs")]);
+            let labels = [label(fingerprint, Judgment::Fail, None)];
+            graded("cel", &labels, &found, None)
+        })
+        .collect();
+    let report = EvalReport::pool(results).unwrap();
     assert_eq!(report.labelled, 2);
     assert_eq!(report.meets_policy, Some(true));
-    assert!(Gathered::default().finish(&request(None), false).is_err());
+    assert!(EvalReport::pool(Vec::new()).is_err());
 }
 
 #[test]
-fn setup_read_adds_the_candidate_file_to_the_decisions_of_the_project() {
-    let dir = tempfile::tempdir().unwrap();
-    let text = Catalog::decision_text(Catalog::bundled().decision(RULE).unwrap());
-    let file = dir.path().join("candidate.yaml");
-    fs::write(&file, text.replace(RULE, "local/probe")).unwrap();
-
-    let (id, setup) = Setup::read(dir.path(), &file).unwrap();
-    assert_eq!(id, "local/probe");
-    assert!(setup.catalog().unwrap().decision("local/probe").is_some());
-
-    fs::write(
-        &file,
-        "apiVersion: lighthouse/v1alpha1\nkind: Project\nmetadata:\n  name: x/p\n",
-    )
-    .unwrap();
-    assert!(Setup::read(dir.path(), &file).is_err());
+fn usage_sums_what_each_repository_asked_of_models() {
+    let usages =
+        [(1, 2, 3, 0.5), (2, 0, 1, 0.25)].map(|(model_decided, reviews, calls, cost)| Usage {
+            model_decided,
+            reviews,
+            calls,
+            cost,
+        });
+    let sum: Usage = usages.into_iter().sum();
+    assert_eq!(
+        (sum.model_decided, sum.reviews, sum.calls, sum.cost),
+        (3, 2, 4, 0.75)
+    );
 }

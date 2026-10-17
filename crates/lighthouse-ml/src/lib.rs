@@ -10,6 +10,5 @@ pub mod metrics;
 pub mod rebuild;
 pub mod train;
 
+mod artifact;
 mod dataset;
-
-pub use lighthouse_model::Result;

@@ -1,7 +1,9 @@
 //! The metrics of evaluating a check against labels, with Wilson 95%
 //! intervals. A proportion over nothing is `None`, never zero.
 
+use lighthouse_model::Judgment;
 use lighthouse_protocol::stats::wilson;
+use lighthouse_spec::Evaluation;
 use serde::Serialize;
 
 /// The equal-width bins of P(fail) the expected calibration error uses.
@@ -43,21 +45,13 @@ pub enum Outcome {
     Pass,
     /// Nothing decided it: left to review.
     Review,
-    /// The check did not select it.
-    Unselected,
-}
-
-/// What a labelled subject was: what the label says, and how the check came
-/// out. A `notApplicable` label is about the selector.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Truth {
-    Fail,
-    Pass,
+    /// The check did not select it (SARIF `notApplicable`).
     NotApplicable,
 }
 
 /// The metrics, each `None` where there is nothing to divide.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Metrics {
     pub labelled: usize,
     pub precision: Option<Rate>,
@@ -67,9 +61,9 @@ pub struct Metrics {
     /// The share of selected subjects not judged `notApplicable`; kept apart
     /// from conformance.
     pub selector_precision: Option<Rate>,
-    /// The share of selected subjects the check decided.
+    /// The share of selected subjects the check decided; its complement is the
+    /// share left to review.
     pub coverage: Option<Rate>,
-    pub abstention: Option<Rate>,
     /// Labelled subjects a model gave a probability of failing; the rest
     /// abstained and are counted, not scored.
     pub answered: usize,
@@ -86,52 +80,69 @@ pub struct Metrics {
     pub ece: Option<f64>,
 }
 
-/// Evaluates `pairs` of (truth, outcome), and the probabilities of failing
-/// `scored` (truth, P(fail)) that models gave the labelled subjects; a
-/// `notApplicable` label is about the selector and is not scored. An unselected `fail` is a missed
-/// violation; an unselected `pass` is a correct silence. A subject labelled
-/// `fail` that was left to review was not found, so it is a miss (recall
-/// counts it); a subject left to review is in no precision, and in coverage
-/// only.
-pub fn evaluate(pairs: &[(Truth, Outcome)], scored: &[(Truth, f64)]) -> Metrics {
-    let count = |want: &dyn Fn(&(Truth, Outcome)) -> bool| pairs.iter().filter(|p| want(p)).count();
-    let selected = |p: &(Truth, Outcome)| p.1 != Outcome::Unselected;
-    let tp = count(&|p| *p == (Truth::Fail, Outcome::Fail));
-    let fp = count(&|p| *p == (Truth::Pass, Outcome::Fail));
-    let tn = count(&|p| p.0 == Truth::Pass && matches!(p.1, Outcome::Pass | Outcome::Unselected));
-    let fn_ = count(&|p| {
-        p.0 == Truth::Fail && matches!(p.1, Outcome::Pass | Outcome::Review | Outcome::Unselected)
-    });
-    let chosen = count(&|p| selected(p));
-    let not_applicable = count(&|p| selected(p) && p.0 == Truth::NotApplicable);
-    let reviewed = count(&|p| p.1 == Outcome::Review);
-    let scored: Vec<(bool, f64)> = scored
-        .iter()
-        .filter_map(|&(truth, p)| match truth {
-            Truth::Fail => Some((true, p)),
-            Truth::Pass => Some((false, p)),
-            Truth::NotApplicable => None,
-        })
-        .collect();
-    Metrics {
-        labelled: pairs.len(),
-        precision: Rate::new(tp, tp + fp),
-        fpr: Rate::new(fp, fp + tn),
-        recall: Rate::new(tp, tp + fn_),
-        fnr: Rate::new(fn_, tp + fn_),
-        selector_precision: Rate::new(chosen - not_applicable, chosen),
-        coverage: Rate::new(chosen - reviewed, chosen),
-        abstention: Rate::new(reviewed, chosen),
-        answered: scored.len(),
-        brier: brier(&scored),
-        auroc: auroc(&scored),
-        ece: ece(&scored),
+impl Metrics {
+    /// The metrics of `pairs` of (judgment, outcome), and of the probabilities
+    /// of failing `scored` (violates, P(fail)) that models gave the labelled
+    /// subjects; a `notApplicable` label is about the selector and is not
+    /// scored. An unselected `fail` is a missed violation; an unselected
+    /// `pass` is a correct silence. A subject labelled `fail` that was left to
+    /// review was not found, so it is a miss (recall counts it); a subject left
+    /// to review is in no precision, and in coverage only.
+    pub fn of(pairs: &[(Judgment, Outcome)], scored: &[(bool, f64)]) -> Self {
+        let count =
+            |want: &dyn Fn(&(Judgment, Outcome)) -> bool| pairs.iter().filter(|p| want(p)).count();
+        let selected = |p: &(Judgment, Outcome)| p.1 != Outcome::NotApplicable;
+        let tp = count(&|p| *p == (Judgment::Fail, Outcome::Fail));
+        let fp = count(&|p| *p == (Judgment::Pass, Outcome::Fail));
+        let tn = count(&|p| {
+            p.0 == Judgment::Pass && matches!(p.1, Outcome::Pass | Outcome::NotApplicable)
+        });
+        let missed = count(&|p| {
+            p.0 == Judgment::Fail
+                && matches!(
+                    p.1,
+                    Outcome::Pass | Outcome::Review | Outcome::NotApplicable
+                )
+        });
+        let chosen = count(&|p| selected(p));
+        let not_applicable = count(&|p| selected(p) && p.0 == Judgment::NotApplicable);
+        let reviewed = count(&|p| p.1 == Outcome::Review);
+        Self {
+            labelled: pairs.len(),
+            precision: Rate::new(tp, tp + fp),
+            fpr: Rate::new(fp, fp + tn),
+            recall: Rate::new(tp, tp + missed),
+            fnr: Rate::new(missed, tp + missed),
+            selector_precision: Rate::new(chosen - not_applicable, chosen),
+            coverage: Rate::new(chosen - reviewed, chosen),
+            answered: scored.len(),
+            brier: brier(scored),
+            auroc: auroc(scored),
+            ece: ece(scored),
+        }
     }
-}
 
-/// The share of subjects two checks answer the same way.
-pub fn agreement(pairs: &[(Outcome, Outcome)]) -> Option<Rate> {
-    Rate::new(pairs.iter().filter(|(a, b)| a == b).count(), pairs.len())
+    /// How the check misses the policy by the point estimates of its precision
+    /// and, when the policy sets a target, of its recall; none when it meets it
+    /// (or has no precision to judge).
+    pub fn shortfall(&self, policy: Evaluation) -> Option<String> {
+        let precision = self.precision?;
+        if precision.value < policy.precision {
+            return Some(format!(
+                "precision {:.2} < {:.2} (n={})",
+                precision.value, policy.precision, precision.of
+            ));
+        }
+        let target = policy.recall?;
+        match self.recall {
+            Some(recall) if recall.value >= target => None,
+            Some(recall) => Some(format!(
+                "recall {:.2} < {target:.2} (n={})",
+                recall.value, recall.of
+            )),
+            None => Some(format!("recall unknown < {target:.2}")),
+        }
+    }
 }
 
 /// The mean squared distance of P(fail) from the label, `true` for a fail.

@@ -1,8 +1,8 @@
 use std::fs;
 
 use lighthouse_ml::{
-    labels::{Baseline, Collect, Judged, Label, Source},
-    metrics::Truth,
+    labels::{Judged, Label, Labels, Source, Table},
+    metrics::Outcome,
 };
 use lighthouse_model::{AgentKind, Attribution, Judgment};
 use lighthouse_spec::Catalog;
@@ -12,8 +12,6 @@ const RULE: &str = "core/file-size";
 fn judged(fingerprint: &str, judgment: Judgment, by: Attribution, meaning: &str) -> Judged {
     Judged {
         fingerprint: fingerprint.to_owned(),
-        decision_name: RULE.to_owned(),
-        decision_uid: None,
         meaning_version: Some(meaning.to_owned()),
         judgment,
         by,
@@ -28,21 +26,17 @@ fn model(id: &str) -> Attribution {
     Attribution::model(id)
 }
 
-fn collect(
-    judgments: Vec<Judged>,
-    baseline: Option<&Baseline>,
-    exclude: Option<&str>,
-) -> Vec<Label> {
+fn collect(judgments: Vec<Judged>, table: Option<&Table>, exclude: Option<&str>) -> Vec<Label> {
     let catalog = Catalog::bundled().clone();
     let decision = catalog.decision(RULE).unwrap().clone();
-    Collect {
+    Labels {
         judgments,
         decision: &decision,
-        baseline,
+        table,
         exclude_model: exclude,
         examples: Vec::new(),
     }
-    .labels()
+    .collect()
     .unwrap()
 }
 
@@ -105,25 +99,25 @@ fn labels_weigh_by_who_gave_them_and_skip_other_meanings_and_the_model_itself() 
         "# comment\nfingerprint\trepo\tlocation\tverdict\treason\nb1\tcel\tx\tTP\t\nb2\tcel\ty\tFP\t\nb3\tcel\tz\tunclear\t\n-\tcel\tw\tTP\t\nb4\tother\tv\tTP\t\n",
     )
     .unwrap();
-    let baseline = Baseline {
+    let table = Table {
         file: &table,
         repo: Some("cel"),
     };
-    let labels = collect(judgments, Some(&baseline), Some("local/x"));
+    let labels = collect(judgments, Some(&table), Some("local/x"));
     let by = |key: &str| labels.iter().find(|l| l.key == key);
 
     let p = by("p").unwrap();
     assert_eq!(
-        (p.truth, p.weight, p.source),
-        (Truth::Fail, 1.0, Source::Person)
+        (p.judgment, p.source.weight(), p.source),
+        (Judgment::Fail, 1.0, Source::Person)
     );
     let a = by("a").unwrap();
     assert_eq!(
-        (a.truth, a.weight, a.source),
-        (Truth::Pass, 0.7, Source::Agent)
+        (a.judgment, a.source.weight(), a.source),
+        (Judgment::Pass, 0.7, Source::Agent)
     );
     let m = by("m").unwrap();
-    assert_eq!((m.weight, m.source), (0.5, Source::Model));
+    assert_eq!((m.source.weight(), m.source), (0.5, Source::Model));
     assert_eq!(m.attribution["hadRole"], "model");
     assert!(
         by("self").is_none(),
@@ -132,15 +126,15 @@ fn labels_weigh_by_who_gave_them_and_skip_other_meanings_and_the_model_itself() 
     assert!(by("old").is_none(), "another meaning version is no label");
     let na = by("na").unwrap();
     assert_eq!(
-        na.truth,
-        Truth::NotApplicable,
+        na.judgment,
+        Judgment::NotApplicable,
         "the selector is graded by it"
     );
     let all = by("zz").unwrap();
-    assert_eq!((all.truth, all.source), (Truth::Fail, Source::Person));
+    assert_eq!((all.judgment, all.source), (Judgment::Fail, Source::Person));
     let b1 = by("b1").unwrap();
-    assert_eq!((b1.truth, b1.source), (Truth::Fail, Source::Tsv));
-    assert_eq!(by("b2").unwrap().truth, Truth::Pass);
+    assert_eq!((b1.judgment, b1.source), (Judgment::Fail, Source::Tsv));
+    assert_eq!(by("b2").unwrap().judgment, Judgment::Pass);
     assert!(by("b3").is_none() && by("b4").is_none());
     assert_eq!(labels.len(), 7);
 }
@@ -164,4 +158,20 @@ fn name_is_what_a_dataset_line_calls_the_source() {
     .map(Source::name)
     .into();
     assert_eq!(names, ["person", "tsv", "agent", "model", "example"]);
+}
+
+#[test]
+fn label_example_is_a_subject_of_the_decision_with_the_outcome_the_check_gave() {
+    let label = Label::example(
+        RULE,
+        "example:core/file-size:fail:1".to_owned(),
+        Judgment::Fail,
+        Outcome::Fail,
+        None,
+    );
+    assert_eq!(
+        (label.judgment, label.source, label.observed),
+        (Judgment::Fail, Source::Example, Some(Outcome::Fail))
+    );
+    assert_eq!(label.attribution["id"], format!("example:{RULE}"));
 }

@@ -5,44 +5,26 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
+use lighthouse_model::{Judgment, ModelRef, Result};
 use lighthouse_plugin::{
     Classifier, CreateFineTuningJobRequest, DATASETS_DIR, DecisionRef, FineTuneMethod,
-    FineTuneSupervisedMethod, FineTuningJob, MODELS_DIR, Subject, artifact_path, fails, request_of,
+    FineTuneSupervisedMethod, FineTuningJob, MODELS_DIR, Subject, fails, request_of,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::{
-    Result,
+    artifact,
     dataset::{self, Row},
-    evaluate::Repo,
     labels::{Label, Source},
-    metrics::Truth,
 };
-
-/// What to train.
-pub struct TrainRequest {
-    pub decision: String,
-    /// The model to train (`<provider>/<model>`); else the decision's bound
-    /// model.
-    pub model: Option<String>,
-    /// A model whose answers on unlabelled subjects are labels too, at the
-    /// weight of a model: a `fail` where it is sure of one, a `pass` where it
-    /// is sure of the other.
-    pub from_model: Option<String>,
-    pub baseline: Option<PathBuf>,
-    /// The repositories the labels are about, as in `eval`; this project when
-    /// empty.
-    pub repos: Vec<Repo>,
-    pub config: Option<PathBuf>,
-}
 
 /// What a training run did.
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Trained {
     pub decision: String,
     pub model: String,
@@ -51,9 +33,7 @@ pub struct Trained {
     pub by_source: BTreeMap<String, usize>,
     /// Labels whose subject no longer exists or is not selected.
     pub unresolved: usize,
-    /// The training file, by content.
-    pub dataset: PathBuf,
-    /// Its digest, `sha256:<hex>`.
+    /// The training file, by content: `sha256:<hex>`.
     pub training_file: String,
     /// The job the trainer gave; `None` when no model that learns is bound.
     pub result: Option<FineTuningJob>,
@@ -61,17 +41,12 @@ pub struct Trained {
     pub card: Option<Value>,
 }
 
-/// What one repository gave to a training run: rows, each with where it came
-/// from.
+/// The rows of a training run, each with where it came from, and the labels
+/// that found no subject.
+#[derive(Default)]
 pub struct Rows {
-    rows: Vec<Sourced>,
+    rows: Vec<Row>,
     unresolved: usize,
-}
-
-/// A row with where it came from.
-struct Sourced {
-    row: Row,
-    source: Source,
 }
 
 impl Rows {
@@ -96,10 +71,22 @@ impl Rows {
         }
         Ok(Self { rows, unresolved })
     }
+
+    /// Adds what another repository gave.
+    pub fn extend(&mut self, more: Self) {
+        self.rows.extend(more.rows);
+        self.unresolved += more.unresolved;
+    }
+
+    /// Writes the dataset of the rows under `root` and gives its digest
+    /// (`sha256:<hex>`).
+    pub fn write(self, root: &Path, decision: &DecisionRef) -> Result<String> {
+        dataset::write(root, decision, self.rows)
+    }
 }
 
 /// Where a training run writes and what it trains.
-pub struct Target<'a> {
+pub struct Fit<'a> {
     /// The project root the dataset is stored under.
     pub root: &'a Path,
     /// The model trained, `<provider>/<model>`.
@@ -109,69 +96,60 @@ pub struct Target<'a> {
     pub model: Option<&'a dyn Classifier>,
 }
 
-/// Writes the dataset of the rows of every repository and asks the model for
-/// a job on it.
-pub fn train(request: &TrainRequest, parts: Vec<Rows>, target: &Target) -> Result<Trained> {
-    let unresolved = parts.iter().map(|p| p.unresolved).sum();
-    let rows: Vec<Sourced> = parts.into_iter().flat_map(|p| p.rows).collect();
+/// Writes the dataset of the rows and asks the model for a job on it.
+pub fn train(rows: Rows, fit: &Fit) -> Result<Trained> {
     let mut by_source = BTreeMap::new();
-    for row in &rows {
+    for row in &rows.rows {
         *by_source.entry(row.source.name().to_owned()).or_insert(0) += 1;
     }
-    let count = rows.len();
-    let written = dataset::write(
-        target.root,
-        target.decision,
-        rows.into_iter().map(|r| r.row).collect(),
-    )?;
-    let reference = target.reference;
-    let result = match target.model.filter(|model| {
-        model
-            .manifest()
-            .capabilities
-            .fine_tuning
-            .is_some_and(|capability| capability.supported)
-    }) {
-        Some(model) => Some(model.train(&job(
-            reference.unwrap_or_default(),
-            &written.digest,
-            target.root,
-            &request.decision,
-        ))?),
+    let (subjects, unresolved) = (rows.rows.len(), rows.unresolved);
+    let training_file = rows.write(fit.root, fit.decision)?;
+    let reference = fit.reference.unwrap_or_default();
+    let result = match fit
+        .model
+        .filter(|model| model.manifest().capabilities.learns())
+    {
+        Some(model) => Some(fine_tune(
+            model,
+            reference,
+            &training_file,
+            fit.root,
+            &fit.decision.id,
+        )?),
         None => None,
     };
-    let card = result.as_ref().and_then(|job| card_of(target.root, job));
+    let card = result.as_ref().and_then(|job| card_of(fit.root, job));
     Ok(Trained {
-        decision: request.decision.clone(),
-        model: reference.unwrap_or_default().to_owned(),
-        subjects: count,
+        decision: fit.decision.id.clone(),
+        model: reference.to_owned(),
+        subjects,
         by_source,
         unresolved,
-        dataset: written.path,
-        training_file: written.digest,
+        training_file,
         result,
         card,
     })
 }
 
-/// Writes the dataset of the rows of every repository and nothing else; gives
-/// its digest (`sha256:<hex>`).
-pub fn write_dataset(parts: Vec<Rows>, root: &Path, decision: &DecisionRef) -> Result<String> {
-    let rows = parts.into_iter().flat_map(|p| p.rows).map(|r| r.row);
-    Ok(dataset::write(root, decision, rows.collect())?.digest)
-}
-
-/// OpenAI's fine-tuning job creation for the dataset: the same dataset for the
-/// same base model is the same job (its seed comes from the digest).
-pub(crate) fn job(
+/// Asks `trainer` for OpenAI's fine-tuning job on the dataset `training_file`:
+/// the same dataset for the same base model is the same job (its seed comes
+/// from the digest).
+pub(crate) fn fine_tune(
+    trainer: &dyn Classifier,
     reference: &str,
     training_file: &str,
     root: &Path,
     decision: &str,
-) -> CreateFineTuningJobRequest {
-    let model = reference.split_once('/').map_or(reference, |(_, m)| m);
-    let seed = u32::from_str_radix(&training_file["sha256:".len()..][..8], 16).unwrap_or(0);
-    CreateFineTuningJobRequest {
+) -> Result<FineTuningJob> {
+    let model = ModelRef::parse(reference).map_or(reference, |parsed| parsed.model);
+    let hex = training_file
+        .strip_prefix("sha256:")
+        .unwrap_or(training_file);
+    let seed = hex
+        .get(..8)
+        .and_then(|prefix| u32::from_str_radix(prefix, 16).ok())
+        .unwrap_or(0);
+    let request = CreateFineTuningJobRequest {
         model: model.to_owned(),
         training_file: training_file.to_owned(),
         validation_file: None,
@@ -193,7 +171,8 @@ pub(crate) fn job(
             ),
         ]),
         options: serde_json::Map::new(),
-    }
+    };
+    Ok(trainer.train(&request)?)
 }
 
 /// Whether a label is a row to learn from. A `notApplicable` label teaches
@@ -201,35 +180,24 @@ pub(crate) fn job(
 /// distribution of the labels (every invalid one is a positive): examples
 /// already ride in each line's question.
 fn teaches(label: &Label) -> bool {
-    label.truth != Truth::NotApplicable && label.source != Source::Example
+    label.judgment != Judgment::NotApplicable && label.source != Source::Example
 }
 
 /// The labels with a subject to learn from, as rows, and the keys they cover.
-fn rows_of(
-    labels: &[Label],
-    observed: &BTreeMap<String, Subject>,
-) -> (Vec<Sourced>, BTreeSet<String>) {
+fn rows_of(labels: &[Label], observed: &BTreeMap<String, Subject>) -> (Vec<Row>, BTreeSet<String>) {
     let mut rows = Vec::new();
     let mut seen = BTreeSet::new();
     for label in labels.iter().filter(|l| teaches(l)) {
-        let fail = match label.truth {
-            Truth::Fail => true,
-            Truth::Pass => false,
-            Truth::NotApplicable => continue,
-        };
         let Some(subject) = label.subject.as_ref().or_else(|| observed.get(&label.key)) else {
             continue;
         };
         seen.insert(label.key.clone());
-        rows.push(Sourced {
-            row: Row {
-                subject: subject.clone(),
-                fail,
-                weight: label.weight,
-                key: label.key.clone(),
-                attribution: label.attribution.clone(),
-            },
+        rows.push(Row {
+            subject: subject.clone(),
+            fail: label.judgment == Judgment::Fail,
             source: label.source,
+            key: label.key.clone(),
+            attribution: label.attribution.clone(),
         });
     }
     (rows, seen)
@@ -242,7 +210,7 @@ fn taught(
     teacher: &dyn Classifier,
     decision: &DecisionRef,
     unlabelled: Vec<(String, Subject)>,
-) -> Result<Vec<Sourced>> {
+) -> Result<Vec<Row>> {
     let attribution = json!({"type": "SoftwareAgent", "hadRole": "model"});
     let mut labelled = Vec::new();
     for (key, subject) in unlabelled {
@@ -257,25 +225,19 @@ fn taught(
         } else {
             continue;
         };
-        labelled.push(Sourced {
-            row: Row {
-                subject,
-                fail,
-                weight: Source::Model.weight(),
-                key,
-                attribution: attribution.clone(),
-            },
+        labelled.push(Row {
+            subject,
+            fail,
             source: Source::Model,
+            key,
+            attribution: attribution.clone(),
         });
     }
     Ok(labelled)
 }
 
-/// The card of the artifact the job's first result file names, when that is
-/// a `sha256:<hex>` document of the store.
+/// The card of the artifact the job made, when it is in the store.
 fn card_of(root: &Path, job: &FineTuningJob) -> Option<Value> {
-    let hex = job.result_files.first()?.strip_prefix("sha256:")?;
-    let path = artifact_path(&root.join(MODELS_DIR), hex);
-    let artifact: Value = serde_json::from_str(&fs::read_to_string(path).ok()?).ok()?;
-    artifact.get("card").cloned()
+    let document = artifact::read(root, artifact::made(job)?).ok()??;
+    document.get("card").cloned()
 }

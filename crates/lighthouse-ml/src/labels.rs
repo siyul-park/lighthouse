@@ -9,18 +9,15 @@
 
 use std::{collections::BTreeMap, fs, path::Path};
 
-use lighthouse_model::{AgentKind, Attribution, Judgment, Role};
+use lighthouse_model::{AgentKind, Attribution, Judgment, Result, Role};
 use lighthouse_plugin::Subject;
 use lighthouse_spec::Decision;
 use serde_json::{Value, json};
 
-use crate::{
-    Result,
-    metrics::{Outcome, Truth},
-};
+use crate::metrics::Outcome;
 
 /// Who gave a label, strongest first.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Source {
     /// A person, by a judgment.
     Person,
@@ -84,8 +81,7 @@ pub struct Label {
     /// The subject's fingerprint; for an example, its own key.
     pub key: String,
     /// What the label says; `NotApplicable` is about the selector.
-    pub truth: Truth,
-    pub weight: f64,
+    pub judgment: Judgment,
     pub source: Source,
     /// PROV `wasAttributedTo` of the label.
     pub attribution: Value,
@@ -95,55 +91,102 @@ pub struct Label {
     pub subject: Option<Subject>,
 }
 
-/// Where baseline rows come from: a table of reviewed findings.
-pub struct Baseline<'a> {
+impl Label {
+    /// A subject an example of `decision` shows: its key is
+    /// `example:<decision>:<example>:<line>` for a `fail` and
+    /// `example:<decision>:<example>:<fingerprint>` for a `pass`. `outcome` is
+    /// how the check came out on it and `subject` what a model is asked, when
+    /// a rule put it to one.
+    pub fn example(
+        decision: &str,
+        key: String,
+        judgment: Judgment,
+        outcome: Outcome,
+        subject: Option<Subject>,
+    ) -> Self {
+        Self {
+            key,
+            judgment,
+            source: Source::Example,
+            attribution: json!({"type": "Person", "id": format!("example:{decision}")}),
+            observed: Some(outcome),
+            subject,
+        }
+    }
+}
+
+/// A table of reviewed findings: `TP` is a `fail`, `FP` a `pass`, anything
+/// else (`unclear`) says nothing. Rows without a fingerprint (`-`) cannot be
+/// found again and are left out. A hand review is a person's.
+pub struct Table<'a> {
     pub file: &'a Path,
     /// Only the rows of this repository; every row when `None`.
     pub repo: Option<&'a str>,
 }
 
-/// One subject an example shows.
-pub struct Shown {
-    /// `example:<decision>:<example>:<line>` for a `fail`, and
-    /// `example:<decision>:<example>:<fingerprint>` for a `pass`.
-    pub key: String,
-    pub truth: Truth,
-    /// How the check came out on it.
-    pub outcome: Outcome,
-    /// What a model is asked about it, when a rule put it to one.
-    pub subject: Option<Subject>,
+impl Table<'_> {
+    fn rows(&self) -> Result<Vec<Label>> {
+        let text =
+            fs::read_to_string(self.file).map_err(|e| format!("{}: {e}", self.file.display()))?;
+        let attribution = json!({"type": "Person", "id": self.file.display().to_string()});
+        let mut rows = Vec::new();
+        for line in text.lines().filter(|l| !l.starts_with('#')) {
+            let cells: Vec<&str> = line.split('\t').collect();
+            let [fingerprint, repo, _, verdict, ..] = cells[..] else {
+                continue;
+            };
+            let judgment = match verdict {
+                "TP" => Judgment::Fail,
+                "FP" => Judgment::Pass,
+                _ => continue,
+            };
+            if fingerprint == "-"
+                || fingerprint == "fingerprint"
+                || self.repo.is_some_and(|wanted| wanted != repo)
+            {
+                continue;
+            }
+            rows.push(Label {
+                key: fingerprint.to_owned(),
+                judgment,
+                source: Source::Tsv,
+                attribution: attribution.clone(),
+                observed: None,
+                subject: None,
+            });
+        }
+        Ok(rows)
+    }
 }
 
-/// A judgment on a subject, as the store records it.
+/// A judgment on a subject of the decision, as the store records it.
 pub struct Judged {
     pub fingerprint: String,
-    /// The name the decision had when the judgment was given.
-    pub decision_name: String,
-    pub decision_uid: Option<String>,
     pub meaning_version: Option<String>,
     pub judgment: Judgment,
     pub by: Attribution,
 }
 
 /// What to collect the labels of.
-pub struct Collect<'a> {
-    /// The judgments of the project, of every decision.
+pub struct Labels<'a> {
+    /// The judgments given on the decision's subjects.
     pub judgments: Vec<Judged>,
     pub decision: &'a Decision,
-    pub baseline: Option<&'a Baseline<'a>>,
+    pub table: Option<&'a Table<'a>>,
     /// `<provider>/<model>`, any version: its own labels are left out.
     pub exclude_model: Option<&'a str>,
     /// The subjects the examples show, checked by the caller; none when the
     /// examples are not subjects.
-    pub examples: Vec<Shown>,
+    pub examples: Vec<Label>,
 }
 
-impl Collect<'_> {
+impl Labels<'_> {
     /// The labels of the decision: its judgments under the current meaning
-    /// version, the rows of the baseline table, and its examples.
-    pub fn labels(mut self) -> Result<Vec<Label>> {
+    /// version, the rows of the table, and its examples.
+    pub fn collect(self) -> Result<Vec<Label>> {
         let mut best: BTreeMap<String, Label> = BTreeMap::new();
-        for label in self.judged()?.into_iter().chain(self.tabled()?) {
+        let tabled = self.table.map_or_else(|| Ok(Vec::new()), Table::rows)?;
+        for label in self.judged()?.into_iter().chain(tabled) {
             let stronger = best
                 .get(&label.key)
                 .is_none_or(|have| label.source.rank() <= have.source.rank());
@@ -152,102 +195,33 @@ impl Collect<'_> {
             }
         }
         let mut labels: Vec<Label> = best.into_values().collect();
-        labels.extend(self.examples());
+        labels.extend(self.examples);
         Ok(labels)
     }
 
     fn judged(&self) -> Result<Vec<Label>> {
-        let decision = self.decision;
-        let meaning = decision.meaning_version();
+        let meaning = self.decision.meaning_version();
         let mut labels = Vec::new();
         for event in &self.judgments {
-            let ours = event.decision_uid.as_deref() == decision.uid() && decision.uid().is_some()
-                || event.decision_name == decision.id();
-            if !ours || event.meaning_version.as_deref() != Some(meaning.as_str()) {
+            if event.meaning_version.as_deref() != Some(meaning.as_str()) {
                 continue;
             }
-            let truth = match event.judgment {
-                Judgment::Fail => Truth::Fail,
-                Judgment::Pass => Truth::Pass,
-                Judgment::NotApplicable => Truth::NotApplicable,
-            };
-            let attributed = &event.by;
-            let id = attributed.id.as_deref().unwrap_or_default();
+            let id = event.by.id.as_deref().unwrap_or_default();
             if self
                 .exclude_model
                 .is_some_and(|model| id.split('@').next() == Some(model))
             {
                 continue;
             }
-            let source = Source::from(attributed);
             labels.push(Label {
                 key: event.fingerprint.clone(),
-                truth,
-                weight: source.weight(),
-                source,
-                attribution: serde_json::to_value(attributed)?,
+                judgment: event.judgment,
+                source: Source::from(&event.by),
+                attribution: serde_json::to_value(&event.by)?,
                 observed: None,
                 subject: None,
             });
         }
         Ok(labels)
     }
-
-    fn tabled(&self) -> Result<Vec<Label>> {
-        self.baseline.map_or_else(|| Ok(Vec::new()), baseline_rows)
-    }
-
-    fn examples(&mut self) -> Vec<Label> {
-        let attribution =
-            json!({"type": "Person", "id": format!("example:{}", self.decision.id())});
-        std::mem::take(&mut self.examples)
-            .into_iter()
-            .map(|s| Label {
-                key: s.key,
-                truth: s.truth,
-                weight: Source::Example.weight(),
-                source: Source::Example,
-                attribution: attribution.clone(),
-                observed: Some(s.outcome),
-                subject: s.subject,
-            })
-            .collect()
-    }
-}
-
-/// The reviewed rows of a baseline table: `TP` is a `fail`, `FP` a `pass`,
-/// anything else (`unclear`) says nothing. Rows without a fingerprint (`-`)
-/// cannot be found again and are left out. A hand review is a person's.
-fn baseline_rows(baseline: &Baseline) -> Result<Vec<Label>> {
-    let text = fs::read_to_string(baseline.file)
-        .map_err(|e| format!("{}: {e}", baseline.file.display()))?;
-    let attribution = json!({"type": "Person", "id": baseline.file.display().to_string()});
-    let mut rows = Vec::new();
-    for line in text.lines().filter(|l| !l.starts_with('#')) {
-        let cells: Vec<&str> = line.split('\t').collect();
-        let [fingerprint, repo, _, verdict, ..] = cells[..] else {
-            continue;
-        };
-        let truth = match verdict {
-            "TP" => Truth::Fail,
-            "FP" => Truth::Pass,
-            _ => continue,
-        };
-        if fingerprint == "-"
-            || fingerprint == "fingerprint"
-            || baseline.repo.is_some_and(|wanted| wanted != repo)
-        {
-            continue;
-        }
-        rows.push(Label {
-            key: fingerprint.to_owned(),
-            truth,
-            weight: Source::Tsv.weight(),
-            source: Source::Tsv,
-            attribution: attribution.clone(),
-            observed: None,
-            subject: None,
-        });
-    }
-    Ok(rows)
 }

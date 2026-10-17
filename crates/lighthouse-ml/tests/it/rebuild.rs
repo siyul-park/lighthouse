@@ -2,12 +2,10 @@ use std::{collections::BTreeMap, fs, path::Path};
 
 use lighthouse_ml::{
     labels::{Label, Source},
-    metrics::Truth,
-    rebuild::{
-        Artifact, Learned, Refit, Status, artifact, has_dataset, learned, refit, unrebuildable,
-    },
-    train::{Rows, write_dataset},
+    rebuild::{Learned, Status, unrebuildable},
+    train::Rows,
 };
+use lighthouse_model::Judgment;
 use lighthouse_plugin::{DecisionRef, Subject};
 use lighthouse_protocol::{canonical, hash::sha256};
 use lighthouse_spec::Catalog;
@@ -33,8 +31,7 @@ fn dataset(root: &Path, texts: &[&str]) -> String {
         .iter()
         .map(|text| Label {
             key: (*text).to_owned(),
-            truth: Truth::Fail,
-            weight: 1.0,
+            judgment: Judgment::Fail,
             source: Source::Person,
             attribution: json!({"type": "Person"}),
             observed: None,
@@ -42,51 +39,45 @@ fn dataset(root: &Path, texts: &[&str]) -> String {
         })
         .collect();
     let rows = Rows::of(&labels, &observed, None, &decision()).unwrap();
-    write_dataset(vec![rows], root, &decision()).unwrap()
+    rows.write(root, &decision()).unwrap()
 }
 
 #[test]
 fn learned_names_the_trainer_and_the_digest_of_a_model_that_is_a_file() {
-    let model = learned("local/learned@sha256:abc").unwrap();
+    let model = Learned::parse("local/learned@sha256:abc").unwrap();
 
     assert_eq!(model.trainer, "local/learned");
     assert_eq!(model.hex, "abc");
-    assert!(learned("openai/gpt-5").is_none());
-    assert!(learned("local/learned@v2").is_none());
+    assert!(Learned::parse("openai/gpt-5").is_none());
+    assert!(Learned::parse("local/learned@v2").is_none());
 }
 
 #[test]
-fn artifact_is_present_when_its_content_has_the_digest_in_its_name() {
+fn check_finds_the_artifact_present_when_its_content_has_the_digest_in_its_name() {
     let dir = tempfile::tempdir().unwrap();
     let document = json!({"card": {}, "seen": ["a"]});
     let hex = sha256(canonical(&document));
-    assert_eq!(artifact(dir.path(), &hex).unwrap(), Artifact::Missing);
+    let reference = format!("fake/m@sha256:{hex}");
+    let model = Learned::parse(&reference).unwrap();
+    assert_eq!(model.check(dir.path()).unwrap(), None);
 
     let store = dir.path().join(".lighthouse/models/sha256");
     fs::create_dir_all(&store).unwrap();
     fs::write(store.join(format!("{hex}.json")), canonical(&document)).unwrap();
-    assert_eq!(artifact(dir.path(), &hex).unwrap(), Artifact::Present);
+    assert_eq!(
+        model.check(dir.path()).unwrap(),
+        Some((Status::Present, None))
+    );
 
     let other = json!({"card": {}, "seen": ["b"]});
     fs::write(store.join(format!("{hex}.json")), canonical(&other)).unwrap();
-    let found = artifact(dir.path(), &hex).unwrap();
-    assert_eq!(found, Artifact::Differs(sha256(canonical(&other))));
+    let (status, note) = model.check(dir.path()).unwrap().unwrap();
+    assert_eq!(status, Status::Differs);
+    assert!(note.unwrap().contains(&sha256(canonical(&other))));
 }
 
 #[test]
-fn has_dataset_looks_for_the_digest_in_the_store() {
-    let dir = tempfile::tempdir().unwrap();
-    let digest = dataset(dir.path(), &["a", "b"]);
-
-    assert!(has_dataset(dir.path(), &digest));
-    assert!(!has_dataset(
-        dir.path(),
-        &format!("sha256:{}", "0".repeat(64))
-    ));
-}
-
-#[test]
-fn write_dataset_gives_the_same_digest_for_the_same_rows() {
+fn rows_write_the_same_digest_for_the_same_rows() {
     let dir = tempfile::tempdir().unwrap();
 
     let first = dataset(dir.path(), &["a", "b"]);
@@ -111,25 +102,16 @@ fn a_trainer_must_learn_and_make_the_same_model_to_make_it_again() {
 }
 
 #[test]
-fn refit_makes_the_model_again_only_when_the_digest_is_the_one_named() {
+fn rebuild_makes_the_model_again_only_when_the_digest_is_the_one_named() {
     let dir = tempfile::tempdir().unwrap();
     let digest = dataset(dir.path(), &["a", "b"]);
     let trainer = Memorizer(manifest(true));
     let request = |hex: &str| {
-        let model = Learned {
-            trainer: "fake/m",
-            hex,
-        };
-        refit(
-            &trainer,
-            &Refit {
-                root: dir.path(),
-                decision: RULE,
-                model: &model,
-                dataset: &digest,
-            },
-        )
-        .unwrap()
+        let reference = format!("fake/m@sha256:{hex}");
+        Learned::parse(&reference)
+            .unwrap()
+            .rebuild(&trainer, dir.path(), RULE, &digest, || Ok(digest.clone()))
+            .unwrap()
     };
 
     let (status, detail) = request(&"0".repeat(64));
@@ -141,6 +123,27 @@ fn refit_makes_the_model_again_only_when_the_digest_is_the_one_named() {
         .unwrap();
 
     assert_eq!(request(made), (Status::Rebuilt, None));
+}
+
+#[test]
+fn rebuild_says_when_the_labels_changed_since_the_dataset_was_attached() {
+    let dir = tempfile::tempdir().unwrap();
+    let attached = format!("sha256:{}", "0".repeat(64));
+    let today = dataset(dir.path(), &["a"]);
+    let reference = format!("fake/m@sha256:{}", "1".repeat(64));
+    let (status, detail) = Learned::parse(&reference)
+        .unwrap()
+        .rebuild(
+            &Memorizer(manifest(true)),
+            dir.path(),
+            RULE,
+            &attached,
+            || Ok(today.clone()),
+        )
+        .unwrap();
+
+    assert_eq!(status, Status::LabelsChanged);
+    assert!(detail.unwrap().contains("labels changed since attach"));
 }
 
 #[test]

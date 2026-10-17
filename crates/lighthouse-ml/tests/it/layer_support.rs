@@ -8,12 +8,11 @@ use std::{
 
 use lighthouse_engine::Run;
 use lighthouse_ml::{
-    Result,
-    evaluate::{EvalRequest, Found, Gathered, Layer, Layered, Repo, grade},
+    evaluate::{EvalReport, Found, Overlaid, Overlay, grade},
     labels::{Label, Source},
-    metrics::{Outcome, Truth},
+    metrics::Outcome,
 };
-use lighthouse_model::{Diagnostic, Fingerprint, Position, Severity, Span};
+use lighthouse_model::{Diagnostic, Fingerprint, Judgment, Position, Result, Severity, Span};
 use lighthouse_plugin::{
     Answer, Capabilities, Classifier, CreateFineTuningJobRequest, DecisionRef, Error,
     FineTuningJob, FineTuningJobStatus, Model, State, Subject, Supports, SystemOneRequest,
@@ -208,14 +207,13 @@ pub fn subject(file: &str, text: &str) -> Subject {
 
 pub fn label(
     key: &str,
-    truth: Truth,
+    judgment: Judgment,
     observed: Option<Outcome>,
     subject: Option<Subject>,
 ) -> Label {
     Label {
         key: key.to_owned(),
-        truth,
-        weight: 1.0,
+        judgment,
         source: Source::Person,
         attribution: json!({"type": "Person", "id": "p"}),
         observed,
@@ -252,25 +250,6 @@ pub fn base(reviews: &[(&str, &str, &str)]) -> Found {
     })
 }
 
-pub fn request() -> EvalRequest {
-    EvalRequest {
-        decision: RULE.to_owned(),
-        repos: Vec::new(),
-        baseline: None,
-        candidate: None,
-        model: None,
-        config: None,
-        audit: None,
-    }
-}
-
-pub fn repo() -> Repo {
-    Repo {
-        name: None,
-        dir: PathBuf::from("."),
-    }
-}
-
 pub fn policy() -> Evaluation {
     Evaluation {
         precision: 0.9,
@@ -278,17 +257,9 @@ pub fn policy() -> Evaluation {
     }
 }
 
-pub fn report(labels: &[Label], layered: &Layered) -> lighthouse_ml::evaluate::EvalReport {
-    let mut gathered = Gathered::default();
-    gathered.add(grade(
-        &request(),
-        &repo(),
-        policy(),
-        labels,
-        &layered.found,
-        None,
-    ));
-    gathered.finish(&request(), false).unwrap()
+pub fn report(labels: &[Label], overlaid: &Overlaid) -> EvalReport {
+    let result = grade(RULE, None, None, policy(), labels, &overlaid.found, None);
+    EvalReport::pool(vec![result]).unwrap()
 }
 
 pub fn over<'a>(
@@ -296,8 +267,8 @@ pub fn over<'a>(
     root: &'a Path,
     decision: &'a DecisionRef,
     models: &'a dyn Fn(&str) -> Result<Box<dyn Classifier + 'a>>,
-) -> Layer<'a> {
-    Layer {
+) -> Overlay<'a> {
+    Overlay {
         model,
         decision,
         root,

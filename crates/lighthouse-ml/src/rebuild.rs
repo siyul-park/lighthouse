@@ -4,14 +4,15 @@
 //! named by its digest and made by a deterministic trainer, so the same
 //! dataset makes the same file.
 
-use std::{fs, path::Path};
+use std::path::Path;
 
-use lighthouse_plugin::{Classifier, FineTuningJobStatus, MODELS_DIR, artifact_path};
+use lighthouse_model::Result;
+use lighthouse_plugin::{Classifier, FineTuningJobStatus};
 use lighthouse_protocol::hash::digest;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{Result, dataset, train::job};
+use crate::{artifact, dataset, train::fine_tune};
 
 /// How a rebuild went for one attached model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -39,106 +40,107 @@ impl Status {
 }
 
 /// A model that is a file: `<provider>/<model>@sha256:<hex>`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Learned<'a> {
+    /// The whole reference.
+    pub model: &'a str,
     /// `<provider>/<model>`, which trains it.
     pub trainer: &'a str,
     /// The digest of the artifact, without the `sha256:`.
     pub hex: &'a str,
 }
 
-/// What the store holds for the digest of a model.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Artifact {
-    /// A file whose canonical form has the digest in its name.
-    Present,
-    /// A file under that name whose canonical form has another digest.
-    Differs(String),
-    Missing,
-}
+impl<'a> Learned<'a> {
+    /// The parts of a model reference that name a file, when it is one.
+    pub fn parse(model: &'a str) -> Option<Self> {
+        let (trainer, digest) = model.split_once('@')?;
+        let hex = digest.strip_prefix("sha256:")?;
+        Some(Self {
+            model,
+            trainer,
+            hex,
+        })
+    }
 
-/// What to train again.
-pub struct Refit<'a> {
-    pub root: &'a Path,
-    pub decision: &'a str,
-    pub model: &'a Learned<'a>,
-    /// The dataset the model learned from (`sha256:<hex>`), in the store.
-    pub dataset: &'a str,
-}
+    /// The dataset (`sha256:<hex>`) the card of the artifact names as the file
+    /// it was trained on; none for a model without an artifact here.
+    pub(crate) fn dataset(&self, root: &Path) -> Result<Option<String>> {
+        let document = artifact::read(root, self.hex)?;
+        Ok(document
+            .as_ref()
+            .and_then(|document| document.pointer("/card/trainingFile"))
+            .and_then(Value::as_str)
+            .map(str::to_owned))
+    }
 
-/// The parts of a model reference that name a file, when it is one.
-pub fn learned(model: &str) -> Option<Learned<'_>> {
-    let (trainer, digest) = model.split_once('@')?;
-    let hex = digest.strip_prefix("sha256:")?;
-    Some(Learned { trainer, hex })
-}
+    /// What the model store of `root` holds for the model: `Present` when the
+    /// file's canonical form has the digest in its name, `Differs` when it has
+    /// another, and `None` when the file is not there.
+    pub fn check(&self, root: &Path) -> Result<Option<(Status, Option<String>)>> {
+        let Some(document) = artifact::read(root, self.hex)? else {
+            return Ok(None);
+        };
+        let actual = digest(&document);
+        Ok(Some(if actual == self.hex {
+            (Status::Present, None)
+        } else {
+            let note = format!("the file holds sha256:{actual}, not sha256:{}", self.hex);
+            (Status::Differs, Some(note))
+        }))
+    }
 
-/// What the model store of `root` holds for `hex`.
-pub fn artifact(root: &Path, hex: &str) -> Result<Artifact> {
-    let path = artifact_path(&root.join(MODELS_DIR), hex);
-    let Ok(text) = fs::read_to_string(&path) else {
-        return Ok(Artifact::Missing);
-    };
-    let document: Value =
-        serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
-    let actual = digest(&document);
-    Ok(if actual == hex {
-        Artifact::Present
-    } else {
-        Artifact::Differs(actual)
-    })
-}
-
-/// Whether the dataset store of `root` holds `digest` (`sha256:<hex>`).
-pub fn has_dataset(root: &Path, digest: &str) -> bool {
-    dataset::path_of(root, digest).is_file()
+    /// Trains the model again on the dataset it was attached with: the one in
+    /// the store, else the one `today` makes when it makes the same. Says
+    /// whether it is the same model, with what to tell about it.
+    pub fn rebuild(
+        &self,
+        trainer: &dyn Classifier,
+        root: &Path,
+        decision: &str,
+        attached: &str,
+        today: impl FnOnce() -> Result<String>,
+    ) -> Result<(Status, Option<String>)> {
+        if let Some(why) = unrebuildable(trainer) {
+            return Ok((Status::NotRebuildable, Some(why)));
+        }
+        if !dataset::path_of(root, attached).is_file() {
+            let made = today()?;
+            if made != attached {
+                let note = format!(
+                    "labels changed since attach (dataset {made}, attached from {attached}); train and attach again"
+                );
+                return Ok((Status::LabelsChanged, Some(note)));
+            }
+        }
+        let done = fine_tune(trainer, self.trainer, attached, root, decision)?;
+        if done.status != FineTuningJobStatus::Succeeded {
+            let why = done
+                .error
+                .map_or_else(String::new, |e| format!(": {}", e.message));
+            return Ok((
+                Status::NotRebuildable,
+                Some(format!("training failed{why}")),
+            ));
+        }
+        let made = artifact::made(&done).unwrap_or_default();
+        if made == self.hex {
+            return Ok((Status::Rebuilt, None));
+        }
+        Ok((
+            Status::Differs,
+            Some(format!(
+                "training made sha256:{made}; the trainer or its weights changed since attach"
+            )),
+        ))
+    }
 }
 
 /// Why `trainer` cannot make a model again, when it cannot: it must learn, and
 /// must make the same model from the same dataset.
 pub fn unrebuildable(trainer: &dyn Classifier) -> Option<String> {
     let manifest = trainer.manifest();
-    let learns = manifest
-        .capabilities
-        .fine_tuning
-        .is_some_and(|capability| capability.supported);
-    if !learns {
+    if !manifest.capabilities.learns() {
         return Some("its trainer does not learn".to_owned());
     }
     (!manifest.deterministic).then(|| "its trainer is not deterministic".to_owned())
-}
-
-/// Trains the model again on its dataset and says whether it is the same
-/// model, with what to tell about it.
-pub fn refit(trainer: &dyn Classifier, request: &Refit) -> Result<(Status, Option<String>)> {
-    let model = request.model;
-    let done = trainer.train(&job(
-        model.trainer,
-        request.dataset,
-        request.root,
-        request.decision,
-    ))?;
-    if done.status != FineTuningJobStatus::Succeeded {
-        let why = done
-            .error
-            .map_or_else(String::new, |e| format!(": {}", e.message));
-        return Ok((
-            Status::NotRebuildable,
-            Some(format!("training failed{why}")),
-        ));
-    }
-    let made = done
-        .result_files
-        .first()
-        .and_then(|file| file.strip_prefix("sha256:"))
-        .unwrap_or_default();
-    if made == model.hex {
-        return Ok((Status::Rebuilt, None));
-    }
-    Ok((
-        Status::Differs,
-        Some(format!(
-            "training made sha256:{made}; the trainer or its weights changed since attach"
-        )),
-    ))
 }

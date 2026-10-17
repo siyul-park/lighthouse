@@ -3,23 +3,21 @@
 
 use lighthouse_ml::{
     attach::{attachable, evidence},
-    evaluate::{EvalReport, LayerInfo, Side},
-    metrics::{Outcome, Truth, evaluate},
+    evaluate::{EvalReport, Layer, Side, Usage},
+    metrics::{Metrics, Outcome},
 };
+use lighthouse_model::Judgment;
 use lighthouse_spec::Evaluation;
 
-type Pairs = [(Truth, Outcome)];
+type Pairs = [(Judgment, Outcome)];
 
-const FAIL: Truth = Truth::Fail;
+const FAIL: Judgment = Judgment::Fail;
 
 fn side(pairs: &Pairs) -> Side {
     Side {
         check: "local/rule".to_owned(),
-        metrics: evaluate(pairs, &[]),
-        model_decided: 0,
-        reviews: 0,
-        calls: 0,
-        cost: 0.0,
+        metrics: Metrics::of(pairs, &[]),
+        usage: Usage::default(),
         scores: Vec::new(),
         notices: Vec::new(),
         layer: None,
@@ -39,7 +37,6 @@ fn allowed() -> EvalReport {
         meets_policy: Some(true),
         decided: 1,
         regressions: Vec::new(),
-        caveat: "",
         audit: None,
         proposal: None,
     }
@@ -54,7 +51,10 @@ fn a_model_that_meets_the_policy_and_loses_nothing_may_be_attached() {
 fn a_model_that_misses_the_policy_is_refused_with_the_shortfall() {
     let report = EvalReport {
         meets_policy: Some(false),
-        candidate: Some(side(&[(Truth::Pass, Outcome::Fail), (FAIL, Outcome::Fail)])),
+        candidate: Some(side(&[
+            (Judgment::Pass, Outcome::Fail),
+            (FAIL, Outcome::Fail),
+        ])),
         ..allowed()
     };
     let reasons = attachable(&report);
@@ -116,7 +116,7 @@ fn every_reason_is_given_at_once() {
     let report = EvalReport {
         meets_policy: Some(false),
         candidate: Some(side(&[
-            (Truth::Pass, Outcome::Fail),
+            (Judgment::Pass, Outcome::Fail),
             (FAIL, Outcome::Review),
         ])),
         regressions: vec!["fp1".to_owned()],
@@ -140,23 +140,16 @@ fn an_evaluation_that_graded_no_model_allows_nothing() {
 
 #[test]
 fn the_evidence_is_the_numbers_of_the_model_and_the_dataset_it_learned_from() {
-    let root = tempfile::tempdir().unwrap();
     let model = "fake/learned@sha256:abc";
-    let artifacts = root.path().join(".lighthouse/models/sha256");
-    std::fs::create_dir_all(&artifacts).unwrap();
-    std::fs::write(
-        artifacts.join("abc.json"),
-        r#"{"card": {"trainingFile": "sha256:def"}}"#,
-    )
-    .unwrap();
     let mut report = allowed();
-    report.candidate.as_mut().unwrap().layer = Some(LayerInfo {
+    report.candidate.as_mut().unwrap().layer = Some(Layer {
         model: model.to_owned(),
         cross_fitted: 2,
         refits: Vec::new(),
+        training_file: Some("sha256:def".to_owned()),
     });
 
-    let value = evidence(&report, model, root.path()).unwrap();
+    let value = evidence(&report).unwrap();
     assert_eq!(value["labelled"], 2);
     assert_eq!(value["policy"]["precision"], 0.9);
     assert_eq!(value["precision"]["hits"], 2);
@@ -165,6 +158,7 @@ fn the_evidence_is_the_numbers_of_the_model_and_the_dataset_it_learned_from() {
     assert_eq!(value["crossFitted"], 2);
     assert_eq!(value["trainingFile"], "sha256:def");
 
-    let alone = evidence(&report, "fake/other", root.path()).unwrap();
+    report.candidate.as_mut().unwrap().layer = None;
+    let alone = evidence(&report).unwrap();
     assert_eq!(alone["trainingFile"], serde_json::Value::Null);
 }

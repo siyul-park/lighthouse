@@ -10,31 +10,23 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lighthouse_model::Result;
 use lighthouse_plugin::{
     DATASETS_DIR, DecisionRef, LineKeys, Question, Subject, TrainingLine, dataset_path,
 };
 use lighthouse_protocol::{canonical, hash::sha256};
 use serde_json::Value;
 
-use crate::Result;
+use crate::labels::Source;
 
 /// A labelled subject, ready to be a line.
 pub(crate) struct Row {
     pub(crate) subject: Subject,
     /// Whether the subject fails the decision.
     pub(crate) fail: bool,
-    pub(crate) weight: f64,
+    pub(crate) source: Source,
     pub(crate) key: String,
     pub(crate) attribution: Value,
-}
-
-/// A written dataset.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Dataset {
-    /// `sha256:<hex>`: what a fine-tuning request calls its `training_file`.
-    pub digest: String,
-    pub path: PathBuf,
-    pub lines: usize,
 }
 
 /// A line of a stored dataset: what the cross-fit needs to place it, and its
@@ -46,8 +38,8 @@ pub(crate) struct Line {
 }
 
 /// Writes the lines of `rows` for `decision`, ordered by key, and gives the
-/// dataset.
-pub(crate) fn write(root: &Path, decision: &DecisionRef, mut rows: Vec<Row>) -> Result<Dataset> {
+/// digest of the dataset.
+pub(crate) fn write(root: &Path, decision: &DecisionRef, mut rows: Vec<Row>) -> Result<String> {
     rows.sort_by(|a, b| a.key.cmp(&b.key));
     let question = Question::new(decision);
     let mut lines = Vec::new();
@@ -62,7 +54,7 @@ pub(crate) fn write(root: &Path, decision: &DecisionRef, mut rows: Vec<Row>) -> 
             &row.subject.state,
             row.fail,
             LineKeys {
-                weight: row.weight,
+                weight: row.source.weight(),
                 group,
                 decision: &decision.id,
                 key: &row.key,
@@ -74,9 +66,9 @@ pub(crate) fn write(root: &Path, decision: &DecisionRef, mut rows: Vec<Row>) -> 
     write_lines(root, &lines)
 }
 
-/// Writes canonical `lines` as a dataset: the one place a training file is
-/// made, so that equal lines are one file.
-pub(crate) fn write_lines(root: &Path, lines: &[String]) -> Result<Dataset> {
+/// Writes canonical `lines` as a dataset and gives its digest: the one place a
+/// training file is made, so that equal lines are one file.
+pub(crate) fn write_lines(root: &Path, lines: &[String]) -> Result<String> {
     let text: String = lines.iter().map(|line| format!("{line}\n")).collect();
     let hex = sha256(&text);
     let path = dataset_path(&root.join(DATASETS_DIR), &hex);
@@ -84,11 +76,7 @@ pub(crate) fn write_lines(root: &Path, lines: &[String]) -> Result<Dataset> {
         fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
     fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
-    Ok(Dataset {
-        digest: format!("sha256:{hex}"),
-        path,
-        lines: lines.len(),
-    })
+    Ok(format!("sha256:{hex}"))
 }
 
 /// The path of the dataset `digest` (`sha256:<hex>`) names.
