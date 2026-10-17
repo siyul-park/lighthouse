@@ -11,7 +11,7 @@ use lighthouse_plugin::{FixDecision, FixRequest, Fixer};
 use serde_json::Value;
 
 use super::{
-    DeclinedFix, FixBinding, FixPlan, FixRun, MODEL_FIXER,
+    DeclinedFix, FixBinding, FixPlan, FixRun, FixedBy,
     edits::{TextEdit, self_overlap},
     lower::{Lowerer, Sources},
     model::{Event, ModelFixer},
@@ -28,7 +28,7 @@ pub(super) struct Proposal {
     /// Where the finding is, for reports.
     pub(super) file: PathBuf,
     pub(super) line: u32,
-    pub(super) fixer: String,
+    pub(super) fixer: FixedBy,
     pub(super) description: String,
     pub(super) safety: Safety,
     pub(super) edits: Vec<TextEdit>,
@@ -107,7 +107,7 @@ impl<'e> Proposer<'e> {
         };
         for finding in self.select(outcome)? {
             let binding = self.binding(&finding.rule_id);
-            let model = binding.as_ref().is_some_and(|b| b.fixer == MODEL_FIXER);
+            let model = binding.as_ref().is_some_and(|b| b.fixer == FixedBy::Model);
             if model != (phase == Phase::Models) {
                 continue;
             }
@@ -124,7 +124,12 @@ impl<'e> Proposer<'e> {
                 continue;
             }
             if model && self.models.is_none() {
-                if !self.plan.models[&finding.rule_id].implicit() {
+                if !self
+                    .plan
+                    .models
+                    .get(&finding.rule_id)
+                    .is_some_and(|m| m.implicit())
+                {
                     decline(finding, NO_MODEL.to_owned());
                 }
                 continue;
@@ -196,7 +201,7 @@ impl<'e> Proposer<'e> {
     fn binding(&self, rule: &str) -> Option<FixBinding> {
         match &self.run.fixer {
             Some(fixer) => Some(FixBinding {
-                fixer: fixer.clone(),
+                fixer: FixedBy::Fixer(fixer.clone()),
                 cap: Safety::Suggested,
                 mechanical: false,
                 runs_command: false,
@@ -220,12 +225,13 @@ impl<'e> Proposer<'e> {
         sources: &Sources,
     ) -> Result<Proposal, String> {
         let engine = self.engine;
-        let fixer: &dyn Fixer = match &self.models {
-            Some(models) if binding.fixer == MODEL_FIXER => models,
-            _ => engine
+        let fixer: &dyn Fixer = match (&binding.fixer, &self.models) {
+            (FixedBy::Model, Some(models)) => models,
+            (FixedBy::Model, None) => return Err(NO_MODEL.to_owned()),
+            (FixedBy::Fixer(id), _) => engine
                 .registry
-                .fixer(&binding.fixer)
-                .ok_or_else(|| format!("fixer `{}` is not registered", binding.fixer))?,
+                .fixer(id)
+                .ok_or_else(|| format!("fixer `{id}` is not registered"))?,
         };
         let file = outcome.project.file(&finding.file);
         let language = file.map_or("", |f| f.lang.as_str());

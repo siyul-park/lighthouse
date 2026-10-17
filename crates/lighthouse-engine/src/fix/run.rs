@@ -11,7 +11,7 @@ use lighthouse_protocol::hash::Hasher;
 use lighthouse_spec::Approval;
 
 use super::{
-    AppliedFix, DeclinedFix, FixPlan, FixReport, FixRun, MAX_ROUNDS, MODEL_FIXER, PreviewedFix,
+    AppliedFix, DeclinedFix, FixPlan, FixReport, FixRun, FixedBy, MAX_ROUNDS, PreviewedFix,
     model::{Event, run_verify},
     propose::{Phase, Proposer},
 };
@@ -149,7 +149,7 @@ impl Orchestrator<'_> {
         }
         let before = (self.texts.clone(), self.original.clone(), self.rounds);
         let checked = self.apply_round(&outcome, proposals, before.2 + 1)?;
-        if !self.applied.iter().any(|a| a.fixer == MODEL_FIXER) {
+        if !self.applied.iter().any(|a| a.fixer == FixedBy::Model) {
             return Ok(outcome);
         }
         if let Some(why) = self.withheld() {
@@ -196,7 +196,7 @@ impl Orchestrator<'_> {
         (self.texts, self.original, self.rounds) = before;
         let (models, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.applied)
             .into_iter()
-            .partition(|a| a.fixer == MODEL_FIXER);
+            .partition(|a| a.fixer == FixedBy::Model);
         self.applied = rest;
         for fix in models {
             if let Some(preview) = self.previewable.remove(&fix.fingerprint) {

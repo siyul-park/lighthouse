@@ -258,7 +258,7 @@ impl From<&AppliedFix> for Applied {
         Self {
             fingerprint: fix.fingerprint.as_str().to_owned(),
             decision: fix.rule_id.clone(),
-            fixer: fix.fixer.clone(),
+            fixer: fix.fixer.to_string(),
             safety: fix.safety.to_string(),
             description: fix.description.clone(),
             files: fix.files.iter().map(|f| slashed(f)).collect(),

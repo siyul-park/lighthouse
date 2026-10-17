@@ -21,6 +21,7 @@ use lighthouse_protocol::prompt::json_in;
 use lighthouse_spec::{Example, ExampleKind, Fix, FixKind};
 use serde_json::Value;
 
+use super::FixedBy;
 use crate::{
     Engine,
     engine::{ChatRoute, Refusal},
@@ -30,9 +31,6 @@ pub(super) use account::{Account, Class, Event};
 use prompt::Ask;
 pub(super) use scratch::run_verify;
 pub(super) use verify::{Verdict, judge};
-
-/// The id of the fixer of the decisions whose fix is `type: model`.
-pub const MODEL_FIXER: &str = "lighthouse/model";
 
 /// What a decision tells the model besides its requirement.
 #[derive(Debug, Clone, Default)]
@@ -93,7 +91,7 @@ impl<'e> ModelFixer<'e> {
             fixes,
             account: Account::default(),
             manifest: FixerManifest {
-                id: MODEL_FIXER.to_owned(),
+                id: FixedBy::Model.to_string(),
                 requires: Vec::new(),
             },
         })
@@ -140,8 +138,22 @@ impl Fixer for ModelFixer<'_> {
             extent: &extent,
             examples: &examples,
         };
+        let (structured, plain) = match (ask.request(true), ask.request(false)) {
+            (Ok(structured), Ok(plain)) => (structured, plain),
+            (Err(e), _) | (_, Err(e)) => {
+                let reason = format!("the request could not be built: {e}");
+                return self.decline(&decision.id, Class::Unanswered, reason);
+            }
+        };
         self.account.add(&decision.id, Event::Asked);
-        let reply = match self.route.ask(&|structured| ask.request(structured)) {
+        let asked = |takes_format: bool| {
+            if takes_format {
+                structured.clone()
+            } else {
+                plain.clone()
+            }
+        };
+        let reply = match self.route.ask(&asked) {
             Ok(reply) => reply,
             Err(Refusal::Budget) => {
                 let reason = "the budget for models is spent".to_owned();

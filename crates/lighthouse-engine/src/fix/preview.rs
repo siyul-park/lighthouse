@@ -12,7 +12,7 @@ use lighthouse_model::{
 use similar::{ChangeTag, TextDiff};
 
 use super::{
-    FixPlan, FixRun, MODEL_FIXER,
+    FixPlan, FixRun, FixedBy,
     edits::apply,
     lower::{Lowerer, Sources},
     propose::{Proposal, Proposer},
@@ -45,7 +45,7 @@ impl Engine {
                 let binding = plan.get(&finding.rule_id)?;
                 if binding.unsupported.is_some()
                     || binding.runs_command
-                    || binding.fixer == MODEL_FIXER
+                    || binding.fixer == FixedBy::Model
                 {
                     return None;
                 }

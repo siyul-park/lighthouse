@@ -3,7 +3,7 @@
 use lighthouse_spec::Catalog;
 use std::fs;
 
-use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun};
+use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun, FixedBy};
 use lighthouse_model::{
     Safety,
     ucm::{EditOp, FixOutcome},
@@ -90,7 +90,7 @@ fn pair(dir: &tempfile::TempDir, formatter: &str) -> (Engine, FixPlan) {
     plan.insert(
         "pair/todo",
         FixBinding {
-            fixer: "pair/both".to_owned(),
+            fixer: FixedBy::Fixer("pair/both".to_owned()),
             cap: Safety::Safe,
             mechanical: true,
             decision: FixDecision {
@@ -239,7 +239,7 @@ fn a_write_that_fails_midway_puts_the_written_files_back() {
     plan.insert(
         "nested/todo",
         FixBinding {
-            fixer: "nested/todo".to_owned(),
+            fixer: FixedBy::Fixer("nested/todo".to_owned()),
             cap: Safety::Safe,
             mechanical: true,
             decision: FixDecision {
@@ -311,7 +311,7 @@ fn a_file_whose_provider_does_not_analyze_overlays_is_not_fixed() {
     plan.insert(
         "plain/todo",
         FixBinding {
-            fixer: "plain/todo".to_owned(),
+            fixer: FixedBy::Fixer("plain/todo".to_owned()),
             cap: Safety::Safe,
             mechanical: true,
             decision: FixDecision {

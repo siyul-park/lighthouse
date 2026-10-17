@@ -10,8 +10,11 @@ use std::{
 
 use lighthouse_model::{Fingerprint, Severity};
 
-use super::{Class, MODEL_FIXER};
-use crate::{Run, fix::propose::Proposal};
+use super::Class;
+use crate::{
+    Run,
+    fix::{FixedBy, propose::Proposal},
+};
 
 /// Why fixes by a model are not kept.
 #[derive(Debug, Default)]
@@ -27,7 +30,7 @@ pub(in crate::fix) struct Verdict {
 pub(in crate::fix) fn judge(kept: &[Proposal], before: &Run, after: &Run) -> Verdict {
     let known: BTreeSet<&Fingerprint> = before.diagnostics.iter().map(|d| &d.fingerprint).collect();
     let mut verdict = Verdict::default();
-    for proposal in kept.iter().filter(|p| p.fixer == MODEL_FIXER) {
+    for proposal in kept.iter().filter(|p| p.fixer == FixedBy::Model) {
         let Some((class, reason)) = flaw(proposal, after, &known) else {
             continue;
         };

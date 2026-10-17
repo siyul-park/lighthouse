@@ -4,7 +4,7 @@
 use lighthouse_spec::Catalog;
 use std::fs;
 
-use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun};
+use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun, FixedBy};
 use lighthouse_model::{
     Diagnostic, Options, Safety,
     ucm::{EditOp, FixOutcome},
@@ -136,7 +136,7 @@ fn a_file_that_changed_since_it_was_read_is_skipped_and_its_fix_is_declined() {
     plan.insert(
         "meddle/todo",
         FixBinding {
-            fixer: "meddle/meddle".to_owned(),
+            fixer: FixedBy::Fixer("meddle/meddle".to_owned()),
             cap: Safety::Safe,
             mechanical: true,
             decision: FixDecision {
@@ -272,7 +272,7 @@ fn eligibility_is_decided_before_a_fixer_is_asked() {
     plan.insert(
         "count/todo",
         FixBinding {
-            fixer: "count/count".to_owned(),
+            fixer: FixedBy::Fixer("count/count".to_owned()),
             cap: Safety::Suggested,
             mechanical: true,
             decision: FixDecision {
@@ -378,7 +378,7 @@ fn a_proposal_whose_edits_overlap_each_other_is_declined() {
     plan.insert(
         "twin/todo",
         FixBinding {
-            fixer: "twin/twin".to_owned(),
+            fixer: FixedBy::Fixer("twin/twin".to_owned()),
             cap: Safety::Safe,
             mechanical: true,
             decision: FixDecision {
@@ -476,7 +476,7 @@ fn fixes_that_undo_each_other_stop_the_run_and_name_their_rules() {
     plan.insert(
         "flip/any",
         FixBinding {
-            fixer: "flip/any".to_owned(),
+            fixer: FixedBy::Fixer("flip/any".to_owned()),
             cap: Safety::Safe,
             mechanical: true,
             decision: FixDecision {
@@ -542,7 +542,7 @@ fn a_fix_that_adds_a_warning_is_rolled_back_like_one_that_adds_an_error() {
     plan.insert(
         "warned/todo",
         FixBinding {
-            fixer: "warned/todo".to_owned(),
+            fixer: FixedBy::Fixer("warned/todo".to_owned()),
             cap: Safety::Safe,
             mechanical: true,
             decision: FixDecision {
@@ -659,7 +659,7 @@ fn a_fix_cannot_reach_outside_the_project_or_into_a_symlink() {
         plan.insert(
             "reach/todo",
             FixBinding {
-                fixer: "reach/reach".to_owned(),
+                fixer: FixedBy::Fixer("reach/reach".to_owned()),
                 cap: Safety::Safe,
                 mechanical: true,
                 decision: FixDecision {

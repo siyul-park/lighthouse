@@ -14,6 +14,7 @@ mod scan;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
+    fmt,
     path::PathBuf,
 };
 
@@ -23,19 +24,38 @@ use lighthouse_plugin::FixDecision;
 use lighthouse_spec::{Catalog, Decision, FixKind};
 
 pub use edits::unified_diff;
+pub use model::ModelCounts;
 use model::ModelFix;
-pub use model::{MODEL_FIXER, ModelCounts};
 
 use crate::Run;
 
 /// How many apply-and-recheck rounds a run takes before it stops.
 pub const MAX_ROUNDS: usize = 5;
 
+/// What makes a fix: a registered fixer, derived from the rule, or the
+/// project's chat model, which guesses and is held to the checks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FixedBy {
+    /// The registered fixer with this id.
+    Fixer(String),
+    /// The model `[models] chat` binds.
+    Model,
+}
+
+impl fmt::Display for FixedBy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Fixer(id) => f.write_str(id),
+            Self::Model => f.write_str("lighthouse/model"),
+        }
+    }
+}
+
 /// How one rule's findings are fixed, as the catalog says.
 #[derive(Debug, Clone)]
 pub struct FixBinding {
-    /// The registered fixer that serves the rule.
-    pub fixer: String,
+    /// What serves the rule.
+    pub fixer: FixedBy,
     /// What the fixer may claim at most.
     pub cap: Safety,
     /// The rule is mechanical: its safe fixes apply without asking.
@@ -70,9 +90,9 @@ impl FixPlan {
                 decision.id(),
                 FixBinding {
                     fixer: if model.is_some() {
-                        MODEL_FIXER.to_owned()
+                        FixedBy::Model
                     } else {
-                        decision.id().to_owned()
+                        FixedBy::Fixer(decision.id().to_owned())
                     },
                     cap: fix.safety,
                     mechanical: decision.severity == Some(Severity::Error),
@@ -101,7 +121,7 @@ impl FixPlan {
             self.insert(
                 decision.id(),
                 FixBinding {
-                    fixer: MODEL_FIXER.to_owned(),
+                    fixer: FixedBy::Model,
                     cap: Safety::Suggested,
                     mechanical: false,
                     runs_command: false,
@@ -153,7 +173,7 @@ pub struct FixRun {
 pub struct AppliedFix {
     pub fingerprint: Fingerprint,
     pub rule_id: String,
-    pub fixer: String,
+    pub fixer: FixedBy,
     pub description: String,
     pub safety: Safety,
     /// Every file the fix changed.

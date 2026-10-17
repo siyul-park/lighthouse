@@ -15,7 +15,7 @@ use super::{
     super::model::{Class, Event, Verdict, judge},
     super::preview::preview_files,
     super::propose::Proposal,
-    super::{AppliedFix, DeclinedFix, MODEL_FIXER},
+    super::{AppliedFix, DeclinedFix, FixedBy},
     Orchestrator,
 };
 use crate::{Error, Run};
@@ -119,7 +119,7 @@ impl Orchestrator<'_> {
                 .filter(|(_, into)| *into == proposal.fingerprint)
                 .map(|(p, _)| p);
             for p in std::iter::once(proposal).chain(covered) {
-                let model = p.fixer == MODEL_FIXER;
+                let model = p.fixer == FixedBy::Model;
                 if let Some((class, reason)) = &reason {
                     if model {
                         self.proposer
@@ -158,7 +158,9 @@ impl Orchestrator<'_> {
         let standing = kept
             .iter()
             .chain(merged.iter().map(|(p, _)| p))
-            .filter(|p| p.fixer == MODEL_FIXER && !p.files.iter().any(|f| rolled.contains_key(f)));
+            .filter(|p| {
+                p.fixer == FixedBy::Model && !p.files.iter().any(|f| rolled.contains_key(f))
+            });
         for p in standing {
             if let Some(files) = preview_files(p, |file| bases.get(file).cloned()) {
                 self.previewable.insert(

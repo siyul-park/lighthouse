@@ -39,7 +39,10 @@ impl Ask<'_> {
     /// The chat completion that asks for the fix. A model that takes a response
     /// format must answer the schema of `{replacement}`; a plain-text one is
     /// told the shape in the instructions only.
-    pub(super) fn request(&self, structured: bool) -> CreateChatCompletionRequest {
+    pub(super) fn request(
+        &self,
+        structured: bool,
+    ) -> Result<CreateChatCompletionRequest, serde_json::Error> {
         let mut body = json!({
             "model": "",
             "temperature": 0,
@@ -64,7 +67,7 @@ impl Ask<'_> {
                 },
             });
         }
-        serde_json::from_value(body).expect("a chat completion request is built from valid parts")
+        serde_json::from_value(body)
     }
 
     /// One and a half times the code in tokens, and a margin.

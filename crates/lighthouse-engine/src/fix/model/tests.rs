@@ -19,7 +19,10 @@ use super::{
     scratch::run_verify,
     verify::judge,
 };
-use crate::{Run, fix::propose::Proposal};
+use crate::{
+    Run,
+    fix::{FixedBy, propose::Proposal},
+};
 
 const FILE: &str = "a.go";
 
@@ -176,7 +179,7 @@ fn the_request_asks_for_the_replacement_of_the_extent_and_nothing_else() {
         examples: &examples,
     };
 
-    let request = serde_json::to_value(ask.request(true)).unwrap();
+    let request = serde_json::to_value(ask.request(true).unwrap()).unwrap();
 
     let want = json!({
         "model": "",
@@ -207,9 +210,12 @@ fn the_request_asks_for_the_replacement_of_the_extent_and_nothing_else() {
         }
     });
     assert_eq!(request, want);
-    assert_eq!(request, serde_json::to_value(ask.request(true)).unwrap());
+    assert_eq!(
+        request,
+        serde_json::to_value(ask.request(true).unwrap()).unwrap()
+    );
 
-    let plain = serde_json::to_value(ask.request(false)).unwrap();
+    let plain = serde_json::to_value(ask.request(false).unwrap()).unwrap();
     assert!(plain.get("response_format").is_none(), "{plain}");
 }
 
@@ -228,7 +234,7 @@ fn the_fence_of_the_code_is_longer_than_any_run_of_backticks_in_it() {
         extent: &extent,
         examples: &[],
     };
-    let request = serde_json::to_value(ask.request(true)).unwrap();
+    let request = serde_json::to_value(ask.request(true).unwrap()).unwrap();
     let user = request["messages"][1]["content"].as_str().unwrap();
     assert!(user.contains("````go\ns := ```x```\n````\n"), "{user}");
     assert!(!user.contains("Instruction:"));
@@ -316,7 +322,7 @@ fn proposal(finding: &Diagnostic) -> Proposal {
         rule_id: finding.rule_id.clone(),
         file: finding.file.clone(),
         line: finding.span.start.line,
-        fixer: super::MODEL_FIXER.to_owned(),
+        fixer: FixedBy::Model,
         description: "model fix".to_owned(),
         safety: Safety::Suggested,
         edits: Vec::new(),
@@ -394,7 +400,7 @@ fn only_fixes_by_a_model_are_judged() {
     let hit = finding("r", 3, Severity::Warn, "a");
     let before = run(vec![hit.clone()], Vec::new());
     let mut rule_made = proposal(&hit);
-    rule_made.fixer = "design/short-names".to_owned();
+    rule_made.fixer = FixedBy::Fixer("design/short-names".to_owned());
     let verdict = judge(&[rule_made], &before, &run(vec![hit], Vec::new()));
     assert!(verdict.own.is_empty());
 }

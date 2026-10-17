@@ -17,7 +17,7 @@ use super::{
     super::lower::Sources,
     super::model::{Class, Event},
     super::propose::Proposal,
-    super::{AppliedFix, DeclinedFix, FileChange, FixReport, MODEL_FIXER},
+    super::{AppliedFix, DeclinedFix, FileChange, FixReport, FixedBy},
     Orchestrator,
 };
 use crate::{Error, Run};
@@ -97,7 +97,7 @@ impl Orchestrator<'_> {
         let (kept, undone): (Vec<AppliedFix>, Vec<AppliedFix>) = std::mem::take(&mut self.applied)
             .into_iter()
             .partition(|a| !a.files.iter().any(|f| skipped.contains_key(f)));
-        for fix in undone.iter().filter(|a| a.fixer == MODEL_FIXER) {
+        for fix in undone.iter().filter(|a| a.fixer == FixedBy::Model) {
             self.proposer
                 .note_model(&fix.rule_id, Event::Declined(Class::RolledBack));
         }
@@ -145,7 +145,7 @@ impl Orchestrator<'_> {
         &mut self,
         kept: &[AppliedFix],
     ) -> (BTreeMap<String, crate::ModelCounts>, usize, f64) {
-        for fix in kept.iter().filter(|a| a.fixer == MODEL_FIXER) {
+        for fix in kept.iter().filter(|a| a.fixer == FixedBy::Model) {
             self.proposer.note_model(&fix.rule_id, Event::Applied);
         }
         match &self.proposer.models {

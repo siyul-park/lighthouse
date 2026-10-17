@@ -5,7 +5,7 @@
 use lighthouse_spec::Catalog;
 use std::{fs, sync::LazyLock};
 
-use lighthouse_engine::{Engine, FixBinding, FixPlan};
+use lighthouse_engine::{Engine, FixBinding, FixPlan, FixedBy};
 use lighthouse_model::{
     Diagnostic, Fingerprint, Incomplete, LineIndex, Options, Position, Safety, Severity, Span,
     ucm::{
@@ -289,7 +289,7 @@ pub fn plan(fixer: &str, cap: Safety, mechanical: bool) -> FixPlan {
     plan.insert(
         "fake/todo",
         FixBinding {
-            fixer: fixer.to_owned(),
+            fixer: FixedBy::Fixer(fixer.to_owned()),
             cap,
             mechanical,
             decision: FixDecision {

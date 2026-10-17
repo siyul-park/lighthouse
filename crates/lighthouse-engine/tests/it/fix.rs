@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use lighthouse_engine::{Engine, Error, FixBinding, FixPlan, FixRun, MODEL_FIXER, unified_diff};
+use lighthouse_engine::{Engine, Error, FixBinding, FixPlan, FixRun, FixedBy, unified_diff};
 use lighthouse_model::{
     Safety,
     ucm::{EditOp, FixOutcome},
@@ -32,7 +32,10 @@ fn a_fix_that_holds_is_applied_and_reported() {
 
     assert_eq!(text(&dir), "fn a\nDONE here\n");
     assert_eq!(report.applied.len(), 1);
-    assert_eq!(report.applied[0].fixer, "fake/to-done");
+    assert_eq!(
+        report.applied[0].fixer,
+        FixedBy::Fixer("fake/to-done".to_owned())
+    );
     assert_eq!(report.rounds, 1);
     assert!(report.declined.is_empty());
     assert!(report.finished.diagnostics.is_empty());
@@ -353,7 +356,7 @@ fn fixes_stop_after_a_bounded_number_of_rounds() {
     plan.insert(
         "grow/todo",
         FixBinding {
-            fixer: "grow/grow".to_owned(),
+            fixer: FixedBy::Fixer("grow/grow".to_owned()),
             cap: Safety::Safe,
             mechanical: true,
             decision: FixDecision {
@@ -393,7 +396,10 @@ fn the_plan_of_a_catalog_binds_each_fixable_rule_to_the_fixer_of_its_pattern() {
     let plan = FixPlan::from_catalog(catalog);
 
     let groups = plan.get("design/declaration-groups").unwrap();
-    assert_eq!(groups.fixer, "design/declaration-groups");
+    assert_eq!(
+        groups.fixer,
+        FixedBy::Fixer("design/declaration-groups".to_owned())
+    );
     assert_eq!(groups.cap, Safety::Safe);
     assert!(groups.mechanical);
     let banners = plan.get("design/comments").unwrap();
@@ -409,13 +415,14 @@ fn model_fixes_are_given_to_the_rules_that_have_a_check_and_no_fix_of_their_own(
     let plan = FixPlan::from_catalog(catalog).with_model_fixes(catalog);
 
     let documented = plan.get("design/exported-doc").unwrap();
-    assert_eq!(documented.fixer, MODEL_FIXER);
+    assert_eq!(documented.fixer, FixedBy::Model);
     assert_eq!(documented.cap, Safety::Suggested);
     assert!(!documented.mechanical && !documented.runs_command);
     assert_eq!(documented.decision.id, "design/exported-doc");
     let groups = plan.get("design/declaration-groups").unwrap();
     assert_eq!(
-        groups.fixer, "design/declaration-groups",
+        groups.fixer,
+        FixedBy::Fixer("design/declaration-groups".to_owned()),
         "a fix of its own stays"
     );
 }
