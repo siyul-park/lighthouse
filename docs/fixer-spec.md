@@ -43,7 +43,10 @@ fix:
   the finding is gone, nothing of `warn` or `error` is new in the file and the file is fully
   analyzed, then writes it or reports a preview by `[approval] fix`, and `--unsafe-fixes` writes it
   whatever the approval; `[fix] verify` commands must pass over the fixed texts first. Examples
-  need no `fixed` for it. See [models.md](models.md#chat-and-fixes).
+  need no `fixed` for it. With `[models] edit` bound the model is an agent run in a scratch copy
+  of the project, once per file, whose changed file is the proposal. See
+  [models.md](models.md#chat-and-fixes) and
+  [models.md](models.md#edit-and-fixes-by-an-agent).
 - **`command`** is the simple text contract; structured data goes through `rpc`. It runs a
   program without a shell in a scratch directory that holds a copy of the finding's file.
   *Exit codes:* `0` succeeds with the result per `output` (an empty result changes nothing),

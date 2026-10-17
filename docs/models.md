@@ -88,9 +88,9 @@ timeout = "10m"            # for each of them
   permission for model fixes only, the flag is the person's permission for all suggested fixes in one
   run. `--dry-run` writes nothing either way.
 - **Accounting.** Per decision: `asked`, `answered`, `verified`, `applied`, `previewed` and `declined`
-  by class (`no-extent`, `unanswered`, `unparsed`, `unchanged`, `unresolved`, `introduced`,
-  `incomplete`, `rolled-back`), in `check --fix` and in the `fix` JSON (`models`), with `usage`
-  (requests and cost).
+  by class (`no-extent`, `unanswered`, `out-of-scope`, `unparsed`, `unchanged`, `unresolved`,
+  `introduced`, `incomplete`, `rolled-back`), in `check --fix` and in the `fix` JSON (`models`),
+  with `usage` (requests and cost; for `edit` also `runs` and `seconds`).
 - **Cost, trust, cache.** Requests count against `[models] budget` at the provider's `cost`; remote
   providers need the opt-in classification does; `command` providers need `lighthouse trust`; the
   answers are kept in the result cache under the model, its version and the digest of the request
@@ -114,6 +114,74 @@ cost = 0
 command = ["claude", "-p", "--tools", "", "--no-session-persistence"]
 # reference: claude/any; `--tools ""` leaves it no tools, and no flag skips permissions
 ```
+
+## Edit and fixes by an agent
+
+`[models] edit` binds an agent that fixes by changing files: one reference, or a route list that
+fails over on error. Only a `command` without a `protocol` serves it, in addition to `chat`:
+running the same program in a scratch copy of the project is what makes it an edit. HTTP and
+plugin providers do not serve `edit`, and binding one is a configuration error ("provider `x` does
+not serve `edit`: only a command without a protocol does"). When `edit` is bound, fixes by a model
+use it instead of `chat`; one binding is used per run. Without it nothing changes.
+
+```toml
+[models]
+edit = "claude/sonnet"
+[models.providers.claude]
+command = ["claude", "-p", "--output-format", "text", "--permission-mode", "acceptEdits",
+           "--allowedTools", "Read,Edit,Write,Glob,Grep", "--model", "{model}"]
+timeout = "10m"            # the default for edit
+[approval]
+fix = "preview"
+```
+
+```toml
+[models]
+edit = "codex/any"
+[models.providers.codex]   # the model is codex's own configuration
+command = ["codex", "exec", "--sandbox", "workspace-write", "--skip-git-repo-check", "-"]
+timeout = "10m"
+```
+
+Both recipes use the narrowest permission the tool offers for editing files in its working
+directory: `claude -p` (prompt on stdin) with `--permission-mode acceptEdits` and only the file
+tools in `--allowedTools`; `codex exec` (prompt on stdin through `-`) with `--sandbox
+workspace-write`, and `--skip-git-repo-check` because the scratch copy has no repository. Never use
+a flag that skips permissions or the sandbox (`--dangerously-skip-permissions`, `--yolo`,
+`--full-auto`, `danger-full-access`); a test checks that no recipe here does. The flags were checked
+against the Claude Code headless docs (<https://code.claude.com/docs/en/headless> and `claude
+--help`) and the Codex non-interactive docs (<https://learn.chatgpt.com/docs/non-interactive-mode>,
+formerly `developers.openai.com/codex/noninteractive`); `codex exec --help` could not be run on the
+machine that wrote this, so `--skip-git-repo-check` and `-` rest on those docs alone.
+
+- **Workspace.** A scratch copy of the project (what version control keeps, with the run's
+  fixed texts in place; the same copy `[fix] verify` uses). The command runs with it as its working
+  directory and the prompt as plain text on stdin, under the process contract (no shell, own process
+  group, `timeout`, output cap, environment of `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TMPDIR`
+  plus `env` and `keyEnv`, project trust). The copy is deleted when the run ends, on every path.
+  stdout is kept for the notes only (2 KB).
+- **One run per file.** Every model-fixable finding of the file in the report scope, up to 20, by
+  line; files run one after another. The prompt names, per finding, the decision (requirement,
+  context, `prompt`), the message, the evidence and `path:line:col`, with up to two before and after
+  examples per decision, and asks for one line per finding in reply; the reply is a note, never a
+  verdict.
+- **What it may change.** The text of that file, nothing else. A change to another file, to a file
+  outside the report scope or one Lighthouse does not index, a file created or deleted, or a
+  non-text file rejects the whole attempt (class `out-of-scope`, the reason names the first
+  path). A non-zero exit, a timeout or a signal is a model error: the route fails over, else the
+  findings are declined `unanswered`.
+- **What keeps it.** The file becomes one `Replace` of the whole file per finding (`suggested`,
+  "model edit by `<provider>/<model>`"), verified as every fix by a model, per file: kept only if
+  at least one targeted finding is gone, nothing new of `warn` or `error` is in the file, and the
+  file is fully analyzed. Targeted findings still there are declined `unresolved`; the rest count
+  as `verified`. Then `[fix] verify` and `[approval]` apply as for `chat`.
+- **Cache.** The key is the model and its version, the digest of the prompt and the digests of the
+  files in the report scope (all an agent may read); the value is the changed texts. A hit runs no
+  process and spends no budget.
+- **Safety.** Trusted projects only. With a `keyEnv` the provider is remote; otherwise it is a
+  local process, and the agent's own configuration decides where code is sent. Lighthouse writes
+  nothing outside the scratch copy; the files are written by the fix run after verification, as for
+  any fix.
 
 ## Providers
 
