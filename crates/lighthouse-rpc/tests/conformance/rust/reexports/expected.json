@@ -9,6 +9,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 22
+            },
+            "start": {
+              "col": 1,
+              "line": 22
+            }
+          },
           "to": "reexports/inner"
         },
         {
@@ -17,6 +27,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 23
+            },
+            "start": {
+              "col": 1,
+              "line": 23
+            }
+          },
           "to": "reexports/named"
         },
         {

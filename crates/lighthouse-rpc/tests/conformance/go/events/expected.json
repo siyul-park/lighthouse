@@ -24,6 +24,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 4
+            },
+            "start": {
+              "col": 2,
+              "line": 4
+            }
+          },
           "to": "context"
         },
         {
@@ -32,6 +42,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 10,
+              "line": 5
+            },
+            "start": {
+              "col": 2,
+              "line": 5
+            }
+          },
           "to": "errors"
         },
         {
@@ -40,6 +60,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 7,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
+            }
+          },
           "to": "fmt"
         },
         {
@@ -48,6 +78,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 6,
+              "line": 7
+            },
+            "start": {
+              "col": 2,
+              "line": 7
+            }
+          },
           "to": "io"
         },
         {
@@ -1952,6 +1992,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 9,
+              "line": 4
+            },
+            "start": {
+              "col": 2,
+              "line": 4
+            }
+          },
           "to": "io/fs"
         },
         {
@@ -1960,6 +2010,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 6,
+              "line": 5
+            },
+            "start": {
+              "col": 2,
+              "line": 5
+            }
+          },
           "to": "os"
         },
         {
@@ -1968,6 +2028,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 8,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
+            }
+          },
           "to": "time"
         },
         {

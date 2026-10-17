@@ -12,11 +12,12 @@ use std::{
     rc::Rc,
 };
 
-use lighthouse_protocol::{SymbolKind, Visibility};
+use lighthouse_protocol::{Span, SymbolKind, Visibility};
 use quote::ToTokens;
 use syn::{Item, UseTree};
 
 use crate::{
+    spans::span_of,
     syntax::doc_of,
     tree::{Tree, vis},
 };
@@ -80,6 +81,8 @@ pub struct UseEntry {
     /// The bound name, `*` for a glob and `_` for an anonymous import.
     pub name: String,
     pub module: ModId,
+    /// The `use` item the entry comes from, as written.
+    pub span: Span,
 }
 
 #[derive(Default)]

@@ -108,6 +108,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 12,
+              "line": 3
+            },
+            "start": {
+              "col": 8,
+              "line": 3
+            }
+          },
           "to": "io"
         },
         {

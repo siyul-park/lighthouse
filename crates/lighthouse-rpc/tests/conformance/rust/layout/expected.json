@@ -40,6 +40,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 12
+            },
+            "start": {
+              "col": 5,
+              "line": 12
+            }
+          },
           "to": "layout"
         },
         {
@@ -393,6 +403,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "to": "layout"
         },
         {
@@ -566,6 +586,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "to": "layout"
         },
         {

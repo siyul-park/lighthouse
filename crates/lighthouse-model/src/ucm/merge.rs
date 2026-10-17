@@ -185,6 +185,11 @@ pub(super) fn sorted_union(
 ) -> (Fragment, Vec<String>, Vec<EdgeRun>) {
     let mut all = Fragment::default();
     let mut edge_files = Vec::new();
+    // By file, so that the edge that stands for several, and its site, do not
+    // depend on the order the providers answered in.
+    let mut parts: Vec<Fragment> = parts.into_iter().collect();
+    let first = |f: &Fragment| f.files.first().map(|file| file.path.clone());
+    parts.sort_by_cached_key(first);
     for part in parts {
         let file = match part.files.as_slice() {
             [only] => Some(only.path.clone()),

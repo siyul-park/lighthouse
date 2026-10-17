@@ -260,6 +260,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 18,
+              "line": 40
+            },
+            "start": {
+              "col": 5,
+              "line": 40
+            }
+          },
           "to": "extents"
         },
         {

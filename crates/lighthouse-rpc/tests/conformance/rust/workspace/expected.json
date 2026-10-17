@@ -9,6 +9,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "to": "core_lib"
         },
         {

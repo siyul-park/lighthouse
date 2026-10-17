@@ -38,6 +38,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 7,
+              "line": 4
+            },
+            "start": {
+              "col": 2,
+              "line": 4
+            }
+          },
           "to": "fmt"
         },
         {
@@ -46,6 +56,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 44,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
+            }
+          },
           "to": "internal/text"
         },
         {

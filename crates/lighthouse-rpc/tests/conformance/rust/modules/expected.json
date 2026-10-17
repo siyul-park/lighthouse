@@ -9,6 +9,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 29,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 15
+            }
+          },
           "to": "modules/util"
         },
         {
@@ -17,6 +27,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 29,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
           "to": "modules/nested/deep"
         },
         {
@@ -25,6 +45,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 36,
+              "line": 18
+            },
+            "start": {
+              "col": 1,
+              "line": 18
+            }
+          },
           "to": "modules/shapes"
         },
         {
@@ -508,6 +538,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "to": "modules/util"
         },
         {
@@ -677,6 +717,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 19,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "to": "modules/shapes"
         },
         {
@@ -685,6 +735,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 2
+            },
+            "start": {
+              "col": 1,
+              "line": 2
+            }
+          },
           "to": "modules/util"
         },
         {

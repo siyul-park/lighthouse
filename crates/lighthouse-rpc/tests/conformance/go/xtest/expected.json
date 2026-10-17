@@ -9,6 +9,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 3
+            },
+            "start": {
+              "col": 8,
+              "line": 3
+            }
+          },
           "to": "testing"
         },
         {
@@ -282,6 +292,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 4
+            },
+            "start": {
+              "col": 2,
+              "line": 4
+            }
+          },
           "to": "testing"
         },
         {
@@ -290,6 +310,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
+            }
+          },
           "to": "pkg"
         },
         {

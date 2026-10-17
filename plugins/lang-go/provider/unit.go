@@ -84,6 +84,8 @@ func (u *unit) fragment() *sdk.Fragment {
 	return u.frag
 }
 
+// imports emits an edge for every import spec, with the span of the spec as
+// written: the optional name and the path.
 func (u *unit) imports() {
 	from := sdk.Node{Module: u.module}
 	for _, spec := range u.file.Imports {
@@ -95,7 +97,8 @@ func (u *unit) imports() {
 		if imported, ok := u.pkg.Imports[path]; ok {
 			to = u.res.importPath(imported.PkgPath)
 		}
-		u.edge(edgeImports, from, to)
+		site := span(u.fset, spec.Pos(), spec.End())
+		u.edgeAt(edgeImports, from, to, &site)
 	}
 }
 

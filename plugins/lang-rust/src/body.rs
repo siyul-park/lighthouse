@@ -19,7 +19,7 @@ use flow::is_logic;
 use crate::{
     macros,
     names::{Index, Ns, Res, Sym, TyCx, UseEntry, flatten, symbol_id},
-    spans::ident_span,
+    spans::{ident_span, span_of},
     tree::SourceFile,
 };
 
@@ -406,12 +406,14 @@ impl<'i> Walker<'i> {
                 Item::Use(u) => {
                     let mut entries = Vec::new();
                     flatten(&u.tree, &mut Vec::new(), &mut entries);
+                    let span = span_of(self.file, u);
                     for (path, name) in entries {
                         self.extra.push(UseEntry {
                             vis: lighthouse_protocol::Visibility::Private,
                             path,
                             name,
                             module: self.cx.module,
+                            span,
                         });
                     }
                 }

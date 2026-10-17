@@ -185,7 +185,7 @@ spec:
 
         func Read() string { return "" }
     expect:
-    - line: 1
+    - line: 3
   - name: go-import-points-down
     language: go
     kind: valid
@@ -238,7 +238,7 @@ spec:
 
         func Serve() string { return "" }
     expect:
-    - line: 1
+    - line: 3
   - name: go-peers-may-be-dependent
     language: go
     kind: valid
@@ -316,7 +316,7 @@ spec:
 
         func Read() string { return "" }
     expect:
-    - line: 1
+    - line: 3
   - name: go-ignored-with-a-reason
     language: go
     kind: valid

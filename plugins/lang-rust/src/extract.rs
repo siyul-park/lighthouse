@@ -82,7 +82,13 @@ impl Extractor<'_> {
             if let Some(to) = self.import_target(m, &entry.path)
                 && to != from
             {
-                self.edge(EdgeKind::Imports, Node::Module(from.clone()), to);
+                self.edge_as(
+                    EdgeKind::Imports,
+                    Node::Module(from.clone()),
+                    to,
+                    Resolution::Syntactic,
+                    Some(entry.span),
+                );
             }
         }
     }
@@ -103,10 +109,6 @@ impl Extractor<'_> {
             None if !matches!(first.as_str(), "crate" | "self" | "super") => Some(first.clone()),
             None => None,
         }
-    }
-
-    fn edge(&mut self, kind: EdgeKind, from: Node, to: String) {
-        self.edge_as(kind, from, to, Resolution::Syntactic, None);
     }
 
     /// Reports an edge once per relation and site.
@@ -216,6 +218,10 @@ impl Extractor<'_> {
     fn declare(&mut self, symbol: Symbol, container: Node) {
         self.edge(EdgeKind::Contains, container, symbol.id.clone());
         self.frag.symbols.push(symbol);
+    }
+
+    fn edge(&mut self, kind: EdgeKind, from: Node, to: String) {
+        self.edge_as(kind, from, to, Resolution::Syntactic, None);
     }
 
     /// The symbol a declaration starts from: everything a declaration of this

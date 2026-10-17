@@ -116,7 +116,7 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   receivers too, is an edge with a `site`, so a rename cannot miss one; no bundled
   provider declares it yet.
   `extent`: every declaration symbol carries its `extent`. `reference-sites`: every
-  edge that comes from a use in code carries its `site`. A fix that needs a capability
+  edge that comes from a use in code, and every `imports` edge, carries its `site`. A fix that needs a capability
   the file's provider lacks is declined, never guessed.
   Hosts ignore capability names they do not know. A provider without
   `semantic-edges` is syntactic: its edges come from names (and, where marked,
@@ -315,8 +315,9 @@ import path, because the dependency itself is the fact.
 `site` (optional, capability `reference-sites`) is the span of the identifier that names
 the target at the place of use, so a host can rename it. The same relation used at
 several places is one edge per place, and the host keeps one edge with every site. A
-provider reports sites for the edges it emits from function bodies; edges between
-modules and `contains` have none.
+provider reports sites for the edges it emits from function bodies and for `imports`
+edges, where the site is the import as written (a Go import spec, a Rust `use` item);
+`contains` edges have none.
 
 `resolution` is `semantic` when the target comes from type information,
 `syntactic` when it comes from names alone, and `heuristic` for a guess: the
@@ -486,7 +487,8 @@ params. Every plugin of the kind a transcript applies to replays it
 
 Reports `extent` (doc comments and the comment groups of the comment map that lead
 the declaration without a blank line, and a comment that trails it) and `reference-sites`
-(the identifier of every use `go/types` resolves, selector identifiers included).
+(the identifier of every use `go/types` resolves, selector identifiers included, and
+the import spec of every `imports` edge).
 
 Loads packages with `golang.org/x/tools/go/packages` (tests included) and
 type-checks with `go/types`.
@@ -534,7 +536,8 @@ type-checks with `go/types`.
 
 Reports `extent` (from the first outer attribute or doc comment, or the plain
 comment lines above them, to the last token) and `reference-sites` for the edges it
-resolves; they are syntactic or heuristic, so a host does not rename through them.
+resolves, and the `use` item of every `imports` edge; they are syntactic or heuristic,
+so a host does not rename through them.
 
 Reads sources with `syn` and `proc-macro2`; it resolves names itself and never
 runs cargo, a build script or the compiler, so analysis needs no network, no lock

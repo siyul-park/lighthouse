@@ -9,6 +9,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 31,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
           "to": "std"
         },
         {
@@ -17,6 +27,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 22,
+              "line": 3
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
           "to": "serde"
         },
         {
@@ -25,6 +45,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 24,
+              "line": 13
+            },
+            "start": {
+              "col": 1,
+              "line": 13
+            }
+          },
           "to": "calls/math"
         },
         {

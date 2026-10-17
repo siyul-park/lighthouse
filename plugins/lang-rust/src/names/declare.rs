@@ -39,12 +39,14 @@ impl Index<'_> {
                 Item::Use(u) => {
                     let mut entries = Vec::new();
                     flatten(&u.tree, &mut Vec::new(), &mut entries);
+                    let span = span_of(&tree.files[tree.mods[m].file], u);
                     for (path, name) in entries {
                         self.names[m].uses.push(UseEntry {
                             vis: vis(&u.vis),
                             path,
                             name,
                             module: m,
+                            span,
                         });
                     }
                 }

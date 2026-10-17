@@ -9,6 +9,16 @@
           },
           "kind": "imports",
           "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 35
+            },
+            "start": {
+              "col": 1,
+              "line": 35
+            }
+          },
           "to": "visibility/inner"
         },
         {

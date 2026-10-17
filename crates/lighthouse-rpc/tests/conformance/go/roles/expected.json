@@ -101,6 +101,16 @@
           },
           "kind": "imports",
           "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 3
+            },
+            "start": {
+              "col": 8,
+              "line": 3
+            }
+          },
           "to": "testing"
         },
         {

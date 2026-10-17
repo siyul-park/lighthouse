@@ -193,11 +193,44 @@ fn a_module_edge_remembers_the_file_of_the_first_fragment_that_has_it() {
     assert_eq!(
         origins,
         [
+            None,
             Some(Path::new("a/one.go")),
             Some(Path::new("a/two.go")),
-            None
         ]
     );
+}
+
+#[test]
+fn an_import_at_several_sites_is_one_edge_with_the_site_of_the_first_file_in_path_order() {
+    let import = |line: u32| Edge {
+        kind: EdgeKind::Imports,
+        from: Node::Module("a".to_owned()),
+        to: Target::Path("b".to_owned()),
+        resolution: Resolution::Syntactic,
+        site: Some(Span {
+            start: Position { line, col: 1 },
+            end: Position { line, col: 9 },
+        }),
+    };
+    let fragment = |path: &str, edges: Vec<Edge>| Fragment {
+        files: vec![File {
+            path: path.into(),
+            lang: "go".to_owned(),
+            hash: String::new(),
+            generated: false,
+            test: false,
+        }],
+        edges,
+        ..Fragment::default()
+    };
+    // The providers answered out of path order.
+    let project = Project::merge([
+        fragment("a/two.go", vec![import(3)]),
+        fragment("a/one.go", vec![import(5), import(7)]),
+    ]);
+    assert_eq!(project.edges.len(), 1);
+    assert_eq!(project.edges[0].site.map(|s| s.start.line), Some(5));
+    assert_eq!(project.origin(0), Some(Path::new("a/one.go")));
 }
 
 #[test]
