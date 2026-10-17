@@ -3,12 +3,11 @@
 //! the path names it: `systemone`. The bodies are the protocol's
 //! [`SystemOneRequest`] and [`SystemOneResponse`], System One's own.
 
-use lighthouse_protocol::{ErrorObject, SystemOneRequest, SystemOneResponse};
+use lighthouse_protocol::{ErrorObject, SYSTEM_ONE, SystemOneRequest, SystemOneResponse};
 
 use crate::{endpoint::Endpoint, http::Client};
 
-/// `POST /v1/systemone`: the questions put to the model, answered as
-/// probabilities.
+/// [`SYSTEM_ONE`]: the questions put to the model, answered as probabilities.
 pub fn systemone(
     client: &dyn Client,
     endpoint: &Endpoint,
@@ -18,7 +17,7 @@ pub fn systemone(
     api_request.options.clear();
     let body = serde_json::to_value(api_request).map_err(|e| e.to_string())?;
     let response = client.post(
-        &endpoint.url("v1/systemone"),
+        &endpoint.url(SYSTEM_ONE.path),
         endpoint.key()?.as_deref(),
         &body,
     )?;

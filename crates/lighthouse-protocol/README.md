@@ -6,6 +6,7 @@ The wire contract between the host and plugin processes: the language-provider p
 
 ## Entry points
 - `VERSION`, `INITIALIZE`, `INDEX`, `CLASSIFY`, `TRAIN`, `SHUTDOWN`, `EXIT`: version and method names, plus the capability constants.
+- `ROUTES`: every method with its HTTP twin; model-http posts to its paths and docs/plugin-protocol.md lists the same table.
 - `read_message`, `write_message`, `Message`: the frames.
 - `serve`, `Handler`: the loop a plugin process runs.
 - `InitializeParams`/`InitializeResult`, `IndexParams`/`IndexResult`, `Fragment`: the language wire (`language/`).

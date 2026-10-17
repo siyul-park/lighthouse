@@ -57,7 +57,11 @@ impl Endpoint {
 
     /// `path` under the base URL.
     pub fn url(&self, path: &str) -> String {
-        format!("{}/{path}", self.base_url.trim_end_matches('/'))
+        format!(
+            "{}/{}",
+            self.base_url.trim_end_matches('/'),
+            path.trim_start_matches('/')
+        )
     }
 
     /// A endpoint for tests.

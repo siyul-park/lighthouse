@@ -51,6 +51,20 @@ and analyzers.
 
 ## Methods
 
+| Method | Kind | HTTP twin |
+|---|---|---|
+| `initialize` | request | none |
+| `index` | request | none |
+| `lighthouse/classify` | request | `POST /v1/systemone` |
+| `lighthouse/train` | request | `POST /v1/fine_tuning/jobs` |
+| `shutdown` | request | none |
+| `exit` | notification | none |
+
+The table is `ROUTES` of `lighthouse-protocol`; a test fails when they differ. A method with an
+HTTP twin takes and returns that API's body, so a server that speaks the API can stand in for the
+plugin. Future methods, added with their first consumer: `lighthouse/embed` (`POST
+/v1/embeddings`) and `lighthouse/chat` (`POST /v1/chat/completions`).
+
 ### `initialize` (request)
 
 Params `{ root, protocolVersion, clientInfo: { name, version } }`, `root`

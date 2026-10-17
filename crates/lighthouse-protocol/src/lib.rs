@@ -2,6 +2,7 @@ mod canonical;
 pub mod hash;
 mod language;
 mod model;
+mod route;
 pub mod stats;
 
 pub use canonical::canonical;
@@ -29,6 +30,7 @@ pub use model::{
     prompt,
     store::{DATASETS_DIR, MODELS_DIR, artifact_path, content_dir, dataset_path},
 };
+pub use route::{FINE_TUNING_JOBS, Http, ROUTES, Route, SYSTEM_ONE};
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.
 pub const VERSION: &str = "0.2";
