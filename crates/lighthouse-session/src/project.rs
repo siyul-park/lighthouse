@@ -223,8 +223,9 @@ pub fn catalog_at(root: &Path) -> Result<Catalog> {
     layered(load_local(root)?.as_ref())
 }
 
-/// Every command the project would run: the formatters of its configuration
-/// and the command fixers and command checks of its catalog.
+/// Every command the project would run: the formatters and the fix
+/// verification of its configuration, its command model providers, and the
+/// command fixers and command checks of its catalog.
 fn commands(config: &Config, catalog: &Catalog) -> Result<Vec<Program>> {
     let mut found: Vec<Program> = config
         .formatters()
@@ -233,6 +234,12 @@ fn commands(config: &Config, catalog: &Catalog) -> Result<Vec<Program>> {
             argv: f.argv.clone(),
         })
         .collect();
+    for argv in config.verify() {
+        found.push(Program {
+            what: format!("fix verification: {}", argv.join(" ")),
+            argv: argv.clone(),
+        });
+    }
     for (name, provider) in &config.models(catalog.projects())?.providers {
         if let lighthouse_spec::ModelProvider::Command { argv, .. } = provider {
             found.push(Program {

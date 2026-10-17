@@ -33,7 +33,11 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
             fingerprints: Vec::new(),
             options: command.options.clone(),
         };
-        let done = apply(ctx, &selection, !args.no_store)?;
+        let models = ModelOptions {
+            off: args.no_models,
+            ..ModelOptions::default()
+        };
+        let done = apply(ctx, &selection, !args.no_store, (models, !args.no_cache))?;
         messages = done.lines();
         if command.options.dry_run && command.format != CheckFormat::Json {
             return Ok(Reply::text(done.diff).with_messages(&messages));
@@ -69,7 +73,7 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
 
 /// The `fix` tool: fix, and say what happened.
 pub fn fix(ctx: &Context, args: &FixArgs, format: reply::Format) -> Result<Reply> {
-    let fixed = apply(ctx, args, true)?;
+    let fixed = apply(ctx, args, true, (ModelOptions::default(), true))?;
     let reply = Reply::data(format, &fixed, || fixed.diff.clone())?;
     Ok(reply.with_messages(&fixed.lines()))
 }
@@ -95,8 +99,14 @@ fn analyze(ctx: &Context, args: &CheckArgs) -> Result<Checked> {
     lighthouse_session::check(&session, &request)
 }
 
-/// Fixes what `args` selects. `store` says whether the run is remembered.
-fn apply(ctx: &Context, args: &FixArgs, store: bool) -> Result<Fixed> {
+/// Fixes what `args` selects. `store` says whether the run is remembered;
+/// `models` is what models may do, and whether their answers are cached.
+fn apply(
+    ctx: &Context,
+    args: &FixArgs,
+    store: bool,
+    (models, cache): (ModelOptions, bool),
+) -> Result<Fixed> {
     if ctx.confined()
         && args.fingerprints.is_empty()
         && args.paths.is_empty()
@@ -118,6 +128,8 @@ fn apply(ctx: &Context, args: &FixArgs, store: bool) -> Result<Fixed> {
         unsafe_fixes: args.options.unsafe_fixes,
         fixer: args.options.fixer.clone(),
         store,
+        models,
+        cache,
     };
     fix::run(&session, &request)
 }

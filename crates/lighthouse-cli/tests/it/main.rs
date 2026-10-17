@@ -10,6 +10,7 @@ mod command_sarif;
 mod environment;
 mod explore;
 mod fix;
+mod fix_model;
 mod fix_trust;
 mod help;
 mod hook_session;

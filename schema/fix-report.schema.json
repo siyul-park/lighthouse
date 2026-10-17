@@ -88,11 +88,131 @@
       },
       "type": "array"
     },
+    "models": {
+      "additionalProperties": {
+        "description": "What became of the findings of one decision that were given to a model.",
+        "properties": {
+          "answered": {
+            "description": "Of them, those it replied to.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "applied": {
+            "description": "Verified fixes that were written.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "asked": {
+            "description": "Findings the model was asked about.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "declined": {
+            "additionalProperties": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "description": "Findings left as they were, by the class of the reason: `no-extent`,\n`unanswered`, `unparsed`, `unchanged`, `unresolved`, `introduced`,\n`incomplete` or `rolled-back`.",
+            "type": "object"
+          },
+          "previewed": {
+            "description": "Verified fixes left as previews.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "verified": {
+            "description": "Replies the checks accepted.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "asked",
+          "answered",
+          "verified",
+          "applied",
+          "previewed",
+          "declined"
+        ],
+        "type": "object"
+      },
+      "description": "What became of the findings given to a model, by decision. Absent when\nno model was asked.",
+      "type": "object"
+    },
+    "previews": {
+      "description": "Fixes by a model that the checks accepted and that were left for a\nhand to apply (`approval.fix = \"preview\"`, or a failing `[fix] verify`\ncommand), each with its diff. Absent when there are none.",
+      "items": {
+        "description": "A fix by a model that was left for a hand to apply.",
+        "properties": {
+          "decision": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "diff": {
+            "description": "The unified diff of the fix.",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "safety": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fingerprint",
+          "decision",
+          "safety",
+          "description",
+          "files",
+          "diff"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
     "rounds": {
       "description": "How many times fixing was repeated until nothing was left.",
       "format": "uint",
       "minimum": 0,
       "type": "integer"
+    },
+    "usage": {
+      "description": "The requests that went to a model this run, and what they cost.\nAbsent when no model was asked.",
+      "properties": {
+        "calls": {
+          "description": "Requests that went to a model; answers kept from earlier runs are not\ncounted.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cost": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "calls",
+        "cost"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
     }
   },
   "required": [

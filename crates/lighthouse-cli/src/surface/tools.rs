@@ -60,7 +60,7 @@ pub const TOOLS: [Tool; 16] = [
         "fix",
         &["check"],
         "FixReport",
-        Hints::WRITE.destructive(),
+        Hints::WRITE.destructive().open(),
         |ctx, args| check::fix(ctx, &parse(args)?, Format::Json),
     ),
     Tool::new::<DecisionListArgs, DecisionList>(

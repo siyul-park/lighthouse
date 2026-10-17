@@ -379,7 +379,7 @@ pub fn check(session: &Session, request: &CheckRequest) -> Result<Checked> {
 
 /// The size limit of the cache in bytes: `LIGHTHOUSE_CACHE_LIMIT_MB`, else
 /// 256 MB.
-fn cache_limit() -> u64 {
+pub(crate) fn cache_limit() -> u64 {
     std::env::var(CACHE_LIMIT_VAR)
         .ok()
         .and_then(|mb| mb.trim().parse::<u64>().ok())

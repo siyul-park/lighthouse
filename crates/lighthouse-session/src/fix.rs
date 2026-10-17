@@ -3,16 +3,22 @@
 //! does the work; this adds what only a session knows: the catalog, the
 //! judgments that keep findings out of reach, and the store.
 
-use std::{collections::BTreeSet, path::PathBuf};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::PathBuf,
+};
 
-use lighthouse_engine::{AppliedFix, DeclinedFix, Engine, FixPlan, FixRun, unified_diff};
+use lighthouse_engine::{
+    AppliedFix, DeclinedFix, Engine, FixPlan, FixRun, ModelCounts, ModelOptions, PreviewedFix,
+    cache, unified_diff,
+};
 use lighthouse_model::Fingerprint;
 use lighthouse_resource::slashed;
 use lighthouse_spec::{Catalog, Decision};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::{Result, Selector, Session, findings, selector::long_enough};
+use crate::{Result, Selector, Session, check::cache_limit, findings, selector::long_enough};
 
 /// Which findings to fix. At least one of `paths`, `fingerprints` and `rules`
 /// narrows a run from the whole project.
@@ -36,6 +42,11 @@ pub struct Selection {
     pub fixer: Option<String>,
     /// Record the run and its fixes, and leave out what judgments hide.
     pub store: bool,
+    /// What models may do. Fixes by a model ask the project's chat model
+    /// unless `off`.
+    pub models: ModelOptions,
+    /// Keep the answers of models in `.lighthouse/cache` and reuse them.
+    pub cache: bool,
 }
 
 /// A finished fix run: the `FixReport` kind.
@@ -49,8 +60,61 @@ pub struct Fixed {
     pub declined: Vec<Declined>,
     /// How many times fixing was repeated until nothing was left.
     pub rounds: usize,
+    /// Fixes by a model that the checks accepted and that were left for a
+    /// hand to apply (`approval.fix = "preview"`, or a failing `[fix] verify`
+    /// command), each with its diff. Absent when there are none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub previews: Vec<Previewed>,
+    /// What became of the findings given to a model, by decision. Absent when
+    /// no model was asked.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub models: BTreeMap<String, Models>,
+    /// The requests that went to a model this run, and what they cost.
+    /// Absent when no model was asked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<Usage>,
     /// What the user should know, in the order it happened.
     pub messages: Vec<String>,
+}
+
+/// A fix by a model that was left for a hand to apply.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Previewed {
+    pub fingerprint: String,
+    pub decision: String,
+    pub safety: String,
+    pub description: String,
+    pub files: Vec<String>,
+    /// The unified diff of the fix.
+    pub diff: String,
+}
+
+/// What became of the findings of one decision that were given to a model.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Models {
+    /// Findings the model was asked about.
+    pub asked: usize,
+    /// Of them, those it replied to.
+    pub answered: usize,
+    /// Replies the checks accepted.
+    pub verified: usize,
+    /// Verified fixes that were written.
+    pub applied: usize,
+    /// Verified fixes left as previews.
+    pub previewed: usize,
+    /// Findings left as they were, by the class of the reason: `no-extent`,
+    /// `unanswered`, `unparsed`, `unchanged`, `unresolved`, `introduced`,
+    /// `incomplete` or `rolled-back`.
+    pub declined: BTreeMap<String, usize>,
+}
+
+/// Requests to models and what they cost.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Usage {
+    /// Requests that went to a model; answers kept from earlier runs are not
+    /// counted.
+    pub calls: usize,
+    pub cost: f64,
 }
 
 /// A fix that was applied.
@@ -91,19 +155,93 @@ impl Fixed {
                 fix.description
             ));
         }
+        for fix in &self.previews {
+            lines.push(format!(
+                "preview {} [{}] {}: {}",
+                fix.decision,
+                fix.safety,
+                fix.files.join(", "),
+                fix.description
+            ));
+            lines.extend(fix.diff.lines().map(|line| format!("  {line}")));
+        }
         for fix in &self.declined {
             lines.push(format!(
                 "not fixed {}:{} {}: {}",
                 fix.path, fix.line, fix.decision, fix.reason
             ));
         }
+        lines.extend(self.models.iter().map(|(decision, counts)| counts.line(decision)));
+        if let Some(usage) = &self.usage {
+            lines.push(format!(
+                "models: {} request(s), cost {}",
+                usage.calls, usage.cost
+            ));
+        }
+        let waiting = if self.previews.is_empty() {
+            String::new()
+        } else {
+            format!(", {} awaiting a hand", self.previews.len())
+        };
         lines.push(format!(
-            "{} fix(es) {}, {} left alone",
+            "{} fix(es) {}, {} left alone{waiting}",
             self.applied.len(),
             if self.dry_run { "proposed" } else { "applied" },
             self.declined.len()
         ));
         lines
+    }
+}
+
+impl Models {
+    /// A person's line for the counts of `decision`.
+    fn line(&self, decision: &str) -> String {
+        let declined: Vec<String> = self
+            .declined
+            .iter()
+            .map(|(class, n)| format!("{class} {n}"))
+            .collect();
+        let declined = if declined.is_empty() {
+            "0".to_owned()
+        } else {
+            format!("{} ({})", self.declined.values().sum::<usize>(), declined.join(", "))
+        };
+        format!(
+            "model fixes {decision}: asked {}, answered {}, verified {}, applied {}, previewed {}, declined {declined}",
+            self.asked, self.answered, self.verified, self.applied, self.previewed
+        )
+    }
+}
+
+impl From<&ModelCounts> for Models {
+    fn from(counts: &ModelCounts) -> Self {
+        Self {
+            asked: counts.asked,
+            answered: counts.answered,
+            verified: counts.verified,
+            applied: counts.applied,
+            previewed: counts.previewed,
+            declined: counts.declined.clone(),
+        }
+    }
+}
+
+impl From<&PreviewedFix> for Previewed {
+    fn from(fix: &PreviewedFix) -> Self {
+        let preview = &fix.preview;
+        let diff = preview
+            .files
+            .iter()
+            .map(|file| format!("--- a/{0}\n+++ b/{0}\n{1}\n", file.path, file.hunks))
+            .collect();
+        Self {
+            fingerprint: preview.fingerprint.as_str().to_owned(),
+            decision: fix.rule_id.clone(),
+            safety: preview.safety.to_string(),
+            description: preview.description.clone(),
+            files: preview.files.iter().map(|f| f.path.clone()).collect(),
+            diff,
+        }
     }
 }
 
@@ -141,8 +279,22 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
     }
     let catalog = &session.catalog;
     let root = &session.root;
+    let chat = !session.config.models(catalog.projects())?.chat.is_empty();
     let plan = FixPlan::from_catalog(catalog);
+    let plan = if chat {
+        plan.with_model_fixes(catalog)
+    } else {
+        plan
+    };
     let (engine, notices) = session.engine()?;
+    let engine = engine.with_models(request.models.clone());
+    // The answers of models are kept in the cache; a project that asks none
+    // runs as it always did.
+    let engine = if chat && request.cache {
+        engine.with_cache(cache::dir(root), cache_limit())
+    } else {
+        engine
+    };
     let mut messages = notices;
     let skip = suppressed(&engine, root, catalog, request.store)?;
     let run = FixRun {
@@ -176,6 +328,16 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
         applied: report.applied.iter().map(Applied::from).collect(),
         declined: report.declined.iter().map(Declined::from).collect(),
         rounds: report.rounds,
+        previews: report.previews.iter().map(Previewed::from).collect(),
+        models: report
+            .models
+            .iter()
+            .map(|(decision, counts)| (decision.clone(), Models::from(counts)))
+            .collect(),
+        usage: (!report.models.is_empty()).then_some(Usage {
+            calls: report.model_calls,
+            cost: report.model_cost,
+        }),
         messages,
     })
 }

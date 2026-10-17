@@ -58,6 +58,13 @@
       "additionalProperties": false,
       "description": "The `fix` table of a project.",
       "properties": {
+        "timeout": {
+          "description": "How long each of those commands may run. Default: `10m`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "verify": {
           "description": "Commands (argument lists, no shell) that must pass over the project\nwith the fixes by models in place, such as its tests. They run once\nper fix run, after its rounds, on a scratch copy of the project, and\nonly in a trusted project. If one fails, every fix by a model of the\nrun is withdrawn to a preview.",
           "items": {
