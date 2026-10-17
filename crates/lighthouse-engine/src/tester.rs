@@ -3,7 +3,7 @@ use std::{fmt::Write as _, fs, path::Path};
 use tempfile::TempDir;
 
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Catalog, CheckKind, Config, Decision, Example, ExampleKind, FORMATTED};
+use lighthouse_spec::{Catalog, CheckKind, Config, Decision, Example, ExampleKind, FORMATTED, Fix};
 use serde_json::Value;
 
 use crate::{Engine, FixPlan, FixRun, ModelOptions, Run, unified_diff};
@@ -103,7 +103,9 @@ impl<'a> RuleTester<'a> {
             ExampleKind::Valid => Err(format!("expected no diagnostics, got {}", describe(&found))),
             ExampleKind::Invalid => {
                 compare(example, &found)?;
-                if decision.fix.is_some() && !example.fixed.is_empty() {
+                if decision.fix.as_ref().is_some_and(Fix::deterministic)
+                    && !example.fixed.is_empty()
+                {
                     self.check_fix(&engine, decision, example, dir.path())?;
                 }
                 Ok(())

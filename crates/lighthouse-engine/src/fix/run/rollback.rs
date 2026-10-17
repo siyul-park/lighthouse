@@ -6,14 +6,16 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{Fingerprint, Severity};
+use lighthouse_model::{Fingerprint, Preview, Safety, Severity};
 
 use lighthouse_protocol::hash;
 
 use super::{
     super::edits::overlap,
+    super::model::{Class, Event, Verdict, judge},
+    super::preview::preview_files,
     super::propose::Proposal,
-    super::{AppliedFix, DeclinedFix},
+    super::{AppliedFix, DeclinedFix, MODEL_FIXER},
     Orchestrator,
 };
 use crate::{Error, Run};
@@ -24,7 +26,7 @@ impl Orchestrator<'_> {
     /// the resulting state, when nothing was dropped.
     pub(super) fn apply_round(
         &mut self,
-        before: Run,
+        before: &Run,
         mut proposals: Vec<Proposal>,
         round: usize,
     ) -> Result<Option<Run>, Error> {
@@ -32,7 +34,7 @@ impl Orchestrator<'_> {
         // shut out by a suggestion.
         proposals.sort_by_key(|p| p.safety);
         let (kept, merged) = kept_proposals(proposals);
-        let mut candidates = self.round(&kept, &before);
+        let mut candidates = self.round(&kept, before);
         let mut failed = std::mem::take(&mut candidates.failed);
         self.notes.append(&mut candidates.notes);
         let changed: Vec<PathBuf> = candidates.texts.keys().cloned().collect();
@@ -47,8 +49,11 @@ impl Orchestrator<'_> {
         } else {
             Some(self.proposer.engine.check_overlaid(&[], &[], &self.texts)?)
         };
+        let mut verdict = Verdict::default();
         if let Some(after) = &after {
-            failed.extend(worse(&before, after, &changed));
+            failed.extend(worse(before, after, &changed));
+            verdict = judge(&kept, before, after);
+            failed.extend(verdict.files.clone());
         }
         let rolled = close_over(&kept, failed);
         for (file, reason) in &rolled {
@@ -64,6 +69,7 @@ impl Orchestrator<'_> {
             self.notes
                 .push(format!("rolled back {}: {reason}", file.display()));
         }
+        self.preview_models(&kept, &merged, &rolled, &candidates.bases);
         for file in changed.iter().filter(|f| !rolled.contains_key(*f)) {
             self.original.entry(file.clone()).or_insert_with(|| {
                 let base = candidates.bases.remove(file).unwrap_or_default();
@@ -71,7 +77,14 @@ impl Orchestrator<'_> {
                 (base, hash)
             });
         }
-        if self.account(&kept, &merged, &rolled, &candidates.unchanged, round) {
+        if self.account(
+            &kept,
+            &merged,
+            &rolled,
+            &verdict,
+            &candidates.unchanged,
+            round,
+        ) {
             self.rounds = round;
         }
         Ok(if rolled.is_empty() { after } else { None })
@@ -84,6 +97,7 @@ impl Orchestrator<'_> {
         kept: &[Proposal],
         merged: &[(Proposal, Fingerprint)],
         rolled: &BTreeMap<PathBuf, String>,
+        verdict: &Verdict,
         unchanged: &BTreeSet<PathBuf>,
         round: usize,
     ) -> bool {
@@ -91,9 +105,12 @@ impl Orchestrator<'_> {
         for proposal in kept {
             let files = &proposal.files;
             let reason = match files.iter().find(|f| rolled.contains_key(*f)) {
-                Some(file) => Some(format!("rolled back: {}", rolled[file])),
+                Some(file) => Some(verdict.own.get(&proposal.fingerprint).map_or_else(
+                    || (Class::RolledBack, format!("rolled back: {}", rolled[file])),
+                    Clone::clone,
+                )),
                 None if files.iter().all(|f| unchanged.contains(f)) => {
-                    Some("the fix changes nothing".to_owned())
+                    Some((Class::Unchanged, "the fix changes nothing".to_owned()))
                 }
                 None => None,
             };
@@ -102,9 +119,17 @@ impl Orchestrator<'_> {
                 .filter(|(_, into)| *into == proposal.fingerprint)
                 .map(|(p, _)| p);
             for p in std::iter::once(proposal).chain(covered) {
-                if let Some(reason) = &reason {
+                let model = p.fixer == MODEL_FIXER;
+                if let Some((class, reason)) = &reason {
+                    if model {
+                        self.proposer
+                            .note_model(&p.rule_id, Event::Declined(*class));
+                    }
                     self.decline_proposal(p, reason.clone());
                     continue;
+                }
+                if model {
+                    self.proposer.note_model(&p.rule_id, Event::Verified);
                 }
                 any = true;
                 self.applied.push(AppliedFix {
@@ -119,6 +144,34 @@ impl Orchestrator<'_> {
             }
         }
         any
+    }
+
+    /// Keeps the preview of every fix by a model that stands, in case the run
+    /// leaves it for a hand to apply. `bases` holds the texts it changed.
+    fn preview_models(
+        &mut self,
+        kept: &[Proposal],
+        merged: &[(Proposal, Fingerprint)],
+        rolled: &BTreeMap<PathBuf, String>,
+        bases: &BTreeMap<PathBuf, String>,
+    ) {
+        let standing = kept
+            .iter()
+            .chain(merged.iter().map(|(p, _)| p))
+            .filter(|p| p.fixer == MODEL_FIXER && !p.files.iter().any(|f| rolled.contains_key(f)));
+        for p in standing {
+            if let Some(files) = preview_files(p, |file| bases.get(file).cloned()) {
+                self.previewable.insert(
+                    p.fingerprint.clone(),
+                    Preview {
+                        fingerprint: p.fingerprint.clone(),
+                        description: p.description.clone(),
+                        safety: Safety::Suggested,
+                        files,
+                    },
+                );
+            }
+        }
     }
 
     fn decline_proposal(&mut self, p: &Proposal, reason: String) {

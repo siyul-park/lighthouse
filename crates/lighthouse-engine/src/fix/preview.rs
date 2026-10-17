@@ -3,6 +3,8 @@
 //! text on disk, nothing more: it is not formatted, not re-checked and not
 //! written. Applying a fix goes through the verified path of a fix run.
 
+use std::path::Path;
+
 use lighthouse_model::{
     Diagnostic, LineIndex, Position, Preview, PreviewEdit, PreviewFile, Safety, ucm::Capability,
     utf16_position,
@@ -10,10 +12,10 @@ use lighthouse_model::{
 use similar::{ChangeTag, TextDiff};
 
 use super::{
-    FixPlan, FixRun,
+    FixPlan, FixRun, MODEL_FIXER,
     edits::apply,
     lower::{Lowerer, Sources},
-    propose::Proposer,
+    propose::{Proposal, Proposer},
 };
 use crate::{Engine, Overlays, Run};
 
@@ -38,38 +40,18 @@ impl Engine {
             .iter()
             .filter_map(|finding| {
                 let binding = plan.get(&finding.rule_id)?;
-                if binding.unsupported.is_some() || binding.runs_command {
+                if binding.unsupported.is_some()
+                    || binding.runs_command
+                    || binding.fixer == MODEL_FIXER
+                {
                     return None;
                 }
                 let proposal = proposer
                     .propose_one(outcome, finding, binding, &lowerer, &sources)
                     .ok()?;
-                let mut changed = Vec::new();
-                for file in &proposal.files {
-                    let base = sources.text(file).ok()?;
-                    let mine: Vec<_> = proposal.edits.iter().filter(|e| e.file == *file).collect();
-                    let after = apply(&base, &mine).ok()?;
-                    if after == *base {
-                        continue;
-                    }
-                    let index = LineIndex::new(&base);
-                    let edits = mine.iter().map(|e| {
-                        (
-                            index.position(e.range.start),
-                            index.position(e.range.end),
-                            e.text.clone(),
-                        )
-                    });
-                    changed.push(preview_file(
-                        file.to_string_lossy().replace('\\', "/"),
-                        &base,
-                        &after,
-                        edits,
-                    ));
-                }
-                if changed.is_empty() {
-                    return None;
-                }
+                let changed = preview_files(&proposal, |file| {
+                    sources.text(file).ok().map(|text| (*text).clone())
+                })?;
                 let needs_unsafe =
                     proposal.safety == Safety::Suggested || proposer.ineligible(binding).is_some();
                 Some(Preview {
@@ -85,6 +67,38 @@ impl Engine {
             })
             .collect()
     }
+}
+
+/// What `proposal` changes in each of its files, the text of which `base`
+/// gives; `None` when an edit does not apply or the proposal changes nothing.
+pub(super) fn preview_files(
+    proposal: &Proposal,
+    base: impl Fn(&Path) -> Option<String>,
+) -> Option<Vec<PreviewFile>> {
+    let mut changed = Vec::new();
+    for file in &proposal.files {
+        let base = base(file)?;
+        let mine: Vec<_> = proposal.edits.iter().filter(|e| e.file == *file).collect();
+        let after = apply(&base, &mine).ok()?;
+        if after == base {
+            continue;
+        }
+        let index = LineIndex::new(&base);
+        let edits = mine.iter().map(|e| {
+            (
+                index.position(e.range.start),
+                index.position(e.range.end),
+                e.text.clone(),
+            )
+        });
+        changed.push(preview_file(
+            file.to_string_lossy().replace('\\', "/"),
+            &base,
+            &after,
+            edits,
+        ));
+    }
+    (!changed.is_empty()).then_some(changed)
 }
 
 /// Lines of unchanged text around a change in the hunks of a preview.

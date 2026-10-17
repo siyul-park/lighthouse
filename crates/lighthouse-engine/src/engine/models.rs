@@ -108,7 +108,7 @@ impl super::Engine {
         Ok(self.clients().build(reference, model.model, &provider))
     }
 
-    fn clients(&self) -> Clients<'_> {
+    pub(super) fn clients(&self) -> Clients<'_> {
         Clients {
             registry: &self.registry,
             trusted: self.trusted,

@@ -7,13 +7,14 @@ use lighthouse_model::{
     Diagnostic, Fingerprint, Safety,
     ucm::{Capability, EditOp, FixOutcome},
 };
-use lighthouse_plugin::{FixDecision, FixRequest};
+use lighthouse_plugin::{FixDecision, FixRequest, Fixer};
 use serde_json::Value;
 
 use super::{
-    DeclinedFix, FixBinding, FixPlan, FixRun,
+    DeclinedFix, FixBinding, FixPlan, FixRun, MODEL_FIXER,
     edits::{TextEdit, self_overlap},
     lower::{Lowerer, Sources},
+    model::{Event, ModelFixer},
 };
 use crate::{Engine, Error, Overlays, Run, engine::Scopes};
 
@@ -32,17 +33,48 @@ pub(super) struct Proposal {
     pub(super) files: Vec<PathBuf>,
 }
 
+/// Whose findings a round proposes fixes for: the rules, which derive a fix
+/// from the finding, or a model, which is asked for one only once the rules
+/// have had their say.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum Phase {
+    Rules,
+    Models,
+}
+
 /// What a fix run asks of fixers: the findings it takes up and the proposals
 /// the fixers make of them.
 pub(super) struct Proposer<'e> {
     pub(super) engine: &'e Engine,
     plan: &'e FixPlan,
     pub(super) run: &'e FixRun,
+    /// The fixer of the model fixes; `None` when no model is to be asked.
+    pub(super) models: Option<ModelFixer<'e>>,
 }
 
 impl<'e> Proposer<'e> {
+    /// A proposer that asks no model.
     pub(super) fn new(engine: &'e Engine, plan: &'e FixPlan, run: &'e FixRun) -> Self {
-        Self { engine, plan, run }
+        Self {
+            engine,
+            plan,
+            run,
+            models: None,
+        }
+    }
+
+    /// The same, asking the models the project binds for chat.
+    #[must_use]
+    pub(super) fn asking_models(mut self) -> Self {
+        self.models = ModelFixer::new(self.engine, &self.plan.models);
+        self
+    }
+
+    /// Counts `event` for the fix by a model of `decision`.
+    pub(super) fn note_model(&self, decision: &str, event: Event) {
+        if let Some(models) = &self.models {
+            models.account.add(decision, event);
+        }
     }
 
     /// The proposals this round can try over the files as `texts` stand in for
@@ -51,6 +83,7 @@ impl<'e> Proposer<'e> {
         &self,
         outcome: &Run,
         texts: &Overlays,
+        phase: Phase,
     ) -> Result<(Vec<Proposal>, BTreeMap<Fingerprint, DeclinedFix>), Error> {
         let sources = Sources::new(&self.engine.ws.root, &outcome.project, texts);
         let engine = self.engine;
@@ -70,22 +103,37 @@ impl<'e> Proposer<'e> {
             );
         };
         for finding in self.select(outcome)? {
-            let Some(binding) = self.binding(&finding.rule_id) else {
+            let binding = self.binding(&finding.rule_id);
+            let model = binding.as_ref().is_some_and(|b| b.fixer == MODEL_FIXER);
+            if model != (phase == Phase::Models) {
+                continue;
+            }
+            let Some(binding) = binding else {
                 decline(finding, "the rule has no fix".to_owned());
                 continue;
             };
             // Eligibility comes first: a fix that would not be applied is never
-            // even asked for, so a command never runs for nothing.
+            // even asked for, so a command never runs for nothing. A fix by a
+            // model is asked for whatever the run may apply: what it may do
+            // with the answer is settled after the checks.
             if let Some(why) = &binding.unsupported {
                 decline(finding, why.clone());
                 continue;
             }
-            if let Some(why) = self.ineligible(&binding) {
+            if model && self.models.is_none() {
+                if !self.plan.models[&finding.rule_id].implicit() {
+                    decline(finding, NO_MODEL.to_owned());
+                }
+                continue;
+            }
+            if let Some(why) = self.ineligible(&binding).filter(|_| !model) {
                 decline(finding, why);
                 continue;
             }
             match self.propose_one(outcome, finding, &binding, &lowerer, &sources) {
-                Ok(proposal) if self.run.unsafe_fixes || proposal.safety == Safety::Safe => {
+                Ok(proposal)
+                    if model || self.run.unsafe_fixes || proposal.safety == Safety::Safe =>
+                {
                     proposals.push(proposal);
                 }
                 Ok(proposal) => {
@@ -169,10 +217,13 @@ impl<'e> Proposer<'e> {
         sources: &Sources,
     ) -> Result<Proposal, String> {
         let engine = self.engine;
-        let fixer = engine
-            .registry
-            .fixer(&binding.fixer)
-            .ok_or_else(|| format!("fixer `{}` is not registered", binding.fixer))?;
+        let fixer: &dyn Fixer = match &self.models {
+            Some(models) if binding.fixer == MODEL_FIXER => models,
+            _ => engine
+                .registry
+                .fixer(&binding.fixer)
+                .ok_or_else(|| format!("fixer `{}` is not registered", binding.fixer))?,
+        };
         let file = outcome.project.file(&finding.file);
         let language = file.map_or("", |f| f.lang.as_str());
         let provided = engine
@@ -256,6 +307,9 @@ impl<'e> Proposer<'e> {
         }
     }
 }
+
+/// Why a fix by a model is not asked for.
+const NO_MODEL: &str = "no chat model is available: `[models] chat` is not bound, or model checks are off (`--no-models`)";
 
 fn op_name(op: &EditOp) -> &'static str {
     match op {

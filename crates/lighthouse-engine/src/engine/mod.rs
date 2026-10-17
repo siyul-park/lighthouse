@@ -28,6 +28,7 @@ use crate::{
 
 mod batch;
 mod cached;
+mod chat;
 mod client;
 mod config;
 mod models;
@@ -36,6 +37,7 @@ mod run;
 mod scopes;
 
 use cached::RunCache;
+pub(crate) use chat::{ChatRoute, Refusal};
 pub use client::CommandModels;
 pub use config::active;
 use config::{constructors, io_error, load_languages, validate_config};

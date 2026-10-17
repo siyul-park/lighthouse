@@ -6,6 +6,7 @@
 
 mod edits;
 mod lower;
+mod model;
 mod preview;
 mod propose;
 mod run;
@@ -17,11 +18,13 @@ use std::{
 };
 
 use lighthouse_model::Severity;
-use lighthouse_model::{Fingerprint, Safety};
+use lighthouse_model::{Fingerprint, Preview, Safety};
 use lighthouse_plugin::FixDecision;
-use lighthouse_spec::{Catalog, FixKind};
+use lighthouse_spec::{Catalog, Decision, FixKind};
 
 pub use edits::unified_diff;
+use model::ModelFix;
+pub use model::{MODEL_FIXER, ModelCounts};
 
 use crate::Run;
 
@@ -50,6 +53,8 @@ pub struct FixBinding {
 #[derive(Debug, Clone, Default)]
 pub struct FixPlan {
     bindings: BTreeMap<String, FixBinding>,
+    /// What the rules whose fix is by a model add to the prompt.
+    models: BTreeMap<String, ModelFix>,
 }
 
 impl FixPlan {
@@ -60,26 +65,55 @@ impl FixPlan {
         let mut plan = Self::default();
         for decision in catalog.decisions() {
             let Some(fix) = &decision.fix else { continue };
+            let model = ModelFix::of(Some(fix), &decision.examples, false);
             plan.insert(
                 decision.id(),
                 FixBinding {
-                    fixer: decision.id().to_owned(),
+                    fixer: if model.is_some() {
+                        MODEL_FIXER.to_owned()
+                    } else {
+                        decision.id().to_owned()
+                    },
                     cap: fix.safety,
                     mechanical: decision.severity == Some(Severity::Error),
                     runs_command: matches!(fix.kind, FixKind::Command(_)),
-                    decision: FixDecision {
-                        id: decision.id().to_owned(),
-                        requirement: decision.requirement.clone(),
-                        context: decision.context.clone(),
-                    },
+                    decision: decision_of(decision),
                     unsupported: matches!(fix.kind, FixKind::Rpc { .. }).then(|| {
                         "the fix of this rule is of kind `rpc`, which is not yet supported"
                             .to_owned()
                     }),
                 },
             );
+            plan.models
+                .extend(model.map(|m| (decision.id().to_owned(), m)));
         }
         plan
+    }
+
+    /// Also gives every rule that has a check and no fix of its own the fix
+    /// by a model, which is asked when the project binds a chat model.
+    #[must_use]
+    pub fn with_model_fixes(mut self, catalog: &Catalog) -> Self {
+        for decision in catalog.decisions() {
+            if decision.check.is_none() || decision.fix.is_some() {
+                continue;
+            }
+            self.insert(
+                decision.id(),
+                FixBinding {
+                    fixer: MODEL_FIXER.to_owned(),
+                    cap: Safety::Suggested,
+                    mechanical: false,
+                    runs_command: false,
+                    decision: decision_of(decision),
+                    unsupported: None,
+                },
+            );
+            self.models.extend(
+                ModelFix::of(None, &decision.examples, true).map(|m| (decision.id().to_owned(), m)),
+            );
+        }
+        self
     }
 
     /// Names `binding` as the fix of `rule`.
@@ -90,6 +124,15 @@ impl FixPlan {
     /// How the findings of `rule` are fixed, if they are.
     pub fn get(&self, rule: &str) -> Option<&FixBinding> {
         self.bindings.get(rule)
+    }
+}
+
+/// The decision as a fixer is told about it.
+fn decision_of(decision: &Decision) -> FixDecision {
+    FixDecision {
+        id: decision.id().to_owned(),
+        requirement: decision.requirement.clone(),
+        context: decision.context.clone(),
     }
 }
 
@@ -145,6 +188,13 @@ pub struct FileChange {
     pub after: String,
 }
 
+/// A fix by a model that the checks accepted and the run left for a hand.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewedFix {
+    pub rule_id: String,
+    pub preview: Preview,
+}
+
 /// What a fix run did.
 #[derive(Debug, Default)]
 pub struct FixReport {
@@ -157,6 +207,17 @@ pub struct FixReport {
     pub rounds: usize,
     /// What the user should know: files rolled back, rounds exhausted.
     pub notes: Vec<String>,
+    /// The fixes by a model that the checks accepted and the run left for a
+    /// hand to apply: the project's approval, or a failing `[fix] verify`
+    /// command, withheld them. With `dry_run` they are the same.
+    pub previews: Vec<PreviewedFix>,
+    /// What became of the findings given to a model, by decision; empty when
+    /// no model was asked.
+    pub models: BTreeMap<String, ModelCounts>,
+    /// Requests that went to a model this run (kept answers are not counted),
+    /// and what they cost.
+    pub model_calls: usize,
+    pub model_cost: f64,
     /// The check of the state the run ended in. After a dry run it describes
     /// the fixed text, which is no longer on disk.
     pub finished: Run,

@@ -15,8 +15,9 @@ use lighthouse_resource::{write_atomic, write_atomic_guarded};
 use super::{
     super::edits::{TextEdit, apply},
     super::lower::Sources,
+    super::model::{Class, Event},
     super::propose::Proposal,
-    super::{AppliedFix, DeclinedFix, FileChange, FixReport},
+    super::{AppliedFix, DeclinedFix, FileChange, FixReport, MODEL_FIXER},
     Orchestrator,
 };
 use crate::{Error, Run};
@@ -100,6 +101,12 @@ impl Orchestrator<'_> {
             outcome.diagnostics.iter().map(|d| &d.fingerprint).collect();
         self.declined
             .retain(|fingerprint, _| still.contains(fingerprint));
+        for fix in &undone {
+            if fix.fixer == MODEL_FIXER {
+                self.proposer
+                    .note_model(&fix.rule_id, Event::Declined(Class::RolledBack));
+            }
+        }
         for fix in undone {
             let why = fix
                 .files
@@ -118,12 +125,27 @@ impl Orchestrator<'_> {
                 },
             );
         }
+        for fix in kept.iter().filter(|a| a.fixer == MODEL_FIXER) {
+            self.proposer.note_model(&fix.rule_id, Event::Applied);
+        }
+        let (models, model_calls, model_cost) = match &self.proposer.models {
+            Some(models) => {
+                let (calls, cost) = models.usage();
+                self.notes.extend(models.finish());
+                (models.account.counts(), calls, cost)
+            }
+            None => Default::default(),
+        };
         Ok(FixReport {
             applied: kept,
             declined: self.declined.into_values().collect(),
             changes,
             rounds: self.rounds,
             notes: self.notes,
+            previews: self.previews,
+            models,
+            model_calls,
+            model_cost,
             finished: outcome,
         })
     }
