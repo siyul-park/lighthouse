@@ -100,10 +100,9 @@ fn a_registry_holds_the_models_of_its_plugins_by_id() {
 #[test]
 fn a_reference_names_a_provider_and_the_model_it_is_asked_for() {
     let dir = tempfile::tempdir().unwrap();
-    let config = Config::parse_inline(
-        "plugins = [\"echo\"]\n[models.providers.work]\ntype = \"rpc\"\nplugin = \"echo\"\n",
-    )
-    .unwrap();
+    let config =
+        Config::parse_inline("plugins = [\"echo\"]\n[models.providers.work]\nplugin = \"echo\"\n")
+            .unwrap();
     let engine = Engine::new(registry(), config, Catalog::bundled(), dir.path())
         .unwrap()
         .with_models(ModelOptions::default());
@@ -168,7 +167,7 @@ fn a_probability_fails_a_subject_only_at_or_above_the_fail_threshold() {
 fn engine_with_commands_builds_the_command_models_of_a_trusted_project() {
     let dir = tempfile::tempdir().unwrap();
     let config = Config::parse_inline(
-        "plugins = []\n[models.providers.prog]\ntype = \"command\"\nargv = [\"run\"]\n",
+        "plugins = []\n[models.providers.prog]\nprotocol = \"typesafe\"\ncommand = [\"run\"]\n",
     )
     .unwrap();
     let engine = |trusted: bool| {
@@ -198,7 +197,7 @@ fn a_project_cannot_declare_the_reserved_provider_local() {
     let dir = tempfile::tempdir().unwrap();
     let config = Config::parse_inline(
         "plugins = [\"echo\"]\n[models]\nclassification = \"local/echo\"\n\
-         [models.providers.local]\ntype = \"rpc\"\nplugin = \"echo\"\n",
+         [models.providers.local]\nplugin = \"echo\"\n",
     )
     .unwrap();
     let error = Engine::new(registry(), config, Catalog::bundled(), dir.path())
@@ -210,10 +209,9 @@ fn a_project_cannot_declare_the_reserved_provider_local() {
 #[test]
 fn a_trained_model_is_another_model_to_the_answer_cache_by_its_digest() {
     let dir = tempfile::tempdir().unwrap();
-    let config = Config::parse_inline(
-        "plugins = [\"echo\"]\n[models.providers.work]\ntype = \"rpc\"\nplugin = \"echo\"\n",
-    )
-    .unwrap();
+    let config =
+        Config::parse_inline("plugins = [\"echo\"]\n[models.providers.work]\nplugin = \"echo\"\n")
+            .unwrap();
     let engine = Engine::new(registry(), config, Catalog::bundled(), dir.path())
         .unwrap()
         .with_models(ModelOptions::default());

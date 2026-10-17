@@ -47,7 +47,7 @@ fn fake_model() -> String {
 /// A project binding `fake/any` to the command provider in `mode`.
 pub(crate) fn provider(mode: &str) -> String {
     format!(
-        "[models]\nclassification = \"fake/any\"\n[models.providers.fake]\ntype = \"command\"\nargv = [{:?}, {mode:?}]\n",
+        "[models]\nclassification = \"fake/any\"\n[models.providers.fake]\nprotocol = \"typesafe\"\ncommand = [{:?}, {mode:?}]\n",
         fake_model()
     )
 }
@@ -255,18 +255,17 @@ fn recorded_model_labels_are_judgments_attributed_to_the_model() {
     assert!(id.starts_with("fake/any@"), "{id}");
 }
 
-/// The bound model plus a weaker one that takes a prompt and answers through
-/// a pointer.
+/// The bound model plus a weaker one that answers through a pointer.
 fn layered() -> String {
     format!(
-        "{}[models.providers.weak]\ntype = \"command\"\nargv = [{:?}, \"weak\"]\nstdin = \"prompt\"\npointer = \"/result\"\n",
+        "{}[models.providers.weak]\nprotocol = \"typesafe\"\ncommand = [{:?}, \"weak\"]\npointer = \"/result\"\n",
         bound(),
         fake_model()
     )
 }
 
 #[test]
-fn an_abstention_falls_through_the_layers_and_a_prompt_command_answers_through_a_pointer() {
+fn an_abstention_falls_through_the_layers_and_a_command_answers_through_a_pointer() {
     let dir = project(&layered());
     let text = fs::read_to_string(dir.path().join("lighthouse.toml")).unwrap();
     fs::write(
@@ -296,7 +295,7 @@ fn route(models: &[(&str, &str)], routing: &str) -> String {
     );
     for (name, mode) in models {
         text.push_str(&format!(
-            "[models.providers.{name}]\ntype = \"command\"\nargv = [{:?}, {mode:?}, \"{name}-calls\"]\n",
+            "[models.providers.{name}]\nprotocol = \"typesafe\"\ncommand = [{:?}, {mode:?}, \"{name}-calls\"]\n",
             fake_model()
         ));
     }
@@ -372,8 +371,8 @@ fn round_robin_starts_each_request_at_the_next_model() {
 fn an_abstaining_model_does_not_fall_back_to_the_next_of_its_route() {
     let models = format!(
         "[models]\nclassification = [\"weak/m\", \"good/m\"]\n\
-         [models.providers.weak]\ntype = \"command\"\nargv = [{fake:?}, \"weak\"]\nstdin = \"prompt\"\npointer = \"/result\"\n\
-         [models.providers.good]\ntype = \"command\"\nargv = [{fake:?}, \"command\", \"good-calls\"]\n",
+         [models.providers.weak]\nprotocol = \"typesafe\"\ncommand = [{fake:?}, \"weak\"]\npointer = \"/result\"\n\
+         [models.providers.good]\nprotocol = \"typesafe\"\ncommand = [{fake:?}, \"command\", \"good-calls\"]\n",
         fake = fake_model()
     );
     let dir = project(&models);

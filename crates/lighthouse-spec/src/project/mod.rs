@@ -5,6 +5,7 @@
 
 mod formatter;
 mod models;
+mod provider;
 mod resolved;
 mod rules;
 mod spec;
@@ -28,7 +29,8 @@ use lighthouse_model::{Options, Severity};
 pub use lighthouse_process::Formatter;
 use lighthouse_resource::{Duration, documents, resource};
 pub use lighthouse_resource::{Format, Metadata, Resource};
-pub use models::{Evaluation, ModelInput, ModelProvider, Models, RESERVED_PROVIDERS, Routing};
+pub use models::{Evaluation, Models, Routing};
+pub use provider::{ModelProvider, ProviderSpec, RESERVED_PROVIDERS};
 use resolved::Resolved;
 pub use rules::{Level, RuleConfig, RuleSetting, Rules};
 use spec::PluginEntry;

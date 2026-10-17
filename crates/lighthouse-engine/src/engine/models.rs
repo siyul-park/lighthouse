@@ -511,7 +511,7 @@ mod tests {
                 })
                 .unwrap();
             let config = Config::parse_inline(
-                "plugins = [\"echo\"]\n[models.providers.work]\ntype = \"rpc\"\nplugin = \"echo\"\n",
+                "plugins = [\"echo\"]\n[models.providers.work]\nplugin = \"echo\"\n",
             )
             .unwrap();
             let engine =

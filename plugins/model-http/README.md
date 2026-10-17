@@ -5,15 +5,15 @@ The model provider over the standard HTTP APIs: TypeSafe System One and the Open
 **Layer.** Out-of-process plugin; depends on `lighthouse-protocol` and `async-openai` types only. Built by `make plugins`; its manifest provides the model `model-http`.
 
 ## Entry points
-- `openai`, `typesafe`: one module per published API, one free function per operation used.
-- `chat`: adapts a System One request to Chat Completions (a prompt asking for the probability of yes, `json_schema` response format).
-- `endpoint`: the provider `options`: `spec`, `baseUrl`, `keyEnv`.
-- `http`: the one I/O seam, `Client`, over one shared agent; `serve`: the handshake and handler, which picks the API a provider declares for `classify` (`typesafe` before `openai`).
+- `openai`, `typesafe`: one module per published protocol, one free function per operation used.
+- `chat`: adapts a System One request to Chat Completions (a prompt asking for `true` or `false`, P(fail) read from the logprobs of the answer token).
+- `endpoint`: the provider `options`: `protocol`, `baseUrl`, `keyEnv`, `extraBody`.
+- `http`: the one I/O seam, `Client`, over one shared agent; `serve`: the handshake and handler, which picks the protocol a provider declares for `classify` (`typesafe` before `openai`).
 
 ## Invariants
 - Request and response bodies are the published ones (protocol's `SystemOneRequest`/`SystemOneResponse`, `async-openai` types), used verbatim; there is no home-made API.
 - The key is read from the environment variable `keyEnv` names, never from configuration.
-- A provider without structured outputs fails the request with the error body it answered; there is no second request without it.
+- A model that returns no logprobs cannot classify: the request fails saying so; a number the model writes is never read as a probability.
 - Only a busy (429, 503) or overloaded (529) service is asked again, after its `Retry-After`; nothing else is retried.
 
 ## Tests

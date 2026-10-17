@@ -14,14 +14,13 @@ classification = "openrouter/qwen/qwen3-coder:free"
 budget = 50
 
 [models.providers.openrouter]
-spec = "openai"
+protocol = "openai"
 baseUrl = "https://openrouter.ai/api/v1"
 keyEnv = "OPENROUTER_API_KEY"
 
 [models.providers.script]
-type = "command"
-argv = ["./scripts/classify", "{model}"]
-stdin = "request"
+protocol = "typesafe"
+command = ["./scripts/classify", "{model}"]
 
 [rules."design/prefer-method"]
 level = "warn"
@@ -85,15 +84,16 @@ fn an_unknown_routing_is_rejected() {
 }
 
 #[test]
-fn a_provider_is_declared_by_spec_or_by_command_and_openai_is_built_in() {
+fn a_provider_is_reached_by_url_command_or_plugin_and_openai_is_built_in() {
     let binding = binding();
     let ModelProvider::Rpc {
         plugin, options, ..
     } = binding.provider("openrouter").unwrap()
     else {
-        panic!("a spec provider is a model-http provider");
+        panic!("a baseUrl provider is a model-http provider");
     };
     assert_eq!(plugin, "model-http");
+    assert_eq!(options["protocol"], "openai");
     assert_eq!(options["baseUrl"], "https://openrouter.ai/api/v1");
     assert!(matches!(
         binding.provider("script"),
@@ -102,6 +102,7 @@ fn a_provider_is_declared_by_spec_or_by_command_and_openai_is_built_in() {
     let ModelProvider::Rpc { options, .. } = binding.provider("openai").unwrap() else {
         panic!("openai is built in");
     };
+    assert_eq!(options["baseUrl"], "https://api.openai.com/v1");
     assert_eq!(options["keyEnv"], "OPENAI_API_KEY");
     assert!(binding.provider("ollama").is_none());
 }
@@ -137,43 +138,152 @@ fn a_predefined_provider_needs_no_declaration_and_routes_list_the_rules_that_bin
     );
 }
 
-#[test]
-fn logprobs_and_extra_body_travel_in_the_options_and_unknown_fields_are_rejected() {
-    let config = Config::parse_inline(
-        "[models.providers.lp]\nspec = \"openai\"\nlogprobs = true\n\
-         extraBody = { provider = { require_parameters = true }, max_tokens = 1024 }\n",
-    )
-    .unwrap();
-    let ModelProvider::Rpc { options, .. } = config
+fn provider(text: &str) -> ModelProvider {
+    Config::parse_inline(&format!("[models.providers.p]\n{text}"))
+        .unwrap()
         .models(&Projects::default())
         .unwrap()
-        .provider("lp")
+        .provider("p")
         .unwrap()
-    else {
-        panic!("a spec provider is a model-http provider");
-    };
-    assert_eq!(options["logprobs"], true);
-    assert_eq!(options["extraBody"]["provider"]["require_parameters"], true);
-    assert_eq!(options["extraBody"]["max_tokens"], 1024);
-    let plain = binding().provider("openrouter").unwrap();
-    let ModelProvider::Rpc { options, .. } = plain else {
-        panic!("a spec provider is a model-http provider");
-    };
-    assert!(!options.contains_key("logprobs") && !options.contains_key("extraBody"));
+}
 
-    let unknown = "[models.providers.x]\nspec = \"openai\"\nlogprob = true\n";
-    assert!(Config::parse_inline(unknown).is_err());
+/// Why `[models.providers.p]` with `text` cannot be a provider.
+fn invalid(text: &str) -> String {
+    let models = Config::parse_inline(&format!("[models.providers.p]\n{text}"))
+        .unwrap()
+        .models(&Projects::default())
+        .unwrap();
+    models.invalid["p"].clone()
 }
 
 #[test]
-fn a_provider_naming_an_unknown_spec_is_invalid() {
-    let bad = Config::parse_inline("[models.providers.x]\nspec = \"nope\"\n").unwrap();
+fn extra_body_travels_in_the_options_and_unknown_fields_are_rejected() {
+    let ModelProvider::Rpc { options, .. } = provider(
+        "protocol = \"openai\"\n\
+         extraBody = { provider = { require_parameters = true }, max_tokens = 1024 }\n",
+    ) else {
+        panic!("a protocol provider is a model-http provider");
+    };
+    assert_eq!(options["extraBody"]["provider"]["require_parameters"], true);
+    assert_eq!(options["extraBody"]["max_tokens"], 1024);
+    let ModelProvider::Rpc { options, .. } = binding().provider("openrouter").unwrap() else {
+        panic!("a baseUrl provider is a model-http provider");
+    };
+    assert!(!options.contains_key("extraBody"));
+
+    for removed in [
+        "logprobs = true",
+        "spec = \"openai\"",
+        "type = \"rpc\"",
+        "tasks = []",
+        "stdin = \"prompt\"",
+    ] {
+        let text = format!("[models.providers.x]\nprotocol = \"openai\"\n{removed}\n");
+        assert!(Config::parse_inline(&text).is_err(), "{removed}");
+    }
+}
+
+#[test]
+fn a_protocol_alone_is_http_at_its_own_service_and_a_key_is_only_defaulted_there() {
+    let ModelProvider::Rpc { options, .. } = provider("protocol = \"typesafe\"\n") else {
+        panic!("a protocol provider is a model-http provider");
+    };
+    assert_eq!(options["baseUrl"], "https://api.typesafe.ai");
+    assert_eq!(options["keyEnv"], "TYPESAFE_API_KEY");
+    let ModelProvider::Rpc { options, .. } =
+        provider("protocol = \"openai\"\nbaseUrl = \"http://localhost:11434/v1\"\n")
+    else {
+        panic!("a baseUrl provider is a model-http provider");
+    };
     assert!(
-        bad.models(&Projects::default())
-            .unwrap()
-            .invalid
-            .contains_key("x")
+        !options.contains_key("keyEnv"),
+        "a local service needs no key"
     );
+}
+
+#[test]
+fn a_plugin_provider_takes_options_and_a_command_provider_its_own_fields() {
+    let ModelProvider::Rpc {
+        plugin, options, ..
+    } = provider("plugin = \"model-local\"\noptions = { tag = 1 }\ncost = 0\n")
+    else {
+        panic!("a plugin provider is an rpc provider");
+    };
+    assert_eq!(
+        (plugin.as_str(), options["tag"].as_i64()),
+        ("model-local", Some(1))
+    );
+    let ModelProvider::Command {
+        argv,
+        cost,
+        pointer,
+        key_env,
+        ..
+    } = provider(
+        "protocol = \"typesafe\"\ncommand = [\"run\", \"{model}\"]\npointer = \"/result\"\nkeyEnv = \"K\"\n",
+    )
+    else {
+        panic!("a command provider is a command");
+    };
+    assert_eq!(argv, ["run", "{model}"]);
+    assert_eq!(
+        (cost, pointer.as_deref(), key_env.as_deref()),
+        (1.0, Some("/result"), Some("K"))
+    );
+}
+
+#[test]
+fn a_provider_with_two_reaches_or_none_is_invalid_naming_the_fields() {
+    let both = invalid("protocol = \"openai\"\nbaseUrl = \"http://x\"\ncommand = [\"run\"]\n");
+    assert!(both.contains("`baseUrl` and `command`"), "{both}");
+    let none = invalid("protocol = \"anthropic\"\n");
+    assert!(none.contains("none of the protocols"), "{none}");
+    let nothing = invalid("cost = 1\n");
+    assert!(
+        nothing.contains("`baseUrl`, `command` or `plugin`"),
+        "{nothing}"
+    );
+    let several = invalid("protocol = [\"openai\", \"typesafe\"]\n");
+    assert!(several.contains("add a `baseUrl`"), "{several}");
+    let unprotocolled = invalid("baseUrl = \"http://x\"\n");
+    assert!(
+        unprotocolled.contains("needs a `protocol`"),
+        "{unprotocolled}"
+    );
+}
+
+#[test]
+fn a_command_speaks_typesafe_and_a_command_without_a_protocol_waits_for_chat() {
+    let plain = invalid("command = [\"run\"]\n");
+    assert!(
+        plain.contains("serves `chat`") && plain.contains("protocol = \"typesafe\""),
+        "{plain}"
+    );
+    let other = invalid("protocol = \"openai\"\ncommand = [\"run\"]\n");
+    assert!(other.contains("speaks `typesafe`"), "{other}");
+    let empty = invalid("protocol = \"typesafe\"\ncommand = []\n");
+    assert!(empty.contains("`command` is empty"), "{empty}");
+}
+
+#[test]
+fn a_field_of_another_reach_is_refused() {
+    let timeout = invalid("protocol = \"openai\"\ntimeout = \"5s\"\n");
+    assert!(
+        timeout.contains("`baseUrl` provider has no `timeout`"),
+        "{timeout}"
+    );
+    let options = invalid("protocol = \"typesafe\"\ncommand = [\"run\"]\noptions = { a = 1 }\n");
+    assert!(
+        options.contains("`command` provider has no `options`"),
+        "{options}"
+    );
+    let protocol = invalid("plugin = \"model-local\"\nprotocol = \"openai\"\n");
+    assert!(
+        protocol.contains("`plugin` provider has no `protocol`"),
+        "{protocol}"
+    );
+    let extra = invalid("plugin = \"model-local\"\nextraBody = { a = 1 }\n");
+    assert!(extra.contains("`extraBody`"), "{extra}");
 }
 
 #[test]

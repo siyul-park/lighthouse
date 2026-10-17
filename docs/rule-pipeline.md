@@ -127,7 +127,7 @@ most specific layer to the least, and an **abstention falls through** to the nex
 | 3. Project default | `[models] classification = "…"` (one model or a route), `embedding = "…"` | the project |
 | 4. Agent | a review task | always available |
 
-A model is named `<provider>/<model>`, split at the first `/`. The standard API specs are built in (`openai`: OpenAI's API at api.openai.com/v1, key in `OPENAI_API_KEY`; `typesafe`: TypeSafe's System One at api.typesafe.ai, key in `TYPESAFE_API_KEY`); any other service is a provider the project declares, with the same `rpc` or `command` union as checks and fixes. OpenRouter, Ollama, vLLM and LM Studio speak the `openai` spec:
+A model is named `<provider>/<model>`, split at the first `/`. A provider has two axes: the **protocol** it speaks (`protocol`: `openai`, `typesafe`, or a list in order of preference) and the **reach** to it, exactly one of `baseUrl` (HTTP, served by `model-http`), `command` (a stdio process) and `plugin` (an rpc plugin). The standard protocols are built in at their own service (`openai`: api.openai.com/v1, key in `OPENAI_API_KEY`; `typesafe`: api.typesafe.ai, key in `TYPESAFE_API_KEY`), so `protocol = "openai"` alone is a provider; any other service is one the project declares. OpenRouter, Ollama, vLLM and LM Studio speak the `openai` protocol:
 
 ```toml
 [models]
@@ -137,49 +137,48 @@ budget = 200                      # subjects per run put to models that cost; th
 explore = 0.05                   # share of an attached model's fails sent on to the next layer, to keep labels coming; 0 to 1
 
 [models.providers.openrouter]     # a recipe: any OpenAI-compatible service; free models first
-spec = "openai"                   # or a list: ["openai", "typesafe"]
+protocol = "openai"               # or a list: ["openai", "typesafe"]
 baseUrl = "https://openrouter.ai/api/v1"
 keyEnv = "OPENROUTER_API_KEY"
 cost = 1                          # counted against the budget = the daily free quota
-extraBody = { provider = { require_parameters = true }, reasoning = { enabled = false } }
-
-[models.providers.openrouter-logprobs]  # the same service, answers read from the first token
-spec = "openai"
-baseUrl = "https://openrouter.ai/api/v1"
-keyEnv = "OPENROUTER_API_KEY"
-cost = 1
-logprobs = true
 # a model whose reasoning is forced needs room for it, and the answer is read past the reasoning tag
 extraBody = { provider = { require_parameters = true }, reasoning = { effort = "low" }, max_tokens = 1024 }
 
 [models.providers.mercury]        # System One on OpenRouter: P(fail) from the model itself
-spec = "typesafe"
+protocol = "typesafe"
 baseUrl = "https://openrouter.ai/api"
 keyEnv = "OPENROUTER_API_KEY"
 cost = 1
 # reference: mercury/inception/mercury-decide:free
 
 [models.providers.ollama]         # a local one needs no key
-spec = "openai"
+protocol = "openai"
 baseUrl = "http://localhost:11434/v1"
 cost = 0
 
+[models.providers.lmstudio]       # LM Studio; vLLM is the same at http://localhost:8000/v1
+protocol = "openai"
+baseUrl = "http://localhost:1234/v1"
+cost = 0
+
 [models.providers.nvidia]         # NVIDIA NIM: free, rate-limited; logprobs are rounded to 0.5 nats
-spec = "openai"
+protocol = "openai"
 baseUrl = "https://integrate.api.nvidia.com/v1"
 keyEnv = "NVIDIA_API_KEY"
-logprobs = true
 extraBody = { chat_template_kwargs = { enable_thinking = false } }  # the first token is the answer
 cost = 1
 # reference: nvidia/nvidia/nemotron-3-super-120b-a12b, nvidia/nvidia/nemotron-3.5-lightning-30b-a3b
 
-[models.providers.script]         # any program that reads a request and prints JSON works
-type = "command"
-argv = ["./scripts/classify", "{model}"]
-stdin = "request"                 # `request` (TypeSafe's body) or `prompt` (text asking for {noul})
-# pointer = "/result"             # RFC 6901 pointer to the answer inside an envelope
+[models.providers.script]         # any program that reads System One's body and prints its response
+protocol = "typesafe"
+command = ["./scripts/classify", "{model}"]
+# pointer = "/result"             # RFC 6901 pointer to the response inside an envelope
 timeout = "120s"
 # reference: script/fast
+
+[models.providers.work]           # a plugin that offers models; its handshake says what it serves
+plugin = "model-local"
+# `local` is built in and needs no declaration: model = "local/learned@sha256:<hex>"
 
 [rules."design/naming-result"]
 level = "info"
@@ -187,14 +186,14 @@ model = "ollama/qwen3-coder:30b"  # a cheaper model for this decision only
 evaluation = { precision = 0.9 }          # recall = 0.8 optional
 ```
 
-- **How a chat model answers.** By default the model is asked for `{"noul": p}` under a `json_schema` response format: a verbalized probability. With `logprobs = true` (OpenAI's own parameter name) the model is asked for one word, `true` if the subject violates the requirement and `false` if it complies (the names of the criteria in the prompt), with `logprobs`, `top_logprobs = 20`, `max_tokens = 1` and `temperature = 0`; P(fail) is p_true / (p_true + p_false) over the first answer token's top log probabilities, after trimming, lower-casing and stripping punctuation (the OpenAI Cookbook's classification recipe, renormalized over the labels as in Zhao et al., ICML 2021). The answer token is the first sampled token that is neither blank nor a closing reasoning tag such as `</think>`. Neither label among the top 20 is an abstention; a response without `logprobs` is a provider error naming the model, never read as verbalized. The answering model id is `<model>@<version>-logprobs`, so the two modes never share a cache entry or an eval row. Use it for a non-reasoning model, or one whose reasoning is merely forced: a model that reasons needs room for it, as in the `openrouter-logprobs` recipe.
-- **`extraBody`** is a JSON object merged shallowly into every request body of a `spec = "openai"` provider (the OpenAI SDK's `extra_body`); its keys override the body's own, `max_tokens` included. It carries service-specific parameters, such as OpenRouter's `provider.require_parameters`, without code for any service.
+- **How a chat model answers.** From its own distribution, never from a number it writes: the model is asked for one word, `true` if the subject violates the requirement and `false` if it complies (the names of the criteria in the prompt), with `logprobs`, `top_logprobs = 20`, `max_tokens = 1` and `temperature = 0`; P(fail) is p_true / (p_true + p_false) over the first answer token's top log probabilities, after trimming, lower-casing and stripping punctuation (the OpenAI Cookbook's classification recipe, renormalized over the labels as in Zhao et al., ICML 2021). The answer token is the first sampled token that is neither blank nor a closing reasoning tag such as `</think>`. Neither label among the top 20 is an abstention; a response without `logprobs` is a provider error ("the model returned no logprobs; it cannot serve classification"), so the route moves to its next model or the subject stays for review. Use a non-reasoning model, or one whose reasoning is merely forced: a model that reasons needs room for it, as in the `openrouter` recipe.
+- **`extraBody`** is a JSON object merged shallowly into every request body of an HTTP provider (the OpenAI SDK's `extra_body`); its keys override the body's own, `max_tokens` included. It carries service-specific parameters, such as OpenRouter's `provider.require_parameters`, without code for any service.
 - **A route.** A binding is one reference or a list of them; a list is one layer, and a layer is asked as one: its models are tried in turn.
   - `routing = "ordered"` (default) starts every request at the first model; `"round-robin"` starts consecutive requests at consecutive models, the others following in the order written, wrapping.
   - A request moves to the next model only when a model fails (an HTTP error including 429 and 5xx, a timeout, missing `logprobs`, unusable output) or the budget refuses a model that costs. An abstention or an unsure answer goes to the next layer, never the next model.
   - A model that fails 3 times in a run is skipped for the rest of it, with one notice (LiteLLM's `allowed_fails`). With every model out, the subject stays for review.
   - A kept answer of any model of the route is used before a request is sent; the model that answered is the one `evidence.model` and `eval`'s `scores[].model` name, and `eval` lists the run's notices per check, so a failing model is not silent.
-- The `spec` providers are served by the `model-http` plugin, which must be listed in `plugins`. A `command` provider reuses the command contract (no shell, its own process group, a time limit, a cap on output, an environment cleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG` and `TMPDIR` plus the declared `env` and `keyEnv`, project trust) and its program is part of what trust covers. An answer that does not fit the shape is no answer, and the subject stays for review.
+- A `baseUrl` provider, and a bare `protocol`, is served by the `model-http` plugin, which must be listed in `plugins`. A `command` provider speaks `typesafe`: System One's body on stdin, the response on stdout, picked out of an envelope by `pointer` when it has one. It reuses the command contract (no shell, its own process group, a time limit, a cap on output, an environment cleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG` and `TMPDIR` plus the declared `env` and `keyEnv`, project trust) and its program is part of what trust covers. An answer that does not fit the shape is no answer, and the subject stays for review. A `command` without a protocol would speak plain text, which has no probability distribution: it serves `chat` and `edit`, which arrive with fixes by models, and until then it is a configuration error.
 - The engine keys off the capabilities a model declares, never its name: `deterministic`, `abstains` and `cost`. The budget and the report scope (changed files, or everything with `--all-models`) limit only the models with a `cost` above 0; an answer is cached under the model, its version, the check's revision and the subject. A model that fails never makes a run incomplete (exit 3): its subjects stay for review.
 - Subjects nothing decided (an abstention, an unsure answer, no bound model, the budget spent, a failed model, `--no-models`) are reported as SARIF results of kind `review`, in the report scope only, and as review tasks in the agent output, grouped. They never change the exit code.
 - `--record-model-labels` records what models fail as `Judgment`s attributed to the model (`<provider>/<model>@<version>`), so that training can reproduce them from `decisions.jsonl`. A person's judgment still wins.
@@ -371,7 +370,7 @@ judgment, meaning version and check revision.
 | --- | --- |
 | Decisions, packs, judgments, suppressions (reviewer-declared and in the code), `decisions.jsonl`, SQLite memory | done |
 | `check` providers (`builtin`, `cel` with `abstain`, `command`, `model`), meaning version and check revision | done |
-| `classification` with layered bindings (Revision, rule, project, agent), `provider/model` references, `model-http` (`openai` spec) and `command` providers, answer cache, budget, SARIF `review` results, `decision eval`, the label collector, `model train` plumbing | done |
+| `classification` with layered bindings (Revision, rule, project, agent), `provider/model` references, `model-http` (`openai` protocol) and `command` providers, answer cache, budget, SARIF `review` results, `decision eval`, the label collector, `model train` plumbing | done |
 | Judgments and suppressions replace verdicts; naming alignment (`intent` → `context`, provenance fields) | done |
 | Judgments on subjects, sampling, evaluation, `Revision` records, log compaction, snapshot budgets | Phase 3 |
 | Evidence sources (grouping, mining) and revision proposals | Phase 4 (mining at `init` in Phase 5) |

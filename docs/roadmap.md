@@ -77,8 +77,8 @@ The biggest direct cut in agent work, and it needs no labels: the verifier alrea
   chosen with `rules."<id>".fix`, and a `type: model` fix is an extent replacement or an
   agent edit of a scratch workspace.
   - Lighthouse ships a ready-made plugin with clients for standard APIs: OpenAI-compatible endpoints (OpenRouter, Ollama, vLLM, LM Studio) now, Anthropic later.
-  - Headless agent CLIs are documented as recipes (command providers); a measured
-    comparison of API, local-server and agent-CLI arms decides the default.
+  - Headless agent CLIs are `chat` and `edit` providers (a `command` without a protocol);
+    a measured comparison of API, local-server and agent-CLI arms decides the default.
   - The fixer's output is always verified (apply, format, re-check, roll back) and is always `suggested`.
   - An `[approval]` policy says which changes may be applied without a person.
 
@@ -91,7 +91,7 @@ Free, local and calibrated, run in process; evaluation is the promotion gate.
   earns it. No arm tried so far (hosted logprobs models, free chat models, the local
   learner) beats that constant.
 - Remote decision models stay behind the published APIs: System One models answer yes/no
-  questions with a probability through TypeSafe's API spec, and `:free` chat models label
+  questions with a probability through TypeSafe's protocol, and `:free` chat models label
   candidates on request.
 
 ### Checks that author themselves

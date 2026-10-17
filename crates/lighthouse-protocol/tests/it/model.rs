@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use lighthouse_protocol::{
     Answer, Capabilities, DecisionRef, Example, ListModelResponse, Model, NOUL, Question, State,
     Subject, SystemOneRequest, artifact_path, content_dir, dataset_path,
-    prompt::{self, json_in, noul_of, response_schema},
+    prompt::{self, json_in, noul_of},
 };
 use serde_json::json;
 
@@ -53,44 +53,18 @@ fn a_question_puts_invalid_examples_under_true_and_valid_ones_under_false() {
 }
 
 #[test]
-fn the_system_text_carries_the_instructions_the_decision_and_its_examples() {
+fn the_system_text_carries_the_instructions_the_decision_and_its_examples_and_asks_for_a_word() {
     let text = prompt::system("design/x", &Question::new(&decision()));
     assert!(text.contains("Is it small?") && text.contains("design/x"));
     assert!(text.contains("Criterion true") && text.contains("func big() {}"));
-    assert!(text.contains("noul"));
-}
-
-#[test]
-fn the_label_system_text_asks_for_a_word_instead_of_a_probability() {
-    let question = Question::new(&decision());
-    let text = prompt::system_label("design/x", &question);
-    assert!(text.contains("Answer with one word") && text.contains("func big() {}"));
+    assert!(text.contains("Answer with one word"));
     assert!(!text.contains("noul") && !text.contains("JSON"));
-    // Only the reply instruction differs.
-    let rest = |text: &str| {
-        text.split_once("\n\nDecision")
-            .map(|(_, rest)| rest.to_owned())
-    };
-    assert_eq!(rest(&text), rest(&prompt::system("design/x", &question)));
 }
 
 #[test]
 fn the_subject_text_shows_the_file_and_the_source() {
     let text = prompt::subject(&state());
     assert!(text.contains("a.go") && text.contains("func f() {}"));
-}
-
-#[test]
-fn a_prompt_holds_both_and_the_schema_asks_for_a_probability() {
-    let request = SystemOneRequest {
-        state: state(),
-        model: "m".to_owned(),
-        questions: BTreeMap::from([("design/x".to_owned(), Question::new(&decision()))]),
-        options: Default::default(),
-    };
-    let text = prompt::render(&request);
-    assert!(text.contains("Is it small?") && text.contains("func f() {}"));
-    assert_eq!(response_schema()["properties"]["noul"]["type"], "number");
 }
 
 #[test]

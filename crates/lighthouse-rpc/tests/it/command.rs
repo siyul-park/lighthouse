@@ -8,7 +8,7 @@ use lighthouse_spec::Config;
 
 fn provider(argv: &str) -> lighthouse_spec::ModelProvider {
     let config = Config::parse_inline(&format!(
-        "plugins = []\n[models.providers.p]\ntype = \"command\"\nargv = {argv}\n"
+        "plugins = []\n[models.providers.p]\nprotocol = \"typesafe\"\ncommand = {argv}\n"
     ))
     .unwrap();
     config
@@ -65,10 +65,8 @@ fn command_new_fails_a_program_that_exits_with_an_error() {
 #[test]
 fn command_new_is_none_for_a_provider_that_is_not_a_command() {
     let dir = tempfile::tempdir().unwrap();
-    let config = Config::parse_inline(
-        "plugins = []\n[models.providers.p]\ntype = \"rpc\"\nplugin = \"x\"\n",
-    )
-    .unwrap();
+    let config =
+        Config::parse_inline("plugins = []\n[models.providers.p]\nplugin = \"x\"\n").unwrap();
     let provider = config
         .models(&lighthouse_spec::Projects::default())
         .unwrap()

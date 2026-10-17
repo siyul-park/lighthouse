@@ -143,9 +143,6 @@ fn validate_models(registry: &Registry, config: &Config, binding: &Models) -> Re
             ModelProvider::Rpc { plugin, .. } if registry.model(plugin).is_none() => {
                 Some(format!("plugin `{plugin}` offers no model"))
             }
-            ModelProvider::Command { argv, .. } if argv.is_empty() => {
-                Some("`argv` is empty".to_owned())
-            }
             _ => None,
         };
         if let Some(reason) = reason {

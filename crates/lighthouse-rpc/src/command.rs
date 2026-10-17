@@ -1,6 +1,7 @@
-//! A model that is any program: it reads a request on stdin and prints JSON.
-//! The project declares it as a `command` provider; the program runs under the
-//! process contract, so a trusted project is the only one that builds it.
+//! A model that is any program: it reads TypeSafe's System One request on
+//! stdin and prints the response. The project declares it as a `command`
+//! provider with `protocol = "typesafe"`; the program runs under the process
+//! contract, so a trusted project is the only one that builds it.
 
 use std::{
     collections::BTreeMap,
@@ -14,10 +15,10 @@ use lighthouse_plugin::{
 use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT};
 use lighthouse_protocol::{
     canonical, hash,
-    prompt::{self, json_in, noul_of},
+    prompt::{json_in, noul_of},
 };
 use lighthouse_resource::Duration as Limit;
-use lighthouse_spec::{ModelInput, ModelProvider};
+use lighthouse_spec::ModelProvider;
 use serde_json::{Value, json};
 
 /// How long a command model may take when the instance says nothing.
@@ -27,7 +28,6 @@ pub struct CommandModel {
     manifest: Model,
     model: String,
     argv: Vec<String>,
-    stdin: ModelInput,
     pointer: Option<String>,
     dir: PathBuf,
     env: Vec<(String, String)>,
@@ -40,9 +40,7 @@ impl CommandModel {
     pub fn new(dir: &Path, name: &str, model: &str, provider: &ModelProvider) -> Option<Self> {
         let ModelProvider::Command {
             argv,
-            stdin,
             pointer,
-            tasks,
             cost,
             timeout,
             env,
@@ -60,21 +58,14 @@ impl CommandModel {
                 created: 0,
                 owned_by: name.to_owned(),
                 capabilities: Capabilities {
-                    classification: tasks
-                        .iter()
-                        .any(|t| t == "classification")
-                        .then_some(Supports { supported: true }),
-                    embedding: tasks
-                        .iter()
-                        .any(|t| t == "embedding")
-                        .then_some(Supports { supported: true }),
+                    classification: Some(Supports { supported: true }),
+                    embedding: None,
                     fine_tuning: None,
                 },
                 version: hash::short(
                     &canonical(&json!({
                         "argv": argv,
                         "model": model,
-                        "stdin": stdin,
                         "pointer": pointer,
                         "env": env,
                         "keyEnv": key_env,
@@ -87,7 +78,6 @@ impl CommandModel {
                 cost: *cost,
             },
             argv: argv.iter().map(|a| a.replace("{model}", model)).collect(),
-            stdin: *stdin,
             pointer: pointer.clone(),
             dir: dir.to_owned(),
             env: command_env(env, key_env.as_deref()),
@@ -106,10 +96,7 @@ impl Classifier for CommandModel {
         let failed = |reason: String| Error::model(&self.manifest.id, reason);
         let mut asked = params.clone();
         asked.model.clone_from(&self.model);
-        let input = match self.stdin {
-            ModelInput::Request => serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?,
-            ModelInput::Prompt => prompt::render(&asked).into_bytes(),
-        };
+        let input = serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?;
         let output = lighthouse_process::run(&Invocation {
             argv: &self.argv,
             dir: &self.dir,

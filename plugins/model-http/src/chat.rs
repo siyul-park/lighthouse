@@ -1,31 +1,25 @@
 //! The one adaptation: a System One request answered through Chat
-//! Completions. Each question is rendered as a prompt and answered in one of
-//! two ways, by the provider's `logprobs` option.
+//! Completions. Each question is rendered as a prompt asking for `true` or
+//! `false`, the names of its criteria, and P(fail) is read from the
+//! probabilities of those two tokens at the answer position, renormalized over
+//! the two labels (OpenAI Cookbook, "Using logprobs for classification"; Zhao
+//! et al., ICML 2021). A model whose reasoning cannot be turned off writes it
+//! first, so the answer position is the first sampled token that is neither
+//! blank nor a closing reasoning tag.
 //!
-//! Verbalized (the default): the prompt asks for the probability of yes, and
-//! the shape of the answer is asked for with `response_format` `json_schema`
-//! (OpenAI and OpenRouter document it:
-//! https://openrouter.ai/docs/features/structured-outputs). A provider that
-//! does not support it refuses the request, and the call fails with the error
-//! body it answered; there is no second request without it.
-//!
-//! Logprobs: the prompt asks for `true` or `false`, the names of its criteria,
-//! and P(fail) is read from the probabilities of those two tokens at the answer
-//! position, renormalized over the two labels (OpenAI Cookbook, "Using logprobs
-//! for classification"; Zhao et al., ICML 2021). A model whose reasoning cannot
-//! be turned off writes it first, so the answer position is the first sampled
-//! token that is neither blank nor a closing reasoning tag.
+//! The probability is the model's own distribution: a number the model writes
+//! is never read as one, so a model that returns no logprobs cannot serve
+//! classification.
 
 use std::collections::BTreeMap;
 
 use async_openai::types::chat::{
     ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
     ChatCompletionRequestUserMessage, ChatCompletionTokenLogprob, CreateChatCompletionRequest,
-    CreateChatCompletionResponse, ResponseFormat, ResponseFormatJsonSchema,
+    CreateChatCompletionResponse,
 };
 use lighthouse_protocol::{
-    Answer, ErrorObject, Question, SystemOneRequest, SystemOneResponse,
-    prompt::{self, json_in, noul_of, response_schema},
+    Answer, ErrorObject, Question, SystemOneRequest, SystemOneResponse, prompt,
 };
 use serde_json::{Map, Value};
 
@@ -33,7 +27,7 @@ use crate::{endpoint::Endpoint, http::Client, openai::create_chat_completion};
 
 /// Changes with the prompt, so that cached answers of another prompt are not
 /// used.
-pub const PROMPT_VERSION: &str = "2";
+pub const PROMPT_VERSION: &str = "3";
 
 /// The most likely tokens asked for at each position (the maximum of OpenAI
 /// and OpenRouter).
@@ -48,52 +42,28 @@ pub fn systemone(
     let user = prompt::subject(&request.state);
     let mut answers = BTreeMap::new();
     for (id, question) in &request.questions {
-        let (asked, fixed) = completion(&request.model, id, question, &user, endpoint.logprobs);
+        let (asked, fixed) = completion(&request.model, id, question, &user);
         let response = create_chat_completion(client, endpoint, &asked, fixed)?;
-        let noul = if endpoint.logprobs {
-            label_noul(&response, &request.model)?
-        } else {
-            verbalized_noul(&response, id)?
-        };
-        if let Some(noul) = noul {
+        if let Some(noul) = label_noul(&response)? {
             answers.insert(id.clone(), Answer::new(noul));
         }
     }
-    let mode = if endpoint.logprobs { "-logprobs" } else { "" };
     Ok(SystemOneResponse {
-        model: format!("{}@{PROMPT_VERSION}{mode}", request.model),
+        model: format!("{}@{PROMPT_VERSION}", request.model),
         answers,
         usage: Value::Null,
     })
 }
 
-/// The probability of yes a model wrote as JSON.
-fn verbalized_noul(
-    response: &CreateChatCompletionResponse,
-    id: &str,
-) -> Result<Option<f64>, ErrorObject> {
-    let text = response
-        .choices
-        .first()
-        .and_then(|choice| choice.message.content.as_deref())
-        .ok_or("the provider's response has no message")?;
-    Ok(json_in(text).and_then(|value| noul_of(&value, id)))
-}
-
 /// P(fail) from the probabilities of `true` and `false` at the answer position;
 /// `None` when neither is among the most likely tokens.
-fn label_noul(
-    response: &CreateChatCompletionResponse,
-    model: &str,
-) -> Result<Option<f64>, ErrorObject> {
+fn label_noul(response: &CreateChatCompletionResponse) -> Result<Option<f64>, ErrorObject> {
     let content = response
         .choices
         .first()
         .and_then(|choice| choice.logprobs.as_ref())
         .and_then(|logprobs| logprobs.content.as_deref())
-        .ok_or_else(|| {
-            format!("model {model} returned no logprobs: the provider ignored the parameter")
-        })?;
+        .ok_or("the model returned no logprobs; it cannot serve classification")?;
     let Some(answer) = content.iter().find(|at| is_answer(at)) else {
         return Ok(None);
     };
@@ -132,14 +102,9 @@ fn completion(
     id: &str,
     question: &Question,
     user: &str,
-    logprobs: bool,
 ) -> (CreateChatCompletionRequest, Map<String, Value>) {
-    let system = if logprobs {
-        prompt::system_label(id, question)
-    } else {
-        prompt::system(id, question)
-    };
-    let mut request = CreateChatCompletionRequest {
+    let system = prompt::system(id, question);
+    let request = CreateChatCompletionRequest {
         model: model.to_owned(),
         temperature: Some(0.0),
         messages: vec![
@@ -148,23 +113,11 @@ fn completion(
             )),
             ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage::from(user)),
         ],
+        logprobs: Some(true),
+        top_logprobs: Some(TOP_LOGPROBS),
         ..Default::default()
     };
-    let mut fixed = Map::new();
-    if logprobs {
-        request.logprobs = Some(true);
-        request.top_logprobs = Some(TOP_LOGPROBS);
-        fixed.insert("max_tokens".to_owned(), Value::from(1));
-    } else {
-        request.response_format = Some(ResponseFormat::JsonSchema {
-            json_schema: ResponseFormatJsonSchema {
-                description: None,
-                name: "classification".to_owned(),
-                schema: response_schema(),
-                strict: Some(true),
-            },
-        });
-    }
+    let fixed = Map::from_iter([("max_tokens".to_owned(), Value::from(1))]);
     (request, fixed)
 }
 
@@ -212,15 +165,6 @@ mod tests {
         }
     }
 
-    fn replying(texts: &[&str]) -> Recording {
-        Recording::replying(
-            texts
-                .iter()
-                .map(|t| json!({"choices": [{"index": 0, "message": {"role": "assistant", "content": t}}], "id": "c", "object": "chat.completion", "created": 1, "model": "m"}))
-                .collect(),
-        )
-    }
-
     /// A reply whose content logprobs are `positions`, each a sampled token
     /// and its most likely tokens.
     fn logprobs_reply(positions: &[(&str, &[(&str, f32)])]) -> Value {
@@ -245,19 +189,18 @@ mod tests {
         }]})
     }
 
-    fn labelled(endpoint_extra: Option<Value>) -> Endpoint {
+    fn endpoint(extra: Option<Value>) -> Endpoint {
         let mut endpoint = Endpoint::at("openai", "https://x");
-        endpoint.logprobs = true;
-        if let Some(Value::Object(extra)) = endpoint_extra {
+        if let Some(Value::Object(extra)) = extra {
             endpoint.extra_body = extra;
         }
         endpoint
     }
 
-    /// P(fail) the logprobs mode reads from one reply.
+    /// P(fail) read from one reply.
     fn read(reply: Value) -> Result<Option<f64>, ErrorObject> {
         let client = Recording::replying(vec![reply]);
-        let result = systemone(&client, &labelled(None), &request(&["d/x"]))?;
+        let result = systemone(&client, &endpoint(None), &request(&["d/x"]))?;
         Ok(result.answers.get("d/x").map(|a| a.noul))
     }
 
@@ -267,55 +210,29 @@ mod tests {
     }
 
     #[test]
-    fn the_completion_asks_for_the_schema_with_the_prompt() {
-        let (asked, fixed) = completion("m", "d/x", &question(), "u", false);
-        let body = serde_json::to_value(asked).unwrap();
-        assert_eq!(body["model"], "m");
-        assert_eq!(body["temperature"], 0.0);
-        assert_eq!(body["response_format"]["type"], "json_schema");
-        assert_eq!(body["response_format"]["json_schema"]["strict"], true);
-        assert_eq!(body["messages"][0]["role"], "system");
-        assert_eq!(body["messages"][1]["content"], "u");
-        assert!(body.get("logprobs").is_none() && fixed.is_empty());
-    }
-
-    #[test]
-    fn each_question_is_one_request_and_a_fenced_probability_is_its_answer() {
-        let client = replying(&["```json\n{\"noul\": 0.93}\n```", "{\"noul\": 0.1}"]);
+    fn each_question_is_one_request_and_its_answer_is_read_from_the_labels() {
+        let client = Recording::replying(vec![
+            logprobs_reply(&[("true", &[("true", -0.1), ("false", -2.4)])]),
+            logprobs_reply(&[("false", &[("false", -0.1), ("true", -2.4)])]),
+        ]);
         let endpoint = Endpoint::at("openai", "https://openrouter.ai/api/v1/");
         let result = systemone(&client, &endpoint, &request(&["d/x", "d/y"])).unwrap();
-        assert_eq!(result.answers["d/x"].noul, 0.93);
-        assert_eq!(result.answers["d/y"].noul, 0.1);
-        assert!(result.model.starts_with("qwen/qwen3-coder:free@"));
-        assert!(!result.model.ends_with("-logprobs"));
+        assert!((result.answers["d/x"].noul - p_of(-0.1, -2.4)).abs() < 1e-9);
+        assert!((result.answers["d/y"].noul - p_of(-2.4, -0.1)).abs() < 1e-9);
+        assert_eq!(
+            result.model,
+            format!("qwen/qwen3-coder:free@{PROMPT_VERSION}")
+        );
         let asked = client.asked();
         assert_eq!(asked.len(), 2);
         assert_eq!(asked[0].0, "https://openrouter.ai/api/v1/chat/completions");
     }
 
     #[test]
-    fn text_that_is_not_a_probability_is_no_answer() {
-        for text in ["I think it is bad", "{\"noul\": 7}"] {
-            let endpoint = Endpoint::at("openai", "https://x");
-            let result = systemone(&replying(&[text]), &endpoint, &request(&["d/x"])).unwrap();
-            assert!(result.answers.is_empty(), "{text}");
-        }
-    }
-
-    #[test]
-    fn a_response_without_a_message_fails() {
-        let client = Recording::replying(vec![
-            json!({"id": "c", "object": "chat.completion", "created": 1, "model": "m", "choices": []}),
-        ]);
-        let endpoint = Endpoint::at("openai", "https://x");
-        assert!(systemone(&client, &endpoint, &request(&["d/x"])).is_err());
-    }
-
-    #[test]
-    fn the_logprobs_request_has_no_schema_and_one_token() {
+    fn the_request_has_no_schema_and_one_token() {
         let reply = logprobs_reply(&[("true", &[("true", -0.1), ("False", -2.4)])]);
         let client = Recording::replying(vec![reply]);
-        systemone(&client, &labelled(None), &request(&["d/x"])).unwrap();
+        systemone(&client, &endpoint(None), &request(&["d/x"])).unwrap();
         let body = &client.asked()[0].1;
         assert_eq!(body["logprobs"], true);
         assert_eq!(body["top_logprobs"], 20);
@@ -331,7 +248,7 @@ mod tests {
     fn extra_body_overrides_the_logprobs_request_including_max_tokens() {
         let reply = logprobs_reply(&[("true", &[("true", -0.1)])]);
         let client = Recording::replying(vec![reply]);
-        let endpoint = labelled(Some(json!({"max_tokens": 1024, "temperature": 0.5})));
+        let endpoint = endpoint(Some(json!({"max_tokens": 1024, "temperature": 0.5})));
         systemone(&client, &endpoint, &request(&["d/x"])).unwrap();
         let body = &client.asked()[0].1;
         assert_eq!(body["max_tokens"], 1024);
@@ -396,24 +313,20 @@ mod tests {
     }
 
     #[test]
-    fn a_response_without_logprobs_fails_naming_the_model() {
-        let failed = read(
+    fn a_response_without_logprobs_fails_saying_the_model_cannot_classify() {
+        for reply in [
             json!({"id": "c", "object": "chat.completion", "created": 1, "model": "m", "choices": [
-                {"index": 0, "message": {"role": "assistant", "content": "true"}}
+                {"index": 0, "message": {"role": "assistant", "content": "{\"noul\": 0.97}"}}
             ]}),
-        )
-        .unwrap_err();
-        assert!(failed.message.contains("qwen/qwen3-coder:free"));
-    }
-
-    #[test]
-    fn the_logprobs_answers_have_a_model_id_of_their_own() {
-        let reply = logprobs_reply(&[("true", &[("true", -0.1)])]);
-        let client = Recording::replying(vec![reply]);
-        let result = systemone(&client, &labelled(None), &request(&["d/x"])).unwrap();
-        assert_eq!(
-            result.model,
-            format!("qwen/qwen3-coder:free@{PROMPT_VERSION}-logprobs")
-        );
+            json!({"id": "c", "object": "chat.completion", "created": 1, "model": "m", "choices": []}),
+        ] {
+            let failed = read(reply).unwrap_err();
+            assert!(
+                failed.message.contains("returned no logprobs"),
+                "{}",
+                failed.message
+            );
+            assert!(failed.message.contains("cannot serve classification"));
+        }
     }
 }

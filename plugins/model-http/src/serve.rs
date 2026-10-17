@@ -1,5 +1,5 @@
 //! The plugin as the protocol sees it: the handshake, and each method handed
-//! to the API that serves it.
+//! to the protocol that serves it.
 
 use lighthouse_protocol::{
     Capabilities, ErrorObject, Handler, InitializeParams, InitializeResult, Model,
@@ -46,7 +46,7 @@ impl Handler for Plugin {
             return Err("the request names no model".into());
         }
         let endpoint = Endpoint::of(&params.options)?;
-        // The method's own API first, then Chat Completions by adaptation.
+        // The method's own protocol first, then Chat Completions by adaptation.
         let client = self.client.as_ref();
         if endpoint.speaks("typesafe") {
             typesafe::systemone(client, &endpoint, &params)
@@ -54,8 +54,8 @@ impl Handler for Plugin {
             chat::systemone(client, &endpoint, &params)
         } else {
             Err(format!(
-                "no spec of {:?} serves classification (served: [\"typesafe\", \"openai\"])",
-                endpoint.specs
+                "no protocol of {:?} serves classification (served: [\"typesafe\", \"openai\"])",
+                endpoint.protocols
             )
             .into())
         }
@@ -78,7 +78,7 @@ mod tests {
     use super::*;
     use crate::http::Http;
 
-    fn params(spec: Value, url: &str) -> SystemOneRequest {
+    fn params(protocol: Value, url: &str) -> SystemOneRequest {
         let side = || Criterion {
             meaning: "m".to_owned(),
             examples: Vec::new(),
@@ -107,7 +107,7 @@ mod tests {
                 },
             )]
             .into(),
-            options: json!({ "spec": spec, "baseUrl": url })
+            options: json!({ "protocol": protocol, "baseUrl": url })
                 .as_object()
                 .unwrap()
                 .clone(),
@@ -154,10 +154,10 @@ mod tests {
     }
 
     #[test]
-    fn the_openai_spec_posts_chat_completions_over_the_network() {
+    fn the_openai_protocol_posts_chat_completions_over_the_network() {
         let (url, request) = serve_once(
             "200 OK",
-            r#"{"id":"c","object":"chat.completion","created":1,"model":"m","choices":[{"index":0,"message":{"role":"assistant","content":"{\"noul\": 0.97}"}}]}"#,
+            r#"{"id":"c","object":"chat.completion","created":1,"model":"m","choices":[{"index":0,"message":{"role":"assistant","content":"true"},"logprobs":{"content":[{"token":"true","logprob":-0.05,"bytes":null,"top_logprobs":[{"token":"true","logprob":-0.05,"bytes":null},{"token":"false","logprob":-3.0,"bytes":null}]}],"refusal":null}}]}"#,
         );
         let result = Plugin::new(Box::new(Http::new()))
             .classify(params(json!("openai"), &url))
@@ -168,12 +168,12 @@ mod tests {
             request.starts_with("POST /chat/completions HTTP/1.1"),
             "{request}"
         );
-        assert!(request.contains("json_schema") && request.contains("qwen/qwen3-coder:free"));
-        assert_eq!(result.answers["d/x"].noul, 0.97);
+        assert!(request.contains("top_logprobs") && request.contains("qwen/qwen3-coder:free"));
+        assert!(result.answers["d/x"].noul > 0.9);
     }
 
     #[test]
-    fn the_typesafe_spec_is_chosen_over_openai_and_posts_system_ones_body() {
+    fn the_typesafe_protocol_is_chosen_over_openai_and_posts_system_ones_body() {
         let (url, request) = serve_once(
             "200 OK",
             r#"{"model":"jev-latest","answers":{"d/x":{"type":"noul","noul":0.81}},"usage":{"tokens":3}}"#,
@@ -201,7 +201,7 @@ mod tests {
     fn an_error_body_travels_as_the_data_of_the_error() {
         let (url, _) = serve_once(
             "400 Bad Request",
-            r#"{"error":{"message":"response_format unsupported"}}"#,
+            r#"{"error":{"message":"logprobs unsupported"}}"#,
         );
         let error = Plugin::new(Box::new(Http::new()))
             .classify(params(json!("openai"), &url))
@@ -209,12 +209,12 @@ mod tests {
         assert!(error.message.contains("400"), "{}", error.message);
         assert_eq!(
             error.data.unwrap()["error"]["message"],
-            "response_format unsupported"
+            "logprobs unsupported"
         );
     }
 
     #[test]
-    fn a_provider_declaring_no_served_spec_is_refused() {
+    fn a_provider_declaring_no_served_protocol_is_refused() {
         let error = Plugin::new(Box::new(Http::new()))
             .classify(params(json!("anthropic"), "http://x"))
             .unwrap_err();

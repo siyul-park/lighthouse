@@ -13,7 +13,7 @@ use crate::{
     models::{bound, count, project, provider, results},
 };
 
-pub(crate) const RPC: &str = "[models]\nclassification = \"fake/m1\"\n[models.providers.fake]\ntype = \"rpc\"\nplugin = \"fake-model\"\noptions = { tag = 1 }\n";
+pub(crate) const RPC: &str = "[models]\nclassification = \"fake/m1\"\n[models.providers.fake]\nplugin = \"fake-model\"\noptions = { tag = 1 }\n";
 
 /// Binds the `fake-model` plugin, which speaks `lighthouse/classify` and
 /// `lighthouse/train`.

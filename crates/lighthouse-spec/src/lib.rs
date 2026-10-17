@@ -35,9 +35,9 @@ pub use options::{LIMIT_ROLES, OptionSchema, OptionType, OptionsSchema, Shape, l
 pub use pack::{Pack, Section};
 pub(crate) use pack::{PackSpec, SectionSpec};
 pub use project::{
-    Config, Evaluation, FILE_NAME, Formatter, GeneratedCheck, GlobSet, Level, ModelInput,
-    ModelProvider, Models, OverrideSpec, PluginRef, ProjectSpec, Projects, RESERVED_PROVIDERS,
-    Routing, RuleConfig, RuleSetting, Rules, glob_set,
+    Config, Evaluation, FILE_NAME, Formatter, GeneratedCheck, GlobSet, Level, ModelProvider,
+    Models, OverrideSpec, PluginRef, ProjectSpec, Projects, RESERVED_PROVIDERS, Routing,
+    RuleConfig, RuleSetting, Rules, glob_set,
 };
 pub(crate) use sources::SourceMapSpec;
 

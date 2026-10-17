@@ -1,6 +1,6 @@
-//! The HTTP all specs share. [`Client`] is the one seam for I/O: a JSON POST
+//! The HTTP all protocols share. [`Client`] is the one seam for I/O: a JSON POST
 //! with a bearer key (RFC 6750), answered with the JSON body or the error. A
-//! spec takes a `&dyn Client`; tests swap the client, never a spec. [`Http`] is
+//! protocol takes a `&dyn Client`; tests swap the client, never a protocol. [`Http`] is
 //! the client: it pauses before asking again when the service is busy (429,
 //! 503) or overloaded (529), for the `Retry-After` the service sent, in
 //! seconds, else a growing time. Nothing else is asked again.
