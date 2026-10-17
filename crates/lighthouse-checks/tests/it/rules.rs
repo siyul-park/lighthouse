@@ -12,12 +12,12 @@ use serde_json::json;
 
 /// A local decision `local/probe` over `scope` with the CEL check `check`: the
 /// lines of its `select`, `where`, `message` and `evidence`.
-fn local(scope: &str, check: &str) -> Result<Checks, String> {
+pub(crate) fn local(scope: &str, check: &str) -> Result<Checks, String> {
     scoped(&format!("{{ subject: {scope}, tests: include }}"), check)
 }
 
 /// Like [`local`], with the whole `scope` written out.
-fn scoped(scope: &str, check: &str) -> Result<Checks, String> {
+pub(crate) fn scoped(scope: &str, check: &str) -> Result<Checks, String> {
     let indented: String = check.lines().map(|l| format!("    {l}\n")).collect();
     let text = format!(
         "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/probe\nspec:\n  title: Probe\n  context: A probe.\n  scope: {scope}\n  requirement: A probe MUST hold.\n  severity: error\n  check:\n    type: cel\n{indented}  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n      expect: [{{ line: 1 }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n"
@@ -27,7 +27,7 @@ fn scoped(scope: &str, check: &str) -> Result<Checks, String> {
     Checks::new("local", &layer).map_err(|e| e.to_string())
 }
 
-fn found(plugin: &Checks, w: &World) -> Vec<(String, u32)> {
+pub(crate) fn found(plugin: &Checks, w: &World) -> Vec<(String, u32)> {
     w.check_in(
         &Subject {
             plugin,

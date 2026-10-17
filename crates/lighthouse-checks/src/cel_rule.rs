@@ -6,7 +6,7 @@ use std::{cell::RefCell, collections::BTreeMap};
 use cel::Program;
 use lighthouse_model::{
     Diagnostic, Position, Reach, Span,
-    ucm::{File, Node, Project, Symbol, SymbolId},
+    ucm::{Edge, File, Node, Project, Symbol, SymbolId},
 };
 use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
 use lighthouse_spec::{CelCheck, Decision, Select};
@@ -297,17 +297,12 @@ impl Evaluation<'_> {
                 }
             }
             Select::Edge => {
-                for edge in &project.edges {
-                    let Some(anchor) = edge_anchor(ctx, &declared, &edge.from) else {
+                for (at, edge) in project.edges.iter().enumerate() {
+                    let Some(place) = edge_anchor(ctx, &declared, at, edge) else {
                         continue;
                     };
                     let value = cel_fact(&facts::edge(project, edge));
                     let key = format!("{:?}->{:?}", edge.from, edge.to);
-                    let place = Anchor {
-                        file: anchor.file.clone(),
-                        span: anchor.span,
-                        symbol: None,
-                    };
                     found.extend(self.judge(value, place, &key)?);
                 }
             }
@@ -470,24 +465,49 @@ impl Evaluation<'_> {
     }
 }
 
-/// The symbol the findings about an edge are reported at, when the edge starts
-/// at a subject of the decision's scope.
+/// Where the findings about the edge at position `at` are reported, when it
+/// starts at a subject of the decision's scope: at the site of the edge when
+/// the provider reports it, else at its symbol or the top of its file. A
+/// module edge is judged by the file it comes from, so a module that declares
+/// no symbol is judged too; an edge of no one file goes to the module's anchor.
 fn edge_anchor<'p>(
     ctx: &Context<'p>,
     declared: &BTreeMap<&str, Declared<'p>>,
-    from: &Node,
-) -> Option<&'p Symbol> {
+    at: usize,
+    edge: &Edge,
+) -> Option<Anchor> {
     let project = ctx.project;
-    match from {
-        Node::Symbol(id) => project
-            .symbol(id)
-            .filter(|s| ctx.applies.admits_symbol(project, s)),
+    match &edge.from {
+        Node::Symbol(id) => {
+            let symbol = project
+                .symbol(id)
+                .filter(|s| ctx.applies.admits_symbol(project, s))?;
+            Some(Anchor {
+                file: symbol.file.clone(),
+                span: edge.site.unwrap_or(symbol.span),
+                symbol: None,
+            })
+        }
         Node::Module(m) => {
+            let module = project.module(m);
+            if let Some(origin) = project.origin(at) {
+                let files: Vec<&File> = project.file(origin).into_iter().collect();
+                return module
+                    .is_none_or(|module| ctx.applies.admits_module(module, &files))
+                    .then(|| Anchor {
+                        file: origin.to_owned(),
+                        span: edge.site.unwrap_or_else(top_of_file),
+                        symbol: None,
+                    });
+            }
             let declared = declared.get(m.as_str())?;
-            project
-                .module(m)
+            module
                 .is_none_or(|module| admits_module(ctx, declared, module))
-                .then_some(declared.anchor)
+                .then(|| Anchor {
+                    file: declared.anchor.file.clone(),
+                    span: edge.site.unwrap_or(declared.anchor.span),
+                    symbol: None,
+                })
         }
     }
 }

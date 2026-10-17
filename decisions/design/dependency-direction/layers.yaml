@@ -185,7 +185,7 @@ spec:
 
         func Read() string { return "" }
     expect:
-    - line: 5
+    - line: 1
   - name: go-import-points-down
     language: go
     kind: valid
@@ -238,7 +238,7 @@ spec:
 
         func Serve() string { return "" }
     expect:
-    - line: 5
+    - line: 1
   - name: go-peers-may-be-dependent
     language: go
     kind: valid
@@ -316,7 +316,7 @@ spec:
 
         func Read() string { return "" }
     expect:
-    - line: 5
+    - line: 1
   - name: go-ignored-with-a-reason
     language: go
     kind: valid
@@ -371,7 +371,7 @@ spec:
             String::new()
         }
     expect:
-    - line: 3
+    - line: 1
   - name: rust-mod-points-down
     language: rust
     kind: valid

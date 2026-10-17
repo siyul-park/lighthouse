@@ -387,6 +387,9 @@ struct Index {
     uses: BTreeMap<SymbolId, Vec<SymbolId>>,
     members: BTreeMap<SymbolId, Vec<SymbolId>>,
     sites: BTreeMap<SymbolId, Vec<Site>>,
+    /// The file of the fragment of each edge that starts at a module, by
+    /// position in `edges`.
+    origins: BTreeMap<usize, PathBuf>,
     /// Positions in `edges` of the edges that start at a symbol.
     edges_from: BTreeMap<SymbolId, Vec<usize>>,
     /// The types that implement an interface, by resolved `implements` edges.
@@ -423,9 +426,10 @@ impl Project {
             ));
         }
         let sites = sites_of(&all, &files);
-        dedup_edges(&mut all);
+        let origins = dedup_edges(&mut all, &files);
         let mut index = Index::new(&all);
         index.sites = sites;
+        index.origins = origins;
         Self {
             all,
             index,
@@ -546,6 +550,13 @@ impl Project {
     /// provider reports no reference sites.
     pub fn sites(&self, id: &SymbolId) -> &[Site] {
         slice(&self.index.sites, id)
+    }
+
+    /// The file the edge at position `at` of `edges` comes from, when it starts
+    /// at a module and its fragment is about one file; an edge that starts at
+    /// a symbol comes from the file of the symbol.
+    pub fn origin(&self, at: usize) -> Option<&Path> {
+        self.index.origins.get(&at).map(PathBuf::as_path)
     }
 
     /// Comments of `path`, in source order.

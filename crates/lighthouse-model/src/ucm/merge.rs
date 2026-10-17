@@ -108,16 +108,33 @@ pub(super) fn resolve_all(all: &mut Fragment) -> usize {
 }
 
 /// Drops duplicate edges: the same relation at several sites is one edge,
-/// which keeps its first site.
-pub(super) fn dedup_edges(all: &mut Fragment) {
+/// which keeps its first site. Returns, by position in the kept edges, the
+/// file of the fragment of each edge that starts at a module.
+pub(super) fn dedup_edges(all: &mut Fragment, runs: &[EdgeRun]) -> BTreeMap<usize, PathBuf> {
     let mut seen = HashSet::new();
+    let mut files = runs
+        .iter()
+        .flat_map(|(len, file)| std::iter::repeat_n(file.as_ref(), *len));
+    let mut origins = BTreeMap::new();
+    let mut kept = 0;
     let keep: Vec<bool> = all
         .edges
         .iter()
-        .map(|e| seen.insert((e.kind, &e.from, &e.to, e.resolution)))
+        .map(|e| {
+            let file = files.next().flatten();
+            let fresh = seen.insert((e.kind, &e.from, &e.to, e.resolution));
+            if fresh {
+                if let (Node::Module(_), Some(file)) = (&e.from, file) {
+                    origins.insert(kept, file.clone());
+                }
+                kept += 1;
+            }
+            fresh
+        })
         .collect();
     let mut keep = keep.into_iter();
     all.edges.retain(|_| keep.next().unwrap_or(true));
+    origins
 }
 
 /// The sited edges that end at a symbol, grouped by target, ordered by file

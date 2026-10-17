@@ -21,10 +21,18 @@ fn modules(paths: &[&str], imports: &[(&str, &str)]) -> World {
     w
 }
 
-/// The importers the layers decision reports, by the name of their module.
+/// The importers the layers decision reports, by the name of their module: an
+/// import has no site here, so it is reported at the top of the file the
+/// module is declared in.
 fn importers(paths: &[&str], imports: &[(&str, &str)], options: Value) -> Vec<String> {
     let w = modules(paths, imports);
-    w.names(&w.check(LAYERS, options))
+    w.check(LAYERS, options)
+        .into_iter()
+        .map(|(file, _)| {
+            let module = file.strip_suffix("/a.ucm").unwrap();
+            module.rsplit('/').next().unwrap().to_owned()
+        })
+        .collect()
 }
 
 #[test]

@@ -85,6 +85,17 @@ pub struct World {
     pub modules: Vec<Module>,
     /// `(importer, imported)` module paths, as import edges of the model.
     pub imports: Vec<(String, String)>,
+    /// Imports written in a file of their own, which need not declare anything.
+    pub file_imports: Vec<FileImport>,
+}
+
+/// An import edge of module `from` to module `to` that comes from `file`,
+/// at `line` when the provider reports sites.
+pub struct FileImport {
+    file: String,
+    from: String,
+    to: String,
+    line: Option<u32>,
 }
 
 pub fn at(line: u32) -> Span {
@@ -173,6 +184,24 @@ impl World {
     /// Module `from` imports module `to`.
     pub fn import(&mut self, from: &str, to: &str) {
         self.imports.push((from.to_owned(), to.to_owned()));
+    }
+
+    /// Module `from` imports module `to` in `file`, at `line` when given. The
+    /// file need not declare a symbol.
+    pub fn import_in(&mut self, file: &str, from: &str, to: &str, line: Option<u32>) {
+        self.files.entry(file.to_owned()).or_insert(false);
+        self.file_imports.push(FileImport {
+            file: file.to_owned(),
+            from: from.to_owned(),
+            to: to.to_owned(),
+            line,
+        });
+    }
+
+    /// An edge from `from` to `to`, at `line` of the file of `from`.
+    pub fn edge_at(&mut self, kind: EdgeKind, from: &Symbol, to: &Symbol, line: u32) {
+        self.edge(kind, from, to);
+        self.edges.last_mut().unwrap().site = Some(at(line));
     }
 
     pub fn forward(&mut self, from: &Symbol, to: &Symbol) {
@@ -306,6 +335,18 @@ impl World {
                                     to: Target::Path(to.clone()),
                                     resolution: Resolution::Syntactic,
                                     site: None,
+                                }),
+                        )
+                        .chain(
+                            self.file_imports
+                                .iter()
+                                .filter(|i| i.file == *path)
+                                .map(|i| Edge {
+                                    kind: EdgeKind::Imports,
+                                    from: Node::Module(i.from.clone()),
+                                    to: Target::Path(i.to.clone()),
+                                    resolution: Resolution::Syntactic,
+                                    site: i.line.map(at),
                                 }),
                         )
                         .collect(),

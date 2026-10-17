@@ -160,6 +160,47 @@ fn module_paths_and_duplicate_edges_are_handled() {
 }
 
 #[test]
+fn a_module_edge_remembers_the_file_of_the_first_fragment_that_has_it() {
+    let import = |to: &str| Edge {
+        kind: EdgeKind::Imports,
+        from: Node::Module("a".to_owned()),
+        to: Target::Path(to.to_owned()),
+        resolution: Resolution::Syntactic,
+        site: None,
+    };
+    let fragment = |path: &str, edges: Vec<Edge>| Fragment {
+        files: vec![File {
+            path: path.into(),
+            lang: "go".to_owned(),
+            hash: String::new(),
+            generated: false,
+            test: false,
+        }],
+        edges,
+        ..Fragment::default()
+    };
+    let project = Project::merge([
+        fragment("a/one.go", vec![import("b")]),
+        fragment("a/two.go", vec![import("b"), import("c")]),
+        Fragment {
+            edges: vec![import("d")],
+            ..Fragment::default()
+        },
+    ]);
+    let origins: Vec<Option<&Path>> = (0..project.edges.len())
+        .map(|at| project.origin(at))
+        .collect();
+    assert_eq!(
+        origins,
+        [
+            Some(Path::new("a/one.go")),
+            Some(Path::new("a/two.go")),
+            None
+        ]
+    );
+}
+
+#[test]
 fn project_indexes_answer_by_file_symbol_and_call_graph() {
     let a = symbol("m", "a");
     let b = symbol("m", "b");

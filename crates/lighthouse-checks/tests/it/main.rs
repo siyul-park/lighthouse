@@ -13,6 +13,7 @@ mod design_layout;
 mod design_placement;
 mod design_rules;
 mod directives;
+mod edge_anchor;
 mod fixes;
 mod formatted;
 mod func_facts;
