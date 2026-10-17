@@ -1,4 +1,7 @@
-use lighthouse_model::{Diagnostic, Fingerprint, Position, Severity, Span, ucm::Project};
+use lighthouse_model::{
+    Diagnostic, Fingerprint, Position, Severity, Span,
+    ucm::{Fragment, Project, Symbol, SymbolId, SymbolKind, Visibility},
+};
 
 #[test]
 fn fingerprint_is_deterministic() {
@@ -153,4 +156,62 @@ fn a_project_discriminates_a_finding_by_its_symbol_else_by_nothing() {
 
     found.symbol = Some("m::f#function".to_owned());
     assert_eq!(Project::default().discriminator(&found), "m::f#function");
+}
+
+fn declared(name: &str, lines: (u32, u32)) -> Symbol {
+    let at = |line| Position { line, col: 1 };
+    Symbol {
+        id: SymbolId::new("m", &[], name, SymbolKind::Function),
+        kind: SymbolKind::Function,
+        visibility: Visibility::Public,
+        owner: None,
+        file: "a.go".into(),
+        span: Span {
+            start: at(lines.0),
+            end: at(lines.1),
+        },
+        extent: None,
+        doc: None,
+        name: name.to_owned(),
+        role: None,
+        optional: false,
+        type_ref: None,
+    }
+}
+
+#[test]
+fn a_finding_is_anchored_to_its_symbol_else_to_the_innermost_symbol_around_it() {
+    let project = Project::merge([Fragment {
+        symbols: vec![declared("outer", (1, 20)), declared("inner", (5, 8))],
+        ..Fragment::default()
+    }]);
+    let at = |line| Position { line, col: 3 };
+    let finding = |line| {
+        Diagnostic::new(
+            "r",
+            Severity::Warn,
+            "m",
+            "a.go",
+            Span {
+                start: at(line),
+                end: at(line),
+            },
+            Fingerprint::new("r", "a.go", "x"),
+        )
+    };
+    let name = |finding: &Diagnostic| project.anchor(finding).map(|s| s.name.clone());
+
+    assert_eq!(name(&finding(6)).as_deref(), Some("inner"));
+    assert_eq!(name(&finding(12)).as_deref(), Some("outer"));
+    assert_eq!(name(&finding(30)), None, "no symbol covers the line");
+
+    let mut named = finding(12);
+    named.symbol = Some("m::inner#function".to_owned());
+    assert_eq!(name(&named).as_deref(), Some("inner"));
+    named.symbol = Some("m::gone#function".to_owned());
+    assert_eq!(
+        name(&named).as_deref(),
+        Some("outer"),
+        "a symbol the project lacks falls back to the one around the finding"
+    );
 }
