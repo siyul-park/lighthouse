@@ -160,7 +160,7 @@ fn validate_models(registry: &Registry, config: &Config, binding: &Models) -> Re
         {
             return Err(Error::Model {
                 name: reference.to_owned(),
-                reason: format!("provider `{name}` does not serve `{task}`"),
+                reason: format!("provider `{name}` does not serve `{task}`{}", only_for(task)),
             });
         }
     }
@@ -179,8 +179,18 @@ fn serves(registry: &Registry, provider: &ModelProvider, task: Task) -> bool {
         let capability = match task {
             Task::Classification => capabilities.classification,
             Task::Chat => capabilities.chat,
+            Task::Edit => None,
         };
         capability.is_some_and(|capability| capability.supported)
     });
     protocol.unwrap_or(true) && listed
+}
+
+/// What a task needs of the provider that serves it, when it is not what the
+/// provider's kind alone says.
+fn only_for(task: Task) -> &'static str {
+    match task {
+        Task::Edit => ": only a command without a protocol does",
+        Task::Classification | Task::Chat => "",
+    }
 }

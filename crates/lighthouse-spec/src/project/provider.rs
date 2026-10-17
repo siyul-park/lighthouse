@@ -40,6 +40,8 @@ pub enum Task {
     Classification,
     /// A reply to a conversation.
     Chat,
+    /// Changes to the files of a directory, made by an agent that runs there.
+    Edit,
 }
 
 impl std::fmt::Display for Task {
@@ -47,6 +49,7 @@ impl std::fmt::Display for Task {
         f.write_str(match self {
             Self::Classification => "classification",
             Self::Chat => "chat",
+            Self::Edit => "edit",
         })
     }
 }
@@ -79,8 +82,8 @@ pub struct ProviderSpec {
     /// (System One), or a list of them in the order of preference. Required
     /// for `baseUrl`. A `command` speaks `typesafe` (it serves classification)
     /// or `openai` (it serves `chat`), or plain text without a `protocol`
-    /// (it serves `chat`); a `plugin` must not name one: its handshake says
-    /// what it serves.
+    /// (it serves `chat` and `edit`); a `plugin` must not name one: its
+    /// handshake says what it serves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub protocol: Option<Names>,
     /// The reach over HTTP: where requests go.
@@ -93,7 +96,8 @@ pub struct ProviderSpec {
     /// trust. `{model}` stands for the model part of the reference. An answer
     /// that does not fit the protocol's shape is no answer. Without a
     /// `protocol` the conversation is plain text on stdin and the answer is
-    /// all of stdout.
+    /// all of stdout; the same program serves `edit` when it runs in a
+    /// scratch copy of the project and changes the files there.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<Vec<String>>,
     /// The reach as a listed plugin that offers models.
@@ -107,7 +111,8 @@ pub struct ProviderSpec {
     /// What one answer costs. Default: 1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost: Option<f64>,
-    /// `command` only: how long one run may take, such as `90s`. Default: 120s.
+    /// `command` only: how long one run may take, such as `90s`. Default: 120s
+    /// (10m for `edit`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<Duration>,
     /// `command` only: variables the program is given besides the allowlist.
@@ -176,12 +181,15 @@ impl ModelProvider {
     }
 
     /// Whether its protocol serves `task`; `None` when only the handshake of
-    /// the plugin behind it can say.
+    /// the plugin behind it can say. A plugin never serves `edit`.
     pub fn serves(&self, task: Task) -> Option<bool> {
         match self {
             Self::Command { protocol, .. } => Some(match task {
                 Task::Classification => *protocol == CommandProtocol::TypeSafe,
                 Task::Chat => *protocol != CommandProtocol::TypeSafe,
+                // Running the same program in a scratch copy is what makes it
+                // an edit, which only plain text allows.
+                Task::Edit => *protocol == CommandProtocol::PlainText,
             }),
             Self::Rpc {
                 plugin, options, ..
@@ -194,9 +202,10 @@ impl ModelProvider {
                 Some(match task {
                     Task::Classification => speaks("typesafe") || speaks("openai"),
                     Task::Chat => speaks("openai"),
+                    Task::Edit => false,
                 })
             }
-            Self::Rpc { .. } => None,
+            Self::Rpc { .. } => (task == Task::Edit).then_some(false),
         }
     }
 

@@ -66,6 +66,13 @@ pub struct ModelsSpec {
     /// fails.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chat: Option<Names>,
+    /// The model (`<provider>/<model>`), or the route of several, that fixes
+    /// by changing files: a headless agent run as a `command` without a
+    /// `protocol`, in a scratch copy of the project. When bound, fixes by a
+    /// model use it instead of `chat`. One binding for the project; a request
+    /// moves to the next model of a route when one fails.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edit: Option<Names>,
     /// Which model of a route a request starts at. Default: `ordered`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub routing: Option<Routing>,
@@ -122,6 +129,8 @@ pub struct Models {
     pub classification: Vec<String>,
     /// The project's route for the model that writes fixes.
     pub chat: Vec<String>,
+    /// The project's route for the agent that fixes by editing files.
+    pub edit: Vec<String>,
     /// Which model of a route a request starts at.
     pub routing: Routing,
     /// The providers the project defines, by name.
@@ -154,6 +163,11 @@ impl Models {
                 .unwrap_or_default(),
             chat: models
                 .chat
+                .as_ref()
+                .map(|names| names.iter().map(str::to_owned).collect())
+                .unwrap_or_default(),
+            edit: models
+                .edit
                 .as_ref()
                 .map(|names| names.iter().map(str::to_owned).collect())
                 .unwrap_or_default(),
@@ -205,6 +219,7 @@ impl Models {
         classification
             .map(|id| (Task::Classification, id.as_str()))
             .chain(self.chat.iter().map(|id| (Task::Chat, id.as_str())))
+            .chain(self.edit.iter().map(|id| (Task::Edit, id.as_str())))
     }
 
     /// The evaluation policy of a rule: what the project sets, else the default.

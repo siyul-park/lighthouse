@@ -236,6 +236,17 @@
           ],
           "description": "The model (`<provider>/<model>`), or the route of several, that judges\na decision no rule binds and no trained model is attached to. A request\nmoves to the next model of a route when one fails. When the route\nabstains, the subject is left to agent review."
         },
+        "edit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Names"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model (`<provider>/<model>`), or the route of several, that fixes\nby changing files: a headless agent run as a `command` without a\n`protocol`, in a scratch copy of the project. When bound, fixes by a\nmodel use it instead of `chat`. One binding for the project; a request\nmoves to the next model of a route when one fails."
+        },
         "explore": {
           "description": "The share, from 0 to 1, of the subjects an attached model fails that are\nsent on to the next layer as if it had abstained, so that labels keep\ncoming from where the model is surest. The same subjects every run.\nDefault: 0.05.",
           "format": "double",
@@ -455,7 +466,7 @@
           ]
         },
         "command": {
-          "description": "The reach as a stdio process under the process contract: no shell, its\nown process group, a time limit, a cap on output, an environment\ncleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TMPDIR`, the\ndeclared `env` and the variable `keyEnv` names, and the project's\ntrust. `{model}` stands for the model part of the reference. An answer\nthat does not fit the protocol's shape is no answer. Without a\n`protocol` the conversation is plain text on stdin and the answer is\nall of stdout.",
+          "description": "The reach as a stdio process under the process contract: no shell, its\nown process group, a time limit, a cap on output, an environment\ncleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TMPDIR`, the\ndeclared `env` and the variable `keyEnv` names, and the project's\ntrust. `{model}` stands for the model part of the reference. An answer\nthat does not fit the protocol's shape is no answer. Without a\n`protocol` the conversation is plain text on stdin and the answer is\nall of stdout; the same program serves `edit` when it runs in a\nscratch copy of the project and changes the files there.",
           "items": {
             "type": "string"
           },
@@ -522,10 +533,10 @@
               "type": "null"
             }
           ],
-          "description": "The protocol spoken at the reach: `openai` (Chat Completions, which\nOpenRouter, Ollama, vLLM and LM Studio also speak) or `typesafe`\n(System One), or a list of them in the order of preference. Required\nfor `baseUrl`. A `command` speaks `typesafe` (it serves classification)\nor `openai` (it serves `chat`), or plain text without a `protocol`\n(it serves `chat`); a `plugin` must not name one: its handshake says\nwhat it serves."
+          "description": "The protocol spoken at the reach: `openai` (Chat Completions, which\nOpenRouter, Ollama, vLLM and LM Studio also speak) or `typesafe`\n(System One), or a list of them in the order of preference. Required\nfor `baseUrl`. A `command` speaks `typesafe` (it serves classification)\nor `openai` (it serves `chat`), or plain text without a `protocol`\n(it serves `chat` and `edit`); a `plugin` must not name one: its\nhandshake says what it serves."
         },
         "timeout": {
-          "description": "`command` only: how long one run may take, such as `90s`. Default: 120s.",
+          "description": "`command` only: how long one run may take, such as `90s`. Default: 120s\n(10m for `edit`).",
           "type": [
             "string",
             "null"
