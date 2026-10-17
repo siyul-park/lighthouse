@@ -4,7 +4,10 @@
 use std::{cell::RefCell, collections::BTreeMap};
 
 use cel::Program;
-use lighthouse_model::{Diagnostic, File, Node, Position, Project, Reach, Span, Symbol, SymbolId};
+use lighthouse_model::{
+    Diagnostic, Position, Reach, Span,
+    ucm::{File, Node, Project, Symbol, SymbolId},
+};
 use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
 use lighthouse_spec::{CelCheck, Decision, Select};
 use serde_json::{Map, Value};
@@ -490,7 +493,11 @@ fn edge_anchor<'p>(
 }
 
 /// Whether a module is a subject of the decision, by the files that declare it.
-fn admits_module(ctx: &Context, declared: &Declared, module: &lighthouse_model::Module) -> bool {
+fn admits_module(
+    ctx: &Context,
+    declared: &Declared,
+    module: &lighthouse_model::ucm::Module,
+) -> bool {
     let files: Vec<&File> = declared
         .files
         .iter()

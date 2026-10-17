@@ -1,6 +1,6 @@
 use crate::support::World;
 use crate::support::at;
-use lighthouse_model::{
+use lighthouse_model::ucm::{
     EdgeKind, Event, EventKind, Flow, FlowKind, Node, Symbol, SymbolId, SymbolKind, Target,
     Visibility,
 };
@@ -265,8 +265,8 @@ fn an_object_limit_names_the_roles_it_limits() {
 
 fn flag(
     w: &mut World,
-    symbol: &lighthouse_model::Symbol,
-    set: impl Fn(&mut lighthouse_model::FunctionSummary),
+    symbol: &lighthouse_model::ucm::Symbol,
+    set: impl Fn(&mut lighthouse_model::ucm::FunctionSummary),
 ) {
     set(w
         .summaries
@@ -331,7 +331,7 @@ fn complexity_skips_dispatchers_unless_asked() {
     assert_eq!(w.names(&w.check(COMPLEX, counted)), ["table"]);
 }
 
-fn params(w: &mut World, symbol: &lighthouse_model::Symbol, n: u32) {
+fn params(w: &mut World, symbol: &lighthouse_model::ucm::Symbol, n: u32) {
     w.summaries
         .iter_mut()
         .find(|s| s.symbol == symbol.id)
@@ -469,15 +469,15 @@ fn coupling_flags_a_coordinator_with_many_callees() {
     assert_eq!(w.names(&found), ["run"]);
 }
 
-fn type_ref(symbol: &str) -> lighthouse_model::TypeRef {
-    lighthouse_model::TypeRef {
+fn type_ref(symbol: &str) -> lighthouse_model::ucm::TypeRef {
+    lighthouse_model::ucm::TypeRef {
         text: symbol.to_owned(),
         symbol: Some(symbol.to_owned()),
         exported: None,
     }
 }
 
-fn takes(w: &mut World, function: &lighthouse_model::Symbol, ty: &str, n: u32) {
+fn takes(w: &mut World, function: &lighthouse_model::ucm::Symbol, ty: &str, n: u32) {
     let summary = w
         .summaries
         .iter_mut()
@@ -530,7 +530,11 @@ fn an_options_struct_counts_only_its_required_fields() {
 
 /// A `build` of 7 parameters whose last one is a 3-field `Request` that only
 /// it takes: 6 + 3 = 9 parameters, over the limit of 8.
-fn requested() -> (World, lighthouse_model::Symbol, lighthouse_model::Symbol) {
+fn requested() -> (
+    World,
+    lighthouse_model::ucm::Symbol,
+    lighthouse_model::ucm::Symbol,
+) {
     let mut w = World::default();
     let request = w.symbol("m", "Request", SymbolKind::Type, "m/a.ucm");
     for field in ["a", "b", "c"] {

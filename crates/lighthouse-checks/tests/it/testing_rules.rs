@@ -2,7 +2,7 @@
 
 use crate::support::{Subject, World};
 use lighthouse_checks::Checks;
-use lighthouse_model::{EdgeKind, Resolution, Symbol, SymbolKind, Visibility};
+use lighthouse_model::ucm::{EdgeKind, Resolution, Symbol, SymbolKind, Visibility};
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 
@@ -217,8 +217,12 @@ fn owner_test_exempts_data_types_and_trait_impl_methods() {
     w.member(&data, "field", SymbolKind::Field, "m/a.ucm");
     let object = w.symbol("m", "Object", SymbolKind::Type, "m/a.ucm");
     let mut via_trait = w.member(&object, "fmt", SymbolKind::Method, "m/a.ucm");
-    via_trait.id =
-        lighthouse_model::SymbolId::new("m", &["Object", "Display"], "fmt", SymbolKind::Method);
+    via_trait.id = lighthouse_model::ucm::SymbolId::new(
+        "m",
+        &["Object", "Display"],
+        "fmt",
+        SymbolKind::Method,
+    );
     *w.symbols.last_mut().unwrap() = via_trait.clone();
     w.summarize(&via_trait, 1, &[]);
     w.summaries.last_mut().unwrap().implementation = true;

@@ -1,4 +1,4 @@
-use lighthouse_model::{Diagnostic, Fingerprint, Position, Project, Severity, Span};
+use lighthouse_model::{Diagnostic, Fingerprint, Position, Severity, Span, ucm::Project};
 
 #[test]
 fn fingerprint_is_deterministic() {

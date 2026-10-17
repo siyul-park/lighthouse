@@ -4,8 +4,8 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use lighthouse_model::{
-    Capability, Diagnostic, Fingerprint, Safety,
-    ucm::{EditOp, FixOutcome},
+    Diagnostic, Fingerprint, Safety,
+    ucm::{Capability, EditOp, FixOutcome},
 };
 use lighthouse_plugin::{FixDecision, FixRequest};
 use serde_json::Value;

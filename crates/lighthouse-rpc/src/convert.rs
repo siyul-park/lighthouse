@@ -1,11 +1,11 @@
-//! The only place where wire types become core model types.
+//! The only place where wire types become code model (UCM) types.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::PathBuf,
 };
 
-use lighthouse_model as core;
+use lighthouse_model::{Incomplete, Position, Span, ucm as core};
 use lighthouse_plugin::{Indexed, ProviderManifest, Source};
 use lighthouse_protocol as wire;
 
@@ -60,7 +60,7 @@ pub(crate) fn indexed(result: wire::IndexResult, sources: &[Source]) -> Result<I
         .iter()
         .map(|s| (s.file.path.clone(), s.file))
         .collect();
-    let mut incomplete: BTreeSet<core::Incomplete> =
+    let mut incomplete: BTreeSet<Incomplete> =
         result.incomplete.into_iter().map(incomplete_of).collect();
     let mut out = Indexed {
         notices: result.notices,
@@ -99,7 +99,7 @@ pub(crate) fn indexed(result: wire::IndexResult, sources: &[Source]) -> Result<I
         out.fragments.push(converted);
     }
     for path in requested.keys().filter(|p| !accepted.contains(*p)) {
-        incomplete.insert(core::Incomplete {
+        incomplete.insert(Incomplete {
             path: Some(path.clone()),
             reason: "the plugin returned no usable fragment".to_owned(),
         });
@@ -134,8 +134,8 @@ fn belongs(f: &wire::Fragment) -> Result<(), String> {
     Ok(())
 }
 
-fn incomplete_of(item: wire::Incomplete) -> core::Incomplete {
-    core::Incomplete {
+fn incomplete_of(item: wire::Incomplete) -> Incomplete {
+    Incomplete {
         path: item.path.map(PathBuf::from),
         reason: item.reason,
     }
@@ -195,12 +195,12 @@ fn symbol(s: wire::Symbol) -> Result<core::Symbol, String> {
     })
 }
 
-fn span(s: wire::Span) -> core::Span {
-    let at = |p: wire::Position| core::Position {
+fn span(s: wire::Span) -> Span {
+    let at = |p: wire::Position| Position {
         line: p.line,
         col: p.col,
     };
-    core::Span {
+    Span {
         start: at(s.start),
         end: at(s.end),
     }

@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{Edge, Node, Project, Symbol, SymbolId, Target};
+use lighthouse_model::ucm::{Edge, Node, Project, Symbol, SymbolId, Target};
 
 use lighthouse_protocol::hash::Hasher;
 use rayon::prelude::*;

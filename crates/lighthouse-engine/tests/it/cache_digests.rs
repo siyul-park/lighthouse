@@ -2,8 +2,11 @@ use std::path::Path;
 
 use lighthouse_engine::cache::{Digests, FileDigest};
 use lighthouse_model::{
-    Edge, EdgeKind, File, Fragment, FunctionSummary, Node, Position, Project, Resolution, Span,
-    Symbol, SymbolId, SymbolKind, SymbolRole, Target, Visibility,
+    Position, Span,
+    ucm::{
+        Edge, EdgeKind, File, Fragment, FunctionSummary, Node, Project, Resolution, Symbol,
+        SymbolId, SymbolKind, SymbolRole, Target, Visibility,
+    },
 };
 
 /// An edit of the callee.

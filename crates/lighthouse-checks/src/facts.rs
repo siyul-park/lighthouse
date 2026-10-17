@@ -5,8 +5,10 @@
 use std::path::Path;
 
 use lighthouse_model::{
-    Document, Edge, Module, Node, Position, Project, Symbol, SymbolKind, SymbolRole, Target,
-    TestCase, Visibility,
+    Document, Position,
+    ucm::{
+        Edge, Module, Node, Project, Symbol, SymbolKind, SymbolRole, Target, TestCase, Visibility,
+    },
 };
 
 use crate::{
@@ -134,8 +136,8 @@ pub(crate) fn test(project: &Project, s: &Symbol, case: &TestCase) -> Value {
         json!({
         "nesting": case.nesting,
         "style": match case.style {
-            lighthouse_model::TestStyle::Table => "table",
-            lighthouse_model::TestStyle::Scenario => "scenario",
+            lighthouse_model::ucm::TestStyle::Table => "table",
+            lighthouse_model::ucm::TestStyle::Scenario => "scenario",
         },
         "target_count": targets.len(),
         "targets": targets,
@@ -184,7 +186,7 @@ pub(crate) fn module(m: &Module, declared: &Declared) -> Value {
     })
 }
 
-pub(crate) fn file(project: &Project, f: &lighthouse_model::File, text: &str) -> Value {
+pub(crate) fn file(project: &Project, f: &lighthouse_model::ucm::File, text: &str) -> Value {
     let symbols = project.symbols_in(&f.path).count();
     let functions = project
         .symbols_in(&f.path)

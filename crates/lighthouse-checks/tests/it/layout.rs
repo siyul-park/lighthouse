@@ -4,7 +4,8 @@ use lighthouse_checks::layout::{
     declarations, declarations_in, exposed, has_word_prefix, is_declaration, owner_key,
 };
 use lighthouse_model::{
-    File, Fragment, Position, Project, Span, Symbol, SymbolId, SymbolKind, SymbolRole, Visibility,
+    Position, Span,
+    ucm::{File, Fragment, Project, Symbol, SymbolId, SymbolKind, SymbolRole, Visibility},
 };
 use lighthouse_plugin::{Context, NoKeys, Workspace};
 
@@ -64,7 +65,7 @@ fn declarations_lists_each_module_of_a_file_in_source_order() {
         trusted: false,
         memo: &lighthouse_plugin::Memo::default(),
         notices: &lighthouse_plugin::Notices::default(),
-        applies: lighthouse_model::Applicability::default(),
+        applies: lighthouse_model::ucm::Applicability::default(),
         models: &lighthouse_plugin::NoModels,
     };
 

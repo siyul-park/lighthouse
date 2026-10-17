@@ -1,6 +1,9 @@
 use std::{collections::BTreeMap, path::Path};
 
-use lighthouse_model::{Diagnostic, Project, SymbolId};
+use lighthouse_model::{
+    Diagnostic,
+    ucm::{Project, SymbolId},
+};
 use lighthouse_plugin::Facts;
 use serde_json::{Map, Value, json};
 

@@ -4,7 +4,7 @@
 
 use std::collections::BTreeSet;
 
-use lighthouse_model::{
+use lighthouse_model::ucm::{
     EdgeKind, FunctionSummary, Node, Project, Symbol, SymbolId, SymbolKind, Target, Visibility,
 };
 use serde_json::{Value, json};

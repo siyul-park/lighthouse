@@ -3,7 +3,9 @@
 
 use std::{fs, path::Path, time::Duration};
 
-use lighthouse_model::{EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Node, Target};
+use lighthouse_model::ucm::{
+    EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Node, Target,
+};
 use lighthouse_plugin::{Indexed, LanguageProvider, Plugin, Source, Workspace};
 use lighthouse_rpc::RpcPlugin;
 use tempfile::TempDir;

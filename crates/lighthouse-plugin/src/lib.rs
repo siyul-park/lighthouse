@@ -12,8 +12,8 @@ use std::{
 };
 
 use lighthouse_model::{
-    Applicability, Capability, Diagnostic, File, Fingerprint, Fragment, Incomplete, Options,
-    Project, Reach, RunScope, Severity,
+    Diagnostic, Fingerprint, Incomplete, Options, Reach, RunScope, Severity,
+    ucm::{Applicability, Capability, File, Fragment, Project},
 };
 use lighthouse_process::Formatter;
 use serde::de::DeserializeOwned;

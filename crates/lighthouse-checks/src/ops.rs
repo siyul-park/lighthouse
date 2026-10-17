@@ -7,7 +7,10 @@
 use std::collections::BTreeSet;
 
 use cel::Program;
-use lighthouse_model::{Diagnostic, EdgeKind, Node, Project, Reach, Symbol, SymbolId, Target};
+use lighthouse_model::{
+    Diagnostic, Reach,
+    ucm::{EdgeKind, Node, Project, Symbol, SymbolId, Target},
+};
 use lighthouse_plugin::{Context, Error as PluginError, KeyContext, OrderKey, RuleManifest};
 use lighthouse_spec::{BuiltinOp, CycleLevel, OrderReport, OrderScope};
 use serde_json::{Map, Value, json};

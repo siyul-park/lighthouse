@@ -2,7 +2,10 @@
 
 use std::fs;
 
-use lighthouse_model::{Edge, File, Fragment, Position, Span, SymbolKind, Visibility};
+use lighthouse_model::{
+    Position, Span,
+    ucm::{Edge, File, Fragment, SymbolKind, Visibility},
+};
 
 use super::*;
 use crate::fix::edits::apply;

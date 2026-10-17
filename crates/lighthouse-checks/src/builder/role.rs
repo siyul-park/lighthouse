@@ -1,6 +1,6 @@
 //! The `role` fact of a function and the constructor facts beside it.
 
-use lighthouse_model::{FunctionSummary, Symbol, SymbolKind};
+use lighthouse_model::ucm::{FunctionSummary, Symbol, SymbolKind};
 use serde_json::{Map, Value, json};
 
 use super::Builder;

@@ -3,7 +3,7 @@
 use std::{fs, os::unix::fs::PermissionsExt, path::Path, time::Duration};
 
 use lighthouse_engine::Engine;
-use lighthouse_model::{File, Incomplete};
+use lighthouse_model::{Incomplete, ucm::File};
 use lighthouse_plugin::{Indexed, LanguageProvider, Plugin, Registry, Source, Workspace};
 use lighthouse_rpc::{Error, RpcPlugin};
 use lighthouse_spec::{Catalog, Config};

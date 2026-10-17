@@ -13,8 +13,8 @@ use std::{
 
 use lighthouse_engine::{Engine, Run};
 use lighthouse_model::{
-    Applicability, Diagnostic, Fingerprint, Fragment, Options, Position, Reach, RunScope, Severity,
-    Span,
+    Diagnostic, Fingerprint, Options, Position, Reach, RunScope, Severity, Span,
+    ucm::{Applicability, Fragment},
 };
 use lighthouse_plugin::{
     Caching, Context, Error as PluginError, Indexed, LanguageProvider, Plugin, PluginManifest,

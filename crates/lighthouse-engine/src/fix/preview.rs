@@ -4,7 +4,7 @@
 //! written. Applying a fix goes through the verified path of a fix run.
 
 use lighthouse_model::{
-    Capability, Diagnostic, LineIndex, Position, Preview, PreviewEdit, PreviewFile, Safety,
+    Diagnostic, LineIndex, Position, Preview, PreviewEdit, PreviewFile, Safety, ucm::Capability,
     utf16_position,
 };
 use similar::{ChangeTag, TextDiff};

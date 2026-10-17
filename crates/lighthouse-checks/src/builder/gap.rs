@@ -1,7 +1,7 @@
 //! The `gap` of a method: what separates it from the previous method of its
 //! owner in the file.
 
-use lighthouse_model::{Symbol, SymbolKind};
+use lighthouse_model::ucm::{Symbol, SymbolKind};
 use serde_json::{Value, json};
 
 use super::Builder;

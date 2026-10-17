@@ -6,7 +6,7 @@ use std::path::Path;
 
 use lighthouse_checks::probe;
 use lighthouse_engine::cache::Digests;
-use lighthouse_model::{
+use lighthouse_model::ucm::{
     Applicability, EdgeKind, File, Project, Symbol, SymbolId, SymbolKind, SymbolRole, Visibility,
 };
 use lighthouse_plugin::{Context, Memo, NoKeys, Notices, Workspace};
@@ -139,8 +139,8 @@ fn rename(w: &mut World, name: &str, module: &str, to: &str) {
         }
     }
     for e in &mut w.edges {
-        if matches!(&e.to, lighthouse_model::Target::Path(p) if p == old.as_str()) {
-            e.to = lighthouse_model::Target::Path(new.as_str().to_owned());
+        if matches!(&e.to, lighthouse_model::ucm::Target::Path(p) if p == old.as_str()) {
+            e.to = lighthouse_model::ucm::Target::Path(new.as_str().to_owned());
         }
     }
 }

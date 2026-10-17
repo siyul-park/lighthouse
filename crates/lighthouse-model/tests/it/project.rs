@@ -1,9 +1,11 @@
 use std::path::Path;
 
 use lighthouse_model::{
-    Comment, Document, Edge, EdgeKind, File, Fragment, FunctionSummary, Module, Node, Position,
-    Project, Resolution, Span, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle,
-    Visibility,
+    Document, Position, Span,
+    ucm::{
+        Comment, Edge, EdgeKind, File, Fragment, FunctionSummary, Module, Node, Project,
+        Resolution, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle, Visibility,
+    },
 };
 
 fn at() -> Span {

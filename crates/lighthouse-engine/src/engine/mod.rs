@@ -8,8 +8,8 @@ use std::{
 use ignore::WalkBuilder;
 use lighthouse_model::RunScope;
 use lighthouse_model::{
-    Applicability, Diagnostic, File, Fingerprint, Fragment, Incomplete, Options, Project, Severity,
-    Suppressed,
+    Diagnostic, Fingerprint, Incomplete, Options, Severity, Suppressed,
+    ucm::{Applicability, File, Fragment, Project},
 };
 use lighthouse_plugin::{
     Context, Facts, Indexed, LanguageProvider, Memo, Notices, Registry, Rule, Source, Workspace,

@@ -1,6 +1,9 @@
 use lighthouse_model::{
-    Edge, EdgeKind, File, Fragment, Node, Position, Project, Resolution, Span, Symbol, SymbolId,
-    SymbolKind, Target, Visibility,
+    Position, Span,
+    ucm::{
+        Edge, EdgeKind, File, Fragment, Node, Project, Resolution, Symbol, SymbolId, SymbolKind,
+        Target, Visibility,
+    },
 };
 
 fn span(line: u32, col: u32) -> Span {

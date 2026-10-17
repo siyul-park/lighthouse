@@ -7,7 +7,7 @@ use std::{
     sync::{Arc, OnceLock, PoisonError, RwLock},
 };
 
-use lighthouse_model::SymbolId;
+use lighthouse_model::ucm::SymbolId;
 
 use crate::eval::Fact;
 

@@ -5,9 +5,11 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use lighthouse_checks::Checks;
 use lighthouse_model::{
-    Diagnostic, File, Fingerprint, Fragment, Node, Options, Position, Project, Severity, Span,
-    Symbol, SymbolId, SymbolKind, Visibility,
-    ucm::{Anchor, EditOp, FixOutcome, Owner},
+    Diagnostic, Fingerprint, Options, Position, Severity, Span,
+    ucm::{
+        Anchor, EditOp, File, FixOutcome, Fragment, Node, Owner, Project, Symbol, SymbolId,
+        SymbolKind, Visibility,
+    },
 };
 use lighthouse_plugin::{
     Error, FixDecision, FixRequest, Fixer, KeyContext, OrderKey, OrderKeyManifest, OrderKeys,
@@ -714,8 +716,8 @@ fn the_fixer_carries_the_capabilities_the_fix_requires() {
     assert_eq!(
         fixer.manifest().requires,
         [
-            lighthouse_model::Capability::Extent,
-            lighthouse_model::Capability::ReferenceSites
+            lighthouse_model::ucm::Capability::Extent,
+            lighthouse_model::ucm::Capability::ReferenceSites
         ]
     );
     assert_eq!(fixer.manifest().id, "local/probe");

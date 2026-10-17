@@ -1,7 +1,7 @@
 //! The layers decision over synthetic projects.
 
 use crate::support::World;
-use lighthouse_model::SymbolKind;
+use lighthouse_model::ucm::SymbolKind;
 use serde_json::{Value, json};
 
 const LAYERS: &str = "design/layers";

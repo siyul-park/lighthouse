@@ -2,7 +2,7 @@
 //! and the vocabulary that tells a declaration's owner and visibility. Order
 //! keys registered by other plugins use the same vocabulary.
 
-use lighthouse_model::{File, Project, Symbol, SymbolKind, SymbolRole, Visibility};
+use lighthouse_model::ucm::{File, Project, Symbol, SymbolKind, SymbolRole, Visibility};
 use lighthouse_plugin::Context;
 
 /// Declarations of the focused file in source order, one list per module the

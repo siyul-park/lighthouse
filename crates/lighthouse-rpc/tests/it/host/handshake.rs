@@ -65,7 +65,7 @@ fn handshake_declares_languages_and_index_converts_the_result() {
     assert_eq!(provider.manifest().globs, ["**/*.fake"]);
     assert_eq!(
         provider.manifest().capabilities,
-        [lighthouse_model::Capability::SemanticEdges],
+        [lighthouse_model::ucm::Capability::SemanticEdges],
         "unknown capabilities are ignored"
     );
     let mut ws = Workspace::new(fake.path());

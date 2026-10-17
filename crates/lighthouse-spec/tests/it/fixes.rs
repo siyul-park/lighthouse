@@ -1,6 +1,6 @@
 //! The `fix:` block of a decision: what a catalog accepts and what it refuses.
 
-use lighthouse_model::{Capability, Safety};
+use lighthouse_model::{Safety, ucm::Capability};
 use lighthouse_spec::{Catalog, CommandSpec, Fix, FixKind, OpSpec, OrderScope};
 use lighthouse_test_support::catalog::*;
 

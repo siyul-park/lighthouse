@@ -3,7 +3,7 @@
 //! providers do not produce.
 
 use crate::support::World;
-use lighthouse_model::{EdgeKind, SymbolKind};
+use lighthouse_model::ucm::{EdgeKind, SymbolKind};
 use serde_json::json;
 
 const GROUPS: &str = "design/declaration-groups";
@@ -176,7 +176,13 @@ fn close_accepts_adjacent_members_of_an_owner() {
 }
 
 /// `Run` calls `helper`; returns both and the world with `helper` private.
-fn call_pair(helper_first: bool) -> (World, lighthouse_model::Symbol, lighthouse_model::Symbol) {
+fn call_pair(
+    helper_first: bool,
+) -> (
+    World,
+    lighthouse_model::ucm::Symbol,
+    lighthouse_model::ucm::Symbol,
+) {
     let mut w = World::default();
     let (run, helper) = if helper_first {
         let helper = w.func("m", "helper", "m/a.ucm");

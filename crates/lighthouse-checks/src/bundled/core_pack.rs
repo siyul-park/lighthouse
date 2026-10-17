@@ -1,6 +1,6 @@
 //! What only code provides for the `core` pack: the fallback text language.
 
-use lighthouse_model::{Capability, Fragment};
+use lighthouse_model::ucm::{Capability, Fragment};
 use lighthouse_plugin::{Error, Indexed, LanguageProvider, ProviderManifest, Source, Workspace};
 
 /// Fallback provider: every file is plain text.

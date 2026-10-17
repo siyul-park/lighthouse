@@ -5,7 +5,7 @@
 
 use std::{collections::BTreeMap, collections::BTreeSet};
 
-use lighthouse_model::{Capability, Safety, Severity};
+use lighthouse_model::{Safety, Severity, ucm::Capability};
 use lighthouse_process::{Output, Stdin};
 use lighthouse_resource::Duration;
 use schemars::JsonSchema;

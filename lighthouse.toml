@@ -31,24 +31,18 @@ formatter = { argv = ["rustfmt", "--edition", "2024", "--emit", "stdout"], stdin
 # their target (`lighthouse_cli[bin:lighthouse]`), so those globs end in `*`.
 [spec.rules."design/layers"]
 level = "warn"
-# The core never knows the code model: the modules of `lighthouse_model` other
-# than `ucm`, the store, the ml crate, reports and sessions import nothing of
-# `ucm`. The core modules are listed because a glob cannot say "all but ucm".
+# The core never knows the code model: the modules of `lighthouse_model`
+# other than `ucm`, the store, the ml crate, reports and sessions import
+# nothing of `ucm`.
 options.forbidden = [
-  { from = "lighthouse_model/annotation", to = "lighthouse_model/ucm/**" },
-  { from = "lighthouse_model/clock", to = "lighthouse_model/ucm/**" },
-  { from = "lighthouse_model/diagnostic", to = "lighthouse_model/ucm/**" },
-  { from = "lighthouse_model/document", to = "lighthouse_model/ucm/**" },
-  { from = "lighthouse_model/fix", to = "lighthouse_model/ucm/**" },
-  { from = "lighthouse_model/model_ref", to = "lighthouse_model/ucm/**" },
-  { from = "lighthouse_model/review", to = "lighthouse_model/ucm/**" },
-  { from = "lighthouse_model/scope", to = "lighthouse_model/ucm/**" },
-  { from = "lighthouse_model/text", to = "lighthouse_model/ucm/**" },
-  { from = "lighthouse_model/vocabulary", to = "lighthouse_model/ucm/**" },
+  { from = "lighthouse_model/**", to = "lighthouse_model/ucm/**" },
   { from = "lighthouse_store/**", to = "lighthouse_model/ucm/**" },
   { from = "lighthouse_ml/**", to = "lighthouse_model/ucm/**" },
   { from = "lighthouse_report/**", to = "lighthouse_model/ucm/**" },
   { from = "lighthouse_session/**", to = "lighthouse_model/ucm/**" },
+]
+options.ignore = [
+  { from = "lighthouse_model/ucm/**", to = "lighthouse_model/ucm/**", reason = "the code model is one module; its parts import each other" },
 ]
 options.layers = [
   ["lighthouse_cli*/**", "lang_rust*/**"],

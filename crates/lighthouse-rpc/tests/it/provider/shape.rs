@@ -1,7 +1,7 @@
 //! Test cases, summaries, control flow, dispatchers and forwarders as the
 //! provider reports them.
 
-use lighthouse_model::{FlowKind, Target, TestStyle};
+use lighthouse_model::ucm::{FlowKind, Target, TestStyle};
 
 use super::fixture::*;
 

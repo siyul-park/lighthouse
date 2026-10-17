@@ -2,7 +2,7 @@
 
 use std::sync::LazyLock;
 
-use lighthouse_model::{Symbol, SymbolKind, SymbolRole};
+use lighthouse_model::ucm::{Symbol, SymbolKind, SymbolRole};
 use lighthouse_plugin::{Error, KeyContext, OrderKey, OrderKeyManifest};
 use lighthouse_spec::Catalog;
 use serde::Deserialize;

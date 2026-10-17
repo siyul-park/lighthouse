@@ -11,7 +11,7 @@ use std::{
 };
 
 use crate::metrics::{MEASURES, Measures, propagation::System};
-use lighthouse_model::{
+use lighthouse_model::ucm::{
     Comment, FunctionSummary, Project, Symbol, SymbolId, SymbolKind, Visibility,
 };
 use lighthouse_plugin::{Context, Error, KeyContext, OrderKey, Workspace};
@@ -188,7 +188,7 @@ impl<'a> Builder<'a> {
     /// A module with the facts its check asks for.
     pub(crate) fn module(
         &self,
-        module: &lighthouse_model::Module,
+        module: &lighthouse_model::ucm::Module,
         declared: &crate::modules::Declared,
     ) -> Value {
         let mut value = facts::module(module, declared);
@@ -205,7 +205,7 @@ impl<'a> Builder<'a> {
     }
 
     /// A file with the facts about its text and its symbols.
-    pub(crate) fn file(&self, file: &lighthouse_model::File, text: &str) -> Value {
+    pub(crate) fn file(&self, file: &lighthouse_model::ucm::File, text: &str) -> Value {
         let mut value = facts::file(self.project, file, text);
         // Whether a file is generated is what the merged model says, not what
         // the run read from disk.
@@ -510,7 +510,7 @@ impl<'a> Builder<'a> {
         value
     }
 
-    fn file_module(&self, file: &lighthouse_model::File) -> Option<String> {
+    fn file_module(&self, file: &lighthouse_model::ucm::File) -> Option<String> {
         self.project
             .symbols_in(&file.path)
             .min_by(|a, b| (a.span.start, &a.id).cmp(&(b.span.start, &b.id)))
@@ -519,7 +519,7 @@ impl<'a> Builder<'a> {
 
     /// The private symbols of the file's own module that the file's symbols
     /// reach, and the first symbol that reaches one.
-    fn private_reach(&self, file: &lighthouse_model::File) -> Value {
+    fn private_reach(&self, file: &lighthouse_model::ucm::File) -> Value {
         let project = self.project;
         let mut symbols: Vec<&Symbol> = project.symbols_in(&file.path).collect();
         symbols.sort_by_key(|s| (s.span.start, &s.id));

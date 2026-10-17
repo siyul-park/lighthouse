@@ -4,7 +4,8 @@ pub mod propagation;
 use std::{collections::BTreeMap, sync::LazyLock};
 
 use lighthouse_model::{
-    FlowKind, FunctionSummary, Project, RunScope, Symbol, SymbolId, SymbolKind,
+    RunScope,
+    ucm::{FlowKind, FunctionSummary, Project, Symbol, SymbolId, SymbolKind},
 };
 use lighthouse_plugin::{Analyzer, AnalyzerManifest, Context, Error, Plugin, PluginManifest};
 use serde::{Deserialize, Serialize};

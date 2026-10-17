@@ -1,7 +1,7 @@
 //! The `stability` of a module and the `reach` of a symbol: how many others
 //! use it directly and through what they use, in the graphs of the project.
 
-use lighthouse_model::{Module, Symbol};
+use lighthouse_model::ucm::{Module, Symbol};
 use serde_json::{Value, json};
 
 use super::Builder;

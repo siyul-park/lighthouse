@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lighthouse_model::{Module, Project, SymbolId, SymbolKind, Visibility};
+use lighthouse_model::ucm::{Module, Project, SymbolId, SymbolKind, Visibility};
 use serde_json::{Value, json};
 
 use super::Builder;

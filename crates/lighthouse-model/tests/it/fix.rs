@@ -1,6 +1,6 @@
 use lighthouse_model::{
-    Node, Position, Safety, Span, SymbolId,
-    ucm::{Anchor, EditOp, FixOutcome, Owner},
+    Position, Safety, Span,
+    ucm::{Anchor, EditOp, FixOutcome, Node, Owner, SymbolId},
 };
 use serde_json::json;
 

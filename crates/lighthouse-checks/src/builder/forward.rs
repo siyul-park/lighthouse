@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use lighthouse_model::{Node, Project, Symbol, SymbolId, Target, Visibility};
+use lighthouse_model::ucm::{Node, Project, Symbol, SymbolId, Target, Visibility};
 
 /// The private target a private undocumented wrapper only forwards to. The
 /// wrapper must have exactly one caller, test callers included, and no use as

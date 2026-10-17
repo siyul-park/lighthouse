@@ -9,7 +9,7 @@ use lighthouse_checks::metrics::{
     propagation::{System, modules, symbols},
 };
 use lighthouse_engine::Engine;
-use lighthouse_model::{EdgeKind, Flow, FlowKind, Symbol, SymbolKind};
+use lighthouse_model::ucm::{EdgeKind, Flow, FlowKind, Symbol, SymbolKind};
 use lighthouse_plugin::Registry;
 use lighthouse_spec::{Catalog, Config};
 use serde_json::json;

@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lighthouse_model::{Project, Symbol, SymbolId, SymbolKind, Visibility};
+use lighthouse_model::ucm::{Project, Symbol, SymbolId, SymbolKind, Visibility};
 use serde_json::{Value, json};
 
 use super::{Builder, effective::named_params};

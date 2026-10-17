@@ -23,11 +23,6 @@ pub use model_ref::ModelRef;
 pub use review::{AgentKind, Attribution, Judgment, Label, Role};
 pub use scope::{Reach, RunScope, TestScope};
 pub use text::{ColumnUnit, LineIndex, Position, Span, byte_position, squash, utf16_position};
-pub use ucm::{
-    Applicability, Capability, Comment, Edge, EdgeKind, Event, EventKind, File, Flow, FlowKind,
-    Fragment, FunctionSummary, Module, Node, Project, Resolution, Signature, Site, Symbol,
-    SymbolId, SymbolKind, SymbolRole, Target, TestCase, TestStyle, TypeRef, Visibility,
-};
 pub use vocabulary::UnknownTerm;
 
 /// Decision options as configured in `lighthouse.toml`.

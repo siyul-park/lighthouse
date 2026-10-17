@@ -1,6 +1,8 @@
 use lighthouse_model::{
-    Applicability, File, Fragment, Module, Position, Project, Span, Symbol, SymbolId, SymbolKind,
-    TestScope, Visibility,
+    Position, Span, TestScope,
+    ucm::{
+        Applicability, File, Fragment, Module, Project, Symbol, SymbolId, SymbolKind, Visibility,
+    },
 };
 
 fn file(path: &str, generated: bool, test: bool) -> File {

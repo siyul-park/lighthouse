@@ -3,8 +3,8 @@
 
 use lighthouse_engine::Engine;
 use lighthouse_model::{
-    Applicability, Diagnostic, Fingerprint, Options, Position, RunScope, Severity, Span,
-    Suppression, SuppressionKind,
+    Diagnostic, Fingerprint, Options, Position, RunScope, Severity, Span, Suppression,
+    SuppressionKind, ucm::Applicability,
 };
 use lighthouse_plugin::{
     Context, Error as PluginError, LanguageProvider, Plugin, PluginManifest, Registry, Rule,

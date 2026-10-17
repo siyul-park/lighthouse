@@ -5,7 +5,7 @@
 
 use std::collections::BTreeSet;
 
-use lighthouse_model::{EdgeKind, Node, Project, Symbol, SymbolId, SymbolKind, Target};
+use lighthouse_model::ucm::{EdgeKind, Node, Project, Symbol, SymbolId, SymbolKind, Target};
 
 use super::graph::Graph;
 

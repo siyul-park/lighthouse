@@ -6,12 +6,13 @@ use lighthouse_spec::Catalog;
 use std::{fs, sync::LazyLock};
 
 use lighthouse_engine::{Engine, FixBinding, FixPlan};
-use lighthouse_model::{Applicability, RunScope};
 use lighthouse_model::{
-    Capability, Diagnostic, File, Fingerprint, Fragment, Incomplete, LineIndex, Options, Position,
-    Safety, Severity, Span, Symbol, SymbolId, SymbolKind, Visibility,
-    ucm::{EditOp, FixOutcome},
+    Diagnostic, Fingerprint, Incomplete, LineIndex, Options, Position, Safety, Severity, Span,
+    ucm::{
+        Capability, EditOp, File, FixOutcome, Fragment, Symbol, SymbolId, SymbolKind, Visibility,
+    },
 };
+use lighthouse_model::{RunScope, ucm::Applicability};
 use lighthouse_plugin::{
     Context, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, Indexed,
     LanguageProvider, Plugin, PluginManifest, ProviderManifest, Registry, Rule, RuleManifest,
@@ -23,7 +24,7 @@ use tempfile::TempDir;
 /// The provider manifest of the toy language: it analyzes overlays.
 pub fn toy() -> ProviderManifest {
     ProviderManifest {
-        capabilities: vec![lighthouse_model::Capability::Overlays],
+        capabilities: vec![lighthouse_model::ucm::Capability::Overlays],
         ..ProviderManifest::new("toy", vec!["**/*.toy".to_owned()])
     }
 }

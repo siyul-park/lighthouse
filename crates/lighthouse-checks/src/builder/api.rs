@@ -2,7 +2,10 @@
 //! function, `type_ref` of a field) and the body events of a function, which a
 //! `select: event` check takes one finding each.
 
-use lighthouse_model::{Event, FunctionSummary, Span, Symbol, TypeRef};
+use lighthouse_model::{
+    Span,
+    ucm::{Event, FunctionSummary, Symbol, TypeRef},
+};
 use serde_json::{Map, Value, json};
 
 use super::Builder;

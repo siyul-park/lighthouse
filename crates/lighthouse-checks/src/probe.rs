@@ -1,7 +1,7 @@
 //! Reads one fact the way a check's expression would, for the tests that hold
 //! the result cache to what the facts depend on. Not part of the API.
 
-use lighthouse_model::{File, Project, Symbol};
+use lighthouse_model::ucm::{File, Project, Symbol};
 use lighthouse_plugin::{Context, Error};
 use serde_json::{Map, Value};
 

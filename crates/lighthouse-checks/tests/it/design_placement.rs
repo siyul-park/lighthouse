@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use crate::support::{Subject, World};
 use lighthouse_checks::Checks;
-use lighthouse_model::{EdgeKind, Symbol, SymbolKind, Visibility};
+use lighthouse_model::ucm::{EdgeKind, Symbol, SymbolKind, Visibility};
 use lighthouse_spec::Catalog;
 use serde_json::{Value, json};
 

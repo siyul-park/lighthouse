@@ -8,7 +8,7 @@
 
 use std::collections::BTreeMap;
 
-use lighthouse_model::{FunctionSummary, Project, Symbol, SymbolId, SymbolKind};
+use lighthouse_model::ucm::{FunctionSummary, Project, Symbol, SymbolId, SymbolKind};
 use serde_json::{Value, json};
 
 use super::Builder;

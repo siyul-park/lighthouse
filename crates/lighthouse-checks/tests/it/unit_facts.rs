@@ -2,7 +2,7 @@
 //! single-use helpers) and the `parent` of a module (what it shares with the
 //! module that holds it), read by cel checks over synthetic projects.
 
-use lighthouse_model::{EdgeKind, Flow, FlowKind, Symbol};
+use lighthouse_model::ucm::{EdgeKind, Flow, FlowKind, Symbol};
 use serde_json::json;
 
 use crate::{func_facts::flagged, support::World};

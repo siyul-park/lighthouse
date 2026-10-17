@@ -2,8 +2,11 @@ use std::collections::BTreeMap;
 
 use lighthouse_checks::metrics::{MEASURES, Measures, Metrics};
 use lighthouse_model::{
-    Edge, EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Node, Position, Project,
-    Resolution, Span, Symbol, SymbolId, SymbolKind, Target, Visibility,
+    Position, Span,
+    ucm::{
+        Edge, EdgeKind, File, Flow, FlowKind, Fragment, FunctionSummary, Node, Project, Resolution,
+        Symbol, SymbolId, SymbolKind, Target, Visibility,
+    },
 };
 use lighthouse_plugin::{Context, Facts, Plugin, Workspace};
 
@@ -87,7 +90,7 @@ fn run(project: &Project, path: &str) -> BTreeMap<SymbolId, Measures> {
         trusted: false,
         memo: &lighthouse_plugin::Memo::default(),
         notices: &lighthouse_plugin::Notices::default(),
-        applies: lighthouse_model::Applicability::default(),
+        applies: lighthouse_model::ucm::Applicability::default(),
         models: &lighthouse_plugin::NoModels,
     };
     serde_json::from_value(analyzer.run(&ctx).unwrap()).unwrap()

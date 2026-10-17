@@ -14,7 +14,7 @@ use lighthouse_checks::metrics::{
     Measures,
     propagation::{modules, symbols},
 };
-use lighthouse_model::{SymbolId, SymbolKind};
+use lighthouse_model::ucm::{SymbolId, SymbolKind};
 use lighthouse_session::{CheckRequest, Result, Session, check};
 use serde_json::json;
 

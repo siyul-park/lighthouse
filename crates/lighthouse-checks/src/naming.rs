@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex, PoisonError},
 };
 
-use lighthouse_model::{Module, Project, Symbol, SymbolId, SymbolKind, TestCase};
+use lighthouse_model::ucm::{Module, Project, Symbol, SymbolId, SymbolKind, TestCase};
 use serde::Deserialize;
 
 use crate::layout::contains;

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use lighthouse_model::{Applicability, RunScope, TestScope};
+use lighthouse_model::{RunScope, TestScope, ucm::Applicability};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};

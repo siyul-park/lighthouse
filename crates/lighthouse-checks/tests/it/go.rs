@@ -6,7 +6,7 @@ use std::{
 
 use lighthouse_checks::metrics::MEASURES;
 use lighthouse_engine::Engine;
-use lighthouse_model::{File, Project};
+use lighthouse_model::ucm::{File, Project};
 use lighthouse_plugin::{Context, Facts, Registry, Source, Workspace};
 use lighthouse_spec::{Catalog, Config};
 use serde_json::Value;
@@ -69,7 +69,7 @@ fn measure(plugin: &Path, metric: &str, source: &str) -> BTreeMap<String, u32> {
         trusted: false,
         memo: &lighthouse_plugin::Memo::default(),
         notices: &lighthouse_plugin::Notices::default(),
-        applies: lighthouse_model::Applicability::default(),
+        applies: lighthouse_model::ucm::Applicability::default(),
         models: &lighthouse_plugin::NoModels,
     };
     let analyzer = registry.order([MEASURES]).unwrap().remove(0);

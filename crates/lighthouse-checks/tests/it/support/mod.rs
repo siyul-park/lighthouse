@@ -7,8 +7,11 @@ use std::{collections::BTreeMap, fs};
 use lighthouse_checks::{Checks, metrics::Metrics};
 use lighthouse_engine::Engine;
 use lighthouse_model::{
-    Comment, Edge, EdgeKind, File, Flow, Fragment, FunctionSummary, Module, Node, Position,
-    Resolution, Span, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle, Visibility,
+    Position, Span,
+    ucm::{
+        Comment, Edge, EdgeKind, File, Flow, Fragment, FunctionSummary, Module, Node, Resolution,
+        Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle, Visibility,
+    },
 };
 use lighthouse_plugin::{
     Conventions, Error, Indexed, LanguageProvider, Plugin, PluginManifest, ProviderManifest,
@@ -325,8 +328,8 @@ impl World {
     }
 
     /// The world as the engine merges it.
-    pub fn project(&self) -> lighthouse_model::Project {
-        lighthouse_model::Project::merge(self.fragments().into_iter().map(|(_, f)| f))
+    pub fn project(&self) -> lighthouse_model::ucm::Project {
+        lighthouse_model::ucm::Project::merge(self.fragments().into_iter().map(|(_, f)| f))
     }
 
     fn diagnose_in(

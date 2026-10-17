@@ -7,7 +7,7 @@ mod shape;
 use std::path::Path;
 
 use fixture::*;
-use lighthouse_model::{Capability, EdgeKind, Node, Project, Resolution, Target};
+use lighthouse_model::ucm::{Capability, EdgeKind, Node, Project, Resolution, Target};
 
 #[test]
 fn provider_claims_go_files_and_offers_semantic_edges() {

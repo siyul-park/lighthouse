@@ -4,9 +4,10 @@ use std::{
 };
 
 use lighthouse_model::{
-    Comment, Diagnostic, Fingerprint, Position, Project, Severity, Span, Suppressed, Suppression,
+    Diagnostic, Fingerprint, Position, Severity, Span, Suppressed, Suppression,
     annotation::{self, ANNOTATION_REASON, Directive, Form, UNUSED_ALLOW},
     squash,
+    ucm::{Comment, Project},
 };
 use lighthouse_plugin::Registry;
 use lighthouse_spec::Error as SpecError;

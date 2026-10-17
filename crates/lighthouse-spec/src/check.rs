@@ -4,7 +4,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lighthouse_model::{Capability, EdgeKind, RunScope};
+use lighthouse_model::{
+    RunScope,
+    ucm::{Capability, EdgeKind},
+};
 use lighthouse_resource::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

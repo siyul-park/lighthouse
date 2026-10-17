@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-use lighthouse_model::{EdgeKind, Node, Project, Symbol, SymbolKind, Target};
+use lighthouse_model::ucm::{EdgeKind, Node, Project, Symbol, SymbolKind, Target};
 
 /// A module that declares a symbol.
 pub(crate) struct Declared<'p> {

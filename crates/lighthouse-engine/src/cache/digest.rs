@@ -19,7 +19,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_model::{Document, Project};
+use lighthouse_model::{Document, ucm::Project};
 
 use lighthouse_protocol::hash::Hasher;
 use rayon::prelude::*;

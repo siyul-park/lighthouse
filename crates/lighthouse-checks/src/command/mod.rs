@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 
-use lighthouse_model::{Diagnostic, Position, Project, RunScope, Span, squash};
+use lighthouse_model::{Diagnostic, Position, RunScope, Span, squash, ucm::Project};
 use lighthouse_plugin::{Context, Error as PluginError, RuleManifest};
 use lighthouse_process::{GRACE, Stdin};
 use lighthouse_spec::{Batch, Check, CheckOutput, CommandCheck, DEFAULT_TIMEOUT};

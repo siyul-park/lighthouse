@@ -9,10 +9,11 @@ use std::{
 };
 
 use lighthouse_engine::{Engine, Error};
-use lighthouse_model::{Applicability, RunScope, TestScope};
 use lighthouse_model::{
-    Capability, Diagnostic, Fingerprint, Fragment, Incomplete, Options, Position, Severity, Span,
+    Diagnostic, Fingerprint, Incomplete, Options, Position, Severity, Span,
+    ucm::{Capability, Fragment},
 };
+use lighthouse_model::{RunScope, TestScope, ucm::Applicability};
 use lighthouse_plugin::{
     Analyzer, AnalyzerManifest, Context, Conventions, Error as PluginError, Indexed,
     LanguageProvider, Plugin, PluginManifest, ProviderManifest, Registry, Rule, RuleManifest,

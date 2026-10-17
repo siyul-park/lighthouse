@@ -1,9 +1,9 @@
 use lighthouse_engine::{ExampleRun, ModelOptions, RuleTester};
-use lighthouse_model::{Applicability, RunScope};
 use lighthouse_model::{
-    Capability, Diagnostic, Fingerprint, Fragment, Options, Position, Safety, Severity, Span,
-    ucm::{EditOp, FixOutcome},
+    Diagnostic, Fingerprint, Options, Position, Safety, Severity, Span,
+    ucm::{Capability, EditOp, FixOutcome, Fragment},
 };
+use lighthouse_model::{RunScope, ucm::Applicability};
 use lighthouse_plugin::{
     Context, Error, FixRequest, Fixer, FixerManifest, Indexed, LanguageProvider, Plugin,
     PluginManifest, ProviderManifest, Registry, Rule, RuleManifest, Source, Workspace,

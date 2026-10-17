@@ -4,7 +4,7 @@
 //! left to agent review.
 
 use cel::Program;
-use lighthouse_model::{Diagnostic, Position, Span, SymbolId};
+use lighthouse_model::{Diagnostic, Position, Span, ucm::SymbolId};
 use lighthouse_plugin::{
     Answered, Ask, Context, DecisionRef, Neighbor, RuleManifest, State, Subject,
 };
@@ -202,7 +202,7 @@ fn outcome(answered: Answered, candidate: Candidate, decision: &DecisionRef) -> 
 
 /// The callers and callees of a symbol, with the source of those in the same
 /// file.
-fn neighbors(ctx: &Context, source: &str, symbol: &lighthouse_model::Symbol) -> Vec<Neighbor> {
+fn neighbors(ctx: &Context, source: &str, symbol: &lighthouse_model::ucm::Symbol) -> Vec<Neighbor> {
     let project = ctx.project;
     let around = |ids: &[SymbolId], relation: &str| -> Vec<Neighbor> {
         ids.iter()

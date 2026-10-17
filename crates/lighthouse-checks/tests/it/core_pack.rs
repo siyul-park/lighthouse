@@ -1,7 +1,10 @@
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use lighthouse_model::RunScope;
-use lighthouse_model::{File, Fragment, Options, Project, Severity};
+use lighthouse_model::{
+    Options, Severity,
+    ucm::{File, Fragment, Project},
+};
 use lighthouse_plugin::{Context, Error, Facts, Workspace};
 use lighthouse_spec::{Catalog, Config, Rules};
 use serde_json::json;
@@ -44,7 +47,7 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
         trusted: false,
         memo: &lighthouse_plugin::Memo::default(),
         notices: &lighthouse_plugin::Notices::default(),
-        applies: lighthouse_model::Applicability::default(),
+        applies: lighthouse_model::ucm::Applicability::default(),
         models: &lighthouse_plugin::NoModels,
     };
     registry
@@ -177,7 +180,7 @@ fn registered_rules_are_exactly_the_automated_catalog_decisions() {
 
 #[test]
 fn every_fix_names_a_registered_fixer_and_the_registry_holds_no_other() {
-    use lighthouse_model::Capability;
+    use lighthouse_model::ucm::Capability;
     use lighthouse_spec::{FixKind, OpSpec};
 
     let registry = lighthouse_checks::registry();
