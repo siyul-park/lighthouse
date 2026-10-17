@@ -190,6 +190,8 @@ func TestServe(t *testing.T) {
 		require.Equal(t, []int{-32002, -32002, -32803, -32002, -32602, -32002}, codes)
 	})
 
+	t.Run("replays the recorded transcripts", replayTranscripts)
+
 	t.Run("reports an input that ends or exits too early", func(t *testing.T) {
 		var out bytes.Buffer
 

@@ -1,0 +1,18 @@
+{
+  "applies": ["language", "model"],
+  "exchanges": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "lighthouse/index",
+        "params": { "project": { "root": "/workspace" }, "language": "go", "files": [] }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": { "code": -32002, "message": "$string" }
+      }
+    }
+  ]
+}

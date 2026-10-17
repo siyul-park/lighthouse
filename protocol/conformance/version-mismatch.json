@@ -1,0 +1,22 @@
+{
+  "applies": ["language", "model"],
+  "exchanges": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "0.0",
+          "clientInfo": { "name": "conformance", "version": "0" },
+          "workspaceFolders": [{ "uri": "file:///workspace", "name": "workspace" }]
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": { "code": -32803, "message": "$string" }
+      }
+    }
+  ]
+}

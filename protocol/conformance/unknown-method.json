@@ -1,0 +1,34 @@
+{
+  "applies": ["language", "model"],
+  "exchanges": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "0.3",
+          "clientInfo": { "name": "conformance", "version": "0" },
+          "workspaceFolders": [{ "uri": "file:///workspace", "name": "workspace" }]
+        }
+      },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "0.3",
+          "serverInfo": { "name": "$string", "version": "$string" },
+          "capabilities": "$any"
+        }
+      }
+    },
+    {
+      "send": { "jsonrpc": "2.0", "id": 2, "method": "lighthouse/nope", "params": {} },
+      "expect": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "error": { "code": -32601, "message": "$string" }
+      }
+    }
+  ]
+}

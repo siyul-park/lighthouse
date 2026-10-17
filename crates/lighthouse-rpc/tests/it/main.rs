@@ -5,3 +5,4 @@ mod conformance;
 mod host;
 mod provider;
 mod support;
+mod transcript;

@@ -18,6 +18,10 @@ static LANG_RUST: OnceLock<PathBuf> = OnceLock::new();
 
 static FAKE_MODEL: OnceLock<PathBuf> = OnceLock::new();
 
+static MODEL_LOCAL: OnceLock<PathBuf> = OnceLock::new();
+
+static MODEL_HTTP: OnceLock<PathBuf> = OnceLock::new();
+
 /// The text of a `lighthouse.toml`: a `Project` document around `spec`, the
 /// bare TOML of its `spec` (`plugins`, `[rules]`, ...). It is four lines long,
 /// the spec on one, so that a test that sets a small line limit on its files
@@ -53,6 +57,22 @@ pub fn lang_rust() -> PathBuf {
 pub fn fake_model() -> PathBuf {
     FAKE_MODEL
         .get_or_init(|| build_rust_plugin("fake-model"))
+        .clone()
+}
+
+/// Directory of the `model-local` plugin (manifest and binary), built once per
+/// process like `lang-rust`.
+pub fn model_local() -> PathBuf {
+    MODEL_LOCAL
+        .get_or_init(|| build_rust_plugin("model-local"))
+        .clone()
+}
+
+/// Directory of the `model-http` plugin (manifest and binary), built once per
+/// process like `lang-rust`.
+pub fn model_http() -> PathBuf {
+    MODEL_HTTP
+        .get_or_init(|| build_rust_plugin("model-http"))
         .clone()
 }
 

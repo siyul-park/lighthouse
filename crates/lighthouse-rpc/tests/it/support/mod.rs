@@ -43,6 +43,11 @@ impl Plugin {
         self.stdin.flush().unwrap();
     }
 
+    /// Sends one message as it is, whatever the plugin makes of it.
+    pub fn send(&mut self, message: &Message) {
+        write_message(&mut self.stdin, message).unwrap();
+    }
+
     pub fn read(&mut self) -> Option<Message> {
         read_message(&mut self.stdout).unwrap()
     }
@@ -78,6 +83,15 @@ impl Plugin {
                 workspace_folders: vec![wire::WorkspaceFolder::at(root).unwrap()],
             },
         )
+    }
+
+    /// Closes the plugin's input and returns its exit code.
+    pub fn close(self) -> Option<i32> {
+        let Self {
+            stdin, mut child, ..
+        } = self;
+        drop(stdin);
+        child.wait().unwrap().code()
     }
 
     /// Shuts the plugin down the way hosts do and returns its exit code.

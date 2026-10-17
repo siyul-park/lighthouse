@@ -21,4 +21,4 @@ The wire contract between the host and plugin processes: the language-provider p
 - The protocol is specified in [docs/plugin-protocol.md](../../docs/plugin-protocol.md); this crate holds no I/O beyond framing.
 
 ## Tests
-`crates/lighthouse-protocol/tests/it`; `cargo test -p lighthouse-protocol`.
+`crates/lighthouse-protocol/tests/it`; `cargo test -p lighthouse-protocol`. The recorded exchanges in `protocol/conformance` are replayed by every plugin (`lighthouse-rpc`'s `transcript` test) and by the Go sdk.

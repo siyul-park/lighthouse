@@ -11,7 +11,7 @@ The Go language provider: loads packages with `go/packages`, type-checks with `g
 - `sdk/`: frames (`frame.go`), wire types (`wire.go`), the serve loop (`server.go`), result validation.
 
 ## Invariants
-- `sdk` is the Go twin of `lighthouse-protocol`: `ProtocolVersion` equals protocol `VERSION`, and a change to either is a change to both in the same commit. The conformance goldens in `crates/lighthouse-rpc/tests/conformance/go` are the only guard that they agree.
+- `sdk` is the Go twin of `lighthouse-protocol`: `ProtocolVersion` equals protocol `VERSION`, and a change to either is a change to both in the same commit. The conformance goldens in `crates/lighthouse-rpc/tests/conformance/go` and the transcripts in `protocol/conformance`, which the sdk replays too, are the guard that they agree.
 - Edges come from `go/types`, not from names; the fragment cache in `provider/cache*.go` is keyed by file text and package context.
 - The tests of `sdk` and `provider` validate results against the protocol JSON Schema.
 

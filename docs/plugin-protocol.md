@@ -473,6 +473,15 @@ edges, visibility, ownership, spans, flow, tests, capabilities and a
 deterministic order. `cargo test -p lighthouse-rpc` runs the suite against the
 built plugin and validates every result against the schema.
 
+The exchanges of the protocol itself are recorded in `protocol/conformance/*.json`: each file
+has `applies` (`language`, `model`) and an ordered list of `exchanges`, each a message to send
+and the reply it must get (`expect`, `null` for a notification), where `"$any"` stands for any
+value and `"$string"` for any string. The transcripts cover the lifecycle, a request before
+`initialize` (`ServerNotInitialized`), an unknown method, another protocol version and invalid
+params. Every plugin of the kind a transcript applies to replays it
+(`crates/lighthouse-rpc/tests/it/transcript.rs`), and the Go sdk replays the same files
+(`plugins/lang-go/sdk/conformance_test.go`), so the two servers cannot drift.
+
 ## `lang-go`
 
 Reports `extent` (doc comments and the comment groups of the comment map that lead
