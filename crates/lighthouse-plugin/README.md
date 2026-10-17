@@ -10,7 +10,7 @@ The in-process plugin SPI: the traits and the registry through which rules, anal
 - `Registry`, `plugin_of`: registration, lookup and analyzer resolution.
 - `Memo`: values the rules of one run share.
 - `Notices`: what a rule tells the user besides its findings.
-- `Classifier`, `Models`, `Ask`, `Settle`, `decide`: asking models and settling their answers.
+- `ModelClient`, `Models`, `Ask`, `Settle`, `decide`: asking models and settling their answers.
 
 ## Invariants
 - Every id is prefixed `<plugin>/` and registered once; analyzers form a DAG, so a missing or cyclic `requires` fails registration.

@@ -3,7 +3,8 @@
 
 use lighthouse_model::Severity;
 use lighthouse_spec::{
-    Config, Evaluation, ModelCheck, ModelProvider, Models, Projects, Routing, Select, Subject,
+    Approval, CommandProtocol, Config, Evaluation, ModelCheck, ModelProvider, Models, Projects,
+    Routing, Select, Subject, Task,
 };
 
 const PROJECT: &str = r#"
@@ -45,7 +46,7 @@ fn the_project_binds_models_by_reference_and_limits_what_they_cost() {
     );
     assert_eq!(binding.routing, Routing::Ordered);
     assert_eq!(binding.budget, 50);
-    let ids: Vec<_> = binding.ids().collect();
+    let ids: Vec<_> = binding.bindings().map(|(_, id)| id).collect();
     assert_eq!(ids, ["openrouter/qwen/qwen3-coder:free", "script/sonnet"]);
 }
 
@@ -72,7 +73,7 @@ fn a_binding_is_one_model_or_a_route_of_several_in_the_order_written() {
         ["c/three", "a/one"]
     );
     assert_eq!(binding.routing, Routing::RoundRobin);
-    let ids: Vec<_> = binding.ids().collect();
+    let ids: Vec<_> = binding.bindings().map(|(_, id)| id).collect();
     assert_eq!(ids, ["a/one", "b/two", "c/three", "a/one"]);
 }
 
@@ -253,16 +254,115 @@ fn a_provider_with_two_reaches_or_none_is_invalid_naming_the_fields() {
 }
 
 #[test]
-fn a_command_speaks_typesafe_and_a_command_without_a_protocol_waits_for_chat() {
-    let plain = invalid("command = [\"run\"]\n");
-    assert!(
-        plain.contains("serves `chat`") && plain.contains("protocol = \"typesafe\""),
-        "{plain}"
+fn a_command_speaks_typesafe_or_openai_or_plain_text_and_nothing_else() {
+    let protocol = |text: &str| match provider(text) {
+        ModelProvider::Command { protocol, .. } => protocol,
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(
+        protocol("command = [\"run\"]\n"),
+        CommandProtocol::PlainText
     );
-    let other = invalid("protocol = \"openai\"\ncommand = [\"run\"]\n");
-    assert!(other.contains("speaks `typesafe`"), "{other}");
+    assert_eq!(
+        protocol("protocol = \"openai\"\ncommand = [\"run\"]\n"),
+        CommandProtocol::OpenAi
+    );
+    assert_eq!(
+        protocol("protocol = \"typesafe\"\ncommand = [\"run\"]\n"),
+        CommandProtocol::TypeSafe
+    );
+    let other = invalid("protocol = \"anthropic\"\ncommand = [\"run\"]\n");
+    assert!(other.contains("plain text without a `protocol`"), "{other}");
+    let several = invalid("protocol = [\"openai\", \"typesafe\"]\ncommand = [\"run\"]\n");
+    assert!(several.contains("plain text"), "{several}");
     let empty = invalid("protocol = \"typesafe\"\ncommand = []\n");
     assert!(empty.contains("`command` is empty"), "{empty}");
+}
+
+#[test]
+fn a_provider_serves_the_tasks_its_protocol_covers() {
+    let serves = |text: &str| {
+        let provider = provider(text);
+        (
+            provider.serves(Task::Classification),
+            provider.serves(Task::Chat),
+        )
+    };
+    let command = |protocol: &str| format!("{protocol}command = [\"run\"]\n");
+    assert_eq!(
+        serves(&command("protocol = \"typesafe\"\n")),
+        (Some(true), Some(false))
+    );
+    assert_eq!(
+        serves(&command("protocol = \"openai\"\n")),
+        (Some(false), Some(true))
+    );
+    assert_eq!(serves(&command("")), (Some(false), Some(true)));
+    assert_eq!(
+        serves("protocol = \"openai\"\n"),
+        (Some(true), Some(true)),
+        "chat completions answer chat, and classification by their logprobs"
+    );
+    assert_eq!(
+        serves("protocol = \"typesafe\"\n"),
+        (Some(true), Some(false))
+    );
+    assert_eq!(
+        serves("protocol = [\"typesafe\", \"openai\"]\nbaseUrl = \"http://x\"\n"),
+        (Some(true), Some(true))
+    );
+    assert_eq!(
+        serves("plugin = \"model-local\"\n"),
+        (None, None),
+        "only the handshake of a plugin says what it serves"
+    );
+}
+
+#[test]
+fn chat_is_one_binding_of_the_project_and_the_approval_of_a_fix_defaults_to_a_preview() {
+    let config = Config::parse_inline(
+        "plugins = []\n[models]\nchat = [\"a/one\", \"b/two\"]\nclassification = \"a/one\"\n",
+    )
+    .unwrap();
+    let binding = config.models(&Projects::default()).unwrap();
+    assert_eq!(binding.chat, ["a/one", "b/two"]);
+    let bound: Vec<_> = binding.bindings().collect();
+    assert_eq!(
+        bound,
+        [
+            (Task::Classification, "a/one"),
+            (Task::Chat, "a/one"),
+            (Task::Chat, "b/two")
+        ]
+    );
+    assert_eq!(config.approval(), Approval::Preview);
+    assert!(config.verify().is_empty());
+}
+
+#[test]
+fn approval_and_the_commands_that_verify_fixes_are_read_and_checked() {
+    let config = Config::parse_inline(
+        "plugins = []\n[approval]\nfix = \"verified\"\n[fix]\nverify = [[\"cargo\", \"test\", \"-q\"]]\n",
+    )
+    .unwrap();
+    assert_eq!(config.approval(), Approval::Verified);
+    assert_eq!(config.verify(), [["cargo", "test", "-q"]]);
+
+    for (text, wanted) in [
+        ("[approval]\nfix = \"always\"\n", "always"),
+        ("[approval]\nminor = \"gate\"\n", "minor"),
+        ("[fix]\nverify = [[]]\n", "`fix.verify[0]` needs a program"),
+        (
+            "[fix]\nverify = [[\" \"]]\n",
+            "`fix.verify[0]` needs a program",
+        ),
+        ("[fix]\ncommands = []\n", "commands"),
+    ] {
+        let error = Config::parse_inline(&format!("plugins = []\n{text}"))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(wanted), "{text}: {error}");
+    }
 }
 
 #[test]

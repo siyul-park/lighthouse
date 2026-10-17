@@ -28,7 +28,7 @@ use crate::{
 
 mod batch;
 mod cached;
-mod classifier;
+mod client;
 mod config;
 mod models;
 mod phases;
@@ -36,7 +36,7 @@ mod run;
 mod scopes;
 
 use cached::RunCache;
-pub use classifier::CommandModels;
+pub use client::CommandModels;
 pub use config::active;
 use config::{constructors, io_error, load_languages, validate_config};
 use models::RunModels;
@@ -365,7 +365,7 @@ impl Engine {
     }
 
     /// Tells the engine how to run the `command` model providers of a trusted
-    /// project: `commands` builds the classifier of one.
+    /// project: `commands` builds the client of one.
     pub fn with_commands(mut self, commands: CommandModels) -> Self {
         self.commands = Some(commands);
         self

@@ -10,7 +10,7 @@ use std::{
 
 use lighthouse_checks::Checks;
 use lighthouse_engine::{CommandModels, Engine};
-use lighthouse_plugin::{Classifier, Registry};
+use lighthouse_plugin::{ModelClient, Registry};
 use lighthouse_resource::Format;
 use lighthouse_rpc::{CommandModel, Registered};
 use lighthouse_spec::{Catalog, CheckKind, FixKind, load_local, local_files};
@@ -161,7 +161,7 @@ impl Session {
         let root = self.root.clone();
         let commands: CommandModels = Arc::new(move |name, model, provider| {
             CommandModel::new(&root, name, model, provider)
-                .map(|command| Box::new(command) as Box<dyn Classifier>)
+                .map(|command| Box::new(command) as Box<dyn ModelClient>)
         });
         let engine = Engine::new(registry, self.config.clone(), &self.catalog, &self.root)?
             .with_incomplete(plugins.incomplete)

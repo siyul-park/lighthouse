@@ -7,7 +7,7 @@
 use std::path::Path;
 
 use lighthouse_model::Result;
-use lighthouse_plugin::{Classifier, FineTuningJobStatus};
+use lighthouse_plugin::{FineTuningJobStatus, ModelClient};
 use lighthouse_protocol::hash::digest;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -95,7 +95,7 @@ impl<'a> Learned<'a> {
     /// whether it is the same model, with what to tell about it.
     pub fn rebuild(
         &self,
-        trainer: &dyn Classifier,
+        trainer: &dyn ModelClient,
         root: &Path,
         decision: &str,
         attached: &str,
@@ -138,7 +138,7 @@ impl<'a> Learned<'a> {
 
 /// Why `trainer` cannot make a model again, when it cannot: it must learn, and
 /// must make the same model from the same dataset.
-pub fn unrebuildable(trainer: &dyn Classifier) -> Option<String> {
+pub fn unrebuildable(trainer: &dyn ModelClient) -> Option<String> {
     let manifest = trainer.manifest();
     if !manifest.capabilities.learns() {
         return Some("its trainer does not learn".to_owned());

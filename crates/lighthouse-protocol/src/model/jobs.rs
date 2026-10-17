@@ -197,6 +197,8 @@ pub struct Capabilities {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<Supports>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat: Option<Supports>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub embedding: Option<Supports>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fine_tuning: Option<Supports>,
@@ -207,6 +209,7 @@ impl Capabilities {
     pub fn classifier(trains: bool) -> Self {
         Self {
             classification: Some(Supports { supported: true }),
+            chat: None,
             embedding: None,
             fine_tuning: trains.then_some(Supports { supported: true }),
         }

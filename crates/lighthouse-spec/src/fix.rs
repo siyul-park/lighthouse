@@ -1,7 +1,8 @@
 //! The `fix:` block of a decision: how the finding of its rule is fixed. A
 //! fix is data, never code of the rule: its `type` names how the proposal is
-//! made (generic operations over the code model, an external command) and
-//! every type compiles into a provider of the one `Fixer` interface.
+//! made (generic operations over the code model, an external command, a
+//! model) and every type compiles into a provider of the one `Fixer`
+//! interface.
 
 use std::{collections::BTreeMap, collections::BTreeSet};
 
@@ -56,11 +57,14 @@ impl<'de> Deserialize<'de> for Fix {
         let own: &[&str] = match table.get("type").and_then(Value::as_str) {
             Some("ops") => &["ops"],
             Some("command") => &["argv", "output", "stdin", "env", "timeout"],
+            Some("model") => &["prompt"],
             Some("rpc") => &["params"],
             other => {
                 return Err(D::Error::custom(match other {
-                    None => "a fix needs a `type`: ops, command or rpc".to_owned(),
-                    Some(found) => format!("fix `type` is `{found}`, expected ops, command or rpc"),
+                    None => "a fix needs a `type`: ops, command, model or rpc".to_owned(),
+                    Some(found) => {
+                        format!("fix `type` is `{found}`, expected ops, command, model or rpc")
+                    }
                 }));
             }
         };
@@ -101,9 +105,21 @@ impl Fix {
                 ops.iter().find_map(OpSpec::problem)
             }
             FixKind::Command(command) => command.problem(),
+            FixKind::Model { .. } if self.safety == Safety::Safe => {
+                Some("a fix by a model is never `safe`; use `suggested`".to_owned())
+            }
+            FixKind::Model { .. } => None,
             // Kept, and declined when a fix is asked for; see `FixPlan`.
             FixKind::Rpc { .. } => None,
         }
+    }
+}
+
+impl Fix {
+    /// Whether the fix is made without a model, so that the same finding
+    /// always gets the same proposal.
+    pub fn deterministic(&self) -> bool {
+        !matches!(self.kind, FixKind::Model { .. })
     }
 }
 
@@ -115,6 +131,15 @@ pub enum FixKind {
     Ops { ops: Vec<OpSpec> },
     /// An external program on a scratch copy of the files.
     Command(CommandSpec),
+    /// A model rewrites the code of the finding, and the checks accept the
+    /// result or not. A decision without a fix of its own has this one
+    /// whenever the project binds a `chat` model.
+    Model {
+        /// What the model is told besides the decision's requirement, such
+        /// as how this decision is usually fixed.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        prompt: Option<String>,
+    },
     /// A language plugin's fix method. Reserved: not yet supported.
     Rpc {
         #[serde(default, skip_serializing_if = "Map::is_empty")]

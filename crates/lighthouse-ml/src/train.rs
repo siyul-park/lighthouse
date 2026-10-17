@@ -10,8 +10,8 @@ use std::{
 
 use lighthouse_model::{Judgment, ModelRef, Result};
 use lighthouse_plugin::{
-    Classifier, CreateFineTuningJobRequest, DATASETS_DIR, DecisionRef, FineTuneMethod,
-    FineTuneSupervisedMethod, FineTuningJob, MODELS_DIR, Subject, fails, request_of,
+    CreateFineTuningJobRequest, DATASETS_DIR, DecisionRef, FineTuneMethod,
+    FineTuneSupervisedMethod, FineTuningJob, MODELS_DIR, ModelClient, Subject, fails, request_of,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -57,7 +57,7 @@ impl Rows {
     pub fn of(
         labels: &[Label],
         observed: &BTreeMap<String, Subject>,
-        teacher: Option<&dyn Classifier>,
+        teacher: Option<&dyn ModelClient>,
         decision: &DecisionRef,
     ) -> Result<Self> {
         let (mut rows, seen) = rows_of(labels, observed);
@@ -94,7 +94,7 @@ pub struct Fit<'a> {
     pub reference: Option<&'a str>,
     pub decision: &'a DecisionRef,
     /// The bound model, to give the job to; it must be able to learn.
-    pub model: Option<&'a dyn Classifier>,
+    pub model: Option<&'a dyn ModelClient>,
 }
 
 /// Writes the dataset of the rows and asks the model for a job on it.
@@ -136,7 +136,7 @@ pub fn train(rows: Rows, fit: &Fit) -> Result<Trained> {
 /// the same dataset for the same base model is the same job (its seed comes
 /// from the digest).
 pub(crate) fn fine_tune(
-    trainer: &dyn Classifier,
+    trainer: &dyn ModelClient,
     reference: &str,
     training_file: &str,
     root: &Path,
@@ -208,7 +208,7 @@ fn rows_of(labels: &[Label], observed: &BTreeMap<String, Subject>) -> (Vec<Row>,
 /// it is at least as sure as the band's upper bound, a `pass` where it is as
 /// sure the other way; what it is unsure of teaches nothing.
 fn taught(
-    teacher: &dyn Classifier,
+    teacher: &dyn ModelClient,
     decision: &DecisionRef,
     unlabelled: Vec<(String, Subject)>,
 ) -> Result<Vec<Row>> {

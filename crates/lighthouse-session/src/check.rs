@@ -122,7 +122,7 @@ pub struct Checked {
 
 impl Checked {
     /// The model `reference` (`<provider>/<model>`), from the engine that ran.
-    pub fn model(&self, reference: &str) -> Result<Box<dyn lighthouse_plugin::Classifier + '_>> {
+    pub fn model(&self, reference: &str) -> Result<Box<dyn lighthouse_plugin::ModelClient + '_>> {
         Ok(self.engine.model(reference)?)
     }
 

@@ -1,9 +1,15 @@
-use crate::{CLASSIFY, EXIT, INDEX, INITIALIZE, SHUTDOWN, TRAIN};
+use crate::{CHAT, CLASSIFY, EXIT, INDEX, INITIALIZE, SHUTDOWN, TRAIN};
 
 /// TypeSafe's System One: the twin of [`CLASSIFY`].
 pub const SYSTEM_ONE: Http = Http {
     verb: "POST",
     path: "/v1/systemone",
+};
+
+/// OpenAI's chat completion creation: the twin of [`CHAT`].
+pub const CHAT_COMPLETIONS: Http = Http {
+    verb: "POST",
+    path: "/v1/chat/completions",
 };
 
 /// OpenAI's fine-tuning job creation: the twin of [`TRAIN`].
@@ -15,7 +21,7 @@ pub const FINE_TUNING_JOBS: Http = Http {
 /// Every method of the protocol, in the order docs/plugin-protocol.md lists
 /// them. Both transports read it: the stdio loop dispatches these names, and a
 /// provider that forwards to an HTTP server posts to these paths.
-pub const ROUTES: [Route; 6] = [
+pub const ROUTES: [Route; 7] = [
     Route {
         method: INITIALIZE,
         http: None,
@@ -27,6 +33,10 @@ pub const ROUTES: [Route; 6] = [
     Route {
         method: CLASSIFY,
         http: Some(SYSTEM_ONE),
+    },
+    Route {
+        method: CHAT,
+        http: Some(CHAT_COMPLETIONS),
     },
     Route {
         method: TRAIN,

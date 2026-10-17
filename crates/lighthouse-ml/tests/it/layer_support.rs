@@ -14,8 +14,8 @@ use lighthouse_ml::{
 };
 use lighthouse_model::{Diagnostic, Fingerprint, Judgment, Position, Result, Severity, Span};
 use lighthouse_plugin::{
-    Answer, Capabilities, Classifier, CreateFineTuningJobRequest, DecisionRef, Error,
-    FineTuningJob, FineTuningJobStatus, Model, State, Subject, Supports, SystemOneRequest,
+    Answer, Capabilities, CreateFineTuningJobRequest, DecisionRef, Error, FineTuningJob,
+    FineTuningJobStatus, Model, ModelClient, State, Subject, Supports, SystemOneRequest,
     SystemOneResponse,
 };
 use lighthouse_protocol::hash::sha256;
@@ -74,7 +74,7 @@ pub fn answers(params: &SystemOneRequest, noul: f64) -> SystemOneResponse {
 /// that is not in it is a pass.
 pub struct Table(pub Model, pub BTreeMap<String, f64>);
 
-impl Classifier for Table {
+impl ModelClient for Table {
     fn manifest(&self) -> &Model {
         &self.0
     }
@@ -100,7 +100,7 @@ pub fn table(rows: &[(&str, f64)]) -> Table {
 /// it answers 1.0 for one it has seen and 0.0 for any other.
 pub struct Memorizer(pub Model);
 
-impl Classifier for Memorizer {
+impl ModelClient for Memorizer {
     fn manifest(&self) -> &Model {
         &self.0
     }
@@ -163,7 +163,7 @@ pub fn memorised(line: &str) -> String {
 /// What a memorising artifact answers.
 pub struct Memory(pub Model, pub BTreeSet<String>);
 
-impl Classifier for Memory {
+impl ModelClient for Memory {
     fn manifest(&self) -> &Model {
         &self.0
     }
@@ -266,7 +266,7 @@ pub fn over<'a>(
     model: &'a str,
     root: &'a Path,
     decision: &'a DecisionRef,
-    models: &'a dyn Fn(&str) -> Result<Box<dyn Classifier + 'a>>,
+    models: &'a dyn Fn(&str) -> Result<Box<dyn ModelClient + 'a>>,
 ) -> Overlay<'a> {
     Overlay {
         model,

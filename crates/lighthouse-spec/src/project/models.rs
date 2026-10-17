@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{ModelProvider, ProviderSpec, Rules};
+use super::{ModelProvider, ProviderSpec, Rules, Task};
 
 /// Requests a run may send to models that cost, unless the project says.
 const DEFAULT_BUDGET: usize = 200;
@@ -60,6 +60,12 @@ pub struct ModelsSpec {
     /// abstains, the subject is left to agent review.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<Names>,
+    /// The model (`<provider>/<model>`), or the route of several, that writes
+    /// the fixes no rule makes by itself: one binding for the project, not
+    /// per decision. A request moves to the next model of a route when one
+    /// fails.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat: Option<Names>,
     /// Which model of a route a request starts at. Default: `ordered`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub routing: Option<Routing>,
@@ -114,6 +120,8 @@ impl Default for Evaluation {
 pub struct Models {
     /// The project's route for decisions no rule binds.
     pub classification: Vec<String>,
+    /// The project's route for the model that writes fixes.
+    pub chat: Vec<String>,
     /// Which model of a route a request starts at.
     pub routing: Routing,
     /// The providers the project defines, by name.
@@ -141,6 +149,11 @@ impl Models {
         Self {
             classification: models
                 .classification
+                .as_ref()
+                .map(|names| names.iter().map(str::to_owned).collect())
+                .unwrap_or_default(),
+            chat: models
+                .chat
                 .as_ref()
                 .map(|names| names.iter().map(str::to_owned).collect())
                 .unwrap_or_default(),
@@ -181,17 +194,17 @@ impl Models {
             .filter_map(|(id, rule)| Some((id.as_str(), rule.model.as_deref()?)))
     }
 
-    /// Every model reference the project binds.
-    pub fn ids(&self) -> impl Iterator<Item = &str> {
-        self.classification
-            .iter()
-            .chain(
-                self.rules
-                    .values()
-                    .filter_map(|r| r.model.as_ref())
-                    .flatten(),
-            )
-            .map(String::as_str)
+    /// Every model reference the project binds, with the task it binds it to.
+    pub fn bindings(&self) -> impl Iterator<Item = (Task, &str)> {
+        let classification = self.classification.iter().chain(
+            self.rules
+                .values()
+                .filter_map(|r| r.model.as_ref())
+                .flatten(),
+        );
+        classification
+            .map(|id| (Task::Classification, id.as_str()))
+            .chain(self.chat.iter().map(|id| (Task::Chat, id.as_str())))
     }
 
     /// The evaluation policy of a rule: what the project sets, else the default.

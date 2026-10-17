@@ -29,8 +29,8 @@ pub(crate) struct Fixer {
 }
 
 impl Fixer {
-    /// `None` when the decision has no fix, or one of a kind that is not yet
-    /// supported; an error when it cannot compile.
+    /// `None` when the decision has no fix, or one of a kind another fixer
+    /// serves or that is not yet supported; an error when it cannot compile.
     pub(crate) fn new(decision: &Decision) -> Result<Option<Self>, Error> {
         let Some(fix) = &decision.fix else {
             return Ok(None);
@@ -38,6 +38,8 @@ impl Fixer {
         let compiled = match &fix.kind {
             FixKind::Ops { ops: list } => Compiled::Ops(ops::Steps::compile(decision.id(), list)?),
             FixKind::Command(command) => Compiled::Command(command.clone()),
+            // The engine's own fixer, built when a model is bound, serves it.
+            FixKind::Model { .. } => return Ok(None),
             // Not supported yet: the decision keeps its fix, no fixer is built, and
             // the plan declines its findings with that reason. The rest of the
             // pack is unaffected.

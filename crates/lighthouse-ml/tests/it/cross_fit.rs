@@ -9,7 +9,7 @@ use lighthouse_ml::{
     train::{Fit, Rows, train},
 };
 use lighthouse_model::{Judgment, Result};
-use lighthouse_plugin::{Classifier, DecisionRef};
+use lighthouse_plugin::{DecisionRef, ModelClient};
 
 use crate::layer_support::*;
 
@@ -55,7 +55,7 @@ fn a_model_that_fits_its_labels_is_graded_on_them_by_refits() {
     let reference = format!("fake/{served}");
     let digest = served.split_once("@sha256:").unwrap().1.to_owned();
 
-    let models = |name: &str| -> Result<Box<dyn Classifier>> {
+    let models = |name: &str| -> Result<Box<dyn ModelClient>> {
         Ok(match name.split_once("@sha256:") {
             Some((_, hex)) => Box::new(remembered(root.path(), hex)),
             None => Box::new(Memorizer(manifest(true))),
@@ -105,7 +105,7 @@ fn a_model_that_fits_its_labels_is_graded_on_them_by_refits() {
 #[test]
 fn a_trainer_that_is_not_deterministic_cannot_refit() {
     let (root, run, labels, reference, decision) = learned(false);
-    let models = |name: &str| -> Result<Box<dyn Classifier>> {
+    let models = |name: &str| -> Result<Box<dyn ModelClient>> {
         Ok(match name.split_once("@sha256:") {
             Some((_, hex)) => Box::new(remembered(root.path(), hex)),
             None => Box::new(Memorizer(manifest(false))),
@@ -132,7 +132,7 @@ fn a_dataset_the_store_lost_is_named() {
     for entry in fs::read_dir(root.path().join(".lighthouse/datasets/sha256")).unwrap() {
         fs::remove_file(entry.unwrap().path()).unwrap();
     }
-    let models = |name: &str| -> Result<Box<dyn Classifier>> {
+    let models = |name: &str| -> Result<Box<dyn ModelClient>> {
         Ok(match name.split_once("@sha256:") {
             Some((_, hex)) => Box::new(remembered(root.path(), hex)),
             None => Box::new(Memorizer(manifest(true))),

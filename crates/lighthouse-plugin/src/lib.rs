@@ -27,12 +27,13 @@ pub use fix::{
 pub use lighthouse_protocol::Conventions;
 pub use memo::Memo;
 pub use models::{
-    Abstained, Answer, Answered, Ask, Capabilities, Classifier, CreateFineTuningJobRequest,
-    DATASETS_DIR, Decided, DecisionRef, Example, Explored, FAIL_AT, FineTuneJobError,
-    FineTuneMethod, FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
-    FineTuningJobStatus, LineKeys, ListModelResponse, MODELS_DIR, Model, Models, Neighbor,
-    NoModels, Question, Settle, State, Subject, Supports, SystemOneRequest, SystemOneResponse,
-    TrainingLine, artifact_path, dataset_path, fails, request_of,
+    Abstained, Answer, Answered, Ask, Capabilities, ChatRequest, CreateChatCompletionRequest,
+    CreateChatCompletionResponse, CreateFineTuningJobRequest, DATASETS_DIR, Decided, DecisionRef,
+    Example, Explored, FAIL_AT, FineTuneJobError, FineTuneMethod,
+    FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
+    FineTuningJobStatus, LineKeys, ListModelResponse, MODELS_DIR, Model, ModelClient, Models,
+    Neighbor, NoModels, Question, Settle, State, Subject, Supports, SystemOneRequest,
+    SystemOneResponse, TrainingLine, artifact_path, dataset_path, fails, request_of,
 };
 pub use notices::Notices;
 pub use registry::{Language, Registry, plugin_of};
@@ -365,7 +366,7 @@ pub trait Plugin {
         Vec::new()
     }
     /// The models of the plugin; each has the id of the plugin.
-    fn models(&self) -> Vec<Box<dyn Classifier>> {
+    fn models(&self) -> Vec<Box<dyn ModelClient>> {
         Vec::new()
     }
 }

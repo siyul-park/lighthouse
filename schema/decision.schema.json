@@ -835,6 +835,39 @@
         },
         {
           "additionalProperties": false,
+          "description": "A model rewrites the code of the finding, and the checks accept the\nresult or not. A decision without a fix of its own has this one\nwhenever the project binds a `chat` model.",
+          "properties": {
+            "prompt": {
+              "description": "What the model is told besides the decision's requirement, such\nas how this decision is usually fixed.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "requires": {
+              "description": "Provider capabilities the fix needs; without them it is declined.",
+              "items": {
+                "$ref": "#/$defs/Capability"
+              },
+              "type": "array"
+            },
+            "safety": {
+              "$ref": "#/$defs/Safety",
+              "description": "Caps what the fixer may claim: a `safe` proposal under a `suggested`\ndecision is downgraded. `safe` is reserved for decisions that author `error`."
+            },
+            "type": {
+              "const": "model",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "safety"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "A language plugin's fix method. Reserved: not yet supported.",
           "properties": {
             "params": {

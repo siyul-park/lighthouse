@@ -9,7 +9,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{Call, CreateFineTuningJobRequest, FineTuningJob};
+use crate::{Call, ChatCall, CreateFineTuningJobRequest, FineTuningJob};
 
 /// The `type` of a question and of its answer: System One's `noul`, the
 /// probability of yes.
@@ -20,6 +20,8 @@ pub const NOUL: &str = "noul";
 pub struct ModelMethods {
     #[serde(rename = "lighthouse/classify")]
     pub classify: Call<SystemOneRequest, SystemOneResponse>,
+    #[serde(rename = "lighthouse/chat")]
+    pub chat: ChatCall,
     #[serde(rename = "lighthouse/train")]
     pub train: Call<CreateFineTuningJobRequest, FineTuningJob>,
 }

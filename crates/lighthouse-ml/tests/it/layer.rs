@@ -5,7 +5,7 @@ use lighthouse_ml::{
     metrics::Outcome,
 };
 use lighthouse_model::{Judgment, Result};
-use lighthouse_plugin::Classifier;
+use lighthouse_plugin::ModelClient;
 
 use crate::layer_support::*;
 
@@ -30,7 +30,7 @@ fn a_subject_the_model_fails_is_failed_and_the_rest_keep_the_outcome_they_had() 
             Some(subject("e.rs", "bad")),
         ),
     ];
-    let models = |_: &str| -> Result<Box<dyn Classifier>> {
+    let models = |_: &str| -> Result<Box<dyn ModelClient>> {
         Ok(Box::new(table(&[("bad", 0.95), ("unsure", 0.6)])))
     };
     let decision = decision();
@@ -70,7 +70,7 @@ fn a_layer_that_fails_what_a_person_passed_proposes_to_detach() {
         label("one", Judgment::Pass, None, None),
         label("two", Judgment::Pass, None, None),
     ];
-    let failing = |_: &str| -> Result<Box<dyn Classifier>> {
+    let failing = |_: &str| -> Result<Box<dyn ModelClient>> {
         Ok(Box::new(table(&[("x", 0.95), ("y", 0.95)])))
     };
     let layered = over("fake/m", root.path(), &decision, &failing)

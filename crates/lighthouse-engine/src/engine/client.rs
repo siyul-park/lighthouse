@@ -1,32 +1,32 @@
 //! A model of the project, as the engine asks it: a model of a plugin process
-//! with the options that pick it, or a program the host builds a classifier
-//! for. Both are a [`Classifier`] named by the reference to the model.
+//! with the options that pick it, or a program the host builds a client for.
+//! Both are a [`ModelClient`] named by the reference to the model.
 
 use std::sync::Arc;
 
 use lighthouse_plugin::{
-    Capabilities, Classifier, CreateFineTuningJobRequest, Error, FineTuningJob, Model, Registry,
-    Supports, SystemOneRequest, SystemOneResponse,
+    Capabilities, ChatRequest, CreateChatCompletionResponse, CreateFineTuningJobRequest, Error,
+    FineTuningJob, Model, ModelClient, Registry, Supports, SystemOneRequest, SystemOneResponse,
 };
 use lighthouse_protocol::hash;
 use lighthouse_spec::ModelProvider;
 use serde_json::{Map, Value};
 
-/// Builds the classifier of a `command` provider: the whole reference, the
+/// Builds the client of a `command` provider: the whole reference, the
 /// model part of it and the provider. The host supplies it, so that the
 /// engine does not know how a program is run as a model.
 pub type CommandModels =
-    Arc<dyn Fn(&str, &str, &ModelProvider) -> Option<Box<dyn Classifier>> + Send + Sync>;
+    Arc<dyn Fn(&str, &str, &ModelProvider) -> Option<Box<dyn ModelClient>> + Send + Sync>;
 
-/// What building a classifier needs from the engine.
-pub(super) struct Classifiers<'a> {
+/// What building a client needs from the engine.
+pub(super) struct Clients<'a> {
     pub(super) registry: &'a Registry,
     /// The project is trusted to run the commands it names.
     pub(super) trusted: bool,
     pub(super) commands: Option<&'a CommandModels>,
 }
 
-impl<'a> Classifiers<'a> {
+impl<'a> Clients<'a> {
     /// The model `model` of `provider`, named `name` (the whole reference);
     /// one that cannot be used is a model that fails with the reason, so its
     /// subjects stay for review.
@@ -35,7 +35,7 @@ impl<'a> Classifiers<'a> {
         name: &str,
         model: &str,
         provider: &ModelProvider,
-    ) -> Box<dyn Classifier + 'a> {
+    ) -> Box<dyn ModelClient + 'a> {
         match provider {
             ModelProvider::Rpc {
                 plugin,
@@ -76,24 +76,31 @@ struct Plugin<'a> {
     manifest: Model,
     /// The part of the reference after the provider.
     name: String,
-    model: &'a dyn Classifier,
+    model: &'a dyn ModelClient,
     options: Map<String, Value>,
 }
 
-impl Classifier for Refused {
+impl ModelClient for Refused {
     fn manifest(&self) -> &Model {
         &self.manifest
     }
 
     fn classify(&self, _: &SystemOneRequest) -> Result<SystemOneResponse, Error> {
-        Err(Error::Failed(format!(
-            "model `{}`: {}",
-            self.manifest.id, self.reason
-        )))
+        Err(self.failure())
+    }
+
+    fn chat(&self, _: &ChatRequest) -> Result<CreateChatCompletionResponse, Error> {
+        Err(self.failure())
     }
 }
 
-impl Classifier for Plugin<'_> {
+impl Refused {
+    fn failure(&self) -> Error {
+        Error::Failed(format!("model `{}`: {}", self.manifest.id, self.reason))
+    }
+}
+
+impl ModelClient for Plugin<'_> {
     fn manifest(&self) -> &Model {
         &self.manifest
     }
@@ -103,6 +110,13 @@ impl Classifier for Plugin<'_> {
         asked.model.clone_from(&self.name);
         asked.options.clone_from(&self.options);
         self.model.classify(&asked)
+    }
+
+    fn chat(&self, request: &ChatRequest) -> Result<CreateChatCompletionResponse, Error> {
+        let mut asked = request.clone();
+        asked.body.model.clone_from(&self.name);
+        asked.options.clone_from(&self.options);
+        self.model.chat(&asked)
     }
 
     fn train(&self, request: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {
@@ -133,7 +147,7 @@ fn manifest(
     }
 }
 
-fn refused<'a>(name: &str, reason: String) -> Box<dyn Classifier + 'a> {
+fn refused<'a>(name: &str, reason: String) -> Box<dyn ModelClient + 'a> {
     Box::new(Refused {
         manifest: Model {
             id: name.to_owned(),
@@ -142,8 +156,8 @@ fn refused<'a>(name: &str, reason: String) -> Box<dyn Classifier + 'a> {
             owned_by: name.to_owned(),
             capabilities: Capabilities {
                 classification: Some(Supports { supported: true }),
-                embedding: None,
-                fine_tuning: None,
+                chat: Some(Supports { supported: true }),
+                ..Capabilities::default()
             },
             version: String::new(),
             deterministic: false,

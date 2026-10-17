@@ -1,5 +1,38 @@
 {
   "$defs": {
+    "Approval": {
+      "description": "Whether a fix a model proposed and the checks accepted is written.",
+      "oneOf": [
+        {
+          "const": "preview",
+          "description": "Reported with its diff and left for a hand to apply.",
+          "type": "string"
+        },
+        {
+          "const": "verified",
+          "description": "Written like any other applied fix, without `--unsafe-fixes`.",
+          "type": "string"
+        }
+      ]
+    },
+    "ApprovalSpec": {
+      "additionalProperties": false,
+      "description": "The `approval` table of a project: what happens without a person's hand.",
+      "properties": {
+        "fix": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Approval"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What becomes of a verified fix by a model. Default: `preview`."
+        }
+      },
+      "type": "object"
+    },
     "Evaluation": {
       "additionalProperties": false,
       "description": "How a rule's check is judged by `lighthouse eval`. A policy, not a\nmeaning: changing it moves no meaning version.",
@@ -17,6 +50,23 @@
             "number",
             "null"
           ]
+        }
+      },
+      "type": "object"
+    },
+    "FixSpec": {
+      "additionalProperties": false,
+      "description": "The `fix` table of a project.",
+      "properties": {
+        "verify": {
+          "description": "Commands (argument lists, no shell) that must pass over the project\nwith the fixes by models in place, such as its tests. They run once\nper fix run, after its rounds, on a scratch copy of the project, and\nonly in a trusted project. If one fails, every fix by a model of the\nrun is withdrawn to a preview.",
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -156,6 +206,17 @@
             "integer",
             "null"
           ]
+        },
+        "chat": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Names"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model (`<provider>/<model>`), or the route of several, that writes\nthe fixes no rule makes by itself: one binding for the project, not\nper decision. A request moves to the next model of a route when one\nfails."
         },
         "classification": {
           "anyOf": [
@@ -321,12 +382,20 @@
       "additionalProperties": false,
       "description": "A project's configuration, and the shape of a shareable one: `extends`\nnames any project, the way an ESLint config extends a shareable config.\nAn extended project contributes its `extends`, `rules` and `overrides`.\nIts `plugins` and `languages` belong to the project that is run.",
       "properties": {
+        "approval": {
+          "$ref": "#/$defs/ApprovalSpec",
+          "description": "What happens to a fix by a model without a person's hand."
+        },
         "extends": {
           "description": "Projects whose rules apply first, in order: the `recommended` and\n`strict` projects of each pack (`core/recommended`), or any `Project`\ndocument of the catalog.",
           "items": {
             "type": "string"
           },
           "type": "array"
+        },
+        "fix": {
+          "$ref": "#/$defs/FixSpec",
+          "description": "How fixes by models are checked beyond the rules."
         },
         "generated": {
           "$ref": "#/$defs/GeneratedSpec",
@@ -379,7 +448,7 @@
           ]
         },
         "command": {
-          "description": "The reach as a stdio process under the process contract: no shell, its\nown process group, a time limit, a cap on output, an environment\ncleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TMPDIR`, the\ndeclared `env` and the variable `keyEnv` names, and the project's\ntrust. `{model}` stands for the model part of the reference. An answer\nthat does not fit the protocol's shape is no answer.",
+          "description": "The reach as a stdio process under the process contract: no shell, its\nown process group, a time limit, a cap on output, an environment\ncleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TMPDIR`, the\ndeclared `env` and the variable `keyEnv` names, and the project's\ntrust. `{model}` stands for the model part of the reference. An answer\nthat does not fit the protocol's shape is no answer. Without a\n`protocol` the conversation is plain text on stdin and the answer is\nall of stdout.",
           "items": {
             "type": "string"
           },
@@ -431,7 +500,7 @@
           ]
         },
         "pointer": {
-          "description": "`command` only: RFC 6901 JSON Pointer to the response inside the\nprinted JSON (stdout is one JSON value), when the program wraps it in\nan envelope.",
+          "description": "`command` only: RFC 6901 JSON Pointer to the response inside the\nprinted JSON (stdout is one JSON value), when the program wraps it in\nan envelope; for plain text, to the string that is the answer.",
           "type": [
             "string",
             "null"
@@ -446,7 +515,7 @@
               "type": "null"
             }
           ],
-          "description": "The protocol spoken at the reach: `openai` (Chat Completions, which\nOpenRouter, Ollama, vLLM and LM Studio also speak) or `typesafe`\n(System One), or a list of them in the order of preference. Required\nfor `baseUrl` and `command`; a `command` speaks `typesafe`, and a\n`plugin` must not name one: its handshake says what it serves."
+          "description": "The protocol spoken at the reach: `openai` (Chat Completions, which\nOpenRouter, Ollama, vLLM and LM Studio also speak) or `typesafe`\n(System One), or a list of them in the order of preference. Required\nfor `baseUrl`. A `command` speaks `typesafe` (it serves classification)\nor `openai` (it serves `chat`), or plain text without a `protocol`\n(it serves `chat`); a `plugin` must not name one: its handshake says\nwhat it serves."
         },
         "timeout": {
           "description": "`command` only: how long one run may take, such as `90s`. Default: 120s.",

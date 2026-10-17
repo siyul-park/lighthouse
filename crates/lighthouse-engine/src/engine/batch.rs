@@ -9,7 +9,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use crate::cache::Digest;
 use lighthouse_model::Diagnostic;
 use lighthouse_plugin::{
-    Abstained, Answered, Ask, Classifier, Decided, Explored, Settle, fails, request_of,
+    Abstained, Answered, Ask, Decided, Explored, ModelClient, Settle, fails, request_of,
 };
 use lighthouse_protocol::hash::sha256;
 use rayon::prelude::*;
@@ -134,7 +134,7 @@ impl<'a> RunModels<'a> {
     /// answer. Every model out, the subjects are left to review.
     fn send(
         &self,
-        order: &[&Arc<dyn Classifier + 'a>],
+        order: &[&Arc<dyn ModelClient + 'a>],
         pending: &[Pending<'a>],
         chunk: &[At],
     ) -> Vec<(At, Answer)> {
@@ -160,7 +160,7 @@ impl<'a> RunModels<'a> {
     /// decision.
     fn attempt(
         &self,
-        model: &dyn Classifier,
+        model: &dyn ModelClient,
         pending: &[Pending<'a>],
         chunk: &[At],
     ) -> Result<Vec<(At, Answer)>, Miss> {

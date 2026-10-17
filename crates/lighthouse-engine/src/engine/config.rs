@@ -9,7 +9,7 @@ use std::{
 
 use lighthouse_model::ModelRef;
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Config, ModelProvider, Models, Projects, glob_set};
+use lighthouse_spec::{Config, ModelProvider, Models, Projects, Task, glob_set};
 
 use super::{Error, Language};
 
@@ -101,8 +101,8 @@ pub(super) fn io_error(path: &Path) -> impl FnOnce(io::Error) -> Error {
     }
 }
 
-/// Rejects a binding to a model whose provider is unknown, and a provider that
-/// cannot work.
+/// Rejects a binding to a model whose provider is unknown or does not serve the
+/// task bound, and a provider that cannot work.
 fn validate_models(registry: &Registry, config: &Config, binding: &Models) -> Result<(), Error> {
     if let Some((name, reason)) = binding.invalid.iter().next() {
         return Err(Error::Model {
@@ -110,7 +110,7 @@ fn validate_models(registry: &Registry, config: &Config, binding: &Models) -> Re
             reason: reason.clone(),
         });
     }
-    for reference in binding.ids() {
+    for (_, reference) in binding.bindings() {
         let known = ModelRef::parse(reference)
             .is_some_and(|model| binding.provider(model.provider).is_some());
         if !known {
@@ -118,8 +118,8 @@ fn validate_models(registry: &Registry, config: &Config, binding: &Models) -> Re
         }
     }
     let used = binding
-        .ids()
-        .filter_map(ModelRef::parse)
+        .bindings()
+        .filter_map(|(_, reference)| ModelRef::parse(reference))
         .map(|model| model.provider);
     let providers: BTreeMap<&str, ModelProvider> = used
         .filter_map(|name| Some((name, binding.provider(name)?)))
@@ -152,5 +152,35 @@ fn validate_models(registry: &Registry, config: &Config, binding: &Models) -> Re
             });
         }
     }
+    for (task, reference) in binding.bindings() {
+        let provider = ModelRef::parse(reference)
+            .and_then(|model| Some((model.provider, binding.provider(model.provider)?)));
+        if let Some((name, provider)) = provider
+            && !serves(registry, &provider, task)
+        {
+            return Err(Error::Model {
+                name: reference.to_owned(),
+                reason: format!("provider `{name}` does not serve `{task}`"),
+            });
+        }
+    }
     Ok(())
+}
+
+/// Whether `provider` serves `task`: what its protocol says, else what its
+/// plugin said in the handshake.
+fn serves(registry: &Registry, provider: &ModelProvider, task: Task) -> bool {
+    let protocol = provider.serves(task);
+    let ModelProvider::Rpc { plugin, .. } = provider else {
+        return protocol.unwrap_or(true);
+    };
+    let listed = registry.model(plugin).is_some_and(|model| {
+        let capabilities = &model.manifest().capabilities;
+        let capability = match task {
+            Task::Classification => capabilities.classification,
+            Task::Chat => capabilities.chat,
+        };
+        capability.is_some_and(|capability| capability.supported)
+    });
+    protocol.unwrap_or(true) && listed
 }

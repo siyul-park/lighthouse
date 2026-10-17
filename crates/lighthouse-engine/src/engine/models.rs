@@ -16,11 +16,11 @@ use std::{
 use crate::cache::{Cache, Digest, KeyBuilder, digest_of};
 use lighthouse_model::{Diagnostic, ModelRef};
 use lighthouse_plugin::{
-    Abstained, Answered, Ask, Classifier, Model, Models, Question, Settle, Subject,
+    Abstained, Answered, Ask, Model, ModelClient, Models, Question, Settle, Subject,
 };
 use lighthouse_spec::{Models as BoundModels, Routing};
 
-use super::{Scopes, batch::Pending, classifier::Classifiers};
+use super::{Scopes, batch::Pending, client::Clients};
 
 /// Failures of a model, in one run, after which it is no longer asked.
 pub(super) const MAX_FAILURES: usize = 3;
@@ -29,7 +29,7 @@ pub(super) const MAX_FAILURES: usize = 3;
 pub(super) struct Layer<'a> {
     /// The references of the models, joined with `,`.
     pub(super) id: String,
-    models: Vec<Arc<dyn Classifier + 'a>>,
+    models: Vec<Arc<dyn ModelClient + 'a>>,
     /// Requests that went through the layer this run, to rotate its models.
     turn: Arc<AtomicUsize>,
     /// The layer is the model a revision attached, the first one.
@@ -39,7 +39,7 @@ pub(super) struct Layer<'a> {
 impl<'a> Layer<'a> {
     /// The models in the order a request tries them: as written, or rotated
     /// by one more than the request before.
-    pub(super) fn order(&self, routing: Routing) -> Vec<&Arc<dyn Classifier + 'a>> {
+    pub(super) fn order(&self, routing: Routing) -> Vec<&Arc<dyn ModelClient + 'a>> {
         let start = match routing {
             Routing::Ordered => 0,
             Routing::RoundRobin => self.turn.fetch_add(1, Ordering::SeqCst) % self.models.len(),
@@ -66,7 +66,7 @@ struct Usage {
 /// What a run needs to ask models: who is bound, how much may be spent, and
 /// where answers are kept.
 pub(super) struct RunModels<'a> {
-    classifiers: Classifiers<'a>,
+    clients: Clients<'a>,
     pub(super) binding: &'a BoundModels,
     /// The model attached to a decision by a revision, by decision id.
     attached: &'a BTreeMap<String, String>,
@@ -91,25 +91,25 @@ pub(super) struct RunModels<'a> {
     turns: Mutex<BTreeMap<String, Arc<AtomicUsize>>>,
     notes: Mutex<BTreeSet<String>>,
     /// Models built so far, by reference; `None` for one that cannot serve.
-    built: Mutex<BTreeMap<String, Option<Arc<dyn Classifier + 'a>>>>,
+    built: Mutex<BTreeMap<String, Option<Arc<dyn ModelClient + 'a>>>>,
     /// What rules asked and has not been put to the models yet, by group.
     queued: Mutex<BTreeMap<String, Vec<Pending<'a>>>>,
     usage: Mutex<Usage>,
 }
 
 impl super::Engine {
-    /// The model `reference` (`<provider>/<model>`) as a classifier, for the
+    /// The model `reference` (`<provider>/<model>`) as a client, for the
     /// commands that train and evaluate it.
-    pub fn model(&self, reference: &str) -> Result<Box<dyn Classifier + '_>, super::Error> {
+    pub fn model(&self, reference: &str) -> Result<Box<dyn ModelClient + '_>, super::Error> {
         let binding = &self.binding;
         let unknown = || super::Error::UnknownModel(reference.to_owned());
         let model = ModelRef::parse(reference).ok_or_else(unknown)?;
         let provider = binding.provider(model.provider).ok_or_else(unknown)?;
-        Ok(self.classifiers().build(reference, model.model, &provider))
+        Ok(self.clients().build(reference, model.model, &provider))
     }
 
-    fn classifiers(&self) -> Classifiers<'_> {
-        Classifiers {
+    fn clients(&self) -> Clients<'_> {
+        Clients {
             registry: &self.registry,
             trusted: self.trusted,
             commands: self.commands.as_ref(),
@@ -127,7 +127,7 @@ impl<'a> RunModels<'a> {
     ) -> Self {
         let options = &engine.models;
         Self {
-            classifiers: engine.classifiers(),
+            clients: engine.clients(),
             binding: &engine.binding,
             attached: &options.attached,
             scopes: (!options.all && options.fingerprints.is_none()).then_some(scopes),
@@ -292,7 +292,7 @@ impl<'a> RunModels<'a> {
     }
 
     /// The model of `reference`, built once per run.
-    fn model(&self, reference: &str) -> Option<Arc<dyn Classifier + 'a>> {
+    fn model(&self, reference: &str) -> Option<Arc<dyn ModelClient + 'a>> {
         let mut built = self.built.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(model) = built.get(reference) {
             return model.clone();
@@ -302,7 +302,7 @@ impl<'a> RunModels<'a> {
         model
     }
 
-    fn resolve(&self, reference: &str) -> Option<Arc<dyn Classifier + 'a>> {
+    fn resolve(&self, reference: &str) -> Option<Arc<dyn ModelClient + 'a>> {
         let provider = ModelRef::parse(reference)
             .and_then(|model| Some((self.binding.provider(model.provider)?, model.model)));
         let Some((provider, model)) = provider else {
@@ -311,8 +311,8 @@ impl<'a> RunModels<'a> {
             ));
             return None;
         };
-        let model: Arc<dyn Classifier + 'a> =
-            Arc::from(self.classifiers.build(reference, model, &provider));
+        let model: Arc<dyn ModelClient + 'a> =
+            Arc::from(self.clients.build(reference, model, &provider));
         if model
             .manifest()
             .capabilities
@@ -450,7 +450,7 @@ mod tests {
 
     struct Echo(Model);
 
-    impl Classifier for Echo {
+    impl ModelClient for Echo {
         fn manifest(&self) -> &Model {
             &self.0
         }
@@ -478,7 +478,7 @@ mod tests {
             &self.manifest
         }
 
-        fn models(&self) -> Vec<Box<dyn Classifier>> {
+        fn models(&self) -> Vec<Box<dyn ModelClient>> {
             vec![Box::new(Echo(self.model.clone()))]
         }
     }

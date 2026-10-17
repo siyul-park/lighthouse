@@ -3,8 +3,8 @@
 
 use lighthouse_engine::{Engine, ModelOptions};
 use lighthouse_plugin::{
-    Abstained, Answer, Capabilities, Classifier, CreateFineTuningJobRequest, DecisionRef, Error,
-    Explored, FineTuningJob, Model, Plugin, PluginManifest, Registry, State, SystemOneRequest,
+    Abstained, Answer, Capabilities, CreateFineTuningJobRequest, DecisionRef, Error, Explored,
+    FineTuningJob, Model, ModelClient, Plugin, PluginManifest, Registry, State, SystemOneRequest,
     SystemOneResponse,
 };
 use lighthouse_spec::{Catalog, Config};
@@ -12,7 +12,7 @@ use lighthouse_spec::{Catalog, Config};
 /// A model that echoes the model it was asked for, taken from the options.
 struct Echo(Model);
 
-impl Classifier for Echo {
+impl ModelClient for Echo {
     fn manifest(&self) -> &Model {
         &self.0
     }
@@ -64,7 +64,7 @@ impl Plugin for Models {
         &self.0
     }
 
-    fn models(&self) -> Vec<Box<dyn Classifier>> {
+    fn models(&self) -> Vec<Box<dyn ModelClient>> {
         vec![Box::new(echo())]
     }
 }
@@ -180,7 +180,7 @@ fn engine_with_commands_builds_the_command_models_of_a_trusted_project() {
         .unwrap()
         .with_trust(trusted);
         engine.with_commands(std::sync::Arc::new(|_, _, _| {
-            Some(Box::new(echo()) as Box<dyn Classifier>)
+            Some(Box::new(echo()) as Box<dyn ModelClient>)
         }))
     };
 

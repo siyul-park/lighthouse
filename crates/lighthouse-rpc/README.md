@@ -1,6 +1,6 @@
 # lighthouse-rpc
 
-Providers that run as processes: discovers and starts plugin processes, adapts them to `Plugin` and `Classifier` over the protocol, and runs a model that is any program.
+Providers that run as processes: discovers and starts plugin processes, adapts them to `Plugin` and `ModelClient` over the protocol, and runs a model that is any program.
 
 **Layer.** L2; depends on model, plugin, process, protocol, resource and spec.
 
@@ -8,7 +8,7 @@ Providers that run as processes: discovers and starts plugin processes, adapts t
 - `register`: starts every plugin `lighthouse.toml` lists and puts it in the `Registry`.
 - `search_dirs`, `discover`, `load`, `parse`: finding and reading `lighthouse-plugin.toml`.
 - `RpcPlugin`: `connect` runs the handshake; `languages()` and the models it offers.
-- `Command`: a `Classifier` over a program that reads System One on stdin.
+- `Command`: a `ModelClient` over a program that reads System One or Chat Completions on stdin, or a conversation as text.
 - `Provides`, `Runtime`, `PluginSpec`: the manifest kind; `descriptors()` gives its schema.
 
 ## Invariants

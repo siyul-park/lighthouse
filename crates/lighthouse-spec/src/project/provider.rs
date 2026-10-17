@@ -17,9 +17,8 @@ const PROTOCOLS: [(&str, &str, &str); 2] = [
     ("typesafe", "https://api.typesafe.ai", "TYPESAFE_API_KEY"),
 ];
 
-/// The protocol a `command` speaks: TypeSafe's System One body on stdin, the
-/// response on stdout.
-const COMMAND_PROTOCOL: &str = "typesafe";
+/// The protocols a `command` may speak; without one it speaks plain text.
+const COMMAND_PROTOCOLS: [&str; 2] = ["typesafe", "openai"];
 
 /// The plugin that speaks the standard protocols over HTTP.
 const HTTP_PLUGIN: &str = "model-http";
@@ -33,6 +32,36 @@ const DEFAULT_COST: f64 = 1.0;
 /// Names a project may not give a provider: they belong to the providers
 /// Lighthouse will predefine.
 pub const RESERVED_PROVIDERS: [&str; 2] = ["local", "anthropic"];
+
+/// What a model is asked to do; a binding of `[models]` names one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Task {
+    /// The probability that a subject fails a decision.
+    Classification,
+    /// A reply to a conversation.
+    Chat,
+}
+
+impl std::fmt::Display for Task {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Classification => "classification",
+            Self::Chat => "chat",
+        })
+    }
+}
+
+/// The protocol a `command` provider speaks over its standard streams.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandProtocol {
+    /// TypeSafe's System One body on stdin, the response on stdout.
+    TypeSafe,
+    /// OpenAI's chat completion request on stdin, the response on stdout.
+    OpenAi,
+    /// The conversation as text on stdin, the assistant's whole answer on
+    /// stdout.
+    PlainText,
+}
 
 /// A provider of models as the project writes it, under
 /// `[models.providers.<name>]`. A model is named `<provider>/<model>`.
@@ -48,8 +77,10 @@ pub struct ProviderSpec {
     /// The protocol spoken at the reach: `openai` (Chat Completions, which
     /// OpenRouter, Ollama, vLLM and LM Studio also speak) or `typesafe`
     /// (System One), or a list of them in the order of preference. Required
-    /// for `baseUrl` and `command`; a `command` speaks `typesafe`, and a
-    /// `plugin` must not name one: its handshake says what it serves.
+    /// for `baseUrl`. A `command` speaks `typesafe` (it serves classification)
+    /// or `openai` (it serves `chat`), or plain text without a `protocol`
+    /// (it serves `chat`); a `plugin` must not name one: its handshake says
+    /// what it serves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub protocol: Option<Names>,
     /// The reach over HTTP: where requests go.
@@ -60,7 +91,9 @@ pub struct ProviderSpec {
     /// cleared to `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `TMPDIR`, the
     /// declared `env` and the variable `keyEnv` names, and the project's
     /// trust. `{model}` stands for the model part of the reference. An answer
-    /// that does not fit the protocol's shape is no answer.
+    /// that does not fit the protocol's shape is no answer. Without a
+    /// `protocol` the conversation is plain text on stdin and the answer is
+    /// all of stdout.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<Vec<String>>,
     /// The reach as a listed plugin that offers models.
@@ -82,7 +115,7 @@ pub struct ProviderSpec {
     pub env: BTreeMap<String, String>,
     /// `command` only: RFC 6901 JSON Pointer to the response inside the
     /// printed JSON (stdout is one JSON value), when the program wraps it in
-    /// an envelope.
+    /// an envelope; for plain text, to the string that is the answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pointer: Option<String>,
     /// `plugin` only: what the plugin is told besides the model.
@@ -106,9 +139,10 @@ pub enum ModelProvider {
         /// What one answer costs, when the plugin's own figure is not right.
         cost: Option<f64>,
     },
-    /// A program that reads TypeSafe's System One body on stdin and prints
-    /// the response.
+    /// A program that reads a request on stdin and prints the answer, in the
+    /// shape its `protocol` says.
     Command {
+        protocol: CommandProtocol,
         /// The program and its arguments; `{model}` stands for the model part
         /// of the reference.
         argv: Vec<String>,
@@ -139,6 +173,31 @@ impl ModelProvider {
         }
         .resolve()
         .ok()
+    }
+
+    /// Whether its protocol serves `task`; `None` when only the handshake of
+    /// the plugin behind it can say.
+    pub fn serves(&self, task: Task) -> Option<bool> {
+        match self {
+            Self::Command { protocol, .. } => Some(match task {
+                Task::Classification => *protocol == CommandProtocol::TypeSafe,
+                Task::Chat => *protocol != CommandProtocol::TypeSafe,
+            }),
+            Self::Rpc {
+                plugin, options, ..
+            } if plugin == HTTP_PLUGIN => {
+                let speaks = |name: &str| match options.get("protocol") {
+                    Some(Value::String(protocol)) => protocol == name,
+                    Some(Value::Array(list)) => list.iter().any(|p| p.as_str() == Some(name)),
+                    _ => false,
+                };
+                Some(match task {
+                    Task::Classification => speaks("typesafe") || speaks("openai"),
+                    Task::Chat => speaks("openai"),
+                })
+            }
+            Self::Rpc { .. } => None,
+        }
     }
 
     /// Whether asking this provider reaches a service outside the machine: a
@@ -236,21 +295,18 @@ impl ProviderSpec {
         if argv.is_empty() {
             return Err("`command` is empty".to_owned());
         }
-        match &self.protocol {
-            None => {
+        let protocol = match self.protocol.as_ref().map(|p| p.iter().collect::<Vec<_>>()) {
+            None => CommandProtocol::PlainText,
+            Some(names) if names == ["typesafe"] => CommandProtocol::TypeSafe,
+            Some(names) if names == ["openai"] => CommandProtocol::OpenAi,
+            Some(names) => {
                 return Err(format!(
-                    "a command without a protocol serves `chat`, which arrives with fixes by models; declare `protocol = \"{COMMAND_PROTOCOL}\"` for classification"
+                    "a `command` speaks one of {COMMAND_PROTOCOLS:?}, or plain text without a `protocol`, not {names:?}"
                 ));
             }
-            Some(protocol) if protocol.iter().collect::<Vec<_>>() != [COMMAND_PROTOCOL] => {
-                return Err(format!(
-                    "a `command` speaks `{COMMAND_PROTOCOL}`, not {:?}",
-                    protocol.iter().collect::<Vec<_>>()
-                ));
-            }
-            Some(_) => {}
-        }
+        };
         Ok(ModelProvider::Command {
+            protocol,
             argv: argv.to_vec(),
             pointer: self.pointer.clone(),
             cost: self.cost.unwrap_or(DEFAULT_COST),

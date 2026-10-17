@@ -3,8 +3,8 @@ use std::{collections::BTreeSet, fs, path::Path, sync::Arc, time::Duration};
 use lighthouse_model::Incomplete;
 
 use lighthouse_plugin::{
-    Classifier, Error, Indexed, LanguageProvider, Plugin, PluginManifest, ProviderManifest, Source,
-    Workspace,
+    Error, Indexed, LanguageProvider, ModelClient, Plugin, PluginManifest, ProviderManifest,
+    Source, Workspace,
 };
 use lighthouse_protocol as wire;
 use lighthouse_protocol::hash;
@@ -94,14 +94,14 @@ impl RpcPlugin {
 
 impl Plugin for RpcPlugin {
     /// One model per entry the process declared, sharing its connection.
-    fn models(&self) -> Vec<Box<dyn Classifier>> {
+    fn models(&self) -> Vec<Box<dyn ModelClient>> {
         self.models
             .iter()
             .map(|manifest| {
                 Box::new(Remote {
                     manifest: manifest.clone(),
                     client: Arc::clone(&self.client),
-                }) as Box<dyn Classifier>
+                }) as Box<dyn ModelClient>
             })
             .collect()
     }

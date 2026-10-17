@@ -1,14 +1,15 @@
-//! Models as the rules see them: a [`Classifier`] is a plugin's model, and
+//! Models as the rules see them: a [`ModelClient`] is a plugin's model, and
 //! [`Models`] is what a run offers a rule to put subjects to the models its
 //! decision is bound to. The wire types are the protocol's: a model is trained
 //! on what it is later asked about.
 
 pub use lighthouse_protocol::{
-    Answer, Capabilities, CreateFineTuningJobRequest, DATASETS_DIR, DecisionRef, Example,
-    FineTuneJobError, FineTuneMethod, FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod,
-    FineTuningJob, FineTuningJobStatus, LineKeys, ListModelResponse, MODELS_DIR, Model, Neighbor,
-    Question, State, Subject, Supports, SystemOneRequest, SystemOneResponse, TrainingLine,
-    artifact_path, dataset_path,
+    Answer, Capabilities, ChatRequest, CreateChatCompletionRequest, CreateChatCompletionResponse,
+    CreateFineTuningJobRequest, DATASETS_DIR, DecisionRef, Example, FineTuneJobError,
+    FineTuneMethod, FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
+    FineTuningJobStatus, LineKeys, ListModelResponse, MODELS_DIR, Model, Neighbor, Question, State,
+    Subject, Supports, SystemOneRequest, SystemOneResponse, TrainingLine, artifact_path,
+    dataset_path,
 };
 
 use lighthouse_model::Diagnostic;
@@ -19,11 +20,20 @@ use crate::Error;
 /// clears a subject.
 pub const FAIL_AT: f64 = 0.9;
 
-/// A model offered by a plugin.
-pub trait Classifier: Send + Sync {
+/// A model offered by a plugin: one method per task, each refusing unless the
+/// model's manifest says it serves the task.
+pub trait ModelClient: Send + Sync {
     fn manifest(&self) -> &Model;
-    /// Answers every subject of the request, or fails as a whole.
-    fn classify(&self, params: &SystemOneRequest) -> Result<SystemOneResponse, Error>;
+    /// Answers every subject of the request, or fails as a whole; only a model
+    /// whose manifest supports `classification` does.
+    fn classify(&self, _params: &SystemOneRequest) -> Result<SystemOneResponse, Error> {
+        Err(Error::model(&self.manifest().id, "does not classify"))
+    }
+    /// Replies to a conversation; only a model whose manifest supports `chat`
+    /// does.
+    fn chat(&self, _request: &ChatRequest) -> Result<CreateChatCompletionResponse, Error> {
+        Err(Error::model(&self.manifest().id, "does not chat"))
+    }
     /// Runs a fine-tuning job; only a model whose manifest supports `fine_tuning` does.
     /// The job is final: `succeeded` or `failed`.
     fn train(&self, _request: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {

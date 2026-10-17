@@ -191,7 +191,7 @@ fn fix(decision: &Decision) -> Result<(), Error> {
             .examples
             .iter()
             .any(|e| e.kind == ExampleKind::Invalid && !e.fixed.is_empty());
-        if !fixed {
+        if fix.deterministic() && !fixed {
             return Err(Error::invalid(
                 id,
                 "a fixable decision needs an invalid example with `fixed`",

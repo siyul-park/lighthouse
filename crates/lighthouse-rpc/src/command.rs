@@ -1,7 +1,10 @@
-//! A model that is any program: it reads TypeSafe's System One request on
-//! stdin and prints the response. The project declares it as a `command`
-//! provider with `protocol = "typesafe"`; the program runs under the process
-//! contract, so a trusted project is the only one that builds it.
+//! A model that is any program, declared as a `command` provider. With
+//! `protocol = "typesafe"` it reads TypeSafe's System One request on stdin and
+//! prints the response (classification); with `protocol = "openai"` it reads
+//! a chat completion request and prints the response; without a protocol it
+//! reads the conversation as text and prints the answer (both `chat`). The
+//! program runs under the process contract, so a trusted project is the only
+//! one that builds it.
 
 use std::{
     collections::BTreeMap,
@@ -10,7 +13,8 @@ use std::{
 };
 
 use lighthouse_plugin::{
-    Answer, Capabilities, Classifier, Error, Model, Supports, SystemOneRequest, SystemOneResponse,
+    Answer, Capabilities, ChatRequest, CreateChatCompletionRequest, CreateChatCompletionResponse,
+    Error, Model, ModelClient, Supports, SystemOneRequest, SystemOneResponse,
 };
 use lighthouse_process::{GRACE, Invocation, MAX_OUTPUT};
 use lighthouse_protocol::{
@@ -18,7 +22,7 @@ use lighthouse_protocol::{
     prompt::{json_in, noul_of},
 };
 use lighthouse_resource::Duration as Limit;
-use lighthouse_spec::ModelProvider;
+use lighthouse_spec::{CommandProtocol, ModelProvider};
 use serde_json::{Value, json};
 
 /// How long a command model may take when the instance says nothing.
@@ -27,6 +31,7 @@ const MODEL_TIMEOUT: Duration = Duration::from_secs(120);
 pub struct CommandModel {
     manifest: Model,
     model: String,
+    protocol: CommandProtocol,
     argv: Vec<String>,
     pointer: Option<String>,
     dir: PathBuf,
@@ -39,6 +44,7 @@ impl CommandModel {
     /// reference), run from `dir`; `None` for a provider of another kind.
     pub fn new(dir: &Path, name: &str, model: &str, provider: &ModelProvider) -> Option<Self> {
         let ModelProvider::Command {
+            protocol,
             argv,
             pointer,
             cost,
@@ -57,13 +63,16 @@ impl CommandModel {
                 object: "model".to_owned(),
                 created: 0,
                 owned_by: name.to_owned(),
-                capabilities: Capabilities {
-                    classification: Some(Supports { supported: true }),
-                    embedding: None,
-                    fine_tuning: None,
+                capabilities: match protocol {
+                    CommandProtocol::TypeSafe => Capabilities::classifier(false),
+                    CommandProtocol::OpenAi | CommandProtocol::PlainText => Capabilities {
+                        chat: Some(Supports { supported: true }),
+                        ..Capabilities::default()
+                    },
                 },
                 version: hash::short(
                     &canonical(&json!({
+                        "protocol": format!("{protocol:?}"),
                         "argv": argv,
                         "model": model,
                         "pointer": pointer,
@@ -77,6 +86,7 @@ impl CommandModel {
                 abstains: true,
                 cost: *cost,
             },
+            protocol: *protocol,
             argv: argv.iter().map(|a| a.replace("{model}", model)).collect(),
             pointer: pointer.clone(),
             dir: dir.to_owned(),
@@ -86,21 +96,14 @@ impl CommandModel {
     }
 }
 
-impl Classifier for CommandModel {
-    fn manifest(&self) -> &Model {
-        &self.manifest
-    }
-
-    /// Output that does not fit the shape of an answer is a provider error.
-    fn classify(&self, params: &SystemOneRequest) -> Result<SystemOneResponse, Error> {
+impl CommandModel {
+    /// Runs the program over `input` and returns what it printed.
+    fn run(&self, input: &[u8]) -> Result<Vec<u8>, Error> {
         let failed = |reason: String| Error::model(&self.manifest.id, reason);
-        let mut asked = params.clone();
-        asked.model.clone_from(&self.model);
-        let input = serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?;
         let output = lighthouse_process::run(&Invocation {
             argv: &self.argv,
             dir: &self.dir,
-            stdin: &input,
+            stdin: input,
             env: Some(&self.env),
             limit: self.timeout,
             grace: GRACE,
@@ -112,7 +115,69 @@ impl Classifier for CommandModel {
             let shown: String = stderr.chars().take(400).collect();
             return Err(failed(format!("exited with {:?}: {shown}", output.code)));
         }
-        let printed = printed_answer(&output.stdout, self.pointer.as_deref());
+        Ok(output.stdout)
+    }
+
+    /// The completion a program that speaks Chat Completions printed.
+    fn completion(&self, stdout: &[u8]) -> Result<CreateChatCompletionResponse, Error> {
+        let failed = |reason: String| Error::model(&self.manifest.id, reason);
+        let printed = serde_json::from_slice::<Value>(stdout)
+            .ok()
+            .and_then(|printed| match self.pointer.as_deref() {
+                Some(pointer) => printed.pointer(pointer).cloned(),
+                None => Some(printed),
+            })
+            .ok_or_else(|| failed("its output is not a chat completion".to_owned()))?;
+        serde_json::from_value(printed)
+            .map_err(|e| failed(format!("its output is not a chat completion: {e}")))
+    }
+
+    /// The completion of a program that printed its answer as text: all of
+    /// stdout, or the string a pointer leads to in a JSON envelope.
+    fn text_completion(&self, stdout: &[u8]) -> Result<CreateChatCompletionResponse, Error> {
+        let failed = |reason: String| Error::model(&self.manifest.id, reason);
+        let text = String::from_utf8_lossy(stdout);
+        let answer = match self.pointer.as_deref() {
+            Some(pointer) => serde_json::from_str::<Value>(&text)
+                .ok()
+                .and_then(|printed| printed.pointer(pointer)?.as_str().map(str::to_owned))
+                .ok_or_else(|| failed(format!("its output has no text at `{pointer}`")))?,
+            None => text.trim_end().to_owned(),
+        };
+        if answer.trim().is_empty() {
+            return Err(failed("it printed no answer".to_owned()));
+        }
+        serde_json::from_value(json!({
+            "id": "command",
+            "object": "chat.completion",
+            "created": 0,
+            "model": self.model,
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": answer},
+                "finish_reason": "stop",
+            }],
+        }))
+        .map_err(|e| failed(e.to_string()))
+    }
+}
+
+impl ModelClient for CommandModel {
+    fn manifest(&self) -> &Model {
+        &self.manifest
+    }
+
+    /// Output that does not fit the shape of an answer is a provider error.
+    fn classify(&self, params: &SystemOneRequest) -> Result<SystemOneResponse, Error> {
+        let failed = |reason: String| Error::model(&self.manifest.id, reason);
+        if self.protocol != CommandProtocol::TypeSafe {
+            return Err(failed("it does not classify".to_owned()));
+        }
+        let mut asked = params.clone();
+        asked.model.clone_from(&self.model);
+        let input = serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?;
+        let stdout = self.run(&input)?;
+        let printed = printed_answer(&stdout, self.pointer.as_deref());
         let answers = params
             .questions
             .keys()
@@ -134,6 +199,49 @@ impl Classifier for CommandModel {
             usage: Value::Null,
         })
     }
+
+    /// The reply of the program: the completion it printed, or its text
+    /// answer as the one choice of a completion.
+    fn chat(&self, request: &ChatRequest) -> Result<CreateChatCompletionResponse, Error> {
+        let failed = |reason: String| Error::model(&self.manifest.id, reason);
+        let mut asked = request.body.clone();
+        asked.model.clone_from(&self.model);
+        match self.protocol {
+            CommandProtocol::TypeSafe => Err(failed("it does not chat".to_owned())),
+            CommandProtocol::OpenAi => {
+                let input = serde_json::to_vec(&asked).map_err(|e| failed(e.to_string()))?;
+                self.completion(&self.run(&input)?)
+            }
+            CommandProtocol::PlainText => {
+                let input = conversation(&asked);
+                self.text_completion(&self.run(input.as_bytes())?)
+            }
+        }
+    }
+}
+
+/// The conversation as plain text: the text of each message in turn, a blank
+/// line between them.
+fn conversation(request: &CreateChatCompletionRequest) -> String {
+    let messages = serde_json::to_value(&request.messages).unwrap_or_default();
+    let text = |message: &Value| match message.get("content")? {
+        Value::String(text) => Some(text.clone()),
+        Value::Array(parts) => Some(
+            parts
+                .iter()
+                .filter_map(|part| part.get("text")?.as_str())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        ),
+        _ => None,
+    };
+    let texts: Vec<String> = messages
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(text)
+        .collect();
+    texts.join("\n\n")
 }
 
 /// The content hash of the program a command runs, so that a changed program

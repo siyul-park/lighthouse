@@ -3,6 +3,7 @@
 //! `strict` projects of a pack derive from its decisions, and a catalog may
 //! hold more.
 
+mod fixing;
 mod formatter;
 mod models;
 mod provider;
@@ -24,13 +25,14 @@ use std::{
 
 pub use globset::GlobSet;
 
+pub use fixing::{Approval, ApprovalSpec, FixSpec};
 use globset::{GlobBuilder, GlobSetBuilder};
 use lighthouse_model::{Options, Severity};
 pub use lighthouse_process::Formatter;
 use lighthouse_resource::{Duration, documents, resource};
 pub use lighthouse_resource::{Format, Metadata, Resource};
 pub use models::{Evaluation, Models, Routing};
-pub use provider::{ModelProvider, ProviderSpec, RESERVED_PROVIDERS};
+pub use provider::{CommandProtocol, ModelProvider, ProviderSpec, RESERVED_PROVIDERS, Task};
 use resolved::Resolved;
 pub use rules::{Level, RuleConfig, RuleSetting, Rules};
 use spec::PluginEntry;
@@ -165,6 +167,8 @@ pub struct Config {
     generated: Option<GlobSet>,
     generated_check: Option<GeneratedCheck>,
     models: Models,
+    approval: Approval,
+    verify: Vec<Vec<String>>,
     extends: Vec<String>,
     rules: Rules,
     overrides: Vec<Override>,
@@ -213,6 +217,14 @@ impl Config {
                 "`models.explore` is {share}, not a share from 0 to 1"
             )));
         }
+        if let Some(at) = spec
+            .fix
+            .verify
+            .iter()
+            .position(|argv| argv.first().is_none_or(|program| program.trim().is_empty()))
+        {
+            return Err(Error::Config(format!("`fix.verify[{at}]` needs a program")));
+        }
         let rules = |settings: BTreeMap<String, RuleSetting>| -> Rules {
             settings
                 .into_iter()
@@ -258,6 +270,8 @@ impl Config {
             generated: globs(&spec.generated.files)?,
             generated_check: spec.generated.check,
             models: Models::new(&spec.models),
+            approval: spec.approval.fix.unwrap_or_default(),
+            verify: spec.fix.verify,
             extends: spec.extends,
             rules: rules(spec.rules),
             overrides,
@@ -364,6 +378,16 @@ impl Config {
     pub fn models(&self, projects: &Projects) -> Result<Models, Error> {
         let rules = self.resolve(Path::new(""), "", projects)?;
         Ok(self.models.with_rules(rules))
+    }
+
+    /// Whether a verified fix by a model is written or left as a preview.
+    pub fn approval(&self) -> Approval {
+        self.approval
+    }
+
+    /// The commands that must pass with the fixes by models in place.
+    pub fn verify(&self) -> &[Vec<String>] {
+        &self.verify
     }
 
     /// Project names named in `extends`, in declaration order.

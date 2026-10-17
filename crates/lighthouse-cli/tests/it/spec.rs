@@ -121,7 +121,7 @@ fn checked_in_schemas_match_the_types() {
 fn the_fix_schema_allows_only_the_fields_of_its_type() {
     let schema = lighthouse_session::schema_of("decision").unwrap().schema;
     let branches = schema["$defs"]["Fix"]["oneOf"].as_array().unwrap();
-    assert_eq!(branches.len(), 3);
+    assert_eq!(branches.len(), 4);
     for branch in branches {
         assert_eq!(branch["additionalProperties"], false, "{branch}");
         for field in ["safety", "requires"] {

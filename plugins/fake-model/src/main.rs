@@ -2,8 +2,12 @@
 //! the source of the subject: `maybe_bad` is surely a violation, `maybe_good`
 //! surely not, anything else unsure.
 //!
-//! Without arguments it is a plugin speaking the protocol (`classify` and
-//! `train`, which keeps what it was given in the store it is told). As a
+//! Without arguments it is a plugin speaking the protocol (`classify`,
+//! `chat` and `train`, which keeps what it was given in the store it is
+//! told). Its `chat` rewrites the code a fix prompt shows: it replaces the
+//! `from` option by the `to` option in it and answers `{"replacement": ...}`,
+//! or answers the `answer` option as it is; the `calls` option names a file
+//! that gets a mark for each chat. As a
 //! `command` provider it has three modes: `command` reads a System One body
 //! on stdin and prints the answer, appending a mark to the file `calls` for
 //! each run; `weak` answers 0.5 in an envelope, as fenced text; `fail` exits
@@ -19,10 +23,10 @@ use std::{
 };
 
 use lighthouse_protocol::{
-    Answer, Capabilities, CreateFineTuningJobRequest, ErrorObject, FineTuningJob,
-    FineTuningJobStatus, Handler, InitializeParams, InitializeResult, Model, NOUL,
-    SystemOneRequest, SystemOneResponse, artifact_path, canonical, dataset_path, hash::sha256,
-    serve,
+    Answer, Capabilities, ChatRequest, CreateChatCompletionResponse, CreateFineTuningJobRequest,
+    ErrorObject, FineTuningJob, FineTuningJobStatus, Handler, InitializeParams, InitializeResult,
+    Model, NOUL, Supports, SystemOneRequest, SystemOneResponse, artifact_path, canonical,
+    dataset_path, hash::sha256, serve,
 };
 use serde_json::{Value, json};
 
@@ -32,10 +36,14 @@ struct Fake;
 
 impl Handler for Fake {
     fn initialize(&mut self, _: InitializeParams) -> Result<InitializeResult, ErrorObject> {
+        let capabilities = Capabilities {
+            chat: Some(Supports { supported: true }),
+            ..Capabilities::classifier(true)
+        };
         let model = Model {
             deterministic: true,
             abstains: true,
-            ..Model::new(ID, "1", Capabilities::classifier(true))
+            ..Model::new(ID, "1", capabilities)
         };
         Ok(InitializeResult::new(ID, "1", Vec::new(), vec![model]))
     }
@@ -47,6 +55,43 @@ impl Handler for Fake {
             answers: answers(params.questions.keys(), noul),
             usage: Value::Null,
         })
+    }
+
+    fn chat(&mut self, request: ChatRequest) -> Result<CreateChatCompletionResponse, ErrorObject> {
+        if let Some(calls) = request.options.get("calls").and_then(Value::as_str) {
+            mark_in(calls).map_err(|e| e.to_string())?;
+        }
+        let text = |key: &str| request.options.get(key).and_then(Value::as_str);
+        let content = match text("answer") {
+            Some(answer) => answer.to_owned(),
+            None => {
+                let messages =
+                    serde_json::to_value(&request.body.messages).map_err(|e| e.to_string())?;
+                let prompt = messages
+                    .as_array()
+                    .and_then(|all| all.iter().rev().find(|m| m["role"] == "user"))
+                    .and_then(|message| message["content"].as_str())
+                    .ok_or("the conversation has no user message")?;
+                let extent = extent_of(prompt).ok_or("the prompt shows no code to fix")?;
+                let replacement = extent.replace(
+                    text("from").unwrap_or_default(),
+                    text("to").unwrap_or_default(),
+                );
+                json!({ "replacement": replacement }).to_string()
+            }
+        };
+        serde_json::from_value(json!({
+            "id": "chat-1",
+            "object": "chat.completion",
+            "created": 0,
+            "model": request.body.model,
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": content},
+                "finish_reason": "stop",
+            }],
+        }))
+        .map_err(|e| e.to_string().into())
     }
 
     fn train(&mut self, request: CreateFineTuningJobRequest) -> Result<FineTuningJob, ErrorObject> {
@@ -147,12 +192,28 @@ fn command() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// Appends a mark to the file of calls. Runs are concurrent: an append of one
-/// byte is atomic, a read and rewrite is not.
+/// The code a fix prompt asks to rewrite: the fenced block after `Code to
+/// fix:`, closed by a fence as long as the one that opened it.
+fn extent_of(prompt: &str) -> Option<&str> {
+    let (_, after) = prompt.split_once("Code to fix:\n")?;
+    let (opening, code) = after.split_once('\n')?;
+    let fence = &opening[..opening.len() - opening.trim_start_matches('`').len()];
+    let end = code.find(&format!("\n{fence}"))?;
+    Some(&code[..end])
+}
+
+/// Appends a mark to the file of calls named by the second argument.
 fn mark() -> std::io::Result<()> {
-    let name = std::env::args()
-        .nth(2)
-        .unwrap_or_else(|| "calls".to_owned());
+    mark_in(
+        &std::env::args()
+            .nth(2)
+            .unwrap_or_else(|| "calls".to_owned()),
+    )
+}
+
+/// Appends a mark to the file `name`. Runs are concurrent: an append of one
+/// byte is atomic, a read and rewrite is not.
+fn mark_in(name: &str) -> std::io::Result<()> {
     fs::OpenOptions::new()
         .create(true)
         .append(true)

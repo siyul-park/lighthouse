@@ -1,4 +1,8 @@
 use async_openai::types::{
+    chat::{
+        CreateChatCompletionRequest as OpenAiCreateChatCompletionRequest,
+        CreateChatCompletionResponse as OpenAiCreateChatCompletionResponse,
+    },
     finetuning::{
         CreateFineTuningJobRequest as OpenAiCreateFineTuningJobRequest,
         FineTuneJobError as OpenAiFineTuneJobError, FineTuneMethod as OpenAiFineTuneMethod,
@@ -9,9 +13,9 @@ use async_openai::types::{
     models::{ListModelResponse as OpenAiListModelResponse, Model as OpenAiModel},
 };
 use lighthouse_protocol::{
-    Capabilities, CreateFineTuningJobRequest, FineTuneJobError, FineTuneMethod,
-    FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod, FineTuningJob,
-    FineTuningJobStatus, ListModelResponse, Model, Supports,
+    Capabilities, ChatRequest, CreateChatCompletionResponse, CreateFineTuningJobRequest,
+    FineTuneJobError, FineTuneMethod, FineTuneSupervisedHyperparameters, FineTuneSupervisedMethod,
+    FineTuningJob, FineTuningJobStatus, ListModelResponse, Model, Supports,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -96,6 +100,7 @@ fn openai_model_shapes_round_trip_and_strip_lighthouse_fields() {
         owned_by: "provider".to_owned(),
         capabilities: Capabilities {
             classification: Some(Supports { supported: true }),
+            chat: Some(Supports { supported: true }),
             embedding: None,
             fine_tuning: Some(Supports { supported: true }),
         },
@@ -198,4 +203,46 @@ fn fine_tuning_openai_shapes_round_trip_and_strip_options_and_m2_fields() {
         metadata: None,
     };
     roundtrip::<_, OpenAiFineTuningJob>(&job, &[]);
+}
+
+#[test]
+fn chat_params_are_openais_body_and_the_options_are_ours() {
+    let request: ChatRequest = serde_json::from_value(json!({
+        "model": "qwen/qwen3-coder:free",
+        "messages": [{"role": "user", "content": "hi"}],
+        "temperature": 0.0,
+        "max_completion_tokens": 64,
+        "response_format": {"type": "json_object"},
+        "options": {"baseUrl": "https://example"},
+    }))
+    .unwrap();
+    assert_eq!(request.body.model, "qwen/qwen3-coder:free");
+    assert_eq!(request.options["baseUrl"], "https://example");
+
+    roundtrip::<_, OpenAiCreateChatCompletionRequest>(&request, &["options"]);
+    let without = ChatRequest {
+        options: serde_json::Map::new(),
+        ..request
+    };
+    assert!(
+        serde_json::to_value(&without)
+            .unwrap()
+            .get("options")
+            .is_none()
+    );
+}
+
+#[test]
+fn the_chat_result_is_openais_completion() {
+    let response = json!({
+        "id": "c",
+        "object": "chat.completion",
+        "created": 1,
+        "model": "m",
+        "choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+    });
+    let ours: CreateChatCompletionResponse = serde_json::from_value(response).unwrap();
+    roundtrip::<_, OpenAiCreateChatCompletionResponse>(&ours, &[]);
+    assert_eq!(ours.choices[0].message.content.as_deref(), Some("ok"));
 }

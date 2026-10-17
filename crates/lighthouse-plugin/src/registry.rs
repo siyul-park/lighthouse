@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    Analyzer, Classifier, Error, Fixer, LanguageProvider, OrderKey, OrderKeys, Plugin,
+    Analyzer, Error, Fixer, LanguageProvider, ModelClient, OrderKey, OrderKeys, Plugin,
     PluginManifest, Rule,
 };
 
@@ -24,7 +24,7 @@ pub struct Registry {
     rules: BTreeMap<String, Box<dyn Rule>>,
     fixers: BTreeMap<String, Box<dyn Fixer>>,
     keys: BTreeMap<String, Box<dyn OrderKey>>,
-    models: BTreeMap<String, Box<dyn Classifier>>,
+    models: BTreeMap<String, Box<dyn ModelClient>>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -129,7 +129,7 @@ impl Registry {
     }
 
     /// The model with this id.
-    pub fn model(&self, id: &str) -> Option<&dyn Classifier> {
+    pub fn model(&self, id: &str) -> Option<&dyn ModelClient> {
         self.models.get(id).map(Box::as_ref)
     }
 

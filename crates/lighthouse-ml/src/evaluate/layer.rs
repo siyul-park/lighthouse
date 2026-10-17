@@ -19,7 +19,7 @@ use std::{
 
 use lighthouse_model::{ModelRef, Result};
 use lighthouse_plugin::{
-    Classifier, DATASETS_DIR, DecisionRef, FineTuningJobStatus, MODELS_DIR, Subject, fails,
+    DATASETS_DIR, DecisionRef, FineTuningJobStatus, MODELS_DIR, ModelClient, Subject, fails,
     request_of,
 };
 use lighthouse_protocol::{content_dir, stats::assign};
@@ -41,7 +41,7 @@ pub struct Overlay<'a> {
     /// The root of the store, where datasets and models are kept.
     pub root: &'a Path,
     /// The classifier of a reference (`<provider>/<model>`).
-    pub models: &'a dyn Fn(&str) -> Result<Box<dyn Classifier + 'a>>,
+    pub models: &'a dyn Fn(&str) -> Result<Box<dyn ModelClient + 'a>>,
 }
 
 /// The labels and the run with a layer's answers laid over them.
@@ -157,7 +157,7 @@ impl<'a> CrossFit<'a> {
 struct Refits<'a, 'l> {
     overlay: &'l Overlay<'a>,
     fit: Option<&'l CrossFit<'a>>,
-    made: BTreeMap<usize, Box<dyn Classifier + 'a>>,
+    made: BTreeMap<usize, Box<dyn ModelClient + 'a>>,
     /// The references the refits are served by.
     served: BTreeSet<String>,
 }
@@ -173,7 +173,7 @@ impl<'a, 'l> Refits<'a, 'l> {
     }
 
     /// The model fitted on every line but those of `fold`.
-    fn model(&mut self, fold: usize) -> Result<&dyn Classifier> {
+    fn model(&mut self, fold: usize) -> Result<&dyn ModelClient> {
         if !self.made.contains_key(&fold) {
             let made = self.refit(fold)?;
             self.made.insert(fold, made);
@@ -181,7 +181,7 @@ impl<'a, 'l> Refits<'a, 'l> {
         Ok(self.made[&fold].as_ref())
     }
 
-    fn refit(&mut self, fold: usize) -> Result<Box<dyn Classifier + 'a>> {
+    fn refit(&mut self, fold: usize) -> Result<Box<dyn ModelClient + 'a>> {
         let fit = self.fit.ok_or("a refit needs the dataset")?;
         let overlay = self.overlay;
         let Learned { model, trainer, .. } = fit.learned;
@@ -260,7 +260,7 @@ impl Drop for Scratch {
 /// P(fail) the model gave the subject, the model as evidence names it, and
 /// what asking cost.
 fn ask(
-    model: &dyn Classifier,
+    model: &dyn ModelClient,
     decision: &DecisionRef,
     subject: &Subject,
 ) -> std::result::Result<(f64, String, f64), String> {
