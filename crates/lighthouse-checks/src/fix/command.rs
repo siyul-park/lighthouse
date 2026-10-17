@@ -8,7 +8,7 @@ use std::{
     path::{Component, Path},
 };
 
-use lighthouse_model::{EditOp, LineIndex, Span};
+use lighthouse_model::{LineIndex, Span, ucm::EditOp};
 use lighthouse_plugin::{Error as PluginError, FixRequest};
 use lighthouse_process::{GRACE, Invocation, Output, Stdin};
 use lighthouse_spec::CommandSpec;

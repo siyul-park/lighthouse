@@ -9,12 +9,12 @@
    RPC host (lighthouse-rpc) ── language plugins as processes
           │                      plugins/lang-go (go/packages + go/types)
           │                      plugins/lang-rust (syn + own module resolution)
-   unified code model (lighthouse-model)
+   code model (UCM, lighthouse_model::ucm)
 ```
 
 The core knows no language and no rule. Languages arrive as providers that turn
-files into the unified code model (symbols, edges, function summaries, tests);
-analyzers and rules read only that model. In-process providers and out-of-process
+files into the code model (UCM: symbols, edges, function summaries, tests);
+analyzers and rules read only the UCM. In-process providers and out-of-process
 plugins (see [plugin-protocol.md](plugin-protocol.md)) implement the same
 `LanguageProvider` contract, which is project-level: the engine calls each
 provider once with all of its files.
@@ -40,7 +40,7 @@ The `initialize` result of a plugin process is its `PluginManifest` plus one
 [plugin-protocol.md](plugin-protocol.md)).
 
 Dependencies point down only (see [Crates](#crates)): `spec` and `plugin` never depend on each other, `plugin` knows no configuration, and protocol stays dependency-free.
-The wire model is separate from the core model: renaming a core field is not a
+The wire types are separate from the UCM: renaming a UCM field is not a
 protocol change. The bridge from a decision to its `Rule` (`rule_manifest`, option
 resolution) lives in `checks`; `spec` only describes. `engine` takes the catalog it runs
 over, for the projects `extends` names and for which decisions are in force.
@@ -142,11 +142,11 @@ Every implemented rule belongs to a catalog decision whose `check` is
 one provider of the union `builtin | cel | command | model`, with the common fields `requires` and `timeout`:
 
 - `builtin` is a standard, decision-agnostic operation (`order`, `cycle`) or, for the two rules the engine reports itself (`core/allow`, `core/no-unused-allow`), a rule named by `id`.
-- `cel` is an expression over the code model, written in the decision, with the standard function library `metrics callers owner tests rank exposed limit counted`, the module path helpers `globMatch layerOf` and the text helpers `lines trim join trimPrefixes trimSuffixes trimLeft trimRight leadingRun drop`.
+- `cel` is an expression over the code model (UCM), written in the decision, with the standard function library `metrics callers owner tests rank exposed limit counted`, the module path helpers `globMatch layerOf` and the text helpers `lines trim join trimPrefixes trimSuffixes trimLeft trimRight leadingRun drop`.
   - A function node has a `role`, computed once for every rule, the first that fits: `test`, `implementation` (it satisfies an interface or trait), `constructor` (named by the language's `constructorPrefixes`, or a Rust associated function returning its owner), `entrypoint` (Go `main`/`init`, Rust `main` of a binary), then `method` or `function`. The test sub-role of a test-file declaration is `test_role`.
   - A limit option is declared `$ref: '#/$defs/limit'`: an integer for every role, or an object with `default` and one entry per role (`function method constructor implementation entrypoint test`), each an integer or null for no limit. `limit(node, max)` gives the value for the node's role, and `counted(node, n, what)` says it (`NewServer needs 9 parameters`, `parse has 9 parameters`).
 - `command` runs a program under the process contract: argv without a shell, `{file}`/`{files}`/`{rule}` filling whole arguments, `batch: file|all`, exit `0` clean, `1` findings (stdout lines, an optional `path:line[:col]: ` prefix), anything else an execution error that leaves the analysis incomplete (exit 3). It runs only in a project the user trusts (`lighthouse trust`), and the trust covers the program and every argument that names a file inside the project, by content, so `sh script.sh` is bound to the script. A command is not sandboxed: it runs with the user's privileges, in the project root, with an environment cleared to `PATH`, `HOME`, `LANG`, `TMPDIR` and the declared `env` plus `LIGHTHOUSE_*`. Trust is the only protection; a command that exits with an execution error, times out or prints more than the output cap leaves the analysis incomplete, never clean. `output: sarif` reads stdout as a SARIF log instead, which is how common linters are wrapped: see [wrapping linters](wrapping-linters.md).
-- `model` hands the decision to agent review (`select` and `prompt` optional); it is not deterministic and caps the severity at `warn`.
+- `model` asks the `classification` task of the model the project binds to the decision (`select` and `prompt` optional); a subject nothing decides stays a review task. It is not deterministic and caps the severity at `warn`.
 
 A decision with no `check` is documentation. How a decision is checked is not part of what it means: the *meaning version* hashes requirement, severity, scope (with its applicability) and options, and the `check_revision` records the check on findings and judgments without ever expiring one.
 
@@ -533,7 +533,7 @@ skill show `fixable: safe|suggested`.
 
 **Edit operations, not a round-trip IR.** Fixers do not rewrite source and there is no
 lift-transform-lower pipeline (that would need a code generator per language and lose
-comments and formatting). A fixer answers with `EditOp`s over code-model nodes, and the
+comments and formatting). A fixer answers with `EditOp`s (`lighthouse_model::ucm`) over code model (UCM) nodes, and the
 orchestrator lowers them to text edits with the spans providers report:
 
 | Operation | Meaning | Needs |
@@ -547,7 +547,7 @@ orchestrator lowers them to text edits with the spans providers report:
 
 `Symbol.extent` is the whole declaration (doc comments, attributes and annotations
 included; a Go spec of a parenthesized group has its own lines) and `Edge.site` is the
-span of the identifier at a reference: both are optional model fields reported by
+span of the identifier at a reference: both are optional UCM fields reported by
 providers that declare the capabilities `extent` and `reference-sites`. A fixer whose
 required capability the file's provider lacks is declined before it is asked: never a
 guess. Moves work on whole lines. A moved block keeps its blank-line separation, and the
@@ -630,7 +630,7 @@ nothing counts as applied. A `--dry-run` never writes. A panic or Ctrl-C before 
 leaves the disk as it was: there is no journal to restore. Declined fixes accumulate over
 the rounds without duplicates. A fix is declined, before its fixer is asked, in a file whose
 provider does not declare the `overlays` capability. Language plugins never verify fixes themselves:
-verification is the re-check on the code model. An applied fix is not recorded: it records what happened to this checkout, not a decision.
+verification is the re-check on the code model (UCM). An applied fix is not recorded: it records what happened to this checkout, not a decision.
 The run that ends the fixing resolves the findings the fixes removed.
 
 Bundled fixes: `design/declaration-groups` (a `reorder` by `design/group`, plus a `move`
@@ -650,7 +650,7 @@ single `Fixer` interface. The kinds, their operations and their testing are in
 
 ## Crates
 
-Dependencies point down only, by the layer table in `lighthouse.toml`; the project model (`Project`, rule levels, overrides) is `spec::project`. Each crate's role, entry points and invariants are in its README.
+Dependencies point down only, by the layer table in `lighthouse.toml`; the project configuration (`Project`, rule levels, overrides) is `spec::project`. Each crate's role, entry points and invariants are in its README.
 
 | Layer | Crates |
 |-------|--------|
@@ -677,10 +677,20 @@ Dependencies point down only, by the layer table in `lighthouse.toml`; the proje
 
 Each crate has one integration-test binary, `tests/it/main.rs` with a module per area.
 
+The core never knows the code model (UCM): the modules of `model` other than `ucm`, and the `store`, `ml`, `report` and `session` crates, import nothing of `lighthouse_model::ucm`. A `forbidden` contract of `design/layers` in `lighthouse.toml` enforces it.
+
 ## Models
 
-A model is a plugin kind beside language providers, behind published API bodies and layered
-bindings. The runtime, the wire, `model-http`, labels, datasets, `decision eval` and `model train` are in
+A model is the provider of a task, named `<provider>/<model>`, and a plugin kind beside language
+providers. A task has one standard body: `classification` (TypeSafe System One), `embedding`
+(OpenAI Embeddings), `chat` (OpenAI Chat Completions) and `edit` (an agent session). Only
+`classification` is built; `chat` and `edit` arrive with fixes by models. The probability of a
+classification comes from the model's own distribution, never from a number the model writes.
+
+A project binds `classification` in layers chosen per decision, where an abstention falls through
+to the next (the attached Revision, `rules."<id>".model`, `[models] classification`, then a review
+task); a layer may be a route of equivalent models that fails over on error or rotates. The
+runtime, the wire, `model-http`, labels, datasets, `decision eval` and `model train` are in
 [models.md](models.md).
 
 ## Frontends

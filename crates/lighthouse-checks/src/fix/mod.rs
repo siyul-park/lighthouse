@@ -8,7 +8,7 @@ mod ops;
 
 use std::sync::Arc;
 
-use lighthouse_model::{FixOutcome, Safety};
+use lighthouse_model::{Safety, ucm::FixOutcome};
 use lighthouse_plugin::{Error as PluginError, FixRequest, FixerManifest};
 use lighthouse_spec::{CommandSpec, Decision, FixKind};
 

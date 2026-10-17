@@ -5,8 +5,9 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use lighthouse_checks::Checks;
 use lighthouse_model::{
-    Anchor, Diagnostic, EditOp, File, Fingerprint, FixOutcome, Fragment, Node, Options, Owner,
-    Position, Project, Severity, Span, Symbol, SymbolId, SymbolKind, Visibility,
+    Diagnostic, File, Fingerprint, Fragment, Node, Options, Position, Project, Severity, Span,
+    Symbol, SymbolId, SymbolKind, Visibility,
+    ucm::{Anchor, EditOp, FixOutcome, Owner},
 };
 use lighthouse_plugin::{
     Error, FixDecision, FixRequest, Fixer, KeyContext, OrderKey, OrderKeyManifest, OrderKeys,

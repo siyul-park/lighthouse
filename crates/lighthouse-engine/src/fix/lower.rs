@@ -13,8 +13,8 @@ use std::{
 };
 
 use lighthouse_model::{
-    Anchor, EdgeKind, EditOp, LineIndex, Node, Owner, Project, Resolution, Symbol, SymbolId,
-    Target, Visibility,
+    EdgeKind, LineIndex, Node, Project, Resolution, Symbol, SymbolId, Target, Visibility,
+    ucm::{Anchor, EditOp, Owner},
 };
 
 use crate::Overlays;

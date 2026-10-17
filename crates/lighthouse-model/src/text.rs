@@ -1,4 +1,18 @@
-use crate::{Position, Span};
+use serde::{Deserialize, Serialize};
+
+/// 1-based line and column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct Position {
+    pub line: u32,
+    pub col: u32,
+}
+
+/// Source range within one file; `start` is never after `end`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct Span {
+    pub start: Position,
+    pub end: Position,
+}
 
 /// Converts between byte offsets of a text and the 1-based line and byte
 /// column positions spans use.

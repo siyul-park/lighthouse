@@ -1,9 +1,7 @@
-use std::path::PathBuf;
-
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{Fingerprint, Node, Position, Span, SymbolId};
+use crate::{Fingerprint, Position};
 
 /// How much a proposed fix may be trusted to keep the program's meaning.
 #[derive(
@@ -21,71 +19,6 @@ vocabulary!(Safety, "safety" {
     Safe => "safe",
     Suggested => "suggested",
 });
-
-/// Where a moved declaration lands, relative to another one.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Anchor {
-    Before(Node),
-    After(Node),
-}
-
-/// The declarations an op reorders: those that share a container with its
-/// members. Used to check that every member is in the named place.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Owner {
-    File(PathBuf),
-    Symbol(SymbolId),
-}
-
-/// An edit stated over code-model nodes, independent of any language. The
-/// orchestrator lowers it to text edits with the spans providers supply:
-/// there is no round-trip IR, so trivia and formatting stay as written.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "op", rename_all = "snake_case")]
-pub enum EditOp {
-    /// Relocates a declaration with its extent.
-    Move { node: Node, anchor: Anchor },
-    /// Removes a declaration with its extent.
-    Delete { node: Node },
-    /// Puts the listed declarations, which share a container, in this order
-    /// within the places they occupy.
-    Reorder { owner: Owner, order: Vec<Node> },
-    /// Renames a symbol at its declaration and at every reference site. Only
-    /// when each reference edge is semantic and has a site.
-    Rename { symbol: SymbolId, name: String },
-    /// Removes a range of text, such as a comment.
-    DeleteRange { file: PathBuf, span: Span },
-    /// Replaces a range of text; an empty range inserts.
-    Replace {
-        file: PathBuf,
-        span: Span,
-        text: String,
-    },
-}
-
-/// What a fixer answers for one finding.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "outcome", rename_all = "snake_case")]
-pub enum FixOutcome {
-    Proposed {
-        description: String,
-        ops: Vec<EditOp>,
-        safety: Safety,
-    },
-    /// The fixer cannot or will not fix this finding; never a guess.
-    Declined { reason: String },
-}
-
-impl FixOutcome {
-    /// A refusal with its reason.
-    pub fn declined(reason: impl Into<String>) -> Self {
-        Self::Declined {
-            reason: reason.into(),
-        }
-    }
-}
 
 /// The fix proposed for one finding, computed without writing anything: what
 /// reports show of it.

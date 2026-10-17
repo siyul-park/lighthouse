@@ -7,28 +7,18 @@ use std::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+mod applicability;
+mod discriminator;
+mod edit;
 mod function;
+mod merge;
 
+pub use applicability::Applicability;
+pub use edit::{Anchor, EditOp, FixOutcome, Owner};
 pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, TypeRef};
 
-use crate::{
-    Document,
-    merge::{dedup_edges, resolve_all, sites_of, sorted_union},
-};
-
-/// 1-based line and column.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Position {
-    pub line: u32,
-    pub col: u32,
-}
-
-/// Source range within one file; `start` is never after `end`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Span {
-    pub start: Position,
-    pub end: Position,
-}
+use crate::{Document, Span};
+use merge::{dedup_edges, resolve_all, sites_of, sorted_union};
 
 /// Provider feature that rules may require.
 #[derive(

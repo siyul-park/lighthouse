@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use lighthouse_protocol::hash::{Hasher, short_digest};
 
-use crate::{Project, Span, squash};
+use crate::{Span, squash};
 
 /// How hard a finding fails a run; serialized and parsed as the lowercase
 /// variant name. Whether a finding also asks for review is not a level: it
@@ -168,12 +168,14 @@ impl Diagnostic {
     }
 
     /// Makes the fingerprints of one run unique. Findings that share a rule,
-    /// file and fingerprint are told apart by a stable discriminator (the
-    /// finding's symbol, else the symbol that encloses or precedes it) and only
-    /// findings that still collide get an ordinal. Returns the fingerprints
-    /// that rest on an ordinal, which moves when an earlier identical finding
-    /// appears or goes.
-    pub fn disambiguate(found: &mut [Self], project: &Project) -> BTreeSet<Fingerprint> {
+    /// file and fingerprint are told apart by `discriminator`, which says
+    /// something stable about where the finding is, and only findings that
+    /// still collide get an ordinal. Returns the fingerprints that rest on an
+    /// ordinal, which moves when an earlier identical finding appears or goes.
+    pub fn disambiguate(
+        found: &mut [Self],
+        discriminator: impl Fn(&Self) -> String,
+    ) -> BTreeSet<Fingerprint> {
         let mut groups: BTreeMap<(&str, &PathBuf, &Fingerprint), Vec<usize>> = BTreeMap::new();
         for (at, d) in found.iter().enumerate() {
             groups
@@ -186,8 +188,10 @@ impl Diagnostic {
         for members in groups {
             let mut by_discriminator: BTreeMap<String, Vec<usize>> = BTreeMap::new();
             for at in members {
-                let discriminator = found[at].discriminator(project);
-                by_discriminator.entry(discriminator).or_default().push(at);
+                by_discriminator
+                    .entry(discriminator(&found[at]))
+                    .or_default()
+                    .push(at);
             }
             for (discriminator, same) in by_discriminator {
                 for (n, &at) in same.iter().enumerate() {
@@ -204,27 +208,6 @@ impl Diagnostic {
             }
         }
         ordinal
-    }
-
-    /// The symbol the finding is about, else the one that encloses or precedes
-    /// it; empty when there is none.
-    fn discriminator(&self, project: &Project) -> String {
-        if let Some(symbol) = &self.symbol {
-            return symbol.clone();
-        }
-        let symbols: Vec<_> = project.symbols_in(&self.file).collect();
-        let at = self.span.start;
-        let innermost = symbols
-            .iter()
-            .filter(|s| s.span.start <= at && at <= s.span.end)
-            .max_by_key(|s| s.span.start);
-        let preceding = symbols
-            .iter()
-            .filter(|s| s.span.end < at)
-            .max_by_key(|s| s.span.end);
-        innermost
-            .or(preceding)
-            .map_or_else(String::new, |s| s.id.as_str().to_owned())
     }
 }
 

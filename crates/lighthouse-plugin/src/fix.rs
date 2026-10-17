@@ -2,7 +2,7 @@
 //! judges, a fixer proposes, the orchestrator executes: nothing here edits a
 //! file.
 
-use lighthouse_model::{Capability, Diagnostic, FixOutcome, Options, Project, Symbol};
+use lighthouse_model::{Capability, Diagnostic, Options, Project, Symbol, ucm::FixOutcome};
 use serde_json::Value;
 
 use crate::{Error, Workspace};

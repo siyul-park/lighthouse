@@ -6,12 +6,11 @@ mod clock;
 mod diagnostic;
 mod document;
 mod fix;
-mod merge;
 mod model_ref;
 mod review;
 mod scope;
 mod text;
-mod ucm;
+pub mod ucm;
 
 pub use clock::now;
 pub use diagnostic::{
@@ -19,14 +18,14 @@ pub use diagnostic::{
     SuppressionStatus, evidence_digest,
 };
 pub use document::Document;
-pub use fix::{Anchor, EditOp, FixOutcome, Owner, Preview, PreviewEdit, PreviewFile, Safety};
+pub use fix::{Preview, PreviewEdit, PreviewFile, Safety};
 pub use model_ref::ModelRef;
 pub use review::{AgentKind, Attribution, Judgment, Label, Role};
-pub use scope::{Applicability, Reach, RunScope, TestScope};
-pub use text::{ColumnUnit, LineIndex, byte_position, squash, utf16_position};
+pub use scope::{Reach, RunScope, TestScope};
+pub use text::{ColumnUnit, LineIndex, Position, Span, byte_position, squash, utf16_position};
 pub use ucm::{
-    Capability, Comment, Edge, EdgeKind, Event, EventKind, File, Flow, FlowKind, Fragment,
-    FunctionSummary, Module, Node, Position, Project, Resolution, Signature, Site, Span, Symbol,
+    Applicability, Capability, Comment, Edge, EdgeKind, Event, EventKind, File, Flow, FlowKind,
+    Fragment, FunctionSummary, Module, Node, Project, Resolution, Signature, Site, Symbol,
     SymbolId, SymbolKind, SymbolRole, Target, TestCase, TestStyle, TypeRef, Visibility,
 };
 pub use vocabulary::UnknownTerm;

@@ -103,22 +103,29 @@ check:
 
 `where` true is a `fail`; `where` false and `abstain` true is an **abstention**; anything else is a `pass`. Abstained subjects fall through the bindings below like a model's own abstention. A `fail` from a model is a finding with the check's own message, evidence, identity and fix, plus `evidence.model` (`<provider>/<model>@<version>`) and `evidence.confidence`. Its level is at most `warn`.
 
-Models are one plugin kind, `Model`, with tasks (`tasks` in the manifest),
-because each task has its own call shape:
+Models are one plugin kind, `Model`, with four tasks (`tasks` in the manifest), because each
+task has its own call shape and standard body:
 
-| Task | Call |
-| --- | --- |
-| `classification` | subject + decision (requirement or prompt, examples) → `pass`/`fail` with a confidence, or abstain |
-| `embedding` | texts → vectors (later; not built) |
+| Task | Call | Body | Built |
+| --- | --- | --- | --- |
+| `classification` | subject + decision (requirement or prompt, examples) → P(fail), or abstain | TypeSafe System One | yes |
+| `embedding` | texts → vectors | OpenAI Embeddings | later; bound per project only |
+| `chat` | messages → text, a proposal | OpenAI Chat Completions | with fixes by models |
+| `edit` | an agent session in a scratch copy; changed files go through the verifier | Agent Client Protocol, or a headless CLI | with fixes by models |
 
-How a model answers is its own business. An LLM, a jev-class System 1 model, or a gradient-
-boosted classifier trained on the decision's judgments all serve `classification` the same
-way.
+`chat` and `edit` are generative only. `classification` is not: its probability comes from the
+model's own distribution (a classifier's score, a System One `noul`, the logprobs of a chat
+model's answer token), so a verbalized number and an agent CLI are never classifiers.
+
+How a model arrives at its distribution is its own business. A chat model with logprobs, a
+jev-class System 1 model, or a classifier trained on the decision's judgments all serve
+`classification` the same way.
 
 **A decision never names a model.** Decisions are shared through git and packs, while which
 models exist (local or remote, allowed or not, at what cost) depends on the machine and the
-project. A decision says what to ask; bindings say who answers. Bindings resolve from the
-most specific layer to the least, and an **abstention falls through** to the next one:
+project. A decision says what to ask; bindings say who answers. A **binding layer** is chosen per
+decision, most specific first, and an **abstention falls through** to the next one (layers exist
+only for `classification`; the other tasks bind once per project):
 
 | Layer | Where | Set by |
 | --- | --- | --- |
@@ -188,7 +195,7 @@ evaluation = { precision = 0.9 }          # recall = 0.8 optional
 
 - **How a chat model answers.** From its own distribution, never from a number it writes: the model is asked for one word, `true` if the subject violates the requirement and `false` if it complies (the names of the criteria in the prompt), with `logprobs`, `top_logprobs = 20`, `max_tokens = 1` and `temperature = 0`; P(fail) is p_true / (p_true + p_false) over the first answer token's top log probabilities, after trimming, lower-casing and stripping punctuation (the OpenAI Cookbook's classification recipe, renormalized over the labels as in Zhao et al., ICML 2021). The answer token is the first sampled token that is neither blank nor a closing reasoning tag such as `</think>`. Neither label among the top 20 is an abstention; a response without `logprobs` is a provider error ("the model returned no logprobs; it cannot serve classification"), so the route moves to its next model or the subject stays for review. Use a non-reasoning model, or one whose reasoning is merely forced: a model that reasons needs room for it, as in the `openrouter` recipe.
 - **`extraBody`** is a JSON object merged shallowly into every request body of an HTTP provider (the OpenAI SDK's `extra_body`); its keys override the body's own, `max_tokens` included. It carries service-specific parameters, such as OpenRouter's `provider.require_parameters`, without code for any service.
-- **A route.** A binding is one reference or a list of them; a list is one layer, and a layer is asked as one: its models are tried in turn.
+- **A route.** Layers and routes are different things: a layer moves on when its models *abstain*, a route moves on when a model *fails*. A binding is one reference or a list of equivalent ones; a list is one layer, and a layer is asked as one: its models are tried in turn.
   - `routing = "ordered"` (default) starts every request at the first model; `"round-robin"` starts consecutive requests at consecutive models, the others following in the order written, wrapping.
   - A request moves to the next model only when a model fails (an HTTP error including 429 and 5xx, a timeout, missing `logprobs`, unusable output) or the budget refuses a model that costs. An abstention or an unsure answer goes to the next layer, never the next model.
   - A model that fails 3 times in a run is skipped for the rest of it, with one notice (LiteLLM's `allowed_fails`). With every model out, the subject stays for review.

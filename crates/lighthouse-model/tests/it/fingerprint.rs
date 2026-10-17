@@ -102,11 +102,55 @@ fn findings_that_share_an_identity_are_told_apart_by_ordinal_and_reported() {
     let alone = all[2].fingerprint.clone();
     let first = all[0].fingerprint.clone();
 
-    let ordinal = Diagnostic::disambiguate(&mut all, &Project::default());
+    let project = Project::default();
+    let ordinal = Diagnostic::disambiguate(&mut all, |d| project.discriminator(d));
 
     assert_eq!(all[2].fingerprint, alone);
     assert_eq!(all[0].fingerprint, first);
     assert_eq!(all[1].fingerprint, first.occurrence(1));
     assert_eq!(ordinal.len(), 2);
     assert!(ordinal.contains(&first) && ordinal.contains(&first.occurrence(1)));
+}
+
+#[test]
+fn findings_that_share_an_identity_are_told_apart_by_the_discriminator_given() {
+    let at = Position { line: 1, col: 1 };
+    let span = Span { start: at, end: at };
+    let found = |symbol: &str| {
+        let mut d = Diagnostic::new(
+            "r",
+            Severity::Warn,
+            "m",
+            "a.go",
+            span,
+            Fingerprint::new("r", "a.go", "x"),
+        );
+        d.symbol = Some(symbol.to_owned());
+        d
+    };
+    let mut all = [found("m::f"), found("m::g")];
+    let first = all[0].fingerprint.clone();
+
+    let ordinal = Diagnostic::disambiguate(&mut all, |d| d.symbol.clone().unwrap_or_default());
+
+    assert_ne!(all[0].fingerprint, all[1].fingerprint);
+    assert_eq!(all[0].fingerprint, first.discriminate("m::f").occurrence(0));
+    assert!(ordinal.is_empty(), "a discriminator leaves no ordinal");
+}
+
+#[test]
+fn a_project_discriminates_a_finding_by_its_symbol_else_by_nothing() {
+    let at = Position { line: 1, col: 1 };
+    let mut found = Diagnostic::new(
+        "r",
+        Severity::Warn,
+        "m",
+        "a.go",
+        Span { start: at, end: at },
+        Fingerprint::new("r", "a.go", "x"),
+    );
+    assert_eq!(Project::default().discriminator(&found), "");
+
+    found.symbol = Some("m::f#function".to_owned());
+    assert_eq!(Project::default().discriminator(&found), "m::f#function");
 }

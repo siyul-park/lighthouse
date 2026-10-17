@@ -5,7 +5,10 @@
 use std::path::PathBuf;
 
 use cel::{Context, Program};
-use lighthouse_model::{Anchor, EditOp, Node, Owner, Project, Span, Symbol, SymbolId, SymbolKind};
+use lighthouse_model::{
+    Node, Project, Span, Symbol, SymbolId, SymbolKind,
+    ucm::{Anchor, EditOp, Owner},
+};
 use lighthouse_plugin::{Error as PluginError, FixRequest, KeyContext};
 use lighthouse_spec::{OpSpec, OrderScope};
 use serde_json::{Value, json};

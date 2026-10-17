@@ -6,7 +6,10 @@
 use std::path::Path;
 
 use lighthouse_engine::{Engine, Error, FixBinding, FixPlan, FixRun, unified_diff};
-use lighthouse_model::{EditOp, FixOutcome, Safety};
+use lighthouse_model::{
+    Safety,
+    ucm::{EditOp, FixOutcome},
+};
 use lighthouse_plugin::{
     Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, LanguageProvider, Plugin,
     PluginManifest, Registry, Rule,

@@ -5,7 +5,10 @@ use lighthouse_spec::Catalog;
 use std::fs;
 
 use lighthouse_engine::{Engine, FixBinding, FixPlan, FixRun};
-use lighthouse_model::{Diagnostic, EditOp, FixOutcome, Options, Safety};
+use lighthouse_model::{
+    Diagnostic, Options, Safety,
+    ucm::{EditOp, FixOutcome},
+};
 use lighthouse_plugin::{
     Context, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, LanguageProvider,
     Plugin, PluginManifest, Registry, Rule, RuleManifest,

@@ -53,6 +53,7 @@ languages and editors are added.
 | Crate boundaries | 15 crates in layers, each one role, the edges enforced by `design/layers`; one name per concept across crates, protocol, schemas and docs (`Run`, `fingerprints`, `decision`) |
 | Hooks report the session's own changes | the first edit of a file records its findings; later hooks report only the findings the session introduced, and a turn with no edit is silent |
 | Stability signals | module stability, reach of functions and a stability probe on the reference repositories |
+| One concept model, first half | a check abstains (the CEL field `abstain`); a provider names the `protocol` it speaks and its reach (`baseUrl`, `command` or `plugin`); chat classification always reads logprobs; the core is free of the code model, with `design/layers` keeping `lighthouse_model::ucm` out of core, store, ml, report and session |
 
 ## Next
 
@@ -62,14 +63,10 @@ where rules fall short, then reach. Each step below comes before the ones that b
 
 ### One concept model
 Renames and removals only, so that what follows builds on one vocabulary:
-- A check abstains (the CEL field `review` becomes `abstain`), a provider names the
-  `protocol` it speaks, and derived strength replaces `mining`.
+- Derived strength replaces `mining`.
 - Protocol 0.3: `lighthouse/index`, `initialize` in LSP and MCP vocabulary, LSP error
   codes, one method table with its HTTP twin, and recorded conformance transcripts for
   the Rust and Go providers.
-- The core stays free of the code model: fingerprint disambiguation comes from the
-  engine, symbol fix operations move to the code domain, and layer contracts keep the
-  code model out of core, store, ml, report and session.
 
 ### Fixes by models, verified
 The biggest direct cut in agent work, and it needs no labels: the verifier already exists.

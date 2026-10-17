@@ -1,4 +1,7 @@
-use lighthouse_model::{Anchor, EditOp, FixOutcome, Node, Owner, Position, Safety, Span, SymbolId};
+use lighthouse_model::{
+    Node, Position, Safety, Span, SymbolId,
+    ucm::{Anchor, EditOp, FixOutcome, Owner},
+};
 use serde_json::json;
 
 fn at(line: u32, col: u32) -> Position {

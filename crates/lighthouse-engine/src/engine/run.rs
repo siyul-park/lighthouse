@@ -186,7 +186,7 @@ impl Engine {
         run: &mut Run,
     ) -> Result<(), Error> {
         in_order(&mut found);
-        let ordinal = Diagnostic::disambiguate(&mut found, scene.project);
+        let ordinal = Diagnostic::disambiguate(&mut found, |d| scene.project.discriminator(d));
         let facts = FindingFacts::new(scene.project, scene.facts, scene.inputs);
         run.facts = found
             .iter()

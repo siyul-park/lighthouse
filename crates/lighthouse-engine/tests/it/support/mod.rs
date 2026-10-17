@@ -8,8 +8,9 @@ use std::{fs, sync::LazyLock};
 use lighthouse_engine::{Engine, FixBinding, FixPlan};
 use lighthouse_model::{Applicability, RunScope};
 use lighthouse_model::{
-    Capability, Diagnostic, EditOp, File, Fingerprint, FixOutcome, Fragment, Incomplete, LineIndex,
-    Options, Position, Safety, Severity, Span, Symbol, SymbolId, SymbolKind, Visibility,
+    Capability, Diagnostic, File, Fingerprint, Fragment, Incomplete, LineIndex, Options, Position,
+    Safety, Severity, Span, Symbol, SymbolId, SymbolKind, Visibility,
+    ucm::{EditOp, FixOutcome},
 };
 use lighthouse_plugin::{
     Context, Error as PluginError, FixDecision, FixRequest, Fixer, FixerManifest, Indexed,
