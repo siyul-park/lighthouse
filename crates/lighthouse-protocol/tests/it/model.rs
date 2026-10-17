@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use lighthouse_protocol::{
     Answer, Capabilities, DecisionRef, Example, ListModelResponse, Model, NOUL, Question, State,
-    Subject, SystemOneRequest, artifact_path, dataset_path,
+    Subject, SystemOneRequest, artifact_path, content_dir, dataset_path,
     prompt::{self, json_in, noul_of, response_schema},
 };
 use serde_json::json;
@@ -227,4 +227,20 @@ fn an_answer_is_a_noul_and_the_store_names_files_by_digest() {
         dataset_path(dir, "ab"),
         std::path::Path::new("/p/.lighthouse/models/sha256/ab.jsonl")
     );
+}
+
+#[test]
+fn content_dir_is_the_sha256_directory_the_store_files_live_in() {
+    let dir = std::path::Path::new("/p/.lighthouse/models");
+    assert_eq!(
+        content_dir(dir),
+        std::path::Path::new("/p/.lighthouse/models/sha256")
+    );
+}
+
+#[test]
+fn capabilities_learns_only_when_fine_tuning_is_supported() {
+    assert!(Capabilities::classifier(true).learns());
+    assert!(!Capabilities::classifier(false).learns());
+    assert!(!Capabilities::default().learns());
 }

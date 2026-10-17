@@ -153,7 +153,7 @@ fn registry() -> Registry {
     .filter_map(|(id, path)| Some(format!("{{ id = \"{id}\", path = {:?} }}", path?.to_str()?)))
     .collect();
     let config = Config::parse_inline(&format!("plugins = [{}]", plugins.join(", "))).unwrap();
-    lighthouse_rpc::register(&mut registry, &config, Path::new("."), &[]).unwrap();
+    lighthouse_rpc::register(&mut registry, &config, Path::new("."), Path::new("."), &[]).unwrap();
     registry
         .register(&Checks::new("demo", &catalog()).unwrap())
         .unwrap();

@@ -20,7 +20,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 pub use document::{Format, documents, kind_of, resource};
 pub use duration::{Duration, InvalidDuration};
 pub use error::Error;
-pub use fs::{file_in, read_optional, write_atomic, write_atomic_guarded};
+pub use fs::{file_in, read_optional, slashed, write_atomic, write_atomic_guarded};
 pub use listing::{Listed, listed};
 pub use schema::{Descriptor, SCHEMA_URL_BASE, header, schema, schema_file};
 pub use xdg::{Base, dir as xdg_dir, dir_in as xdg_dir_in, plugins as xdg_plugins};

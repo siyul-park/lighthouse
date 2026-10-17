@@ -2,6 +2,9 @@
 
 use std::{collections::BTreeMap, time::Duration};
 
+/// How many rules the breakdown names, longest first.
+const TOP_RULES: usize = 5;
+
 /// How long the phases of a run took. Phases that run in parallel are timed on
 /// the wall clock; `rule` is the time each rule spent, summed over the files
 /// it ran on, so it adds up to more than the wall clock of the rules phase.
@@ -38,6 +41,43 @@ pub struct Timings {
 }
 
 impl Timings {
+    /// The lines of the breakdown. `report` is the time spent printing the
+    /// findings and `total` the time of the whole run.
+    pub fn lines(&self, report: Duration, total: Duration) -> Vec<String> {
+        let mut out = vec![line("setup", self.setup), line("read", self.read)];
+        out.extend(
+            self.index
+                .iter()
+                .map(|(language, spent)| line(&format!("index {language}"), *spent)),
+        );
+        out.push(line("merge", self.merge));
+        if self.hashing > Duration::ZERO {
+            out.push(format!(
+                "{} ({} cache hit(s), {} miss(es))",
+                line("hashing", self.hashing),
+                self.cache_hits,
+                self.cache_misses
+            ));
+        }
+        out.extend(
+            self.analyzers
+                .iter()
+                .map(|(analyzer, spent)| line(&format!("analyzer {analyzer}"), *spent)),
+        );
+        out.push(format!("{} (wall clock)", line("rules", self.rules)));
+        out.extend(self.rule.iter().take(TOP_RULES).map(|(rule, spent)| {
+            format!(
+                "{} (summed over files)",
+                line(&format!("rule {rule}"), *spent)
+            )
+        }));
+        out.push(line("fingerprints", self.fingerprints));
+        out.push(line("store", self.store));
+        out.push(line("report", report));
+        out.push(line("total", total));
+        out
+    }
+
     /// Folds `times` into the total of each rule.
     pub(crate) fn add_rules(&mut self, times: BTreeMap<String, Duration>) {
         let mut totals: BTreeMap<String, Duration> =
@@ -49,4 +89,8 @@ impl Timings {
         self.rule
             .sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
     }
+}
+
+fn line(phase: &str, spent: Duration) -> String {
+    format!("timings: {phase} {:.1}ms", spent.as_secs_f64() * 1000.0)
 }

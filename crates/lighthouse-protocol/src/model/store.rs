@@ -12,12 +12,17 @@ pub const DATASETS_DIR: &str = ".lighthouse/datasets";
 /// under the root it was initialized with.
 pub const MODELS_DIR: &str = ".lighthouse/models";
 
+/// The directory under `dir` that holds the files named by their SHA-256.
+pub fn content_dir(dir: &Path) -> PathBuf {
+    dir.join("sha256")
+}
+
 /// The dataset of digest `hex` in the datasets directory `dir`.
 pub fn dataset_path(dir: &Path, hex: &str) -> PathBuf {
-    dir.join("sha256").join(format!("{hex}.jsonl"))
+    content_dir(dir).join(format!("{hex}.jsonl"))
 }
 
 /// The trained model of digest `hex` in the models directory `dir`.
 pub fn artifact_path(dir: &Path, hex: &str) -> PathBuf {
-    dir.join("sha256").join(format!("{hex}.json"))
+    content_dir(dir).join(format!("{hex}.json"))
 }

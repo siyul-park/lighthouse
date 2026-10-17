@@ -137,3 +137,11 @@ fn build_identity_names_the_version_and_the_program() {
     );
     assert_eq!(identity, lighthouse_engine::cache::build_identity());
 }
+
+#[test]
+fn dir_is_the_cache_folder_under_the_state_directory() {
+    assert_eq!(
+        lighthouse_engine::cache::dir(std::path::Path::new("/p")),
+        std::path::Path::new("/p/.lighthouse/cache")
+    );
+}

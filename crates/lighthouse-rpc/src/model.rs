@@ -43,12 +43,7 @@ impl Classifier for Remote {
     /// Asks for the fine-tuning job; the answer is final, `succeeded` or
     /// `failed`, and a failed job is an error here.
     fn train(&self, request: &CreateFineTuningJobRequest) -> Result<FineTuningJob, Error> {
-        if !self
-            .manifest
-            .capabilities
-            .fine_tuning
-            .is_some_and(|capability| capability.supported)
-        {
+        if !self.manifest.capabilities.learns() {
             return Err(Error::model(&self.manifest.id, "it does not train"));
         }
         let job: FineTuningJob = self

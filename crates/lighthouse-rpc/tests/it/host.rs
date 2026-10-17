@@ -87,11 +87,19 @@ fn a_broken_manifest_only_matters_to_the_plugin_it_names() {
         &mut registry,
         &config("[\"other\"]"),
         Path::new("."),
+        Path::new("."),
         &search,
     )
     .expect("an unlisted broken manifest is ignored");
     assert!(registered.notices[0].contains("ignored plugin manifest"));
-    let err = register(&mut registry, &config("[\"bad\"]"), Path::new("."), &search).unwrap_err();
+    let err = register(
+        &mut registry,
+        &config("[\"bad\"]"),
+        Path::new("."),
+        Path::new("."),
+        &search,
+    )
+    .unwrap_err();
     assert!(matches!(err, Error::Manifest { .. }), "{err}");
 
     fs::write(
@@ -113,6 +121,7 @@ fn the_same_id_in_two_places_is_an_error_and_nothing_is_started() {
         &mut registry,
         &config("[\"lang-x\"]"),
         Path::new("."),
+        Path::new("."),
         &[a.path().to_owned(), b.path().to_owned()],
     )
     .unwrap_err();
@@ -132,6 +141,7 @@ fn an_id_that_is_also_built_in_is_an_error() {
     let err = register(
         &mut registry,
         &config("[\"core\"]"),
+        Path::new("."),
         Path::new("."),
         &[a.path().to_owned()],
     )
@@ -169,7 +179,14 @@ fn explicit_paths_must_hold_the_listed_id_and_a_runnable_command() {
         mismatch.path().to_str().unwrap()
     );
     let mut registry = Registry::default();
-    let err = register(&mut registry, &config(&toml), Path::new("."), &[]).unwrap_err();
+    let err = register(
+        &mut registry,
+        &config(&toml),
+        Path::new("."),
+        Path::new("."),
+        &[],
+    )
+    .unwrap_err();
     assert!(matches!(err, Error::IdMismatch { .. }), "{err}");
 
     let missing = tempfile::tempdir().unwrap();
@@ -178,12 +195,20 @@ fn explicit_paths_must_hold_the_listed_id_and_a_runnable_command() {
         "[{{ id = \"fake\", path = {:?} }}]",
         missing.path().to_str().unwrap()
     );
-    let err = register(&mut registry, &config(&toml), Path::new("."), &[]).unwrap_err();
+    let err = register(
+        &mut registry,
+        &config(&toml),
+        Path::new("."),
+        Path::new("."),
+        &[],
+    )
+    .unwrap_err();
     assert!(err.to_string().contains("cannot start"), "{err}");
 
     let err = register(
         &mut registry,
         &config("[{ id = \"fake\", path = \"no/such/dir\" }]"),
+        Path::new("."),
         Path::new("."),
         &[],
     )
@@ -203,6 +228,7 @@ fn only_listed_plugins_start_and_unknown_ids_are_left_to_the_engine() {
     register(
         &mut registry,
         &config("[\"nowhere\"]"),
+        Path::new("."),
         Path::new("."),
         &[search.path().to_owned()],
     )

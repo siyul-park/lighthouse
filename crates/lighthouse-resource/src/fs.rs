@@ -13,6 +13,11 @@ pub fn file_in(dir: &Path, names: &[&str]) -> Option<PathBuf> {
     names.iter().map(|n| dir.join(n)).find(|p| p.is_file())
 }
 
+/// `path` with `/` as its separator, as documents and reports spell paths.
+pub fn slashed(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
+
 /// The text of the file at `path`; `None` when there is no such file.
 pub fn read_optional(path: &Path) -> Result<Option<String>, Error> {
     match fs::read_to_string(path) {

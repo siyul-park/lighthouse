@@ -27,7 +27,7 @@ pub use model::{
         Neighbor, Question, State, Subject, SystemOneRequest, SystemOneResponse,
     },
     prompt,
-    store::{DATASETS_DIR, MODELS_DIR, artifact_path, dataset_path},
+    store::{DATASETS_DIR, MODELS_DIR, artifact_path, content_dir, dataset_path},
 };
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.

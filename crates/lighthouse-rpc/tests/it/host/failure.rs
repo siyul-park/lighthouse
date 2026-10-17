@@ -225,8 +225,14 @@ fn a_plugin_that_dies_during_initialize_is_incomplete_not_a_config_error() {
         fake.path().to_str().unwrap()
     );
     let mut registry = Registry::default();
-    let registered =
-        register(&mut registry, &config(&toml), Path::new("."), &[]).expect("not an error");
+    let registered = register(
+        &mut registry,
+        &config(&toml),
+        Path::new("."),
+        Path::new("."),
+        &[],
+    )
+    .expect("not an error");
     assert_eq!(registered.incomplete.len(), 1);
     assert!(registered.incomplete[0].reason.contains("unavailable"));
     assert!(registry.has_plugin("fake"));

@@ -211,6 +211,12 @@ impl Capabilities {
             fine_tuning: trains.then_some(Supports { supported: true }),
         }
     }
+
+    /// Whether the model can be fitted on labelled subjects.
+    pub fn learns(&self) -> bool {
+        self.fine_tuning
+            .is_some_and(|capability| capability.supported)
+    }
 }
 
 /// One model: OpenAI's model object, with what Lighthouse adds

@@ -24,7 +24,7 @@ fn registry(plugin: &Path) -> Registry {
         plugin.to_str().unwrap()
     ))
     .unwrap();
-    lighthouse_rpc::register(&mut registry, &config, Path::new("."), &[]).unwrap();
+    lighthouse_rpc::register(&mut registry, &config, Path::new("."), Path::new("."), &[]).unwrap();
     registry
 }
 

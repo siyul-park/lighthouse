@@ -1,4 +1,4 @@
-use lighthouse_resource::{read_optional, write_atomic, write_atomic_guarded};
+use lighthouse_resource::{read_optional, slashed, write_atomic, write_atomic_guarded};
 
 #[test]
 fn atomic_write_replaces_a_file_and_removes_temporary_files() {
@@ -44,4 +44,10 @@ fn a_missing_file_reads_as_none_and_a_present_one_as_its_text() {
 
     assert_eq!(read_optional(&path).unwrap().as_deref(), Some("here"));
     assert!(read_optional(dir.path()).is_err(), "a directory is no text");
+}
+
+#[test]
+fn slashed_spells_a_path_with_forward_slashes() {
+    assert_eq!(slashed(std::path::Path::new("a/b.rs")), "a/b.rs");
+    assert_eq!(slashed(std::path::Path::new("a\\b.rs")), "a/b.rs");
 }

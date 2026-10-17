@@ -26,7 +26,7 @@ pub(crate) fn check(source: &str, rules: &str) -> Run {
     ))
     .unwrap();
     let mut registry = lighthouse_checks::registry();
-    lighthouse_rpc::register(&mut registry, &config, dir.path(), &[]).unwrap();
+    lighthouse_rpc::register(&mut registry, &config, dir.path(), dir.path(), &[]).unwrap();
     let outcome = Engine::new(registry, config, Catalog::bundled(), dir.path())
         .unwrap()
         .check(&[], &[])

@@ -16,7 +16,7 @@ fn registry() -> Registry {
         plugin.to_str().unwrap()
     ))
     .unwrap();
-    lighthouse_rpc::register(&mut registry, &config, Path::new("."), &[]).unwrap();
+    lighthouse_rpc::register(&mut registry, &config, Path::new("."), Path::new("."), &[]).unwrap();
     registry
 }
 
@@ -87,7 +87,7 @@ fn exported_doc_findings(source: &str) -> Vec<(String, Fingerprint)> {
     ))
     .unwrap();
     let mut registry = lighthouse_checks::registry();
-    lighthouse_rpc::register(&mut registry, &config, dir.path(), &[]).unwrap();
+    lighthouse_rpc::register(&mut registry, &config, dir.path(), dir.path(), &[]).unwrap();
     let engine = Engine::new(registry, config, Catalog::bundled(), dir.path()).unwrap();
     let outcome = engine.check(&[], &[]).unwrap();
     assert!(outcome.incomplete.is_empty(), "{:?}", outcome.incomplete);

@@ -7,8 +7,12 @@
 //! [`KeyBuilder`] builds a key from those and from the rule; [`Cache`] stores the
 //! findings under it in `results.db`.
 
-use std::{fs, io, path::Path};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+};
 
+use lighthouse_resource::STATE_DIR;
 use thiserror::Error;
 
 mod digest;
@@ -36,6 +40,11 @@ pub enum Error {
     },
     #[error("a value cannot be hashed: {0}")]
     Hash(#[from] serde_json::Error),
+}
+
+/// Where the cache of the project at `root` lives: `<root>/.lighthouse/cache`.
+pub fn dir(root: &Path) -> PathBuf {
+    root.join(STATE_DIR).join(DIR)
 }
 
 /// What tells one build of Lighthouse from another: its version and the size

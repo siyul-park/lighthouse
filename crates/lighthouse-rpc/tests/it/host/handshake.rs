@@ -146,6 +146,7 @@ fn an_explicit_path_disambiguates_and_relative_commands_resolve_next_to_the_mani
         &mut registry,
         &config(&toml),
         project.path(),
+        project.path(),
         &[search.path().to_owned()],
     )
     .unwrap();

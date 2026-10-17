@@ -280,7 +280,7 @@ fn indexed(id: &str, plugin: &Path, files: &[(&str, &str)]) -> System {
         plugin.to_str().unwrap()
     ))
     .unwrap();
-    lighthouse_rpc::register(&mut registry, &config, Path::new("."), &[]).unwrap();
+    lighthouse_rpc::register(&mut registry, &config, Path::new("."), Path::new("."), &[]).unwrap();
     let outcome = Engine::new(registry, config, Catalog::bundled(), dir.path())
         .unwrap()
         .check(&[], &[])

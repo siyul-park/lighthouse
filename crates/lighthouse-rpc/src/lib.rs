@@ -87,11 +87,14 @@ pub fn descriptors() -> Vec<lighthouse_resource::Descriptor> {
 /// starts but crashes, times out or answers badly during `initialize` is
 /// reported as incomplete instead. Ids found nowhere are left for the engine
 /// to report as unknown. Manifests of unlisted plugins are never started and,
-/// when broken, ignored.
+/// when broken, ignored. A plugin that provides models is started in `store`,
+/// the root of the datasets and models, which is `root` unless a run spans
+/// several projects; any other plugin is started in `root`.
 pub fn register(
     registry: &mut Registry,
     config: &Config,
     root: &Path,
+    store: &Path,
     search: &[PathBuf],
 ) -> Result<Registered, Error> {
     let discovered = discover(search)?;
@@ -102,7 +105,12 @@ pub fn register(
         let chosen = choose(listed, registry.has_plugin(id), &discovered.found, root)?;
         let Some(one) = chosen.first() else { continue };
         let timeout = listed.timeout().unwrap_or(PLUGIN_TIMEOUT);
-        let registration = match RpcPlugin::connect(one, root, timeout) {
+        let at = if one.resource.spec.provides.models.is_empty() {
+            root
+        } else {
+            store
+        };
+        let registration = match RpcPlugin::connect(one, at, timeout) {
             Ok(plugin) => registry.register(&plugin),
             Err(Error::Unavailable {
                 id,
