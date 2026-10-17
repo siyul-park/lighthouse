@@ -62,7 +62,7 @@ fn a_timeout_kills_the_plugin_and_later_calls_fail_fast() {
 fn malformed_answers_are_incomplete() {
     for (mode, expect) in [
         ("garbage", "malformed"),
-        ("badshape", "malformed `index` result"),
+        ("badshape", "malformed `lighthouse/index` result"),
         ("badid", "malformed symbol id `nope`"),
     ] {
         let fake = Fake::new(mode);
@@ -83,11 +83,13 @@ fn an_error_response_is_incomplete_but_the_plugin_stays_usable() {
     assert!(
         only_gap(&first)
             .reason
-            .contains("rejected `index` (-32000): no thanks")
+            .contains("rejected `lighthouse/index` (-32000): no thanks")
     );
     let second = index(provider.as_ref(), &ws, &["a.fake"]);
     assert!(
-        only_gap(&second).reason.contains("rejected `index`"),
+        only_gap(&second)
+            .reason
+            .contains("rejected `lighthouse/index`"),
         "still answering"
     );
 }
@@ -167,7 +169,7 @@ fn a_plugin_that_never_reads_cannot_block_past_the_timeout_or_the_drop() {
     let indexed = index(provider.as_ref(), &ws(&fake), &refs);
     let reason = only_gap(&indexed).reason.clone();
     assert!(
-        reason.contains("timed out after 5s") && reason.contains("`index`"),
+        reason.contains("timed out after 5s") && reason.contains("`lighthouse/index`"),
         "{reason}"
     );
     assert!(started.elapsed() < timeout * 3);

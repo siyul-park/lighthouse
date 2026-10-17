@@ -10,11 +10,12 @@ pub use language::{
     frame::{ErrorObject, FrameError, Id, Message, read_message, write_message},
     serve::{Handler, ServeError, serve},
     wire::{
-        CacheRef, Call, ClientInfo, Comment, Context, Conventions, Edge, EdgeKind, Event,
-        EventKind, FileInfo, FileRef, Flow, FlowKind, Fragment, FunctionSummary, Incomplete,
+        CacheRef, Call, Comment, Context, Conventions, Edge, EdgeKind, Event, EventKind, FileInfo,
+        FileRef, Flow, FlowKind, Fragment, FunctionSummary, Implementation, Incomplete,
         IndexParams, IndexResult, InitializeParams, InitializeResult, Methods, Module, Node,
-        Overlay, Position, ProjectRef, ProviderManifest, Resolution, Signature, Span, Symbol,
-        SymbolKind, SymbolRole, TestCase, TestStyle, TypeRef, Visibility,
+        Overlay, Position, ProjectRef, ProviderManifest, Resolution, ServerCapabilities, Signature,
+        Span, Symbol, SymbolKind, SymbolRole, TestCase, TestStyle, TypeRef, Visibility,
+        WorkspaceFolder,
     },
 };
 pub use model::{
@@ -33,12 +34,12 @@ pub use model::{
 pub use route::{FINE_TUNING_JOBS, Http, ROUTES, Route, SYSTEM_ONE};
 
 /// Protocol version spoken by this crate. Peers must agree on it exactly.
-pub const VERSION: &str = "0.2";
+pub const VERSION: &str = "0.3";
 
 /// Request: handshake; the first message of a session.
 pub const INITIALIZE: &str = "initialize";
 /// Request: index the files of one language.
-pub const INDEX: &str = "index";
+pub const INDEX: &str = "lighthouse/index";
 /// Request: put the subjects of a decision to a model.
 pub const CLASSIFY: &str = "lighthouse/classify";
 /// Request: fit a model on labelled subjects.

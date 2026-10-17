@@ -100,22 +100,6 @@
       },
       "type": "object"
     },
-    "ClientInfo": {
-      "description": "Name and version of the host, for the plugin's diagnostics only.",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "version": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "version"
-      ],
-      "type": "object"
-    },
     "Comment": {
       "description": "A comment of the file. Adjacent line comments are one comment.",
       "properties": {
@@ -831,6 +815,22 @@
       ],
       "type": "object"
     },
+    "Implementation": {
+      "description": "Name and version of a peer: `clientInfo` of the host, `serverInfo` of the\nplugin. For diagnostics, except that the plugin's name is its id.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "type": "object"
+    },
     "Incomplete": {
       "description": "Part of the request that was not analyzed; \"not checked\" is not \"passed\".",
       "properties": {
@@ -916,53 +916,45 @@
       "description": "First request, sent by the host. Fields of protocol messages are camelCase;\nfields of the code model are snake_case.",
       "properties": {
         "clientInfo": {
-          "$ref": "#/$defs/ClientInfo"
+          "$ref": "#/$defs/Implementation"
         },
         "protocolVersion": {
           "type": "string"
         },
-        "root": {
-          "description": "Absolute path of the project root.",
-          "type": "string"
+        "workspaceFolders": {
+          "description": "The project root; exactly one folder for now.",
+          "items": {
+            "$ref": "#/$defs/WorkspaceFolder"
+          },
+          "type": "array"
         }
       },
       "required": [
-        "root",
         "protocolVersion",
-        "clientInfo"
+        "clientInfo",
+        "workspaceFolders"
       ],
       "type": "object"
     },
     "InitializeResult": {
-      "description": "A plugin's answer to `initialize`: who it is, which protocol it speaks, and\nthe languages it indexes.",
+      "description": "A plugin's answer to `initialize`: who it is, which protocol it speaks, and\nwhat it offers.",
       "properties": {
-        "id": {
-          "description": "Plugin id; must equal the `id` of its `lighthouse-plugin.toml`.",
-          "type": "string"
-        },
-        "languages": {
-          "items": {
-            "$ref": "#/$defs/ProviderManifest"
-          },
-          "type": "array"
-        },
-        "models": {
-          "$ref": "#/$defs/ListModelResponse",
-          "description": "The models the plugin offers, as OpenAI's list object; empty for a\nlanguage plugin."
+        "capabilities": {
+          "$ref": "#/$defs/ServerCapabilities"
         },
         "protocolVersion": {
           "description": "Must equal the host's protocol version.",
           "type": "string"
         },
-        "version": {
-          "type": "string"
+        "serverInfo": {
+          "$ref": "#/$defs/Implementation",
+          "description": "`name` is the plugin id; it must equal the `id` of its\n`lighthouse-plugin.toml`."
         }
       },
       "required": [
-        "id",
-        "version",
         "protocolVersion",
-        "languages"
+        "serverInfo",
+        "capabilities"
       ],
       "type": "object"
     },
@@ -1265,6 +1257,25 @@
           "type": "string"
         }
       ]
+    },
+    "ServerCapabilities": {
+      "description": "What a plugin offers: the languages it indexes and the models it serves.",
+      "properties": {
+        "languages": {
+          "items": {
+            "$ref": "#/$defs/ProviderManifest"
+          },
+          "type": "array"
+        },
+        "models": {
+          "$ref": "#/$defs/ListModelResponse",
+          "description": "The models the plugin offers, as OpenAI's list object; empty for a\nlanguage plugin."
+        }
+      },
+      "required": [
+        "languages"
+      ],
+      "type": "object"
     },
     "Signature": {
       "description": "The parameter and result types of a function, receiver excluded. A Rust\ntuple result is one `results` entry.",
@@ -1585,19 +1596,37 @@
         "internal"
       ],
       "type": "string"
+    },
+    "WorkspaceFolder": {
+      "description": "A root of the workspace, as in LSP.",
+      "properties": {
+        "name": {
+          "description": "The directory's name.",
+          "type": "string"
+        },
+        "uri": {
+          "description": "`file://` URI of the directory, percent-encoded as RFC 8089 says.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri",
+        "name"
+      ],
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Every method with its params and result. Exists to anchor the schema.",
   "properties": {
-    "index": {
-      "$ref": "#/$defs/Call2"
-    },
     "initialize": {
       "$ref": "#/$defs/Call"
     },
     "lighthouse/classify": {
       "$ref": "#/$defs/Call"
+    },
+    "lighthouse/index": {
+      "$ref": "#/$defs/Call2"
     },
     "lighthouse/train": {
       "$ref": "#/$defs/Call2"
@@ -1605,7 +1634,7 @@
   },
   "required": [
     "initialize",
-    "index"
+    "lighthouse/index"
   ],
   "title": "Methods",
   "type": "object"

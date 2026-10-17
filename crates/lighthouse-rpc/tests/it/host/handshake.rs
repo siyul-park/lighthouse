@@ -124,7 +124,7 @@ fn handshake_refuses_other_protocol_versions_and_identities() {
         Err(e) => e.to_string(),
         Ok(_) => panic!("{mode} connected"),
     };
-    assert!(message("version").contains("speaks protocol 9.9, lighthouse speaks 0.2"));
+    assert!(message("version").contains("speaks protocol 9.9, lighthouse speaks 0.3"));
     assert!(message("identity").contains("identifies itself as `other`"));
     let early = message("crash_at_init");
     assert!(early.contains("plugin `fake`"), "{early}");

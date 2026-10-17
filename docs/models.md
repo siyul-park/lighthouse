@@ -3,7 +3,7 @@
 A model is a plugin kind beside language providers: a process (`rpc`) that answers
 `lighthouse/classify` (and `lighthouse/train` when it learns), or any program (`command`).
 Lighthouse defines no API of its own. The wire types are in `lighthouse-protocol`, with a JSON
-Schema (`protocol/schema/lighthouse-protocol-0.2.json`). Each request is the published API body
+Schema (`protocol/schema/lighthouse-protocol-0.3.json`). Each request is the published API body
 plus provider `options`, omitted when empty. Classification uses TypeSafe System One
 (`SystemOneRequest` `{state, model, questions, options?}` to `SystemOneResponse`
 `{model, answers, usage}`). HTTP providers remove `options` before posting the body. Training and

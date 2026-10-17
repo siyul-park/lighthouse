@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	schemaPath = "../../../protocol/schema/lighthouse-protocol-0.2.json"
+	schemaPath = "../../../protocol/schema/lighthouse-protocol-0.3.json"
 	casesGlob  = "../../../crates/lighthouse-rpc/tests/conformance/go/*"
 )
 
@@ -24,18 +24,10 @@ func TestProviderInitialize(t *testing.T) {
 	t.Run("describes Go as the protocol schema defines it", func(t *testing.T) {
 		g := provider.New("lang-go", "test")
 
-		result, err := g.Initialize(sdk.InitializeParams{Root: "/", ProtocolVersion: sdk.ProtocolVersion})
+		result, err := g.Initialize(sdk.InitializeParams{ProtocolVersion: sdk.ProtocolVersion})
 
 		require.NoError(t, err)
 		assertValid(t, validator(t, "InitializeResult"), result, "initialize result")
-	})
-
-	t.Run("refuses another protocol version", func(t *testing.T) {
-		g := provider.New("lang-go", "test")
-
-		_, err := g.Initialize(sdk.InitializeParams{ProtocolVersion: "9.9"})
-
-		require.Error(t, err, "another protocol version must be refused")
 	})
 }
 

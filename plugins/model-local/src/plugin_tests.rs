@@ -4,9 +4,9 @@
 use std::{fs, path::Path};
 
 use lighthouse_protocol::{
-    ClientInfo, CreateFineTuningJobRequest, Criteria, Criterion, FineTuneMethod,
-    FineTuningJobStatus, Handler, InitializeParams, Instructions, MODELS_DIR, Question, State,
-    SystemOneRequest, VERSION, artifact_path, hash::sha256,
+    CreateFineTuningJobRequest, Criteria, Criterion, FineTuneMethod, FineTuningJobStatus, Handler,
+    Implementation, InitializeParams, Instructions, MODELS_DIR, Question, State, SystemOneRequest,
+    VERSION, WorkspaceFolder, artifact_path, hash::sha256,
 };
 use serde_json::{Value, json};
 
@@ -50,19 +50,22 @@ fn dataset(fails: usize, passes: usize) -> String {
     file(&rows)
 }
 
+/// The handshake of a host whose project is at `root`.
+fn initialize_params(root: &Path) -> InitializeParams {
+    InitializeParams {
+        protocol_version: VERSION.to_owned(),
+        client_info: Implementation {
+            name: "test".to_owned(),
+            version: "0".to_owned(),
+        },
+        workspace_folders: vec![WorkspaceFolder::at(root).unwrap()],
+    }
+}
+
 /// A plugin started on a project at `root` that holds `dataset`; its digest.
 fn project(root: &Path, open: crate::embed::Open, dataset: &str) -> (Plugin, String) {
     let mut plugin = Plugin::new(open);
-    plugin
-        .initialize(InitializeParams {
-            root: root.display().to_string(),
-            protocol_version: VERSION.to_owned(),
-            client_info: ClientInfo {
-                name: "test".to_owned(),
-                version: "0".to_owned(),
-            },
-        })
-        .unwrap();
+    plugin.initialize(initialize_params(root)).unwrap();
     let hex = sha256(dataset);
     let store = root.join(".lighthouse/datasets/sha256");
     fs::create_dir_all(&store).unwrap();
@@ -153,17 +156,11 @@ fn the_process_lists_the_models_its_manifest_provides() {
     let root = tempfile::tempdir().unwrap();
     let manifest = include_str!("../lighthouse-plugin.toml");
     let result = Plugin::new(fake)
-        .initialize(InitializeParams {
-            root: root.path().display().to_string(),
-            protocol_version: VERSION.to_owned(),
-            client_info: ClientInfo {
-                name: "test".to_owned(),
-                version: "0".to_owned(),
-            },
-        })
+        .initialize(initialize_params(root.path()))
         .unwrap();
 
     let ids: Vec<String> = result
+        .capabilities
         .models
         .data
         .iter()

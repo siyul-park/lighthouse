@@ -282,9 +282,9 @@ fn initialize_declares_the_language_and_checks_the_protocol_version() {
         let root = workspace();
         let mut plugin = Plugin::start(&dir, &root);
         let result = plugin.initialize(&root);
-        assert_eq!(result.id, lang.manifest_id);
+        assert_eq!(result.server_info.name, lang.manifest_id);
         assert_eq!(result.protocol_version, wire::VERSION);
-        let declared = &result.languages[0];
+        let declared = &result.capabilities.languages[0];
         assert_eq!(declared.id, lang.id);
         assert_eq!(declared.globs, lang.globs);
         assert_eq!(declared.conventions.test_globs, lang.test_globs);
@@ -297,9 +297,15 @@ fn initialize_declares_the_language_and_checks_the_protocol_version() {
 
         let stale = plugin.request(
             wire::INITIALIZE,
-            json!({ "root": "/", "protocolVersion": "9.9", "clientInfo": { "name": "x", "version": "0" } }),
+            json!({
+                "protocolVersion": "9.9",
+                "clientInfo": { "name": "x", "version": "0" },
+                "workspaceFolders": [{ "uri": "file:///", "name": "" }]
+            }),
         );
-        assert!(stale.error.unwrap().message.contains("protocol"));
+        let stale = stale.error.unwrap();
+        assert_eq!(stale.code, -32803);
+        assert!(stale.message.contains("protocol"));
         let unknown = plugin.request("nope", json!({}));
         assert_eq!(unknown.error.unwrap().code, -32601);
         assert_eq!(plugin.finish(), Some(0));
@@ -363,8 +369,9 @@ fn framing_survives_bodies_larger_than_one_read_and_mixed_case_headers() {
         let mut plugin = Plugin::start(&dir, &root);
         let init = json!({
             "jsonrpc": "2.0", "id": 1, "method": "initialize",
-            "params": { "root": root, "protocolVersion": wire::VERSION,
-                        "clientInfo": { "name": "t", "version": "0" } }
+            "params": { "protocolVersion": wire::VERSION,
+                        "clientInfo": { "name": "t", "version": "0" },
+                        "workspaceFolders": [wire::WorkspaceFolder::at(&root).unwrap()] }
         })
         .to_string();
         plugin.raw(&format!(

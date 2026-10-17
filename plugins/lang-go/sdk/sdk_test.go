@@ -28,7 +28,15 @@ func (h handler) Index(p sdk.IndexParams) (sdk.IndexResult, error) { return h.in
 func newHandler() handler {
 	return handler{
 		initialize: func(p sdk.InitializeParams) (sdk.InitializeResult, error) {
-			return sdk.InitializeResult{ID: "x", Version: "1", ProtocolVersion: sdk.ProtocolVersion, Languages: []sdk.ProviderManifest{{ID: p.Root}}}, nil
+			root, err := p.WorkspaceFolders[0].Path()
+			if err != nil {
+				return sdk.InitializeResult{}, err
+			}
+			return sdk.InitializeResult{
+				ProtocolVersion: sdk.ProtocolVersion,
+				ServerInfo:      sdk.Implementation{Name: "x", Version: "1"},
+				Capabilities:    sdk.ServerCapabilities{Languages: []sdk.ProviderManifest{{ID: root}}},
+			}, nil
 		},
 		index: func(p sdk.IndexParams) (sdk.IndexResult, error) {
 			if p.Language == "panic" {
@@ -132,7 +140,7 @@ func TestReadMessage(t *testing.T) {
 func TestServe(t *testing.T) {
 	t.Run("answers requests and stops after shutdown and exit", func(t *testing.T) {
 		var in strings.Builder
-		in.WriteString(request(t, 1, sdk.MethodInitialize, sdk.InitializeParams{Root: "/r", ProtocolVersion: "0.2"}))
+		in.WriteString(request(t, 1, sdk.MethodInitialize, sdk.InitializeParams{ProtocolVersion: sdk.ProtocolVersion, WorkspaceFolders: []sdk.WorkspaceFolder{{URI: "file:///r%20x/", Name: "r x"}}}))
 		in.WriteString(request(t, 2, sdk.MethodIndex, sdk.IndexParams{Project: sdk.ProjectRef{Root: "/r"}, Language: "go"}))
 		in.WriteString(request(t, 3, "nope", struct{}{}))
 		in.WriteString(request(t, 4, sdk.MethodIndex, sdk.IndexParams{Language: "panic"}))
@@ -149,14 +157,37 @@ func TestServe(t *testing.T) {
 		require.Len(t, got, 7)
 		var init sdk.InitializeResult
 		require.NoError(t, json.Unmarshal(got[0].Result, &init))
-		require.Equal(t, "/r", init.Languages[0].ID)
+		require.Equal(t, "x", init.ServerInfo.Name)
+		require.Equal(t, "/r x", init.Capabilities.Languages[0].ID)
 		require.JSONEq(t, `{"fragments":[],"notices":["/r"],"incomplete":[]}`, string(got[1].Result))
-		for i, code := range map[int]int{2: -32601, 3: -32603, 4: -32603, 5: -32602} {
+		for i, code := range map[int]int{2: -32601, 3: -32603, 4: -32803, 5: -32602} {
 			require.NotNil(t, got[i].Error, "reply %d", i)
 			require.Equal(t, code, got[i].Error.Code, "reply %d", i)
 		}
 		require.Contains(t, got[3].Error.Message, "panic: boom")
 		require.Equal(t, "null", string(got[6].Result))
+	})
+
+	t.Run("refuses a request before initialize until one succeeds", func(t *testing.T) {
+		var in strings.Builder
+		in.WriteString(request(t, 1, sdk.MethodIndex, sdk.IndexParams{Language: "go"}))
+		in.WriteString(request(t, 2, "nope", struct{}{}))
+		in.WriteString(request(t, 3, sdk.MethodInitialize, sdk.InitializeParams{ProtocolVersion: sdk.ProtocolVersion, WorkspaceFolders: []sdk.WorkspaceFolder{{URI: "http://x/"}}}))
+		in.WriteString(request(t, 4, sdk.MethodIndex, sdk.IndexParams{Language: "go"}))
+		in.WriteString(request(t, 5, sdk.MethodInitialize, struct{}{}))
+		in.WriteString(request(t, 6, sdk.MethodShutdown, nil))
+		in.WriteString(frame(t, sdk.Message{Method: sdk.MethodExit}))
+		var out bytes.Buffer
+
+		require.Error(t, sdk.Serve(strings.NewReader(in.String()), &out, newHandler()))
+
+		got := replies(t, out.String())
+		codes := make([]int, len(got))
+		for i, reply := range got {
+			require.NotNil(t, reply.Error, "reply %d", i)
+			codes[i] = reply.Error.Code
+		}
+		require.Equal(t, []int{-32002, -32002, -32803, -32002, -32602, -32002}, codes)
 	})
 
 	t.Run("reports an input that ends or exits too early", func(t *testing.T) {

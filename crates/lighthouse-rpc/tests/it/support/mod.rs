@@ -70,12 +70,12 @@ impl Plugin {
         self.call(
             wire::INITIALIZE,
             wire::InitializeParams {
-                root: root.to_string_lossy().into_owned(),
                 protocol_version: wire::VERSION.to_owned(),
-                client_info: wire::ClientInfo {
+                client_info: wire::Implementation {
                     name: "conformance".to_owned(),
                     version: "0".to_owned(),
                 },
+                workspace_folders: vec![wire::WorkspaceFolder::at(root).unwrap()],
             },
         )
     }

@@ -3,11 +3,7 @@
 // docs/plugin-protocol.md.
 package provider
 
-import (
-	"fmt"
-
-	"github.com/siyul-park/lighthouse/plugins/lang-go/sdk"
-)
+import "github.com/siyul-park/lighthouse/plugins/lang-go/sdk"
 
 // Provider is the language provider of Go; it implements sdk.Handler.
 type Provider struct {
@@ -21,22 +17,17 @@ const language = "go"
 // New returns a Go provider that identifies itself as id and version.
 func New(id, version string) *Provider { return &Provider{id: id, version: version} }
 
-// Initialize describes the Go language. It fails when the host speaks another
-// protocol version.
-func (p *Provider) Initialize(params sdk.InitializeParams) (sdk.InitializeResult, error) {
-	if params.ProtocolVersion != sdk.ProtocolVersion {
-		return sdk.InitializeResult{}, fmt.Errorf("host speaks protocol %s, this plugin speaks %s", params.ProtocolVersion, sdk.ProtocolVersion)
-	}
+// Initialize describes the Go language.
+func (p *Provider) Initialize(sdk.InitializeParams) (sdk.InitializeResult, error) {
 	return sdk.InitializeResult{
-		ID:              p.id,
-		Version:         p.version,
 		ProtocolVersion: sdk.ProtocolVersion,
-		Languages: []sdk.ProviderManifest{{
+		ServerInfo:      sdk.Implementation{Name: p.id, Version: p.version},
+		Capabilities: sdk.ServerCapabilities{Languages: []sdk.ProviderManifest{{
 			ID:           language,
 			Globs:        []string{"**/*.go"},
 			Conventions:  sdk.Conventions{TestGlobs: []string{"**/*_test.go"}, ConstructorPrefixes: []string{"New", "new"}},
 			Capabilities: []string{sdk.SemanticEdges, sdk.Extent, sdk.ReferenceSites, sdk.Overlays},
-		}},
+		}}},
 	}, nil
 }
 

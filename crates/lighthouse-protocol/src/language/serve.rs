@@ -7,14 +7,16 @@ use serde::Serialize;
 use serde_json::Value;
 use thiserror::Error;
 
-use super::frame::{INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND, PARSE_ERROR};
+use super::frame::{
+    INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND, PARSE_ERROR, SERVER_NOT_INITIALIZED,
+};
 use crate::{
     CLASSIFY, CreateFineTuningJobRequest, EXIT, ErrorObject, FineTuningJob, FrameError, INDEX,
     INITIALIZE, IndexParams, IndexResult, InitializeParams, InitializeResult, Message, SHUTDOWN,
     SystemOneRequest, SystemOneResponse, TRAIN, VERSION, read_message, write_message,
 };
 
-/// The methods of a plugin. An `Err` becomes an internal error response; the
+/// The methods of a plugin. An `Err` becomes a failed-request response; the
 /// plugin stays usable. [`serve`] refuses an `initialize` of another protocol
 /// version before the handler sees it.
 ///
@@ -50,22 +52,30 @@ pub enum ServeError {
     Frame(#[from] FrameError),
 }
 
+/// What the loop knows of the conversation.
+#[derive(Default)]
+struct Session {
+    initialized: bool,
+    shutdown: bool,
+}
+
 /// Answers requests from `reader` on `writer` until the host sends `exit`.
 /// Returns `Ok` after a `shutdown` followed by `exit`, or by the input closing
 /// once `shutdown` was answered (a host that went away after asking the plugin
 /// to stop). Input that closes before `shutdown` is [`ServeError::Closed`]; a
-/// malformed message is answered with a parse error and ends the loop. The loop knows framing and
-/// method names only, nothing about the code model.
+/// malformed message is answered with a parse error and ends the loop. A
+/// request other than `initialize` before a successful one is refused. The
+/// loop knows framing and method names only, nothing about the code model.
 pub fn serve(
     mut reader: impl BufRead,
     mut writer: impl Write,
     handler: &mut impl Handler,
 ) -> Result<(), ServeError> {
-    let mut shutdown = false;
+    let mut session = Session::default();
     loop {
         let mut message = match read_message(&mut reader) {
             Ok(Some(message)) => message,
-            Ok(None) if shutdown => return Ok(()),
+            Ok(None) if session.shutdown => return Ok(()),
             Ok(None) => return Err(ServeError::Closed),
             Err(error) => {
                 let failure =
@@ -78,14 +88,14 @@ pub fn serve(
             continue;
         };
         if method == EXIT {
-            return if shutdown {
+            return if session.shutdown {
                 Ok(())
             } else {
                 Err(ServeError::ExitWithoutShutdown)
             };
         }
         let id = message.id.take();
-        let outcome = dispatch(handler, &method, message, &mut shutdown);
+        let outcome = dispatch(handler, &method, message, &mut session);
         if let Some(id) = id {
             let reply = match outcome {
                 Ok(value) => Message::response(id, value).expect("a value serializes"),
@@ -100,15 +110,23 @@ fn dispatch(
     handler: &mut impl Handler,
     method: &str,
     message: Message,
-    shutdown: &mut bool,
+    session: &mut Session,
 ) -> Result<Value, ErrorObject> {
     catch_unwind(AssertUnwindSafe(|| match method {
-        INITIALIZE => call(message, |p| initialize(handler, p)),
+        INITIALIZE => {
+            let result = call(message, |p| initialize(handler, p));
+            session.initialized |= result.is_ok();
+            result
+        }
+        _ if !session.initialized => Err(ErrorObject::new(
+            SERVER_NOT_INITIALIZED,
+            format!("`{method}` before `initialize`"),
+        )),
         INDEX => call(message, |p| handler.index(p)),
         CLASSIFY => call(message, |p| handler.classify(p)),
         TRAIN => call(message, |p| handler.train(p)),
         SHUTDOWN => {
-            *shutdown = true;
+            session.shutdown = true;
             Ok(Value::Null)
         }
         other => Err(ErrorObject::new(
@@ -148,5 +166,5 @@ fn call<P: serde::de::DeserializeOwned, R: Serialize>(
     let params = message
         .into_params::<P>()
         .map_err(|e| ErrorObject::new(INVALID_PARAMS, e.to_string()))?;
-    serde_json::to_value(run(params)?).map_err(|e| e.to_string().into())
+    serde_json::to_value(run(params)?).map_err(|e| ErrorObject::new(INTERNAL_ERROR, e.to_string()))
 }

@@ -42,12 +42,12 @@ impl RpcPlugin {
             notices: client.drain_stderr(),
         };
         let params = wire::InitializeParams {
-            root: root.to_string_lossy().into_owned(),
             protocol_version: wire::VERSION.to_owned(),
-            client_info: wire::ClientInfo {
+            client_info: wire::Implementation {
                 name: "lighthouse".to_owned(),
                 version: env!("CARGO_PKG_VERSION").to_owned(),
             },
+            workspace_folders: vec![folder(root).map_err(failed)?],
         };
         let result: wire::InitializeResult = client
             .call(wire::INITIALIZE, params)
@@ -59,19 +59,20 @@ impl RpcPlugin {
                 wire::VERSION
             )));
         }
-        if result.id != id {
+        if result.server_info.name != id {
             return Err(failed(format!(
                 "identifies itself as `{}`, its manifest says `{id}`",
-                result.id
+                result.server_info.name
             )));
         }
         let provides = &found.resource.spec.provides;
-        let reported: Vec<&str> = result.languages.iter().map(|l| l.id.as_str()).collect();
+        let languages = result.capabilities.languages;
+        let reported: Vec<&str> = languages.iter().map(|l| l.id.as_str()).collect();
         declared("languages", &provides.languages, &reported).map_err(failed)?;
-        let models = result.models.data;
+        let models = result.capabilities.models.data;
         let offered: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
         declared("models", &provides.models, &offered).map_err(failed)?;
-        let digest = if result.languages.is_empty() {
+        let digest = if languages.is_empty() {
             String::new()
         } else {
             let binary = fs::read(found.command_path());
@@ -80,10 +81,10 @@ impl RpcPlugin {
         };
         Ok(Self {
             manifest: PluginManifest {
-                id: result.id,
-                version: result.version,
+                id: result.server_info.name,
+                version: result.server_info.version,
             },
-            languages: result.languages,
+            languages,
             models,
             client: Arc::new(client),
             digest,
@@ -234,6 +235,12 @@ impl Provider {
             dir: dir.to_string_lossy().into_owned(),
         }))
     }
+}
+
+/// The workspace folder of a project root, which may be relative.
+fn folder(root: &Path) -> Result<wire::WorkspaceFolder, String> {
+    let root = std::path::absolute(root).map_err(|e| format!("cannot absolutize the root: {e}"))?;
+    wire::WorkspaceFolder::at(&root)
 }
 
 /// Checks what a manifest promised against what the process reported; a

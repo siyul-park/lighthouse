@@ -24,7 +24,7 @@ pub(super) const SCRIPT: &str = r#"#!/bin/bash
       body=$(dd bs=1 count="$n" 2>/dev/null)
     }
     languages='[{"id":"fake","globs":["**/*.fake"],"capabilities":["semantic-edges","future-thing"]}]'
-    initialize() { send '{"jsonrpc":"2.0","id":1,"result":{"id":"'"${1:-fake}"'","version":"1.2","protocolVersion":"'"${2:-0.2}"'","languages":'"$languages"'}}'; }
+    initialize() { send '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"'"${2:-0.3}"'","serverInfo":{"name":"'"${1:-fake}"'","version":"1.2"},"capabilities":{"languages":'"$languages"'}}}'; }
     fragment='{"file":{"path":"a.fake","generated":true},"modules":[{"path":"m"}],"symbols":[],"edges":[],"functions":[],"tests":[]}'
     recv
     case "$mode" in
@@ -38,7 +38,7 @@ pub(super) const SCRIPT: &str = r#"#!/bin/bash
       case "$body" in
         *'"method":"shutdown"'*) echo shutdown >> "$log"; send '{"jsonrpc":"2.0","id":3,"result":null}';;
         *'"method":"exit"'*) echo exit >> "$log"; exit 0;;
-        *'"method":"index"'*)
+        *'"method":"lighthouse/index"'*)
           printf '%s' "$body" > "$log.request"
           id=$(printf '%s' "$body" | sed 's/.*"id":\([0-9]*\).*/\1/')
           case "$mode" in

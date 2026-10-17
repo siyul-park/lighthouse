@@ -1,13 +1,20 @@
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use url::Url;
+
+use super::frame::{ErrorObject, INVALID_PARAMS};
 
 /// Every method with its params and result. Exists to anchor the schema.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Methods {
     pub initialize: Call<InitializeParams, InitializeResult>,
+    #[serde(rename = "lighthouse/index")]
     pub index: Call<IndexParams, IndexResult>,
 }
 
@@ -18,11 +25,43 @@ pub struct Call<P, R> {
     pub result: R,
 }
 
-/// Name and version of the host, for the plugin's diagnostics only.
+/// Name and version of a peer: `clientInfo` of the host, `serverInfo` of the
+/// plugin. For diagnostics, except that the plugin's name is its id.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct ClientInfo {
+pub struct Implementation {
     pub name: String,
     pub version: String,
+}
+
+/// A root of the workspace, as in LSP.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct WorkspaceFolder {
+    /// `file://` URI of the directory, percent-encoded as RFC 8089 says.
+    pub uri: String,
+    /// The directory's name.
+    pub name: String,
+}
+
+impl WorkspaceFolder {
+    /// The folder at the absolute directory `path`.
+    pub fn at(path: &Path) -> Result<Self, String> {
+        let uri = Url::from_directory_path(path)
+            .map_err(|()| format!("`{}` is not an absolute path", path.display()))?;
+        let name = path.file_name().unwrap_or_default().to_string_lossy();
+        Ok(Self {
+            uri: uri.into(),
+            name: name.into_owned(),
+        })
+    }
+
+    /// The directory the folder names; fails for a URI that is not a `file://`
+    /// path of this machine.
+    pub fn path(&self) -> Result<PathBuf, String> {
+        Url::parse(&self.uri)
+            .ok()
+            .and_then(|uri| uri.to_file_path().ok())
+            .ok_or_else(|| format!("`{}` is not a file URI", self.uri))
+    }
 }
 
 /// First request, sent by the host. Fields of protocol messages are camelCase;
@@ -30,22 +69,46 @@ pub struct ClientInfo {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InitializeParams {
-    /// Absolute path of the project root.
-    pub root: String,
     pub protocol_version: String,
-    pub client_info: ClientInfo,
+    pub client_info: Implementation,
+    /// The project root; exactly one folder for now.
+    pub workspace_folders: Vec<WorkspaceFolder>,
+}
+
+impl InitializeParams {
+    /// The project root: the path of the one workspace folder.
+    pub fn root(&self) -> Result<PathBuf, ErrorObject> {
+        let [folder] = self.workspace_folders.as_slice() else {
+            return Err(ErrorObject::new(
+                INVALID_PARAMS,
+                format!(
+                    "expected one workspace folder, got {}",
+                    self.workspace_folders.len()
+                ),
+            ));
+        };
+        folder
+            .path()
+            .map_err(|message| ErrorObject::new(INVALID_PARAMS, message))
+    }
 }
 
 /// A plugin's answer to `initialize`: who it is, which protocol it speaks, and
-/// the languages it indexes.
+/// what it offers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InitializeResult {
-    /// Plugin id; must equal the `id` of its `lighthouse-plugin.toml`.
-    pub id: String,
-    pub version: String,
     /// Must equal the host's protocol version.
     pub protocol_version: String,
+    /// `name` is the plugin id; it must equal the `id` of its
+    /// `lighthouse-plugin.toml`.
+    pub server_info: Implementation,
+    pub capabilities: ServerCapabilities,
+}
+
+/// What a plugin offers: the languages it indexes and the models it serves.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ServerCapabilities {
     pub languages: Vec<ProviderManifest>,
     /// The models the plugin offers, as OpenAI's list object; empty for a
     /// language plugin.
@@ -62,11 +125,15 @@ impl InitializeResult {
         models: Vec<crate::Model>,
     ) -> Self {
         Self {
-            id: id.into(),
-            version: version.into(),
             protocol_version: crate::VERSION.to_owned(),
-            languages,
-            models: crate::ListModelResponse::new(models),
+            server_info: Implementation {
+                name: id.into(),
+                version: version.into(),
+            },
+            capabilities: ServerCapabilities {
+                languages,
+                models: crate::ListModelResponse::new(models),
+            },
         }
     }
 }

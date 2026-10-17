@@ -1,10 +1,10 @@
-# Plugin protocol 0.2
+# Plugin protocol 0.3
 
 Normative contract between Lighthouse (the host) and a language plugin: a
 separate process that analyzes source in its own language with native tools.
 Rules and analyzers stay in the host; a plugin only turns files into
 the code model. The wire types are defined by
-[`protocol/schema/lighthouse-protocol-0.2.json`](../protocol/schema/lighthouse-protocol-0.2.json),
+[`protocol/schema/lighthouse-protocol-0.3.json`](../protocol/schema/lighthouse-protocol-0.3.json),
 generated from the `lighthouse-protocol` crate and checked in; where this text
 and the schema disagree, the schema wins. The wire model is separate from the
 host's internal model: internal changes are not protocol changes.
@@ -27,16 +27,16 @@ Key words MUST, SHOULD and MAY are used as in RFC 2119.
 
 ## Versioning
 
-`protocolVersion` is `"0.2"`. Host and plugin MUST agree exactly; a plugin that
+`protocolVersion` is `"0.3"`. Host and plugin MUST agree exactly; a plugin that
 receives another version answers `initialize` with an error, a host that
 receives another version refuses the plugin. Receivers MUST ignore unknown
 fields. Fields of protocol messages are camelCase (`protocolVersion`,
-`clientInfo`); fields of the code model keep the model's snake_case names
+`clientInfo`, `workspaceFolders`); fields of the code model keep the model's snake_case names
 (`test_of`, `max_nesting`).
 
 `extent` on symbols, `site` on edges and the capabilities `extent` and
 `reference-sites` were added to 0.1 before 1.0, as optional fields: a plugin that
-sends none of them remains valid in 0.2, and hosts ignore what they do not
+sends none of them remains valid in 0.3, and hosts ignore what they do not
 know. They make fixes possible (see "Fixing" in [architecture.md](architecture.md)).
 
 `context.overlays` is real: a list of `{ path, text }` that stand in for requested
@@ -46,7 +46,7 @@ run verifies candidate edits this way, and writes only after they pass. `lang-go
 passes them to `go/packages` as its `Overlay`, `lang-rust` reads them in place of the
 files.
 
-Reserved for later versions, not implemented in 0.2: further methods for rules
+Reserved for later versions, not implemented in 0.3: further methods for rules
 and analyzers.
 
 ## Methods
@@ -54,7 +54,7 @@ and analyzers.
 | Method | Kind | HTTP twin |
 |---|---|---|
 | `initialize` | request | none |
-| `index` | request | none |
+| `lighthouse/index` | request | none |
 | `lighthouse/classify` | request | `POST /v1/systemone` |
 | `lighthouse/train` | request | `POST /v1/fine_tuning/jobs` |
 | `shutdown` | request | none |
@@ -67,17 +67,30 @@ plugin. Future methods, added with their first consumer: `lighthouse/embed` (`PO
 
 ### `initialize` (request)
 
-Params `{ root, protocolVersion, clientInfo: { name, version } }`, `root`
-absolute. Result:
+The shape is MCP's, with LSP's names for the workspace. Params:
 
 ```json
-{ "id": "lang-go", "version": "0.1.0", "protocolVersion": "0.1",
-  "languages": [{ "id": "go", "globs": ["**/*.go"], "priority": 0,
-                  "conventions": { "test_globs": ["**/*_test.go"], "constructor_prefixes": ["New", "new"] },
-                  "capabilities": ["semantic-edges"] }] }
+{ "protocolVersion": "0.3",
+  "clientInfo": { "name": "lighthouse", "version": "0.1.0" },
+  "workspaceFolders": [{ "uri": "file:///abs/root", "name": "root" }] }
 ```
 
-- `id` MUST equal the `id` of the plugin's manifest.
+`workspaceFolders` holds exactly one folder for now: the project root, as a `file://` URI
+percent-encoded as RFC 8089 and RFC 3986 say. A plugin turns the URI back into a path (`url`
+in Rust, `net/url` in Go) and refuses anything else. Result:
+
+```json
+{ "protocolVersion": "0.3",
+  "serverInfo": { "name": "lang-go", "version": "0.1.0" },
+  "capabilities": {
+    "languages": [{ "id": "go", "globs": ["**/*.go"], "priority": 0,
+                    "conventions": { "test_globs": ["**/*_test.go"], "constructor_prefixes": ["New", "new"] },
+                    "capabilities": ["semantic-edges"] }] } }
+```
+
+- `serverInfo.name` MUST equal the `id` of the plugin's manifest. `clientInfo` and `serverInfo`
+  are one type, MCP's `Implementation`.
+- `capabilities.models` (see "Model methods") is omitted when the plugin offers none.
 - `globs` select project-relative files (`*` and `?` stop at `/`; a `**`
   component spans directories). Of several languages matching a file, the higher
   `priority` wins, then registration order; a `fallback: true` language only
@@ -88,11 +101,11 @@ absolute. Result:
   constructor (a name is one when it is a prefix, or a prefix followed by a new
   word). Every rule that tells constructors apart shares them; a project replaces
   them once in `[languages.<id>] constructorPrefixes`.
-- Each entry of `languages` is the language's **provider manifest**
+- Each entry of `capabilities.languages` is the language's **provider manifest**
   (`ProviderManifest`): `id`, `globs`, `priority`, `fallback`, `conventions` and
   `capabilities`. It is what the host's `LanguageProvider::manifest()` returns, field
-  for field; the plugin's own identity (`id`, `version`) is the plugin manifest.
-- `capabilities` list what the provider guarantees. `semantic-edges`: `calls`,
+  for field; the plugin's own identity (`serverInfo`) is the plugin manifest.
+- The `capabilities` of a language list what its provider guarantees. `semantic-edges`: `calls`,
   `references`, `implements` and `accesses-private` edges are resolved by the
   language's own semantic analysis (types, scopes), not by name matching. A rule
   that requires a capability is skipped, with a notice, for languages without it.
@@ -110,7 +123,7 @@ absolute. Result:
   guesses), which makes its caller and reference sets lower bounds; no separate
   capability announces that.
 
-### `index` (request)
+### `lighthouse/index` (request)
 
 Params:
 
@@ -140,7 +153,7 @@ used only when its key matches, and a key covers everything the entry was comput
 from: the provider build, the options, the toolchain, and the content of the files and
 of what they depend on. Any doubt is a miss. A result with an `incomplete` entry is
 never written. Conformance indexes every case cold, then warm, and compares the answer
-with an uncached run byte for byte. The protocol version stays 0.2: the field is optional.
+with an uncached run byte for byte. The field is optional.
 
 Result `{ fragments, notices, incomplete }`:
 
@@ -170,7 +183,7 @@ Lighthouse defines no model API of its own: each method takes the body of a publ
 verbatim, with that API's own field names.
 
 A plugin may offer models instead of, or besides, languages. `initialize` lists them in
-`models`, a `ListModelResponse` with the OpenAI list shape `{object: "list", data: [Model]}`.
+`capabilities.models`, a `ListModelResponse` with the OpenAI list shape `{object: "list", data: [Model]}`.
 Each `Model` has OpenAI's `{id, object, created, owned_by}`, capabilities
 `{classification | embedding | fine_tuning: {supported}}`, and Lighthouse's `version` (changes
 whenever answers for the same input may), `cost` (0 for a model that runs locally for free),
@@ -216,14 +229,24 @@ backoff on 429, 503 and 529. A model that fails leaves its subjects to review.
 
 ## Errors and failure handling
 
-A response MAY carry a JSON-RPC `error`: `-32700` malformed input (the plugin
-then stops), `-32601` unknown method, `-32602` invalid params, `-32603`
-internal error. The host treats failures as follows, always turning them into
+A response MAY carry a JSON-RPC `error`, with the codes of JSON-RPC and LSP:
+
+| Code | Name | Meaning |
+|---|---|---|
+| `-32700` | ParseError | malformed input (the plugin then stops) |
+| `-32601` | MethodNotFound | unknown method |
+| `-32602` | InvalidParams | the params do not fit the method |
+| `-32603` | InternalError | a panic or a broken invariant of the plugin |
+| `-32803` | RequestFailed | the request was valid and the plugin could not do the job; `data` is the error body of the API behind it, verbatim |
+| `-32002` | ServerNotInitialized | any request but `initialize` before a successful `initialize` |
+
+A plugin that receives another protocol version answers `initialize` with `RequestFailed`.
+The host treats failures as follows, always turning them into
 `incomplete` entries and never into a crash:
 
 | Failure | Host behavior |
 |---|---|
-| `error` response to `index` | batch incomplete; plugin stays usable |
+| `error` response to `lighthouse/index` | batch incomplete; plugin stays usable |
 | crash, closed output, malformed or invalid message | batch incomplete; plugin is killed and every later call fails the same way |
 | no answer within the request timeout (default 600 s, `timeout` of the plugin entry in seconds; the first index may build a cold cache) | as above; the whole process group is killed |
 | fragment for a file that was not requested | ignored, with a notice |
@@ -445,7 +468,7 @@ when listed; an unlisted manifest is never executed.
 
 Every provider passes the golden suite in `crates/lighthouse-rpc/tests/conformance/<language>`: each
 case is a project, option variants (`options[.variant].json`) and the exact
-`index` result expected for them (`expected[.variant].json`), covering symbols,
+`lighthouse/index` result expected for them (`expected[.variant].json`), covering symbols,
 edges, visibility, ownership, spans, flow, tests, capabilities and a
 deterministic order. `cargo test -p lighthouse-rpc` runs the suite against the
 built plugin and validates every result against the schema.

@@ -44,7 +44,7 @@ impl Plugin {
 
 impl Handler for Plugin {
     fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult, ErrorObject> {
-        self.dir = PathBuf::from(params.root).join(MODELS_DIR);
+        self.dir = params.root()?.join(MODELS_DIR);
         let model = Model {
             deterministic: true,
             ..Model::new(

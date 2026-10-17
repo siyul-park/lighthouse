@@ -9,3 +9,4 @@ mod route;
 mod schema;
 mod serve;
 mod stats;
+mod workspace;

@@ -3,27 +3,45 @@
 // languages or Lighthouse rules.
 package sdk
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+	"net/url"
+	"path/filepath"
+)
 
-// ClientInfo identifies the host in InitializeParams.
-type ClientInfo struct {
+// Implementation names a peer: the host as clientInfo, the plugin as serverInfo.
+type Implementation struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
 }
 
+// WorkspaceFolder is a root of the workspace, as in LSP.
+type WorkspaceFolder struct {
+	// URI is the `file://` URI of the directory, percent-encoded.
+	URI  string `json:"uri"`
+	Name string `json:"name"`
+}
+
 // InitializeParams is the request of the `initialize` method.
 type InitializeParams struct {
-	Root            string     `json:"root"`
-	ProtocolVersion string     `json:"protocolVersion"`
-	ClientInfo      ClientInfo `json:"clientInfo"`
+	ProtocolVersion string         `json:"protocolVersion"`
+	ClientInfo      Implementation `json:"clientInfo"`
+	// WorkspaceFolders holds exactly one folder for now: the project root.
+	WorkspaceFolders []WorkspaceFolder `json:"workspaceFolders"`
 }
 
 // InitializeResult is the response of the `initialize` method.
 type InitializeResult struct {
-	ID              string             `json:"id"`
-	Version         string             `json:"version"`
-	ProtocolVersion string             `json:"protocolVersion"`
-	Languages       []ProviderManifest `json:"languages"`
+	ProtocolVersion string `json:"protocolVersion"`
+	// ServerInfo.Name is the plugin id.
+	ServerInfo   Implementation     `json:"serverInfo"`
+	Capabilities ServerCapabilities `json:"capabilities"`
+}
+
+// ServerCapabilities is what the plugin offers.
+type ServerCapabilities struct {
+	Languages []ProviderManifest `json:"languages"`
 }
 
 // ProviderManifest is what a language provider declares: the language a
@@ -242,7 +260,7 @@ type Comment struct {
 }
 
 // ProtocolVersion is the wire protocol version this package implements.
-const ProtocolVersion = "0.2"
+const ProtocolVersion = "0.3"
 
 // SemanticEdges names the capability of reporting type-resolved edges.
 const SemanticEdges = "semantic-edges"
@@ -255,3 +273,16 @@ const Overlays = "overlays"
 
 // ReferenceSites names the capability of reporting where references occur.
 const ReferenceSites = "reference-sites"
+
+// Path is the directory the folder names; it fails for a URI that is not a
+// file URI of this machine.
+func (f WorkspaceFolder) Path() (string, error) {
+	u, err := url.Parse(f.URI)
+	if err != nil {
+		return "", err
+	}
+	if u.Scheme != "file" || (u.Host != "" && u.Host != "localhost") {
+		return "", fmt.Errorf("%q is not a file URI", f.URI)
+	}
+	return filepath.Clean(filepath.FromSlash(u.Path)), nil
+}

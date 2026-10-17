@@ -66,13 +66,28 @@ pub(crate) fn index_with(
             }),
         },
     };
-    let request = Message::request(1, wire::INDEX, params).unwrap();
+    let handshake = wire::InitializeParams {
+        protocol_version: wire::VERSION.to_owned(),
+        client_info: wire::Implementation {
+            name: "test".to_owned(),
+            version: "0".to_owned(),
+        },
+        workspace_folders: vec![wire::WorkspaceFolder::at(&root).unwrap()],
+    };
+    let request = Message::request(1, wire::INITIALIZE, handshake).unwrap();
+    write_message(&mut stdin, &request).unwrap();
+    let reply = read_message(&mut stdout).unwrap().unwrap();
+    reply
+        .into_result::<wire::InitializeResult>()
+        .unwrap()
+        .unwrap();
+    let request = Message::request(2, wire::INDEX, params).unwrap();
     write_message(&mut stdin, &request).unwrap();
     let reply = read_message(&mut stdout).unwrap().unwrap();
     let result = reply.into_result::<IndexResult>().unwrap().unwrap();
     write_message(
         &mut stdin,
-        &Message::request(2, wire::SHUTDOWN, ()).unwrap(),
+        &Message::request(3, wire::SHUTDOWN, ()).unwrap(),
     )
     .unwrap();
     read_message(&mut stdout).unwrap().unwrap();

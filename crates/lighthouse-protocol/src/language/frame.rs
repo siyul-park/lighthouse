@@ -11,6 +11,10 @@ pub(super) const PARSE_ERROR: i64 = -32700;
 pub(super) const METHOD_NOT_FOUND: i64 = -32601;
 pub(super) const INVALID_PARAMS: i64 = -32602;
 pub(super) const INTERNAL_ERROR: i64 = -32603;
+/// LSP: the request was valid and its handler could not do the job.
+pub(super) const REQUEST_FAILED: i64 = -32803;
+/// LSP: a request arrived before `initialize`.
+pub(super) const SERVER_NOT_INITIALIZED: i64 = -32002;
 
 /// Why a message could not be read or written; the stream is unusable after
 /// any variant but a clean end of input.
@@ -35,7 +39,7 @@ pub enum Id {
 }
 
 /// JSON-RPC error carried by a failed response, and what a handler fails
-/// with: a message turned into one is an internal error, and `data` holds the
+/// with: a message turned into one is a failed request, and `data` holds the
 /// body of the error behind it when there is one (an API's own error object).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ErrorObject {
@@ -54,7 +58,7 @@ impl ErrorObject {
         }
     }
 
-    /// An internal error with the error body of the API that caused it.
+    /// A failed request with the error body of the API that caused it.
     pub fn with_data(message: impl Into<String>, data: Value) -> Self {
         Self {
             data: Some(data),
@@ -65,7 +69,7 @@ impl ErrorObject {
 
 impl From<String> for ErrorObject {
     fn from(message: String) -> Self {
-        Self::new(INTERNAL_ERROR, message)
+        Self::new(REQUEST_FAILED, message)
     }
 }
 
