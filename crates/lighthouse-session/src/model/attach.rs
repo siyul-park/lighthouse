@@ -10,7 +10,8 @@ use lighthouse_spec::Decision;
 use lighthouse_store::{Change, Records, RevisionSpec, append_revision};
 use serde_json::{Value, json};
 
-use crate::{EvalReport, EvalRequest, Result, Session, eval};
+use super::{EvalReport, EvalRequest, eval};
+use crate::{Result, Session};
 
 /// What came of asking to attach a model.
 pub struct Attachment {
@@ -22,7 +23,7 @@ pub struct Attachment {
     pub reasons: Vec<String>,
     /// The numbers the gate looked at, as a revision records them.
     pub evaluation: Value,
-    pub report: Box<EvalReport>,
+    pub report: EvalReport,
 }
 
 /// The revision that detached a model.
@@ -44,6 +45,27 @@ struct Revision<'a> {
     evaluation: Value,
 }
 
+impl Revision<'_> {
+    /// Appends the revision to the log under `root` and gives its id.
+    fn append(self, root: &Path) -> Result<String> {
+        let key = self.decision.key();
+        Ok(append_revision(
+            root,
+            RevisionSpec {
+                decision: key.to_owned(),
+                parent: self.records.latest(key).map(|latest| latest.id.clone()),
+                meaning_version: Some(self.decision.meaning_version()),
+                check_revision: Some(self.decision.check_revision()),
+                change: Change::Minor,
+                evaluation: self.evaluation,
+                approval: self.approval,
+                model: self.model.map(str::to_owned),
+                generated_at_time: now(),
+            },
+        )?)
+    }
+}
+
 /// Evaluates `request.model` as the first layer of the decision and, when the
 /// evaluation allows it, appends the revision that attaches it.
 pub fn attach(request: &EvalRequest, approval: Attribution) -> Result<Attachment> {
@@ -51,14 +73,14 @@ pub fn attach(request: &EvalRequest, approval: Attribution) -> Result<Attachment
         .model
         .clone()
         .ok_or("--model names the model to attach")?;
-    let session = Session::load(request.config.as_deref())?;
-    let catalog = session.catalog()?;
-    let decision = catalog
+    let session = Session::load(request.labelling.config.as_deref())?;
+    let decision = session
+        .catalog
         .decision(&request.decision)
         .ok_or_else(|| format!("unknown decision `{}`", request.decision))?;
     let records = Records::read(&session.root)?;
     let report = eval(request)?;
-    let evaluation = evidence(&report, &model, &session.root)?;
+    let evaluation = evidence(&report)?;
     let mut reasons = attachable(&report);
     if records.attached().get(decision.key()) == Some(&model) {
         reasons.push(format!("`{model}` is already attached"));
@@ -71,7 +93,7 @@ pub fn attach(request: &EvalRequest, approval: Attribution) -> Result<Attachment
             model: Some(&model),
             evaluation: evaluation.clone(),
         };
-        Some(append(&session.root, revision)?)
+        Some(revision.append(&session.root)?)
     } else {
         None
     };
@@ -81,15 +103,15 @@ pub fn attach(request: &EvalRequest, approval: Attribution) -> Result<Attachment
         revision,
         reasons,
         evaluation,
-        report: Box::new(report),
+        report,
     })
 }
 
 /// Appends the revision that unbinds the model of `decision`.
 pub fn detach(config: Option<&Path>, decision: &str, approval: Attribution) -> Result<Detachment> {
     let session = Session::load(config)?;
-    let catalog = session.catalog()?;
-    let found = catalog
+    let found = session
+        .catalog
         .decision(decision)
         .ok_or_else(|| format!("unknown decision `{decision}`"))?;
     let records = Records::read(&session.root)?;
@@ -97,39 +119,17 @@ pub fn detach(config: Option<&Path>, decision: &str, approval: Attribution) -> R
         .attached()
         .remove(found.key())
         .ok_or_else(|| format!("no model is attached to `{decision}`"))?;
-    let revision = append(
-        &session.root,
-        Revision {
-            records: &records,
-            decision: found,
-            approval,
-            model: None,
-            evaluation: json!({ "detached": model }),
-        },
-    )?;
+    let revision = Revision {
+        records: &records,
+        decision: found,
+        approval,
+        model: None,
+        evaluation: json!({ "detached": model }),
+    }
+    .append(&session.root)?;
     Ok(Detachment {
         revision,
         decision: found.id().to_owned(),
         model,
     })
-}
-
-/// Appends `revision` to the log and gives its id.
-fn append(root: &Path, revision: Revision) -> Result<String> {
-    let decision = revision.decision;
-    let key = decision.key();
-    Ok(append_revision(
-        root,
-        RevisionSpec {
-            decision: key.to_owned(),
-            parent: revision.records.latest(key).map(|latest| latest.id.clone()),
-            meaning_version: Some(decision.meaning_version()),
-            check_revision: Some(decision.check_revision()),
-            change: Change::Minor,
-            evaluation: revision.evaluation,
-            approval: revision.approval,
-            model: revision.model.map(str::to_owned),
-            generated_at_time: now(),
-        },
-    )?)
 }

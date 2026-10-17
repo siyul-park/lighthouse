@@ -185,11 +185,11 @@ fn side() -> Value {
             "check": string(),
             "metrics": object(json!({
                 "precision": rate(), "fpr": rate(), "recall": rate(), "fnr": rate(),
-                "selector_precision": rate(), "coverage": rate(), "abstention": rate(),
+                "selectorPrecision": rate(), "coverage": rate(),
                 "answered": integer(), "brier": nullable(json!({ "type": "number" })), "auroc": nullable(json!({ "type": "number" })),
                 "ece": nullable(json!({ "type": "number" }))
             }), &[]),
-            "model_decided": integer(), "reviews": integer(), "calls": integer(),
+            "modelDecided": integer(), "reviews": integer(), "calls": integer(),
             "cost": { "type": "number" },
             "scores": list_of(object(json!({
                 "fingerprint": string(), "repo": nullable(string()),
@@ -198,13 +198,14 @@ fn side() -> Value {
             }), &["fingerprint", "violates", "probability", "model"])),
             "notices": list_of(string()),
             "layer": object(json!({
-                "model": string(), "cross_fitted": integer(), "refits": strings()
-            }), &["model", "cross_fitted", "refits"])
+                "model": string(), "crossFitted": integer(), "refits": strings(),
+                "trainingFile": string()
+            }), &["model", "crossFitted", "refits"])
         }),
         &[
             "check",
             "metrics",
-            "model_decided",
+            "modelDecided",
             "reviews",
             "calls",
             "cost",
@@ -220,12 +221,12 @@ fn eval_report() -> Value {
             "decision": string(), "labelled": integer(),
             "policy": object(json!({ "precision": { "type": "number" } }), &["precision"]),
             "current": side(), "candidate": nullable(side()), "agreement": rate(),
-            "meets_policy": nullable(json!({ "type": "boolean" })),
+            "meetsPolicy": nullable(json!({ "type": "boolean" })),
             "decided": integer(), "regressions": strings(),
-            "caveat": string(), "audit": nullable(string()),
+            "audit": nullable(string()),
             "proposal": object(json!({
-                "action": { "enum": ["detach"] }, "model": string(), "reason": string()
-            }), &["action", "model", "reason"])
+                "model": string(), "reason": string()
+            }), &["model", "reason"])
         }),
         &[
             "decision",
@@ -234,7 +235,6 @@ fn eval_report() -> Value {
             "current",
             "decided",
             "regressions",
-            "caveat",
         ],
     )
 }
@@ -323,17 +323,17 @@ fn train_report() -> Value {
     object(
         json!({
             "decision": string(), "model": string(), "subjects": integer(),
-            "by_source": { "type": "object", "additionalProperties": integer() },
-            "unresolved": integer(), "dataset": string(), "training_file": string(),
-            "result": nullable(json!({ "type": "object" }))
+            "bySource": { "type": "object", "additionalProperties": integer() },
+            "unresolved": integer(), "trainingFile": string(),
+            "result": nullable(json!({ "type": "object" })),
+            "card": nullable(json!({ "type": "object" }))
         }),
         &[
             "decision",
             "model",
             "subjects",
             "unresolved",
-            "dataset",
-            "training_file",
+            "trainingFile",
         ],
     )
 }

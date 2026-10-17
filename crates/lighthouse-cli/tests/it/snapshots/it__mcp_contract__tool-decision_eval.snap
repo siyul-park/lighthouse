@@ -9,7 +9,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     "openWorldHint": false,
     "readOnlyHint": true
   },
-  "description": "Measure a decision's check against its labels.\n\nReports precision, FPR, recall, FNR, selector precision, coverage and abstention, each with a Wilson 95% interval; the Brier score, ECE and AUROC of the probabilities models gave, with how many subjects they answered; the model calls and their cost, and a verdict against the decision's evaluation policy (`rules.\"<id>\".evaluation`). With --check, a candidate decision file is measured beside it and their agreement is reported. Labelled positives come mostly from flagged findings, so recall is an upper bound; --audit writes unflagged selected subjects for a person to label.\n\nExamples:\n  lighthouse decision eval design/prefer-method\n  lighthouse decision eval design/prefer-method --check candidate.yaml --format json\n  lighthouse decision eval design/prefer-method --repo cel=../cel --audit 50",
+  "description": "Measure a decision's check against its labels.\n\nReports precision, FPR, recall, FNR, selector precision and coverage, each with a Wilson 95% interval; the Brier score, ECE and AUROC of the probabilities models gave, with how many subjects they answered; the model calls and their cost, and a verdict against the decision's evaluation policy (`rules.\"<id>\".evaluation`). With --check, a candidate decision file is measured beside it and their agreement is reported. Labelled positives come mostly from flagged findings, so recall is an upper bound; --audit writes unflagged selected subjects for a person to label.\n\nExamples:\n  lighthouse decision eval design/prefer-method\n  lighthouse decision eval design/prefer-method --check candidate.yaml --format json\n  lighthouse decision eval design/prefer-method --repo cel=../cel --audit 50",
   "inputSchema": {
     "additionalProperties": false,
     "description": "`decision eval`.",
@@ -133,7 +133,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
               },
               "layer": {
                 "properties": {
-                  "cross_fitted": {
+                  "crossFitted": {
                     "minimum": 0,
                     "type": "integer"
                   },
@@ -145,53 +145,20 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                       "type": "string"
                     },
                     "type": "array"
+                  },
+                  "trainingFile": {
+                    "type": "string"
                   }
                 },
                 "required": [
                   "model",
-                  "cross_fitted",
+                  "crossFitted",
                   "refits"
                 ],
                 "type": "object"
               },
               "metrics": {
                 "properties": {
-                  "abstention": {
-                    "anyOf": [
-                      {
-                        "properties": {
-                          "high": {
-                            "type": "number"
-                          },
-                          "hits": {
-                            "minimum": 0,
-                            "type": "integer"
-                          },
-                          "low": {
-                            "type": "number"
-                          },
-                          "of": {
-                            "minimum": 0,
-                            "type": "integer"
-                          },
-                          "value": {
-                            "type": "number"
-                          }
-                        },
-                        "required": [
-                          "hits",
-                          "of",
-                          "value",
-                          "low",
-                          "high"
-                        ],
-                        "type": "object"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
                   "answered": {
                     "minimum": 0,
                     "type": "integer"
@@ -406,7 +373,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                       }
                     ]
                   },
-                  "selector_precision": {
+                  "selectorPrecision": {
                     "anyOf": [
                       {
                         "properties": {
@@ -446,7 +413,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                 "required": [],
                 "type": "object"
               },
-              "model_decided": {
+              "modelDecided": {
                 "minimum": 0,
                 "type": "integer"
               },
@@ -500,7 +467,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
             "required": [
               "check",
               "metrics",
-              "model_decided",
+              "modelDecided",
               "reviews",
               "calls",
               "cost",
@@ -513,9 +480,6 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
             "type": "null"
           }
         ]
-      },
-      "caveat": {
-        "type": "string"
       },
       "current": {
         "properties": {
@@ -531,7 +495,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
           },
           "layer": {
             "properties": {
-              "cross_fitted": {
+              "crossFitted": {
                 "minimum": 0,
                 "type": "integer"
               },
@@ -543,53 +507,20 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                   "type": "string"
                 },
                 "type": "array"
+              },
+              "trainingFile": {
+                "type": "string"
               }
             },
             "required": [
               "model",
-              "cross_fitted",
+              "crossFitted",
               "refits"
             ],
             "type": "object"
           },
           "metrics": {
             "properties": {
-              "abstention": {
-                "anyOf": [
-                  {
-                    "properties": {
-                      "high": {
-                        "type": "number"
-                      },
-                      "hits": {
-                        "minimum": 0,
-                        "type": "integer"
-                      },
-                      "low": {
-                        "type": "number"
-                      },
-                      "of": {
-                        "minimum": 0,
-                        "type": "integer"
-                      },
-                      "value": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "hits",
-                      "of",
-                      "value",
-                      "low",
-                      "high"
-                    ],
-                    "type": "object"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
               "answered": {
                 "minimum": 0,
                 "type": "integer"
@@ -804,7 +735,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                   }
                 ]
               },
-              "selector_precision": {
+              "selectorPrecision": {
                 "anyOf": [
                   {
                     "properties": {
@@ -844,7 +775,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
             "required": [],
             "type": "object"
           },
-          "model_decided": {
+          "modelDecided": {
             "minimum": 0,
             "type": "integer"
           },
@@ -898,7 +829,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "required": [
           "check",
           "metrics",
-          "model_decided",
+          "modelDecided",
           "reviews",
           "calls",
           "cost",
@@ -918,7 +849,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "minimum": 0,
         "type": "integer"
       },
-      "meets_policy": {
+      "meetsPolicy": {
         "anyOf": [
           {
             "type": "boolean"
@@ -941,11 +872,6 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       },
       "proposal": {
         "properties": {
-          "action": {
-            "enum": [
-              "detach"
-            ]
-          },
           "model": {
             "type": "string"
           },
@@ -954,7 +880,6 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
           }
         },
         "required": [
-          "action",
           "model",
           "reason"
         ],
@@ -973,8 +898,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "policy",
       "current",
       "decided",
-      "regressions",
-      "caveat"
+      "regressions"
     ],
     "title": "EvalReport",
     "type": "object"

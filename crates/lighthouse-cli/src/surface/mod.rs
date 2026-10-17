@@ -18,7 +18,6 @@ mod model;
 mod rebuild;
 pub mod reply;
 mod review;
-mod timings;
 pub mod tools;
 
 pub use cli::{Action, run};

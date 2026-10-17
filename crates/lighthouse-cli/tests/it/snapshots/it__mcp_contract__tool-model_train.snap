@@ -61,15 +61,22 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/train-report.schema.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "properties": {
-      "by_source": {
+      "bySource": {
         "additionalProperties": {
           "minimum": 0,
           "type": "integer"
         },
         "type": "object"
       },
-      "dataset": {
-        "type": "string"
+      "card": {
+        "anyOf": [
+          {
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "decision": {
         "type": "string"
@@ -91,7 +98,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "minimum": 0,
         "type": "integer"
       },
-      "training_file": {
+      "trainingFile": {
         "type": "string"
       },
       "unresolved": {
@@ -104,8 +111,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
       "model",
       "subjects",
       "unresolved",
-      "dataset",
-      "training_file"
+      "trainingFile"
     ],
     "title": "TrainReport",
     "type": "object"

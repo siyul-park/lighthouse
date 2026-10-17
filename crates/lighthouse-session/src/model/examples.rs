@@ -5,37 +5,35 @@
 //! one is `pass` wherever the check looked.
 
 use lighthouse_engine::{ExampleRun, ModelOptions, Run};
-use lighthouse_ml::{
-    labels::Shown,
-    metrics::{Outcome, Truth},
-};
-use lighthouse_model::Diagnostic;
-use lighthouse_spec::{Catalog, Decision, Example, ExampleKind};
+use lighthouse_ml::{labels::Label, metrics::Outcome};
+use lighthouse_model::{Diagnostic, Judgment};
+use lighthouse_spec::{Decision, Example, ExampleKind};
 
-use crate::{Result, Session, check::attached_models};
+use super::attached;
+use crate::{Result, Session};
 
 /// What the examples of a decision show, checked by `rule` (the decision's own
 /// rule, or a candidate's) under `models`.
-pub(crate) fn shown(
+pub(super) fn labels(
     session: &Session,
-    catalog: &Catalog,
     decision: &Decision,
     rule: &str,
     models: &ModelOptions,
-) -> Result<Vec<Shown>> {
+) -> Result<Vec<Label>> {
+    let models = ModelOptions {
+        attached: attached(&session.root, &session.catalog),
+        collect: true,
+        ..models.clone()
+    };
     let mut all = Vec::new();
     for example in &decision.examples {
         let (registry, _) = session.registry()?;
         let run = ExampleRun {
             registry,
             config: session.config.clone(),
-            catalog,
+            catalog: &session.catalog,
             trusted: session.trusted(),
-            models: ModelOptions {
-                attached: attached_models(&session.root, catalog),
-                collect: true,
-                ..models.clone()
-            },
+            models: models.clone(),
         }
         .run(rule, example)
         .map_err(|e| format!("{} {}: {e}", decision.id(), example.name))?;
@@ -44,8 +42,10 @@ pub(crate) fn shown(
     Ok(all)
 }
 
-fn of_example(decision: &str, example: &Example, run: &Run) -> Vec<Shown> {
+fn of_example(decision: &str, example: &Example, run: &Run) -> Vec<Label> {
     let prefix = format!("example:{decision}:{}", example.name);
+    let label =
+        |key, judgment, outcome, subject| Label::example(decision, key, judgment, outcome, subject);
     match example.kind {
         ExampleKind::Invalid => example
             .expect
@@ -58,13 +58,12 @@ fn of_example(decision: &str, example: &Example, run: &Run) -> Vec<Shown> {
                     .find(at)
                     .map(|d| (Outcome::Fail, d))
                     .or_else(|| run.reviews.iter().find(at).map(|d| (Outcome::Review, d)));
-                Shown {
-                    key: format!("{prefix}:{}", expect.line),
-                    truth: Truth::Fail,
-                    outcome: hit.map_or(Outcome::Unselected, |(outcome, _)| outcome),
-                    subject: hit
-                        .and_then(|(_, d)| run.questions.get(d.fingerprint.as_str()).cloned()),
-                }
+                label(
+                    format!("{prefix}:{}", expect.line),
+                    Judgment::Fail,
+                    hit.map_or(Outcome::NotApplicable, |(outcome, _)| outcome),
+                    hit.and_then(|(_, d)| run.questions.get(d.fingerprint.as_str()).cloned()),
+                )
             })
             .collect(),
         ExampleKind::Valid => {
@@ -78,21 +77,25 @@ fn of_example(decision: &str, example: &Example, run: &Run) -> Vec<Shown> {
                     Outcome::Pass
                 }
             };
-            let asked = run.questions.iter().map(|(fingerprint, subject)| Shown {
-                key: format!("{prefix}:{fingerprint}"),
-                truth: Truth::Pass,
-                outcome: state(fingerprint),
-                subject: Some(subject.clone()),
+            let asked = run.questions.iter().map(|(fingerprint, subject)| {
+                label(
+                    format!("{prefix}:{fingerprint}"),
+                    Judgment::Pass,
+                    state(fingerprint),
+                    Some(subject.clone()),
+                )
             });
             let flagged = run
                 .diagnostics
                 .iter()
                 .filter(|d| !run.questions.contains_key(d.fingerprint.as_str()))
-                .map(|d| Shown {
-                    key: format!("{prefix}:{}", d.fingerprint.as_str()),
-                    truth: Truth::Pass,
-                    outcome: Outcome::Fail,
-                    subject: None,
+                .map(|d| {
+                    label(
+                        format!("{prefix}:{}", d.fingerprint.as_str()),
+                        Judgment::Pass,
+                        Outcome::Fail,
+                        None,
+                    )
                 });
             asked.chain(flagged).collect()
         }

@@ -80,10 +80,9 @@ pub struct Tested {
 /// `decision list`.
 pub fn list(ctx: &Context, args: &DecisionListArgs, output: Output) -> Result<Reply> {
     let session = Session::load_or_default(ctx.config.as_deref())?;
-    let catalog = session.catalog()?;
     let registry = session.in_process_registry()?;
     let enabled = active_decisions(&session)?;
-    let rows = decision_rows(&catalog, &registry, args.all);
+    let rows = decision_rows(&session.catalog, &registry, args.all);
     let Page { items, omitted } = page(rows, args.limit);
     let decisions: Vec<DecisionItem> = items
         .into_iter()
@@ -115,9 +114,8 @@ pub fn list(ctx: &Context, args: &DecisionListArgs, output: Output) -> Result<Re
 /// `decision show`.
 pub fn show(ctx: &Context, args: &DecisionShowArgs, output: Output) -> Result<Reply> {
     let session = Session::load_or_default(ctx.config.as_deref())?;
-    let catalog = session.catalog()?;
     let registry = session.in_process_registry()?;
-    let markdown = explain(&catalog, &registry, &args.id)?;
+    let markdown = explain(&session.catalog, &registry, &args.id)?;
     let shown = DecisionShow {
         id: args.id.clone(),
         markdown: markdown.clone(),
@@ -131,9 +129,9 @@ pub fn author(ctx: &Context, text: &str, create: bool, output: Output) -> Result
         .map_err(|e| format!("the document is not valid YAML or JSON: {e}"))?;
     let session = Session::load(ctx.config.as_deref())?;
     let done = if create {
-        create_decision(session, document)?
+        create_decision(&session, document)?
     } else {
-        replace_decision(session, document)?
+        replace_decision(&session, document)?
     };
     let report = authored(&done);
     let verb = if done.created { "created" } else { "updated" };

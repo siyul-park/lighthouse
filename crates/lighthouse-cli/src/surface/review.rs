@@ -6,8 +6,8 @@ use std::fmt::Write;
 use lighthouse_model::Fingerprint;
 use lighthouse_report::{Entry, GroupOptions, Grouped};
 use lighthouse_session::{
-    FindingRecord, JudgmentEvent, NewJudgment, Standing, TaskQuery, catalog_at, head, long_enough,
-    project_root, record_judgment, review_finding, review_history, review_prune, review_tasks,
+    catalog_at, head, long_enough, project_root,
+    review::{self, FindingRecord, JudgmentEvent, NewJudgment, Query, Recorded, Standing},
 };
 use serde_json::{Map, Value, json};
 
@@ -24,12 +24,12 @@ const JSON_LIMIT: usize = 50;
 /// `review list`.
 pub fn list(args: &ReviewListArgs, output: Output) -> Result<Reply> {
     let root = project_root()?;
-    let query = TaskQuery {
+    let query = Query {
         rules: args.decision.clone(),
         status: args.status.into(),
         all_tiers: args.all,
     };
-    let Some(tasks) = review_tasks(&root, &query)? else {
+    let Some(tasks) = review::list(&root, &query)? else {
         let empty = match args.detail {
             Detail::Compact => "groups",
             Detail::Full => "tasks",
@@ -66,14 +66,14 @@ pub fn list(args: &ReviewListArgs, output: Output) -> Result<Reply> {
 /// `review show`.
 pub fn show(args: &FingerprintArgs, output: Output) -> Result<Reply> {
     long_enough(&args.fingerprint)?;
-    let finding = review_finding(&project_root()?, &args.fingerprint)?;
+    let finding = review::show(&project_root()?, &args.fingerprint)?;
     Reply::data(output, &finding, || detail(&finding))
 }
 
 /// `review history`.
 pub fn history(args: &FingerprintArgs, output: Output) -> Result<Reply> {
     long_enough(&args.fingerprint)?;
-    let events = review_history(&project_root()?, &args.fingerprint)?;
+    let events = review::history(&project_root()?, &args.fingerprint)?;
     let notes = if events.is_empty() {
         vec![format!(
             "lighthouse: no judgments recorded for {}",
@@ -102,7 +102,7 @@ pub fn history(args: &FingerprintArgs, output: Output) -> Result<Reply> {
 
 /// `review prune`.
 pub fn prune(older_than: Option<u32>) -> Result<Reply> {
-    let removed = review_prune(&project_root()?, older_than)?;
+    let removed = review::prune(&project_root()?, older_than)?;
     Ok(Reply::text(format!(
         "removed {removed} unreviewed finding(s) that are resolved or inactive\n"
     )))
@@ -122,7 +122,7 @@ pub fn resolve(ctx: &Context, args: &ReviewResolveArgs, output: Output) -> Resul
         expect_seen: args.seen.clone(),
         lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
     };
-    let recorded = record_judgment(&root, &review)?;
+    let recorded = review::resolve(&root, &review)?;
     let event = &recorded.event;
     let value = json!({
         "recorded": {
@@ -186,7 +186,7 @@ fn json_list(
     })
 }
 
-fn resolved_text(recorded: &lighthouse_session::Recorded) -> String {
+fn resolved_text(recorded: &Recorded) -> String {
     let event = &recorded.event;
     let suppressed = event
         .suppressions

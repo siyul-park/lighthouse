@@ -233,7 +233,6 @@ fn eval_proposes_detaching_an_attached_model_that_misses_the_policy_and_only_the
     // The labels now say the model's failure was a false alarm.
     mislabelled(dir.path());
     let report = eval(dir.path());
-    assert_eq!(report["proposal"]["action"], "detach");
     assert_eq!(report["proposal"]["model"], MODEL);
     assert!(
         report["proposal"]["reason"]

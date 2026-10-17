@@ -1,6 +1,9 @@
 //! `fix`, and `check --fix`: apply the fixes the catalog names, verified.
 
-use lighthouse_session::{AppliedRow, DeclinedRow, FixSelection, FixTargets, Fixed, Session};
+use lighthouse_session::{
+    Session,
+    fix::{self, AppliedRow, DeclinedRow, Fixed, Selection, Targets},
+};
 use serde::Serialize;
 
 use crate::surface::{
@@ -36,8 +39,8 @@ pub fn apply(ctx: &Context, args: &FixArgs, store: bool) -> Result<Fixed> {
         );
     }
     let session = Session::load(ctx.config.as_deref())?;
-    let request = FixSelection {
-        targets: FixTargets {
+    let request = Selection {
+        targets: Targets {
             paths: ctx.paths(&session.root, &args.paths)?,
             fingerprints: args.fingerprints.clone(),
             rules: args.decision.clone(),
@@ -47,7 +50,7 @@ pub fn apply(ctx: &Context, args: &FixArgs, store: bool) -> Result<Fixed> {
         fixer: args.options.fixer.clone(),
         store,
     };
-    lighthouse_session::fix(session, &request)
+    fix::run(&session, &request)
 }
 
 /// The report of a finished fix run.

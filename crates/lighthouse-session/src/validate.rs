@@ -98,7 +98,7 @@ impl Sets {
         let bundled = Catalog::bundled();
         let mut layered: Vec<(Catalog, Vec<String>)> = Vec::new();
         let known: BTreeSet<String> = session
-            .catalog()?
+            .catalog
             .projects()
             .names()
             .map(str::to_owned)
@@ -114,7 +114,7 @@ impl Sets {
             let loaded = match self.catalog_root(dir) {
                 Some(root) if !roots.insert(root.clone()) => continue,
                 Some(root) => Catalog::load(&root).map(|c| (root.display().to_string(), c)),
-                None => Catalog::from_local(local_files(files))
+                None => Catalog::from_local(by_file_name(files))
                     .and_then(|local| Catalog::overlay(bundled, &local))
                     .map(|c| (dir.display().to_string(), c)),
             };
@@ -288,7 +288,7 @@ fn known_rules<'a>(
     }
 }
 
-fn local_files(files: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+fn by_file_name(files: &BTreeMap<String, String>) -> BTreeMap<String, String> {
     files
         .iter()
         .map(|(path, text)| {
@@ -322,7 +322,7 @@ fn references(catalog: &Catalog, registry: &Registry, path: &str, problems: &mut
             named_rule(decision, builtin, registry, path, problems);
             if let BuiltinCheck::Op(BuiltinOp::Order { clauses }) = builtin {
                 for clause in clauses {
-                    unknown_keys(decision, &clause.by, &keys, path, problems);
+                    unknown_keys(decision, "`order`", &clause.by, &keys, path, problems);
                 }
             }
         }
@@ -352,6 +352,7 @@ fn named_rule(
 
 fn unknown_keys(
     decision: &Decision,
+    what: &str,
     by: &[String],
     keys: &BTreeSet<&str>,
     path: &str,
@@ -360,7 +361,7 @@ fn unknown_keys(
     for key in by.iter().filter(|key| !keys.contains(key.as_str())) {
         problems.push(problem(
             path,
-            format!("{}: `order` names unknown order key `{key}`", decision.id()),
+            format!("{}: {what} names unknown order key `{key}`", decision.id()),
         ));
     }
 }
@@ -373,16 +374,8 @@ fn order_keys(decision: &Decision, keys: &BTreeSet<&str>, path: &str, problems: 
         return;
     };
     for op in ops {
-        let OpSpec::Reorder { by, .. } = op else {
-            continue;
-        };
-        for key in by {
-            if !keys.contains(key.as_str()) {
-                problems.push(problem(
-                    path,
-                    format!("{}: reorder names unknown order key `{key}`", decision.id()),
-                ));
-            }
+        if let OpSpec::Reorder { by, .. } = op {
+            unknown_keys(decision, "reorder", by, keys, path, problems);
         }
     }
 }

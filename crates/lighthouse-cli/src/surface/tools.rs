@@ -3,7 +3,7 @@
 //! and descriptions come from the command's own help; input schemas from the
 //! arguments struct that also holds the command's flags.
 
-use lighthouse_session::{Session, remote_bound};
+use lighthouse_session::{Session, model::remote_bound};
 use schemars::{JsonSchema, generate::SchemaSettings};
 use serde::de::DeserializeOwned;
 use serde_json::Value;

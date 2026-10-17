@@ -64,7 +64,7 @@
             },
             "layer": {
               "properties": {
-                "cross_fitted": {
+                "crossFitted": {
                   "minimum": 0,
                   "type": "integer"
                 },
@@ -76,53 +76,20 @@
                     "type": "string"
                   },
                   "type": "array"
+                },
+                "trainingFile": {
+                  "type": "string"
                 }
               },
               "required": [
                 "model",
-                "cross_fitted",
+                "crossFitted",
                 "refits"
               ],
               "type": "object"
             },
             "metrics": {
               "properties": {
-                "abstention": {
-                  "anyOf": [
-                    {
-                      "properties": {
-                        "high": {
-                          "type": "number"
-                        },
-                        "hits": {
-                          "minimum": 0,
-                          "type": "integer"
-                        },
-                        "low": {
-                          "type": "number"
-                        },
-                        "of": {
-                          "minimum": 0,
-                          "type": "integer"
-                        },
-                        "value": {
-                          "type": "number"
-                        }
-                      },
-                      "required": [
-                        "hits",
-                        "of",
-                        "value",
-                        "low",
-                        "high"
-                      ],
-                      "type": "object"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
                 "answered": {
                   "minimum": 0,
                   "type": "integer"
@@ -337,7 +304,7 @@
                     }
                   ]
                 },
-                "selector_precision": {
+                "selectorPrecision": {
                   "anyOf": [
                     {
                       "properties": {
@@ -377,7 +344,7 @@
               "required": [],
               "type": "object"
             },
-            "model_decided": {
+            "modelDecided": {
               "minimum": 0,
               "type": "integer"
             },
@@ -431,7 +398,7 @@
           "required": [
             "check",
             "metrics",
-            "model_decided",
+            "modelDecided",
             "reviews",
             "calls",
             "cost",
@@ -444,9 +411,6 @@
           "type": "null"
         }
       ]
-    },
-    "caveat": {
-      "type": "string"
     },
     "current": {
       "properties": {
@@ -462,7 +426,7 @@
         },
         "layer": {
           "properties": {
-            "cross_fitted": {
+            "crossFitted": {
               "minimum": 0,
               "type": "integer"
             },
@@ -474,53 +438,20 @@
                 "type": "string"
               },
               "type": "array"
+            },
+            "trainingFile": {
+              "type": "string"
             }
           },
           "required": [
             "model",
-            "cross_fitted",
+            "crossFitted",
             "refits"
           ],
           "type": "object"
         },
         "metrics": {
           "properties": {
-            "abstention": {
-              "anyOf": [
-                {
-                  "properties": {
-                    "high": {
-                      "type": "number"
-                    },
-                    "hits": {
-                      "minimum": 0,
-                      "type": "integer"
-                    },
-                    "low": {
-                      "type": "number"
-                    },
-                    "of": {
-                      "minimum": 0,
-                      "type": "integer"
-                    },
-                    "value": {
-                      "type": "number"
-                    }
-                  },
-                  "required": [
-                    "hits",
-                    "of",
-                    "value",
-                    "low",
-                    "high"
-                  ],
-                  "type": "object"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "answered": {
               "minimum": 0,
               "type": "integer"
@@ -735,7 +666,7 @@
                 }
               ]
             },
-            "selector_precision": {
+            "selectorPrecision": {
               "anyOf": [
                 {
                   "properties": {
@@ -775,7 +706,7 @@
           "required": [],
           "type": "object"
         },
-        "model_decided": {
+        "modelDecided": {
           "minimum": 0,
           "type": "integer"
         },
@@ -829,7 +760,7 @@
       "required": [
         "check",
         "metrics",
-        "model_decided",
+        "modelDecided",
         "reviews",
         "calls",
         "cost",
@@ -849,7 +780,7 @@
       "minimum": 0,
       "type": "integer"
     },
-    "meets_policy": {
+    "meetsPolicy": {
       "anyOf": [
         {
           "type": "boolean"
@@ -872,11 +803,6 @@
     },
     "proposal": {
       "properties": {
-        "action": {
-          "enum": [
-            "detach"
-          ]
-        },
         "model": {
           "type": "string"
         },
@@ -885,7 +811,6 @@
         }
       },
       "required": [
-        "action",
         "model",
         "reason"
       ],
@@ -904,8 +829,7 @@
     "policy",
     "current",
     "decided",
-    "regressions",
-    "caveat"
+    "regressions"
   ],
   "title": "EvalReport",
   "type": "object"

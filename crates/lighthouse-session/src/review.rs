@@ -5,13 +5,14 @@ use std::{env, path::Path};
 
 use lighthouse_model::{AgentKind, Attribution, Severity};
 use lighthouse_spec::{Catalog, Decision};
-use lighthouse_store::{
-    Filter, FindingRecord, JudgmentEvent, NewJudgment, Standing, State, StatusFilter, Store,
-    Versions,
-};
+use lighthouse_store::{Filter, State, Store, Versions};
 use serde_json::Value;
 
 use crate::{Result, Selector, git::user_name, project::catalog_at};
+
+pub use lighthouse_store::{
+    FindingRecord, JudgmentEvent, NewJudgment, Standing, StatusFilter, SuppressionEvent,
+};
 
 /// Says who is attributed with what is recorded when no flag does.
 const ATTRIBUTED_VAR: &str = "LIGHTHOUSE_ATTRIBUTED_TO";
@@ -27,8 +28,8 @@ pub struct Recorded {
     pub catalog_error: Option<String>,
 }
 
-/// Which remembered findings [`review_tasks`] lists.
-pub struct TaskQuery {
+/// Which remembered findings [`list`] gives.
+pub struct Query {
     /// Only these decisions: ids or globs over them; empty for all.
     pub rules: Vec<String>,
     pub status: StatusFilter,
@@ -38,7 +39,7 @@ pub struct TaskQuery {
 }
 
 /// The remembered findings that wait for review.
-pub struct Tasks {
+pub struct Listed {
     pub findings: Vec<FindingRecord>,
     /// What opening the store skipped in the log, such as a last line an
     /// interrupted write cut short.
@@ -86,7 +87,7 @@ pub fn person(root: &Path) -> Attribution {
 
 /// The findings the store remembers that match `query`; `None` when no check
 /// has recorded anything yet.
-pub fn review_tasks(root: &Path, query: &TaskQuery) -> Result<Option<Tasks>> {
+pub fn list(root: &Path, query: &Query) -> Result<Option<Listed>> {
     let Some(store) = Store::open_existing(root)? else {
         return Ok(None);
     };
@@ -95,7 +96,7 @@ pub fn review_tasks(root: &Path, query: &TaskQuery) -> Result<Option<Tasks>> {
         decision: None,
         status: query.status,
     })?;
-    Ok(Some(Tasks {
+    Ok(Some(Listed {
         findings: found
             .into_iter()
             .filter(|f| selector.matches(&f.decision))
@@ -106,40 +107,51 @@ pub fn review_tasks(root: &Path, query: &TaskQuery) -> Result<Option<Tasks>> {
 }
 
 /// The finding whose fingerprint starts with `fingerprint`, as remembered.
-pub fn review_finding(root: &Path, fingerprint: &str) -> Result<FindingRecord> {
+pub fn show(root: &Path, fingerprint: &str) -> Result<FindingRecord> {
     Ok(existing_store(root)?.finding(fingerprint)?)
 }
 
 /// Every judgment recorded on a finding, oldest first.
-pub fn review_history(root: &Path, fingerprint: &str) -> Result<Vec<JudgmentEvent>> {
+pub fn history(root: &Path, fingerprint: &str) -> Result<Vec<JudgmentEvent>> {
     Ok(existing_store(root)?.history(fingerprint)?)
 }
 
 /// Deletes the resolved and inactive findings nobody judged, only those that
 /// have been for `older_than` days when given; returns how many.
-pub fn review_prune(root: &Path, older_than: Option<u32>) -> Result<usize> {
+pub fn prune(root: &Path, older_than: Option<u32>) -> Result<usize> {
     Ok(existing_store(root)?.prune(older_than)?)
 }
 
 /// Records the judgment, stamping it with the versions of the finding's
 /// decision when the catalog can be read; a broken catalog is reported, not
 /// fatal.
-pub fn record_judgment(root: &Path, review: &NewJudgment) -> Result<Recorded> {
+pub fn resolve(root: &Path, review: &NewJudgment) -> Result<Recorded> {
+    resolve_all(root, std::slice::from_ref(review))?.remove(0)
+}
+
+/// Records the judgments one after the other, opening the store and reading
+/// the catalog once. Each judgment succeeds or fails by itself.
+pub fn resolve_all(root: &Path, reviews: &[NewJudgment]) -> Result<Vec<Result<Recorded>>> {
     let mut store = existing_store(root)?;
-    let store = &mut store;
     let (catalog, catalog_error) = match catalog_at(root) {
         Ok(catalog) => (Some(catalog), None),
         Err(e) => (None, Some(e.to_string())),
     };
-    let resolved = store.resolve(review, |finding| stamp(catalog.as_ref(), finding))?;
-    let standing = store.finding(&resolved.event.spec.fingerprint)?.standing;
-    Ok(Recorded {
-        warnings: warnings(&resolved.finding),
-        event: resolved.event,
-        finding: resolved.finding,
-        standing,
-        catalog_error,
-    })
+    let record = |store: &mut Store, review: &NewJudgment| -> Result<Recorded> {
+        let resolved = store.resolve(review, |finding| stamp(catalog.as_ref(), finding))?;
+        let standing = store.finding(&resolved.event.spec.fingerprint)?.standing;
+        Ok(Recorded {
+            warnings: warnings(&resolved.finding),
+            event: resolved.event,
+            finding: resolved.finding,
+            standing,
+            catalog_error: catalog_error.clone(),
+        })
+    };
+    Ok(reviews
+        .iter()
+        .map(|review| record(&mut store, review))
+        .collect())
 }
 
 /// Whether a finding is a task of a listing: among the open ones, those that

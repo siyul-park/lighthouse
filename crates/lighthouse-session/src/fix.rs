@@ -9,15 +9,16 @@ use lighthouse_engine::{
     AppliedFix, DeclinedFix, Engine, FixPlan, FixReport, FixRun, unified_diff,
 };
 use lighthouse_model::Fingerprint;
+use lighthouse_resource::slashed;
 use lighthouse_spec::{Catalog, Decision};
 use serde::Serialize;
 
-use crate::{Result, Selector, Session, findings, long_enough, models::command_models};
+use crate::{Result, Selector, Session, findings, long_enough};
 
 /// Which findings to fix. At least one of `paths`, `fingerprints` and `rules`
 /// narrows a run from the whole project.
 #[derive(Default)]
-pub struct FixTargets {
+pub struct Targets {
     pub paths: Vec<PathBuf>,
     /// Fingerprints or unambiguous prefixes.
     pub fingerprints: Vec<String>,
@@ -26,8 +27,8 @@ pub struct FixTargets {
 
 /// What to fix, and how.
 #[derive(Default)]
-pub struct FixSelection {
-    pub targets: FixTargets,
+pub struct Selection {
+    pub targets: Targets,
     /// Do everything but leave the files as they were.
     pub dry_run: bool,
     /// Also apply suggested fixes.
@@ -81,30 +82,19 @@ impl Fixed {
     }
 }
 
-/// The fixer of every rule whose decision has a `fix`; see
-/// [`FixPlan::from_catalog`].
-pub fn fix_plan(catalog: &Catalog) -> FixPlan {
-    FixPlan::from_catalog(catalog)
-}
-
 /// Fixes what `request` selects. With `dry_run` nothing is left changed and
 /// nothing is recorded; otherwise every applied fix is recorded and the
 /// findings it removed are resolved in the store.
-pub fn fix(session: Session, request: &FixSelection) -> Result<Fixed> {
+pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
     for prefix in &request.targets.fingerprints {
         long_enough(prefix)?;
     }
-    let (registry, plugins) = session.registry()?;
-    let trusted = session.trusted();
-    let root = session.root.clone();
-    let catalog = session.catalog()?;
-    let plan = fix_plan(&catalog);
-    let engine = Engine::new(registry, session.config, &catalog, &root)?
-        .with_incomplete(plugins.incomplete)
-        .with_trust(trusted)
-        .with_commands(command_models(&root));
-    let mut messages = plugins.notices.clone();
-    let skip = suppressed(&engine, &root, &catalog, request.store)?;
+    let catalog = &session.catalog;
+    let root = &session.root;
+    let plan = FixPlan::from_catalog(catalog);
+    let (engine, notices) = session.engine()?;
+    let mut messages = notices;
+    let skip = suppressed(&engine, root, catalog, request.store)?;
     let run = FixRun {
         paths: request.targets.paths.clone(),
         rules: Selector::new(&request.targets.rules)?.expand(
@@ -122,7 +112,7 @@ pub fn fix(session: Session, request: &FixSelection) -> Result<Fixed> {
     let mut report = engine.fix(&plan, &run)?;
     messages.extend(report.notes.iter().cloned());
     if request.store && !request.dry_run {
-        let remembered = findings::remember(&root, &catalog, &mut report.finished);
+        let remembered = findings::remember(root, catalog, &mut report.finished);
         messages.extend(remembered.messages);
     }
     let diff = report
@@ -157,10 +147,6 @@ fn declined_row(fix: &DeclinedFix) -> DeclinedRow {
         line: fix.line,
         reason: fix.reason.clone(),
     }
-}
-
-fn slashed(path: &std::path::Path) -> String {
-    path.to_string_lossy().replace('\\', "/")
 }
 
 /// Reads the project as it is before any fix, recording it when the run uses

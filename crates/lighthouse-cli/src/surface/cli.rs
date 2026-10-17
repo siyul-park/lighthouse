@@ -176,8 +176,8 @@ pub enum DecisionCommand {
     },
     /// Measure a decision's check against its labels.
     ///
-    /// Reports precision, FPR, recall, FNR, selector precision, coverage and
-    /// abstention, each with a Wilson 95% interval; the Brier score, ECE and
+    /// Reports precision, FPR, recall, FNR, selector precision and coverage,
+    /// each with a Wilson 95% interval; the Brier score, ECE and
     /// AUROC of the probabilities models gave, with how many subjects they answered;
     /// the model calls and their cost, and a verdict against the decision's evaluation policy
     /// (`rules."<id>".evaluation`). With --check, a candidate decision file is

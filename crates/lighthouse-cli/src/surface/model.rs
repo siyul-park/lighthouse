@@ -2,13 +2,16 @@
 
 use std::fmt::Write;
 
-use lighthouse_session::{Session, TrainRequest, Trained, bound_models, train};
+use lighthouse_session::{
+    Session,
+    model::{BoundModel, TrainRequest, Trained, list as bound_models, train},
+};
 use serde::Serialize;
 
 use crate::surface::{
     Result,
     args::{ModelListArgs, ModelTrainArgs},
-    eval::repos_of,
+    eval::labelling_of,
     list::{omitted_line, page},
     reply::{Context, Output, Reply},
 };
@@ -16,7 +19,7 @@ use crate::surface::{
 /// The `ModelList` kind.
 #[derive(Debug, Serialize)]
 pub struct ModelList {
-    pub models: Vec<lighthouse_session::BoundModel>,
+    pub models: Vec<BoundModel>,
     /// How many models `limit` left out.
     pub omitted: usize,
 }
@@ -52,9 +55,7 @@ pub fn train_model(ctx: &Context, args: &ModelTrainArgs, output: Output) -> Resu
         decision: args.id.clone(),
         model: args.model.clone(),
         from_model: args.from_model.clone(),
-        baseline: args.baseline.clone(),
-        repos: repos_of(ctx, &args.repo)?,
-        config: ctx.config.clone(),
+        labelling: labelling_of(ctx, &args.repo, args.baseline.clone())?,
     })?;
     Reply::data(output, &trained, || train_text(&trained))
 }
@@ -69,12 +70,7 @@ fn train_text(trained: &Trained) -> String {
     for (source, n) in &trained.by_source {
         let _ = writeln!(out, "  {source}: {n}");
     }
-    let _ = writeln!(
-        out,
-        "dataset: {} ({})",
-        trained.dataset.display(),
-        trained.training_file
-    );
+    let _ = writeln!(out, "dataset: {}", trained.training_file);
     match &trained.result {
         Some(job) => {
             let _ = writeln!(

@@ -3,7 +3,10 @@
 use std::path::{Path, PathBuf};
 
 use clap::{Args, ValueEnum};
-use lighthouse_session::{AgentKind, Attribution, attribute_to, person};
+use lighthouse_session::{
+    AgentKind, Attribution,
+    review::{attribute_to, person},
+};
 use serde::Serialize;
 use serde_json::Value;
 

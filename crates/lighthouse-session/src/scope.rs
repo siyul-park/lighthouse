@@ -11,19 +11,7 @@ use crate::{Result, git::git};
 /// sorted.
 pub fn changed(root: &Path) -> Result<Vec<PathBuf>> {
     let against = base_of_changes(root)?;
-    let mut files = tracked(
-        root,
-        &[
-            "diff",
-            "--name-only",
-            "--no-renames",
-            "--diff-filter=ACMRTD",
-            "-z",
-            &against,
-        ],
-    )?;
-    files.extend(untracked(root)?);
-    finish(root, files)
+    with_untracked(root, &against)
 }
 
 /// Files changed since the merge base of `base` and HEAD, in the working tree,
@@ -33,7 +21,12 @@ pub fn since(root: &Path, base: &str) -> Result<Vec<PathBuf>> {
         return Err(format!("`{base}` is not a git ref").into());
     }
     let merge_base = git(root, &["merge-base", "--", base, "HEAD"])?;
-    let merge_base = merge_base.trim();
+    with_untracked(root, merge_base.trim())
+}
+
+/// The files that differ from `against` in the working tree, and the
+/// untracked ones.
+fn with_untracked(root: &Path, against: &str) -> Result<Vec<PathBuf>> {
     let mut files = tracked(
         root,
         &[
@@ -42,10 +35,19 @@ pub fn since(root: &Path, base: &str) -> Result<Vec<PathBuf>> {
             "--no-renames",
             "--diff-filter=ACMRTD",
             "-z",
-            merge_base,
+            against,
         ],
     )?;
-    files.extend(untracked(root)?);
+    files.extend(tracked(
+        root,
+        &[
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+            "--full-name",
+            "-z",
+        ],
+    )?);
     finish(root, files)
 }
 
@@ -60,19 +62,6 @@ fn base_of_changes(root: &Path) -> Result<String> {
     Ok(git(root, &["hash-object", "-t", "tree", "--stdin"])?
         .trim()
         .to_owned())
-}
-
-fn untracked(root: &Path) -> Result<Vec<String>> {
-    tracked(
-        root,
-        &[
-            "ls-files",
-            "--others",
-            "--exclude-standard",
-            "--full-name",
-            "-z",
-        ],
-    )
 }
 
 fn tracked(root: &Path, args: &[&str]) -> Result<Vec<String>> {

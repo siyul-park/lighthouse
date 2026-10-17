@@ -124,10 +124,9 @@ fn eval_measures_the_check_with_a_model_plugin_bound() {
     assert_eq!(m["precision"]["hits"], 3);
     assert_eq!(m["precision"]["of"], 3);
     assert_eq!(m["recall"]["of"], 3);
-    assert_eq!(m["abstention"]["hits"], 1);
-    assert_eq!(report["current"]["model_decided"], 1);
+    assert_eq!(report["current"]["modelDecided"], 1);
     assert_eq!(report["policy"]["precision"], 0.9);
-    assert_eq!(report["meets_policy"], true);
+    assert_eq!(report["meetsPolicy"], true);
 }
 
 #[test]
@@ -209,7 +208,7 @@ fn model_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
     );
     let trained = json(&out);
     assert_eq!(trained["model"], "fake/m1");
-    let digest = trained["training_file"].as_str().unwrap();
+    let digest = trained["trainingFile"].as_str().unwrap();
     assert!(digest.starts_with("sha256:"), "{digest}");
     assert_eq!(trained["result"]["status"], "succeeded");
     let made = trained["result"]["result_files"][0].as_str().unwrap();
@@ -220,8 +219,8 @@ fn model_train_hands_the_labelled_subjects_to_the_model_and_prints_its_metrics()
     assert_eq!(trained["unresolved"], 0);
     // The three reviewed rows; the example is no row to learn from.
     assert_eq!(trained["subjects"], 3);
-    assert_eq!(trained["by_source"]["tsv"], 3);
-    assert!(trained["by_source"].get("example").is_none());
+    assert_eq!(trained["bySource"]["tsv"], 3);
+    assert!(trained["bySource"].get("example").is_none());
 
     // The dataset is a file of the host's store named by its digest, in
     // canonical JSON, one training line per subject.
@@ -297,7 +296,7 @@ fn eval_grades_a_model_beside_the_check_as_its_first_layer() {
     assert_eq!(report["current"]["metrics"]["recall"]["hits"], 2);
     let candidate = &report["candidate"];
     assert_eq!(candidate["layer"]["model"], "fake/learned@sha256:abc");
-    assert_eq!(candidate["layer"]["cross_fitted"], 0);
+    assert_eq!(candidate["layer"]["crossFitted"], 0);
     // The model fails `maybe_bad`, which a person called a violation.
     assert_eq!(candidate["metrics"]["recall"]["hits"], 3);
     assert_eq!(candidate["metrics"]["precision"]["of"], 3);

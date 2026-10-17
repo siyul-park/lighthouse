@@ -3,22 +3,26 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
+    sync::Arc,
     time::Instant,
 };
 
-use lighthouse_engine::{Engine, FixPlan, ModelOptions, Run};
+use lighthouse_engine::{Engine, FixPlan, ModelOptions, Run, cache};
 use lighthouse_model::{Diagnostic, Preview, Severity, Suppressed};
-use lighthouse_report::{Briefing, Detail};
+use lighthouse_report::{Briefing, Detail, Format, render, report};
+use lighthouse_resource::slashed;
 use lighthouse_spec::{Catalog, Decision};
 use serde::Serialize;
+use serde_json::{Value, json};
 
-use crate::{
-    Remembered, Result, Selector, Session,
-    cache::{cache_dir, cache_limit},
-    findings,
-    models::command_models,
-    scope,
-};
+use crate::{Remembered, Result, Selector, Session, findings, model::attached, review, scope};
+
+/// The environment variable that sets the size limit of the cache, in MB.
+const CACHE_LIMIT_VAR: &str = "LIGHTHOUSE_CACHE_LIMIT_MB";
+/// Most findings of a SARIF report whose fix is previewed.
+const SARIF_FIXES: usize = 200;
+/// Findings of a JSON report when no limit is given.
+const JSON_LIMIT: usize = 25;
 
 /// What to report on. The whole project is always analyzed.
 #[derive(Default)]
@@ -38,24 +42,12 @@ pub struct CheckRequest {
     /// `.lighthouse/cache` when the code they read has not changed, and keep
     /// new ones there. The findings are the same either way.
     pub cache: bool,
-    pub models: ModelFlags,
-}
-
-/// What a run may do with models.
-#[derive(Default, Clone)]
-pub struct ModelFlags {
-    /// Ask no model: what they would judge is left to review (`--no-models`).
-    pub off: bool,
-    /// Ask models that cost about the whole project (`--all-models`).
-    pub all: bool,
-    /// Ask models only about these subjects (their fingerprints), wherever
-    /// they are.
-    pub subjects: Option<BTreeSet<String>>,
+    /// What models may do. The models revisions attached are the run's own
+    /// (see `detached`), whatever `attached` says.
+    pub models: ModelOptions,
     /// Record what models fail as judgments attributed to them
     /// (`--record-model-labels`), so that training can reproduce them.
-    pub record: bool,
-    /// Keep the subjects models were put, for training and evaluation.
-    pub collect: bool,
+    pub record_model_labels: bool,
     /// Leave out the models revisions attached: the run is the check without
     /// that layer, as grading it needs.
     pub detached: bool,
@@ -90,8 +82,8 @@ pub struct Summary {
 
 /// A finished run with what the store decided about it.
 pub struct Checked {
-    pub outcome: Run,
-    pub catalog: Catalog,
+    pub run: Run,
+    pub catalog: Arc<Catalog>,
     pub remembered: Remembered,
     /// Every suppressed finding with its suppression, the ones a directive in
     /// the code declares and the ones recorded outside it.
@@ -114,18 +106,17 @@ impl Checked {
 
     /// The status and counts of this run.
     pub fn summary(&self) -> Summary {
-        let outcome = &self.outcome;
+        let run = &self.run;
         let count = |severity| {
-            outcome
-                .diagnostics
+            run.diagnostics
                 .iter()
                 .filter(|d| d.severity == severity)
                 .count()
         };
-        let incomplete = outcome.incomplete.len();
+        let incomplete = run.incomplete.len();
         let status = if incomplete > 0 {
             RunStatus::Incomplete
-        } else if outcome.diagnostics.is_empty() {
+        } else if run.diagnostics.is_empty() {
             RunStatus::Clean
         } else {
             RunStatus::Findings
@@ -137,16 +128,104 @@ impl Checked {
             infos: count(Severity::Info),
             reviews: {
                 let briefing = self.briefing(None);
-                outcome
-                    .diagnostics
+                run.diagnostics
                     .iter()
                     .filter(|d| briefing.needs_review(d))
                     .count()
             },
             incomplete,
             suppressed: self.remembered.suppressed,
-            allowed: outcome.suppressed.len(),
+            allowed: run.suppressed.len(),
         }
+    }
+
+    /// The findings to print: what the check found, then the subjects nothing
+    /// decided, which are reported beside them as `review` results and never
+    /// change the exit code.
+    pub fn findings(&self) -> Vec<Diagnostic> {
+        let run = &self.run;
+        run.diagnostics
+            .iter()
+            .chain(&run.reviews)
+            .cloned()
+            .collect()
+    }
+
+    /// The report in `format`, at most `limit` findings of the agent format.
+    /// The agent format is for hooks: it shows the findings that count, with
+    /// the fixes it shows and the names of the tools that act on them.
+    pub fn render(&self, format: Format, limit: Option<usize>) -> String {
+        let run = &self.run;
+        match format {
+            Format::Text => render(
+                format,
+                &self.findings(),
+                &run.incomplete,
+                &self.briefing(limit),
+            ),
+            Format::Sarif => {
+                let first: Vec<_> = run.diagnostics.iter().take(SARIF_FIXES).collect();
+                let fixes = self.fixes(&first);
+                let sources = self.sources();
+                render(
+                    format,
+                    &self.findings(),
+                    &run.incomplete,
+                    &Briefing {
+                        fixes: Some(&fixes),
+                        sources: Some(&sources),
+                        ..self.briefing(limit)
+                    },
+                )
+            }
+            Format::Agent => {
+                let fixes = self.shown_fixes(limit, Detail::default());
+                render(
+                    format,
+                    &run.diagnostics,
+                    &run.incomplete,
+                    &Briefing {
+                        fixes: Some(&fixes),
+                        tool_form: true,
+                        ..self.briefing(limit)
+                    },
+                )
+            }
+        }
+    }
+
+    /// The `CheckReport` kind: the findings grouped by decision for a program,
+    /// with the gaps and the counts, and what the run has to say.
+    pub fn report(&self, detail: Detail, limit: Option<usize>) -> Value {
+        let limit = Some(limit.unwrap_or(JSON_LIMIT));
+        let fixes = self.shown_fixes(limit, detail);
+        let mut body = report(
+            &self.findings(),
+            &self.run.incomplete,
+            &Briefing {
+                detail,
+                fixes: Some(&fixes),
+                sources: None,
+                tool_form: true,
+                ..self.briefing(limit)
+            },
+        )
+        .fields;
+        match detail {
+            Detail::Compact => {
+                if !self.messages.is_empty() {
+                    body.insert("messages".to_owned(), json!(self.messages));
+                }
+            }
+            Detail::Full => {
+                let summary = self.summary();
+                body.insert("status".to_owned(), json!(summary.status));
+                body.insert("summary".to_owned(), json!(summary));
+                body.insert("messages".to_owned(), json!(self.messages));
+                body.entry("reasons").or_insert(Value::Null);
+            }
+        }
+        Value::Object(body)
     }
 
     /// The fixes proposed for `findings`, by fingerprint, computed in memory:
@@ -156,7 +235,7 @@ impl Checked {
     pub fn fixes(&self, findings: &[&Diagnostic]) -> BTreeMap<String, Preview> {
         let plan = FixPlan::from_catalog(&self.catalog);
         self.engine
-            .preview_fixes(&plan, &self.outcome, findings)
+            .preview_fixes(&plan, &self.run, findings)
             .into_iter()
             .map(|preview| (preview.fingerprint.as_str().to_owned(), preview))
             .collect()
@@ -167,7 +246,7 @@ impl Checked {
     /// code units. A file that cannot be read is left out.
     pub fn sources(&self) -> BTreeMap<String, String> {
         let files: BTreeSet<&Path> = self
-            .outcome
+            .run
             .diagnostics
             .iter()
             .chain(self.suppressions.iter().map(|s| &s.diagnostic))
@@ -177,8 +256,7 @@ impl Checked {
             .into_iter()
             .filter_map(|file| {
                 let text = std::fs::read_to_string(self.root.join(file)).ok()?;
-                let key = file.to_string_lossy().replace('\\', "/");
-                (!text.is_ascii()).then_some((key, text))
+                (!text.is_ascii()).then(|| (slashed(file), text))
             })
             .collect()
     }
@@ -191,7 +269,7 @@ impl Checked {
             detail,
             ..self.briefing(limit)
         };
-        let shown = lighthouse_report::shown(&self.outcome.diagnostics, &briefing);
+        let shown = lighthouse_report::shown(&self.run.diagnostics, &briefing);
         self.fixes(&shown)
     }
 
@@ -200,12 +278,12 @@ impl Checked {
     /// ask for review.
     pub fn briefing(&self, limit: Option<usize>) -> Briefing<'_> {
         Briefing {
-            catalog: Some(&self.catalog),
-            facts: Some(&self.outcome.facts),
+            catalog: Some(&*self.catalog),
+            facts: Some(&self.run.facts),
             notes: Some(&self.remembered.notes),
             judged: Some(&self.remembered.judged),
             suppressed: self.remembered.suppressed,
-            allowed: self.outcome.suppressed.len(),
+            allowed: self.run.suppressed.len(),
             suppressions: Some(&self.suppressions),
             limit,
             detail: Detail::default(),
@@ -218,30 +296,22 @@ impl Checked {
 
 /// Analyzes the project, reports what `request` selects and, when asked,
 /// records the run and drops the findings that judgments keep out.
-pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
+pub fn check(session: &Session, request: &CheckRequest) -> Result<Checked> {
     let started = Instant::now();
-    let (registry, plugins) = session.registry()?;
-    let trusted = session.trusted();
+    let (engine, notices) = session.engine()?;
     let root = session.root.clone();
-    let catalog = session.catalog()?;
-    let engine = Engine::new(registry, session.config, &catalog, &root)?
-        .with_incomplete(plugins.incomplete)
-        .with_trust(trusted)
-        .with_commands(command_models(&root));
-    let attached = if request.models.detached {
+    let catalog = Arc::clone(&session.catalog);
+    let attached = if request.detached {
         BTreeMap::new()
     } else {
-        attached_models(&root, &catalog)
+        attached(&root, &catalog)
     };
     let engine = engine.with_models(ModelOptions {
-        off: request.models.off,
-        all: request.models.all,
-        fingerprints: request.models.subjects.clone(),
-        collect: request.models.collect,
         attached,
+        ..request.models.clone()
     });
     let engine = if request.cache {
-        engine.with_cache(cache_dir(&root), cache_limit())
+        engine.with_cache(cache::dir(&root), cache_limit())
     } else {
         engine
     };
@@ -252,34 +322,34 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
         .map(Decision::id)
         .filter(|id| engine.active(id));
     let rules = Selector::new(&request.rules)?.expand(enabled)?;
-    let mut outcome = analyze(&engine, &root, request, &rules, &mut messages)?;
-    outcome.timings.setup = setup;
-    messages.extend(plugins.notices.iter().chain(&outcome.notices).cloned());
+    let mut run = analyze(&engine, &root, request, &rules, &mut messages)?;
+    run.timings.setup = setup;
+    messages.extend(notices.iter().chain(&run.notices).cloned());
     let started = Instant::now();
     let remembered = if request.store {
-        findings::remember(&root, &catalog, &mut outcome)
+        findings::remember(&root, &catalog, &mut run)
     } else {
         Remembered::default()
     };
-    if request.store && request.models.record {
-        messages.extend(record_model_labels(&root, &outcome));
+    if request.store && request.record_model_labels {
+        messages.extend(record_model_labels(&root, &run));
     }
-    outcome.timings.store = started.elapsed();
+    run.timings.store = started.elapsed();
     messages.extend(remembered.messages.iter().cloned());
-    if !outcome.suppressed.is_empty() {
+    if !run.suppressed.is_empty() {
         messages.push(format!(
             "{} finding(s) allowed by source annotations",
-            outcome.suppressed.len()
+            run.suppressed.len()
         ));
     }
-    let suppressions = outcome
+    let suppressions = run
         .suppressed
         .iter()
         .chain(&remembered.suppressions)
         .cloned()
         .collect();
     Ok(Checked {
-        outcome,
+        run,
         catalog,
         remembered,
         suppressions,
@@ -289,53 +359,53 @@ pub fn check(session: Session, request: &CheckRequest) -> Result<Checked> {
     })
 }
 
-/// The model each rule is bound to by an approved revision, by rule id.
-pub fn attached_models(root: &Path, catalog: &Catalog) -> BTreeMap<String, String> {
-    let Ok(records) = lighthouse_store::Records::read(root) else {
-        return BTreeMap::new();
-    };
-    let named = |key: &str| {
-        catalog
-            .decisions()
-            .find(|d| d.is_key(key))
-            .map(|d| d.id().to_owned())
-    };
-    records
-        .attached()
-        .into_iter()
-        .filter_map(|(decision, model)| Some((named(&decision)?, model)))
-        .collect()
+/// The size limit of the cache in bytes: `LIGHTHOUSE_CACHE_LIMIT_MB`, else
+/// 256 MB.
+fn cache_limit() -> u64 {
+    std::env::var(CACHE_LIMIT_VAR)
+        .ok()
+        .and_then(|mb| mb.trim().parse::<u64>().ok())
+        .map_or(cache::DEFAULT_LIMIT, |mb| mb.saturating_mul(1 << 20))
 }
 
 /// Records what models failed as judgments attributed to them, in the role of
 /// a model: the reason names the model and its probability.
-fn record_model_labels(root: &Path, outcome: &Run) -> Vec<String> {
-    let mut done = 0;
-    let mut notes = Vec::new();
-    for d in &outcome.diagnostics {
-        let Some(model) = d.evidence.get("model").and_then(|v| v.as_str()) else {
-            continue;
-        };
-        let confidence = d
-            .evidence
-            .get("confidence")
-            .and_then(|v| v.as_f64())
-            .unwrap_or_default();
-        let review = lighthouse_store::NewJudgment {
-            fingerprint: d.fingerprint.as_str().to_owned(),
-            judgment: lighthouse_model::Judgment::Fail,
-            reason: Some(format!("model {model} P(fail)={confidence:.2}")),
-            suppress: None,
-            attribution: lighthouse_model::Attribution::model(model),
-            commit: None,
-            expect_seen: None,
-            lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
-        };
-        match crate::reviewing::record_judgment(root, &review) {
-            Ok(_) => done += 1,
-            Err(e) => notes.push(format!("a model label was not recorded: {e}")),
-        }
+fn record_model_labels(root: &Path, run: &Run) -> Vec<String> {
+    let reviews: Vec<_> = run
+        .diagnostics
+        .iter()
+        .filter_map(|d| {
+            let model = d.evidence.get("model").and_then(|v| v.as_str())?;
+            let confidence = d
+                .evidence
+                .get("confidence")
+                .and_then(|v| v.as_f64())
+                .unwrap_or_default();
+            Some(lighthouse_store::NewJudgment {
+                fingerprint: d.fingerprint.as_str().to_owned(),
+                judgment: lighthouse_model::Judgment::Fail,
+                reason: Some(format!("model {model} P(fail)={confidence:.2}")),
+                suppress: None,
+                attribution: lighthouse_model::Attribution::model(model),
+                commit: None,
+                expect_seen: None,
+                lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
+            })
+        })
+        .collect();
+    if reviews.is_empty() {
+        return Vec::new();
     }
+    let recorded = match review::resolve_all(root, &reviews) {
+        Ok(recorded) => recorded,
+        Err(e) => return vec![format!("model labels were not recorded: {e}")],
+    };
+    let mut notes: Vec<String> = recorded
+        .iter()
+        .filter_map(|r| r.as_ref().err())
+        .map(|e| format!("a model label was not recorded: {e}"))
+        .collect();
+    let done = recorded.iter().filter(|r| r.is_ok()).count();
     if done > 0 {
         notes.push(format!("{done} model label(s) recorded"));
     }

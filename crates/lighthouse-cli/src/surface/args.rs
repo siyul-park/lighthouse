@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 
 use clap::{Args, ValueEnum};
-use lighthouse_session::{Judgment, StatusFilter};
+use lighthouse_session::{Judgment, review::StatusFilter};
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;

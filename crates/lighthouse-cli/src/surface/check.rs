@@ -2,22 +2,15 @@
 
 use std::time::Instant;
 
-use lighthouse_report::{Briefing, Format, render, report};
-use lighthouse_session::{CheckRequest, Checked, FailOn, ModelFlags, Session};
-use serde_json::{Value, json};
+use lighthouse_report::Format;
+use lighthouse_session::{CheckRequest, Checked, FailOn, ModelOptions, Session, fix::Fixed};
 
 use crate::surface::{
     Result,
-    args::{CheckArgs, Detail, FixArgs, FixOptions},
+    args::{CheckArgs, FixArgs, FixOptions},
     fix,
     reply::{CheckFormat, Context, Reply},
-    timings,
 };
-
-/// Most findings of a SARIF report whose fix is previewed.
-const SARIF_FIXES: usize = 200;
-/// Findings of a JSON report when `--limit` is not given.
-const JSON_LIMIT: usize = 25;
 
 /// What `check` is asked to print besides the findings.
 #[derive(Debug, Default, Clone)]
@@ -58,18 +51,19 @@ pub fn run(ctx: &Context, args: &CheckArgs, printing: &Printing) -> Result<Reply
     let reporting = Instant::now();
     let mut reply = match (&fixed, printing.format) {
         (Some(done), CheckFormat::Json) => Reply::json(serde_json::to_value(fix::report(done))?)?,
-        (_, CheckFormat::Json) => Reply::json(json_report(&checked, args))?,
-        (_, CheckFormat::Sarif) => Reply::text(sarif(&checked, args)),
-        (_, CheckFormat::Text) => Reply::text(text(&checked, args)),
+        (_, CheckFormat::Json) => Reply::json(checked.report(args.detail.into(), args.limit))?,
+        (_, CheckFormat::Sarif) => Reply::text(checked.render(Format::Sarif, args.limit)),
+        (_, CheckFormat::Text) => Reply::text(checked.render(Format::Text, args.limit)),
     };
     if printing.timings {
-        notes.extend(timings::lines(
-            &checked.outcome.timings,
-            reporting.elapsed(),
-            started.elapsed(),
-        ));
+        notes.extend(
+            checked
+                .run
+                .timings
+                .lines(reporting.elapsed(), started.elapsed()),
+        );
     }
-    let code = checked.outcome.exit_code(
+    let code = checked.run.exit_code(
         FailOn {
             strict: args.strict,
             max_warnings: args.max_warnings,
@@ -82,7 +76,7 @@ pub fn run(ctx: &Context, args: &CheckArgs, printing: &Printing) -> Result<Reply
 }
 
 /// Analyzes the project and keeps what the arguments report.
-pub fn analyze(ctx: &Context, args: &CheckArgs) -> Result<Checked> {
+fn analyze(ctx: &Context, args: &CheckArgs) -> Result<Checked> {
     let session = Session::load(ctx.config.as_deref())?;
     let request = CheckRequest {
         paths: ctx.paths(&session.root, &args.paths)?,
@@ -91,98 +85,21 @@ pub fn analyze(ctx: &Context, args: &CheckArgs) -> Result<Checked> {
         rules: args.decision.clone(),
         store: !args.no_store,
         cache: !args.no_cache,
-        models: ModelFlags {
+        models: ModelOptions {
             off: args.no_models,
             all: args.all_models,
-            subjects: None,
-            record: args.record_model_labels,
-            collect: false,
-            detached: false,
+            ..ModelOptions::default()
         },
+        record_model_labels: args.record_model_labels,
+        detached: false,
     };
-    lighthouse_session::check(session, &request)
-}
-
-/// The `CheckReport` kind: the findings grouped by decision for a program,
-/// with the gaps and the counts, and what the run has to say.
-pub fn json_report(checked: &Checked, args: &CheckArgs) -> Value {
-    let outcome = &checked.outcome;
-    let limit = Some(args.limit.unwrap_or(JSON_LIMIT));
-    let detail = args.detail.into();
-    let fixes = checked.shown_fixes(limit, detail);
-    let mut body = report(
-        &shown(checked),
-        &outcome.incomplete,
-        &Briefing {
-            detail,
-            fixes: Some(&fixes),
-            sources: None,
-            tool_form: true,
-            ..checked.briefing(limit)
-        },
-    )
-    .fields;
-    match args.detail {
-        Detail::Compact => {
-            if !checked.messages.is_empty() {
-                body.insert("messages".to_owned(), json!(checked.messages));
-            }
-        }
-        Detail::Full => {
-            let summary = checked.summary();
-            body.insert("status".to_owned(), json!(summary.status));
-            body.insert("summary".to_owned(), json!(summary));
-            body.insert("messages".to_owned(), json!(checked.messages));
-            body.entry("reasons").or_insert(Value::Null);
-        }
-    }
-    Value::Object(body)
+    lighthouse_session::check(&session, &request)
 }
 
 /// The reply of a dry run: the diff is the data.
-fn report_dry_run(done: &lighthouse_session::Fixed, printing: &Printing) -> Result<Reply> {
+fn report_dry_run(done: &Fixed, printing: &Printing) -> Result<Reply> {
     match printing.format {
         CheckFormat::Json => Reply::json(serde_json::to_value(fix::report(done))?),
         _ => Ok(Reply::text(done.diff.clone())),
     }
-}
-
-/// The findings to print: what the check found, then the subjects nothing
-/// decided, which are reported beside them as `review` results and never
-/// change the exit code.
-fn shown(checked: &Checked) -> Vec<lighthouse_model::Diagnostic> {
-    let outcome = &checked.outcome;
-    outcome
-        .diagnostics
-        .iter()
-        .chain(&outcome.reviews)
-        .cloned()
-        .collect()
-}
-
-fn text(checked: &Checked, args: &CheckArgs) -> String {
-    let outcome = &checked.outcome;
-    render(
-        Format::Text,
-        &shown(checked),
-        &outcome.incomplete,
-        &checked.briefing(args.limit),
-    )
-}
-
-fn sarif(checked: &Checked, args: &CheckArgs) -> String {
-    let outcome = &checked.outcome;
-    let all: Vec<_> = outcome.diagnostics.iter().take(SARIF_FIXES).collect();
-    let fixes = checked.fixes(&all);
-    let sources = checked.sources();
-    render(
-        Format::Sarif,
-        &shown(checked),
-        &outcome.incomplete,
-        &Briefing {
-            fixes: Some(&fixes),
-            sources: Some(&sources),
-            ..checked.briefing(args.limit)
-        },
-    )
 }

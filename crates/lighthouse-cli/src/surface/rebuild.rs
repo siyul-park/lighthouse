@@ -3,12 +3,12 @@
 
 use std::fmt::Write;
 
-use lighthouse_session::{RebuildRequest, Rebuilt, rebuild};
+use lighthouse_session::model::{RebuildRequest, Rebuilt, rebuild};
 
 use crate::surface::{
     Result,
     args::ModelRebuildArgs,
-    eval::{default_baseline, repos_of},
+    eval::{default_baseline, labelling_of},
     reply::{Context, FOUND, Output, Reply},
 };
 
@@ -20,9 +20,7 @@ pub fn run(ctx: &Context, args: &ModelRebuildArgs, output: Output) -> Result<Rep
     });
     let rows = rebuild(&RebuildRequest {
         decisions: args.ids.clone(),
-        baseline,
-        repos: repos_of(ctx, &args.repo)?,
-        config: ctx.config.clone(),
+        labelling: labelling_of(ctx, &args.repo, baseline)?,
     })?;
     let holds = rows.iter().all(|row| row.status.holds());
     let reply = Reply::data(output, &rows, || text(&rows))?;

@@ -1,5 +1,5 @@
-//! The session baseline of the Claude Code hooks: what a file's findings were
-//! before the session first touched it, kept per Claude Code `session_id` in
+//! The session baseline of the agent hooks: what a file's findings were
+//! before the session first touched it, kept per agent `session_id` in
 //! `.lighthouse/cache/hooks/<session_id>/<hash of path>.json`. A hook reports
 //! only the findings that are `new` (fingerprint absent from the baseline) or
 //! `updated` (same fingerprint, different evidence digest) against it, the SARIF
@@ -11,24 +11,25 @@
 
 use std::{
     collections::BTreeMap,
-    fs,
+    fs::{self, File},
+    io::Read,
     path::{Path, PathBuf},
     time::Duration,
 };
 
+use lighthouse_engine::{SKIPPED_DIRS, cache};
 use lighthouse_model::{Diagnostic, evidence_digest};
-
 use lighthouse_protocol::hash;
-use lighthouse_resource::write_atomic;
-use lighthouse_session::cache_dir;
+use lighthouse_resource::{STATE_DIR, slashed, write_atomic};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
-use crate::cli::Result;
+use crate::Result;
 
 /// Under the cache directory: one directory per session.
 const DIR: &str = "hooks";
 const MAX_SESSION_ID: usize = 128;
+/// Bytes read to tell text from binary.
+const SNIFF: usize = 8192;
 /// Session directories older than this are deleted whenever one is written.
 const MAX_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 
@@ -46,7 +47,7 @@ impl Baseline {
     /// a file that does not exist yet.
     pub fn of(path: &Path, findings: &[Diagnostic]) -> Self {
         Self {
-            path: key(path),
+            path: slashed(path),
             findings: findings
                 .iter()
                 .map(|d| {
@@ -65,9 +66,9 @@ impl Baseline {
     }
 }
 
-/// The `session_id` of the payload, when it is safe to use as a directory name.
-pub fn session_id(payload: &Value) -> Option<&str> {
-    let id = payload["session_id"].as_str()?;
+/// The `session_id`, when it is safe to use as a directory name.
+pub fn session_id(id: Option<&str>) -> Option<&str> {
+    let id = id?;
     let valid = (1..=MAX_SESSION_ID).contains(&id.len())
         && id
             .bytes()
@@ -77,16 +78,16 @@ pub fn session_id(payload: &Value) -> Option<&str> {
 
 /// Whether the session already has a baseline of `path`.
 pub fn exists(root: &Path, session: &str, path: &Path) -> bool {
-    file(root, session, &key(path)).exists()
+    file(root, session, &slashed(path)).exists()
 }
 
 /// The session's baseline of `path`; a missing or unreadable one is `None`.
 pub fn load(root: &Path, session: &str, path: &Path) -> Option<Baseline> {
-    read(&file(root, session, &key(path)))
+    read(&file(root, session, &slashed(path)))
 }
 
 /// Every baseline of the session, sorted by path.
-pub fn session(root: &Path, session: &str) -> Vec<Baseline> {
+pub fn load_all(root: &Path, session: &str) -> Vec<Baseline> {
     let Ok(entries) = fs::read_dir(dir(root, session)) else {
         return Vec::new();
     };
@@ -125,7 +126,7 @@ pub fn introduced(findings: &mut Vec<Diagnostic>, baselines: &[Baseline]) {
     findings.retain(|d| {
         baselines
             .iter()
-            .find(|b| b.path == key(&d.file))
+            .find(|b| b.path == slashed(&d.file))
             .is_none_or(|b| {
                 b.findings
                     .get(d.fingerprint.as_str())
@@ -134,18 +135,53 @@ pub fn introduced(findings: &mut Vec<Diagnostic>, baselines: &[Baseline]) {
     });
 }
 
+/// The project-relative path of `path`, an absolute path an editing tool
+/// touches, when it is worth checking: it lies inside the project (`root`,
+/// canonical), is not in a directory Lighthouse never reads, and is text when
+/// it exists. A file the tool is about to create counts. Everything else is a
+/// cheap `None`, before any plugin starts.
+pub fn editable(path: &Path, root: &Path) -> Option<PathBuf> {
+    let absolute = resolved(path)?;
+    let relative = absolute.strip_prefix(root).ok()?;
+    let skipped = relative
+        .components()
+        .any(|c| c.as_os_str() == STATE_DIR || SKIPPED_DIRS.iter().any(|d| c.as_os_str() == *d));
+    (!skipped && (!absolute.exists() || is_text(&absolute))).then(|| relative.to_owned())
+}
+
 fn read(path: &Path) -> Option<Baseline> {
     serde_json::from_str(&fs::read_to_string(path).ok()?).ok()
 }
 
-fn key(path: &Path) -> String {
-    path.to_string_lossy().replace('\\', "/")
-}
-
 fn dir(root: &Path, session: &str) -> PathBuf {
-    cache_dir(root).join(DIR).join(session)
+    cache::dir(root).join(DIR).join(session)
 }
 
 fn file(root: &Path, session: &str, path: &str) -> PathBuf {
     dir(root, session).join(format!("{}.json", hash::short(path, 8)))
+}
+
+/// `path` made canonical as far as it exists, so that a file about to be
+/// created resolves like one that is there; `..` in the part that does not
+/// exist is refused.
+fn resolved(path: &Path) -> Option<PathBuf> {
+    let mut missing = PathBuf::new();
+    let mut here = path;
+    loop {
+        if let Ok(found) = here.canonicalize() {
+            return Some(found.join(missing));
+        }
+        missing = Path::new(here.file_name()?).join(missing);
+        here = here.parent()?;
+    }
+}
+
+fn is_text(path: &Path) -> bool {
+    let mut head = Vec::with_capacity(SNIFF);
+    let Ok(file) = File::open(path) else {
+        return false;
+    };
+    file.take(SNIFF as u64)
+        .read_to_end(&mut head)
+        .is_ok_and(|_| !head.contains(&0))
 }

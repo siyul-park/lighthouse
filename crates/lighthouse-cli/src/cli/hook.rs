@@ -21,24 +21,20 @@
 
 use std::{
     env,
-    fs::File,
     io::{Read, Write},
     path::{Path, PathBuf},
 };
 
 use clap::ValueEnum;
-use lighthouse_report::{Briefing, Detail, Format, render};
-use lighthouse_resource::STATE_DIR;
-use lighthouse_session::{CheckRequest, Checked, RunStatus, SKIPPED_DIRS, Session};
+use lighthouse_report::Format;
+use lighthouse_session::{CheckRequest, Checked, ModelOptions, RunStatus, Session, baseline};
 use serde_json::{Value, json};
 
-use crate::cli::{Result, baseline};
+use crate::cli::Result;
 
 /// Findings printed back to the agent by an edit and by the end of a turn.
 const EDIT_LIMIT: usize = 5;
 const STOP_LIMIT: usize = 10;
-/// Bytes read to tell text from binary.
-const SNIFF: usize = 8192;
 const EDIT_TOOLS: [&str; 3] = ["Edit", "Write", "MultiEdit"];
 /// Said with a report that had no baseline to be measured against.
 const NO_BASELINE: &str = "Lighthouse: no pre-edit baseline, so every finding in the file is shown, including ones that were there before this session; `lighthouse init --agent claude-code` adds the PreToolUse hook that records it.";
@@ -100,7 +96,7 @@ fn answer_event(event: Event, allow_incomplete: bool, payload: &Value) -> Result
         return Ok(None);
     };
     let root = session.root.canonicalize()?;
-    let id = baseline::session_id(payload);
+    let id = baseline::session_id(payload["session_id"].as_str());
     match event {
         Event::PreToolUse => {
             let (Some(id), Some(file)) = (id, edited_file(payload, &root)) else {
@@ -110,8 +106,8 @@ fn answer_event(event: Event, allow_incomplete: bool, payload: &Value) -> Result
                 return Ok(None);
             }
             let found = if root.join(&file).exists() {
-                lighthouse_session::check(session, &request(vec![root.join(&file)], false))?
-                    .outcome
+                lighthouse_session::check(&session, &request(vec![root.join(&file)], false))?
+                    .run
                     .diagnostics
             } else {
                 Vec::new()
@@ -124,19 +120,16 @@ fn answer_event(event: Event, allow_incomplete: bool, payload: &Value) -> Result
                 return Ok(None);
             };
             let mut checked =
-                lighthouse_session::check(session, &request(vec![root.join(&file)], true))?;
+                lighthouse_session::check(&session, &request(vec![root.join(&file)], true))?;
             let before = id.and_then(|id| baseline::load(&root, id, &file));
             if let Some(before) = &before {
-                baseline::introduced(
-                    &mut checked.outcome.diagnostics,
-                    std::slice::from_ref(before),
-                );
+                baseline::introduced(&mut checked.run.diagnostics, std::slice::from_ref(before));
             }
             Ok(after_edit(&checked, allow_incomplete, before.is_none()))
         }
         Event::Stop => {
             let before = id
-                .map(|id| baseline::session(&root, id))
+                .map(|id| baseline::load_all(&root, id))
                 .unwrap_or_default();
             let files: Vec<PathBuf> = before
                 .iter()
@@ -146,8 +139,8 @@ fn answer_event(event: Event, allow_incomplete: bool, payload: &Value) -> Result
             if files.is_empty() {
                 return Ok(None);
             }
-            let mut checked = lighthouse_session::check(session, &request(files, true))?;
-            baseline::introduced(&mut checked.outcome.diagnostics, &before);
+            let mut checked = lighthouse_session::check(&session, &request(files, true))?;
+            baseline::introduced(&mut checked.run.diagnostics, &before);
             let active = payload["stop_hook_active"].as_bool().unwrap_or(false);
             Ok(at_stop(&checked, allow_incomplete, active))
         }
@@ -176,60 +169,28 @@ fn unchecked(event: Event, stop_hook_active: bool, error: &str) -> Option<Value>
 fn request(paths: Vec<PathBuf>, store: bool) -> CheckRequest {
     CheckRequest {
         paths,
-        changed: false,
-        diff: None,
-        rules: Vec::new(),
         store,
         cache: true,
         // An edit hook never spends on a model.
-        models: lighthouse_session::ModelFlags {
+        models: ModelOptions {
             off: true,
-            ..Default::default()
+            ..ModelOptions::default()
         },
+        ..CheckRequest::default()
     }
 }
 
 /// The project-relative path an editing tool touches, when it is worth
-/// checking: it lies inside the project (`root`, canonical), is not in a
-/// directory Lighthouse never reads, and is text when it exists. A file the
-/// tool is about to create counts. Everything else is a cheap `None`, before
-/// any plugin starts.
+/// checking (`root` is canonical).
 fn edited_file(payload: &Value, root: &Path) -> Option<PathBuf> {
     let tool = payload["tool_name"].as_str()?;
     if !EDIT_TOOLS.contains(&tool) {
         return None;
     }
-    let absolute = resolved(Path::new(payload["tool_input"]["file_path"].as_str()?))?;
-    let relative = absolute.strip_prefix(root).ok()?;
-    let skipped = relative
-        .components()
-        .any(|c| c.as_os_str() == STATE_DIR || SKIPPED_DIRS.iter().any(|d| c.as_os_str() == *d));
-    (!skipped && (!absolute.exists() || is_text(&absolute))).then(|| relative.to_owned())
-}
-
-/// `path` made canonical as far as it exists, so that a file about to be
-/// created resolves like one that is there; `..` in the part that does not
-/// exist is refused.
-fn resolved(path: &Path) -> Option<PathBuf> {
-    let mut missing = PathBuf::new();
-    let mut here = path;
-    loop {
-        if let Ok(found) = here.canonicalize() {
-            return Some(found.join(missing));
-        }
-        missing = Path::new(here.file_name()?).join(missing);
-        here = here.parent()?;
-    }
-}
-
-fn is_text(path: &Path) -> bool {
-    let mut head = Vec::with_capacity(SNIFF);
-    let Ok(file) = File::open(path) else {
-        return false;
-    };
-    file.take(SNIFF as u64)
-        .read_to_end(&mut head)
-        .is_ok_and(|_| !head.contains(&0))
+    baseline::editable(
+        Path::new(payload["tool_input"]["file_path"].as_str()?),
+        root,
+    )
 }
 
 /// An edit: error and warn findings go back to the agent as the reason of a
@@ -245,7 +206,7 @@ fn after_edit(checked: &Checked, allow_incomplete: bool, unbaselined: bool) -> O
             "decision": "block",
             "reason": format!(
                 "Lighthouse found problems in the file you just edited. Fix them, then continue.\n{}{}",
-                feedback(checked, EDIT_LIMIT),
+                checked.render(Format::Agent, Some(EDIT_LIMIT)),
                 note.map_or_else(String::new, |n| format!("\n{n}")),
             ),
         }));
@@ -262,7 +223,7 @@ fn after_edit(checked: &Checked, allow_incomplete: bool, unbaselined: bool) -> O
     if incomplete {
         notes.push(format!(
             "Lighthouse: the analysis was INCOMPLETE, so this file is not known to be clean:\n{}",
-            feedback(checked, 0)
+            checked.render(Format::Agent, Some(0))
         ));
     }
     (!notes.is_empty()).then(|| {
@@ -302,7 +263,7 @@ fn at_stop(checked: &Checked, allow_incomplete: bool, stop_hook_active: bool) ->
         }
         return Some(json!({
             "decision": "block",
-            "reason": format!("Lighthouse: {}\n{}", why.join(" "), feedback(checked, STOP_LIMIT)),
+            "reason": format!("Lighthouse: {}\n{}", why.join(" "), checked.render(Format::Agent, Some(STOP_LIMIT))),
         }));
     }
     let mut parts = Vec::new();
@@ -325,21 +286,4 @@ fn at_stop(checked: &Checked, allow_incomplete: bool, stop_hook_active: bool) ->
         format!("Lighthouse: {} introduced this session.", parts.join(", "))
     };
     (!message.is_empty()).then(|| json!({ "systemMessage": message }))
-}
-
-/// The agent-format text of the findings and gaps, at most `limit` findings.
-fn feedback(checked: &Checked, limit: usize) -> String {
-    let outcome = &checked.outcome;
-    let fixes = checked.shown_fixes(Some(limit), Detail::default());
-    render(
-        Format::Agent,
-        &outcome.diagnostics,
-        &outcome.incomplete,
-        &Briefing {
-            fixes: Some(&fixes),
-            // The agent has the tools of `lighthouse mcp`: hints name them.
-            tool_form: true,
-            ..checked.briefing(Some(limit))
-        },
-    )
 }

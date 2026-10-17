@@ -13,8 +13,8 @@ use crate::cli::{Result, command::Agent, setup};
 
 pub fn cache_clean() -> Result<u8> {
     let root = lighthouse_session::project_root()?;
-    let dir = lighthouse_session::cache_dir(&root);
-    let had = lighthouse_session::clean_cache(&root)?;
+    let dir = lighthouse_session::cache::dir(&root);
+    let had = lighthouse_session::cache::clean(&dir)?;
     println!(
         "{} {}",
         if had {

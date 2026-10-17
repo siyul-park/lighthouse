@@ -35,7 +35,7 @@ pub struct Authored {
 /// Adds the local decision the `Decision` document describes. The document is
 /// complete: `metadata.name` is its id (`local/<name>`), `spec` carries the
 /// examples. A missing `apiVersion` or `metadata.uid` is filled in.
-pub fn create_decision(session: Session, mut document: Value) -> Result<Authored> {
+pub fn create_decision(session: &Session, mut document: Value) -> Result<Authored> {
     let (id, name) = local_name(&document)?;
     let _lock = lock(&session.root)?;
     if local_files(&session.root)?.is_some_and(|f| f.contains_key(&file_name(&name))) {
@@ -49,12 +49,12 @@ pub fn create_decision(session: Session, mut document: Value) -> Result<Authored
 /// the uid the decision has. A bundled decision is not changed in place: its
 /// level and options are the project's `rules`, and different wording or
 /// examples are a local decision.
-pub fn replace_decision(session: Session, mut document: Value) -> Result<Authored> {
+pub fn replace_decision(session: &Session, mut document: Value) -> Result<Authored> {
     let id = document_id(&document)?;
     let _lock = lock(&session.root)?;
     let files = local_files(&session.root)?.unwrap_or_default();
     let Some(name) = id.strip_prefix("local/") else {
-        if session.catalog()?.decision(&id).is_none() {
+        if session.catalog.decision(&id).is_none() {
             return Err(format!("unknown decision `{id}`").into());
         }
         return Err(format!(
@@ -134,7 +134,7 @@ fn lock(root: &Path) -> Result<File> {
 
 /// Validates and tests the candidate layer, then writes it.
 fn commit(
-    session: Session,
+    session: &Session,
     id: &str,
     name: &str,
     mut doc: Value,
@@ -147,10 +147,9 @@ fn commit(
     files.insert(file_name(name), serde_norway::to_string(&doc)?);
     let local = Catalog::from_local(files)?;
     let text = canonical(&local, id)?;
-    let candidate = session.with_local(Some(local));
-    candidate.catalog()?;
+    let candidate = session.with_local(Some(local))?;
     let testable = candidate
-        .catalog()?
+        .catalog
         .decision(id)
         .is_some_and(|d| d.automated());
     let test = if testable {

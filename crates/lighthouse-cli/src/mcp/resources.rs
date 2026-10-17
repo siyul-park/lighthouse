@@ -1,10 +1,7 @@
 //! Resources: the catalog index, one rendered decision, the effective config.
 
-use std::fs;
-
-use lighthouse_session::{Session, active_decisions, catalog_index, config_file, decision_text};
+use lighthouse_session::{Session, catalog_index, config_summary, decision_text};
 use rmcp::model::{Resource, ResourceTemplate};
-use serde_json::json;
 
 pub const CATALOG: &str = "lighthouse://catalog";
 pub const CONFIG: &str = "lighthouse://config";
@@ -42,7 +39,10 @@ pub fn read(uri: &str) -> Result<(String, &'static str), String> {
             .map_err(|e| e.to_string());
     }
     if uri == CONFIG {
-        return config(&session).map(|text| (text, "application/json"));
+        return config_summary(&session)
+            .and_then(|summary| Ok(serde_json::to_string_pretty(&summary)?))
+            .map(|text| (text, "application/json"))
+            .map_err(|e| e.to_string());
     }
     let Some(id) = uri.strip_prefix(DECISION_PREFIX) else {
         return Err(format!("unknown resource `{uri}`"));
@@ -50,23 +50,4 @@ pub fn read(uri: &str) -> Result<(String, &'static str), String> {
     decision_text(&session, id)
         .map(|text| (text, MARKDOWN))
         .map_err(|e| e.to_string())
-}
-
-fn config(session: &Session) -> Result<String, String> {
-    let active = active_decisions(session).map_err(|e| e.to_string())?;
-    let plugins: Vec<&str> = session
-        .config
-        .plugins()
-        .iter()
-        .map(|p| p.id.as_str())
-        .collect();
-    let file = config_file(&session.root).and_then(|path| fs::read_to_string(path).ok());
-    Ok(serde_json::to_string_pretty(&json!({
-        "root": session.root.display().to_string(),
-        "plugins": plugins,
-        "extends": session.config.extends(),
-        "activeRules": active,
-        "file": file,
-    }))
-    .unwrap_or_default())
 }

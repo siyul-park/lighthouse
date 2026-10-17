@@ -4,14 +4,15 @@
 use std::fmt::Write;
 
 use lighthouse_session::{
-    Attachment, Detachment, EvalRequest, Session, attach as attach_model, detach as detach_model,
+    Session,
+    model::{Attachment, Detachment, EvalRequest, attach as attach_model, detach as detach_model},
 };
 use serde_json::json;
 
 use crate::surface::{
     Result,
     args::{ModelAttachArgs, ModelDetachArgs},
-    eval::{default_baseline, rate_text, repos_of},
+    eval::{default_baseline, labelling_of, rate_text},
     reply::{Context, FOUND, Output, Reply},
 };
 
@@ -22,11 +23,13 @@ pub fn attach(ctx: &Context, args: &ModelAttachArgs, output: Output) -> Result<R
     let attachment = attach_model(
         &EvalRequest {
             decision: args.id.clone(),
-            repos: repos_of(ctx, &args.repo)?,
-            baseline: args.baseline.clone().or_else(|| default_baseline(&args.id)),
+            labelling: labelling_of(
+                ctx,
+                &args.repo,
+                args.baseline.clone().or_else(|| default_baseline(&args.id)),
+            )?,
             candidate: None,
             model: Some(args.model.clone()),
-            config: ctx.config.clone(),
             audit: None,
         },
         ctx.attribution(&root, args.attributed_to.as_deref())?,

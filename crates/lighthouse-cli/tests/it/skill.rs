@@ -29,7 +29,7 @@ fn skill_for_lists_every_rule_the_engines_registry_enables() {
             .iter()
             .any(|l| l.provider.manifest().id == "rust")
     );
-    let catalog = session.catalog().unwrap();
+    let catalog = &session.catalog;
     let enabled = active(&session.config, catalog.projects()).unwrap();
     assert!(!enabled.is_empty());
 

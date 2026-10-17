@@ -38,20 +38,20 @@ pub struct Basis {
     pub commands: Vec<String>,
 }
 
-/// A command the project would run, for the digest and for the user.
-pub(crate) struct Command {
+/// A program the project would run, with its arguments, for the digest and for the user.
+pub(crate) struct Program {
     pub(crate) what: String,
     pub(crate) argv: Vec<String>,
 }
 
 impl Basis {
     /// The basis of the project at `root` as loaded from `config` and the rule
-    /// files `rules`, running `commands`.
+    /// files `rules`, running `programs`.
     pub(crate) fn of(
         root: &Path,
         config: &str,
         rules: &BTreeMap<String, String>,
-        commands: &[Command],
+        programs: &[Program],
     ) -> Self {
         let mut hash = Hasher::new();
         field(&mut hash, "config", config.as_bytes());
@@ -60,7 +60,7 @@ impl Basis {
             field(&mut hash, "rule", text.as_bytes());
         }
         let root = root.canonicalize().ok();
-        for command in commands {
+        for command in programs {
             let program = command.argv.first().map_or("", String::as_str);
             field(&mut hash, "program", program.as_bytes());
             // The program and every argument that names a file inside the
@@ -84,7 +84,7 @@ impl Basis {
         }
         Self {
             digest: hash.hex(),
-            commands: commands.iter().map(|c| c.what.clone()).collect(),
+            commands: programs.iter().map(|c| c.what.clone()).collect(),
         }
     }
 

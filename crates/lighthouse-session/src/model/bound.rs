@@ -1,14 +1,12 @@
 //! The models a project binds to its decisions.
 
-use std::{collections::BTreeMap, path::Path, sync::Arc};
+use std::{collections::BTreeMap, path::Path};
 
-use lighthouse_engine::CommandModels;
 use lighthouse_model::ModelRef;
-use lighthouse_plugin::Classifier;
-use lighthouse_rpc::CommandModel;
+use lighthouse_spec::Catalog;
 use serde::Serialize;
 
-use crate::{Result, Selector, Session, attached_models};
+use crate::{Result, Selector, Session};
 
 /// Where a binding comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -36,8 +34,8 @@ pub struct BoundModel {
 
 /// The models of the project bound to decisions matching `decisions` (ids and
 /// globs; all when empty), in a stable order.
-pub fn bound_models(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> {
-    let catalog = session.catalog()?;
+pub fn list(session: &Session, decisions: &[String]) -> Result<Vec<BoundModel>> {
+    let catalog = &session.catalog;
     let bound = session.config.models(catalog.projects())?;
     let known: Vec<&str> = catalog.decisions().map(|d| d.id()).collect();
     let selector = Selector::new(decisions)?;
@@ -61,7 +59,6 @@ pub fn bound_models(session: &Session, decisions: &[String]) -> Result<Vec<Bound
             bind(model, None, Binding::Classification);
         }
     }
-    let attached: BTreeMap<String, String> = attached_models(&session.root, &catalog);
     for (decision, models) in bound.routes() {
         if selector.matches(decision) {
             for model in models {
@@ -69,7 +66,7 @@ pub fn bound_models(session: &Session, decisions: &[String]) -> Result<Vec<Bound
             }
         }
     }
-    for (decision, model) in &attached {
+    for (decision, model) in &attached(&session.root, catalog) {
         if selector.matches(decision) {
             bind(model, Some(decision.as_str()), Binding::Attached);
         }
@@ -80,15 +77,24 @@ pub fn bound_models(session: &Session, decisions: &[String]) -> Result<Vec<Bound
 /// Whether the project binds a model that reaches a service outside the
 /// machine.
 pub fn remote_bound(session: &Session) -> bool {
-    bound_models(session, &[]).is_ok_and(|models| models.iter().any(|m| m.remote))
+    list(session, &[]).is_ok_and(|models| models.iter().any(|m| m.remote))
 }
 
-/// How the engine runs the `command` model providers of the project at
-/// `root`: as programs started from it.
-pub(crate) fn command_models(root: &Path) -> CommandModels {
-    let root = root.to_owned();
-    Arc::new(move |name, model, provider| {
-        CommandModel::new(&root, name, model, provider)
-            .map(|command| Box::new(command) as Box<dyn Classifier>)
-    })
+/// The model each decision is bound to by an approved revision, by decision
+/// id.
+pub(crate) fn attached(root: &Path, catalog: &Catalog) -> BTreeMap<String, String> {
+    let Ok(records) = lighthouse_store::Records::read(root) else {
+        return BTreeMap::new();
+    };
+    let named = |key: &str| {
+        catalog
+            .decisions()
+            .find(|d| d.is_key(key))
+            .map(|d| d.id().to_owned())
+    };
+    records
+        .attached()
+        .into_iter()
+        .filter_map(|(decision, model)| Some((named(&decision)?, model)))
+        .collect()
 }

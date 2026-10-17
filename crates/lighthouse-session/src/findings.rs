@@ -8,6 +8,7 @@ use std::{
 
 use lighthouse_engine as engine;
 use lighthouse_model::{Diagnostic, Fingerprint, Incomplete, Suppressed, Suppression};
+use lighthouse_resource::slashed;
 use lighthouse_spec::{Catalog, Decision, authored_severity};
 use lighthouse_store::{Observed, Ruling, Run, Standing, Store, Subject, Unchecked};
 use serde_json::{Value, json};
@@ -69,7 +70,7 @@ struct Versions {
 
 /// What the store has to say about a run's findings, with what opening it
 /// skipped.
-type Judged = (BTreeMap<String, Ruling>, Vec<String>);
+type Rulings = (BTreeMap<String, Ruling>, Vec<String>);
 
 /// The versions of the decisions seen so far in a run, by decision id.
 #[derive(Default)]
@@ -87,15 +88,15 @@ impl Seen {
     }
 }
 
-/// Records the run in the project's store and removes from `outcome` the
+/// Records the run in the project's store and removes from `run` the
 /// findings that their latest judgment hides. A judgment whose decision or
 /// evidence changed no longer applies, and an error is never hidden; both stay
 /// in the report with a note. A store that cannot be used never fails the
 /// check: it is reported, and judgments already recorded are still applied
 /// read-only.
-pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut engine::Run) -> Remembered {
+pub fn remember(root: &Path, catalog: &Catalog, run: &mut engine::Run) -> Remembered {
     let mut remembered = Remembered::default();
-    let rulings = match record(root, catalog, outcome) {
+    let rulings = match record(root, catalog, run) {
         Ok((rulings, notices)) => {
             remembered.messages.extend(notices);
             rulings
@@ -104,7 +105,7 @@ pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut engine::Run) -> Re
             remembered
                 .messages
                 .push(format!("findings not recorded: {e}"));
-            match read_only(root, catalog, outcome) {
+            match read_only(root, catalog, run) {
                 Ok((rulings, notices)) => {
                     remembered.messages.extend(notices);
                     rulings
@@ -118,8 +119,8 @@ pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut engine::Run) -> Re
             }
         }
     };
-    let mut kept = Vec::with_capacity(outcome.diagnostics.len());
-    for d in std::mem::take(&mut outcome.diagnostics) {
+    let mut kept = Vec::with_capacity(run.diagnostics.len());
+    for d in std::mem::take(&mut run.diagnostics) {
         let Some(ruling) = rulings.get(d.fingerprint.as_str()) else {
             kept.push(d);
             continue;
@@ -146,12 +147,12 @@ pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut engine::Run) -> Re
             }
         }
     }
-    outcome.diagnostics = kept;
+    run.diagnostics = kept;
     remembered.announce();
     remembered
 }
 
-/// Removes from `outcome` the findings that the committed decision log hides,
+/// Removes from `run` the findings that the committed decision log hides,
 /// without recording anything: for runs that do not use the store but still
 /// honor what the team decided. The judgments are matched to the findings of
 /// this run, so a clone that holds only the log applies them too. A log that
@@ -159,16 +160,16 @@ pub fn remember(root: &Path, catalog: &Catalog, outcome: &mut engine::Run) -> Re
 pub fn apply_judgments(
     root: &Path,
     catalog: &Catalog,
-    outcome: &mut engine::Run,
+    run: &mut engine::Run,
 ) -> Result<usize, lighthouse_store::Error> {
-    let (rulings, _) = read_only(root, catalog, outcome)?;
-    let before = outcome.diagnostics.len();
-    outcome.diagnostics.retain(|d| {
+    let (rulings, _) = read_only(root, catalog, run)?;
+    let before = run.diagnostics.len();
+    run.diagnostics.retain(|d| {
         rulings
             .get(d.fingerprint.as_str())
             .is_none_or(|r| r.standing != Standing::Suppressed)
     });
-    Ok(before - outcome.diagnostics.len())
+    Ok(before - run.diagnostics.len())
 }
 
 /// Why a judged finding is reported anyway; `None` when nothing needs saying.
@@ -187,12 +188,12 @@ fn note(ruling: &Ruling) -> Option<String> {
 fn record(
     root: &Path,
     catalog: &Catalog,
-    outcome: &engine::Run,
-) -> Result<Judged, lighthouse_store::Error> {
+    run: &engine::Run,
+) -> Result<Rulings, lighthouse_store::Error> {
     let mut store = Store::open(root)?;
-    let run = run_of(root, catalog, outcome);
-    let subjects: Vec<Subject> = run.observed.iter().map(Observed::subject).collect();
-    store.record(&run)?;
+    let seen = run_of(root, catalog, run);
+    let subjects: Vec<Subject> = seen.observed.iter().map(Observed::subject).collect();
+    store.record(&seen)?;
     Ok((store.standings_for(&subjects)?, store.notices().to_vec()))
 }
 
@@ -201,12 +202,12 @@ fn record(
 fn read_only(
     root: &Path,
     catalog: &Catalog,
-    outcome: &engine::Run,
-) -> Result<Judged, lighthouse_store::Error> {
+    run: &engine::Run,
+) -> Result<Rulings, lighthouse_store::Error> {
     let Some(store) = Store::open_existing(root)? else {
         return Ok((BTreeMap::new(), Vec::new()));
     };
-    let subjects: Vec<Subject> = observed_all(catalog, outcome)
+    let subjects: Vec<Subject> = observed_all(catalog, run)
         .iter()
         .map(Observed::subject)
         .collect();
@@ -214,29 +215,24 @@ fn read_only(
 }
 
 /// Every finding of the run as the store records it.
-fn observed_all(catalog: &Catalog, outcome: &engine::Run) -> Vec<Observed> {
+fn observed_all(catalog: &Catalog, run: &engine::Run) -> Vec<Observed> {
     let mut seen = Seen::default();
-    outcome
-        .diagnostics
+    run.diagnostics
         .iter()
-        .map(|d| observed(d, catalog, outcome, &mut seen))
+        .map(|d| observed(d, catalog, run, &mut seen))
         .collect()
 }
 
 /// What the store needs to know about a run: its findings with their facts,
 /// options and rule versions, the paths and rules it covered, what it could not
 /// check, and where and with which tools it ran.
-fn run_of(root: &Path, catalog: &Catalog, outcome: &engine::Run) -> Run {
+fn run_of(root: &Path, catalog: &Catalog, run: &engine::Run) -> Run {
     Run {
-        observed: observed_all(catalog, outcome),
-        reported: outcome
-            .reported
-            .iter()
-            .map(|p| slashed(&p.to_string_lossy()))
-            .collect(),
-        ran: outcome.ran.clone(),
-        active: outcome.active.clone(),
-        unchecked: unchecked(&outcome.incomplete),
+        observed: observed_all(catalog, run),
+        reported: run.reported.iter().map(|p| slashed(p)).collect(),
+        ran: run.ran.clone(),
+        active: run.active.clone(),
+        unchecked: unchecked(&run.incomplete),
         commit: git::head(root),
         dirty: git::dirty(root),
         catalog_version: Some(catalog.version().to_owned()),
@@ -244,13 +240,13 @@ fn run_of(root: &Path, catalog: &Catalog, outcome: &engine::Run) -> Run {
     }
 }
 
-fn observed(d: &Diagnostic, catalog: &Catalog, outcome: &engine::Run, seen: &mut Seen) -> Observed {
-    let facts = outcome.facts.get(&d.fingerprint);
+fn observed(d: &Diagnostic, catalog: &Catalog, run: &engine::Run, seen: &mut Seen) -> Observed {
+    let facts = run.facts.get(&d.fingerprint);
     let decision = catalog.decision(&d.rule_id);
     let mut record = Observed::from_diagnostic(d, facts.cloned().unwrap_or_else(|| json!({})));
     record.decision_uid = decision.and_then(|d| d.uid()).map(str::to_owned);
     record.authored_severity = authored_severity(d.severity, decision);
-    record.options = options(decision, d, facts, outcome);
+    record.options = options(decision, d, facts, run);
     let versions = decision.map(|d| seen.of(d));
     record.meaning_version = versions.map(|v| v.meaning.clone());
     record.check_revision = versions.map(|v| v.check.clone());
@@ -264,13 +260,9 @@ fn options(
     decision: Option<&Decision>,
     d: &Diagnostic,
     facts: Option<&Value>,
-    outcome: &engine::Run,
+    run: &engine::Run,
 ) -> Value {
-    let configured = outcome
-        .options
-        .get(&d.fingerprint)
-        .cloned()
-        .unwrap_or_default();
+    let configured = run.options.get(&d.fingerprint).cloned().unwrap_or_default();
     let language = facts
         .and_then(|f| f.get("language"))
         .and_then(Value::as_str);
@@ -288,7 +280,7 @@ fn unchecked(incomplete: &[Incomplete]) -> Unchecked {
         let Some(path) = &gap.path else {
             return Unchecked::Everything;
         };
-        let dir = path.parent().map(|p| slashed(&p.to_string_lossy()));
+        let dir = path.parent().map(slashed);
         dirs.push(dir.unwrap_or_default());
     }
     if dirs.is_empty() {
@@ -296,8 +288,4 @@ fn unchecked(incomplete: &[Incomplete]) -> Unchecked {
     } else {
         Unchecked::Paths(dirs)
     }
-}
-
-fn slashed(path: &str) -> String {
-    path.replace('\\', "/")
 }

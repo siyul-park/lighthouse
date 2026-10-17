@@ -1,14 +1,15 @@
 //! Looking at decisions and running their examples.
 
-use std::{cell::RefCell, collections::BTreeSet, fmt::Write};
+use std::{cell::RefCell, collections::BTreeSet, fmt::Write, fs};
 
 use lighthouse_engine::RuleTester;
 use lighthouse_plugin::Registry;
 use lighthouse_report::docs::{Density, decision_markdown};
 use lighthouse_spec::{Catalog, Decision, authored_severity};
 use serde::Serialize;
+use serde_json::{Value, json};
 
-use crate::{Result, Selector, Session};
+use crate::{Result, Selector, Session, config_file};
 
 /// A decision shown on its own: titled at heading 1, examples named without links.
 const ENTRY: Density<'static> = Density::Entry {
@@ -23,11 +24,34 @@ const NEUTRAL: &str = "text";
 #[derive(Debug, Clone, Serialize)]
 pub struct DecisionRow {
     pub id: String,
-    /// `not-enforced` (its status is not accepted), `implemented` (a program checks it), `judged` (agent review checks it), `unimplemented` (a check is named but nothing registers it) or `doc`.
-    pub status: &'static str,
+    pub status: Implementation,
     pub severity: String,
     pub title: String,
 }
+
+/// How far a decision is carried out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Implementation {
+    /// Its status is not accepted: written down, tested, not enforced.
+    NotEnforced,
+    /// A program checks it.
+    Implemented,
+    /// Agent review checks it.
+    Judged,
+    /// A check is named but nothing registers it.
+    Unimplemented,
+    /// It has no check.
+    Doc,
+}
+
+lighthouse_model::vocabulary!(Implementation, "implementation" {
+    NotEnforced => "not-enforced",
+    Implemented => "implemented",
+    Judged => "judged",
+    Unimplemented => "unimplemented",
+    Doc => "doc",
+});
 
 /// The outcome of running examples.
 pub struct DecisionTest {
@@ -61,7 +85,7 @@ pub fn decision_rows(catalog: &Catalog, registry: &Registry, all: bool) -> Vec<D
         }
         rows.push(DecisionRow {
             id: meta.id.clone(),
-            status: "implemented",
+            status: Implementation::Implemented,
             severity: meta.severity.to_string(),
             title: meta.description.clone(),
         });
@@ -72,25 +96,43 @@ pub fn decision_rows(catalog: &Catalog, registry: &Registry, all: bool) -> Vec<D
 /// The rules the project's configuration enables for at least one file: the
 /// projects it extends and the entries it sets, resolved over the catalog.
 pub fn active_decisions(session: &Session) -> Result<BTreeSet<String>> {
-    let catalog = session.catalog()?;
     Ok(lighthouse_engine::active(
         &session.config,
-        catalog.projects(),
+        session.catalog.projects(),
     )?)
+}
+
+/// The effective configuration of the project: its root, the plugins and
+/// projects it names, the decisions in force and the text of its file.
+pub fn config_summary(session: &Session) -> Result<Value> {
+    let plugins: Vec<&str> = session
+        .config
+        .plugins()
+        .iter()
+        .map(|p| p.id.as_str())
+        .collect();
+    let file = config_file(&session.root).and_then(|path| fs::read_to_string(path).ok());
+    Ok(json!({
+        "root": session.root.display().to_string(),
+        "plugins": plugins,
+        "extends": session.config.extends(),
+        "activeRules": active_decisions(session)?,
+        "file": file,
+    }))
 }
 
 /// The index of the project's catalog, one decision per line: id, authored
 /// severity, status and title, tab-separated.
 pub fn catalog_index(session: &Session) -> Result<String> {
     let mut out = String::new();
-    for decision in session.catalog()?.decisions() {
-        let tier = decision.severity.map_or_else(
+    for decision in session.catalog.decisions() {
+        let severity = decision.severity.map_or_else(
             || "doc".to_owned(),
             |s| authored_severity(s, Some(decision)).to_string(),
         );
         let _ = writeln!(
             out,
-            "{}\t{tier}\t{}\t{}",
+            "{}\t{severity}\t{}\t{}",
             decision.id(),
             decision.status,
             decision.title
@@ -101,8 +143,8 @@ pub fn catalog_index(session: &Session) -> Result<String> {
 
 /// One decision of the project's catalog rendered as Markdown.
 pub fn decision_text(session: &Session, id: &str) -> Result<String> {
-    let catalog = session.catalog()?;
-    let decision = catalog
+    let decision = session
+        .catalog
         .decision(id)
         .ok_or_else(|| format!("unknown decision `{id}`"))?;
     Ok(decision_markdown(decision, ENTRY))
@@ -150,7 +192,7 @@ pub fn test_decisions(
     ids: &[String],
     language: Option<&str>,
 ) -> Result<DecisionTest> {
-    test_catalog(session, &session.catalog()?, ids, language)
+    test_catalog(session, &session.catalog, ids, language)
 }
 
 /// Like [`test_decisions`], over `catalog` instead of the project's own.
@@ -160,8 +202,7 @@ pub(crate) fn test_catalog(
     ids: &[String],
     language: Option<&str>,
 ) -> Result<DecisionTest> {
-    let catalog = catalog.clone();
-    let decisions = selected(&catalog, ids)?;
+    let decisions = selected(catalog, ids)?;
     let (probe, registered) = session.registry()?;
     if let Some(gap) = registered.incomplete.first() {
         return Err(format!("a language plugin did not start: {}", gap.reason).into());
@@ -197,7 +238,7 @@ pub(crate) fn test_catalog(
                     lighthouse_checks::registry()
                 })
         };
-        let tester = RuleTester::new(fresh, &catalog)
+        let tester = RuleTester::new(fresh, catalog)
             .language(language)
             .trusted(session.trusted());
         for decision in &decisions {
@@ -221,21 +262,20 @@ pub(crate) fn test_catalog(
     })
 }
 
-fn status(decision: &Decision, registry: &Registry) -> &'static str {
+fn status(decision: &Decision, registry: &Registry) -> Implementation {
     if decision.check.is_some() && !decision.status.enforced() {
-        // Written down, tested, not enforced.
-        "not-enforced"
+        Implementation::NotEnforced
     } else if registry.rule(decision.id()).is_some()
         && decision.check.is_some() == decision.automated()
     {
         // A model check has a rule too, but a model judges it: it stays `judged`.
-        "implemented"
+        Implementation::Implemented
     } else if decision.check.is_none() {
-        "doc"
+        Implementation::Doc
     } else if !decision.automated() {
-        "judged"
+        Implementation::Judged
     } else {
-        "unimplemented"
+        Implementation::Unimplemented
     }
 }
 

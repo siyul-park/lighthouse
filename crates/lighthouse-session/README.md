@@ -5,11 +5,12 @@ The operations every frontend shares, and the composition root that wires store,
 **Layer.** L4; depends on every layer below except protocol and process.
 
 ## Entry points
-- `Session::load`, `catalog`, `registry`: the configuration, the catalog layers and the plugins of a project.
-- `check`, `fix`: run, narrow the report, remember the run.
-- `review_finding`, `record_judgment`, `review_tasks`: judgments through the store.
+- `Session::load`, `load_in`, `find_in`, `catalog`, `registry`: the configuration, the catalog layers and the plugins of a project, found from a directory without changing the process's.
+- `check`, `Checked::render`, `Checked::report`, `fix::run`: run, narrow the report, remember the run.
+- `review::{list, show, history, prune, resolve}`: judgments through the store.
 - `create_decision`, `replace_decision`, `test_decisions`, `validate_paths`: authoring.
-- `eval`, `train`, `bound_models`: models (they feed ml and convert store records for it).
+- `model::{eval, train, rebuild, attach, detach, list}`: models (they feed ml and convert store records for it). One store (the first repository's) keeps the datasets and models of a run over several.
+- `baseline`: what a hook reports, the findings the agent's session introduced.
 - `trust`, `revoke`, `skill`, `bundled_docs`.
 
 ## Invariants

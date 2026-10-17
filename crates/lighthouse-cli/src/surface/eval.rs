@@ -2,7 +2,10 @@
 
 use std::{fmt::Write, path::PathBuf};
 
-use lighthouse_session::{EvalReport, EvalRequest, Rate, Repo, Session, Side, eval};
+use lighthouse_session::{
+    Session,
+    model::{EvalReport, EvalRequest, Labelling, Rate, Repo, Side, eval},
+};
 
 use crate::surface::{
     Result,
@@ -29,6 +32,16 @@ pub fn repos_of(ctx: &Context, specs: &[String]) -> Result<Vec<Repo>> {
         .collect()
 }
 
+/// What the labels come from: the repositories `--repo` names and the table
+/// of reviewed findings.
+pub fn labelling_of(ctx: &Context, repos: &[String], table: Option<PathBuf>) -> Result<Labelling> {
+    Ok(Labelling {
+        repos: repos_of(ctx, repos)?,
+        table,
+        config: ctx.config.clone(),
+    })
+}
+
 /// `baseline/precision/<decision>.tsv` when it exists.
 pub fn default_baseline(decision: &str) -> Option<PathBuf> {
     let path = PathBuf::from(format!("baseline/precision/{decision}.tsv"));
@@ -39,11 +52,13 @@ pub fn default_baseline(decision: &str) -> Option<PathBuf> {
 pub fn run(ctx: &Context, args: &DecisionEvalArgs, output: Output) -> Result<Reply> {
     let report = eval(&EvalRequest {
         decision: args.id.clone(),
-        repos: repos_of(ctx, &args.repo)?,
-        baseline: args.baseline.clone().or_else(|| default_baseline(&args.id)),
+        labelling: labelling_of(
+            ctx,
+            &args.repo,
+            args.baseline.clone().or_else(|| default_baseline(&args.id)),
+        )?,
         candidate: args.check.clone(),
         model: args.model.clone(),
-        config: ctx.config.clone(),
         audit: args.audit,
     })?;
     Reply::data(output, &report, || text(&report))
@@ -96,8 +111,8 @@ fn text(report: &EvalReport) -> String {
     if let Some(proposal) = &report.proposal {
         let _ = writeln!(
             out,
-            "proposal: {} {}: {}; run lighthouse model {} {}",
-            proposal.action, proposal.model, proposal.reason, proposal.action, report.decision
+            "proposal: detach {}: {}; run lighthouse model detach {}",
+            proposal.model, proposal.reason, report.decision
         );
     }
     if let Some(path) = &report.audit {
@@ -107,7 +122,6 @@ fn text(report: &EvalReport) -> String {
             path.display()
         );
     }
-    let _ = writeln!(out, "note: {}", report.caveat);
     out
 }
 
@@ -134,7 +148,6 @@ fn side(out: &mut String, label: &str, side: &Side) {
         ("FNR", m.fnr),
         ("selector precision", m.selector_precision),
         ("coverage", m.coverage),
-        ("abstention", m.abstention),
     ] {
         let _ = writeln!(out, "  {name}: {}", rate_text(rate));
     }
@@ -151,7 +164,7 @@ fn side(out: &mut String, label: &str, side: &Side) {
     let _ = writeln!(
         out,
         "  decided by a model: {}, left to review: {}, questions asked: {} (cost {})",
-        side.model_decided, side.reviews, side.calls, side.cost
+        side.usage.model_decided, side.usage.reviews, side.usage.calls, side.usage.cost
     );
     for notice in &side.notices {
         let _ = writeln!(out, "  note: {notice}");
