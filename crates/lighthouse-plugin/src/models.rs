@@ -114,7 +114,7 @@ pub trait Models: Send + Sync {
 
     /// Whether the run puts the subjects `rule` suspects to models: a model is
     /// bound to its decision, or the run asks for model work. Otherwise the
-    /// rule skips its `review` route.
+    /// rule skips its `abstain` route.
     fn asks(&self, _rule: &str) -> bool {
         false
     }

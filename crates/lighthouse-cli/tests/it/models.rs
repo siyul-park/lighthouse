@@ -1,4 +1,4 @@
-//! Model checks end to end: a cel check whose `review` abstains to a model
+//! Model checks end to end: a cel check whose `abstain` abstains to a model
 //! the project binds. The model is a `command` provider, a small script, so
 //! no network is used.
 
@@ -22,7 +22,7 @@ spec:
   check:
     type: cel
     where: symbol.kind == "function" && symbol.name == "bad_one"
-    review: symbol.kind == "function" && symbol.name.startsWith("maybe")
+    abstain: symbol.kind == "function" && symbol.name.startsWith("maybe")
     message: "{{ symbol.name }} is banned"
   examples:
     - name: bad

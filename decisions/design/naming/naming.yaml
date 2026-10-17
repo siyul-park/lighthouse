@@ -128,7 +128,7 @@ spec:
                                            && (!has(e.kinds) || symbol.kind in e.kinds))
             ? ['encoding'] : [])
     where: size(matched) > 0
-    review: >-
+    abstain: >-
       size(matched) == 0 && !symbol.test && !symbol.generated
       && (size(symbol.name) == 1
           || (symbol.func != null && size(symbol.func.signature.results) == 1

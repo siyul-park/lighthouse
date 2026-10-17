@@ -7,6 +7,7 @@
 //! per-function metrics the checks read, the order keys fixes sort by, and the
 //! registry of every bundled plugin, derived from the catalog's packs.
 
+mod abstain;
 mod builder;
 mod bundled;
 pub mod caching;
@@ -29,7 +30,6 @@ mod ops;
 mod order;
 #[doc(hidden)]
 pub mod probe;
-mod review;
 mod table;
 mod text;
 

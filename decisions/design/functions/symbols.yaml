@@ -99,7 +99,7 @@ spec:
               && size(symbol.implementers) == 1
              ? ['interface'] : [])
     where: size(matched) > 0
-    review: >-
+    abstain: >-
       ('wrapper' in options.kinds && callable
         && symbol.visibility == 'private' && symbol.name != 'main' && symbol.name != 'init'
         && !symbol.implementation && size(callers(symbol.func).filter(c, !c.test)) == 1)

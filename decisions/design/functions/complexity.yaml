@@ -49,7 +49,7 @@ spec:
     reports tables and visitors that read linearly.
 
     A function that is not over a limit but has reached 60% of one is put to a
-    model for the abstraction level (`review`); a finding on a function is
+    model for the abstraction level (`abstain`); a finding on a function is
     never asked again.
   scope:
     subject: symbol
@@ -185,7 +185,7 @@ spec:
           && (rows.exists(r, r.max > 0 && r.own * 10 >= r.max * 6)
               || (caps.nesting > 0 && m.nesting * 10 >= caps.nesting * 6))
     where: size(found) > 0
-    review: near || (fold && size(via) > 0)
+    abstain: near || (fold && size(via) > 0)
     message: >-
       {{ first.kind == ''
          ? (size(via) == 0 ? ''

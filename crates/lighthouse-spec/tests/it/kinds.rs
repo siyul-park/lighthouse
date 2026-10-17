@@ -114,7 +114,7 @@ fn cel_check_selects() {
         evidence: BTreeMap::new(),
         at: None,
         identity: None,
-        review: None,
+        abstain: None,
         prompt: None,
     };
 

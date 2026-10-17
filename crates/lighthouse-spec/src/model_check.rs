@@ -1,5 +1,5 @@
 //! The `model` check: a decision only a model can judge. It is the same
-//! runtime as a `cel` check whose `where` is false and whose `review` is the
+//! runtime as a `cel` check whose `where` is false and whose `abstain` is the
 //! `select`: the subjects `select` picks are put to the models the decision is
 //! bound to.
 
@@ -52,7 +52,7 @@ impl ModelCheck {
             evidence: BTreeMap::new(),
             at: None,
             identity: self.identity.clone(),
-            review: Some(self.select.clone().unwrap_or_else(|| "true".to_owned())),
+            abstain: Some(self.select.clone().unwrap_or_else(|| "true".to_owned())),
             prompt: self.prompt.clone(),
         })
     }
@@ -65,6 +65,6 @@ impl ModelCheck {
             return compile_problem("check select", self.select.as_deref()?);
         };
         cel.problem()
-            .map(|p| p.replacen("check review", "check select", 1))
+            .map(|p| p.replacen("check abstain", "check select", 1))
     }
 }

@@ -91,17 +91,17 @@ That is the whole check for a decision the model should evaluate:
 - **Candidates:** the subjects in the decision's `scope`. An optional `select` (CEL) narrows them. Only subjects of a file (a symbol, function, file, test, comment or event) can be judged: a model needs their source.
 - **Output:** fixed by the task, so there is nothing to configure: the probability that the subject fails (TypeSafe System One's `noul`). The host maps it to `fail` or `review` (the SARIF result kinds) with one band per (model, decision): at or above `upper` it is a `fail`, at or below `lower` a `pass`, otherwise it is left to the next binding. Until `eval` has calibrated a band, `upper` is 0.9 and nothing is cleared. The cache keeps the raw probability, so a new band never invalidates it. There is no reason.
 
-`type: model` is the same runtime as a `cel` check whose `where` is `false` and whose `review` is the `select`. A `cel` check that can prove part of a decision says so in the same place:
+`type: model` is the same runtime as a `cel` check whose `where` is `false` and whose `abstain` is the `select`. A `cel` check that can prove part of a decision says so in the same place:
 
 ```yaml
 check:
   type: cel
   where: func.envy.count >= 3 && size(func.envy.others) == 0   # proven: a finding
-  review: func.envy.count >= 2                                  # suspected: ask the bound model
+  abstain: func.envy.count >= 2                                 # suspected: ask the bound model
   message: "{{ func.name }} depends on {{ func.envy.target_name }}'s members only"
 ```
 
-`where` true is a `fail`; `where` false and `review` true is an **abstention**; anything else is a `pass`. Abstained subjects fall through the bindings below like a model's own abstention. A `fail` from a model is a finding with the check's own message, evidence, identity and fix, plus `evidence.model` (`<provider>/<model>@<version>`) and `evidence.confidence`. Its level is at most `warn`.
+`where` true is a `fail`; `where` false and `abstain` true is an **abstention**; anything else is a `pass`. Abstained subjects fall through the bindings below like a model's own abstention. A `fail` from a model is a finding with the check's own message, evidence, identity and fix, plus `evidence.model` (`<provider>/<model>@<version>`) and `evidence.confidence`. Its level is at most `warn`.
 
 Models are one plugin kind, `Model`, with tasks (`tasks` in the manifest),
 because each task has its own call shape:
@@ -212,7 +212,7 @@ evaluation = { precision = 0.9 }          # recall = 0.8 optional
 - **Exploring.** A model that is surest of a fail would otherwise never be checked. A share `[models] explore` (default 0.05, a number from 0 to 1; anything else is a configuration error) of the subjects the attached model fails is treated as an abstention, so the layers below judge them and a person or agent can label them. A subject is in the share when the first 8 hex digits of sha256(`rule`, NUL, subject key), as a number out of 2^32, are below `explore`: the same subjects every run. Only the attached model, layer 1, is explored, and nothing changes where none is attached. A subject nothing below decides stays open with the reason `explored: <model> said fail at <confidence>`; one a lower layer fails carries `explored: {model, confidence}` in its evidence.
 - `embedding` is bound only per project. Classifiers trained on embeddings record the embedding model in their version tuple, and changing the embedding model invalidates them.
 - The order is about **cost and confidence**, not quality. A trained classifier approximates a boundary that has no faithful predicate; it is not a weaker deterministic rule.
-- A deterministic check decides every subject it selects unless it abstains (`review`); abstained subjects fall through to the model bindings, like a model's abstention. Providers are never stacked.
+- A deterministic check decides every subject it selects unless it abstains (`abstain`); abstained subjects fall through to the model bindings, like a model's abstention. Providers are never stacked.
 - Deterministic evaluation is the **preferred** endpoint when the boundary can be expressed faithfully. It is not a required one: some decisions stay model-evaluated for good.
 
 ## Evidence
@@ -370,7 +370,7 @@ judgment, meaning version and check revision.
 | Part | State |
 | --- | --- |
 | Decisions, packs, judgments, suppressions (reviewer-declared and in the code), `decisions.jsonl`, SQLite memory | done |
-| `check` providers (`builtin`, `cel` with `review`, `command`, `model`), meaning version and check revision | done |
+| `check` providers (`builtin`, `cel` with `abstain`, `command`, `model`), meaning version and check revision | done |
 | `classification` with layered bindings (Revision, rule, project, agent), `provider/model` references, `model-http` (`openai` spec) and `command` providers, answer cache, budget, SARIF `review` results, `decision eval`, the label collector, `model train` plumbing | done |
 | Judgments and suppressions replace verdicts; naming alignment (`intent` → `context`, provenance fields) | done |
 | Judgments on subjects, sampling, evaluation, `Revision` records, log compaction, snapshot budgets | Phase 3 |

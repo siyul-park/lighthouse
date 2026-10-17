@@ -145,7 +145,7 @@ spec:
           size(found) > 0 ? found[0]
           : {'kind': '', 'value': 0, 'max': 0, 'what': '', 'hint': ''}
     where: size(found) > 0
-    review: >-
+    abstain: >-
       m.measured && size(found) == 0 && func.visibility != 'private'
       && (func.role == 'function' || func.role == 'method' || func.role == 'constructor')
       && func.signature.params.exists(t, t.symbol != '')

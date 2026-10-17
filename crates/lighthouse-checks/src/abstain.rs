@@ -1,4 +1,4 @@
-//! The model half of a `cel` check: the subjects `review` suspects, put to the
+//! The model half of a `cel` check: the subjects `abstain` suspects, put to the
 //! models the decision is bound to. A `fail` is reported with the check's own
 //! message and identity and the model's evidence; a subject no model failed is
 //! left to agent review.
@@ -26,7 +26,7 @@ const MAX_NEIGHBOR_TEXT: usize = 600;
 const MAX_NEIGHBORS: usize = 5;
 
 /// What a check asks a model, compiled.
-pub(crate) struct Review {
+pub(crate) struct Abstain {
     program: Program,
     fact: Program,
     select: Select,
@@ -34,7 +34,7 @@ pub(crate) struct Review {
     revision: String,
 }
 
-/// A subject `review` picked, with the finding it becomes if a model says
+/// A subject `abstain` picked, with the finding it becomes if a model says
 /// `fail`.
 pub(crate) struct Candidate {
     pub(crate) diagnostic: Diagnostic,
@@ -45,24 +45,24 @@ pub(crate) struct Candidate {
     pub(crate) decided: bool,
 }
 
-impl Review {
-    /// Compiles the `review` of `check`; `None` for a check without one.
+impl Abstain {
+    /// Compiles the `abstain` of `check`; `None` for a check without one.
     pub(crate) fn new(
         decision: &Decision,
         check: &CelCheck,
         select: Select,
     ) -> Result<Option<Self>, Error> {
-        let Some(source) = &check.review else {
+        let Some(source) = &check.abstain else {
             return Ok(None);
         };
         let id = decision.id();
         let decision_ref = decision.reference();
         let revision = serde_json::to_vec(&(decision.uid(), check, &decision_ref))
             .map(hash::sha256)
-            .map_err(|e| Error::invalid(id, format!("the review cannot be hashed: {e}")))?;
+            .map_err(|e| Error::invalid(id, format!("the abstain cannot be hashed: {e}")))?;
         Ok(Some(Self {
-            program: compile(id, "review", source)?,
-            fact: compile(id, "review", select.variable())?,
+            program: compile(id, "abstain", source)?,
+            fact: compile(id, "abstain", select.variable())?,
             select,
             decision: decision_ref,
             revision,
@@ -74,7 +74,7 @@ impl Review {
         match frame.run(&self.program)? {
             cel::Value::Bool(asks) => Ok(asks),
             cel::Value::Null => Ok(false),
-            other => Err(frame.fail(format!("`review` is {}, not a bool", render(&other)))),
+            other => Err(frame.fail(format!("`abstain` is {}, not a bool", render(&other)))),
         }
     }
 

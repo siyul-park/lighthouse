@@ -50,7 +50,7 @@ spec:
     where: >-
       symbol.kind == "var" && symbol.owner == "" && symbol.visibility != "private"
       && symbol.lang == "go" && !symbol.name.startsWith("Err")
-    review: >-
+    abstain: >-
       !symbol.test && !symbol.generated
       && ((symbol.kind == 'var' && symbol.owner == '')
           || (symbol.kind == 'type' && symbol.members > 0 && !symbol.data_only))

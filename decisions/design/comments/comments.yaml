@@ -136,7 +136,7 @@ spec:
             && options.todoKeywords.exists(k, bodies[0].matches('^' + k + '\\b'))
             ? ['todo'] : [])
     where: size(matched) > 0
-    review: >-
+    abstain: >-
       !comment.generated && !comment.attached && !documentation && size(bodies) > 0
       && !bodies[0].startsWith('lighthouse-')
     message: >-

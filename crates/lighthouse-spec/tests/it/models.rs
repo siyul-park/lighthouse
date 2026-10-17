@@ -204,7 +204,10 @@ fn a_model_check_is_a_cel_check_that_never_fails_and_reviews_what_it_selects() {
     };
     let cel = check.as_cel(Subject::Symbol).unwrap();
     assert_eq!(cel.condition, "false");
-    assert_eq!(cel.review.as_deref(), Some("symbol.name.startsWith(\"x\")"));
+    assert_eq!(
+        cel.abstain.as_deref(),
+        Some("symbol.name.startsWith(\"x\")")
+    );
     assert_eq!(cel.select, Some(Select::Symbol));
     assert!(ModelCheck::default().as_cel(Subject::Project).is_none());
 }

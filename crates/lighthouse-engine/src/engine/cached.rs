@@ -106,7 +106,7 @@ impl Engine {
     }
 
     /// The prefix of the keys of each selected rule that may be cached: not one
-    /// whose `review` route the models are asked about this run.
+    /// whose `abstain` route the models are asked about this run.
     fn prefixes(&self, selected: &[&dyn Rule], models: &dyn Models) -> HashMap<String, Prefix> {
         let base = self.cache_base();
         selected

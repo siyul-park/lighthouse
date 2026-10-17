@@ -1,6 +1,6 @@
 //! The decisions about where functions live: feature envy and misplaced
 //! symbols, the `envy` and `module` kinds of `design/prefer-method`. Both are
-//! review candidates, so the tests read the `review` of the check.
+//! review candidates, so the tests read the `abstain` of the check.
 
 use std::collections::BTreeMap;
 
@@ -27,12 +27,12 @@ fn limits(kind: &str, overrides: Value) -> Value {
 }
 
 /// The `(file, line)` of what the review of `design/prefer-method` offers a
-/// model for the kind `kind`: the same check with its `review` as `where`.
+/// model for the kind `kind`: the same check with its `abstain` as `where`.
 fn candidates(world: &World, kind: &str, overrides: Value) -> Vec<(String, u32)> {
     let mut spec = serde_json::to_value(Catalog::bundled().decision(RULE).unwrap().spec()).unwrap();
-    let review = spec["check"]["review"].take();
+    let review = spec["check"]["abstain"].take();
     spec["check"]["where"] = review;
-    spec["check"].as_object_mut().unwrap().remove("review");
+    spec["check"].as_object_mut().unwrap().remove("abstain");
     spec["examples"] = json!([
         { "name": "bad", "language": "text", "kind": "invalid",
           "files": [{ "path": "a.txt", "body": "x" }], "expect": [{ "line": 1 }] },

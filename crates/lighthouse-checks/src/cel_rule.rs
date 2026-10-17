@@ -11,6 +11,7 @@ use serde_json::{Map, Value};
 
 use crate::{
     Error,
+    abstain::{Abstain, Candidate},
     builder::Builder,
     caching,
     eval::{Fact, Frame, Template, cel_fact, compile, compile_all},
@@ -18,7 +19,6 @@ use crate::{
     library::{self, Needs},
     metrics::MEASURES,
     modules::{self, Declared},
-    review::{Candidate, Review},
 };
 
 /// A CEL check with every expression compiled.
@@ -30,7 +30,7 @@ pub(crate) struct CelRule {
     evidence: Vec<(String, Program)>,
     at: Option<At>,
     identity: Option<Identity>,
-    review: Option<Review>,
+    abstain: Option<Abstain>,
     needs: Needs,
     library: cel::Context<'static>,
 }
@@ -71,7 +71,7 @@ impl CelRule {
             sources.push(&identity.subject);
             sources.extend(identity.snippet.as_deref());
         }
-        sources.extend(check.review.as_deref());
+        sources.extend(check.abstain.as_deref());
         let select = check
             .selects(decision.scope.subject)
             .ok_or_else(|| Error::invalid(id, "a project decision needs a `select`"))?;
@@ -80,7 +80,7 @@ impl CelRule {
         };
         Ok(Self {
             select,
-            review: Review::new(decision, check, select)?,
+            abstain: Abstain::new(decision, check, select)?,
             bindings: check
                 .bindings
                 .iter()
@@ -122,7 +122,7 @@ impl CelRule {
 
     /// Whether the check has a route that puts subjects to the models.
     pub(crate) fn reviews(&self) -> bool {
-        self.review.is_some()
+        self.abstain.is_some()
     }
 
     /// The analyzers whose facts the expressions read.
@@ -165,8 +165,8 @@ impl CelRule {
             lighthouse_model::RunScope::File => run.check_file(ctx),
             lighthouse_model::RunScope::Project => run.check_project(ctx),
         }?;
-        if let Some(review) = self.review.as_ref().filter(|_| reviewing) {
-            found.extend(review.settle(ctx, meta, run.candidates.take()));
+        if let Some(abstain) = self.abstain.as_ref().filter(|_| reviewing) {
+            found.extend(abstain.settle(ctx, meta, run.candidates.take()));
         }
         Ok(found)
     }
@@ -174,12 +174,12 @@ impl CelRule {
 
 struct Evaluation<'a> {
     rule: &'a CelRule,
-    /// Whether the `review` route is evaluated: the run asks the models of this rule.
+    /// Whether the `abstain` route is evaluated: the run asks the models of this rule.
     reviewing: bool,
     meta: &'a RuleManifest,
     builder: Builder<'a>,
     options: Fact,
-    /// The subjects `review` picked, to be put to the models.
+    /// The subjects `abstain` picked, to be put to the models.
     candidates: RefCell<Vec<Candidate>>,
 }
 
@@ -364,10 +364,10 @@ impl Evaluation<'_> {
             frame.set_cel(name, bound);
         }
         let found = frame.truth(&rule.condition)?;
-        let review = rule.review.as_ref().filter(|_| self.reviewing);
-        match (review, found) {
+        let abstain = rule.abstain.as_ref().filter(|_| self.reviewing);
+        match (abstain, found) {
             (None, false) => return Ok(None),
-            (Some(review), false) if !review.asks(&frame)? => return Ok(None),
+            (Some(abstain), false) if !abstain.asks(&frame)? => return Ok(None),
             _ => {}
         }
         // The message and evidence of a subject only suspected may read what
@@ -406,8 +406,8 @@ impl Evaluation<'_> {
         );
         diagnostic.symbol = place.symbol.map(|id| id.as_str().to_owned());
         diagnostic.evidence = evidence;
-        if let Some(review) = review {
-            let fact = review.fact_of(&frame)?;
+        if let Some(abstain) = abstain {
+            let fact = abstain.fact_of(&frame)?;
             self.candidates.borrow_mut().push(Candidate {
                 diagnostic: diagnostic.clone(),
                 fact,

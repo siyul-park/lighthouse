@@ -84,7 +84,7 @@ spec:
           && !func.name.startsWith('Benchmark')
           && func.module_imports.exists(i, options.libraries.exists(l, i == l || i.startsWith(l + '/')))
     where: manual
-    review: "func.kind == 'test' && !func.name.startsWith('Benchmark')"
+    abstain: "func.kind == 'test' && !func.name.startsWith('Benchmark')"
     message: >-
       {{ !manual ? ''
          : (func.kind == 'test' ? 'test' : func.test_role == 'test-helper' ? 'test helper' : 'function')

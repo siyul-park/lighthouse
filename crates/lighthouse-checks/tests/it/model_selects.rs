@@ -16,13 +16,13 @@ const EXAMPLES_JSON: &str = r#"[{"name":"bad","language":"text","kind":"invalid"
 const LOCAL_HEAD: &str =
     "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/select\nspec: ";
 
-/// The decision `spec` whose `where` is the `review` route of its cel check:
+/// The decision `spec` whose `where` is the `abstain` route of its cel check:
 /// what the check puts to a model.
 fn reviewed(mut spec: Value) -> String {
-    let review = spec["check"]["review"].take();
+    let review = spec["check"]["abstain"].take();
     spec["check"]["where"] = review;
     let check = spec["check"].as_object_mut().unwrap();
-    check.remove("review");
+    check.remove("abstain");
     check.remove("at");
     let name = match spec["check"]["select"].as_str() {
         Some("function") => "func.name",

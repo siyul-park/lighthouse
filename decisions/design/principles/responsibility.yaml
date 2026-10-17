@@ -90,7 +90,7 @@ spec:
     # Recall-oriented: modules under 600 lines with a single dependent or
     # nothing declared, and modules nobody imports unless they are an entry
     # module (a Go `main` package or a Rust binary target).
-    review: >-
+    abstain: >-
       tied
       || (module.lines < 600
           && (size(module.dependents) == 1 || module.declares == 0

@@ -104,7 +104,7 @@ spec:
       - name: matched
         expr: "(callee_first ? ['callers-first'] : []) + (separated ? ['gap'] : [])"
     where: size(matched) > 0
-    review: >-
+    abstain: >-
       size(matched) == 0 && !func.test && !func.generated
       && ((func.kind == 'method' && func.gap.previous != null && size(func.gap.between) > 0)
           || ((func.kind == 'method' || func.kind == 'function') && !func.implementation

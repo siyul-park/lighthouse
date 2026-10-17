@@ -132,7 +132,7 @@ spec:
         expr: >-
           (method ? ['method'] : []) + (envied ? ['envy'] : []) + (misplaced ? ['module'] : [])
     where: method
-    review: envied || misplaced
+    abstain: envied || misplaced
     message: >-
       {{ method
          ? 'private function ' + func.name + ' is called only by methods of ' + affinity.owner_name

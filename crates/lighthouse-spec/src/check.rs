@@ -84,7 +84,7 @@ impl<'de> Deserialize<'de> for Check {
                 }
             },
             Some("cel") => &[
-                "select", "with", "where", "message", "evidence", "at", "identity", "review",
+                "select", "with", "where", "message", "evidence", "at", "identity", "abstain",
                 "prompt",
             ],
             Some("command") => &[
@@ -175,7 +175,7 @@ impl CheckKind {
                 }
                 // A model cannot be asked about a subject outside a file; a
                 // module is left to agent review, which lists its subjects.
-                (cel.review.is_some()
+                (cel.abstain.is_some()
                     && select.scope() != RunScope::File
                     && select != Select::Module)
                     .then(|| {
@@ -477,15 +477,16 @@ pub struct CelCheck {
     /// the default (the selected value) does not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub identity: Option<Identity>,
-    /// CEL over the selected value, evaluated when `where` is false: when it
-    /// is true, or gives a kind (a string), a model is asked and the
-    /// subject is a finding, with this check's message, evidence and
+    /// The condition under which the check is unsure and leaves the subject to
+    /// the next layer. CEL over the selected value, evaluated when `where` is
+    /// false: when it is true, or gives a kind (a string), a model is asked and
+    /// the subject is a finding, with this check's message, evidence and
     /// identity, only if the model says `fail`. An unbound or unsure model
     /// leaves the subject to agent review. A check that cannot be proven by
     /// the code model but can be suspected by it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub review: Option<String>,
-    /// What the model is told about `review`'s subjects. Default: the
+    pub abstain: Option<String>,
+    /// What the model is told about `abstain`'s subjects. Default: the
     /// decision's requirement.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
@@ -554,7 +555,7 @@ impl CelCheck {
         if let Some(problem) = compile_problem("check where", &self.condition) {
             return Some(problem);
         }
-        if let Some(problem) = self.review_problem() {
+        if let Some(problem) = self.abstain_problem() {
             return Some(problem);
         }
         for (name, source) in &self.evidence {
@@ -585,14 +586,14 @@ impl CelCheck {
         template_problem("check message", &self.message)
     }
 
-    /// What is wrong with `review` or `prompt`.
-    fn review_problem(&self) -> Option<String> {
-        if self.review.is_none() && self.prompt.is_some() {
-            return Some("check: `prompt` needs a `review`".to_owned());
+    /// What is wrong with `abstain` or `prompt`.
+    fn abstain_problem(&self) -> Option<String> {
+        if self.abstain.is_none() && self.prompt.is_some() {
+            return Some("check: `prompt` needs an `abstain`".to_owned());
         }
         if self.prompt.as_deref().is_some_and(|p| p.trim().is_empty()) {
             return Some("check: `prompt` is empty".to_owned());
         }
-        compile_problem("check review", self.review.as_deref()?)
+        compile_problem("check abstain", self.abstain.as_deref()?)
     }
 }
